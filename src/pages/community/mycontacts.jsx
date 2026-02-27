@@ -22,7 +22,9 @@ import {
     FormControlLabel,
     Switch,
     Snackbar,
-    Alert
+    Alert,
+    Tabs,
+    Tab
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -30,6 +32,9 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import MapRoundedIcon from "@mui/icons-material/MapRounded";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRounded";
 import { isAdminUser } from "../../utils/adminRole";
 import { geoCentroid } from "d3-geo";
 import { feature as topoFeature } from "topojson-client";
@@ -404,6 +409,94 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
     );
 };
 
+const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }) => {
+    // type: "sent" | "received"
+    const u = type === "sent" ? req.to_user : req.from_user;
+    if (!u) return null;
+
+    const name = u?.profile?.full_name || `${u?.first_name || ""} ${u?.last_name || ""}`.trim() || u?.username || "Unknown User";
+    const title = getJobTitleFromUser(u);
+    const company = getCompanyFromUser(u);
+    const country = getCountryFromUser(u);
+    const industry = getIndustryFromUser(u);
+
+    return (
+        <Paper
+            onClick={() => onOpenProfile(u)}
+            sx={{
+                p: 1.5,
+                borderRadius: 3,
+                border: `1px solid ${BORDER}`,
+                cursor: "pointer",
+                transition: "transform 0.2s, box-shadow 0.2s",
+                "&:hover": { transform: "translateY(-2px)", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" },
+            }}
+        >
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                <Avatar src={u.profile?.user_image_url || u.user_image_url || u.avatar_url || u.avatar || u.user_image} sx={{ width: 44, height: 44 }}>
+                    {name[0]?.toUpperCase()}
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 200 }}>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, noWrap: true }}>{name}</Typography>
+                        {u.profile?.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />}
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                        {title}{company && ` at ${company}`}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                        {industry}{country && ` • ${country}`}
+                    </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} sx={{ mt: { xs: 1, sm: 0 }, ml: { xs: 0, sm: "auto" } }}>
+                    {type === "sent" ? (
+                        <>
+                            <Chip size="small" icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label="Pending" sx={{ bgcolor: "#F5F5F5", color: "#616161", mr: 1 }} />
+                            <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onCancel(req.id); }} startIcon={<HighlightOffIcon />}>Cancel request</Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button size="small" variant="contained" onClick={(e) => { e.stopPropagation(); onAccept(req.id); }} startIcon={<CheckCircleOutlineIcon />}>Accept</Button>
+                            <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); onDecline(req.id); }} startIcon={<HighlightOffIcon />}>Decline</Button>
+                        </>
+                    )}
+                </Stack>
+            </Stack>
+        </Paper>
+    );
+};
+
+const MemberCardSkeleton = () => (
+    <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 3, border: `1px solid ${BORDER}` }}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
+            <Skeleton variant="circular" width={44} height={44} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Skeleton variant="text" width="40%" height={24} />
+                <Skeleton variant="text" width="60%" height={16} />
+                <Skeleton variant="text" width="50%" height={16} />
+            </Box>
+            <Skeleton variant="rounded" width={60} height={30} sx={{ borderRadius: 2 }} />
+        </Stack>
+    </Paper>
+);
+
+const RequestCardSkeleton = () => (
+    <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 3, border: `1px solid ${BORDER}` }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+            <Skeleton variant="circular" width={44} height={44} />
+            <Box sx={{ flex: 1, minWidth: 200 }}>
+                <Skeleton variant="text" width="40%" height={24} />
+                <Skeleton variant="text" width="60%" height={16} />
+                <Skeleton variant="text" width="50%" height={16} />
+            </Box>
+            <Stack direction="row" spacing={1} sx={{ mt: { xs: 1, sm: 0 }, ml: { xs: 0, sm: "auto" } }}>
+                <Skeleton variant="rounded" width={80} height={30} sx={{ borderRadius: 2 }} />
+                <Skeleton variant="rounded" width={80} height={30} sx={{ borderRadius: 2 }} />
+            </Stack>
+        </Stack>
+    </Paper>
+);
+
 /* ------------------------------ Page Component ------------------------------ */
 export default function MyContacts() {
     const navigate = useNavigate();
@@ -413,6 +506,11 @@ export default function MyContacts() {
     const cityCentersRef = useRef({});
     const [cityCenters, setCityCenters] = useState({});
     const [showMap, setShowMap] = useState(true);
+
+    const [tabIndex, setTabIndex] = useState(0); // 0 = Contacts, 1 = Sent, 2 = Received
+    const [sentRequests, setSentRequests] = useState([]);
+    const [receivedRequests, setReceivedRequests] = useState([]);
+    const [loadingRequests, setLoadingRequests] = useState(false);
 
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -472,6 +570,71 @@ export default function MyContacts() {
             setToast({ open: true, msg: "Contact request sent!", type: "success" });
         } catch (e) { setToast({ open: true, msg: e?.message || "Failed to send request", type: "error" }); }
     }
+
+    async function cancelRequest(id) {
+        try {
+            const r = await fetch(`${API_BASE}/friend-requests/${id}/cancel/`, {
+                method: "POST",
+                headers: { ...tokenHeader(), Accept: "application/json" },
+            });
+            if (r.ok) {
+                setSentRequests((prev) => prev.filter((req) => req.id !== id));
+                setToast({ open: true, msg: "Request canceled", type: "success" });
+            } else throw new Error();
+        } catch { setToast({ open: true, msg: "Failed to cancel request", type: "error" }); }
+    }
+
+    async function acceptRequest(id) {
+        try {
+            const r = await fetch(`${API_BASE}/friend-requests/${id}/accept/`, {
+                method: "POST",
+                headers: { ...tokenHeader(), Accept: "application/json" },
+            });
+            if (r.ok) {
+                setReceivedRequests((prev) => prev.filter((req) => req.id !== id));
+                setToast({ open: true, msg: "Request accepted", type: "success" });
+                // Optionally reload roster here if needed
+                setTimeout(() => window.location.reload(), 1000);
+            } else throw new Error();
+        } catch { setToast({ open: true, msg: "Failed to accept request", type: "error" }); }
+    }
+
+    async function declineRequest(id) {
+        try {
+            const r = await fetch(`${API_BASE}/friend-requests/${id}/decline/`, {
+                method: "POST",
+                headers: { ...tokenHeader(), Accept: "application/json" },
+            });
+            if (r.ok) {
+                setReceivedRequests((prev) => prev.filter((req) => req.id !== id));
+                setToast({ open: true, msg: "Request declined", type: "success" });
+            } else throw new Error();
+        } catch { setToast({ open: true, msg: "Failed to decline request", type: "error" }); }
+    }
+
+    useEffect(() => {
+        if (tabIndex === 0) return;
+        const ctrl = new AbortController();
+        (async () => {
+            try {
+                setLoadingRequests(true);
+                const isSent = tabIndex === 1;
+                const endpoint = isSent ? 'outgoing' : 'incoming';
+                const res = await fetch(`${API_BASE}/friend-requests/?type=${endpoint}&status=pending`, {
+                    headers: tokenHeader(),
+                    signal: ctrl.signal,
+                    credentials: "include",
+                });
+                const json = await res.json().catch(() => []);
+                const list = Array.isArray(json) ? json : json?.results ?? [];
+                if (isSent) setSentRequests(list);
+                else setReceivedRequests(list);
+            } catch (e) {
+                if (e.name !== "AbortError") console.error(e);
+            } finally { setLoadingRequests(false); }
+        })();
+        return () => ctrl.abort();
+    }, [tabIndex, me?.id]);
 
     // Load Filter Options
     useEffect(() => {
@@ -737,10 +900,13 @@ export default function MyContacts() {
                                     direction="row"
                                     alignItems="center"
                                     justifyContent="space-between"
+                                    sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
                                 >
-                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                        My Contacts ({filtered.length})
-                                    </Typography>
+                                    <Tabs value={tabIndex} onChange={(e, v) => setTabIndex(v)} variant="scrollable" scrollButtons="auto">
+                                        <Tab label={`My Contacts ${tabIndex === 0 ? `(${filtered.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
+                                        <Tab label={`Requests Sent ${tabIndex === 1 && sentRequests.length ? `(${sentRequests.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
+                                        <Tab label={`Requests Received ${tabIndex === 2 && receivedRequests.length ? `(${receivedRequests.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
+                                    </Tabs>
 
                                     {isCompact && (
                                         <Tooltip title="View map">
@@ -755,217 +921,232 @@ export default function MyContacts() {
                                     )}
                                 </Stack>
 
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    placeholder="Search contacts..."
-                                    value={q}
-                                    onChange={(e) => { setQ(e.target.value); setPage(1); }}
-                                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
-                                />
-
-                                <Box
-                                    sx={{
-                                        width: "100%",
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: 1,
-                                    }}
-                                >
-                                    {/* Row 1: Company, Country, Job title */}
-                                    <Stack
-                                        direction={{ xs: "column", sm: "row" }}
-                                        spacing={1}
-                                    >
-                                        {/* Company */}
-                                        <Autocomplete
-                                            multiple
-                                            fullWidth
-                                            size="small"
-                                            options={globalOptions.companies}
-                                            value={selectedCompanies}
-                                            onChange={(_, v) => { setSelectedCompanies(v); setPage(1); }}
-                                            filterSelectedOptions
-                                            disableCloseOnSelect
-                                            renderInput={(p) => (
-                                                <TextField
-                                                    {...p}
-                                                    label="Company"
-                                                    placeholder={selectedCompanies.length ? "" : "All companies"}
-                                                />
-                                            )}
-                                            sx={{ flex: 1 }}
-                                        />
-
-                                        {/* Region */}
-                                        <Autocomplete
-                                            multiple
-                                            fullWidth
-                                            size="small"
-                                            options={globalOptions.countries}
-                                            value={selectedCountries}
-                                            onChange={(_, v) => { setSelectedCountries(v); setPage(1); }}
-                                            filterSelectedOptions
-                                            disableCloseOnSelect
-                                            renderInput={(p) => (
-                                                <TextField
-                                                    {...p}
-                                                    label="Region"
-                                                    placeholder={selectedCountries.length ? "" : "All regions"}
-                                                />
-                                            )}
-                                            sx={{ flex: 1 }}
-                                        />
-
-                                        {/* Job title */}
-                                        <Autocomplete
-                                            multiple
-                                            fullWidth
-                                            size="small"
-                                            options={globalOptions.titles}
-                                            value={selectedTitles}
-                                            onChange={(_, v) => { setSelectedTitles(v); setPage(1); }}
-                                            filterSelectedOptions
-                                            disableCloseOnSelect
-                                            renderInput={(p) => (
-                                                <TextField
-                                                    {...p}
-                                                    label="Job title"
-                                                    placeholder={selectedTitles.length ? "" : "All job titles"}
-                                                />
-                                            )}
-                                            sx={{ flex: 1 }}
-                                        />
-                                    </Stack>
-
-                                    {/* Row 2: Industry, Company size */}
-                                    <Stack
-                                        direction={{ xs: "column", sm: "row" }}
-                                        spacing={1}
-                                    >
-                                        {/* Industry */}
+                                {tabIndex === 0 && (
+                                    <>
                                         <TextField
-                                            select
                                             fullWidth
                                             size="small"
-                                            label="Industry"
-                                            value={selectedIndustries}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                setSelectedIndustries(typeof value === "string" ? value.split(",") : value);
-                                                setPage(1);
-                                            }}
-                                            InputLabelProps={{ shrink: true }}
-                                            SelectProps={{
-                                                multiple: true,
-                                                displayEmpty: true,
-                                                renderValue: (selected) => {
-                                                    if (!selected || selected.length === 0) return "All industries";
-                                                    return selected.join(", ");
-                                                },
-                                            }}
-                                            sx={{ flex: 1 }}
-                                        >
-                                            {globalOptions.industries.map((n) => (
-                                                <MenuItem key={n} value={n}>
-                                                    <Checkbox checked={selectedIndustries.indexOf(n) > -1} />
-                                                    <ListItemText primary={n} />
-                                                </MenuItem>
-                                            ))}
-                                        </TextField>
+                                            placeholder="Search contacts..."
+                                            value={q}
+                                            onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                                            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+                                        />
 
-                                        {/* Company Size */}
-                                        <TextField
-                                            select
-                                            fullWidth
-                                            size="small"
-                                            label="Company Size"
-                                            value={selectedCompanySizes}
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                setSelectedCompanySizes(typeof value === "string" ? value.split(",") : value);
-                                                setPage(1);
+                                        <Box
+                                            sx={{
+                                                width: "100%",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: 1,
                                             }}
-                                            InputLabelProps={{ shrink: true }}
-                                            SelectProps={{
-                                                multiple: true,
-                                                displayEmpty: true,
-                                                renderValue: (selected) => {
-                                                    if (!selected || selected.length === 0) return "All sizes";
-                                                    return selected.map((s) => formatCompanySizeLabel(s)).join(", ");
-                                                },
-                                            }}
-                                            sx={{ flex: 1 }}
                                         >
-                                            {globalOptions.sizes.map((n) => (
-                                                <MenuItem key={n} value={n}>
-                                                    <Checkbox checked={selectedCompanySizes.indexOf(n) > -1} />
-                                                    <ListItemText primary={formatCompanySizeLabel(n)} />
-                                                </MenuItem>
-                                            ))}
-                                        </TextField>
-                                    </Stack>
-                                </Box>
+                                            {/* Row 1: Company, Country, Job title */}
+                                            <Stack
+                                                direction={{ xs: "column", sm: "row" }}
+                                                spacing={1}
+                                            >
+                                                {/* Company */}
+                                                <Autocomplete
+                                                    multiple
+                                                    fullWidth
+                                                    size="small"
+                                                    options={globalOptions.companies}
+                                                    value={selectedCompanies}
+                                                    onChange={(_, v) => { setSelectedCompanies(v); setPage(1); }}
+                                                    filterSelectedOptions
+                                                    disableCloseOnSelect
+                                                    renderInput={(p) => (
+                                                        <TextField
+                                                            {...p}
+                                                            label="Company"
+                                                            placeholder={selectedCompanies.length ? "" : "All companies"}
+                                                        />
+                                                    )}
+                                                    sx={{ flex: 1 }}
+                                                />
+
+                                                {/* Region */}
+                                                <Autocomplete
+                                                    multiple
+                                                    fullWidth
+                                                    size="small"
+                                                    options={globalOptions.countries}
+                                                    value={selectedCountries}
+                                                    onChange={(_, v) => { setSelectedCountries(v); setPage(1); }}
+                                                    filterSelectedOptions
+                                                    disableCloseOnSelect
+                                                    renderInput={(p) => (
+                                                        <TextField
+                                                            {...p}
+                                                            label="Region"
+                                                            placeholder={selectedCountries.length ? "" : "All regions"}
+                                                        />
+                                                    )}
+                                                    sx={{ flex: 1 }}
+                                                />
+
+                                                {/* Job title */}
+                                                <Autocomplete
+                                                    multiple
+                                                    fullWidth
+                                                    size="small"
+                                                    options={globalOptions.titles}
+                                                    value={selectedTitles}
+                                                    onChange={(_, v) => { setSelectedTitles(v); setPage(1); }}
+                                                    filterSelectedOptions
+                                                    disableCloseOnSelect
+                                                    renderInput={(p) => (
+                                                        <TextField
+                                                            {...p}
+                                                            label="Job title"
+                                                            placeholder={selectedTitles.length ? "" : "All job titles"}
+                                                        />
+                                                    )}
+                                                    sx={{ flex: 1 }}
+                                                />
+                                            </Stack>
+
+                                            {/* Row 2: Industry, Company size */}
+                                            <Stack
+                                                direction={{ xs: "column", sm: "row" }}
+                                                spacing={1}
+                                            >
+                                                {/* Industry */}
+                                                <TextField
+                                                    select
+                                                    fullWidth
+                                                    size="small"
+                                                    label="Industry"
+                                                    value={selectedIndustries}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setSelectedIndustries(typeof value === "string" ? value.split(",") : value);
+                                                        setPage(1);
+                                                    }}
+                                                    InputLabelProps={{ shrink: true }}
+                                                    SelectProps={{
+                                                        multiple: true,
+                                                        displayEmpty: true,
+                                                        renderValue: (selected) => {
+                                                            if (!selected || selected.length === 0) return "All industries";
+                                                            return selected.join(", ");
+                                                        },
+                                                    }}
+                                                    sx={{ flex: 1 }}
+                                                >
+                                                    {globalOptions.industries.map((n) => (
+                                                        <MenuItem key={n} value={n}>
+                                                            <Checkbox checked={selectedIndustries.indexOf(n) > -1} />
+                                                            <ListItemText primary={n} />
+                                                        </MenuItem>
+                                                    ))}
+                                                </TextField>
+
+                                                {/* Company Size */}
+                                                <TextField
+                                                    select
+                                                    fullWidth
+                                                    size="small"
+                                                    label="Company Size"
+                                                    value={selectedCompanySizes}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setSelectedCompanySizes(typeof value === "string" ? value.split(",") : value);
+                                                        setPage(1);
+                                                    }}
+                                                    InputLabelProps={{ shrink: true }}
+                                                    SelectProps={{
+                                                        multiple: true,
+                                                        displayEmpty: true,
+                                                        renderValue: (selected) => {
+                                                            if (!selected || selected.length === 0) return "All sizes";
+                                                            return selected.map((s) => formatCompanySizeLabel(s)).join(", ");
+                                                        },
+                                                    }}
+                                                    sx={{ flex: 1 }}
+                                                >
+                                                    {globalOptions.sizes.map((n) => (
+                                                        <MenuItem key={n} value={n}>
+                                                            <Checkbox checked={selectedCompanySizes.indexOf(n) > -1} />
+                                                            <ListItemText primary={formatCompanySizeLabel(n)} />
+                                                        </MenuItem>
+                                                    ))}
+                                                </TextField>
+                                            </Stack>
+                                        </Box>
+                                    </>
+                                )}
                             </Stack>
                         </Paper>
 
-                        {loading && (
-                            <Stack spacing={1.5}>
+                        {(loading || loadingRequests) && (
+                            <Stack spacing={0}>
                                 {Array.from({ length: 5 }).map((_, i) => (
-                                    <Paper key={i} sx={{ p: 2, borderRadius: 3, border: `1px solid ${BORDER}` }}>
-                                        <Stack direction="row" spacing={2} alignItems="center">
-                                            <Skeleton variant="circular" width={44} height={44} />
-                                            <Box sx={{ flex: 1 }}><Skeleton width="40%" /><Skeleton width="60%" /></Box>
-                                        </Stack>
-                                    </Paper>
+                                    <React.Fragment key={i}>
+                                        {tabIndex === 0 ? <MemberCardSkeleton /> : <RequestCardSkeleton />}
+                                    </React.Fragment>
                                 ))}
                             </Stack>
                         )}
 
                         {!loading && error && <Typography color="error">⚠️ {error}</Typography>}
 
-                        {!loading && !error && (
+                        {!loading && !loadingRequests && !error && (
                             <Stack spacing={1.5}>
-                                {current.map((u) => (
-                                    <MemberCard
-                                        key={u.id}
-                                        u={u}
-                                        friendStatus={friendStatusByUser[u.id]}
-                                        onOpenProfile={handleOpenProfile}
-                                        onAddFriend={sendFriendRequest}
-                                        currentUserId={me.id}
-                                        viewerIsStaff={viewerIsStaff}
-                                    />
-                                ))}
-                                {filtered.length === 0 && (
-                                    <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                                        No contacts found matching your filters.
-                                    </Typography>
+                                {tabIndex === 0 && (
+                                    <>
+                                        {current.map((u) => (
+                                            <MemberCard
+                                                key={u.id}
+                                                u={u}
+                                                friendStatus={friendStatusByUser[u.id]}
+                                                onOpenProfile={handleOpenProfile}
+                                                onAddFriend={sendFriendRequest}
+                                                currentUserId={me.id}
+                                                viewerIsStaff={viewerIsStaff}
+                                            />
+                                        ))}
+                                        {filtered.length === 0 && (
+                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                                                No contacts found matching your filters.
+                                            </Typography>
+                                        )}
+                                        {filtered.length > 0 && (
+                                            <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} sx={{ mt: 2 }}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Showing {filtered.length === 0 ? "0" : `${startIdx + 1}–${Math.min(startIdx + ROWS_PER_PAGE, filtered.length)} of ${filtered.length}`}
+                                                </Typography>
+                                                <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" size="small" />
+                                            </Stack>
+                                        )}
+                                    </>
                                 )}
-                                <Stack
-                                    direction={{ xs: "column", sm: "row" }}
-                                    alignItems={{ xs: "flex-start", sm: "center" }}
-                                    justifyContent="space-between"
-                                    spacing={1}
-                                    sx={{ mt: 2 }}
-                                >
-                                    <Typography variant="body2" color="text.secondary">
-                                        Showing{" "}
-                                        {filtered.length === 0
-                                            ? "0"
-                                            : `${startIdx + 1}–${Math.min(
-                                                startIdx + ROWS_PER_PAGE,
-                                                filtered.length
-                                            )} of ${filtered.length}`}
-                                    </Typography>
-                                    <Pagination
-                                        count={pageCount}
-                                        page={page}
-                                        onChange={(_, p) => setPage(p)}
-                                        color="primary"
-                                        size="small"
-                                    />
-                                </Stack>
+
+                                {tabIndex === 1 && (
+                                    <>
+                                        {sentRequests.map((req) => (
+                                            <RequestCard key={req.id} req={req} type="sent" onOpenProfile={handleOpenProfile} onCancel={cancelRequest} />
+                                        ))}
+                                        {sentRequests.length === 0 && (
+                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                                                No sent requests pending.
+                                            </Typography>
+                                        )}
+                                    </>
+                                )}
+
+                                {tabIndex === 2 && (
+                                    <>
+                                        {receivedRequests.map((req) => (
+                                            <RequestCard key={req.id} req={req} type="received" onOpenProfile={handleOpenProfile} onAccept={acceptRequest} onDecline={declineRequest} />
+                                        ))}
+                                        {receivedRequests.length === 0 && (
+                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                                                No pending requests received.
+                                            </Typography>
+                                        )}
+                                    </>
+                                )}
                             </Stack>
                         )}
                     </Box>
