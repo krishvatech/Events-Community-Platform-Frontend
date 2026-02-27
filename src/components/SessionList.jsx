@@ -50,7 +50,7 @@ function SessionList({ sessions, onEdit, onDelete }) {
 
   const formatDateTime = (isoString) => {
     const date = dayjs(isoString);
-    return date.isValid() ? date.format("MMM DD, YYYY • HH:mm") : "—";
+    return date.isValid() ? date.format("MMM DD, YYYY • h:mm A") : "—";
   };
 
   return (
