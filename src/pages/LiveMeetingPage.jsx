@@ -14691,6 +14691,15 @@ export default function NewLiveMeeting() {
                 <ListItemText primary="Screen share" secondary="Enable/disable screen sharing" />
                 <Switch checked={hostPerms.screenShare} onChange={handleToggleScreenShare} />
               </MenuItem>
+              {!eventData?.waiting_room_enabled && (
+                <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+                  <ListItemIcon sx={{ minWidth: 34 }}>
+                    <FiberManualRecordIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Auto-record on join" secondary="Start recording when first participant joins" />
+                  <Switch checked={autoRecordOnAdmit} onChange={(e) => setAutoRecordOnAdmit(e.target.checked)} />
+                </MenuItem>
+              )}
 
               <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
               <MenuItem disabled sx={{ fontWeight: 800, opacity: 0.9, fontSize: 12 }}>
