@@ -5381,6 +5381,7 @@ export default function ProfilePage() {
                 label="Start Month"
                 type="month"
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ lang: "en-US" }}
                 fullWidth
                 value={trainingForm.start_month || ""}
                 onChange={(e) => setTrainingForm((p) => ({ ...p, start_month: e.target.value }))}
@@ -5391,6 +5392,7 @@ export default function ProfilePage() {
                 label="End Month"
                 type="month"
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ lang: "en-US" }}
                 disabled={!!trainingForm.currently_ongoing}
                 fullWidth
                 value={trainingForm.end_month || ""}
@@ -5528,6 +5530,7 @@ export default function ProfilePage() {
                 label="Issue Month"
                 type="month"
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ lang: "en-US" }}
                 fullWidth
                 value={certForm.issue_month || ""}
                 onChange={(e) => setCertForm((p) => ({ ...p, issue_month: e.target.value }))}
@@ -5538,6 +5541,7 @@ export default function ProfilePage() {
                 label="Expiration Month"
                 type="month"
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ lang: "en-US" }}
                 disabled={!!certForm.no_expiration}
                 fullWidth
                 value={certForm.expiration_month || ""}
@@ -5661,6 +5665,7 @@ export default function ProfilePage() {
                 label="Start Month"
                 type="month"
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ lang: "en-US" }}
                 fullWidth
                 value={memberForm.start_month || ""}
                 onChange={(e) => setMemberForm((p) => ({ ...p, start_month: e.target.value }))}
@@ -5671,6 +5676,7 @@ export default function ProfilePage() {
                 label="End Month"
                 type="month"
                 InputLabelProps={{ shrink: true }}
+                inputProps={{ lang: "en-US" }}
                 disabled={!!memberForm.ongoing}
                 fullWidth
                 value={memberForm.end_month || ""}
