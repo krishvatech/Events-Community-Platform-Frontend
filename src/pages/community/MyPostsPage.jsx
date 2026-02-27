@@ -335,6 +335,7 @@ function PostCard({
   onDelete,
   onVote,
   onOpenLikes,
+  viewerId,
 }) {
   const name = post.actor_name || "You";
   const initial = (name[0] || "U").toUpperCase();
@@ -393,9 +394,13 @@ function PostCard({
     setVotersRows([]);
   };
 
+  // Find my entry in the likers list to get the specific reactionId
+  const myLikerEntry = viewerId ? likers.find(u => String(u.id) === String(viewerId)) : null;
+
   // NEW: my reaction info for UI
   const myReactionId =
-    post.my_reaction || (post.liked_by_me ? "like" : null);
+    myLikerEntry?.reactionId || post.my_reaction || (post.liked_by_me ? "like" : null);
+
   const myReactionDef = POST_REACTIONS.find(
     (r) => r.id === myReactionId
   );
@@ -476,7 +481,7 @@ function PostCard({
     return () => {
       cancelled = true;
     };
-  }, [post.id]);
+  }, [post.id, post.my_reaction, post.liked_by_me]);
 
   const primaryLiker = likers?.[0] || null;
   const othersCount = Math.max(0, (likeCount || 0) - 1);
@@ -1683,7 +1688,12 @@ export default function MyPostsPage() {
 
                 // try to read your reaction from metrics (adjust field name to your API)
                 const apiUserReaction =
-                  m.user_reaction || m.reaction || null;
+                  m.user_reaction ||
+                  m.reaction ||
+                  m.reaction_type ||
+                  m.user_reaction_type ||
+                  m.kind ||
+                  null;
 
                 const likedBy =
                   m.user_has_liked ?? p.liked_by_me ?? !!apiUserReaction;
@@ -1902,6 +1912,7 @@ export default function MyPostsPage() {
               onDelete={setDeleteObj}
               onVote={handleVote}
               onOpenLikes={setLikesId}
+              viewerId={me?.id || me?.user?.id}
             />
           ))}
         </>
