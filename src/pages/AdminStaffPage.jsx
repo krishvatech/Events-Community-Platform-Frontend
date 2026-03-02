@@ -23,7 +23,7 @@ import { listAdminUsers, patchStaff, bulkSetStaff, createAdminUser, updateAdminU
 import { useLocation, useParams } from "react-router-dom";
 
 
-// Simple Dialog for Creating/Editing Users
+// Simple Dialog for Creating/Editing Users/staff
 function UserDialog({ open, onClose, mode, initialData, onSave, loading }) {
     const [formData, setFormData] = React.useState({
         email: "",
