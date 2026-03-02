@@ -125,6 +125,14 @@ import RoomLocationBadge from "../components/RoomLocationBadge.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
+import {
+  createDyteBackgroundEffectsController,
+  getVideoBackgroundEffect,
+  isDyteBackgroundEffectsSupported,
+  readStoredVideoBackgroundEffect,
+  storeVideoBackgroundEffect,
+  VIDEO_BACKGROUND_OPTIONS,
+} from "../utils/dyteBackgroundEffects.js";
 import { isPreEventLoungeOpen } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
@@ -2253,10 +2261,17 @@ export default function NewLiveMeeting() {
   const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState("");
   const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState("");
   const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+  const [showBackgroundEffects, setShowBackgroundEffects] = useState(false);
   const [deviceSwitchError, setDeviceSwitchError] = useState("");
+  const [backgroundEffectsBusy, setBackgroundEffectsBusy] = useState(false);
+  const [backgroundEffectsError, setBackgroundEffectsError] = useState("");
+  const [selectedBackgroundEffectId, setSelectedBackgroundEffectId] = useState(
+    () => readStoredVideoBackgroundEffect().id
+  );
   const activeAudioStreamRef = useRef(null); // Track audio stream for device switching
   const activeVideoStreamRef = useRef(null); // Track video stream for device switching
   const remoteAudioRef = useRef(null); // Reference to remote audio element for output device selection
+  const backgroundEffectsControllerRef = useRef(null);
 
   // ============ POLL CREATION STATE ============
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
@@ -3405,6 +3420,84 @@ export default function NewLiveMeeting() {
     }
   }, []);
 
+  const backgroundEffectsSupported = useMemo(
+    () => isDyteBackgroundEffectsSupported(),
+    []
+  );
+
+  const ensureBackgroundEffectsController = useCallback(async () => {
+    if (!dyteMeeting?.self) {
+      throw new Error("Join the meeting before applying background effects.");
+    }
+
+    if (!backgroundEffectsSupported) {
+      throw new Error("Virtual backgrounds are not supported in this browser.");
+    }
+
+    if (!backgroundEffectsControllerRef.current) {
+      backgroundEffectsControllerRef.current =
+        await createDyteBackgroundEffectsController(dyteMeeting);
+    }
+
+    return backgroundEffectsControllerRef.current;
+  }, [backgroundEffectsSupported, dyteMeeting]);
+
+  const applyBackgroundEffect = useCallback(async (effectOrId, options = {}) => {
+    const { silent = false, persist = true } = options;
+    const effect =
+      typeof effectOrId === "string"
+        ? getVideoBackgroundEffect(effectOrId)
+        : getVideoBackgroundEffect(effectOrId?.id);
+
+    try {
+      setBackgroundEffectsError("");
+      setBackgroundEffectsBusy(true);
+      const controller = await ensureBackgroundEffectsController();
+      await controller.apply(effect);
+      setSelectedBackgroundEffectId(effect.id);
+      if (persist) {
+        storeVideoBackgroundEffect(effect);
+      }
+      if (!silent) {
+        showSnackbar(
+          effect.type === "none"
+            ? "Virtual background cleared."
+            : `${effect.label} applied.`,
+          "success"
+        );
+      }
+      return effect;
+    } catch (err) {
+      const message =
+        err?.message || "Unable to apply virtual background right now.";
+      setBackgroundEffectsError(message);
+      if (!silent) {
+        showSnackbar(message, "error");
+      }
+      throw err;
+    } finally {
+      setBackgroundEffectsBusy(false);
+    }
+  }, [ensureBackgroundEffectsController, showSnackbar]);
+
+  useEffect(() => {
+    return () => {
+      const controller = backgroundEffectsControllerRef.current;
+      backgroundEffectsControllerRef.current = null;
+      controller?.destroy?.();
+    };
+  }, [dyteMeeting]);
+
+  useEffect(() => {
+    if (!dyteMeeting?.self || !backgroundEffectsSupported) return;
+
+    const savedEffect = readStoredVideoBackgroundEffect();
+    setSelectedBackgroundEffectId(savedEffect.id);
+    if (savedEffect.type === "none") return;
+
+    applyBackgroundEffect(savedEffect, { silent: true, persist: false }).catch(() => {});
+  }, [applyBackgroundEffect, backgroundEffectsSupported, dyteMeeting]);
+
 
 
   const handleToggleCamera = useCallback(async () => {
@@ -3536,6 +3629,12 @@ export default function NewLiveMeeting() {
         await new Promise((r) => setTimeout(r, 100));
         const newState = Boolean(dyteMeeting.self.videoEnabled);
         console.log("[LiveMeeting] After all enable ops - final SDK videoEnabled:", newState);
+        if (newState && selectedBackgroundEffectId !== "none" && backgroundEffectsSupported) {
+          await applyBackgroundEffect(selectedBackgroundEffectId, {
+            silent: true,
+            persist: false,
+          }).catch(() => {});
+        }
         if (!newState) {
           showSnackbar("Unable to turn on camera. Please check browser/site camera permission.", "warning");
         }
@@ -3553,11 +3652,14 @@ export default function NewLiveMeeting() {
     }
   }, [
     dyteMeeting,
+    applyBackgroundEffect,
+    backgroundEffectsSupported,
     ensureVideoInputReady,
     enforceSelfBreakMediaLock,
     isOnBreak,
     isBreakout,
     role,
+    selectedBackgroundEffectId,
     showSnackbar,
   ]);
 
@@ -14928,6 +15030,27 @@ export default function NewLiveMeeting() {
                 </ListItemIcon>
                 <ListItemText primary="Choose Devices" secondary="Mic, camera & speakers" />
               </MenuItem>
+
+              <MenuItem
+                onClick={() => {
+                  setShowBackgroundEffects(true);
+                  closePermMenu();
+                }}
+                disabled={!backgroundEffectsSupported}
+                sx={{ gap: 1.25, py: 1.1 }}
+              >
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <AutoAwesomeIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Virtual Background"
+                  secondary={
+                    backgroundEffectsSupported
+                      ? "Blur or replace your backdrop"
+                      : "Not supported in this browser"
+                  }
+                />
+              </MenuItem>
             </>
           ) : (
             <>
@@ -14960,6 +15083,27 @@ export default function NewLiveMeeting() {
                   <SettingsIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText primary="Device Settings" secondary="Choose mic & camera" />
+              </MenuItem>
+
+              <MenuItem
+                onClick={() => {
+                  setShowBackgroundEffects(true);
+                  closePermMenu();
+                }}
+                disabled={!backgroundEffectsSupported}
+                sx={{ gap: 1.25, py: 1.1 }}
+              >
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <AutoAwesomeIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Virtual Background"
+                  secondary={
+                    backgroundEffectsSupported
+                      ? "Blur or replace your backdrop"
+                      : "Not supported in this browser"
+                  }
+                />
               </MenuItem>
             </>
           )}
@@ -15989,6 +16133,175 @@ export default function NewLiveMeeting() {
               }}
             >
               Yes, Return to Main Room
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={showBackgroundEffects}
+          onClose={() => setShowBackgroundEffects(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={MODAL_PAPER_PROPS}
+        >
+          <DialogTitle sx={{ pb: 1, pt: 2, px: 2, fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 1 }}>
+            <AutoAwesomeIcon fontSize="small" />
+            Virtual Background & Blur
+          </DialogTitle>
+
+          <DialogContent sx={{ px: 2, py: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            {!backgroundEffectsSupported && (
+              <Alert severity="warning" sx={{ bgcolor: "rgba(255,152,0,0.14)", border: "1px solid rgba(255,152,0,0.26)", color: "#ffcc80" }}>
+                Virtual backgrounds are not supported in this browser. Chrome and Edge work best.
+              </Alert>
+            )}
+
+            {backgroundEffectsError && (
+              <Alert severity="error" sx={{ bgcolor: "rgba(244,67,54,0.15)", border: "1px solid rgba(244,67,54,0.3)", color: "#ff6b6b" }}>
+                {backgroundEffectsError}
+              </Alert>
+            )}
+
+            <Stack direction="row" flexWrap="wrap" gap={1.5}>
+              {VIDEO_BACKGROUND_OPTIONS.map((effect) => {
+                const isSelected = selectedBackgroundEffectId === effect.id;
+                return (
+                  <Paper
+                    key={effect.id}
+                    variant="outlined"
+                    onClick={() => {
+                      if (!backgroundEffectsSupported || backgroundEffectsBusy) return;
+                      applyBackgroundEffect(effect).catch(() => {});
+                    }}
+                    sx={{
+                      width: { xs: "100%", sm: "calc(50% - 6px)" },
+                      p: 1.25,
+                      borderRadius: 2.5,
+                      cursor: backgroundEffectsSupported ? "pointer" : "not-allowed",
+                      borderColor: isSelected ? "rgba(20,184,177,0.72)" : "rgba(255,255,255,0.12)",
+                      bgcolor: isSelected ? "rgba(20,184,177,0.10)" : "rgba(255,255,255,0.04)",
+                      opacity: backgroundEffectsSupported ? 1 : 0.6,
+                      transition: "border-color 160ms ease, background-color 160ms ease, transform 160ms ease",
+                      "&:hover": backgroundEffectsSupported
+                        ? {
+                            borderColor: "rgba(20,184,177,0.45)",
+                            bgcolor: "rgba(255,255,255,0.07)",
+                            transform: "translateY(-1px)",
+                          }
+                        : undefined,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        height: 110,
+                        borderRadius: 2,
+                        mb: 1.25,
+                        position: "relative",
+                        overflow: "hidden",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        bgcolor: effect.type === "none" ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.06)",
+                        backgroundImage:
+                          effect.type === "image"
+                            ? `url("${effect.imageUrl}")`
+                            : effect.type === "blur"
+                              ? "linear-gradient(135deg, rgba(14,165,233,0.45), rgba(59,130,246,0.18)), radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4), transparent 26%), radial-gradient(circle at 75% 25%, rgba(255,255,255,0.32), transparent 22%), radial-gradient(circle at 55% 68%, rgba(255,255,255,0.3), transparent 26%)"
+                              : "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        filter: effect.type === "blur" ? "blur(0px)" : "none",
+                      }}
+                    >
+                      {effect.type === "blur" && (
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            inset: 18,
+                            borderRadius: 2,
+                            border: "1px solid rgba(255,255,255,0.18)",
+                            backdropFilter: "blur(12px)",
+                            bgcolor: "rgba(255,255,255,0.08)",
+                          }}
+                        />
+                      )}
+                      {effect.type === "none" && (
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            inset: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "rgba(255,255,255,0.7)",
+                            fontWeight: 700,
+                            letterSpacing: 0.3,
+                          }}
+                        >
+                          Real Background
+                        </Box>
+                      )}
+                      {isSelected && (
+                        <Chip
+                          size="small"
+                          icon={<CheckRoundedIcon />}
+                          label="Selected"
+                          sx={{
+                            position: "absolute",
+                            top: 10,
+                            right: 10,
+                            bgcolor: "rgba(20,184,177,0.92)",
+                            color: "#03211f",
+                            fontWeight: 800,
+                          }}
+                        />
+                      )}
+                    </Box>
+
+                    <Typography sx={{ fontWeight: 800, fontSize: 14 }}>
+                      {effect.label}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
+                      {effect.description}
+                    </Typography>
+                  </Paper>
+                );
+              })}
+            </Stack>
+
+            <Box sx={{ p: 1.5, bgcolor: "rgba(33,150,243,0.10)", border: "1px solid rgba(33,150,243,0.2)", borderRadius: 2 }}>
+              <Typography sx={{ fontSize: 12, color: "rgba(100,200,255,0.9)", lineHeight: 1.5 }}>
+                Effects are applied only to your own camera feed. If your camera is off, your selection is saved and reused the next time you turn it on.
+              </Typography>
+            </Box>
+          </DialogContent>
+
+          <DialogActions sx={{ px: 2, py: 2, gap: 1 }}>
+            <Button
+              onClick={() => {
+                applyBackgroundEffect("none").catch(() => {});
+              }}
+              disabled={!backgroundEffectsSupported || backgroundEffectsBusy}
+              variant="outlined"
+              sx={{
+                borderColor: "rgba(255,255,255,0.2)",
+                color: "#fff",
+                textTransform: "none",
+                fontWeight: 600,
+                "&:hover": { bgcolor: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.3)" },
+              }}
+            >
+              Clear
+            </Button>
+            <Button
+              onClick={() => setShowBackgroundEffects(false)}
+              variant="contained"
+              sx={{
+                textTransform: "none",
+                bgcolor: "#14b8b1",
+                "&:hover": { bgcolor: "#0e8e88" },
+                fontWeight: 700,
+              }}
+            >
+              Close
             </Button>
           </DialogActions>
         </Dialog>
