@@ -12886,8 +12886,7 @@ export default function NewLiveMeeting() {
                             key={idx}
                             disablePadding
                           >
-                            <Tooltip title="Open Profile" arrow placement="top">
-                              <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
+                              <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                               <ListItemAvatar>
                                 {renderMemberAvatar(m)}
                               </ListItemAvatar>
@@ -12895,7 +12894,12 @@ export default function NewLiveMeeting() {
                                 primary={
                                   <Stack spacing={1}>
                                     <Stack direction="row" spacing={0.8} alignItems="center">
-                                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>
+                                      <Typography
+                                        sx={{ fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => openMemberInfo(m)}
+                                      >
+                                        {m.name}{isSelfMember(m) ? " (You)" : ""}
+                                      </Typography>
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
                                         if (userId && !participantKycCache[userId]) {
@@ -12924,7 +12928,9 @@ export default function NewLiveMeeting() {
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host (self) */}
                                       <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off"))}>
                                         <IconButton
+                                          data-no-member-info="true"
                                           size="small"
+                                          onMouseDown={(e) => e.stopPropagation()}
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             if (isHost && isSelfMember(m)) handleToggleMic();
@@ -12949,7 +12955,9 @@ export default function NewLiveMeeting() {
                                       {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host (self) */}
                                       <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off"))}>
                                         <IconButton
+                                          data-no-member-info="true"
                                           size="small"
+                                          onMouseDown={(e) => e.stopPropagation()}
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             if (isHost && isSelfMember(m)) handleToggleCamera();
@@ -13039,7 +13047,6 @@ export default function NewLiveMeeting() {
                                 }
                               />
                               </ListItemButton>
-                            </Tooltip>
                           </ListItem>
                         ))}
                       </List>
@@ -13306,8 +13313,7 @@ export default function NewLiveMeeting() {
                             key={idx}
                             disablePadding
                           >
-                            <Tooltip title="Open Profile" arrow placement="top">
-                              <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
+                              <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                               <ListItemAvatar>
                                 {renderMemberAvatar(m)}
                               </ListItemAvatar>
@@ -13315,7 +13321,10 @@ export default function NewLiveMeeting() {
                                 primary={
                                   <Stack spacing={1}>
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
+                                      <Typography
+                                        sx={{ fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => openMemberInfo(m)}
+                                      >
                                         {m.name}{isSelfMember(m) ? " (You)" : ""}
                                       </Typography>
                                       {(() => {
@@ -13343,21 +13352,27 @@ export default function NewLiveMeeting() {
                                     {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off"))}>
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (isHost ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")))}>
                                         <IconButton
+                                          data-no-member-info="true"
                                           size="small"
+                                          onMouseDown={(e) => e.stopPropagation()}
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            if (isHost && !isSelfMember(m)) forceMuteParticipant(m);
+                                            if (isSelfMember(m)) {
+                                              handleToggleMic();
+                                              return;
+                                            }
+                                            if (isHost) forceMuteParticipant(m);
                                           }}
-                                          disabled={isOnBreak || !isHost || isSelfMember(m)}
+                                          disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
                                           sx={{
                                             bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                             border: "1px solid",
                                             borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                             color: m.mic ? "#22c55e" : "#ef4444",
                                             padding: "4px",
-                                            cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                            cursor: (isSelfMember(m) || isHost) ? "pointer" : "default",
                                             "&:hover": {
                                               bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                             }
@@ -13368,21 +13383,27 @@ export default function NewLiveMeeting() {
                                       </Tooltip>
 
                                       {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off"))}>
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (isHost ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")))}>
                                         <IconButton
+                                          data-no-member-info="true"
                                           size="small"
+                                          onMouseDown={(e) => e.stopPropagation()}
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            if (isHost && !isSelfMember(m)) forceCameraOffParticipant(m);
+                                            if (isSelfMember(m)) {
+                                              handleToggleCamera();
+                                              return;
+                                            }
+                                            if (isHost) forceCameraOffParticipant(m);
                                           }}
-                                          disabled={isOnBreak || !isHost || isSelfMember(m)}
+                                          disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
                                           sx={{
                                             bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                             border: "1px solid",
                                             borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                             color: m.cam ? "#22c55e" : "#ef4444",
                                             padding: "4px",
-                                            cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                            cursor: (isSelfMember(m) || isHost) ? "pointer" : "default",
                                             "&:hover": {
                                               bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                             }
@@ -13412,7 +13433,6 @@ export default function NewLiveMeeting() {
                                 secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
                               />
                               </ListItemButton>
-                            </Tooltip>
                           </ListItem>
                         ))}
                       </List>
@@ -13520,8 +13540,7 @@ export default function NewLiveMeeting() {
                           key={idx}
                           disablePadding
                         >
-                          <Tooltip title="Open Profile" arrow placement="top">
-                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
+                            <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                             <ListItemAvatar>
                               {renderMemberAvatar(m)}
                             </ListItemAvatar>
@@ -13529,7 +13548,11 @@ export default function NewLiveMeeting() {
                               primary={
                                 <Stack spacing={1}>
                                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                                    <Typography noWrap sx={{ fontWeight: 700, fontSize: 13 }}>
+                                    <Typography
+                                      noWrap
+                                      sx={{ fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                      onClick={() => openMemberInfo(m)}
+                                    >
                                       {m.name}{isSelfMember(m) ? " (You)" : ""}
                                     </Typography>
                                     {(() => {
@@ -13557,21 +13580,27 @@ export default function NewLiveMeeting() {
                                   {renderMoodRow(m)}
                                   <Stack direction="row" spacing={0.75} alignItems="center">
                                     {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off"))}>
+                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (isHost ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")))}>
                                       <IconButton
+                                        data-no-member-info="true"
                                         size="small"
+                                        onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          if (isHost && !isSelfMember(m)) forceMuteParticipant(m);
+                                          if (isSelfMember(m)) {
+                                            handleToggleMic();
+                                            return;
+                                          }
+                                          if (isHost) forceMuteParticipant(m);
                                         }}
-                                        disabled={isOnBreak || !isHost || isSelfMember(m)}
+                                        disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
                                         sx={{
                                           bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                           border: "1px solid",
                                           borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                           color: m.mic ? "#22c55e" : "#ef4444",
                                           padding: "4px",
-                                          cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                          cursor: (isSelfMember(m) || isHost) ? "pointer" : "default",
                                           "&:hover": {
                                             bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                           }
@@ -13582,22 +13611,27 @@ export default function NewLiveMeeting() {
                                     </Tooltip>
 
                                     {/* CAMERA ICON - GREEN when ON, RED when OFF - Read-only for self, Clickable for Host on others */}
-                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off"))}>
+                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (isHost ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")))}>
                                       <IconButton
+                                        data-no-member-info="true"
                                         size="small"
+                                        onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          if (isHost && !isSelfMember(m)) forceCameraOffParticipant(m);
+                                          if (isSelfMember(m)) {
+                                            handleToggleCamera();
+                                            return;
+                                          }
+                                          if (isHost) forceCameraOffParticipant(m);
                                         }}
-                                        disabled={isOnBreak || !isHost || isSelfMember(m)}
+                                        disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
                                         sx={{
                                           bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                           border: "1px solid",
                                           borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                           color: m.cam ? "#22c55e" : "#ef4444",
                                           padding: "4px",
-                                          cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                          opacity: isSelfMember(m) ? 0.6 : 1,
+                                          cursor: (isSelfMember(m) || isHost) ? "pointer" : "default",
                                           "&:hover": {
                                             bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                           }
@@ -13675,7 +13709,6 @@ export default function NewLiveMeeting() {
                               }
                             />
                             </ListItemButton>
-                          </Tooltip>
                         </ListItem>
                       ))}
                     </List>
