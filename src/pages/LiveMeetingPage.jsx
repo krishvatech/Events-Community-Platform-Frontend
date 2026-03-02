@@ -4592,13 +4592,127 @@ export default function NewLiveMeeting() {
 
     await revokeMainStageScreenShare(target);
     setApprovedMainStageScreenShare(null);
+
+    // Notify the participant that their permission was revoked
+    const revokeRequestId = `ssr-revoke-${Date.now()}`;
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+        requestId: revokeRequestId,
+        status: "revoked",
+        participantId: target.participantId || null,
+        participantUserKey: target.participantUserKey || null,
+        name: target.name,
+        byHostId: dyteMeeting?.self?.id || null,
+        ts: Date.now(),
+      });
+    } catch (e) {
+      console.warn("[ScreenShare] Failed to broadcast revoke:", e);
+    }
+
     showSnackbar(`Screen share revoked for ${target.name}.`, "info");
   }, [
     approvedMainStageScreenShare,
+    dyteMeeting,
     isHost,
     participantMenuTarget,
     revokeMainStageScreenShare,
     showSnackbar,
+  ]);
+
+  const handleGrantParticipantScreenShare = useCallback(async () => {
+    const p = participantMenuTarget;
+    handleCloseParticipantMenu();
+    if (!isHost || !p || !hostPerms.screenShare) return;
+
+    // Must be the spotlighted participant
+    const targetId = p.id ? String(p.id) : "";
+    const targetKey = getParticipantUserKey(p?._raw || p) || "";
+    const spotlightId = spotlightTarget?.participantId ? String(spotlightTarget.participantId) : "";
+    const spotlightKey = spotlightTarget?.participantUserKey ? String(spotlightTarget.participantUserKey) : "";
+    const isTargetSpotlighted =
+      (spotlightId && targetId && spotlightId === targetId) ||
+      (spotlightKey && targetKey && spotlightKey === targetKey);
+
+    if (!isTargetSpotlighted) {
+      showSnackbar("Screen share can only be granted to the participant on main stage.", "info");
+      return;
+    }
+
+    const participant = findParticipantByIdentity(targetId, targetKey);
+    if (!participant?.id) {
+      showSnackbar("Unable to grant: participant not found.", "warning");
+      return;
+    }
+
+    // Revoke any existing approval before granting to a new one
+    const approvedId = approvedMainStageScreenShare?.participantId
+      ? String(approvedMainStageScreenShare.participantId) : "";
+    const approvedKey = approvedMainStageScreenShare?.participantUserKey
+      ? String(approvedMainStageScreenShare.participantUserKey) : "";
+    const isAlreadyApproved =
+      (approvedId && targetId && approvedId === targetId) ||
+      (approvedKey && targetKey && approvedKey === targetKey);
+
+    if (isAlreadyApproved) {
+      showSnackbar(`${p.name || "Participant"} already has screen share permission.`, "info");
+      return;
+    }
+
+    // Clear any pending incoming request before attempting permission update
+    setIncomingMainStageScreenShareRequest(null);
+
+    if (approvedMainStageScreenShare) {
+      await revokeMainStageScreenShare(approvedMainStageScreenShare);
+    }
+
+    // Update Dyte permissions
+    try {
+      await dyteMeeting.participants.updatePermissions([participant.id], {
+        canProduceScreenshare: "ALLOWED",
+        requestProduceScreenshare: true,
+      });
+    } catch (e) {
+      console.warn("[ScreenShare] Failed to grant permission:", e);
+      showSnackbar("Unable to grant screen share right now.", "error");
+      return;
+    }
+
+    const approvedPayload = {
+      participantId: participant.id || p.id || null,
+      participantUserKey: targetKey || p.id || null,
+      name: participant?.name || p?.name || "Participant",
+      ts: Date.now(),
+    };
+    setApprovedMainStageScreenShare(approvedPayload);
+
+    // Notify the participant (reuses existing broadcast handler on participant side)
+    const requestId = `ssr-grant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+        requestId,
+        status: "approved",
+        proactive: true,
+        participantId: approvedPayload.participantId,
+        participantUserKey: approvedPayload.participantUserKey,
+        name: approvedPayload.name,
+        byHostId: dyteMeeting?.self?.id || null,
+        ts: Date.now(),
+      });
+    } catch (e) {
+      console.warn("[ScreenShare] Failed to broadcast proactive grant:", e);
+    }
+
+    showSnackbar(`Screen share granted to ${approvedPayload.name}.`, "success");
+  }, [
+    approvedMainStageScreenShare,
+    dyteMeeting,
+    findParticipantByIdentity,
+    hostPerms.screenShare,
+    isHost,
+    participantMenuTarget,
+    revokeMainStageScreenShare,
+    showSnackbar,
+    spotlightTarget,
   ]);
 
   const respondMainStageScreenShareRequest = useCallback(
@@ -8033,7 +8147,7 @@ export default function NewLiveMeeting() {
 
         if (payload?.status === "approved") {
           setIsSelfMainStageScreenShareApproved(true);
-          showSnackbar("Host approved your screen share request.", "success");
+          showSnackbar(payload?.proactive ? "Host granted you screen sharing permission." : "Host approved your screen share request.", "success");
         } else if (payload?.status === "denied") {
           setIsSelfMainStageScreenShareApproved(false);
           const reason = payload?.reason;
@@ -8044,6 +8158,18 @@ export default function NewLiveMeeting() {
           } else {
             showSnackbar("Screen share request denied.", "info");
           }
+          if (isScreenSharing) {
+            (async () => {
+              try {
+                await dyteMeeting?.self?.disableScreenShare?.();
+              } catch { }
+              setIsScreenSharing(false);
+            })();
+          }
+        } else if (payload?.status === "revoked") {
+          setIsSelfMainStageScreenShareApproved(false);
+          setPendingMainStageScreenShareRequest(null);
+          showSnackbar("Host removed your screen sharing permission.", "info");
           if (isScreenSharing) {
             (async () => {
               try {
@@ -16165,6 +16291,42 @@ export default function NewLiveMeeting() {
             </ListItemIcon>
             <ListItemText>Clear Spotlight</ListItemText>
           </MenuItem>
+          {/* --- Screen Share Grant/Revoke (host only, spotlight-aware) --- */}
+          {(() => {
+            const tId = participantMenuTarget?.id ? String(participantMenuTarget.id) : "";
+            const tKey = getParticipantUserKey(participantMenuTarget?._raw || participantMenuTarget) || "";
+            const spId = spotlightTarget?.participantId ? String(spotlightTarget.participantId) : "";
+            const spKey = spotlightTarget?.participantUserKey ? String(spotlightTarget.participantUserKey) : "";
+            const isTargetSpotlighted =
+              (spId && tId && spId === tId) || (spKey && tKey && spKey === tKey);
+            const apId = approvedMainStageScreenShare?.participantId
+              ? String(approvedMainStageScreenShare.participantId) : "";
+            const apKey = approvedMainStageScreenShare?.participantUserKey
+              ? String(approvedMainStageScreenShare.participantUserKey) : "";
+            const isTargetApproved =
+              (apId && tId && apId === tId) || (apKey && tKey && apKey === tKey);
+
+            return (
+              <>
+                {isTargetSpotlighted && hostPerms.screenShare && !isTargetApproved && (
+                  <MenuItem onClick={handleGrantParticipantScreenShare}>
+                    <ListItemIcon>
+                      <ScreenShareIcon fontSize="small" sx={{ color: "#22c55e" }} />
+                    </ListItemIcon>
+                    <ListItemText>Grant Screen Share</ListItemText>
+                  </MenuItem>
+                )}
+                {isTargetApproved && (
+                  <MenuItem onClick={handleRevokeParticipantScreenShare}>
+                    <ListItemIcon>
+                      <ScreenShareIcon fontSize="small" sx={{ color: "#ef4444" }} />
+                    </ListItemIcon>
+                    <ListItemText>Revoke Screen Share</ListItemText>
+                  </MenuItem>
+                )}
+              </>
+            );
+          })()}
           <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
           <MenuItem onClick={handleKickParticipant}>
             <ListItemIcon>
