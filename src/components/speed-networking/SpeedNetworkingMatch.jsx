@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Alert, Box, Typography, Button, LinearProgress, Collapse, Chip, Avatar, Divider, IconButton, TextField, CircularProgress, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Box, Typography, Button, LinearProgress, Collapse, Chip, Avatar, Divider, IconButton, TextField, CircularProgress } from '@mui/material';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -7,19 +7,9 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import SendIcon from '@mui/icons-material/Send';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
 import { DyteMeeting, defaultConfig } from '@dytesdk/react-ui-kit';
 import InterestDisplay from './InterestDisplay';
-import {
-    createDyteBackgroundEffectsController,
-    getVideoBackgroundEffect,
-    isDyteBackgroundEffectsSupported,
-    readStoredVideoBackgroundEffect,
-    storeVideoBackgroundEffect,
-    VIDEO_BACKGROUND_OPTIONS
-} from '../../utils/dyteBackgroundEffects.js';
 
 // Style to ensure Dyte UI controls don't overflow
 const dyteStyles = `
@@ -95,19 +85,10 @@ export default function SpeedNetworkingMatch({
     const [chatMessages, setChatMessages] = useState([]);
     const [chatInput, setChatInput] = useState('');
     const [chatSending, setChatSending] = useState(false);
-    const [backgroundEffectsAnchorEl, setBackgroundEffectsAnchorEl] = useState(null);
-    const [backgroundEffectsBusy, setBackgroundEffectsBusy] = useState(false);
-    const [backgroundEffectsError, setBackgroundEffectsError] = useState(null);
-    const [selectedBackgroundEffectId, setSelectedBackgroundEffectId] = useState(
-        () => readStoredVideoBackgroundEffect().id
-    );
     const chatBottomRef = useRef(null);
     const autoAdvanceTriggeredRef = useRef(false);
     const matchStartMsRef = useRef(Date.now());
     const speedNetworkingUiConfigRef = useRef(null);
-    const backgroundEffectsControllerRef = useRef(null);
-    const backgroundEffectsSupported = isDyteBackgroundEffectsSupported();
-    const backgroundEffectsMenuOpen = Boolean(backgroundEffectsAnchorEl);
 
     if (!speedNetworkingUiConfigRef.current) {
         // Start from Dyte defaults and only remove the 4 requested controls.
@@ -189,85 +170,6 @@ export default function SpeedNetworkingMatch({
             };
         }
     }, [meeting]);
-
-    useEffect(() => {
-        return () => {
-            const controller = backgroundEffectsControllerRef.current;
-            backgroundEffectsControllerRef.current = null;
-            controller?.destroy?.();
-        };
-    }, [meeting]);
-
-    useEffect(() => {
-        if (!meeting?.self || !backgroundEffectsSupported) return;
-
-        const savedEffect = readStoredVideoBackgroundEffect();
-        setSelectedBackgroundEffectId(savedEffect.id);
-        if (savedEffect.type === 'none') return;
-
-        let cancelled = false;
-
-        const restore = async () => {
-            try {
-                if (!backgroundEffectsControllerRef.current) {
-                    backgroundEffectsControllerRef.current =
-                        await createDyteBackgroundEffectsController(meeting);
-                }
-                if (cancelled) return;
-                await backgroundEffectsControllerRef.current.apply(savedEffect);
-            } catch (err) {
-                if (!cancelled) {
-                    setBackgroundEffectsError(err?.message || 'Unable to restore your virtual background.');
-                }
-            }
-        };
-
-        restore();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [backgroundEffectsSupported, meeting]);
-
-    const applyBackgroundEffect = async (effectOrId, { persist = true } = {}) => {
-        const effect =
-            typeof effectOrId === 'string'
-                ? getVideoBackgroundEffect(effectOrId)
-                : getVideoBackgroundEffect(effectOrId?.id);
-
-        if (!meeting?.self) {
-            setBackgroundEffectsError('Join the Dyte room before applying a virtual background.');
-            return;
-        }
-
-        if (!backgroundEffectsSupported) {
-            setBackgroundEffectsError('Virtual backgrounds are not supported in this browser.');
-            return;
-        }
-
-        try {
-            setBackgroundEffectsBusy(true);
-            setBackgroundEffectsError(null);
-
-            if (!backgroundEffectsControllerRef.current) {
-                backgroundEffectsControllerRef.current =
-                    await createDyteBackgroundEffectsController(meeting);
-            }
-
-            await backgroundEffectsControllerRef.current.apply(effect);
-            setSelectedBackgroundEffectId(effect.id);
-            if (persist) {
-                storeVideoBackgroundEffect(effect);
-            }
-            setBackgroundEffectsAnchorEl(null);
-        } catch (err) {
-            setBackgroundEffectsError(
-                err?.message || 'Unable to apply virtual background right now.'
-            );
-        } finally {
-            setBackgroundEffectsBusy(false);
-        }
-    };
 
     // Track whether partner has actually joined the Dyte room
     useEffect(() => {
@@ -506,32 +408,6 @@ export default function SpeedNetworkingMatch({
                     <Typography sx={{ flex: 1, color: '#fff', fontWeight: 700, fontSize: 14 }}>
                         Speed Networking  ·  {session.name || 'Session'}
                     </Typography>
-                    <Button
-                        size="small"
-                        onClick={(event) => setBackgroundEffectsAnchorEl(event.currentTarget)}
-                        disabled={!backgroundEffectsSupported || backgroundEffectsBusy}
-                        startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-                        sx={{
-                            color: '#d5fffb',
-                            borderColor: 'rgba(20,184,177,0.35)',
-                            bgcolor: 'rgba(20,184,177,0.08)',
-                            textTransform: 'none',
-                            fontWeight: 700,
-                            minWidth: 0,
-                            px: 1.25,
-                            '&:hover': {
-                                bgcolor: 'rgba(20,184,177,0.14)',
-                                borderColor: 'rgba(20,184,177,0.5)'
-                            },
-                            '&.Mui-disabled': {
-                                color: 'rgba(255,255,255,0.35)',
-                                borderColor: 'rgba(255,255,255,0.1)'
-                            }
-                        }}
-                        variant="outlined"
-                    >
-                        Effects
-                    </Button>
                     <Typography sx={{ color: timeRemaining < 30 ? '#ef4444' : '#22c55e', fontWeight: 700, fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>
                         {formatTime(timeRemaining)}
                     </Typography>
@@ -617,103 +493,7 @@ export default function SpeedNetworkingMatch({
                         </Typography>
                     </Box>
                 )}
-                {backgroundEffectsError && (
-                    <Alert
-                        severity="warning"
-                        sx={{
-                            borderRadius: 0,
-                            bgcolor: 'rgba(245,158,11,0.12)',
-                            borderTop: '1px solid rgba(245,158,11,0.18)',
-                            color: '#fde68a',
-                            '& .MuiAlert-icon': { color: '#fbbf24' }
-                        }}
-                    >
-                        {backgroundEffectsError}
-                    </Alert>
-                )}
             </Box>
-
-            <Menu
-                anchorEl={backgroundEffectsAnchorEl}
-                open={backgroundEffectsMenuOpen}
-                onClose={() => setBackgroundEffectsAnchorEl(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                PaperProps={{
-                    sx: {
-                        mt: 1,
-                        minWidth: 300,
-                        bgcolor: 'rgba(9,13,24,0.96)',
-                        color: '#fff',
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        borderRadius: 2.5,
-                        backdropFilter: 'blur(12px)',
-                        '& .MuiListItemIcon-root': { color: 'inherit' },
-                        '& .MuiListItemText-primary': { color: '#fff' },
-                        '& .MuiListItemText-secondary': { color: 'rgba(255,255,255,0.62)' }
-                    }
-                }}
-                MenuListProps={{
-                    dense: true,
-                    sx: {
-                        py: 0.5,
-                        '& .MuiMenuItem-root:hover': { bgcolor: 'rgba(255,255,255,0.06)' }
-                    }
-                }}
-            >
-                {!backgroundEffectsSupported && (
-                    <MenuItem disabled sx={{ whiteSpace: 'normal', opacity: 1 }}>
-                        <ListItemText
-                            primary="Virtual backgrounds unavailable"
-                            secondary="Try Chrome or Edge for blur and replacement backgrounds."
-                        />
-                    </MenuItem>
-                )}
-                {backgroundEffectsSupported && VIDEO_BACKGROUND_OPTIONS.map((effect) => {
-                    const isSelected = selectedBackgroundEffectId === effect.id;
-                    return (
-                        <MenuItem
-                            key={effect.id}
-                            onClick={() => applyBackgroundEffect(effect)}
-                            disabled={backgroundEffectsBusy}
-                            sx={{
-                                alignItems: 'flex-start',
-                                gap: 1.25,
-                                py: 1,
-                                bgcolor: isSelected ? 'rgba(20,184,177,0.12)' : undefined
-                            }}
-                        >
-                            <Box
-                                sx={{
-                                    width: 52,
-                                    height: 36,
-                                    borderRadius: 1.5,
-                                    flexShrink: 0,
-                                    border: '1px solid rgba(255,255,255,0.08)',
-                                    bgcolor: effect.type === 'none' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
-                                    backgroundImage:
-                                        effect.type === 'image'
-                                            ? `url("${effect.imageUrl}")`
-                                            : effect.type === 'blur'
-                                                ? 'linear-gradient(135deg, rgba(20,184,177,0.35), rgba(59,130,246,0.16)), radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), transparent 20%), radial-gradient(circle at 70% 60%, rgba(255,255,255,0.25), transparent 22%)'
-                                                : 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-                                    backgroundSize: 'cover',
-                                    backgroundPosition: 'center'
-                                }}
-                            />
-                            <ListItemText
-                                primary={effect.label}
-                                secondary={effect.description}
-                            />
-                            {isSelected && (
-                                <ListItemIcon sx={{ minWidth: 24, justifyContent: 'flex-end', mt: 0.25 }}>
-                                    <CheckRoundedIcon fontSize="small" />
-                                </ListItemIcon>
-                            )}
-                        </MenuItem>
-                    );
-                })}
-            </Menu>
 
             {/* Main Content: Dyte + Partner Profile Sidebar */}
             <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
