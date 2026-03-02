@@ -644,21 +644,26 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onCancelFrien
                 )}
               </Stack>
             ) : status === "pending_incoming" ? (
-              <Stack direction="row" spacing={1}>
-                {onAcceptFriend && onDeclineFriend ? (
-                  <>
-                    <Button size="small" variant="contained" color="success" onClick={(e) => { e.stopPropagation(); onAcceptFriend?.(u); }} sx={{ textTransform: "none", borderRadius: 2, minWidth: isMobile ? 'auto' : undefined, px: isMobile ? 1 : undefined }}>
-                      Accept
+              <Stack direction="column" alignItems="flex-end" spacing={0.5}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                  Your received a request to Connect
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  {onAcceptFriend && onDeclineFriend ? (
+                    <>
+                      <Button size="small" variant="contained" color="success" onClick={(e) => { e.stopPropagation(); onAcceptFriend?.(u); }} sx={{ textTransform: "none", borderRadius: 2, minWidth: isMobile ? 'auto' : undefined, px: isMobile ? 1 : undefined }}>
+                        Accept
+                      </Button>
+                      <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onDeclineFriend?.(u); }} sx={{ textTransform: "none", borderRadius: 2, minWidth: isMobile ? 'auto' : undefined, px: isMobile ? 1 : undefined }}>
+                        Decline
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="small" variant="outlined" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+                      Pending your approval
                     </Button>
-                    <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onDeclineFriend?.(u); }} sx={{ textTransform: "none", borderRadius: 2, minWidth: isMobile ? 'auto' : undefined, px: isMobile ? 1 : undefined }}>
-                      Decline
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="small" variant="outlined" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-                    Pending your approval
-                  </Button>
-                )}
+                  )}
+                </Stack>
               </Stack>
             ) : isMobile ? (
               <Tooltip title={blockByVerified ? "Verified members only" : "Request Contact"}>

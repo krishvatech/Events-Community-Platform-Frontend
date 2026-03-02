@@ -455,10 +455,15 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onCancel(req.id); }} startIcon={<HighlightOffIcon />}>Cancel request</Button>
                         </>
                     ) : (
-                        <>
-                            <Button size="small" variant="contained" onClick={(e) => { e.stopPropagation(); onAccept(req.id); }} startIcon={<CheckCircleOutlineIcon />}>Accept</Button>
-                            <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); onDecline(req.id); }} startIcon={<HighlightOffIcon />}>Decline</Button>
-                        </>
+                        <Stack direction="column" alignItems="flex-end" spacing={0.5}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                                Your received a request to Connect
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                                <Button size="small" variant="contained" onClick={(e) => { e.stopPropagation(); onAccept(req.id); }} startIcon={<CheckCircleOutlineIcon />}>Accept</Button>
+                                <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onDecline(req.id); }} startIcon={<HighlightOffIcon />}>Decline</Button>
+                            </Stack>
+                        </Stack>
                     )}
                 </Stack>
             </Stack>

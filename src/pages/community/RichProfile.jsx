@@ -3460,27 +3460,32 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           </Stack>
                         )}
                         {!friendLoading && friendStatus === "pending_incoming" && (
-                          <Stack direction="row" spacing={1}>
-                            <Button
-                              variant="contained"
-                              size="small"
-                              color="success"
-                              onClick={() => respondToRequest("accept")}
-                              disabled={friendSubmitting}
-                              sx={{ textTransform: "none", borderRadius: 2 }}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              color="error"
-                              onClick={() => respondToRequest("decline")}
-                              disabled={friendSubmitting}
-                              sx={{ textTransform: "none", borderRadius: 2 }}
-                            >
-                              Decline
-                            </Button>
+                          <Stack direction="column" alignItems="flex-end" spacing={0.5}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                              Your received a request to Connect
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                variant="contained"
+                                size="small"
+                                color="success"
+                                onClick={() => respondToRequest("accept")}
+                                disabled={friendSubmitting}
+                                sx={{ textTransform: "none", borderRadius: 2 }}
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                color="error"
+                                onClick={() => respondToRequest("decline")}
+                                disabled={friendSubmitting}
+                                sx={{ textTransform: "none", borderRadius: 2 }}
+                              >
+                                Decline
+                              </Button>
+                            </Stack>
                           </Stack>
                         )}
                         {!friendLoading && friendStatus === "none" && (
@@ -4270,27 +4275,32 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                 }
                                 if (status === "pending_incoming") {
                                   return (
-                                    <Stack direction="row" spacing={0.5}>
-                                      <Button
-                                        size="small"
-                                        variant="contained"
-                                        color="success"
-                                        disabled={connSubmitting[String(f.id)]}
-                                        onClick={() => respondToConnRequest(f.id, "accept")}
-                                        sx={{ textTransform: "none", borderRadius: 2, minWidth: 'auto', px: 1 }}
-                                      >
-                                        Accept
-                                      </Button>
-                                      <Button
-                                        size="small"
-                                        variant="outlined"
-                                        color="error"
-                                        disabled={connSubmitting[String(f.id)]}
-                                        onClick={() => respondToConnRequest(f.id, "decline")}
-                                        sx={{ textTransform: "none", borderRadius: 2, minWidth: 'auto', px: 1 }}
-                                      >
-                                        Decline
-                                      </Button>
+                                    <Stack direction="column" alignItems="flex-end" spacing={0.5}>
+                                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                                        Your received a request to Connect
+                                      </Typography>
+                                      <Stack direction="row" spacing={0.5}>
+                                        <Button
+                                          size="small"
+                                          variant="contained"
+                                          color="success"
+                                          disabled={connSubmitting[String(f.id)]}
+                                          onClick={() => respondToConnRequest(f.id, "accept")}
+                                          sx={{ textTransform: "none", borderRadius: 2, minWidth: 'auto', px: 1 }}
+                                        >
+                                          Accept
+                                        </Button>
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          color="error"
+                                          disabled={connSubmitting[String(f.id)]}
+                                          onClick={() => respondToConnRequest(f.id, "decline")}
+                                          sx={{ textTransform: "none", borderRadius: 2, minWidth: 'auto', px: 1 }}
+                                        >
+                                          Decline
+                                        </Button>
+                                      </Stack>
                                     </Stack>
                                   );
                                 }
