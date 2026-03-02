@@ -3567,15 +3567,45 @@ export default function LiveFeedPage({
     }
   }
 
+  async function fetchBatchMetricsForTargetType(ids, targetType = null) {
+    if (!ids?.length) return {};
+    const params = new URLSearchParams({ ids: ids.join(",") });
+    if (targetType) params.set("target_type", targetType);
+    const url = toApiUrl(`engagements/metrics/?${params.toString()}`);
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+      if (!res.ok) return {};
+      return await res.json();
+    } catch {
+      return {};
+    }
+  }
+
   async function hydrateMetrics(feedItems) {
     if (!feedItems?.length) return feedItems;
 
-    // only numeric ids are engageable by the current endpoints
-    const numericIds = feedItems.map(p => p.id).filter((id) => Number.isInteger(id));
-    const map = await fetchBatchMetrics(numericIds);
+    const idsByTargetType = feedItems.reduce((acc, post) => {
+      const target = engageTargetOf(post);
+      if (!Number.isInteger(target?.id)) return acc;
+      const key = target.type || "__feed_item__";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(target.id);
+      return acc;
+    }, {});
+
+    const metricMaps = await Promise.all(
+      Object.entries(idsByTargetType).map(async ([key, ids]) => ([
+        key,
+        await fetchBatchMetricsForTargetType(ids, key === "__feed_item__" ? null : key),
+      ]))
+    );
+    const metricsByTargetType = Object.fromEntries(metricMaps);
 
     return feedItems.map(p => {
-      const m = map[p.id] || {};
+      const target = engageTargetOf(p);
+      const key = target.type || "__feed_item__";
+      const typedMap = metricsByTargetType[key] || {};
+      const m = typedMap[target.id] || typedMap[String(target.id)] || {};
       return {
         ...p,
         like_count: m.like_count ?? m.likes ?? p.like_count ?? 0,
