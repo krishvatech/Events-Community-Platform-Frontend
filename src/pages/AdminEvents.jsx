@@ -1293,7 +1293,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     textField: {
                       fullWidth: true,
                       error: !!errors.startDate,
-                      helperText: errors.startDate
+                      helperText: errors.startDate,
+                      placeholder: "DD/MM/YYYY"
                     }
                   }}
                 />
@@ -1313,7 +1314,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       textField: {
                         fullWidth: true,
                         error: !!errors.endDate,
-                        helperText: errors.endDate
+                        helperText: errors.endDate,
+                        placeholder: "DD/MM/YYYY"
                       }
                     }}
                   />
@@ -1554,7 +1556,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     slotProps={{
                       textField: {
                         fullWidth: true,
-                        error: !!errors.resource_publish_at
+                        error: !!errors.resource_publish_at,
+                        placeholder: "DD/MM/YYYY"
                       }
                     }}
                   />

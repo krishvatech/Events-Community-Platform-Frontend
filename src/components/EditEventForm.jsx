@@ -1072,7 +1072,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                             textField: {
                                 fullWidth: true,
                                 error: !!errors.startDate,
-                                helperText: errors.startDate
+                                helperText: errors.startDate,
+                                placeholder: "DD/MM/YYYY"
                             }
                         }}
                     />
@@ -1088,7 +1089,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                 textField: {
                                     fullWidth: true,
                                     error: !!errors.endDate,
-                                    helperText: errors.endDate
+                                    helperText: errors.endDate,
+                                    placeholder: "DD/MM/YYYY"
                                 }
                             }}
                         />
