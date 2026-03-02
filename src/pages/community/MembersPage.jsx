@@ -1175,9 +1175,19 @@ export default function MembersPage() {
   const filtered = useMemo(() => {
     let sourceList = users;
 
+    // 🔒 PRIVACY FILTER: Remove hidden users (unless current user or admin viewing)
+    sourceList = sourceList.filter((u) => {
+      const isHidden = !!u.profile?.directory_hidden;
+      const isCurrentUser = me?.id && String(me.id) === String(u.id);
+      const isAdmin = viewerIsStaff;
+
+      // Show if: NOT hidden OR is current user OR is admin
+      return !isHidden || isCurrentUser || isAdmin;
+    });
+
     // Tab filter (All Members / My Contacts)
     if (tabValue === 1) {
-      sourceList = users.filter((u) => {
+      sourceList = sourceList.filter((u) => {
         const status = (friendStatusByUser[u.id] || "").toLowerCase();
         return status === "friends";
       });
@@ -1279,8 +1289,10 @@ export default function MembersPage() {
     selectedCompanies,
     selectedCountries,
     selectedTitles,
-    selectedIndustries,   // Added
-    selectedCompanySizes, // Added
+    selectedIndustries,
+    selectedCompanySizes,
+    me?.id,           // Added for privacy filter
+    viewerIsStaff,    // Added for privacy filter
   ]);
 
 
