@@ -742,33 +742,38 @@ function NotificationRow({
       if (item.state === "accepted") return null;
       if (item.state === "declined") return null;
       return (
-        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAcceptRequest?.(item.id);
-            }}
-            disabled={!!item._busy}
-            sx={{ textTransform: "none", borderRadius: 2 }}
-            startIcon={<CheckCircleOutlineIcon />}
-          >
-            Accept
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeclineRequest?.(item.id);
-            }}
-            disabled={!!item._busy}
-            sx={{ textTransform: "none", borderRadius: 2 }}
-            startIcon={<HighlightOffIcon />}
-          >
-            Decline
-          </Button>
+        <Stack direction="column" spacing={0.5} sx={{ mt: 1 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+            “Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted.”
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAcceptRequest?.(item.id);
+              }}
+              disabled={!!item._busy}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+              startIcon={<CheckCircleOutlineIcon />}
+            >
+              Accept
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeclineRequest?.(item.id);
+              }}
+              disabled={!!item._busy}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+              startIcon={<HighlightOffIcon />}
+            >
+              Decline
+            </Button>
+          </Stack>
         </Stack>
       );
     }

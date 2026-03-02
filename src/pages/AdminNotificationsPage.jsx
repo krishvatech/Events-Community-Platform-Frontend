@@ -488,38 +488,43 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
           {n.status === 'pending' && (n.type === "name_change" || n.type === "join_request" || n.type === "verification_request" || n.type === "friend_request" || n.type === "connection_request" || n.type === "sent_request") && (
             <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
               {(n.type !== "sent_request") ? (
-                <>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    disabled={busy}
-                    onClick={() => {
-                      if (n.type === "name_change") return onDecideName(n, "approved");
-                      if (n.type === "verification_request") return onDecideVerif(n, "approved");
-                      if (n.type === "friend_request" || n.type === "connection_request") return onAcceptContact(n);
-                      return onApprove(n);
-                    }}
-                    startIcon={<CheckCircleOutlineIcon />}
-                    sx={{ textTransform: "none", borderRadius: 2, bgcolor: TEAL, '&:hover': { bgcolor: TEAL }, px: 2 }}
-                  >
-                    {n.type === "friend_request" || n.type === "connection_request" ? "Accept" : "Approve"}
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    disabled={busy}
-                    onClick={() => {
-                      if (n.type === "name_change") return onDecideName(n, "rejected");
-                      if (n.type === "verification_request") return onDecideVerif(n, "rejected");
-                      if (n.type === "friend_request" || n.type === "connection_request") return onDeclineContact(n);
-                      return onReject(n);
-                    }}
-                    startIcon={<HighlightOffIcon />}
-                    sx={{ textTransform: "none", borderRadius: 2, color: 'text.secondary', borderColor: BORDER, '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } }}
-                  >
-                    {n.type === "friend_request" || n.type === "connection_request" ? "Decline" : "Reject"}
-                  </Button>
-                </>
+                <Stack direction="column" spacing={0.5}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                    “Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted.”
+                  </Typography>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={busy}
+                      onClick={() => {
+                        if (n.type === "name_change") return onDecideName(n, "approved");
+                        if (n.type === "verification_request") return onDecideVerif(n, "approved");
+                        if (n.type === "friend_request" || n.type === "connection_request") return onAcceptContact(n);
+                        return onApprove(n);
+                      }}
+                      startIcon={<CheckCircleOutlineIcon />}
+                      sx={{ textTransform: "none", borderRadius: 2, bgcolor: TEAL, '&:hover': { bgcolor: TEAL }, px: 2 }}
+                    >
+                      {n.type === "friend_request" || n.type === "connection_request" ? "Accept" : "Approve"}
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={busy}
+                      onClick={() => {
+                        if (n.type === "name_change") return onDecideName(n, "rejected");
+                        if (n.type === "verification_request") return onDecideVerif(n, "rejected");
+                        if (n.type === "friend_request" || n.type === "connection_request") return onDeclineContact(n);
+                        return onReject(n);
+                      }}
+                      startIcon={<HighlightOffIcon />}
+                      sx={{ textTransform: "none", borderRadius: 2, color: 'text.secondary', borderColor: BORDER, '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } }}
+                    >
+                      {n.type === "friend_request" || n.type === "connection_request" ? "Decline" : "Reject"}
+                    </Button>
+                  </Stack>
+                </Stack>
               ) : (
                 <Button
                   size="small"

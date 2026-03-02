@@ -1129,6 +1129,11 @@ export default function MyContacts() {
 
                                 {tabIndex === 1 && (
                                     <>
+                                        {sentRequests.length > 0 && (
+                                            <Typography variant="body2" color="text.secondary" sx={{ pb: 1, pl: 1, fontWeight: 500 }}>
+                                                “Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted.”
+                                            </Typography>
+                                        )}
                                         {sentRequests.map((req) => (
                                             <RequestCard key={req.id} req={req} type="sent" onOpenProfile={handleOpenProfile} onCancel={cancelRequest} />
                                         ))}
@@ -1142,6 +1147,11 @@ export default function MyContacts() {
 
                                 {tabIndex === 2 && (
                                     <>
+                                        {receivedRequests.length > 0 && (
+                                            <Typography variant="body2" color="text.secondary" sx={{ pb: 1, pl: 1, fontWeight: 500 }}>
+                                                “Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted.”
+                                            </Typography>
+                                        )}
                                         {receivedRequests.map((req) => (
                                             <RequestCard key={req.id} req={req} type="received" onOpenProfile={handleOpenProfile} onAccept={acceptRequest} onDecline={declineRequest} />
                                         ))}

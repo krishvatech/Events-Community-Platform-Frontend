@@ -163,6 +163,8 @@ const SocialLoungeIcon = (props) => (
 const API_ROOT = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 ).replace(/\/$/, "");
+const SPOTLIGHT_INVITE_TIMEOUT_MS = 10000;
+const SPOTLIGHT_INVITE_WARNING_SECONDS = 5;
 
 function getToken() {
   return (
@@ -4048,7 +4050,7 @@ export default function NewLiveMeeting() {
       participantUserKey: getParticipantUserKey(p?._raw || p) || null,
       name: p.name || "Participant",
       byHostId: dyteMeeting?.self?.id || null,
-      expiresAt: Date.now() + 5000,
+      expiresAt: Date.now() + SPOTLIGHT_INVITE_TIMEOUT_MS,
       ts: Date.now(),
     };
 
@@ -7892,7 +7894,7 @@ export default function NewLiveMeeting() {
           (targetKey && selfKey && targetKey === selfKey);
 
         if (isForSelf && !isHost) {
-          const expiresAt = Number(payload?.expiresAt) || Date.now() + 5000;
+          const expiresAt = Number(payload?.expiresAt) || Date.now() + SPOTLIGHT_INVITE_TIMEOUT_MS;
           setIncomingSpotlightInvite({
             inviteId: payload?.inviteId || `spotlight-${Date.now()}`,
             participantId: payload?.participantId || null,
@@ -15985,12 +15987,19 @@ export default function NewLiveMeeting() {
             </Typography>
             <LinearProgress
               variant="determinate"
-              value={Math.max(0, Math.min(100, (spotlightInviteSecondsLeft / 5) * 100))}
+              value={Math.max(0, Math.min(100, (spotlightInviteSecondsLeft / (SPOTLIGHT_INVITE_TIMEOUT_MS / 1000)) * 100))}
               sx={{
                 height: 8,
                 borderRadius: 8,
                 bgcolor: "rgba(255,255,255,0.12)",
-                "& .MuiLinearProgress-bar": { bgcolor: "#22c55e" },
+                "& .MuiLinearProgress-bar": {
+                  bgcolor: spotlightInviteSecondsLeft <= SPOTLIGHT_INVITE_WARNING_SECONDS ? "#f59e0b" : "#22c55e",
+                  animation: spotlightInviteSecondsLeft <= SPOTLIGHT_INVITE_WARNING_SECONDS ? "spotlightInvitePulse 1s ease-in-out infinite" : "none",
+                },
+                "@keyframes spotlightInvitePulse": {
+                  "0%, 100%": { opacity: 1 },
+                  "50%": { opacity: 0.45 },
+                },
               }}
             />
           </DialogContent>
@@ -17402,4 +17411,3 @@ function MemberInfoContent({ selectedMember, onClose }) {
     </Box>
   );
 }
-
