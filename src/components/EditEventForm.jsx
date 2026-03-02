@@ -156,6 +156,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [replayAvailable, setReplayAvailable] = React.useState(false);
     const [replayDuration, setReplayDuration] = React.useState("");
 
+    // Memoize dayjs objects to prevent DatePicker from snapping back while navigating calendar
+    const startDateValue = useMemo(() => startDate ? dayjs(startDate) : null, [startDate]);
+    const endDateValue = useMemo(() => endDate ? dayjs(endDate) : null, [endDate]);
+
     const normalizeParticipantsFromEvent = useCallback((eventPayload) => {
         const normalizedParticipants = [];
         const pushParticipant = (p = {}) => {
@@ -613,8 +617,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     };
 
     return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="h5" className="font-extrabold mb-4">Edit Event</Typography>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Box sx={{ p: 2 }}>
+                <Typography variant="h5" className="font-extrabold mb-4">Edit Event</Typography>
 
             <Typography variant="body2" className="text-slate-500 mb-4">
                 Update the fields and click Save.
@@ -1054,52 +1059,47 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 </Grid>
 
                 <Grid item xs={12} md={isMultiDay ? 6 : 12}>
-                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                        label={isMultiDay ? "Start Date" : "Date"}
+                        value={startDateValue}
+                        onChange={(newValue) => {
+                            const v = newValue ? newValue.format("YYYY-MM-DD") : "";
+                            setStartDate(v);
+                            if (!isMultiDay) setEndDate(v);
+                        }}
+                        format="DD/MM/YYYY"
+                        slotProps={{
+                            textField: {
+                                fullWidth: true,
+                                error: !!errors.startDate,
+                                helperText: errors.startDate
+                            }
+                        }}
+                    />
+                </Grid>
+                {isMultiDay && (
+                    <Grid item xs={12} md={6}>
                         <DatePicker
-                            label={isMultiDay ? "Start Date" : "Date"}
-                            value={startDate ? dayjs(startDate) : null}
-                            onChange={(newValue) => {
-                                const v = newValue ? newValue.format("YYYY-MM-DD") : "";
-                                setStartDate(v);
-                                if (!isMultiDay) setEndDate(v);
-                            }}
+                            label="End Date"
+                            value={endDateValue}
+                            onChange={(newValue) => setEndDate(newValue ? newValue.format("YYYY-MM-DD") : "")}
                             format="DD/MM/YYYY"
                             slotProps={{
                                 textField: {
                                     fullWidth: true,
-                                    error: !!errors.startDate,
-                                    helperText: errors.startDate
+                                    error: !!errors.endDate,
+                                    helperText: errors.endDate
                                 }
                             }}
                         />
-                    </LocalizationProvider>
-                </Grid>
-                {isMultiDay && (
-                    <Grid item xs={12} md={6}>
-                        <LocalizationProvider dateAdapter={AdapterDayjs}>
-                            <DatePicker
-                                label="End Date"
-                                value={endDate ? dayjs(endDate) : null}
-                                onChange={(newValue) => setEndDate(newValue ? newValue.format("YYYY-MM-DD") : "")}
-                                format="DD/MM/YYYY"
-                                slotProps={{
-                                    textField: {
-                                        fullWidth: true,
-                                        error: !!errors.endDate,
-                                        helperText: errors.endDate
-                                    }
-                                }}
-                            />
-                        </LocalizationProvider>
                     </Grid>
                 )}
 
                 <Grid item xs={12}>
                     <Grid container spacing={3}>
-                        <LocalizationProvider dateAdapter={AdapterDayjs}>
-                            {!isMultiDay && (
-                                <>
-                                    <Grid item xs={12} md={4}>
+                        {!isMultiDay && (
+                            <>
+                                <Grid item xs={12} md={4}>
                                         <TimePicker
                                             label="Start time *" ampm minutesStep={1}
                                             disabled={isMultiDay}
@@ -1165,7 +1165,6 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     </Grid>
                                 </>
                             )}
-                        </LocalizationProvider>
 
                         <Grid item xs={12} md={isMultiDay ? 12 : 4}>
                             <Autocomplete
@@ -1366,6 +1365,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                     {toast.msg}
                 </Alert>
             </Snackbar>
-        </Box>
+            </Box>
+        </LocalizationProvider>
     );
 }

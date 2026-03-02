@@ -255,6 +255,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [resPublishDate, setResPublishDate] = React.useState(defaultSchedule.startDate);
   const [resPublishTime, setResPublishTime] = React.useState(defaultSchedule.startTime);
 
+  // Memoize dayjs objects to prevent DatePicker from snapping back while navigating calendar
+  const startDateValue = React.useMemo(() => startDate ? dayjs(startDate) : null, [startDate]);
+  const endDateValue = React.useMemo(() => endDate ? dayjs(endDate) : null, [endDate]);
+  const resPublishDateValue = React.useMemo(() => resPublishDate ? dayjs(resPublishDate) : null, [resPublishDate]);
+
   const [submitting, setSubmitting] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [errors, setErrors] = React.useState({});
@@ -697,14 +702,15 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      fullWidth
-      maxWidth="md"
-      PaperProps={{ sx: { width: { xs: "100%", sm: 880 }, maxWidth: "100%", borderRadius: 3 } }}
-    >
-      <DialogTitle className="font-extrabold">Create an Event</DialogTitle>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ sx: { width: { xs: "100%", sm: 880 }, maxWidth: "100%", borderRadius: 3 } }}
+      >
+        <DialogTitle className="font-extrabold">Create an Event</DialogTitle>
 
       <DialogContent dividers>
         <Typography variant="body2" className="text-slate-500 mb-4">
@@ -1269,10 +1275,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           </Box>
           <Grid container spacing={2} sx={{ mb: 2 }}>
             <Grid item xs={12} md={isMultiDay ? 6 : 12}>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DatePicker
                   label={isMultiDay ? "Start Date" : "Date"}
-                  value={startDate ? dayjs(startDate) : null}
+                  value={startDateValue}
                   onChange={(newValue) => {
                     const v = newValue ? newValue.format("YYYY-MM-DD") : "";
                     console.log("📅 Start Date Changed:", { previousStartDate: startDate, newStartDate: v, isMultiDay });
@@ -1292,14 +1297,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     }
                   }}
                 />
-              </LocalizationProvider>
             </Grid>
             {isMultiDay && (
               <Grid item xs={12} md={6}>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DatePicker
                     label="End Date"
-                    value={endDate ? dayjs(endDate) : null}
+                    value={endDateValue}
                     onChange={(newValue) => {
                       const v = newValue ? newValue.format("YYYY-MM-DD") : "";
                       console.log("📅 End Date Changed:", { previousEndDate: endDate, newEndDate: v });
@@ -1314,7 +1317,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       }
                     }}
                   />
-                </LocalizationProvider>
               </Grid>
             )}
           </Grid>
@@ -1323,7 +1325,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             {!isMultiDay && (
               <>
                 <Grid item xs={12} md={4}>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <TimePicker
                       label="Start time *"
                       ampm
@@ -1364,10 +1365,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                         }
                       }}
                       slotProps={{ textField: { fullWidth: true, error: !!errors.startTime, helperText: errors.startTime } }} />
-                  </LocalizationProvider>
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <TimePicker
                       label="End time *"
                       ampm
@@ -1398,7 +1397,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                         setEndTime(newEnd);
                       }}
                       slotProps={{ textField: { fullWidth: true, error: !!errors.endTime, helperText: errors.endTime } }} />
-                  </LocalizationProvider>
                 </Grid>
               </>
             )}
@@ -1548,10 +1546,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           {!resourcesPublishNow && (
             <Grid container spacing={2} sx={{ mb: 1 }}>
               <Grid item xs={12} md={6}>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DatePicker
                     label="Publish Date"
-                    value={resPublishDate ? dayjs(resPublishDate) : null}
+                    value={resPublishDateValue}
                     onChange={(newValue) => setResPublishDate(newValue ? newValue.format("YYYY-MM-DD") : "")}
                     format="DD/MM/YYYY"
                     slotProps={{
@@ -1561,10 +1558,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       }
                     }}
                   />
-                </LocalizationProvider>
               </Grid>
               <Grid item xs={12} md={6}>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <TimePicker
                     label="Publish Time"
                     ampm
@@ -1573,7 +1568,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     onChange={(val) => setResPublishTime(val ? dayjs(val).minute(0).second(0).format("HH:mm") : resPublishTime)}
                     slotProps={{ textField: { fullWidth: true, error: !!errors.resource_publish_at } }}
                   />
-                </LocalizationProvider>
               </Grid>
             </Grid>
           )}
@@ -1785,7 +1779,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         eventEndTime={actualEventEndTime || toUTCISO(endDate, endTime, timezone)}
         timezone={timezone}
       />
-    </Dialog>
+      </Dialog>
+    </LocalizationProvider>
   );
 }
 
