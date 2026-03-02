@@ -551,10 +551,22 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     minHeight: 0,
                     overflowY: "auto",
                     py: 1,
-                    // Hide scrollbar
-                    "&::-webkit-scrollbar": { display: "none" },
-                    scrollbarWidth: "none",
-                    msOverflowStyle: "none"
+                    scrollbarWidth: "thin",
+                    scrollbarColor: "#a8ddda #dff1ef",
+                    "&::-webkit-scrollbar": {
+                        width: 8
+                    },
+                    "&::-webkit-scrollbar-track": {
+                        backgroundColor: "#dff1ef",
+                        borderRadius: 999
+                    },
+                    "&::-webkit-scrollbar-thumb": {
+                        backgroundColor: "#a8ddda",
+                        borderRadius: 999
+                    },
+                    "&::-webkit-scrollbar-thumb:hover": {
+                        backgroundColor: "#97d4d1"
+                    }
                 }}
             >
                 {renderList(discoverItems, "Discover")}
