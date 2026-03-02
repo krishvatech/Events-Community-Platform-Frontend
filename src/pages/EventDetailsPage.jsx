@@ -21,6 +21,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
+import { useJoinLiveState } from "../utils/sessionJoinLogic";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ParticipantListDialog from "../components/ParticipantListDialog";
 import SpeedNetworkingMatchHistory from "../components/speed-networking/SpeedNetworkingMatchHistory";
@@ -415,6 +416,9 @@ export default function EventDetailsPage() {
   // Force re-render every second to keep join button text current
   useSecondTick();
 
+  // Get session-aware join state for multi-day events
+  const joinState = useJoinLiveState(event);
+
   // Fetch registration status
   const [registration, setRegistration] = useState(null);
   useEffect(() => {
@@ -667,8 +671,16 @@ export default function EventDetailsPage() {
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
   const isPreEventLounge = isPreEventLoungeOpen(event);
 
-  const canShowActiveJoin = isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
-  const canJoinEventNow = isHost || Boolean(registration);
+  // For multi-day events, check session-based join state
+  const multiDayCanJoin = event.is_multi_day ? joinState?.enabled : null;
+  const multiDayJoinLabel = event.is_multi_day ? joinState?.buttonText : null;
+
+  const canShowActiveJoin = event.is_multi_day
+    ? (joinState?.enabled || isPreEventLounge || isPostEventLounge)
+    : (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge);
+  const canJoinEventNow = event.is_multi_day
+    ? (joinState?.enabled || isPreEventLounge || isPostEventLounge || isHost)
+    : (isHost || Boolean(registration));
   const canWatch = isPast && !!event.recording_url;
   const desc = event?.description ?? "";
 
@@ -1018,7 +1030,16 @@ export default function EventDetailsPage() {
                             className="rounded-xl"
                             variant="contained"
                           >
-                            {isHost ? "Join as Host" : getJoinButtonText(event, isLive, false)}
+                            {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false))}
+                          </Button>
+                        ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" ? (
+                          <Button
+                            disabled
+                            variant="contained"
+                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            className="rounded-xl"
+                          >
+                            {multiDayJoinLabel}
                           </Button>
                         ) : !canJoinEventNow && !isPast ? (
                           <Button

@@ -108,7 +108,7 @@ export const determineJoinState = (event, currentTime = new Date()) => {
 
     // Session coming up but not within 15 minutes
     return {
-      buttonText: `Waiting for ${nextSession.title || "Next Session"} Session`,
+      buttonText: `Waiting for ${nextSession.title || "Next Session"}`,
       enabled: false,
       status: "waiting_for_session",
       sessionName: nextSession.title,
