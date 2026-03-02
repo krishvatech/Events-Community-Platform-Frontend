@@ -677,7 +677,7 @@ function ScreenShareVideo({ participant, meeting }) {
   );
 }
 
-function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick }) {
+function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick, onToggleSelfMic, onToggleSelfCamera }) {
   const isSmall = tileW <= 132 || tileH <= 76;
 
   const raw = p?._raw || null;
@@ -760,16 +760,54 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick }) {
             zIndex: 1,
           }}
         >
-          {p.cam ? (
-            <VideocamIcon sx={{ fontSize: 18, color: "#22c55e" }} />
-          ) : (
-            <VideocamOffIcon sx={{ fontSize: 18, color: "#ef4444" }} />
-          )}
+          {isSelf ? (
+            <>
+              <IconButton
+                size="small"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSelfCamera?.();
+                }}
+                sx={{ p: 0.25 }}
+              >
+                {p.cam ? (
+                  <VideocamIcon sx={{ fontSize: 18, color: "#22c55e" }} />
+                ) : (
+                  <VideocamOffIcon sx={{ fontSize: 18, color: "#ef4444" }} />
+                )}
+              </IconButton>
 
-          {p.mic ? (
-            <MicIcon sx={{ fontSize: 18, color: "#22c55e" }} />
+              <IconButton
+                size="small"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSelfMic?.();
+                }}
+                sx={{ p: 0.25 }}
+              >
+                {p.mic ? (
+                  <MicIcon sx={{ fontSize: 18, color: "#22c55e" }} />
+                ) : (
+                  <MicOffIcon sx={{ fontSize: 18, color: "#ef4444" }} />
+                )}
+              </IconButton>
+            </>
           ) : (
-            <MicOffIcon sx={{ fontSize: 18, color: "#ef4444" }} />
+            <>
+              {p.cam ? (
+                <VideocamIcon sx={{ fontSize: 18, color: "#22c55e" }} />
+              ) : (
+                <VideocamOffIcon sx={{ fontSize: 18, color: "#ef4444" }} />
+              )}
+
+              {p.mic ? (
+                <MicIcon sx={{ fontSize: 18, color: "#22c55e" }} />
+              ) : (
+                <MicOffIcon sx={{ fontSize: 18, color: "#ef4444" }} />
+              )}
+            </>
           )}
         </Box>
       </Paper>
@@ -15211,6 +15249,8 @@ export default function NewLiveMeeting() {
                     tileW={stageTileW}
                     tileH={stageTileH}
                     onMemberClick={openMemberInfo}
+                    onToggleSelfMic={handleToggleMic}
+                    onToggleSelfCamera={handleToggleCamera}
                   />
 
                 ))}
