@@ -685,10 +685,15 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick, onT
   const showVideo = Boolean(p?.cam && raw);
 
   return (
-    <Tooltip title="Open Profile" arrow placement="top">
+    <Tooltip
+      title={isSelf ? "" : "Open Profile"}
+      arrow
+      placement="top"
+      disableHoverListener={isSelf}
+    >
       <Paper
         variant="outlined"
-        onClick={() => onMemberClick?.(p)}
+        onClick={isSelf ? undefined : () => onMemberClick?.(p)}
         sx={{
           flex: "0 0 auto",
           width: tileW,
@@ -703,7 +708,7 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick, onT
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          cursor: "pointer",
+          cursor: isSelf ? "default" : "pointer",
           "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
         }}
       >
@@ -13059,8 +13064,10 @@ export default function NewLiveMeeting() {
                                   <Stack spacing={1}>
                                     <Stack direction="row" spacing={0.8} alignItems="center">
                                       <Typography
-                                        sx={{ fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                                        onClick={() => openMemberInfo(m)}
+                                        sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
+                                        onClick={() => {
+                                          if (!isSelfMember(m)) openMemberInfo(m);
+                                        }}
                                       >
                                         {m.name}{isSelfMember(m) ? " (You)" : ""}
                                       </Typography>
@@ -13486,8 +13493,10 @@ export default function NewLiveMeeting() {
                                   <Stack spacing={1}>
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                                       <Typography
-                                        sx={{ fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                                        onClick={() => openMemberInfo(m)}
+                                        sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
+                                        onClick={() => {
+                                          if (!isSelfMember(m)) openMemberInfo(m);
+                                        }}
                                       >
                                         {m.name}{isSelfMember(m) ? " (You)" : ""}
                                       </Typography>
@@ -13714,8 +13723,10 @@ export default function NewLiveMeeting() {
                                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                                     <Typography
                                       noWrap
-                                      sx={{ fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                                      onClick={() => openMemberInfo(m)}
+                                      sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
+                                      onClick={() => {
+                                        if (!isSelfMember(m)) openMemberInfo(m);
+                                      }}
                                     >
                                       {m.name}{isSelfMember(m) ? " (You)" : ""}
                                     </Typography>
