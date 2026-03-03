@@ -1721,7 +1721,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           if (editingParticipantIndex !== null) {
             // Edit existing
             setParticipants(prev => prev.map((p, i) =>
-              i === editingParticipantIndex ? participantData : p
+              i === editingParticipantIndex ? { ...p, ...participantData } : p
             ));
             setToast({ open: true, type: "success", msg: "Participant updated" });
           } else {

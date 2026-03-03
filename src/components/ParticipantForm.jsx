@@ -69,6 +69,10 @@ const ParticipantForm = ({
             first_name: initialData.firstName || "",
             last_name: initialData.lastName || "",
             email: initialData.email || "",
+            name:
+              initialData.name ||
+              initialData.guestName ||
+              `${initialData.firstName || ""} ${initialData.lastName || ""}`.trim(),
           });
           setUserSearch("");
         } else {
@@ -190,9 +194,17 @@ const ParticipantForm = ({
       };
 
       if (isAccountParticipant) {
+        const resolvedFullName =
+          `${selectedUser.first_name || ""} ${selectedUser.last_name || ""}`.trim() ||
+          selectedUser.name ||
+          initialData?.name ||
+          initialData?.guestName ||
+          "";
         participantData.userId = selectedUser.id;
         participantData.firstName = selectedUser.first_name || "";
         participantData.lastName = selectedUser.last_name || "";
+        participantData.name = resolvedFullName;
+        participantData.guestName = resolvedFullName;
         participantData.email = selectedUser.email || "";
         participantData.imageUrl =
           selectedUser.avatar_url ||

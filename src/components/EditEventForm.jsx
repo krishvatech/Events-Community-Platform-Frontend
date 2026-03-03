@@ -1311,7 +1311,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                     if (editingParticipantIndex !== null) {
                         // Edit existing
                         setParticipants(prev => prev.map((p, i) =>
-                            i === editingParticipantIndex ? participantData : p
+                            i === editingParticipantIndex ? { ...p, ...participantData } : p
                         ));
                         setToast({ open: true, type: "success", msg: "Participant updated" });
                     } else {

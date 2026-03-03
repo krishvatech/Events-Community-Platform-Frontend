@@ -45,15 +45,17 @@ const ParticipantList = ({ participants, onEdit, onRemove }) => {
         const roleConfig = ROLE_CONFIG[participant.role] || ROLE_CONFIG.speaker;
         const isAccountParticipant =
           participant.participantType === "staff" || participant.participantType === "user";
-        const name =
-          isAccountParticipant
-            ? `${participant.firstName || ""} ${participant.lastName || ""}`.trim() ||
-              participant.email
-            : participant.guestName || "Unknown Guest";
-        const email =
-          isAccountParticipant
-            ? participant.email
-            : participant.guestEmail;
+        const accountFullName = `${participant.firstName || ""} ${participant.lastName || ""}`.trim();
+        const fallbackDisplayName =
+          participant.name ||
+          participant.guestName ||
+          `${participant.firstName || ""} ${participant.lastName || ""}`.trim();
+        const name = isAccountParticipant
+          ? accountFullName || fallbackDisplayName || "Unknown Participant"
+          : fallbackDisplayName || "Unknown Guest";
+        const secondaryEmail = isAccountParticipant
+          ? participant.email
+          : participant.guestEmail;
         const bio = participant.bio || "";
         const bioPreview = bio.length > 80 ? `${bio.substring(0, 80)}...` : bio;
 
@@ -141,7 +143,7 @@ const ParticipantList = ({ participants, onEdit, onRemove }) => {
                         {name}
                       </Typography>
 
-                      {email && (
+                      {secondaryEmail && (
                         <Typography
                           variant="caption"
                           color="text.secondary"
@@ -151,7 +153,7 @@ const ParticipantList = ({ participants, onEdit, onRemove }) => {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {email}
+                          {secondaryEmail}
                         </Typography>
                       )}
                     </Stack>
