@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
-import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -675,6 +675,7 @@ export default function EventDetailsPage() {
   const isLive = status === "live" && event.status !== "ended";
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
   const isPreEventLounge = isPreEventLoungeOpen(event);
+  const shouldOpenPreEventLounge = isHost || !willGoToWaitingRoom(event);
 
   // For multi-day events, check session-based join state
   const multiDayCanJoin = event.is_multi_day ? joinState?.enabled : null;
@@ -1029,7 +1030,11 @@ export default function EventDetailsPage() {
                           <Button
                             component={Link}
                             to={livePath}
-                            state={{ event, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge }}
+                            state={{
+                              event,
+                              openLounge: isPostEventLounge || (isPreEventLounge && shouldOpenPreEventLounge),
+                              preEventLounge: isPreEventLounge,
+                            }}
                             sx={{
                               textTransform: "none",
                               backgroundColor: "#10b8a6",
@@ -1038,7 +1043,7 @@ export default function EventDetailsPage() {
                             className="rounded-xl"
                             variant="contained"
                           >
-                            {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false))}
+                            {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false, registration))}
                           </Button>
                         ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" ? (
                           <Button
