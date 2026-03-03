@@ -3220,6 +3220,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   const [connLoading, setConnLoading] = useState(false);
   const [connections, setConnections] = useState([]);
   const [connQ, setConnQ] = useState("");
+  const [connPrivacyBlocked, setConnPrivacyBlocked] = useState(false);
 
   const displayName = (u) =>
     u?.full_name ||                             // like shares list
@@ -3267,12 +3268,22 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
     const url = `${API_BASE}/friends/of/?user_id=${targetUserId}`;
     try {
       const r = await fetch(url, { headers: tokenHeader(), credentials: "include" });
+      if (r.status === 403) {
+        const err = await r.json().catch(() => ({}));
+        const detail = err?.detail || "This member has hidden their connections list.";
+        const privacyBlocked = detail.toLowerCase().includes("hidden their connections list");
+        return { list: [], privacyBlocked, detail };
+      }
       const j = await r.json().catch(() => null);
-      if (!r.ok || !j) return [];
+      if (!r.ok || !j) return { list: [], privacyBlocked: false, detail: "" };
       const arr = Array.isArray(j) ? j : j.results || j.friends || [];
-      return Array.isArray(arr) ? arr.map(normalizeFriendShape) : [];
+      return {
+        list: Array.isArray(arr) ? arr.map(normalizeFriendShape) : [],
+        privacyBlocked: false,
+        detail: "",
+      };
     } catch {
-      return [];
+      return { list: [], privacyBlocked: false, detail: "" };
     }
   }
 
@@ -3293,13 +3304,19 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   const openConnections = async () => {
     setConnOpen(true);
     setConnLoading(true);
-    const [list, mutualList] = await Promise.all([
+    setConnPrivacyBlocked(false);
+    const [listResult, mutualList] = await Promise.all([
       fetchFriendList(userId),
       fetchMutualList(userId),
     ]);
+    const list = listResult?.list || [];
     setConnections(list);
     setMutual(mutualList);
     setMutualCount(mutualList.length);
+    setConnPrivacyBlocked(!!listResult?.privacyBlocked);
+    if (listResult?.privacyBlocked) {
+      setToast({ open: true, msg: listResult.detail || "This member has hidden their connections list.", type: "info" });
+    }
 
     // Preload friendship status for everyone we might show
     const ids = Array.from(new Set([...list, ...mutualList].map((x) => String(x?.id)).filter(Boolean)));
@@ -3331,6 +3348,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
     () => filterList(mutual),
     [mutual, connQ]
   );
+  const connectionsAreVisible = isMe || !userItem?.profile?.connections_hidden;
 
   /* ========================= */
 
@@ -3432,14 +3450,16 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                 sx={{ alignSelf: "center" }}
                               />
                             )}
-                            <Button
-                              variant="contained"
-                              size="small"
-                              onClick={openConnections}
-                              sx={{ textTransform: "none", borderRadius: 2 }}
-                            >
-                              Connections
-                            </Button>
+                            {connectionsAreVisible && (
+                              <Button
+                                variant="contained"
+                                size="small"
+                                onClick={openConnections}
+                                sx={{ textTransform: "none", borderRadius: 2 }}
+                              >
+                                Connections
+                              </Button>
+                            )}
                           </>
                         )}
                         {!friendLoading && friendStatus === "pending_outgoing" && (
@@ -4219,13 +4239,18 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
             <LinearProgress />
           ) : (
             <>
-              {(connTab === "mutual" ? filteredMutual : filteredConnections).length === 0 ? (
+              {connPrivacyBlocked ? (
+                <Typography variant="body2" color="text.secondary">
+                  This member has hidden their connections list.
+                </Typography>
+              ) : (connTab === "mutual" ? filteredMutual : filteredConnections).length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   No connections found.
                 </Typography>
               ) : (
                 <List dense sx={{ py: 0 }}>
                   {(connTab === "mutual" ? filteredMutual : filteredConnections).map((f, idx) => {
+                    const currentList = connTab === "mutual" ? filteredMutual : filteredConnections;
                     const name = displayName(f);
                     return (
                       <React.Fragment key={f.id || idx}>
@@ -4304,7 +4329,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                     </Stack>
                                   );
                                 }
-                                // not friends → Add friend
+                                // not friends → Add contact
                                 return (
                                   <Button
                                     size="small"
@@ -4314,7 +4339,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                     disabled={!!connSubmitting[f.id]}
                                     onClick={() => sendFriendRequestTo(f.id)}
                                   >
-                                    {connSubmitting[f.id] ? "Sending…" : "Add friend"}
+                                    {connSubmitting[f.id] ? "Sending…" : "Add contact"}
                                   </Button>
                                 );
                               })()}
@@ -4331,7 +4356,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                             secondary={<Typography variant="caption" color="text.secondary">{f?.email || ""}</Typography>}
                           />
                         </ListItem>
-                        {idx < filteredConnections.length - 1 && <Divider component="li" />}
+                        {idx < currentList.length - 1 && <Divider component="li" />}
                       </React.Fragment>
                     );
                   })}

@@ -1419,6 +1419,7 @@ export default function ProfilePage() {
     bio: "", headline: "", job_title: "", company: "", location: "",
     skillsText: "", linksText: "", avatar: "", kyc_status: "not_started",
     legal_name_locked: false, kyc_decline_reason: "", directory_hidden: false,
+    connections_hidden: false, hide_from_others_connections: false,
     pending_verification_request: false,
   });
 
@@ -1647,7 +1648,11 @@ export default function ProfilePage() {
 
   // Privacy Dialog State
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [privacyHidden, setPrivacyHidden] = useState(false);
+  const [privacySettings, setPrivacySettings] = useState({
+    directory_hidden: false,
+    connections_hidden: false,
+    hide_from_others_connections: false,
+  });
 
   // --- Email Verification State ---
   const [emailVerificationOpen, setEmailVerificationOpen] = useState(false);
@@ -1786,6 +1791,8 @@ export default function ProfilePage() {
           legal_name_locked: prof.legal_name_locked || false,
           kyc_decline_reason: prof.kyc_decline_reason || "",
           directory_hidden: prof.directory_hidden || false,
+          connections_hidden: prof.connections_hidden || false,
+          hide_from_others_connections: prof.hide_from_others_connections || false,
           pending_verification_request: prof.pending_verification_request || false,
         });
       } catch (e) {
@@ -2512,21 +2519,25 @@ export default function ProfilePage() {
 
 
   function openPrivacy() {
-    setPrivacyHidden(form.directory_hidden || false);
+    setPrivacySettings({
+      directory_hidden: form.directory_hidden || false,
+      connections_hidden: form.connections_hidden || false,
+      hide_from_others_connections: form.hide_from_others_connections || false,
+    });
     setPrivacyOpen(true);
   }
 
   async function savePrivacy() {
     try {
       setSaving(true);
-      const newValue = privacyHidden; // Read from local dialog state
-
       const payload = {
         first_name: form.first_name,
         last_name: form.last_name,
         email: form.email,
         profile: {
-          directory_hidden: newValue,
+          directory_hidden: privacySettings.directory_hidden,
+          connections_hidden: privacySettings.connections_hidden,
+          hide_from_others_connections: privacySettings.hide_from_others_connections,
         },
       };
 
@@ -2540,12 +2551,9 @@ export default function ProfilePage() {
         throw new Error("Failed to update privacy settings");
       }
 
-      setForm((prev) => ({ ...prev, directory_hidden: newValue }));
+      setForm((prev) => ({ ...prev, ...privacySettings }));
 
-      showNotification(
-        "success",
-        newValue ? "You are now hidden from the directory" : "You are visible in the directory"
-      );
+      showNotification("success", "Privacy settings updated");
       setPrivacyOpen(false);
     } catch (e) {
       showNotification("error", e?.message || "Update failed");
@@ -4023,22 +4031,53 @@ export default function ProfilePage() {
                           </Tooltip>
                         }
                       >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={form.directory_hidden}
-                                disabled
-                                size="small"
-                              />
-                            }
-                            label="Not listed in Directory"
-                          />
-                        </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          When enabled, your profile will be hidden from the public Member Directory.
-                          You will still be visible to members of groups you have joined and events you attend.
-                        </Typography>
+                        <Stack spacing={1.5}>
+                          <Box>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={form.directory_hidden}
+                                  disabled
+                                  size="small"
+                                />
+                              }
+                              label="Not listed in Directory"
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                              Directory: hides your profile from the public Member Directory. You will still be visible to members of groups you have joined and events you attend.
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={form.connections_hidden}
+                                  disabled
+                                  size="small"
+                                />
+                              }
+                              label="Hide my connections list"
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                              Connections list: prevents other members from opening the list of people you are connected to.
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={form.hide_from_others_connections}
+                                  disabled
+                                  size="small"
+                                />
+                              }
+                              label="Hide me from other members' connection lists"
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                              Hidden from others' lists: removes you from other members' visible connection lists.
+                            </Typography>
+                          </Box>
+                        </Stack>
 
                         <Dialog
                           open={privacyOpen}
@@ -4049,20 +4088,52 @@ export default function ProfilePage() {
                           <DialogTitle>Privacy Settings</DialogTitle>
                           <DialogContent>
                             <DialogContentText sx={{ mb: 2 }}>
-                              Manage your visibility in the member directory.
+                              Manage your visibility in the directory and connection lists.
                             </DialogContentText>
-                            <FormControlLabel
-                              control={
-                                <Switch
-                                  checked={privacyHidden}
-                                  onChange={(e) => setPrivacyHidden(e.target.checked)}
+                            <Stack spacing={2}>
+                              <Box>
+                                <FormControlLabel
+                                  control={
+                                    <Switch
+                                      checked={privacySettings.directory_hidden}
+                                      onChange={(e) => setPrivacySettings((prev) => ({ ...prev, directory_hidden: e.target.checked }))}
+                                    />
+                                  }
+                                  label="Not listed in Directory"
                                 />
-                              }
-                              label="Not listed in Directory"
-                            />
-                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                              Turn ON to hide your profile. Turn OFF to be visible.
-                            </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                  Turn ON to hide your profile from the public member directory.
+                                </Typography>
+                              </Box>
+                              <Box>
+                                <FormControlLabel
+                                  control={
+                                    <Switch
+                                      checked={privacySettings.connections_hidden}
+                                      onChange={(e) => setPrivacySettings((prev) => ({ ...prev, connections_hidden: e.target.checked }))}
+                                    />
+                                  }
+                                  label="Hide my connections list"
+                                />
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                  Turn ON to stop other members from opening your connections list.
+                                </Typography>
+                              </Box>
+                              <Box>
+                                <FormControlLabel
+                                  control={
+                                    <Switch
+                                      checked={privacySettings.hide_from_others_connections}
+                                      onChange={(e) => setPrivacySettings((prev) => ({ ...prev, hide_from_others_connections: e.target.checked }))}
+                                    />
+                                  }
+                                  label="Hide me from other members' connection lists"
+                                />
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                  Turn ON to remove your name from other members&apos; visible connection lists.
+                                </Typography>
+                              </Box>
+                            </Stack>
                           </DialogContent>
                           <DialogActions>
                             <Button onClick={() => setPrivacyOpen(false)}>Cancel</Button>
