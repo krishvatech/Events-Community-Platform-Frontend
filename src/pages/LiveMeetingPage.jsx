@@ -2937,6 +2937,44 @@ export default function NewLiveMeeting() {
     [eventId]
   );
 
+  const getSelfScreenShareActive = useCallback(() => {
+    const self = dyteMeeting?.self;
+    if (!self) return false;
+
+    const enabled =
+      self?.screenShareEnabled ??
+      self?.screenshareEnabled ??
+      self?.isScreenSharing ??
+      self?.screenSharing ??
+      self?.screenShareOn ??
+      self?.screensharing ??
+      self?.isScreensharing ??
+      self?.isScreenShareEnabled ??
+      self?.isScreenshareEnabled;
+
+    if (enabled) return true;
+
+    const tracks =
+      self?.screenShareTracks ??
+      self?.screenshareTracks ??
+      self?.screenShareVideoTracks ??
+      self?.screenshareVideoTracks ??
+      self?.screenShareTrack ??
+      self?.screenshareTrack ??
+      null;
+
+    try {
+      if (Array.isArray(tracks) && tracks.length > 0) return true;
+      if (typeof tracks?.size === "number" && tracks.size > 0) return true;
+      if (typeof tracks?.length === "number" && tracks.length > 0) return true;
+      if (typeof tracks?.toArray === "function") return (tracks.toArray()?.length ?? 0) > 0;
+    } catch {
+      // ignore
+    }
+
+    return false;
+  }, [dyteMeeting]);
+
   const canSelfScreenShare =
     selfPermissions?.canProduceScreenshare === "ALLOWED"; // Dyte permission string
 
@@ -3628,19 +3666,18 @@ export default function NewLiveMeeting() {
     try {
       if (isScreenSharing) {
         await dyteMeeting.self.disableScreenShare?.();   // stop
-        setIsScreenSharing(false);
       } else {
         await dyteMeeting.self.enableScreenShare?.();    // start
-        setIsScreenSharing(true);
       }
+      setIsScreenSharing(getSelfScreenShareActive());
     } catch (e) {
       console.warn("[LiveMeeting] screenshare toggle failed:", e);
-      // keep state consistent if it failed
-      setIsScreenSharing(false);
+      setIsScreenSharing(getSelfScreenShareActive());
     }
   }, [
     canSelfScreenShare,
     dyteMeeting,
+    getSelfScreenShareActive,
     isSelfMainStageScreenShareApproved,
     isBreakout,
     isHost,
@@ -3653,6 +3690,46 @@ export default function NewLiveMeeting() {
   const canScreenShare = selfPermissions?.canProduceScreenshare === "ALLOWED";
   const shouldHideScreenShare = !isHost && (!canScreenShare || hostForceBlock);
   // const screenShareDisabled = isHost ? false : shouldHideScreenShare || !hostPerms.screenShare;
+
+  useEffect(() => {
+    if (!dyteMeeting?.self) {
+      setIsScreenSharing(false);
+      return;
+    }
+
+    const syncSelfScreenShareState = () => {
+      setIsScreenSharing(getSelfScreenShareActive());
+    };
+
+    syncSelfScreenShareState();
+
+    const cleanups = [];
+    const safeOn = (obj, evt) => {
+      try {
+        if (typeof obj?.on === "function") {
+          obj.on(evt, syncSelfScreenShareState);
+          cleanups.push(() => {
+            try { obj.off?.(evt, syncSelfScreenShareState); } catch { }
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    safeOn(dyteMeeting?.self, "screenShareUpdate");
+    safeOn(dyteMeeting?.self, "screenShareStarted");
+    safeOn(dyteMeeting?.self, "screenShareStopped");
+
+    const interval = setInterval(syncSelfScreenShareState, 800);
+
+    return () => {
+      clearInterval(interval);
+      cleanups.forEach((fn) => {
+        try { fn(); } catch { }
+      });
+    };
+  }, [dyteMeeting, getSelfScreenShareActive]);
 
   // ---------- Host detection (for audience waiting screen) ----------
   const [hostJoined, setHostJoined] = useState(false);
