@@ -3,6 +3,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
+import { normalizeTimezoneName } from "./timezoneUtils";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -41,7 +42,7 @@ const FALLBACK_TIMEZONES = [
 
 export const getBrowserTimezone = () => {
     if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+        return normalizeTimezoneName(Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata");
     }
     return "Asia/Kolkata";
 };

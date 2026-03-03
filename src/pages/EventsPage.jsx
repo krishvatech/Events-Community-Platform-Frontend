@@ -45,7 +45,7 @@ import { apiClient } from "../utils/api";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
-import { getNextUpcomingSession, formatSessionTimeRange } from "../utils/timezoneUtils";
+import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -406,7 +406,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const [expandedSessionDescriptions, setExpandedSessionDescriptions] = React.useState({});
 
   // Timezone logic
-  const organizerTimezone = ev.timezone;
+  const organizerTimezone = normalizeTimezoneName(ev.timezone);
   const timeFormat = "h:mm A";
   const dateFormat = "MMM D, YYYY";
 
@@ -420,7 +420,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const localDateStr = localStartObj.format(dateFormat);
   const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
 
-  const userTimezoneName = dayjs.tz.guess();
+  const userTimezoneName = getBrowserTimezone();
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
   const showYourTime = ev.event_format === 'virtual' && organizerTimezone && timesDiffer;
 
@@ -597,7 +597,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         );
                         return (
                           <div className="text-xs">
-                            <span className="font-medium text-neutral-900">{sessionTimeRange.primary}</span>
+                            <span className="font-medium text-neutral-900">
+                              {sessionTimeRange.primary}
+                              {organizerTimezone && (
+                                <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                              )}
+                            </span>
                             {sessionTimeRange.secondary && (
                               <span className="block text-neutral-600 mt-0.5">
                                 <span className="font-semibold text-teal-700">Your Time:</span> {sessionTimeRange.secondary.label.replace('Your Time: ', '')} <span className="text-neutral-400">({sessionTimeRange.secondary.timezone})</span>
@@ -628,7 +633,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     <span>
                       {/* Primary: Organizer Time + Location (for single-day) */}
                       <span className="block font-medium text-neutral-900">
-                        {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
+                        {orgDateStr} {orgTimeRangeKey}
+                        {organizerTimezone && (
+                          <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                        )}
                       </span>
 
                       {/* Secondary: Your Time */}
@@ -725,7 +733,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         <div className="font-medium text-neutral-900">{session.title || `Session ${idx + 1}`}</div>
                         <div className="text-neutral-500 mt-0.5">
                           <span className="inline-block bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded text-xs mr-1.5">{sessionType}</span>
-                          <span>{sessionTimeRange.primary}</span>
+                          <span>
+                            {sessionTimeRange.primary}
+                            {organizerTimezone && (
+                              <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                            )}
+                          </span>
                           <span className="ml-1">•</span>
                           <span className="ml-1">{formatDuration(sessionDuration)}</span>
                         </div>
@@ -882,7 +895,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
 
   // Timezone logic
   // Timezone logic
-  const organizerTimezone = ev.timezone;
+  const organizerTimezone = normalizeTimezoneName(ev.timezone);
   const timeFormat = "h:mm A";
   const dateFormat = "MMM D, YYYY";
 
@@ -896,7 +909,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const localDateStr = localStartObj.format(dateFormat);
   const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
 
-  const userTimezoneName = dayjs.tz.guess();
+  const userTimezoneName = getBrowserTimezone();
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
   const showYourTime = ev.event_format === 'virtual' && organizerTimezone && timesDiffer;
 
@@ -1036,7 +1049,10 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     <span>
                       {/* Primary: Organizer Time + Location */}
                       <span className="block font-medium text-neutral-900">
-                        {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
+                        {orgDateStr} {orgTimeRangeKey}
+                        {organizerTimezone && (
+                          <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                        )}
                       </span>
 
                       {/* Secondary: Your Time */}

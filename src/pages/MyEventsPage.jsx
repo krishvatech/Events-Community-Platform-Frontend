@@ -24,7 +24,7 @@ import RegisteredActions from "../components/RegisteredActions.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
-import { getNextUpcomingSession, formatSessionTimeRange } from "../utils/timezoneUtils";
+import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 // ---------------------- API base + helpers (kept) ----------------------
@@ -60,13 +60,14 @@ function fmtDateRange(startISO, endISO, organizerTimezone) {
   try {
     const dateFormat = "MMM D, YYYY";
     const timeFormat = "h:mm A";
+    const normalizedOrganizerTimezone = normalizeTimezoneName(organizerTimezone);
 
     // Organizer's timezone (if provided)
-    const orgStartObj = (startISO && organizerTimezone)
-      ? dayjs(startISO).tz(organizerTimezone)
+    const orgStartObj = (startISO && normalizedOrganizerTimezone)
+      ? dayjs(startISO).tz(normalizedOrganizerTimezone)
       : dayjs(startISO);
-    const orgEndObj = (endISO && organizerTimezone)
-      ? dayjs(endISO).tz(organizerTimezone)
+    const orgEndObj = (endISO && normalizedOrganizerTimezone)
+      ? dayjs(endISO).tz(normalizedOrganizerTimezone)
       : dayjs(endISO);
     const orgDateStr = orgStartObj.format(dateFormat);
     const orgTimeRangeKey = `${orgStartObj.format(timeFormat)} – ${orgEndObj.format(timeFormat)}`;
@@ -78,18 +79,19 @@ function fmtDateRange(startISO, endISO, organizerTimezone) {
     const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
 
     // Check if times differ
-    const userTimezoneName = dayjs.tz.guess();
+    const userTimezoneName = getBrowserTimezone();
     const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
 
     return {
       primary: `${orgDateStr} ${orgTimeRangeKey}`,
+      primaryTimezone: normalizedOrganizerTimezone || "",
       secondary: timesDiffer ? {
         label: `Your Time: ${localDateStr} ${localTimeRangeKey}`,
         timezone: userTimezoneName
       } : null
     };
   } catch {
-    return { primary: "", secondary: null };
+    return { primary: "", primaryTimezone: "", secondary: null };
   }
 }
 
@@ -324,6 +326,9 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                             sx={{ fontSize: 11, lineHeight: 1.4 }}
                           >
                             {sessionTimeRange.primary}
+                            {normalizeTimezoneName(ev.timezone) && (
+                              <span className="text-neutral-400 ml-1">({normalizeTimezoneName(ev.timezone)})</span>
+                            )}
                           </Typography>
 
                           {/* Secondary: Your Time */}
@@ -365,18 +370,21 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                   className="block font-medium text-slate-900"
                   sx={{ fontSize: 12.5 }}
                 >
-                  {`${dateRange.primary} • ${ev.location || "Virtual"}`}
+                  {dateRange.primary}
+                  {dateRange.primaryTimezone && (
+                    <span className="text-neutral-400 ml-1">({dateRange.primaryTimezone})</span>
+                  )}
                 </Typography>
 
                 {/* Secondary: Your Time */}
                 {dateRange.secondary && (
                   <Typography
                     variant="caption"
-                    className="block mt-1 text-xs text-neutral-600"
-                    sx={{ fontSize: 11 }}
-                  >
-                    <span className="font-semibold text-teal-700">Your Time:</span>{" "}
-                    {dateRange.secondary.label}
+                  className="block mt-1 text-xs text-neutral-600"
+                  sx={{ fontSize: 11 }}
+                >
+                  <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                    {dateRange.secondary.label.replace("Your Time: ", "")}
                     <span className="text-neutral-400 ml-1">({dateRange.secondary.timezone})</span>
                   </Typography>
                 )}

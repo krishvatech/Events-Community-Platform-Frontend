@@ -62,6 +62,7 @@ import RecordVoiceOverRoundedIcon from "@mui/icons-material/RecordVoiceOverRound
 import SessionDialog from "../components/SessionDialog";
 import SessionList from "../components/SessionList";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
+import { normalizeTimezoneName } from "../utils/timezoneUtils";
 import {
   getToken,
   toAbs,
@@ -1854,7 +1855,7 @@ function AdminEventCard({
         : joinLabel.split(" ")[0];
 
   // Timezone logic
-  const organizerTimezone = ev.timezone;
+  const organizerTimezone = normalizeTimezoneName(ev.timezone);
   const timeFormat = "h:mm A";
   const dateFormat = "MMM D, YYYY";
 
@@ -1868,7 +1869,7 @@ function AdminEventCard({
   const localDateStr = localStartObj.format(dateFormat);
   const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
 
-  const userTimezoneName = dayjs.tz.guess();
+  const userTimezoneName = getBrowserTimezone();
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
   // Check both format fields just in case
   const isVirtual = ev.format === 'virtual' || ev.event_format === 'virtual';
@@ -1999,6 +2000,9 @@ function AdminEventCard({
                         {/* Primary: Organizer Time */}
                         <span className="block text-xs font-medium text-slate-900" style={{ lineHeight: 1.4 }}>
                           {sessionTimeRange.primary}
+                          {organizerTimezone && (
+                            <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                          )}
                         </span>
 
                         {/* Secondary: Your Time */}
@@ -2021,7 +2025,10 @@ function AdminEventCard({
               <>
                 {/* Primary: Organizer Time + Location (for single-day events) */}
                 <span className="block font-medium text-slate-900">
-                  {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
+                  {orgDateStr} {orgTimeRangeKey}
+                  {organizerTimezone && (
+                    <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                  )}
                 </span>
 
                 {/* Secondary: Your Time */}

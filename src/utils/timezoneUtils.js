@@ -5,6 +5,16 @@ import timezone from "dayjs/plugin/timezone";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const TIMEZONE_ALIASES = {
+  "Asia/Calcutta": "Asia/Kolkata",
+};
+
+export const normalizeTimezoneName = (tz) => {
+  const value = String(tz || "").trim();
+  if (!value) return "UTC";
+  return TIMEZONE_ALIASES[value] || value;
+};
+
 /**
  * Detects the user's browser timezone using the Intl API
  * @returns {string} The timezone string (e.g., 'America/New_York')
@@ -12,7 +22,7 @@ dayjs.extend(timezone);
 export const getBrowserTimezone = () => {
   if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
     try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      return normalizeTimezoneName(Intl.DateTimeFormat().resolvedOptions().timeZone);
     } catch (e) {
       console.warn("Failed to detect timezone:", e);
       return "UTC";
@@ -121,7 +131,7 @@ export const formatSessionTimeRange = (sessionStartTime, sessionEndTime, organiz
     const localTimeRangeStr = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
 
     // Check if times differ between organizer and user timezone
-    const userTimezoneName = dayjs.tz.guess();
+    const userTimezoneName = normalizeTimezoneName(dayjs.tz.guess());
     const timesDiffer = (orgTimeRangeStr !== localTimeRangeStr) || (orgDateStr !== localDateStr);
 
     return {
