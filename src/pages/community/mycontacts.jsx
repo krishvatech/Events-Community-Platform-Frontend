@@ -24,7 +24,11 @@ import {
     Snackbar,
     Alert,
     Tabs,
-    Tab
+    Tab,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -351,7 +355,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
 }
 
 /* -------------------------- Member card -------------------------- */
-const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId, viewerIsStaff }) => {
+const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFriend, currentUserId, viewerIsStaff }) => {
     const name = u?.profile?.full_name || `${u?.first_name || ""} ${u?.last_name || ""}`.trim() || u?.username || "Unknown User";
     const title = getJobTitleFromUser(u);
     const company = getCompanyFromUser(u);
@@ -402,7 +406,18 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
                     </Button>
                 )}
                 {isFriend && (
-                    <Chip label="Contact" size="small" color="success" variant="outlined" sx={{ fontWeight: 600 }} />
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip label="Contact" size="small" color="success" variant="outlined" sx={{ fontWeight: 600 }} />
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={(e) => { e.stopPropagation(); onRemoveFriend(u.id); }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                        >
+                            Remove Contact
+                        </Button>
+                    </Stack>
                 )}
             </Stack>
         </Paper>
@@ -540,12 +555,51 @@ export default function MyContacts() {
 
     const [friendStatusByUser, setFriendStatusByUser] = useState({});
     const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
+    const [removeDialog, setRemoveDialog] = useState({ open: false, userId: null, name: "", submitting: false });
 
     const me = useMemo(() => {
         try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
     }, []);
 
     const viewerIsStaff = isAdminUser();
+
+    function openRemoveFriendDialog(id) {
+        const user = users.find((item) => String(item.id) === String(id));
+        const name =
+            user?.profile?.full_name ||
+            `${user?.first_name || ""} ${user?.last_name || ""}`.trim() ||
+            user?.username ||
+            "This member";
+        setRemoveDialog({ open: true, userId: id, name, submitting: false });
+    }
+
+    function closeRemoveFriendDialog() {
+        setRemoveDialog((prev) => (prev.submitting ? prev : { open: false, userId: null, name: "", submitting: false }));
+    }
+
+    async function removeFriend() {
+        const id = removeDialog.userId;
+        if (!id) return;
+        setRemoveDialog((prev) => ({ ...prev, submitting: true }));
+        try {
+            const r = await fetch(`${API_BASE}/friends/remove/?user_id=${id}`, {
+                method: "DELETE",
+                headers: { Accept: "application/json", ...tokenHeader() },
+                credentials: "include",
+            });
+            if (!r.ok) {
+                const data = await r.json().catch(() => ({}));
+                throw new Error(data?.detail || "Failed to remove contact");
+            }
+
+            setFriendStatusByUser((m) => ({ ...m, [id]: "none" }));
+            setRemoveDialog({ open: false, userId: null, name: "", submitting: false });
+            setToast({ open: true, msg: "Contact removed.", type: "success" });
+        } catch (e) {
+            setRemoveDialog((prev) => ({ ...prev, submitting: false }));
+            setToast({ open: true, msg: e?.message || "Failed to remove contact", type: "error" });
+        }
+    }
 
     async function fetchFriendStatus(id) {
         const r = await fetch(`${API_BASE}/friends/status/?user_id=${id}`, { headers: tokenHeader(), credentials: "include" });
@@ -596,10 +650,13 @@ export default function MyContacts() {
                 headers: { ...tokenHeader(), Accept: "application/json" },
             });
             if (r.ok) {
+                const acceptedReq = receivedRequests.find((req) => req.id === id);
+                const acceptedUserId = acceptedReq?.from_user?.id;
                 setReceivedRequests((prev) => prev.filter((req) => req.id !== id));
+                if (acceptedUserId) {
+                    setFriendStatusByUser((prev) => ({ ...prev, [acceptedUserId]: "friends" }));
+                }
                 setToast({ open: true, msg: "Request accepted", type: "success" });
-                // Optionally reload roster here if needed
-                setTimeout(() => window.location.reload(), 1000);
             } else throw new Error();
         } catch { setToast({ open: true, msg: "Failed to accept request", type: "error" }); }
     }
@@ -1107,6 +1164,7 @@ export default function MyContacts() {
                                                 friendStatus={friendStatusByUser[u.id]}
                                                 onOpenProfile={handleOpenProfile}
                                                 onAddFriend={sendFriendRequest}
+                                                onRemoveFriend={openRemoveFriendDialog}
                                                 currentUserId={me.id}
                                                 viewerIsStaff={viewerIsStaff}
                                             />
@@ -1344,6 +1402,78 @@ export default function MyContacts() {
                     </Paper>
                 </Box>
             )}
+            <Dialog
+                open={removeDialog.open}
+                onClose={closeRemoveFriendDialog}
+                fullWidth
+                maxWidth="xs"
+                PaperProps={{
+                    sx: {
+                        borderRadius: 4,
+                        overflow: "hidden",
+                        background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+                        boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
+                    },
+                }}
+            >
+                <Box
+                    sx={{
+                        px: 3,
+                        pt: 2.5,
+                        pb: 1.5,
+                        background: "linear-gradient(135deg, rgba(8,145,178,0.14), rgba(14,116,144,0.05))",
+                        borderBottom: "1px solid rgba(148,163,184,0.18)",
+                    }}
+                >
+                    <Chip
+                        size="small"
+                        label="Contact Management"
+                        sx={{
+                            mb: 1.5,
+                            bgcolor: "rgba(8,145,178,0.12)",
+                            color: "#0f766e",
+                            fontWeight: 700,
+                        }}
+                    />
+                    <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+                        Remove contact?
+                    </DialogTitle>
+                </Box>
+                <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Avatar sx={{ bgcolor: "#0f766e", width: 44, height: 44, fontWeight: 800 }}>
+                            {(removeDialog.name || "?").slice(0, 1).toUpperCase()}
+                        </Avatar>
+                        <Box>
+                            <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                                {removeDialog.name || "This member"}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: "#475569" }}>
+                                This removes them from your contacts list. You can send a new request later.
+                            </Typography>
+                        </Box>
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2.5, pt: 1.5, gap: 1 }}>
+                    <Button
+                        onClick={closeRemoveFriendDialog}
+                        disabled={removeDialog.submitting}
+                        variant="outlined"
+                        sx={{ borderRadius: 999, px: 2.25, textTransform: "none", fontWeight: 700 }}
+                    >
+                        Keep contact
+                    </Button>
+                    <Button
+                        onClick={removeFriend}
+                        disabled={removeDialog.submitting}
+                        variant="contained"
+                        color="error"
+                        sx={{ borderRadius: 999, px: 2.5, textTransform: "none", fontWeight: 700, boxShadow: "none" }}
+                    >
+                        {removeDialog.submitting ? "Removing..." : "Remove"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
             <Snackbar
                 open={toast.open}
                 autoHideDuration={4000}

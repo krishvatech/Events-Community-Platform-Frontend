@@ -2172,6 +2172,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   const [friendSubmitting, setFriendSubmitting] = useState(false);
   const [friendRequestId, setFriendRequestId] = useState(null);
   const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
+  const [removeDialog, setRemoveDialog] = useState({ open: false, submitting: false });
 
   const handleReportProfile = async (payload) => {
     setReportBusy(true);
@@ -2749,6 +2750,39 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
     }
   };
 
+  const openRemoveFriendDialog = () => {
+    setRemoveDialog({ open: true, submitting: false });
+  };
+
+  const closeRemoveFriendDialog = () => {
+    setRemoveDialog((prev) => (prev.submitting ? prev : { open: false, submitting: false }));
+  };
+
+  const removeFriend = async () => {
+    if (!userId) return;
+    setRemoveDialog((prev) => ({ ...prev, submitting: true }));
+    setFriendSubmitting(true);
+    try {
+      const r = await fetch(`${API_BASE}/friends/remove/?user_id=${userId}`, {
+        method: "DELETE",
+        headers: { Accept: "application/json", ...tokenHeader() },
+        credentials: "include",
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.detail || "Failed to remove contact");
+
+      setFriendStatus("none");
+      setFriendRequestId(null);
+      setRemoveDialog({ open: false, submitting: false });
+      setToast({ open: true, msg: "Contact removed.", type: "success" });
+    } catch (e) {
+      setRemoveDialog((prev) => ({ ...prev, submitting: false }));
+      setToast({ open: true, msg: e?.message || "Failed to remove contact", type: "error" });
+    } finally {
+      setFriendSubmitting(false);
+    }
+  };
+
   const handleStartKYC = async () => {
     try {
       const data = await startKYC();
@@ -2871,6 +2905,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       "Member"
     );
   }, [userItem]);
+  const profileAvatarUrl = useMemo(() => pickAvatarUrl(userItem), [userItem]);
 
   const currentExp = useMemo(() => pickBestExperience(experiences), [experiences]);
 
@@ -3460,6 +3495,16 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                 Connections
                               </Button>
                             )}
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="error"
+                              onClick={openRemoveFriendDialog}
+                              disabled={friendSubmitting}
+                              sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                              Remove Contact
+                            </Button>
                           </>
                         )}
                         {!friendLoading && friendStatus === "pending_outgoing" && (
@@ -4371,6 +4416,79 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
           </Button>
         </DialogActions>
       </Dialog >
+
+      <Dialog
+        open={removeDialog.open}
+        onClose={closeRemoveFriendDialog}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            overflow: "hidden",
+            background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+            boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            px: 3,
+            pt: 2.5,
+            pb: 1.5,
+            background: "linear-gradient(135deg, rgba(8,145,178,0.14), rgba(14,116,144,0.05))",
+            borderBottom: "1px solid rgba(148,163,184,0.18)",
+          }}
+        >
+          <Chip
+            size="small"
+            label="Contact Management"
+            sx={{
+              mb: 1.5,
+              bgcolor: "rgba(8,145,178,0.12)",
+              color: "#0f766e",
+              fontWeight: 700,
+            }}
+          />
+          <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+            Remove contact?
+          </DialogTitle>
+        </Box>
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Avatar src={profileAvatarUrl || ""} sx={{ bgcolor: "#0f766e", width: 44, height: 44, fontWeight: 800 }}>
+              {!profileAvatarUrl ? (fullName || "?").slice(0, 1).toUpperCase() : null}
+            </Avatar>
+            <Box>
+              <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                {fullName || "This member"}
+              </Typography>
+              <Typography variant="body2" sx={{ color: "#475569" }}>
+                This removes them from your contacts list. You can send a new request later.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1.5, gap: 1 }}>
+          <Button
+            onClick={closeRemoveFriendDialog}
+            disabled={removeDialog.submitting}
+            variant="outlined"
+            sx={{ borderRadius: 999, px: 2.25, textTransform: "none", fontWeight: 700 }}
+          >
+            Keep contact
+          </Button>
+          <Button
+            onClick={removeFriend}
+            disabled={removeDialog.submitting}
+            variant="contained"
+            color="error"
+            sx={{ borderRadius: 999, px: 2.5, textTransform: "none", fontWeight: 700, boxShadow: "none" }}
+          >
+            {removeDialog.submitting ? "Removing..." : "Remove Contact"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <ReportProfileDialog
         open={reportOpen}
