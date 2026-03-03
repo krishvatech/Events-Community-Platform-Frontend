@@ -125,7 +125,7 @@ import RoomLocationBadge from "../components/RoomLocationBadge.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
-import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils.js";
+import { isPreEventLoungeOpen } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
 
@@ -2735,11 +2735,6 @@ export default function NewLiveMeeting() {
     () => isPreEventLoungeOpen(eventData || eventFromState),
     [eventData, eventFromState, preEventTick]
   );
-  const attendeeWaitingRoomRequired = useMemo(() => {
-    if (role === "publisher") return false;
-    if (waitingRoomStatus === "admitted") return false;
-    return willGoToWaitingRoom(eventData || eventFromState);
-  }, [role, waitingRoomStatus, eventData, eventFromState]);
   const isPostEventWindowOpen = useMemo(
     () => loungeOpenStatus?.status === "OPEN" && loungeOpenStatus?.reason?.includes("Post-event"),
     [loungeOpenStatus?.status, loungeOpenStatus?.reason]
@@ -5181,7 +5176,7 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] Skipping token fetch - breakout join in progress");
       return;
     }
-    if ((isPostEventWindowOpen || ((preEventLoungeOpen || openLoungeFromState) && !attendeeWaitingRoomRequired)) && !joinMainRequested &&
+    if ((preEventLoungeOpen || openLoungeFromState || isPostEventWindowOpen) && !joinMainRequested &&
       (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
       !authToken && !mainAuthTokenRef.current) {
       // ✅ Log when skipping token fetch due to pre-event lounge
@@ -5282,7 +5277,7 @@ export default function NewLiveMeeting() {
         }
       }
     })();
-  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, openLoungeFromState, isPostEventWindowOpen, attendeeWaitingRoomRequired, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly]);
+  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, openLoungeFromState, isPostEventWindowOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly]);
 
   useEffect(() => {
     if (!eventId || !waitingRoomActive) return;
@@ -5372,10 +5367,10 @@ export default function NewLiveMeeting() {
   }, [eventId, fetchLoungeState]);
 
   useEffect(() => {
-    if (preEventLoungeOpen && isLoungeCurrentlyOpen && role !== "publisher" && !isBreakout && !waitingRoomActive && !attendeeWaitingRoomRequired) {
+    if (preEventLoungeOpen && isLoungeCurrentlyOpen && role !== "publisher" && !isBreakout) {
       setLoungeOpen(true);
     }
-  }, [preEventLoungeOpen, isLoungeCurrentlyOpen, role, isBreakout, waitingRoomActive, attendeeWaitingRoomRequired]);
+  }, [preEventLoungeOpen, isLoungeCurrentlyOpen, role, isBreakout]);
 
   useEffect(() => {
     if (!isPostEventWindowOpen || loungeHasEnded) return;
@@ -10325,7 +10320,6 @@ export default function NewLiveMeeting() {
   const shouldShowPreEventLoungeGate =
     preEventLoungeOpen && !joinMainRequested &&
     !waitingRoomActive &&
-    !attendeeWaitingRoomRequired &&
     (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
     (!isBreakout || loungeOpen);
 

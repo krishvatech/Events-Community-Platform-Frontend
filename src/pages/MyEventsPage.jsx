@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
-import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
@@ -835,14 +835,12 @@ export default function MyEventsPage() {
     try {
       const isPreEventLounge = isPreEventLoungeOpen(ev);
       const isPostEventLounge = isPostEventLoungeOpen(ev);
-      const shouldOpenPreEventLounge =
-        isHost || !willGoToWaitingRoom(ev);
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${isHost ? "publisher" : "audience"}`;
 
       navigate(livePath, {
         state: {
           event: ev,
-          openLounge: isPostEventLounge || (isPreEventLounge && shouldOpenPreEventLounge),
+          openLounge: isPreEventLounge || isPostEventLounge,
           preEventLounge: isPreEventLounge,
         },
         replace: false,
