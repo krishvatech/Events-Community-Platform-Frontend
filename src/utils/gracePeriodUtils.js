@@ -110,11 +110,6 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
     return "Application Declined";
   }
 
-  // Pre-event lounge (if configured and open)
-  if (isPreEventLoungeOpen(event)) {
-    return "Join Social Lounge";
-  }
-
   // Post-event lounge (if configured and open)
   if (isPostEventLoungeOpen(event)) {
     return "Join Social Lounge";
@@ -124,6 +119,11 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
   // always reflect that in the button label wherever a join option is shown.
   if (willGoToWaitingRoom(event)) {
     return "Join Waiting Room";
+  }
+
+  // Pre-event lounge (if configured and open)
+  if (isPreEventLoungeOpen(event)) {
+    return "Join Social Lounge";
   }
 
   // Event is live (or within early-join windows that allow direct join)
