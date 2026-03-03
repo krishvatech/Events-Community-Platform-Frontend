@@ -89,6 +89,18 @@ const getUserDisplayName = (u) => {
   return name || u?.full_name || u?.username || "User";
 };
 
+const getCurrentUserId = () => {
+  try {
+    const stored =
+      JSON.parse(localStorage.getItem("user") || "null") ||
+      JSON.parse(sessionStorage.getItem("user") || "null");
+    const user = stored?.user || stored;
+    return user?.id ?? user?.user_id ?? null;
+  } catch {
+    return null;
+  }
+};
+
 // ---- Data Loaders ----
 async function loadNameChangeRequests() {
   // ✅ Staff should not call superuser-only endpoint
@@ -342,6 +354,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
   // Pending items are always highlighted (teal background).
   const isRead = !!n.read_at && n.status !== 'pending';
   const isMobile = useMediaQuery("(max-width:600px)");
+  const currentUserId = React.useMemo(() => String(getCurrentUserId() ?? ""), []);
 
   // Check if this is a moderation report notification
   const isModerationReport = n.type === "system" && (n.title?.toLowerCase().includes("report") || n.data?.type === "moderation_report");
@@ -418,15 +431,38 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
               </>
             ) : (n.type === "friend_request" || n.type === "connection_request") ? (
               <>
-                {n.status === 'declined' || n.status === 'rejected' ? (
-                  <>Contact request from <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> was declined.</>
-                ) : (
-                  <>{String(n.title || "").toLowerCase().includes("accepted") || n.status === 'accepted' ? (
-                    <><Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> accepted your contact request.</>
-                  ) : (
-                    <><Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> sent you a contact request.</>
-                  )}</>
-                )}
+                {(() => {
+                  const fromUserId = String(n.data?.from_user_id ?? "");
+                  const toUserId = String(n.data?.to_user_id ?? "");
+                  const actedByCurrentUser = !!currentUserId && !!fromUserId && !toUserId;
+
+                  if (n.status === 'declined' || n.status === 'rejected') {
+                    return (
+                      <>
+                        {actedByCurrentUser ? "You declined the contact request from " : "Contact request was declined by "}
+                        <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box>.
+                      </>
+                    );
+                  }
+
+                  if ((String(n.title || "").toLowerCase().includes("accepted") || n.status === 'accepted') && actedByCurrentUser) {
+                    return (
+                      <>
+                        You accepted the contact request from <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box>.
+                      </>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {String(n.title || "").toLowerCase().includes("accepted") || n.status === 'accepted' ? (
+                        <><Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> accepted your contact request.</>
+                      ) : (
+                        <><Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> sent you a contact request.</>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             ) : n.type === "mention" ? (
               <>

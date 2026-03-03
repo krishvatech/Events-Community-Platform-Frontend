@@ -56,6 +56,18 @@ function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
 
+function getCurrentUserId() {
+  try {
+    const stored =
+      JSON.parse(localStorage.getItem("user") || "null") ||
+      JSON.parse(sessionStorage.getItem("user") || "null");
+    const user = stored?.user || stored;
+    return user?.id ?? user?.user_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function groupByDay(items) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
@@ -354,6 +366,7 @@ function NotificationRow({
   const unread = !item.is_read;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const currentUserId = React.useMemo(() => String(getCurrentUserId() ?? ""), []);
   const showDescription =
     item.description &&
     !/^Post #\d+$/i.test(String(item.description).trim());
@@ -605,6 +618,10 @@ function NotificationRow({
       const isAccepted = String(item.title || "").toLowerCase().includes("accepted") || item.state === "accepted";
       const isDeclined = item.state === "declined" || item.state === "rejected";
       const isSent = item.source === "sent_request";
+      const fromUserId = String(item.data?.from_user_id ?? "");
+      const toUserId = String(item.data?.to_user_id ?? "");
+      const actedByCurrentUser = !!currentUserId && !!fromUserId && !toUserId;
+      const declinedByCurrentUser = !!currentUserId && !!fromUserId && !toUserId;
 
       if (isSent) {
         return (
@@ -630,7 +647,7 @@ function NotificationRow({
         return (
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2">
-              Contact request from
+              {declinedByCurrentUser ? "You declined the contact request from" : "Contact request was declined by"}
             </Typography>
             <Typography
               variant="body2"
@@ -643,7 +660,30 @@ function NotificationRow({
               {item.actor?.name || "Someone"}
             </Typography>
             <Typography variant="body2">
-              was declined.
+              .
+            </Typography>
+          </Stack>
+        );
+      }
+
+      if (isAccepted && actedByCurrentUser) {
+        return (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography variant="body2">
+              You accepted the contact request from
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAvatarClick?.(item);
+              }}
+            >
+              {item.actor?.name || "Someone"}
+            </Typography>
+            <Typography variant="body2">
+              .
             </Typography>
           </Stack>
         );
