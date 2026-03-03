@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import LaunchIcon from '@mui/icons-material/Launch';
 import { Link as RouterLink } from "react-router-dom";
 
 const ROLE_CHIP_PROPS = {
@@ -76,7 +77,24 @@ export default function ParticipantListDialog({
                             </Box>
                         )}
                         {participants.map((reg) => (
-                            <ListItem key={reg.registration_id || reg.user_id || reg.display_name}>
+                            <ListItem
+                                key={reg.registration_id || reg.user_id || reg.display_name}
+                                secondaryAction={
+                                    reg.is_profile_clickable ? (
+                                        <Tooltip title="Open profile">
+                                            <IconButton
+                                                edge="end"
+                                                aria-label={`Open ${reg.display_name || "participant"} profile`}
+                                                component={RouterLink}
+                                                to={reg.profile_url}
+                                                sx={{ color: "text.secondary" }}
+                                            >
+                                                <LaunchIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    ) : null
+                                }
+                            >
                                 <ListItemAvatar>
                                     <Avatar
                                         src={reg.avatar_url}
@@ -119,7 +137,6 @@ export default function ParticipantListDialog({
                                             )}
                                         </Box>
                                     }
-                                    secondary={reg.email}
                                 />
                             </ListItem>
                         ))}
