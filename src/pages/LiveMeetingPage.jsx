@@ -2634,6 +2634,8 @@ export default function NewLiveMeeting() {
   const [eventId, setEventId] = useState(null);
   const [role, setRole] = useState("audience"); // 'publisher' | 'audience'
   const isHost = role === "publisher";
+  const roleRef = useRef(role);
+  const isHostRef = useRef(isHost);
 
   const [authToken, setAuthToken] = useState("");
   const mainAuthTokenRef = useRef("");
@@ -2683,6 +2685,11 @@ export default function NewLiveMeeting() {
   const [mainRoomSupportStatus, setMainRoomSupportStatus] = useState(null);
   const [assistanceCooldownUntil, setAssistanceCooldownUntil] = useState(0);
   const currentUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
+
+  useEffect(() => {
+    roleRef.current = role;
+    isHostRef.current = role === "publisher";
+  }, [role]);
   const primaryHostUserId = useMemo(
     () => String(eventData?.created_by_id || ""),
     [eventData?.created_by_id]
@@ -5526,7 +5533,7 @@ export default function NewLiveMeeting() {
         } else if (msg.type === "server_debug") {
           // Show debug message to host
           console.log("[SERVER_DEBUG]", msg.message);
-          if (isHost) {
+          if (isHostRef.current) {
             // Show as both state and snackbar for better visibility
             setServerDebugMessage(msg.message);
             // Determine severity based on message content
@@ -5648,7 +5655,7 @@ export default function NewLiveMeeting() {
           // Host gets a notification that a new participant joined during breakout
           console.log("[MainSocket] Late joiner notification:", msg.notification);
           // ✅ FIX: Only show notification to host/publisher role
-          if (role === "publisher") {
+          if (roleRef.current === "publisher") {
             const notif = msg.notification;
             showSnackbar(
               `${notif.participant_name} joined and is in the Main Room.`,
@@ -5736,7 +5743,7 @@ export default function NewLiveMeeting() {
         } else if (msg.type === "waiting_room_enforced") {
           // ✅ NEW: Handle waiting room enforcement
           console.log("[MainSocket] Received waiting_room_enforced");
-          if (!isHost) {
+          if (!isHostRef.current) {
             console.log("[MainSocket] Enforcing waiting room transition - host started meeting");
 
             // 1. Unset main token ref so we don't auto-rejoin main
@@ -6080,7 +6087,7 @@ export default function NewLiveMeeting() {
           } else {
             // User is on main stage - enforce break media lock
             enforceSelfBreakMediaLock();
-            if (isHost) updateAudienceMediaForBreak(true);
+            if (isHostRef.current) updateAudienceMediaForBreak(true);
 
             if (loungeOpen && !msg.lounge_enabled_breaks) {
               setLoungeOpen(false);
@@ -6097,7 +6104,7 @@ export default function NewLiveMeeting() {
             clearInterval(breakTimerRef.current);
             breakTimerRef.current = null;
           }
-          if (isHost) updateAudienceMediaForBreak(false);
+          if (isHostRef.current) updateAudienceMediaForBreak(false);
 
           // ✅ BUGFIX: Always clear breakout state when break ends
           // User is no longer in a breakout room after break ends (they were removed from lounge)
@@ -6125,7 +6132,7 @@ export default function NewLiveMeeting() {
           setLoungeCountdownTransition(msg.transition);
 
           // Show countdown UI in snackbar for non-host participants
-          if (!isHost) {
+          if (!isHostRef.current) {
             showSnackbar(
               `The webinar is starting in ${msg.countdown_seconds} seconds. The Social Lounge is closing...`,
               "info",
@@ -6138,7 +6145,7 @@ export default function NewLiveMeeting() {
           setLoungeCountingDown(false);
           setLoungeCountdownValue(0);
 
-          if (!isHost) {
+          if (!isHostRef.current) {
             if (msg.transition === "to_main_room") {
               // Participant is now admitted - main room will load
               setWaitingRoomActive(false);
@@ -6179,7 +6186,7 @@ export default function NewLiveMeeting() {
           }
 
           // Refresh lounge participants if host
-          if (isHost) {
+          if (isHostRef.current) {
             try {
               const res = await fetch(toApiUrl(`events/${eventId}/lounge-participants/`), {
                 headers: authHeader(),
@@ -6227,7 +6234,7 @@ export default function NewLiveMeeting() {
       console.log("[MainSocket] Cleanup function called - closing WebSocket");
       if (ws.readyState <= WebSocket.OPEN) ws.close();
     };
-  }, [eventId, isHost]);
+  }, [eventId]);
 
   // ✅ Additional polling for lounge status while in breakout (more frequent)
   // Ensures lounge close is detected quickly even if WebSocket updates are delayed
