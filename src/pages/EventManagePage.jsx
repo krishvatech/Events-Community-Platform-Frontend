@@ -287,14 +287,14 @@ export default function EventManagePage() {
   const [loungeCreateOpen, setLoungeCreateOpen] = useState(false);
   const [loungeCreateCategory, setLoungeCreateCategory] = useState("LOUNGE"); // 'LOUNGE' | 'BREAKOUT'
   const [loungeCreateName, setLoungeCreateName] = useState("Networking Table");
-  const [loungeCreateSeats, setLoungeCreateSeats] = useState(4);
+  const [loungeCreateSeats, setLoungeCreateSeats] = useState("4");
   const [loungeCreateSaving, setLoungeCreateSaving] = useState(false);
   const [loungeCreateIcon, setLoungeCreateIcon] = useState(null);
   const [loungeCreatePreview, setLoungeCreatePreview] = useState("");
   const [loungeEditOpen, setLoungeEditOpen] = useState(false);
   const [loungeEditTarget, setLoungeEditTarget] = useState(null);
   const [loungeEditName, setLoungeEditName] = useState("");
-  const [loungeEditSeats, setLoungeEditSeats] = useState(4);
+  const [loungeEditSeats, setLoungeEditSeats] = useState("4");
   const [loungeEditSaving, setLoungeEditSaving] = useState(false);
   const [loungeEditIcon, setLoungeEditIcon] = useState(null);
   const [loungeEditPreview, setLoungeEditPreview] = useState("");
@@ -740,6 +740,7 @@ export default function EventManagePage() {
   }, [speedNetworkingEditTarget]);
 
   const clampSeats = useCallback((value) => Math.max(2, Math.min(30, value || 0)), []);
+  const normalizeSeatsInput = useCallback((value) => clampSeats(Number.parseInt(String(value || ""), 10)), [clampSeats]);
 
   const normalizeLoungeTables = useCallback(
     (tables) =>
@@ -783,7 +784,7 @@ export default function EventManagePage() {
       const token = getToken();
       const url = `${API_ROOT}/events/${eventId}/create-lounge-table/`;
       let res;
-      const seatsValue = clampSeats(loungeCreateSeats);
+      const seatsValue = normalizeSeatsInput(loungeCreateSeats);
       if (loungeCreateIcon) {
         const formData = new FormData();
         formData.append("name", name);
@@ -811,7 +812,7 @@ export default function EventManagePage() {
       }
       setLoungeCreateOpen(false);
       setLoungeCreateName("Networking Table");
-      setLoungeCreateSeats(4);
+      setLoungeCreateSeats("4");
       setLoungeCreateIcon(null);
       fetchLoungeTables();
     } catch (e) {
@@ -824,7 +825,7 @@ export default function EventManagePage() {
   const handleOpenEditLoungeTable = (table) => {
     setLoungeEditTarget(table);
     setLoungeEditName(table?.name || "");
-    setLoungeEditSeats(clampSeats(table?.max_seats || 4));
+    setLoungeEditSeats(String(clampSeats(table?.max_seats || 4)));
     setLoungeEditIcon(null);
     setLoungeEditPreview(table?.icon_url || "");
     setLoungeEditOpen(true);
@@ -839,7 +840,7 @@ export default function EventManagePage() {
       const token = getToken();
       const url = `${API_ROOT}/events/${eventId}/lounge-table-update/`;
       let res;
-      const seatsValue = clampSeats(loungeEditSeats);
+      const seatsValue = normalizeSeatsInput(loungeEditSeats);
       if (loungeEditIcon) {
         const formData = new FormData();
         formData.append("table_id", String(loungeEditTarget.id));
@@ -4330,7 +4331,9 @@ export default function EventManagePage() {
                 type="number"
                 inputProps={{ min: 2, max: 30 }}
                 value={loungeCreateSeats}
-                onChange={(e) => setLoungeCreateSeats(clampSeats(Number(e.target.value)))}
+                onChange={(e) => setLoungeCreateSeats(e.target.value)}
+                onBlur={(e) => setLoungeCreateSeats(String(normalizeSeatsInput(e.target.value)))}
+                helperText="Allowed range: 2 to 30 seats"
                 fullWidth
               />
               {loungeCreateCategory !== 'BREAKOUT' && (
@@ -4423,7 +4426,9 @@ export default function EventManagePage() {
                 type="number"
                 inputProps={{ min: 2, max: 30 }}
                 value={loungeEditSeats}
-                onChange={(e) => setLoungeEditSeats(clampSeats(Number(e.target.value)))}
+                onChange={(e) => setLoungeEditSeats(e.target.value)}
+                onBlur={(e) => setLoungeEditSeats(String(normalizeSeatsInput(e.target.value)))}
+                helperText="Allowed range: 2 to 30 seats"
                 fullWidth
               />
               {(loungeEditTarget?.category || 'LOUNGE') !== 'BREAKOUT' && (
