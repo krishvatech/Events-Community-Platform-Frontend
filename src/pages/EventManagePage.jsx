@@ -343,6 +343,9 @@ export default function EventManagePage() {
   const [participantVisibility, setParticipantVisibility] = useState({
     show_participants_before_event: true,
     show_participants_after_event: false,
+    show_public_hosts: true,
+    show_public_speakers: true,
+    show_public_moderators: false,
     show_speed_networking_match_history: true,
   });
 
@@ -503,6 +506,9 @@ export default function EventManagePage() {
       setParticipantVisibility({
         show_participants_before_event: visibilityUpdated ? (event.show_participants_before_event ?? true) : true,
         show_participants_after_event: event.show_participants_after_event ?? false,
+        show_public_hosts: event.show_public_hosts ?? true,
+        show_public_speakers: event.show_public_speakers ?? true,
+        show_public_moderators: event.show_public_moderators ?? false,
         show_speed_networking_match_history: visibilityUpdated ? (event.show_speed_networking_match_history ?? true) : true,
       });
     }
@@ -1714,6 +1720,48 @@ export default function EventManagePage() {
                     <Box>
                       <Typography variant="body2" fontWeight={500}>Show participants after event ends</Typography>
                       <Typography variant="caption" color="text.secondary">Default: Off</Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={participantVisibility.show_public_hosts}
+                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_public_hosts: e.target.checked }))}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>Show hosts publicly</Typography>
+                      <Typography variant="caption" color="text.secondary">Turn off when host accounts are only providing technical support.</Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={participantVisibility.show_public_speakers}
+                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_public_speakers: e.target.checked }))}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>Show speakers publicly</Typography>
+                      <Typography variant="caption" color="text.secondary">Public-facing experts should usually remain visible.</Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={participantVisibility.show_public_moderators}
+                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_public_moderators: e.target.checked }))}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>Show moderators publicly</Typography>
+                      <Typography variant="caption" color="text.secondary">Off by default unless moderators are also public-facing presenters.</Typography>
                     </Box>
                   }
                 />

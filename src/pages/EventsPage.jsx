@@ -10,7 +10,9 @@ import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import {
   Box,
+  Avatar,
   Button,
+  Chip,
   Container,
   Divider,
   Grid,
@@ -287,6 +289,8 @@ function toCard(ev) {
     live_ended_at: ev.live_ended_at,
     show_participants_before_event: ev.show_participants_before_event,
     show_participants_after_event: ev.show_participants_after_event,
+    featured_participants: Array.isArray(ev.featured_participants) ? ev.featured_participants : [],
+    featured_participants_total: Number(ev.featured_participants_total ?? ev.featured_participants?.length ?? 0),
     timezone: ev.timezone,
     is_multi_day: ev.is_multi_day || false,  // ✅ NEW: Multi-day event flag
     sessions: Array.isArray(ev.sessions) ? ev.sessions.map(normalizeSession) : [], // ✅ NEW: Event sessions array
@@ -318,6 +322,59 @@ function canJoinEarly(ev, minutes = 15) {
   const windowMs = minutes * 60 * 1000;
 
   return diff > 0 && diff <= windowMs;
+}
+
+function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
+  if (!participants.length) return null;
+
+  return (
+    <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50/70 p-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-700">
+        Featured Participants
+      </div>
+      <div className="mt-2 space-y-2">
+        {participants.map((person, index) => {
+          const row = (
+            <div className="flex items-center gap-3 rounded-lg bg-white/80 px-2.5 py-2">
+              <Avatar
+                src={person.avatar_url || ""}
+                alt={person.display_name}
+                sx={{ width: 34, height: 34, fontSize: "0.9rem" }}
+              >
+                {(person.display_name?.[0] || "P").toUpperCase()}
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-neutral-900">
+                  {person.display_name}
+                </div>
+              </div>
+              <Chip
+                label={person.role_label || "Participant"}
+                size="small"
+                color={person.role === "host" ? "primary" : person.role === "speaker" ? "success" : "secondary"}
+                sx={{ height: 22, fontSize: "0.7rem" }}
+              />
+            </div>
+          );
+
+          return person.is_profile_clickable && person.profile_url ? (
+            <Link key={`${person.user_id || person.display_name}-${index}`} to={person.profile_url} className="block no-underline">
+              {row}
+            </Link>
+          ) : (
+            <div key={`${person.user_id || person.display_name}-${index}`}>
+              {row}
+            </div>
+          );
+        })}
+      </div>
+      {total > participants.length && (
+        <div className="mt-2 text-xs font-medium text-teal-700">
+          +{total - participants.length} more
+        </div>
+      )}
+    </div>
+  );
 }
 // ————————————————————————————————————————
 // Card (thumbnail view)
@@ -487,6 +544,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         {ev.description && (
           <p className="mt-2 text-neutral-600 text-sm three-line">{ev.description}</p>
         )}
+
+        <FeaturedParticipantsStrip
+          participants={ev.featured_participants}
+          total={ev.featured_participants_total}
+        />
 
         <div className="mt-4 space-y-2 text-neutral-800 text-sm meta-rows sm:min-h-[88px] md:min-h-[96px]">
           {(() => {
@@ -957,6 +1019,11 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                 </p>
               )}
 
+              <FeaturedParticipantsStrip
+                participants={ev.featured_participants}
+                total={ev.featured_participants_total}
+              />
+
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-neutral-800 text-sm">
                 <span className="inline-flex items-center gap-2">
                   <CalendarMonthIcon fontSize="small" className="text-teal-700" />
@@ -1209,6 +1276,8 @@ export default function EventsPage() {
   const [participantListLoading, setParticipantListLoading] = useState(false);
   const [participantListError, setParticipantListError] = useState("");
   const [participantEventTitle, setParticipantEventTitle] = useState("");
+  const [participantHiddenRolesCount, setParticipantHiddenRolesCount] = useState(0);
+  const [participantTotalRegisteredCount, setParticipantTotalRegisteredCount] = useState(0);
 
   const handleShowParticipants = React.useCallback(async (eventId, eventTitle) => {
     setParticipantEventTitle(eventTitle);
@@ -1216,6 +1285,8 @@ export default function EventsPage() {
     setParticipantListLoading(true);
     setParticipantListError("");
     setParticipantList([]);
+    setParticipantHiddenRolesCount(0);
+    setParticipantTotalRegisteredCount(0);
 
     try {
       const token = localStorage.getItem("access_token") ||
@@ -1233,7 +1304,9 @@ export default function EventsPage() {
       }
 
       const data = await res.json();
-      setParticipantList(data);
+      setParticipantList(Array.isArray(data) ? data : (data.participants || []));
+      setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
+      setParticipantTotalRegisteredCount(Number(data?.total_registered_count || 0));
     } catch (err) {
       setParticipantListError(err.message);
     } finally {
@@ -2638,6 +2711,8 @@ export default function EventsPage() {
         eventTitle={participantEventTitle}
         loading={participantListLoading}
         error={participantListError}
+        hiddenRolesCount={participantHiddenRolesCount}
+        totalRegisteredCount={participantTotalRegisteredCount}
       />
       <ToastContainer
         position="top-center"

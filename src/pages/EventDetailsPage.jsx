@@ -261,6 +261,8 @@ export default function EventDetailsPage() {
   // Participant List Dialog
   const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
   const [participantList, setParticipantList] = useState([]);
+  const [participantHiddenRolesCount, setParticipantHiddenRolesCount] = useState(0);
+  const [participantTotalRegisteredCount, setParticipantTotalRegisteredCount] = useState(0);
   const [expandedSessionDescriptions, setExpandedSessionDescriptions] = useState({});
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantError, setParticipantError] = useState(null);
@@ -379,8 +381,7 @@ export default function EventDetailsPage() {
         if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
-          // If the API returns a paginated response, handle it, otherwise assume array
-          const list = Array.isArray(data) ? data : (data.results || []);
+          const list = Array.isArray(data) ? data : (data.participants || data.results || []);
           setPreviewParticipants(list);
         }
       } catch (err) {
@@ -396,6 +397,8 @@ export default function EventDetailsPage() {
   const handleShowParticipants = async () => {
     setShowParticipantsDialog(true);
     setParticipantList([]);
+    setParticipantHiddenRolesCount(0);
+    setParticipantTotalRegisteredCount(0);
     setLoadingParticipants(true);
     setParticipantError(null);
 
@@ -405,7 +408,9 @@ export default function EventDetailsPage() {
       });
       if (!res.ok) throw new Error("Failed to load participants");
       const data = await res.json();
-      setParticipantList(data);
+      setParticipantList(Array.isArray(data) ? data : (data.participants || []));
+      setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
+      setParticipantTotalRegisteredCount(Number(data?.total_registered_count || 0));
     } catch (err) {
       setParticipantError(err.message);
     } finally {
@@ -935,12 +940,15 @@ export default function EventDetailsPage() {
                                       }}
                                     >
                                       {previewParticipants.map((p) => (
-                                        <Tooltip key={p.id} title={p.user_name || "User"}>
+                                        <Tooltip
+                                          key={p.registration_id || p.id}
+                                          title={p.primary_role ? `${p.display_name || "User"} • ${p.role_labels?.[0] || p.primary_role}` : (p.display_name || "User")}
+                                        >
                                           <Avatar
-                                            src={p.user_avatar_url}
-                                            alt={p.user_name || "User"}
+                                            src={p.avatar_url}
+                                            alt={p.display_name || "User"}
                                           >
-                                            {(p.user_name?.[0] || "U").toUpperCase()}
+                                            {(p.display_name?.[0] || "U").toUpperCase()}
                                           </Avatar>
                                         </Tooltip>
                                       ))}
@@ -1229,6 +1237,8 @@ export default function EventDetailsPage() {
         eventTitle={event?.title || "Event"}
         loading={loadingParticipants}
         error={participantError}
+        hiddenRolesCount={participantHiddenRolesCount}
+        totalRegisteredCount={participantTotalRegisteredCount}
       />
     </div>
   );

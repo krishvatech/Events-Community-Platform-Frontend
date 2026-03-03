@@ -17,8 +17,24 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import { Link as RouterLink } from "react-router-dom";
 
-export default function ParticipantListDialog({ open, onClose, participants, eventTitle, loading, error }) {
+const ROLE_CHIP_PROPS = {
+    host: { label: "Host", color: "primary" },
+    speaker: { label: "Speaker", color: "success" },
+    moderator: { label: "Moderator", color: "secondary" },
+};
+
+export default function ParticipantListDialog({
+    open,
+    onClose,
+    participants,
+    eventTitle,
+    loading,
+    error,
+    hiddenRolesCount = 0,
+    totalRegisteredCount = 0,
+}) {
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
@@ -51,36 +67,59 @@ export default function ParticipantListDialog({ open, onClose, participants, eve
                     </Box>
                 ) : (
                     <List>
+                        {hiddenRolesCount > 0 && (
+                            <Box sx={{ px: 2, pb: 1 }}>
+                                <Typography variant="caption" color="text.secondary">
+                                    Some organizer roles are hidden for this event.
+                                    {totalRegisteredCount > 0 ? ` Showing ${participants.length} of ${totalRegisteredCount} registered.` : ""}
+                                </Typography>
+                            </Box>
+                        )}
                         {participants.map((reg) => (
-                            <ListItem key={reg.id}>
+                            <ListItem key={reg.registration_id || reg.user_id || reg.display_name}>
                                 <ListItemAvatar>
-                                    <Avatar src={reg.user_avatar_url} alt={reg.user_name}>
-                                        {reg.user_name?.[0]?.toUpperCase()}
+                                    <Avatar
+                                        src={reg.avatar_url}
+                                        alt={reg.display_name}
+                                        component={reg.is_profile_clickable ? RouterLink : "div"}
+                                        to={reg.is_profile_clickable ? reg.profile_url : undefined}
+                                        sx={reg.is_profile_clickable ? { cursor: "pointer" } : undefined}
+                                    >
+                                        {reg.display_name?.[0]?.toUpperCase()}
                                     </Avatar>
                                 </ListItemAvatar>
                                 <ListItemText
                                     primary={
                                         <Box display="flex" alignItems="center" gap={1}>
-                                            <Typography variant="body1">
-                                                {reg.user_name || "Unknown User"}
+                                            <Typography
+                                                variant="body1"
+                                                component={reg.is_profile_clickable ? RouterLink : "span"}
+                                                to={reg.is_profile_clickable ? reg.profile_url : undefined}
+                                                sx={reg.is_profile_clickable ? {
+                                                    color: "inherit",
+                                                    textDecoration: "none",
+                                                    "&:hover": { textDecoration: "underline" },
+                                                } : undefined}
+                                            >
+                                                {reg.display_name || "Unknown User"}
                                             </Typography>
                                             {/* KYC Badge */}
-                                            {['approved', 'verified'].includes((reg.user_kyc_status || reg.kyc_status || '').toLowerCase()) && (
+                                            {['approved', 'verified'].includes((reg.kyc_status || '').toLowerCase()) && (
                                                 <Tooltip title="Verified Member">
                                                     <VerifiedIcon sx={{ fontSize: 16, color: '#22d3ee' }} />
                                                 </Tooltip>
                                             )}
-                                            {reg.is_host && (
+                                            {reg.primary_role && (
                                                 <Chip
-                                                    label="Host"
+                                                    label={ROLE_CHIP_PROPS[reg.primary_role]?.label || reg.role_labels?.[0] || "Participant"}
                                                     size="small"
-                                                    color="primary"
+                                                    color={ROLE_CHIP_PROPS[reg.primary_role]?.color || "default"}
                                                     sx={{ height: 20, fontSize: '0.7rem' }}
                                                 />
                                             )}
                                         </Box>
                                     }
-                                    secondary={reg.user_email}
+                                    secondary={reg.email}
                                 />
                             </ListItem>
                         ))}
