@@ -13908,14 +13908,18 @@ export default function NewLiveMeeting() {
                                 primary={
                                   <Stack spacing={1}>
                                     <Stack direction="row" spacing={0.8} alignItems="center">
-                                      <Typography
-                                        sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
-                                        onClick={() => {
-                                          if (!isSelfMember(m)) openMemberInfo(m);
-                                        }}
-                                      >
-                                        {m.name}{isSelfMember(m) ? " (You)" : ""}
-                                      </Typography>
+                                      <Tooltip title="View Profile" disableHoverListener={isSelfMember(m)}>
+                                        <span>
+                                          <Typography
+                                            sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
+                                            onClick={() => {
+                                              if (!isSelfMember(m)) openMemberInfo(m);
+                                            }}
+                                          >
+                                            {m.name}{isSelfMember(m) ? " (You)" : ""}
+                                          </Typography>
+                                        </span>
+                                      </Tooltip>
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
                                         if (userId && !participantKycCache[userId]) {
@@ -14337,14 +14341,18 @@ export default function NewLiveMeeting() {
                                 primary={
                                   <Stack spacing={1}>
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                                      <Typography
-                                        sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
-                                        onClick={() => {
-                                          if (!isSelfMember(m)) openMemberInfo(m);
-                                        }}
-                                      >
-                                        {m.name}{isSelfMember(m) ? " (You)" : ""}
-                                      </Typography>
+                                      <Tooltip title="View Profile" disableHoverListener={isSelfMember(m)}>
+                                        <span>
+                                          <Typography
+                                            sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
+                                            onClick={() => {
+                                              if (!isSelfMember(m)) openMemberInfo(m);
+                                            }}
+                                          >
+                                            {m.name}{isSelfMember(m) ? " (You)" : ""}
+                                          </Typography>
+                                        </span>
+                                      </Tooltip>
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
                                         if (userId && !participantKycCache[userId]) {
@@ -14438,6 +14446,22 @@ export default function NewLiveMeeting() {
                                           {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
                                         </IconButton>
                                       </Tooltip>
+
+                                      {!isSelfMember(m) && (
+                                        <Tooltip title={isOnBreak ? "Disabled during break" : "Open Profile"}>
+                                          <IconButton
+                                            size="small"
+                                            disabled={isOnBreak}
+                                            sx={{ color: "rgba(255,255,255,0.9)" }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openMemberInfo(m);
+                                            }}
+                                          >
+                                            <InfoOutlinedIcon fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      )}
 
                                       {/* KICK/BAN MENU for Host */}
                                       {isHost && !isSelfMember(m) && (
@@ -14595,15 +14619,19 @@ export default function NewLiveMeeting() {
                               primary={
                                 <Stack spacing={1}>
                                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                                    <Typography
-                                      noWrap
-                                      sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
-                                      onClick={() => {
-                                        if (!isSelfMember(m)) openMemberInfo(m);
-                                      }}
-                                    >
-                                      {m.name}{isSelfMember(m) ? " (You)" : ""}
-                                    </Typography>
+                                    <Tooltip title="View Profile" disableHoverListener={isSelfMember(m)}>
+                                      <span>
+                                        <Typography
+                                          noWrap
+                                          sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
+                                          onClick={() => {
+                                            if (!isSelfMember(m)) openMemberInfo(m);
+                                          }}
+                                        >
+                                          {m.name}{isSelfMember(m) ? " (You)" : ""}
+                                        </Typography>
+                                      </span>
+                                    </Tooltip>
                                     {(() => {
                                       const userId = m._raw?.customParticipantId || m.id;
                                       if (userId && !participantKycCache[userId]) {
