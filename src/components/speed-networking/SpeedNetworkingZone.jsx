@@ -70,6 +70,7 @@ export default function SpeedNetworkingZone({
     onClose,
     dyteMeeting,
     onEnterMatch,
+    onNetworkingStateChange,
     lastMessage,
     onMemberInfo,
     onPrivateChat,
@@ -666,6 +667,13 @@ export default function SpeedNetworkingZone({
         if (inQueue || currentMatch || transitionMatch) return;
         fetchMyMatch();
     }, [session, inQueue, currentMatch, transitionMatch, fetchMyMatch]);
+
+    useEffect(() => {
+        if (!onNetworkingStateChange) return;
+        const mode = (currentMatch || transitionMatch) ? 'matched' : (inQueue ? 'finding_match' : 'idle');
+        const inNetworkingFlow = mode !== 'idle';
+        onNetworkingStateChange({ mode, inNetworkingFlow });
+    }, [currentMatch, inQueue, onNetworkingStateChange, transitionMatch]);
 
     useEffect(() => {
         if (!autoJoinOnOpen || !session || session.status !== 'ACTIVE') return;

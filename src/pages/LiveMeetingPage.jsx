@@ -2486,6 +2486,8 @@ export default function NewLiveMeeting() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [loungeOpen, setLoungeOpen] = useState(false);
   const [showSpeedNetworking, setShowSpeedNetworking] = useState(false);
+  const [speedNetworkingMainIsolation, setSpeedNetworkingMainIsolation] = useState(false);
+  const [speedNetworkingRejoinTick, setSpeedNetworkingRejoinTick] = useState(0);
   const [speedNetworkingAutoJoinTrigger, setSpeedNetworkingAutoJoinTrigger] = useState(0);
   const [speedNetworkingNotification, setSpeedNetworkingNotification] = useState(null); // ✅ Notification message
 
@@ -2730,6 +2732,7 @@ export default function NewLiveMeeting() {
   const tokenFetchInFlightRef = useRef(false);
   const initInFlightRef = useRef(false);
   const joinInFlightRef = useRef(false);
+  const speedNetworkingMainSwitchInFlightRef = useRef(false);
   const mainJoinInFlightRef = useRef(false);
   const lastInitTokenRef = useRef(null);
   const tokenFetchAbortControllerRef = useRef(null); // ✅ AbortController for cancelling in-flight token fetches
@@ -3346,6 +3349,57 @@ export default function NewLiveMeeting() {
     },
     [dyteMeeting]
   );
+
+  const setMainMeetingIsolationForSpeedNetworking = useCallback(
+    async (shouldIsolate) => {
+      if (!dyteMeeting?.self) return;
+      if (speedNetworkingMainSwitchInFlightRef.current) return;
+      if (speedNetworkingMainIsolation === shouldIsolate) return;
+
+      speedNetworkingMainSwitchInFlightRef.current = true;
+      try {
+        if (shouldIsolate) {
+          setSpeedNetworkingMainIsolation(true);
+          await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 80 });
+          if (dyteMeeting.self.roomJoined) {
+            ignoreRoomLeftRef.current = true;
+            try {
+              await dyteMeeting.leaveRoom?.();
+            } finally {
+              ignoreRoomLeftRef.current = false;
+            }
+          }
+          setRoomJoined(false);
+          joinedOnceRef.current = false;
+          setMicOn(false);
+        } else {
+          if (!dyteMeeting.self.roomJoined) {
+            setRoomJoined(false);
+            joinedOnceRef.current = false;
+            setSpeedNetworkingRejoinTick((v) => v + 1);
+          }
+          setSpeedNetworkingMainIsolation(false);
+        }
+      } catch (e) {
+        console.warn("[LiveMeeting] Failed switching speed networking/main room media:", e);
+      } finally {
+        speedNetworkingMainSwitchInFlightRef.current = false;
+      }
+    },
+    [dyteMeeting, forceSelfAudioOffAtMediaLevel, speedNetworkingMainIsolation]
+  );
+
+  const handleSpeedNetworkingStateChange = useCallback(
+    ({ inNetworkingFlow }) => {
+      setMainMeetingIsolationForSpeedNetworking(Boolean(inNetworkingFlow));
+    },
+    [setMainMeetingIsolationForSpeedNetworking]
+  );
+
+  const handleCloseSpeedNetworking = useCallback(() => {
+    setShowSpeedNetworking(false);
+    setMainMeetingIsolationForSpeedNetworking(false);
+  }, [setMainMeetingIsolationForSpeedNetworking]);
 
   const enforceSelfBreakMediaLock = useCallback(async () => {
     // ✅ STATE PRIORITY FIX: Skip lock enforcement for lounge users during break
@@ -7552,6 +7606,39 @@ export default function NewLiveMeeting() {
         setMainMicHardMuted(false);
       }
 
+      // Speed networking isolation leave/rejoin can leave participant collections stale
+      // until next internal SDK sync; force a refresh so remote users appear immediately.
+      try {
+        if (typeof dyteMeeting?.participants?.refresh === "function") {
+          await dyteMeeting.participants.refresh();
+        }
+      } catch (e) {
+        console.warn("[LiveMeeting] participants.refresh failed after roomJoined:", e?.message || e);
+      }
+      try {
+        if (typeof dyteMeeting?.participants?.videoSubscribed?.refresh === "function") {
+          await dyteMeeting.participants.videoSubscribed.refresh();
+        }
+      } catch (e) {
+        console.warn("[LiveMeeting] participants.videoSubscribed.refresh failed after roomJoined:", e?.message || e);
+      }
+      // Retry refreshes shortly after join; some clients need extra time for remote track propagation.
+      [500, 1500, 2600].forEach((delayMs) => {
+        setTimeout(async () => {
+          if (!dyteMeeting?.self?.roomJoined) return;
+          try {
+            if (typeof dyteMeeting?.participants?.refresh === "function") {
+              await dyteMeeting.participants.refresh();
+            }
+          } catch (_) { }
+          try {
+            if (typeof dyteMeeting?.participants?.videoSubscribed?.refresh === "function") {
+              await dyteMeeting.participants.videoSubscribed.refresh();
+            }
+          } catch (_) { }
+        }, delayMs);
+      });
+
       // ✅ Auto-record for direct joins (Waiting Room disabled)
       if (isHost && autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
         // dyteMeeting.participants.joined is a MAP-like object (size/length vary by SDK)
@@ -7636,7 +7723,7 @@ export default function NewLiveMeeting() {
     return () => {
       dyteMeeting.self.off?.("roomJoined", onRoomJoined);
     };
-  }, [dyteMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak]);
+  }, [dyteMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick]);
 
   // On lounge/breakout -> main transition, some SDKs recreate audio senders asynchronously.
   // Keep forcing hard mute briefly while mic UI is OFF to prevent ghost audio transmission.
@@ -15317,7 +15404,7 @@ export default function NewLiveMeeting() {
         ref={remoteAudioRef}
         style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
       >
-        <DyteParticipantsAudio meeting={dyteMeeting} />
+        {!speedNetworkingMainIsolation && <DyteParticipantsAudio meeting={dyteMeeting} />}
       </div>
       <Box
         ref={rootRef}
@@ -17526,15 +17613,16 @@ export default function NewLiveMeeting() {
         <Dialog
           fullScreen
           open={showSpeedNetworking}
-          onClose={() => setShowSpeedNetworking(false)}
+          onClose={handleCloseSpeedNetworking}
           sx={{ zIndex: 1250 }} // Above lounge but below snackbars
         >
           <SpeedNetworkingZone
             eventId={eventId}
             isAdmin={isHost}
-            onClose={() => setShowSpeedNetworking(false)}
+            onClose={handleCloseSpeedNetworking}
             dyteMeeting={dyteMeeting}
             autoJoinOnOpen={speedNetworkingAutoJoinTrigger}
+            onNetworkingStateChange={handleSpeedNetworkingStateChange}
             // Passing down the last WebSocket message to handle matching events
             lastMessage={lastMessage}
             onMemberInfo={openMemberInfo}
