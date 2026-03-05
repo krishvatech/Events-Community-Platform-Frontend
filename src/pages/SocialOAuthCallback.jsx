@@ -151,7 +151,7 @@ const SocialOAuthCallback = () => {
         const { path } = getRoleAndRedirectPath({
           cognitoGroups,
           backendUser,
-          defaultPath: "/events",
+          defaultPath: "/account/profile",
         });
 
         if (path === "/admin/events") {

@@ -13,7 +13,7 @@ const GuestOnly = ({ children }) => {
   const loc = useLocation();
   if (isAuthed()) {
     const params = new URLSearchParams(loc.search);
-    const next = params.get("next") || "/events";
+    const next = params.get("next") || "/account/profile";
     return <Navigate to={next} replace />;
   }
   return children;

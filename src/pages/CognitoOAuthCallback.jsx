@@ -49,7 +49,7 @@ const CognitoOAuthCallback = () => {
     const state = params.get("state");
 
     const redirectKey = `post_login_redirect_${state}`;
-    const intended = sessionStorage.getItem(redirectKey) || "/community";
+    const intended = sessionStorage.getItem(redirectKey) || "/account/profile";
     sessionStorage.removeItem(redirectKey);
 
     if (!code || !state) {

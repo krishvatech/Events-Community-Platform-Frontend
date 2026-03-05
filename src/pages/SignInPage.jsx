@@ -346,7 +346,7 @@ const SignInPage = () => {
       saveLoginPayload(data, { email: formData.email });
 
       const params = new URLSearchParams(location.search);
-      const intended = params.get("next") || location.state?.from?.pathname || "/community";
+      const intended = params.get("next") || location.state?.from?.pathname || "/account/profile";
 
       const accessTokenForGroups = data?.access || localStorage.getItem("access_token") || "";
       const cognitoGroups = getCognitoGroupsFromTokens(accessTokenForGroups);
@@ -354,7 +354,7 @@ const SignInPage = () => {
       const { role, path } = getRoleAndRedirectPath({
         cognitoGroups,
         backendUser,
-        defaultPath: intended || "/community",
+        defaultPath: intended || "/account/profile",
       });
 
       console.log("[auth] role redirect", {
