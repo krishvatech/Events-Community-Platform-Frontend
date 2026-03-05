@@ -2402,7 +2402,6 @@ function EventsPage() {
   const token = getToken();
   const isOwner = isOwnerUser();
   const navigate = useNavigate();
-  const location = useLocation();
   const user = useMemo(() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "{}");
@@ -2554,8 +2553,7 @@ function EventsPage() {
     setHostingId(ev.id);
     try {
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=publisher`;
-      const fromPath = `${location.pathname}${location.search || ""}`;
-      navigate(livePath, { state: { event: ev, fromPath } });
+      navigate(livePath);
     } catch (e) {
       setErrMsg(e?.message || "Unable to start live meeting.");
       setErrOpen(true);
@@ -2571,13 +2569,11 @@ function EventsPage() {
       const isPreEventLounge = isPreEventLoungeOpen(ev);
       const isPostEventLounge = isPostEventLoungeOpen(ev);
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
-      const fromPath = `${location.pathname}${location.search || ""}`;
       navigate(livePath, {
         state: {
           event: ev,
           openLounge: isPreEventLounge || isPostEventLounge,
           preEventLounge: isPreEventLounge,
-          fromPath,
         }
       });
     } catch (e) {

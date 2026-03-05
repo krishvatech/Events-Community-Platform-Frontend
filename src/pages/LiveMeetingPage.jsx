@@ -2717,48 +2717,6 @@ export default function NewLiveMeeting() {
   const location = useLocation();
   const preEventTick = useSecondTick();
   const eventFromState = location?.state?.event || null;
-  const sanitizeMeetingReturnPath = useCallback((rawPath) => {
-    if (!rawPath) return null;
-
-    try {
-      const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
-      const parsed = rawPath.startsWith("http://") || rawPath.startsWith("https://")
-        ? new URL(rawPath)
-        : new URL(rawPath, currentOrigin || "http://localhost");
-
-      if (currentOrigin && parsed.origin !== currentOrigin) return null;
-
-      const normalizedPathname =
-        parsed.pathname !== "/" && parsed.pathname.endsWith("/")
-          ? parsed.pathname.slice(0, -1)
-          : parsed.pathname;
-      const normalized = `${normalizedPathname}${parsed.search || ""}${parsed.hash || ""}`;
-
-      const allowedStaticPaths = new Set([
-        "/events",
-        "/account/events",
-        "/admin/events",
-      ]);
-      const isAllowedDetailsPath = /^\/events\/[^/?#]+(?:\?.*)?$/.test(normalized);
-      const isAllowedAdminEventPath = /^\/admin\/events\/[^/?#]+(?:\?.*)?$/.test(normalized);
-
-      if (allowedStaticPaths.has(normalized) || isAllowedDetailsPath || isAllowedAdminEventPath) {
-        return normalized;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }, []);
-  const meetingReturnPathFromState = useMemo(
-    () => sanitizeMeetingReturnPath(location?.state?.fromPath || location?.state?.from || ""),
-    [location?.state?.from, location?.state?.fromPath, sanitizeMeetingReturnPath]
-  );
-  const meetingReturnPathFromReferrer = useMemo(() => {
-    if (typeof document === "undefined") return null;
-    return sanitizeMeetingReturnPath(document.referrer || "");
-  }, [sanitizeMeetingReturnPath]);
-  const meetingReturnPath = meetingReturnPathFromState || meetingReturnPathFromReferrer || null;
 
   // ---------- Old logic states (real) ----------
   const [loungeSettingsOpen, setLoungeSettingsOpen] = useState(false);
@@ -8296,8 +8254,8 @@ export default function NewLiveMeeting() {
     [eventData?.created_by_id, isEventOwner, role]
   );
   const navigateAfterMeetingExit = useCallback(() => {
-    navigate(meetingReturnPath || defaultMeetingExitPath);
-  }, [defaultMeetingExitPath, meetingReturnPath, navigate]);
+    navigate(defaultMeetingExitPath, { replace: true });
+  }, [defaultMeetingExitPath, navigate]);
 
   const handleMeetingEnd = useCallback(
     async (state, options = {}) => {

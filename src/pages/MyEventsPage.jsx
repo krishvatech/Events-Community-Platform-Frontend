@@ -1,6 +1,6 @@
 // src/pages/MyEventsPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
@@ -617,7 +617,6 @@ function EventCardSkeleton() {
 // ---------------------- Main Page (kept with token-join MOD) ----------------------
 export default function MyEventsPage() {
   const navigate = useNavigate(); // MOD
-  const location = useLocation();
   const storedUser = useMemo(() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "{}");
@@ -839,14 +838,12 @@ export default function MyEventsPage() {
       const shouldOpenLoungeOnEntry =
         isPostEventLounge || (isPreEventLounge && (isHost || !willGoToWaitingRoom(ev)));
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${isHost ? "publisher" : "audience"}`;
-      const fromPath = `${location.pathname}${location.search || ""}`;
 
       navigate(livePath, {
         state: {
           event: ev,
           openLounge: shouldOpenLoungeOnEntry,
           preEventLounge: isPreEventLounge,
-          fromPath,
         },
         replace: false,
       });
