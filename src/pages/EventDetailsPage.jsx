@@ -695,6 +695,7 @@ export default function EventDetailsPage() {
   const refParam = searchParams.get("ref");
   const backLabel = refParam === "my_events" ? "My Events" : "Explore Events";
   const backPath = refParam === "my_events" ? "/account/events" : "/events";
+  const fromPath = `${location.pathname}${location.search || ""}`;
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -1031,7 +1032,12 @@ export default function EventDetailsPage() {
                           <Button
                             component={Link}
                             to={livePath}
-                            state={{ event, openLounge: shouldOpenLoungeOnEntry, preEventLounge: isPreEventLounge }}
+                            state={{
+                              event,
+                              openLounge: shouldOpenLoungeOnEntry,
+                              preEventLounge: isPreEventLounge,
+                              fromPath,
+                            }}
                             sx={{
                               textTransform: "none",
                               backgroundColor: "#10b8a6",

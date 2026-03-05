@@ -1167,7 +1167,8 @@ export default function EventManagePage() {
     setHostingId(event.id);
     try {
       const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=publisher`;
-      navigate(livePath);
+      const fromPath = `${location.pathname}${location.search || ""}`;
+      navigate(livePath, { state: { event, fromPath } });
     } catch (e) {
       setErrMsg(e?.message || "Unable to start live meeting.");
       setErrOpen(true);
@@ -1183,7 +1184,15 @@ export default function EventManagePage() {
       const isPreEventLounge = isPreEventLoungeOpen(event);
       const isPostEventLounge = isPostEventLoungeOpen(event);
       const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=audience`;
-      navigate(livePath, { state: { event, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge } });
+      const fromPath = `${location.pathname}${location.search || ""}`;
+      navigate(livePath, {
+        state: {
+          event,
+          openLounge: isPreEventLounge || isPostEventLounge,
+          preEventLounge: isPreEventLounge,
+          fromPath,
+        }
+      });
     } catch (e) {
       setErrMsg(e?.message || "Unable to join live.");
       setErrOpen(true);

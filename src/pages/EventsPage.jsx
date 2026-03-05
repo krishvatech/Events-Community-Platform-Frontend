@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import {
@@ -381,6 +381,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 // ————————————————————————————————————————
 function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const owner = isOwnerUser();
   const reg = myRegistrations?.[ev.id];
   const status = computeStatus(ev);
@@ -498,8 +499,14 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
   const handleJoinCard = () => {
     const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+    const fromPath = `${location.pathname}${location.search || ""}`;
     navigate(livePath, {
-      state: { event: ev, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge },
+      state: {
+        event: ev,
+        openLounge: isPreEventLounge || isPostEventLounge,
+        preEventLounge: isPreEventLounge,
+        fromPath,
+      },
       replace: false,
     });
   };
@@ -874,6 +881,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 // ————————————————————————————————————————
 function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const reg = myRegistrations?.[ev.id];
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
@@ -978,8 +986,14 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
 
   const handleJoinRow = () => {
     const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+    const fromPath = `${location.pathname}${location.search || ""}`;
     navigate(livePath, {
-      state: { event: ev, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge },
+      state: {
+        event: ev,
+        openLounge: isPreEventLounge || isPostEventLounge,
+        preEventLounge: isPreEventLounge,
+        fromPath,
+      },
       replace: false,
     });
   };

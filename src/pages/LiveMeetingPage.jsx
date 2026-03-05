@@ -2717,6 +2717,48 @@ export default function NewLiveMeeting() {
   const location = useLocation();
   const preEventTick = useSecondTick();
   const eventFromState = location?.state?.event || null;
+  const sanitizeMeetingReturnPath = useCallback((rawPath) => {
+    if (!rawPath) return null;
+
+    try {
+      const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      const parsed = rawPath.startsWith("http://") || rawPath.startsWith("https://")
+        ? new URL(rawPath)
+        : new URL(rawPath, currentOrigin || "http://localhost");
+
+      if (currentOrigin && parsed.origin !== currentOrigin) return null;
+
+      const normalizedPathname =
+        parsed.pathname !== "/" && parsed.pathname.endsWith("/")
+          ? parsed.pathname.slice(0, -1)
+          : parsed.pathname;
+      const normalized = `${normalizedPathname}${parsed.search || ""}${parsed.hash || ""}`;
+
+      const allowedStaticPaths = new Set([
+        "/events",
+        "/account/events",
+        "/admin/events",
+      ]);
+      const isAllowedDetailsPath = /^\/events\/[^/?#]+(?:\?.*)?$/.test(normalized);
+      const isAllowedAdminEventPath = /^\/admin\/events\/[^/?#]+(?:\?.*)?$/.test(normalized);
+
+      if (allowedStaticPaths.has(normalized) || isAllowedDetailsPath || isAllowedAdminEventPath) {
+        return normalized;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const meetingReturnPathFromState = useMemo(
+    () => sanitizeMeetingReturnPath(location?.state?.fromPath || location?.state?.from || ""),
+    [location?.state?.from, location?.state?.fromPath, sanitizeMeetingReturnPath]
+  );
+  const meetingReturnPathFromReferrer = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    return sanitizeMeetingReturnPath(document.referrer || "");
+  }, [sanitizeMeetingReturnPath]);
+  const meetingReturnPath = meetingReturnPathFromState || meetingReturnPathFromReferrer || null;
 
   // ---------- Old logic states (real) ----------
   const [loungeSettingsOpen, setLoungeSettingsOpen] = useState(false);
@@ -8249,6 +8291,13 @@ export default function NewLiveMeeting() {
     if (!myUserId || !eventData?.created_by_id) return false;
     return String(myUserId) === String(eventData.created_by_id);
   }, [myUserId, eventData?.created_by_id]);
+  const defaultMeetingExitPath = useMemo(
+    () => (isEventOwner || (role === "publisher" && !eventData?.created_by_id) ? "/admin/events" : "/my-events"),
+    [eventData?.created_by_id, isEventOwner, role]
+  );
+  const navigateAfterMeetingExit = useCallback(() => {
+    navigate(meetingReturnPath || defaultMeetingExitPath);
+  }, [defaultMeetingExitPath, meetingReturnPath, navigate]);
 
   const handleMeetingEnd = useCallback(
     async (state, options = {}) => {
@@ -8297,11 +8346,7 @@ export default function NewLiveMeeting() {
       // ✅ Fetch latest lounge status in case it changed
       if (!eventId) {
         console.log("[LiveMeeting] No eventId, navigating away");
-        if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) {
-          navigate("/admin/events");
-        } else {
-          navigate(-1);
-        }
+        navigateAfterMeetingExit();
         return;
       }
 
@@ -8354,13 +8399,7 @@ export default function NewLiveMeeting() {
 
         // Schedule a single auto-redirect after four seconds
         navigationTimeoutRef.current = setTimeout(() => {
-          if (role === "publisher" || isEventOwner) {
-            // Admins still go to dashboard
-            navigate("/admin/events");
-          } else {
-            // Participants go explicitly to My Events (avoids history.goBack issues)
-            navigate("/my-events");
-          }
+          navigateAfterMeetingExit();
         }, 4000);
 
         // Clean up the timeout if the component unmounts
@@ -8370,19 +8409,14 @@ export default function NewLiveMeeting() {
         };
       }
     },
-    [navigate, role, isEventOwner, eventData?.created_by_id, updateLiveStatus, dyteMeeting, isBanned, eventId]
+    [navigateAfterMeetingExit, updateLiveStatus, dyteMeeting, isBanned, eventId, role, loungeOpenStatus]
   );
 
   // ✅ Handler for exiting post-event lounge
   const handleExitPostEventLounge = useCallback(() => {
     setIsPostEventLounge(false);
-    // ✅ Host goes to admin dashboard, participants go to My Events
-    if (role === "publisher" || isEventOwner) {
-      navigate("/admin/events");
-    } else {
-      navigate("/my-events");
-    }
-  }, [navigate, role, isEventOwner]);
+    navigateAfterMeetingExit();
+  }, [navigateAfterMeetingExit]);
 
   // Poll event status so clients exit when backend ends the meeting
   useEffect(() => {
@@ -11107,8 +11141,7 @@ export default function NewLiveMeeting() {
 
   // Back behavior (same as old intent)
   const handleBack = () => {
-    if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) navigate("/admin/events");
-    else navigate(-1);
+    navigateAfterMeetingExit();
   };
 
   const handleLeaveMeetingClick = useCallback(async () => {
@@ -14884,7 +14917,7 @@ export default function NewLiveMeeting() {
         <Typography variant="body1" sx={{ opacity: 0.7 }}>
           You have been banned from this meeting by the host.
         </Typography>
-        <Button variant="outlined" color="inherit" onClick={() => navigate(-1)}>
+        <Button variant="outlined" color="inherit" onClick={navigateAfterMeetingExit}>
           Go Back
         </Button>
       </Box>
@@ -15161,13 +15194,7 @@ export default function NewLiveMeeting() {
           <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
             <Button
               variant="contained"
-              onClick={() => {
-                if (role === "publisher" || isEventOwner) {
-                  navigate("/admin/events");
-                } else {
-                  navigate(-1);
-                }
-              }}
+              onClick={navigateAfterMeetingExit}
               sx={{
                 bgcolor: "#14b8b1",
                 color: "white",
@@ -15181,7 +15208,7 @@ export default function NewLiveMeeting() {
                 },
               }}
             >
-              {role === "publisher" || isEventOwner ? "Go to Dashboard" : "Go Back"}
+              Go Back
             </Button>
           </Box>
           <Typography
@@ -15262,13 +15289,7 @@ export default function NewLiveMeeting() {
           <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
             <Button
               variant="contained"
-              onClick={() => {
-                if (role === "publisher" || isEventOwner) {
-                  navigate("/admin/events");
-                } else {
-                  navigate(-1);
-                }
-              }}
+              onClick={navigateAfterMeetingExit}
               sx={{
                 bgcolor: "#14b8b1",
                 color: "white",
@@ -15282,7 +15303,7 @@ export default function NewLiveMeeting() {
                 },
               }}
             >
-              {role === "publisher" || isEventOwner ? "Go to Dashboard" : "Go Back"}
+              Go Back
             </Button>
           </Box>
         </Box>
@@ -15369,13 +15390,7 @@ export default function NewLiveMeeting() {
           <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
             <Button
               variant="contained"
-              onClick={() => {
-                if (role === "publisher" || isEventOwner) {
-                  navigate("/admin/events");
-                } else {
-                  navigate(-1);
-                }
-              }}
+              onClick={navigateAfterMeetingExit}
               sx={{
                 bgcolor: "#14b8b1",
                 color: "white",
@@ -15389,7 +15404,7 @@ export default function NewLiveMeeting() {
                 },
               }}
             >
-              {role === "publisher" || isEventOwner ? "Go to Dashboard" : "Go Back"}
+              Go Back
             </Button>
           </Box>
         </Box>
