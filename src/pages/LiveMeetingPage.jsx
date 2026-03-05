@@ -2186,8 +2186,9 @@ export default function NewLiveMeeting() {
     screenShare: true,
   });
   const [hostForceBlock, setHostForceBlock] = useState(false);
-  const [hostMediaLocks, setHostMediaLocks] = useState({ mic: true, cam: false });
+  const [hostMediaLocks, setHostMediaLocks] = useState({ mic: true, cam: true });
   const defaultMuteAppliedRef = useRef(false);
+  const defaultCameraLockAppliedRef = useRef(false);
 
   // ✅ Settings menu anchor
   const [permAnchorEl, setPermAnchorEl] = useState(null);
@@ -2947,10 +2948,33 @@ export default function NewLiveMeeting() {
     if (typeof value === "boolean") return value;
     return true;
   }, [selfPermissions]);
+
+  const selfCanProduceVideo = useMemo(() => {
+    const value =
+      selfPermissions?.canProduceVideo ??
+      selfPermissions?.video?.canProduceVideo ??
+      selfPermissions?.video?.canProduce;
+    if (typeof value === "string") return value !== "NOT_ALLOWED";
+    if (typeof value === "boolean") return value;
+    return true;
+  }, [selfPermissions]);
+
   const myParticipantKey = useMemo(
     () => getParticipantUserKey(dyteMeeting?.self),
     [dyteMeeting?.self]
   );
+  const isSelfElevatedRole = useMemo(() => {
+    const elevated = new Set(["Host", "Moderator", "Speaker"]);
+    const self = dyteMeeting?.self;
+    const candidates = [
+      selfAssignedRole,
+      normalizeDisplayRole(role),
+      normalizeDisplayRole(self?.role || self?.participantRole || ""),
+      roleFromPreset(self?.presetName || ""),
+      role === "publisher" ? "Host" : "",
+    ];
+    return candidates.some((x) => elevated.has(x));
+  }, [dyteMeeting?.self, role, selfAssignedRole]);
 
   const syncMoodMapFromApi = useCallback(async () => {
     if (!eventId) return;
@@ -5157,16 +5181,29 @@ export default function NewLiveMeeting() {
 
   const forceMuteParticipant = useCallback(
     async (participant) => {
-      if (!canManageParticipantMic || !dyteMeeting) return;
+      console.log("[forceMuteParticipant] Called with participant:", participant?.id || participant?._raw?.id, "canManageParticipantMic:", canManageParticipantMic);
+      if (!canManageParticipantMic || !dyteMeeting) {
+        console.warn("[forceMuteParticipant] Permission check failed - canManageParticipantMic:", canManageParticipantMic, "dyteMeeting:", !!dyteMeeting);
+        return;
+      }
       const raw = participant?._raw || participant;
       const id = raw?.id || participant?.id;
-      if (!id) return;
+      if (!id) {
+        console.warn("[forceMuteParticipant] No participant ID found");
+        return;
+      }
+      const participantName = raw?.displayName || participant?.displayName || "Participant";
+      const participantUserKey = getParticipantUserKey(raw);
       try {
-        const shouldUnmute = !Boolean(raw?.audioEnabled ?? participant?.mic);
+        const currentMicState = raw?.audioEnabled ?? participant?.mic;
+        const shouldUnmute = !Boolean(currentMicState);
+        console.log("[forceMuteParticipant] Participant:", participantName, "currentMicState:", currentMicState, "shouldUnmute:", shouldUnmute);
+
         if (shouldUnmute && hostMediaLocks.mic) {
-          showSnackbar("Mute Everyone is active. Disable it before unmuting participants.", "info");
-          return;
+          console.log("[forceMuteParticipant] Unmuting despite global mic lock");
         }
+
+        // Update permissions
         await dyteMeeting.participants.updatePermissions([id], shouldUnmute ? {
           canProduceAudio: "ALLOWED",
           requestProduceAudio: true,
@@ -5174,45 +5211,151 @@ export default function NewLiveMeeting() {
           canProduceAudio: "NOT_ALLOWED",
           requestProduceAudio: false,
         });
+        console.log("[forceMuteParticipant] Permissions updated successfully");
+
+        // Try to enable/disable audio on the participant
         if (shouldUnmute) {
-          await raw?.enableAudio?.();
+          try {
+            await raw?.enableAudio?.();
+            console.log("[forceMuteParticipant] enableAudio() called");
+          } catch (e) {
+            console.warn("[forceMuteParticipant] enableAudio() failed:", e);
+          }
+          console.log("[forceMuteParticipant] Mic unmuted");
+          showSnackbar(`${participantName} unmuted`, "success");
+          try {
+            dyteMeeting?.participants?.broadcastMessage?.("participant-force-unmute", {
+              participantId: id,
+              participantUserKey: participantUserKey || null,
+              ts: Date.now(),
+            });
+          } catch (_) { }
         } else {
-          await raw?.disableAudio?.();
+          try {
+            await raw?.disableAudio?.();
+            console.log("[forceMuteParticipant] disableAudio() called");
+          } catch (e) {
+            console.warn("[forceMuteParticipant] disableAudio() failed:", e);
+          }
+          console.log("[forceMuteParticipant] Mic muted");
+          showSnackbar(`${participantName} muted`, "success");
+          try {
+            dyteMeeting?.participants?.broadcastMessage?.("participant-force-mute", {
+              participantId: id,
+              participantUserKey: participantUserKey || null,
+              ts: Date.now(),
+            });
+          } catch (_) { }
         }
       } catch (e) {
-        console.warn("Failed to toggle participant mic", e);
+        console.error("[forceMuteParticipant] Failed to toggle participant mic:", e);
+        showSnackbar("Failed to update participant mic settings", "error");
       }
     },
-    [canManageParticipantMic, dyteMeeting, hostMediaLocks.mic, showSnackbar]
+    [canManageParticipantMic, dyteMeeting, hostMediaLocks.mic]
   );
 
-  const forceCameraOffParticipant = useCallback(
+  const forceToggleCameraParticipant = useCallback(
     async (participant) => {
-      if (!isHost || !dyteMeeting) return;
+      console.log("[forceToggleCameraParticipant] Called with participant:", participant?.id || participant?._raw?.id, "isHost:", isHost);
+      if (!isHost || !dyteMeeting) {
+        console.warn("[forceToggleCameraParticipant] Permission check failed - isHost:", isHost, "dyteMeeting:", !!dyteMeeting);
+        return;
+      }
       const raw = participant?._raw || participant;
       const id = raw?.id || participant?.id;
-      if (!id) return;
+      if (!id) {
+        console.warn("[forceToggleCameraParticipant] No participant ID found");
+        return;
+      }
+      const participantName = raw?.displayName || participant?.displayName || "Participant";
+      const participantUserKey = getParticipantUserKey(raw);
       try {
-        await dyteMeeting.participants.updatePermissions([id], {
+        const currentCamState = raw?.videoEnabled ?? participant?.cam;
+        const shouldEnableCamera = !Boolean(currentCamState);
+        console.log("[forceToggleCameraParticipant] Participant:", participantName, "currentCamState:", currentCamState, "shouldEnable:", shouldEnableCamera);
+
+        // Update permissions - this is the key action for remote participants
+        await dyteMeeting.participants.updatePermissions([id], shouldEnableCamera ? {
+          canProduceVideo: "ALLOWED",
+          requestProduceVideo: true,
+        } : {
           canProduceVideo: "NOT_ALLOWED",
           requestProduceVideo: false,
         });
+        console.log("[forceToggleCameraParticipant] Permissions updated successfully");
+
+        // Send broadcast message to participant to enable/disable video on their end
+        if (shouldEnableCamera) {
+          console.log("[forceToggleCameraParticipant] Sending enable-video message to:", id, "userKey:", participantUserKey);
+          showSnackbar(`${participantName} camera turned on`, "success");
+          try {
+            const result = dyteMeeting?.participants?.broadcastMessage?.("participant-force-enable-video", {
+              participantId: id,
+              participantUserKey: participantUserKey || null,
+              ts: Date.now(),
+            });
+            console.log("[forceToggleCameraParticipant] Broadcast result:", result);
+          } catch (e) {
+            console.warn("[forceToggleCameraParticipant] Failed to broadcast enable-video:", e);
+          }
+        } else {
+          console.log("[forceToggleCameraParticipant] Sending disable-video message to:", id, "userKey:", participantUserKey);
+          showSnackbar(`${participantName} camera turned off`, "success");
+          try {
+            await raw?.disableVideo?.();
+            console.log("[forceToggleCameraParticipant] disableVideo() called");
+          } catch (e) {
+            console.warn("[forceToggleCameraParticipant] disableVideo() failed:", e);
+          }
+          try {
+            const result = dyteMeeting?.participants?.broadcastMessage?.("participant-force-disable-video", {
+              participantId: id,
+              participantUserKey: participantUserKey || null,
+              ts: Date.now(),
+            });
+            console.log("[forceToggleCameraParticipant] Broadcast result:", result);
+          } catch (e) {
+            console.warn("[forceToggleCameraParticipant] Failed to broadcast disable-video:", e);
+          }
+        }
       } catch (e) {
-        console.warn("Failed to lock camera for participant", e);
-      }
-      try {
-        await raw?.disableVideo?.();
-      } catch (e) {
-        console.warn("Failed to force camera off for participant", e);
+        console.error("[forceToggleCameraParticipant] Failed to toggle participant camera:", e);
+        showSnackbar("Failed to update participant camera settings", "error");
       }
     },
     [dyteMeeting, isHost]
   );
 
+  const getAudienceParticipantsForBulkMedia = useCallback(() => {
+    if (!dyteMeeting) return [];
+    const selfId = String(dyteMeeting?.self?.id || "");
+    const elevatedRoles = new Set(["Host", "Moderator", "Speaker"]);
+
+    return getJoinedParticipants().filter((participant) => {
+      const id = String(participant?.id || "");
+      if (!id || id === selfId) return false;
+
+      const raw = participant?._raw || participant;
+      const userKey = getParticipantUserKey(raw || participant);
+      const roleFromIdentity =
+        (userKey ? assignedRoleByIdentity.get(String(userKey).toLowerCase()) : null) ||
+        assignedRoleByIdentity.get(`id:${id}`) ||
+        null;
+      const resolvedRole =
+        roleFromIdentity ||
+        normalizeDisplayRole(raw?.role || raw?.participantRole || "") ||
+        roleFromPreset(raw?.presetName || participant?.presetName || "");
+
+      return !elevatedRoles.has(resolvedRole);
+    });
+  }, [assignedRoleByIdentity, dyteMeeting, getJoinedParticipants]);
+
   const forceMuteAll = useCallback(async () => {
     if (!canManageParticipantMic || !dyteMeeting) return;
     setHostMediaLocks((prev) => ({ ...prev, mic: true }));
-    const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+    // Only apply to audience members (exclude host/moderator/speaker)
+    const participants = getAudienceParticipantsForBulkMedia();
     const ids = participants.map((p) => p.id).filter(Boolean);
     if (ids.length) {
       try {
@@ -5229,12 +5372,13 @@ export default function NewLiveMeeting() {
         await p?.disableAudio?.();
       } catch (_) { }
     }
-  }, [canManageParticipantMic, dyteMeeting, getJoinedParticipants]);
+  }, [canManageParticipantMic, dyteMeeting, getAudienceParticipantsForBulkMedia]);
 
   const forceCameraOffAll = useCallback(async () => {
     if (!isHost || !dyteMeeting) return;
     setHostMediaLocks((prev) => ({ ...prev, cam: true }));
-    const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+    // Only apply to audience members (exclude host/moderator/speaker)
+    const participants = getAudienceParticipantsForBulkMedia();
     const ids = participants.map((p) => p.id).filter(Boolean);
     if (ids.length) {
       try {
@@ -5251,16 +5395,17 @@ export default function NewLiveMeeting() {
         await p?.disableVideo?.();
       } catch (_) { }
     }
-  }, [dyteMeeting, getJoinedParticipants, isHost]);
+  }, [dyteMeeting, getAudienceParticipantsForBulkMedia, isHost]);
 
   const forceUnmuteAll = useCallback(async () => {
     if (!canManageParticipantMic || !dyteMeeting) return;
     console.log("[forceUnmuteAll] Starting permission unlock + global unmute signal...");
     setHostMediaLocks((prev) => ({ ...prev, mic: false }));
-    const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+    // Only apply to audience members (exclude host/moderator/speaker)
+    const participants = getAudienceParticipantsForBulkMedia();
     const ids = participants.map((p) => p.id).filter(Boolean);
 
-    // 1) Unlock audio permissions for everyone
+    // 1) Unlock audio permissions for audience only
     if (ids.length) {
       try {
         await dyteMeeting.participants.updatePermissions(ids, {
@@ -5293,13 +5438,14 @@ export default function NewLiveMeeting() {
     }
 
     console.log("[forceUnmuteAll] Completed");
-  }, [canManageParticipantMic, dyteMeeting, getJoinedParticipants]);
+  }, [canManageParticipantMic, dyteMeeting, getAudienceParticipantsForBulkMedia]);
 
   const forceCameraOnAll = useCallback(async () => {
     if (!isHost || !dyteMeeting) return;
     console.log("[forceCameraOnAll] Starting force camera on for all...");
     setHostMediaLocks((prev) => ({ ...prev, cam: false }));
-    const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+    // Only apply to audience members (exclude host/moderator/speaker)
+    const participants = getAudienceParticipantsForBulkMedia();
     const ids = participants.map((p) => p.id).filter(Boolean);
 
     // Update permissions to allow video
@@ -5315,67 +5461,19 @@ export default function NewLiveMeeting() {
       }
     }
 
-    // Force camera on using WebRTC APIs - try multiple approaches
-    for (const participant of participants) {
-      try {
-        const raw = participant?._raw || participant;
-
-        // Approach 1: Try getSenders() on peerConnection
-        if (raw?.peerConnection?.getSenders) {
-          try {
-            const senders = raw.peerConnection.getSenders();
-            const videoSenders = senders.filter(s => s.track?.kind === 'video');
-            for (const sender of videoSenders) {
-              if (sender.track) {
-                sender.track.enabled = true;
-                console.log(`[forceCameraOnAll] ✅ Enabled video track for ${participant.name}`);
-              }
-            }
-            if (videoSenders.length > 0) continue; // Success with this approach
-          } catch (err) {
-            console.log(`[forceCameraOnAll] getSenders approach failed for ${participant.name}:`, err?.message);
-          }
-        }
-
-        // Approach 2: Try getTransceivers() on peerConnection
-        if (raw?.peerConnection?.getTransceivers) {
-          try {
-            const transceivers = raw.peerConnection.getTransceivers();
-            const videoTransceivers = transceivers.filter(t => t.receiver?.track?.kind === 'video' || t.sender?.track?.kind === 'video');
-            for (const transceiver of videoTransceivers) {
-              if (transceiver.sender?.track) {
-                transceiver.sender.track.enabled = true;
-              }
-              if (transceiver.receiver?.track) {
-                transceiver.receiver.track.enabled = true;
-              }
-            }
-            if (videoTransceivers.length > 0) {
-              console.log(`[forceCameraOnAll] ✅ Enabled video transceivers for ${participant.name}`);
-              continue; // Success
-            }
-          } catch (err) {
-            console.log(`[forceCameraOnAll] getTransceivers approach failed for ${participant.name}:`, err?.message);
-          }
-        }
-
-        // Approach 3: Try direct enableVideo call
-        try {
-          if (raw?.enableVideo) {
-            await raw.enableVideo();
-            console.log(`[forceCameraOnAll] ✅ enableVideo worked for ${participant.name}`);
-          }
-        } catch (err) {
-          console.log(`[forceCameraOnAll] enableVideo failed for ${participant.name}:`, err?.message);
-        }
-
-      } catch (err) {
-        console.warn(`[forceCameraOnAll] Error processing ${participant.name}:`, err?.message);
-      }
+    // Broadcast message to audience participants to enable their cameras
+    try {
+      console.log("[forceCameraOnAll] Broadcasting global enable-video message");
+      dyteMeeting?.participants?.broadcastMessage?.("global-enable-all-video", {
+        byHostId: dyteMeeting?.self?.id || null,
+        ts: Date.now(),
+      });
+    } catch (e) {
+      console.warn("[forceCameraOnAll] Failed to broadcast global-enable-all-video:", e);
     }
 
     console.log("[forceCameraOnAll] Force camera on completed");
-  }, [dyteMeeting, getJoinedParticipants, isHost]);
+  }, [dyteMeeting, getAudienceParticipantsForBulkMedia, isHost]);
 
   // ---------- Read query params + fetch DB status ----------
   useEffect(() => {
@@ -8408,6 +8506,137 @@ export default function NewLiveMeeting() {
         tryEnable();
       }
 
+      if (type === "global-enable-all-video") {
+        // Only audience members should respond - exclude host/moderator/speaker
+        if (isSelfElevatedRole) {
+          console.log("[global-enable-all-video] Ignoring - elevated role client", {
+            selfAssignedRole,
+            role,
+            dyteRole: dyteMeeting?.self?.role || dyteMeeting?.self?.participantRole || "",
+            presetName: dyteMeeting?.self?.presetName || "",
+          });
+          return;
+        }
+        console.log("[global-enable-all-video] Broadcasting enable video to audience only");
+        const tryEnableVideo = async () => {
+          for (let i = 0; i < 20; i++) {
+            try {
+              if (selfCanProduceVideo && dyteMeeting?.self?.enableVideo) {
+                await dyteMeeting.self.enableVideo();
+                          console.log("[global-enable-all-video] enableVideo success, iteration:", i);
+                if (dyteMeeting?.self?.videoEnabled) return;
+              }
+            } catch (_) { }
+            await new Promise((r) => setTimeout(r, 250));
+          }
+          console.warn("[global-enable-all-video] Failed after 20 attempts");
+        };
+        tryEnableVideo();
+      }
+
+      if ((type === "participant-force-unmute" || type === "participant-force-mute") && (payload?.participantId || payload?.participantUserKey)) {
+        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const targetId = payload?.participantId ? String(payload.participantId) : "";
+        const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
+        const isForSelf =
+          (targetId && selfId && targetId === selfId) ||
+          (targetKey && selfKey && targetKey === selfKey);
+        if (!isForSelf) return;
+
+        if (type === "participant-force-unmute") {
+          const enableSelf = async () => {
+            setMainMicHardMuted(false);
+            userMediaPreferenceRef.current.mic = true;
+            for (let i = 0; i < 20; i++) {
+              try {
+                if (selfCanProduceAudio && dyteMeeting?.self?.enableAudio) {
+                  await dyteMeeting.self.enableAudio();
+                  setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
+                  if (dyteMeeting?.self?.audioEnabled) return;
+                }
+              } catch (_) { }
+              await new Promise((r) => setTimeout(r, 250));
+            }
+          };
+          enableSelf();
+        } else {
+          const muteSelf = async () => {
+            try { await dyteMeeting?.self?.disableAudio?.(); } catch { }
+            setMicOn(false);
+            userMediaPreferenceRef.current.mic = false;
+          };
+          muteSelf();
+        }
+      }
+
+      // Handle participant-force-enable-video message (camera on)
+      if (type === "participant-force-enable-video" && (payload?.participantId || payload?.participantUserKey)) {
+        console.log("[participant-force-enable-video] Message received, payload:", payload);
+        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const targetId = payload?.participantId ? String(payload.participantId) : "";
+        const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
+        console.log("[participant-force-enable-video] selfId:", selfId, "targetId:", targetId, "selfKey:", selfKey, "targetKey:", targetKey);
+        const isForSelf =
+          (targetId && selfId && targetId === selfId) ||
+          (targetKey && selfKey && targetKey === selfKey);
+        console.log("[participant-force-enable-video] isForSelf:", isForSelf);
+        if (!isForSelf) {
+          console.log("[participant-force-enable-video] Message not for self, ignoring");
+          return;
+        }
+        console.log("[participant-force-enable-video] Message is for self, enabling video");
+
+        const enableVideoSelf = async () => {
+          console.log("[participant-force-enable-video] Attempting to enable video");
+          for (let i = 0; i < 20; i++) {
+            try {
+              if (selfCanProduceVideo && dyteMeeting?.self?.enableVideo) {
+                await dyteMeeting.self.enableVideo();
+                console.log("[participant-force-enable-video] enableVideo() success, iteration:", i);
+                          if (dyteMeeting?.self?.videoEnabled) return;
+              }
+            } catch (e) {
+              console.warn("[participant-force-enable-video] enableVideo() attempt", i, "failed:", e);
+            }
+            await new Promise((r) => setTimeout(r, 250));
+          }
+          console.warn("[participant-force-enable-video] Failed after 20 attempts");
+        };
+        enableVideoSelf();
+      }
+
+      // Handle participant-force-disable-video message (camera off)
+      if (type === "participant-force-disable-video" && (payload?.participantId || payload?.participantUserKey)) {
+        console.log("[participant-force-disable-video] Message received, payload:", payload);
+        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const targetId = payload?.participantId ? String(payload.participantId) : "";
+        const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
+        console.log("[participant-force-disable-video] selfId:", selfId, "targetId:", targetId, "selfKey:", selfKey, "targetKey:", targetKey);
+        const isForSelf =
+          (targetId && selfId && targetId === selfId) ||
+          (targetKey && selfKey && targetKey === selfKey);
+        console.log("[participant-force-disable-video] isForSelf:", isForSelf);
+        if (!isForSelf) {
+          console.log("[participant-force-disable-video] Message not for self, ignoring");
+          return;
+        }
+        console.log("[participant-force-disable-video] Message is for self, disabling video");
+
+        const disableVideoSelf = async () => {
+          try {
+            console.log("[participant-force-disable-video] Disabling video");
+            await dyteMeeting?.self?.disableVideo?.();
+            console.log("[participant-force-disable-video] disableVideo() success");
+          } catch (e) {
+            console.warn("[participant-force-disable-video] disableVideo() failed:", e);
+          }
+        };
+        disableVideoSelf();
+      }
+
       if (type === "meeting-ended" && payload?.hostId) {
         // ignore echo for host itself
         if (dyteMeeting?.self?.id !== payload.hostId) {
@@ -8654,6 +8883,7 @@ export default function NewLiveMeeting() {
     dyteMeeting,
     getJoinedParticipants,
     hostPerms.screenShare,
+    isSelfElevatedRole,
     canManageParticipantMic,
     isHost,
     isLiveEventSocialLounge,
@@ -8661,8 +8891,11 @@ export default function NewLiveMeeting() {
     pendingSpotlightInvite,
     presentationTarget,
     selfCanProduceAudio,
+    selfCanProduceVideo,
+    selfAssignedRole,
     showSnackbar,
     spotlightTarget,
+    role,
   ]);
 
   useEffect(() => {
@@ -9060,6 +9293,18 @@ export default function NewLiveMeeting() {
     defaultMuteAppliedRef.current = true;
     forceMuteAll();
   }, [canManageParticipantMic, forceMuteAll, hostMediaLocks.mic, roomJoined]);
+
+  // ✅ Apply default camera lock when host joins the room
+  useEffect(() => {
+    if (!roomJoined) {
+      defaultCameraLockAppliedRef.current = false;
+      return;
+    }
+    if (!canManageParticipantMic || !hostMediaLocks.cam) return;
+    if (defaultCameraLockAppliedRef.current) return;
+    defaultCameraLockAppliedRef.current = true;
+    forceCameraOffAll();
+  }, [canManageParticipantMic, forceCameraOffAll, hostMediaLocks.cam, roomJoined]);
 
   useEffect(() => {
     if (!dyteMeeting) return;
@@ -14016,7 +14261,11 @@ export default function NewLiveMeeting() {
                                             handleToggleMic();
                                             return;
                                           }
-                                          if (canManageParticipantMic) forceMuteParticipant(m);
+                                          if (canManageParticipantMic) {
+                                            (async () => {
+                                              await forceMuteParticipant(m);
+                                            })();
+                                          }
                                         }}
                                           disabled={isOnBreak || (!isSelfMember(m) && !canManageParticipantMic)}
                                         sx={{
@@ -14047,7 +14296,11 @@ export default function NewLiveMeeting() {
                                               handleToggleCamera();
                                               return;
                                             }
-                                            if (isHost) forceCameraOffParticipant(m);
+                                            if (isHost) {
+                                              (async () => {
+                                                await forceToggleCameraParticipant(m);
+                                              })();
+                                            }
                                           }}
                                           disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
                                           sx={{
@@ -14175,7 +14428,11 @@ export default function NewLiveMeeting() {
                               <IconButton
                                 size="small"
                                 disabled={isOnBreak}
-                                onClick={hostMediaLocks.mic ? forceUnmuteAll : forceMuteAll}
+                                onClick={() => {
+                                  (async () => {
+                                    await (hostMediaLocks.mic ? forceUnmuteAll() : forceMuteAll());
+                                  })();
+                                }}
                                 aria-label={hostMediaLocks.mic ? "Unmute all" : "Mute all"}
                                 sx={{
                                   color: hostMediaLocks.mic ? "rgba(239, 68, 68, 0.9)" : "rgba(255,255,255,0.9)",
@@ -14195,7 +14452,7 @@ export default function NewLiveMeeting() {
                                   bgcolor: hostMediaLocks.cam ? "rgba(239, 68, 68, 0.15)" : "transparent",
                                   border: hostMediaLocks.cam ? "1px solid rgba(239, 68, 68, 0.3)" : "none"
                                 }}>
-                                {hostMediaLocks.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
+                                {hostMediaLocks.cam ? <VideocamOffIcon fontSize="small" /> : <VideocamIcon fontSize="small" />}
                               </IconButton>
                             </Tooltip>
                           </Stack>
@@ -14263,7 +14520,11 @@ export default function NewLiveMeeting() {
                                             handleToggleMic();
                                             return;
                                           }
-                                          if (canManageParticipantMic) forceMuteParticipant(m);
+                                          if (canManageParticipantMic) {
+                                            (async () => {
+                                              await forceMuteParticipant(m);
+                                            })();
+                                          }
                                         }}
                                         disabled={isOnBreak || (!isSelfMember(m) && !canManageParticipantMic)}
                                         sx={{
@@ -14294,7 +14555,7 @@ export default function NewLiveMeeting() {
                                             handleToggleCamera();
                                             return;
                                           }
-                                          if (isHost) forceCameraOffParticipant(m);
+                                          if (isHost) forceToggleCameraParticipant(m);
                                         }}
                                         disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
                                         sx={{
