@@ -2586,6 +2586,7 @@ export default function NewLiveMeeting() {
   // -------------------------------------
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(false);
+  const [mainMicHardMuted, setMainMicHardMuted] = useState(false);
   // ✅ Store user's preferred media state to preserve across room switches
   const userMediaPreferenceRef = useRef({ mic: true, cam: false });
   // ✅ Store local audio/video streams to stop them when needed
@@ -2811,6 +2812,17 @@ export default function NewLiveMeeting() {
 
     return map;
   }, [eventData?.event_participants]);
+  const selfAssignedRole = useMemo(
+    () => assignedRoleByIdentity.get(`id:${String(currentUserId)}`) || "",
+    [assignedRoleByIdentity, currentUserId]
+  );
+  const canManageParticipantMic = useMemo(
+    () =>
+      isHost ||
+      (currentUserId && eventData?.created_by_id && String(currentUserId) === String(eventData.created_by_id)) ||
+      ["Host", "Moderator", "Speaker"].includes(selfAssignedRole),
+    [currentUserId, eventData?.created_by_id, isHost, selfAssignedRole]
+  );
 
   const [loungeTables, setLoungeTables] = useState([]);
   const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
@@ -2925,6 +2937,15 @@ export default function NewLiveMeeting() {
 
   const [initDone, setInitDone] = useState(false);
   const selfPermissions = useDytePermissions(dyteMeeting);
+  const selfCanProduceAudio = useMemo(() => {
+    const value =
+      selfPermissions?.canProduceAudio ??
+      selfPermissions?.audio?.canProduceAudio ??
+      selfPermissions?.audio?.canProduce;
+    if (typeof value === "string") return value !== "NOT_ALLOWED";
+    if (typeof value === "boolean") return value;
+    return true;
+  }, [selfPermissions]);
   const myParticipantKey = useMemo(
     () => getParticipantUserKey(dyteMeeting?.self),
     [dyteMeeting?.self]
@@ -3258,6 +3279,49 @@ export default function NewLiveMeeting() {
     }
   }, [dyteMeeting]);
 
+  const forceSelfAudioOffAtMediaLevel = useCallback(
+    async ({ stopLocalStream = false, attempts = 1, delayMs = 80 } = {}) => {
+      if (!dyteMeeting?.self) return;
+      userMediaPreferenceRef.current.mic = false;
+      setMicOn(false);
+
+      if (stopLocalStream && localAudioStreamRef.current) {
+        try {
+          localAudioStreamRef.current.getTracks().forEach((track) => track.stop());
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to stop local audio stream during hard mute:", e);
+        } finally {
+          localAudioStreamRef.current = null;
+        }
+      }
+
+      for (let i = 0; i < Math.max(1, attempts); i++) {
+        try {
+          await dyteMeeting.self.disableAudio?.();
+        } catch (_) { }
+        try {
+          const audioSenders =
+            dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+              (s) => s.track?.kind === "audio"
+            ) || [];
+          for (const sender of audioSenders) {
+            if (sender?.track) {
+              sender.track.enabled = false;
+              try { sender.track.stop?.(); } catch { }
+            }
+            try { await sender.replaceTrack?.(null); } catch { }
+          }
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed hard-muting self audio senders:", e);
+        }
+        if (i < attempts - 1 && delayMs > 0) {
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+    },
+    [dyteMeeting]
+  );
+
   const enforceSelfBreakMediaLock = useCallback(async () => {
     // ✅ STATE PRIORITY FIX: Skip lock enforcement for lounge users during break
     if (isBreakout && isOnBreak) {
@@ -3359,6 +3423,7 @@ export default function NewLiveMeeting() {
         );
         // ✅ CRITICAL FIX: Save preference IMMEDIATELY to false, don't wait for SDK response
         userMediaPreferenceRef.current.mic = false;
+        if (!isBreakout) setMainMicHardMuted(true);
 
         // ✅ NEW FIX FOR LOUNGE: Stop local audio stream to prevent any audio capture
         if (isBreakout) {
@@ -3415,6 +3480,7 @@ export default function NewLiveMeeting() {
       } else {
         // ✅ CRITICAL FIX: Save preference IMMEDIATELY to true
         userMediaPreferenceRef.current.mic = true;
+        if (!isBreakout) setMainMicHardMuted(false);
 
         // ✅ NEW FIX FOR LOUNGE: Re-establish local audio stream in lounge
         if (isBreakout) {
@@ -3462,8 +3528,25 @@ export default function NewLiveMeeting() {
       setMicOn(newState);
       // ✅ Save to user preference ref
       userMediaPreferenceRef.current.mic = newState;
+      if (!isBreakout) setMainMicHardMuted(!newState);
     }
-  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak]);
+  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak, isBreakout]);
+
+  const requestMicUnmute = useCallback(() => {
+    if (!dyteMeeting?.self) return;
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.("participant-unmute-request", {
+        participantId: dyteMeeting.self.id || null,
+        participantUserKey: getParticipantUserKey(dyteMeeting.self) || null,
+        name: dyteMeeting.self.name || "Participant",
+        ts: Date.now(),
+      });
+      showSnackbar("Unmute request sent to host/moderator/speaker.", "info");
+    } catch (e) {
+      console.warn("[LiveMeeting] Failed to send unmute request:", e);
+      showSnackbar("Unable to send unmute request right now.", "error");
+    }
+  }, [dyteMeeting, showSnackbar]);
 
   /**
    * Switch to a different video device
@@ -3910,6 +3993,12 @@ export default function NewLiveMeeting() {
 
       if (mainAuthTokenRef.current) {
         console.log("[LiveMeeting] Returning to main meeting...");
+        try {
+          await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 60 });
+          setMainMicHardMuted(true);
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed pre-transition hard mute before returning to main:", e);
+        }
         if (dyteMeeting) {
           console.log("[LiveMeeting] Leaving breakout room explicitly...");
           ignoreRoomLeftRef.current = true;
@@ -3966,6 +4055,12 @@ export default function NewLiveMeeting() {
         }
       } else {
         console.warn("[LiveMeeting] No main token available to return to! Resetting state to re-join.");
+        try {
+          await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 60 });
+          setMainMicHardMuted(true);
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed hard mute while resetting to re-join main:", e);
+        }
         setIsBreakout(false);
         isBreakoutRef.current = false;
         setAuthToken(null);
@@ -3978,7 +4073,7 @@ export default function NewLiveMeeting() {
         setRoomChatConversationId(null);
       }
     },
-    [dyteMeeting, isBreakout, mainRoomAuthToken, mainDyteMeeting, initMainMeeting]
+    [dyteMeeting, forceSelfAudioOffAtMediaLevel, initMainMeeting, isBreakout, mainRoomAuthToken, mainDyteMeeting]
   );
 
   // ✅ NEW: Auto-close lounge overlay once user is in breakout meeting (fixes rejoin UI issue)
@@ -5071,25 +5166,33 @@ export default function NewLiveMeeting() {
 
   const forceMuteParticipant = useCallback(
     async (participant) => {
-      if (!isHost || !dyteMeeting) return;
+      if (!canManageParticipantMic || !dyteMeeting) return;
       const raw = participant?._raw || participant;
       const id = raw?.id || participant?.id;
       if (!id) return;
       try {
-        await dyteMeeting.participants.updatePermissions([id], {
+        const shouldUnmute = !Boolean(raw?.audioEnabled ?? participant?.mic);
+        if (shouldUnmute && hostMediaLocks.mic) {
+          showSnackbar("Mute Everyone is active. Disable it before unmuting participants.", "info");
+          return;
+        }
+        await dyteMeeting.participants.updatePermissions([id], shouldUnmute ? {
+          canProduceAudio: "ALLOWED",
+          requestProduceAudio: true,
+        } : {
           canProduceAudio: "NOT_ALLOWED",
           requestProduceAudio: false,
         });
+        if (shouldUnmute) {
+          await raw?.enableAudio?.();
+        } else {
+          await raw?.disableAudio?.();
+        }
       } catch (e) {
-        console.warn("Failed to lock mic for participant", e);
-      }
-      try {
-        await raw?.disableAudio?.();
-      } catch (e) {
-        console.warn("Failed to force mute participant", e);
+        console.warn("Failed to toggle participant mic", e);
       }
     },
-    [dyteMeeting, isHost]
+    [canManageParticipantMic, dyteMeeting, hostMediaLocks.mic, showSnackbar]
   );
 
   const forceCameraOffParticipant = useCallback(
@@ -5866,6 +5969,12 @@ export default function NewLiveMeeting() {
           if (newStatus === "admitted") {
             // User was admitted - exit waiting room and enter meeting
             console.log("[MainSocket] ✅ User admitted! Exiting waiting room...");
+            try {
+              await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 60 });
+              setMainMicHardMuted(true);
+            } catch (e) {
+              console.warn("[MainSocket] Failed pre-admission hard mute:", e);
+            }
             setWaitingRoomActive(false);
             setLoungeOpen(false);
             setJoinMainRequested(true);
@@ -5884,6 +5993,12 @@ export default function NewLiveMeeting() {
           } else if (newStatus === "waiting") {
             // User has been moved back to waiting room.
             console.log("[MainSocket] User moved to waiting room");
+            try {
+              await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 60 });
+              setMainMicHardMuted(true);
+            } catch (e) {
+              console.warn("[MainSocket] Failed hard mute while moving to waiting room:", e);
+            }
             setWaitingRoomActive(true);
             setWaitingRoomStatus("waiting");
             setLoungeOpen(false);
@@ -7230,6 +7345,15 @@ export default function NewLiveMeeting() {
           }
         }
       }
+      if (!isBreakoutRef.current) {
+        try {
+          console.log("[LiveMeeting] Main room joined: enforcing default mic OFF at media level");
+          setMainMicHardMuted(true);
+          await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 4, delayMs: 100 });
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to enforce default main-room mic mute:", e);
+        }
+      }
 
       // ✅ Auto-record for direct joins (Waiting Room disabled)
       if (isHost && autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
@@ -7269,11 +7393,11 @@ export default function NewLiveMeeting() {
       joinedOnceRef.current = true;
       joinInFlightRef.current = true;
 
-      // ✅ ask mic+cam permission (browser popup)
+      // Ask camera permission only on join. Mic permission is requested only on explicit unmute.
       if (!askedMediaPermRef.current) {
         askedMediaPermRef.current = true;
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           stream.getTracks().forEach((t) => t.stop());
         } catch (e) {
           console.warn("[LiveMeeting] getUserMedia denied:", e);
@@ -7315,7 +7439,44 @@ export default function NewLiveMeeting() {
     return () => {
       dyteMeeting.self.off?.("roomJoined", onRoomJoined);
     };
-  }, [dyteMeeting, ensureVideoInputReady, initDone, dbStatus, role, isBreakout, isOnBreak]);
+  }, [dyteMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak]);
+
+  // On lounge/breakout -> main transition, some SDKs recreate audio senders asynchronously.
+  // Keep forcing hard mute briefly while mic UI is OFF to prevent ghost audio transmission.
+  useEffect(() => {
+    if (!dyteMeeting?.self || !roomJoined || isBreakout || micOn) return;
+
+    let ticks = 0;
+    const interval = setInterval(async () => {
+      ticks += 1;
+      if (micOn || isBreakoutRef.current) {
+        clearInterval(interval);
+        return;
+      }
+      await forceSelfAudioOffAtMediaLevel({ stopLocalStream: ticks === 1, attempts: 1, delayMs: 0 });
+      if (ticks >= 15) clearInterval(interval);
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, [dyteMeeting, forceSelfAudioOffAtMediaLevel, isBreakout, micOn, roomJoined]);
+
+  useEffect(() => {
+    if (isBreakout) setMainMicHardMuted(false);
+  }, [isBreakout]);
+
+  useEffect(() => {
+    if (!dyteMeeting?.self || !roomJoined || isBreakout || !mainMicHardMuted) return;
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      if (cancelled) return;
+      await forceSelfAudioOffAtMediaLevel({ stopLocalStream: false, attempts: 1, delayMs: 0 });
+      setMicOn(false);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [dyteMeeting, forceSelfAudioOffAtMediaLevel, isBreakout, mainMicHardMuted, roomJoined]);
 
   // ✅ NEW: Initialize main room peek AFTER breakout is ready (not during breakout join)
   // This prevents concurrent Dyte init calls that cause "Unsupported concurrent calls" error
@@ -7520,7 +7681,8 @@ export default function NewLiveMeeting() {
     }
 
     const sync = () => {
-      setMicOn(Boolean(dyteMeeting.self.audioEnabled));
+      const effectiveMicOn = mainMicHardMuted && !isBreakout ? false : Boolean(dyteMeeting.self.audioEnabled);
+      setMicOn(effectiveMicOn);
       setCamOn(Boolean(dyteMeeting.self.videoEnabled));
     };
 
@@ -7532,7 +7694,7 @@ export default function NewLiveMeeting() {
       dyteMeeting.self.off?.("audioUpdate", sync);
       dyteMeeting.self.off?.("videoUpdate", sync);
     };
-  }, [dyteMeeting, isOnBreak, isBreakout]);
+  }, [dyteMeeting, isOnBreak, isBreakout, mainMicHardMuted]);
   useEffect(() => {
     if (!dyteMeeting?.self) return;
 
@@ -7541,9 +7703,9 @@ export default function NewLiveMeeting() {
       return;
     }
 
-    setMicOn(Boolean(dyteMeeting.self.audioEnabled));
+    setMicOn(mainMicHardMuted && !isBreakout ? false : Boolean(dyteMeeting.self.audioEnabled));
     setCamOn(Boolean(dyteMeeting.self.videoEnabled));
-  }, [dyteMeeting, roomJoined, isOnBreak, isBreakout]);
+  }, [dyteMeeting, roomJoined, isOnBreak, isBreakout, mainMicHardMuted]);
 
   // ✅ CRITICAL FIX: Explicit media state sync when entering/leaving lounge (breakout)
   // This ensures UI state matches actual media track state when transitioning between rooms
@@ -7567,9 +7729,9 @@ export default function NewLiveMeeting() {
     );
 
     // Force sync on breakout entry (only outside of break)
-    setMicOn(Boolean(dyteMeeting.self.audioEnabled));
+    setMicOn(mainMicHardMuted && !isBreakout ? false : Boolean(dyteMeeting.self.audioEnabled));
     setCamOn(Boolean(dyteMeeting.self.videoEnabled));
-  }, [isBreakout, dyteMeeting?.self?.id, isOnBreak]); // Trigger when entering/leaving breakout
+  }, [isBreakout, dyteMeeting?.self?.id, isOnBreak, mainMicHardMuted]); // Trigger when entering/leaving breakout
 
   // ✅ CRITICAL FIX: Ensure media tracks are properly muted at WebRTC level when disabled
   // This adds an extra layer of protection specifically for lounge/breakout rooms
@@ -8301,6 +8463,14 @@ export default function NewLiveMeeting() {
         });
       }
 
+      if (type === "participant-unmute-request" && (payload?.participantId || payload?.participantUserKey)) {
+        if (!canManageParticipantMic) return;
+        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
+        const senderId = payload?.participantId ? String(payload.participantId) : "";
+        if (selfId && senderId && selfId === senderId) return;
+        showSnackbar(`${payload?.name || "A participant"} requested to be unmuted.`, "info");
+      }
+
       if (type === "main-stage-screenshare-response" && payload?.requestId) {
         const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
         const selfKey = getParticipantUserKey(dyteMeeting?.self);
@@ -8366,6 +8536,7 @@ export default function NewLiveMeeting() {
     dyteMeeting,
     getJoinedParticipants,
     hostPerms.screenShare,
+    canManageParticipantMic,
     isHost,
     isLiveEventSocialLounge,
     isScreenSharing,
@@ -13704,31 +13875,31 @@ export default function NewLiveMeeting() {
                                     {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (isHost ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")))}>
-                                        <IconButton
-                                          data-no-member-info="true"
-                                          size="small"
-                                          onMouseDown={(e) => e.stopPropagation()}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (isSelfMember(m)) {
-                                              handleToggleMic();
-                                              return;
-                                            }
-                                            if (isHost) forceMuteParticipant(m);
-                                          }}
-                                          disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
-                                          sx={{
-                                            bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                            border: "1px solid",
-                                            borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                            color: m.mic ? "#22c55e" : "#ef4444",
-                                            padding: "4px",
-                                            cursor: (isSelfMember(m) || isHost) ? "pointer" : "default",
-                                            "&:hover": {
-                                              bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                            }
-                                          }}
+                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (canManageParticipantMic ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")))}>
+                                      <IconButton
+                                        data-no-member-info="true"
+                                        size="small"
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isSelfMember(m)) {
+                                            handleToggleMic();
+                                            return;
+                                          }
+                                          if (canManageParticipantMic) forceMuteParticipant(m);
+                                        }}
+                                          disabled={isOnBreak || (!isSelfMember(m) && !canManageParticipantMic)}
+                                        sx={{
+                                          bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                          border: "1px solid",
+                                          borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                          color: m.mic ? "#22c55e" : "#ef4444",
+                                          padding: "4px",
+                                          cursor: (isSelfMember(m) || canManageParticipantMic) ? "pointer" : "default",
+                                          "&:hover": {
+                                            bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                          }
+                                        }}
                                         >
                                           {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
                                         </IconButton>
@@ -13934,7 +14105,7 @@ export default function NewLiveMeeting() {
                                   {renderMoodRow(m)}
                                   <Stack direction="row" spacing={0.75} alignItems="center">
                                     {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (isHost ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")))}>
+                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (canManageParticipantMic ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")))}>
                                       <IconButton
                                         data-no-member-info="true"
                                         size="small"
@@ -13945,16 +14116,16 @@ export default function NewLiveMeeting() {
                                             handleToggleMic();
                                             return;
                                           }
-                                          if (isHost) forceMuteParticipant(m);
+                                          if (canManageParticipantMic) forceMuteParticipant(m);
                                         }}
-                                        disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
+                                        disabled={isOnBreak || (!isSelfMember(m) && !canManageParticipantMic)}
                                         sx={{
                                           bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                           border: "1px solid",
                                           borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                           color: m.mic ? "#22c55e" : "#ef4444",
                                           padding: "4px",
-                                          cursor: (isSelfMember(m) || isHost) ? "pointer" : "default",
+                                          cursor: (isSelfMember(m) || canManageParticipantMic) ? "pointer" : "default",
                                           "&:hover": {
                                             bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                           }
@@ -15827,9 +15998,15 @@ export default function NewLiveMeeting() {
                     width: { xs: "100%", sm: "auto" },
                   }}
                 >
-                  <Tooltip title={(isOnBreak && !isBreakout) ? "Disabled during break" : (micOn ? "Mute" : "Unmute")}>
+                  <Tooltip title={(isOnBreak && !isBreakout) ? "Disabled during break" : (!micOn && !selfCanProduceAudio ? "Request unmute" : (micOn ? "Mute" : "Unmute"))}>
                     <IconButton
-                      onClick={handleToggleMic}
+                      onClick={() => {
+                        if (!micOn && !selfCanProduceAudio) {
+                          requestMicUnmute();
+                          return;
+                        }
+                        handleToggleMic();
+                      }}
                       disabled={isOnBreak && !isBreakout}
                       aria-label="Toggle mic"
                     >
@@ -15982,9 +16159,7 @@ export default function NewLiveMeeting() {
                   {!isHost &&
                     !isBreakout &&
                     !isEventOwner &&
-                    !["Host", "Moderator", "Speaker"].includes(
-                      assignedRoleByIdentity.get(`id:${String(currentUserId)}`) || ""
-                    ) && (
+                    !["Host", "Moderator", "Speaker"].includes(selfAssignedRole) && (
                       <Tooltip
                         title={
                           assistanceCooldownRemaining > 0
