@@ -2186,7 +2186,8 @@ export default function NewLiveMeeting() {
     screenShare: true,
   });
   const [hostForceBlock, setHostForceBlock] = useState(false);
-  const [hostMediaLocks, setHostMediaLocks] = useState({ mic: false, cam: false });
+  const [hostMediaLocks, setHostMediaLocks] = useState({ mic: true, cam: false });
+  const defaultMuteAppliedRef = useRef(false);
 
   // ✅ Settings menu anchor
   const [permAnchorEl, setPermAnchorEl] = useState(null);
@@ -3993,12 +3994,7 @@ export default function NewLiveMeeting() {
 
       if (mainAuthTokenRef.current) {
         console.log("[LiveMeeting] Returning to main meeting...");
-        try {
-          await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 60 });
-          setMainMicHardMuted(true);
-        } catch (e) {
-          console.warn("[LiveMeeting] Failed pre-transition hard mute before returning to main:", e);
-        }
+        setMainMicHardMuted(false);
         if (dyteMeeting) {
           console.log("[LiveMeeting] Leaving breakout room explicitly...");
           ignoreRoomLeftRef.current = true;
@@ -4055,12 +4051,7 @@ export default function NewLiveMeeting() {
         }
       } else {
         console.warn("[LiveMeeting] No main token available to return to! Resetting state to re-join.");
-        try {
-          await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 60 });
-          setMainMicHardMuted(true);
-        } catch (e) {
-          console.warn("[LiveMeeting] Failed hard mute while resetting to re-join main:", e);
-        }
+        setMainMicHardMuted(false);
         setIsBreakout(false);
         isBreakoutRef.current = false;
         setAuthToken(null);
@@ -5219,7 +5210,7 @@ export default function NewLiveMeeting() {
   );
 
   const forceMuteAll = useCallback(async () => {
-    if (!isHost || !dyteMeeting) return;
+    if (!canManageParticipantMic || !dyteMeeting) return;
     setHostMediaLocks((prev) => ({ ...prev, mic: true }));
     const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
     const ids = participants.map((p) => p.id).filter(Boolean);
@@ -5238,7 +5229,7 @@ export default function NewLiveMeeting() {
         await p?.disableAudio?.();
       } catch (_) { }
     }
-  }, [dyteMeeting, getJoinedParticipants, isHost]);
+  }, [canManageParticipantMic, dyteMeeting, getJoinedParticipants]);
 
   const forceCameraOffAll = useCallback(async () => {
     if (!isHost || !dyteMeeting) return;
@@ -5260,6 +5251,130 @@ export default function NewLiveMeeting() {
         await p?.disableVideo?.();
       } catch (_) { }
     }
+  }, [dyteMeeting, getJoinedParticipants, isHost]);
+
+  const forceUnmuteAll = useCallback(async () => {
+    if (!canManageParticipantMic || !dyteMeeting) return;
+    console.log("[forceUnmuteAll] Starting permission unlock + global unmute signal...");
+    setHostMediaLocks((prev) => ({ ...prev, mic: false }));
+    const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+    const ids = participants.map((p) => p.id).filter(Boolean);
+
+    // 1) Unlock audio permissions for everyone
+    if (ids.length) {
+      try {
+        await dyteMeeting.participants.updatePermissions(ids, {
+          canProduceAudio: "ALLOWED",
+          requestProduceAudio: true,
+        });
+        console.log("[forceUnmuteAll] Permissions updated");
+      } catch (e) {
+        console.warn("Failed to unlock mic permissions", e);
+      }
+    }
+
+    // 2) Ask clients to self-enable mic (reliable path)
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.("global-unmute-all", {
+        byHostId: dyteMeeting?.self?.id || null,
+        ts: Date.now(),
+      });
+      setTimeout(() => {
+        try {
+          dyteMeeting?.participants?.broadcastMessage?.("global-unmute-all", {
+            byHostId: dyteMeeting?.self?.id || null,
+            ts: Date.now(),
+            retry: true,
+          });
+        } catch { }
+      }, 1200);
+    } catch (e) {
+      console.warn("[forceUnmuteAll] Failed to broadcast global-unmute-all:", e);
+    }
+
+    console.log("[forceUnmuteAll] Completed");
+  }, [canManageParticipantMic, dyteMeeting, getJoinedParticipants]);
+
+  const forceCameraOnAll = useCallback(async () => {
+    if (!isHost || !dyteMeeting) return;
+    console.log("[forceCameraOnAll] Starting force camera on for all...");
+    setHostMediaLocks((prev) => ({ ...prev, cam: false }));
+    const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+    const ids = participants.map((p) => p.id).filter(Boolean);
+
+    // Update permissions to allow video
+    if (ids.length) {
+      try {
+        await dyteMeeting.participants.updatePermissions(ids, {
+          canProduceVideo: "ALLOWED",
+          requestProduceVideo: true,
+        });
+        console.log("[forceCameraOnAll] Permissions updated");
+      } catch (e) {
+        console.warn("Failed to unlock camera permissions", e);
+      }
+    }
+
+    // Force camera on using WebRTC APIs - try multiple approaches
+    for (const participant of participants) {
+      try {
+        const raw = participant?._raw || participant;
+
+        // Approach 1: Try getSenders() on peerConnection
+        if (raw?.peerConnection?.getSenders) {
+          try {
+            const senders = raw.peerConnection.getSenders();
+            const videoSenders = senders.filter(s => s.track?.kind === 'video');
+            for (const sender of videoSenders) {
+              if (sender.track) {
+                sender.track.enabled = true;
+                console.log(`[forceCameraOnAll] ✅ Enabled video track for ${participant.name}`);
+              }
+            }
+            if (videoSenders.length > 0) continue; // Success with this approach
+          } catch (err) {
+            console.log(`[forceCameraOnAll] getSenders approach failed for ${participant.name}:`, err?.message);
+          }
+        }
+
+        // Approach 2: Try getTransceivers() on peerConnection
+        if (raw?.peerConnection?.getTransceivers) {
+          try {
+            const transceivers = raw.peerConnection.getTransceivers();
+            const videoTransceivers = transceivers.filter(t => t.receiver?.track?.kind === 'video' || t.sender?.track?.kind === 'video');
+            for (const transceiver of videoTransceivers) {
+              if (transceiver.sender?.track) {
+                transceiver.sender.track.enabled = true;
+              }
+              if (transceiver.receiver?.track) {
+                transceiver.receiver.track.enabled = true;
+              }
+            }
+            if (videoTransceivers.length > 0) {
+              console.log(`[forceCameraOnAll] ✅ Enabled video transceivers for ${participant.name}`);
+              continue; // Success
+            }
+          } catch (err) {
+            console.log(`[forceCameraOnAll] getTransceivers approach failed for ${participant.name}:`, err?.message);
+          }
+        }
+
+        // Approach 3: Try direct enableVideo call
+        try {
+          if (raw?.enableVideo) {
+            await raw.enableVideo();
+            console.log(`[forceCameraOnAll] ✅ enableVideo worked for ${participant.name}`);
+          }
+        } catch (err) {
+          console.log(`[forceCameraOnAll] enableVideo failed for ${participant.name}:`, err?.message);
+        }
+
+      } catch (err) {
+        console.warn(`[forceCameraOnAll] Error processing ${participant.name}:`, err?.message);
+      }
+    }
+
+    console.log("[forceCameraOnAll] Force camera on completed");
   }, [dyteMeeting, getJoinedParticipants, isHost]);
 
   // ---------- Read query params + fetch DB status ----------
@@ -5969,12 +6084,7 @@ export default function NewLiveMeeting() {
           if (newStatus === "admitted") {
             // User was admitted - exit waiting room and enter meeting
             console.log("[MainSocket] ✅ User admitted! Exiting waiting room...");
-            try {
-              await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 60 });
-              setMainMicHardMuted(true);
-            } catch (e) {
-              console.warn("[MainSocket] Failed pre-admission hard mute:", e);
-            }
+            setMainMicHardMuted(false);
             setWaitingRoomActive(false);
             setLoungeOpen(false);
             setJoinMainRequested(true);
@@ -5993,12 +6103,7 @@ export default function NewLiveMeeting() {
           } else if (newStatus === "waiting") {
             // User has been moved back to waiting room.
             console.log("[MainSocket] User moved to waiting room");
-            try {
-              await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 60 });
-              setMainMicHardMuted(true);
-            } catch (e) {
-              console.warn("[MainSocket] Failed hard mute while moving to waiting room:", e);
-            }
+            setMainMicHardMuted(false);
             setWaitingRoomActive(true);
             setWaitingRoomStatus("waiting");
             setLoungeOpen(false);
@@ -7346,13 +7451,7 @@ export default function NewLiveMeeting() {
         }
       }
       if (!isBreakoutRef.current) {
-        try {
-          console.log("[LiveMeeting] Main room joined: enforcing default mic OFF at media level");
-          setMainMicHardMuted(true);
-          await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 4, delayMs: 100 });
-        } catch (e) {
-          console.warn("[LiveMeeting] Failed to enforce default main-room mic mute:", e);
-        }
+        setMainMicHardMuted(false);
       }
 
       // ✅ Auto-record for direct joins (Waiting Room disabled)
@@ -8290,6 +8389,25 @@ export default function NewLiveMeeting() {
         setHostForceBlock(!payload?.allowed);
       }
 
+      if (type === "global-unmute-all") {
+        if (canManageParticipantMic) return;
+        const tryEnable = async () => {
+          setMainMicHardMuted(false);
+          userMediaPreferenceRef.current.mic = true;
+          for (let i = 0; i < 20; i++) {
+            try {
+              if (selfCanProduceAudio && dyteMeeting?.self?.enableAudio) {
+                await dyteMeeting.self.enableAudio();
+                setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
+                if (dyteMeeting?.self?.audioEnabled) return;
+              }
+            } catch (_) { }
+            await new Promise((r) => setTimeout(r, 250));
+          }
+        };
+        tryEnable();
+      }
+
       if (type === "meeting-ended" && payload?.hostId) {
         // ignore echo for host itself
         if (dyteMeeting?.self?.id !== payload.hostId) {
@@ -8542,6 +8660,7 @@ export default function NewLiveMeeting() {
     isScreenSharing,
     pendingSpotlightInvite,
     presentationTarget,
+    selfCanProduceAudio,
     showSnackbar,
     spotlightTarget,
   ]);
@@ -8930,6 +9049,17 @@ export default function NewLiveMeeting() {
     }, 800);
     return () => clearInterval(interval);
   }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak]);
+
+  useEffect(() => {
+    if (!roomJoined) {
+      defaultMuteAppliedRef.current = false;
+      return;
+    }
+    if (!canManageParticipantMic || !hostMediaLocks.mic) return;
+    if (defaultMuteAppliedRef.current) return;
+    defaultMuteAppliedRef.current = true;
+    forceMuteAll();
+  }, [canManageParticipantMic, forceMuteAll, hostMediaLocks.mic, roomJoined]);
 
   useEffect(() => {
     if (!dyteMeeting) return;
@@ -14041,14 +14171,31 @@ export default function NewLiveMeeting() {
                             Bans
                           </Button>
                           <Stack direction="row" spacing={0.75}>
-                            <Tooltip title={isOnBreak ? "Disabled during break" : "Mute all"}>
-                              <IconButton size="small" disabled={isOnBreak} onClick={forceMuteAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
-                                <MicOffIcon fontSize="small" />
+                            <Tooltip title={isOnBreak ? "Disabled during break" : (hostMediaLocks.mic ? "Unmute all" : "Mute all")}>
+                              <IconButton
+                                size="small"
+                                disabled={isOnBreak}
+                                onClick={hostMediaLocks.mic ? forceUnmuteAll : forceMuteAll}
+                                aria-label={hostMediaLocks.mic ? "Unmute all" : "Mute all"}
+                                sx={{
+                                  color: hostMediaLocks.mic ? "rgba(239, 68, 68, 0.9)" : "rgba(255,255,255,0.9)",
+                                  bgcolor: hostMediaLocks.mic ? "rgba(239, 68, 68, 0.15)" : "transparent",
+                                  border: hostMediaLocks.mic ? "1px solid rgba(239, 68, 68, 0.3)" : "none"
+                                }}>
+                                {hostMediaLocks.mic ? <MicOffIcon fontSize="small" /> : <MicIcon fontSize="small" />}
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title={isOnBreak ? "Disabled during break" : "Camera off all"}>
-                              <IconButton size="small" disabled={isOnBreak} onClick={forceCameraOffAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
-                                <VideocamOffIcon fontSize="small" />
+                            <Tooltip title={isOnBreak ? "Disabled during break" : (hostMediaLocks.cam ? "Camera on for all" : "Camera off for all")}>
+                              <IconButton
+                                size="small"
+                                disabled={isOnBreak}
+                                onClick={hostMediaLocks.cam ? forceCameraOnAll : forceCameraOffAll}
+                                sx={{
+                                  color: hostMediaLocks.cam ? "rgba(239, 68, 68, 0.9)" : "rgba(255,255,255,0.9)",
+                                  bgcolor: hostMediaLocks.cam ? "rgba(239, 68, 68, 0.15)" : "transparent",
+                                  border: hostMediaLocks.cam ? "1px solid rgba(239, 68, 68, 0.3)" : "none"
+                                }}>
+                                {hostMediaLocks.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
                               </IconButton>
                             </Tooltip>
                           </Stack>
