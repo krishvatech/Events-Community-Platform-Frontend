@@ -177,7 +177,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 
 // ---- Tabs / pagination ----
 const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
-const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms Tables", "Social Lounge"];
+const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
 
@@ -1182,7 +1182,9 @@ export default function EventManagePage() {
     try {
       const isPreEventLounge = isPreEventLoungeOpen(event);
       const isPostEventLounge = isPostEventLoungeOpen(event);
-      const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=audience`;
+      // Use publisher role if this user is a host (assigned via EventParticipant)
+      const joinRole = myReg?.is_host ? "publisher" : "audience";
+      const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=${joinRole}`;
       navigate(livePath, {
         state: {
           event,
@@ -1226,9 +1228,10 @@ export default function EventManagePage() {
   const isLive = status === "live" && event?.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(event, 15);
   const isPreEventLounge = isPreEventLoungeOpen(event);
-  const canShowActiveJoin = (isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge) && status !== "cancelled";
+  const isHost = Boolean(myReg?.is_host);
+  const canShowActiveJoin = (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge) && status !== "cancelled" && event?.status !== "ended";
 
-  const joinLabel = getJoinButtonText(event, isLive, false, myReg);
+  const joinLabel = isHost ? "Join as Host" : getJoinButtonText(event, isLive, false, myReg);
   const statusMeta = statusChip(status);
   const avatarLetter = (event?.title?.[0] || "E").toUpperCase();
 
@@ -1680,8 +1683,8 @@ export default function EventManagePage() {
           </Paper>
         </Grid>
 
-        {/* Participant Visibility Settings (Owner/Staff only) */}
-        {(isOwner || isStaff) && (
+        {/* Participant Visibility Settings (Owner only) */}
+        {isOwner && (
           <Grid item xs={12}>
             <Paper
               elevation={0}
@@ -4210,8 +4213,6 @@ export default function EventManagePage() {
                 <>
                   {tab === 0 && renderOverview()}
                   {tab === 1 && renderResources()}
-                  {tab === 2 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                  {tab === 3 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                 </>
               )}
             </Box>

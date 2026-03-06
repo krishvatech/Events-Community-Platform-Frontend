@@ -713,569 +713,569 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       >
         <DialogTitle className="font-extrabold">Create an Event</DialogTitle>
 
-      <DialogContent dividers>
-        <Typography variant="body2" className="text-slate-500 mb-4">
-          *Required fields are marked with an asterisk
-        </Typography>
+        <DialogContent dividers>
+          <Typography variant="body2" className="text-slate-500 mb-4">
+            *Required fields are marked with an asterisk
+          </Typography>
 
-        {/* ===== Basic Info ===== */}
-        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-          <Typography variant="h6" className="font-semibold mb-3">Basic Info</Typography>
+          {/* ===== Basic Info ===== */}
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+            <Typography variant="h6" className="font-semibold mb-3">Basic Info</Typography>
 
-          <Box className="flex items-start mb-3">
+            <Box className="flex items-start mb-3">
+              <TextField
+                label="Name of the Event *"
+                placeholder="Enter event name"
+                InputLabelProps={{ shrink: true }}
+                value={title}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTitle(v);
+                  if (!slug || slug === slugifyLocal(title)) setSlug(slugifyLocal(v));
+                }}
+                fullWidth
+                error={!!errors.title}
+                helperText={errors.title}
+              />
+            </Box>
+
             <TextField
-              label="Name of the Event *"
-              placeholder="Enter event name"
+              label="Description *"
+              placeholder="Enter event description..."
               InputLabelProps={{ shrink: true }}
-              value={title}
+              multiline
+              minRows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              fullWidth
+              error={!!errors.description}
+              helperText={errors.description}
+              sx={{ mb: 2 }}
+            />
+
+            <TextField
+              label="Slug *"
+              placeholder="enter-event-slug"
+              InputLabelProps={{ shrink: true }}
+              value={slug}
               onChange={(e) => {
-                const v = e.target.value;
-                setTitle(v);
-                if (!slug || slug === slugifyLocal(title)) setSlug(slugifyLocal(v));
+                setSlug(slugifyLocal(e.target.value));
+                setErrors((prev) => ({ ...prev, slug: "" }));
               }}
               fullWidth
-              error={!!errors.title}
-              helperText={errors.title}
+              error={!!errors.slug || slugStatus.available === false}
+              helperText={
+                errors.slug ||
+                (slugStatus.checking
+                  ? "Checking slug availability..."
+                  : slugStatus.available === true
+                    ? "Slug is available."
+                    : slugStatus.available === false
+                      ? "This slug is already taken."
+                      : "Use lowercase letters, numbers, and hyphens.")
+              }
+              sx={{ mb: 2 }}
             />
+
+            <TextField
+              label="Format"
+              select
+              value={format}
+              onChange={(e) => {
+                const next = e.target.value;
+                setFormat(next);
+                if (next === "virtual") {
+                  setErrors((prev) => ({ ...prev, location: "" }));
+                }
+              }}
+              fullWidth
+              sx={{ mb: 2 }}
+            >
+              {formats.map((f) => (
+                <MenuItem key={f.value} value={f.value}>
+                  {f.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Paper>
+
+          {/* Replay Options - Only for Virtual/Hybrid */}
+          {(format === "virtual" || format === "hybrid") && (
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+              <Typography variant="h6" className="font-semibold mb-3">Replay Options</Typography>
+              <Stack direction="row" spacing={3} alignItems="center">
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={replayAvailable}
+                      onChange={(e) => setReplayAvailable(e.target.checked)}
+                    />
+                  }
+                  label="Replay will be available"
+                />
+                {replayAvailable && (
+                  <TextField
+                    select
+                    label="Available for"
+                    value={replayDuration}
+                    onChange={(e) => setReplayDuration(e.target.value)}
+                    size="small"
+                    sx={{ minWidth: 200 }}
+                  >
+                    {[
+                      "7 Days",
+                      "14 Days",
+                      "30 Days",
+                      "60 Days",
+                      "90 Days",
+                      "6 Months",
+                      "1 Year",
+                      "Unlimited"
+                    ].map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {option}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          {/* Country Field */}
+          <Box sx={{ mb: 2 }}>
+            {format === "virtual" ? (
+              <Autocomplete
+                fullWidth
+                options={COUNTRY_OPTIONS}
+                autoHighlight
+                value={getSelectedCountry({ location })}
+                getOptionLabel={(opt) => opt?.label ?? ""}
+                isOptionEqualToValue={(o, v) => o.code === v.code}
+                onChange={(_, newVal) => {
+                  setLocation(newVal ? newVal.label : "");
+                  setErrors((prev) => ({ ...prev, location: "" }));
+                }}
+                ListboxProps={{
+                  style: {
+                    maxHeight: 36 * 7,
+                    overflowY: "auto",
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                  },
+                }}
+                renderOption={(props, option) => (
+                  <li {...props} key={option.code}>
+                    <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                    {option.label}
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Country"
+                    placeholder="Select country"
+                    fullWidth
+                    error={!!errors.location}
+                    helperText={errors.location}
+                    inputProps={{
+                      ...params.inputProps,
+                      autoComplete: "new-password",
+                    }}
+                  />
+                )}
+              />
+            ) : (
+              <TextField
+                label="Location *"
+                placeholder="Enter location (City, Country)"
+                InputLabelProps={{ shrink: true }}
+                value={location}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  setErrors((prev) => ({ ...prev, location: "" }));
+                }}
+                fullWidth
+                error={!!errors.location}
+                helperText={errors.location || "City & country, or full address"}
+              />
+            )}
           </Box>
 
-          <TextField
-            label="Description *"
-            placeholder="Enter event description..."
-            InputLabelProps={{ shrink: true }}
-            multiline
-            minRows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            fullWidth
-            error={!!errors.description}
-            helperText={errors.description}
-            sx={{ mb: 2 }}
-          />
 
-          <TextField
-            label="Slug *"
-            placeholder="enter-event-slug"
-            InputLabelProps={{ shrink: true }}
-            value={slug}
-            onChange={(e) => {
-              setSlug(slugifyLocal(e.target.value));
-              setErrors((prev) => ({ ...prev, slug: "" }));
-            }}
-            fullWidth
-            error={!!errors.slug || slugStatus.available === false}
-            helperText={
-              errors.slug ||
-              (slugStatus.checking
-                ? "Checking slug availability..."
-                : slugStatus.available === true
-                  ? "Slug is available."
-                  : slugStatus.available === false
-                    ? "This slug is already taken."
-                    : "Use lowercase letters, numbers, and hyphens.")
-            }
-            sx={{ mb: 2 }}
-          />
 
-          <TextField
-            label="Format"
-            select
-            value={format}
-            onChange={(e) => {
-              const next = e.target.value;
-              setFormat(next);
-              if (next === "virtual") {
-                setErrors((prev) => ({ ...prev, location: "" }));
-              }
-            }}
-            fullWidth
-            sx={{ mb: 2 }}
-          >
-            {formats.map((f) => (
-              <MenuItem key={f.value} value={f.value}>
-                {f.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Paper>
-
-        {/* Replay Options - Only for Virtual/Hybrid */}
-        {(format === "virtual" || format === "hybrid") && (
-          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-            <Typography variant="h6" className="font-semibold mb-3">Replay Options</Typography>
-            <Stack direction="row" spacing={3} alignItems="center">
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={replayAvailable}
-                    onChange={(e) => setReplayAvailable(e.target.checked)}
-                  />
-                }
-                label="Replay will be available"
-              />
-              {replayAvailable && (
-                <TextField
-                  select
-                  label="Available for"
-                  value={replayDuration}
-                  onChange={(e) => setReplayDuration(e.target.value)}
-                  size="small"
-                  sx={{ minWidth: 200 }}
-                >
-                  {[
-                    "7 Days",
-                    "14 Days",
-                    "30 Days",
-                    "60 Days",
-                    "90 Days",
-                    "6 Months",
-                    "1 Year",
-                    "Unlimited"
-                  ].map((option) => (
-                    <MenuItem key={option} value={option}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
-            </Stack>
-          </Paper>
-        )}
-
-        {/* Country Field */}
-        <Box sx={{ mb: 2 }}>
-          {format === "virtual" ? (
-            <Autocomplete
+          {/* Category Field */}
+          <Box sx={{ mb: 3 }}>
+            <TextField
+              label="Category"
+              select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
               fullWidth
-              options={COUNTRY_OPTIONS}
-              autoHighlight
-              value={getSelectedCountry({ location })}
-              getOptionLabel={(opt) => opt?.label ?? ""}
-              isOptionEqualToValue={(o, v) => o.code === v.code}
-              onChange={(_, newVal) => {
-                setLocation(newVal ? newVal.label : "");
-                setErrors((prev) => ({ ...prev, location: "" }));
-              }}
-              ListboxProps={{
-                style: {
-                  maxHeight: 36 * 7,
-                  overflowY: "auto",
-                  paddingTop: 0,
-                  paddingBottom: 0,
-                },
-              }}
-              renderOption={(props, option) => (
-                <li {...props} key={option.code}>
-                  <span style={{ marginRight: 8 }}>{option.emoji}</span>
-                  {option.label}
-                </li>
-              )}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Country"
-                  placeholder="Select country"
-                  fullWidth
-                  error={!!errors.location}
-                  helperText={errors.location}
-                  inputProps={{
-                    ...params.inputProps,
-                    autoComplete: "new-password",
+            >
+              {categories.map((c) => (
+                <MenuItem key={c} value={c}>
+                  {c}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+
+          {/* Row 2: Free Event & Price */}
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            {/* Free Event Checkbox */}
+            <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
+              <FormControlLabel
+                control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+                label="Free Event"
+                sx={{ width: "100%", m: 0 }}
+              />
+            </Grid>
+            {/* Price Field */}
+            <Grid item xs={12} sm={4}>
+              <TextField
+                label="Price ($)"
+                placeholder="0.00"
+                InputLabelProps={{ shrink: true }}
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                inputProps={{ min: 0, step: "0.01" }}
+                fullWidth
+                error={!!errors.price}
+                helperText={errors.price}
+                disabled={isFree}
+              />
+            </Grid>
+            {/* Max Participants Field */}
+            <Grid item xs={12} sm={4}>
+              <TextField
+                label="Max Participants"
+                placeholder="e.g., 100"
+                InputLabelProps={{ shrink: true }}
+                type="number"
+                value={maxParticipants}
+                onChange={(e) => setMaxParticipants(e.target.value)}
+                inputProps={{ min: 1, step: 1 }}
+                fullWidth
+                helperText="Leave empty for unlimited"
+              />
+            </Grid>
+          </Grid>
+
+          {/* Images Row - Three Equal Columns */}
+          <Box
+            sx={{
+              mt: 3,
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: 2,
+            }}
+          >
+            {/* Update Logo / Picture */}
+            <Box>
+              <Typography variant="subtitle1" className="font-semibold">Logo / Picture</Typography>
+              <Typography variant="caption" className="text-slate-500 block mb-2">
+                Recommended 200x200px - Max 5 MB
+              </Typography>
+
+              <Box
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
+              >
+                {localLogoImagePreview ? (
+                  <img
+                    src={localLogoImagePreview}
+                    alt="logo preview"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <Stack alignItems="center" spacing={1}>
+                    <ImageRoundedIcon />
+                    <Typography variant="body2" className="text-slate-600">Logo / Picture</Typography>
+                  </Stack>
+                )}
+
+                <input
+                  id="ev-logo-image-file"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (f.size > 5 * 1024 * 1024) {
+                      setToast({ open: true, type: "error", msg: "Logo image size must be less than 5MB" });
+                      return;
+                    }
+                    setLogoImageFile(f);
+                    const r = new FileReader();
+                    r.onload = (ev) =>
+                      setLocalLogoImagePreview(String(ev.target?.result || ""));
+                    r.readAsDataURL(f);
                   }}
                 />
-              )}
-            />
-          ) : (
-            <TextField
-              label="Location *"
-              placeholder="Enter location (City, Country)"
-              InputLabelProps={{ shrink: true }}
-              value={location}
-              onChange={(e) => {
-                setLocation(e.target.value);
-                setErrors((prev) => ({ ...prev, location: "" }));
-              }}
-              fullWidth
-              error={!!errors.location}
-              helperText={errors.location || "City & country, or full address"}
-            />
-          )}
-        </Box>
+              </Box>
 
+              <label htmlFor="ev-logo-image-file">
+                <Button
+                  component="span"
+                  size="small"
+                  variant="outlined"
+                  startIcon={<InsertPhotoRoundedIcon />}
+                  sx={{ mt: 1 }}
+                >
+                  Upload Logo
+                </Button>
+              </label>
+            </Box>
 
+            {/* Cover Image */}
+            <Box>
+              <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+              <Typography variant="caption" className="text-slate-500 block mb-2">
+                Recommended 1280x720px - Max 5 MB
+              </Typography>
 
-        {/* Category Field */}
-        <Box sx={{ mb: 3 }}>
-          <TextField
-            label="Category"
-            select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            fullWidth
+              <Box
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
+              >
+                {localCoverImagePreview ? (
+                  <img
+                    src={localCoverImagePreview}
+                    alt="cover preview"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <Stack alignItems="center" spacing={1}>
+                    <ImageRoundedIcon />
+                    <Typography variant="body2" className="text-slate-600">Cover Image</Typography>
+                  </Stack>
+                )}
+
+                <input
+                  id="ev-cover-image-file"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (f.size > 5 * 1024 * 1024) {
+                      setToast({ open: true, type: "error", msg: "Cover image size must be less than 5MB" });
+                      return;
+                    }
+                    setCoverImageFile(f);
+                    const r = new FileReader();
+                    r.onload = (ev) =>
+                      setLocalCoverImagePreview(String(ev.target?.result || ""));
+                    r.readAsDataURL(f);
+                  }}
+                />
+              </Box>
+
+              <label htmlFor="ev-cover-image-file">
+                <Button
+                  component="span"
+                  size="small"
+                  variant="outlined"
+                  startIcon={<InsertPhotoRoundedIcon />}
+                  sx={{ mt: 1 }}
+                >
+                  Upload Cover
+                </Button>
+              </label>
+            </Box>
+
+            {/* Waiting Room Image */}
+            <Box>
+              <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
+              <Typography variant="caption" className="text-slate-500 block mb-2">
+                Recommended 1280x720px - Max 5 MB
+              </Typography>
+
+              <Box
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
+              >
+                {localWaitingRoomImagePreview ? (
+                  <img
+                    src={localWaitingRoomImagePreview}
+                    alt="waiting room preview"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <Stack alignItems="center" spacing={1}>
+                    <ImageRoundedIcon />
+                    <Typography variant="body2" className="text-slate-600">Waiting Room</Typography>
+                  </Stack>
+                )}
+
+                <input
+                  id="ev-waiting-room-image-file"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    if (f.size > 5 * 1024 * 1024) {
+                      setToast({ open: true, type: "error", msg: "Waiting room image size must be less than 5MB" });
+                      return;
+                    }
+                    setWaitingRoomImageFile(f);
+                    const r = new FileReader();
+                    r.onload = (ev) =>
+                      setLocalWaitingRoomImagePreview(String(ev.target?.result || ""));
+                    r.readAsDataURL(f);
+                  }}
+                />
+              </Box>
+
+              <label htmlFor="ev-waiting-room-image-file">
+                <Button
+                  component="span"
+                  size="small"
+                  variant="outlined"
+                  startIcon={<InsertPhotoRoundedIcon />}
+                  sx={{ mt: 1 }}
+                >
+                  Upload Waiting Room
+                </Button>
+              </label>
+
+            </Box>
+          </Box>
+
+          <Box
+            sx={{
+              mt: 2,
+              width: "100%",
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+              gap: 1.5,
+              alignItems: "center",
+            }}
           >
-            {categories.map((c) => (
-              <MenuItem key={c} value={c}>
-                {c}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Box>
-
-        {/* Row 2: Free Event & Price */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {/* Free Event Checkbox */}
-          <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
             <FormControlLabel
-              control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
-              label="Free Event"
-              sx={{ width: "100%", m: 0 }}
+              control={
+                <Switch
+                  checked={waitingRoomEnabled}
+                  onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
+                />
+              }
+              label="Enable Waiting Room"
+              sx={{
+                m: 0,
+                width: "100%",
+                justifyContent: "flex-start",
+                gap: 1.5,
+                "& .MuiFormControlLabel-label": { marginLeft: 0 },
+              }}
             />
-          </Grid>
-          {/* Price Field */}
-          <Grid item xs={12} sm={4}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={waitingRoomLoungeAllowed}
+                  onChange={(e) => setWaitingRoomLoungeAllowed(e.target.checked)}
+                  disabled={!waitingRoomEnabled}
+                />
+              }
+              label="Allow Social Lounge while waiting"
+              sx={{
+                m: 0,
+                width: "100%",
+                justifyContent: "flex-start",
+                gap: 1.5,
+                "& .MuiFormControlLabel-label": { marginLeft: 0 },
+              }}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={waitingRoomNetworkingAllowed}
+                  onChange={(e) => setWaitingRoomNetworkingAllowed(e.target.checked)}
+                  disabled={!waitingRoomEnabled}
+                />
+              }
+              label="Allow Networking Tables while waiting"
+              sx={{
+                m: 0,
+                width: "100%",
+                justifyContent: "flex-start",
+                gap: 1.5,
+                "& .MuiFormControlLabel-label": { marginLeft: 0 },
+              }}
+            />
             <TextField
-              label="Price ($)"
-              placeholder="0.00"
-              InputLabelProps={{ shrink: true }}
+              label="Auto-admit after (seconds)"
+              size="small"
               type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              inputProps={{ min: 0, step: "0.01" }}
+              value={waitingRoomAutoAdmitSeconds}
+              onChange={(e) => setWaitingRoomAutoAdmitSeconds(e.target.value)}
+              disabled={!waitingRoomEnabled}
               fullWidth
-              error={!!errors.price}
-              helperText={errors.price}
-              disabled={isFree}
             />
-          </Grid>
-          {/* Max Participants Field */}
-          <Grid item xs={12} sm={4}>
-            <TextField
-              label="Max Participants"
-              placeholder="e.g., 100"
-              InputLabelProps={{ shrink: true }}
-              type="number"
-              value={maxParticipants}
-              onChange={(e) => setMaxParticipants(e.target.value)}
-              inputProps={{ min: 1, step: 1 }}
-              fullWidth
-              helperText="Leave empty for unlimited"
-            />
-          </Grid>
-        </Grid>
-
-        {/* Images Row - Three Equal Columns */}
-        <Box
-          sx={{
-            mt: 3,
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: 2,
-          }}
-        >
-          {/* Update Logo / Picture */}
-          <Box>
-            <Typography variant="subtitle1" className="font-semibold">Logo / Picture</Typography>
-            <Typography variant="caption" className="text-slate-500 block mb-2">
-              Recommended 200x200px - Max 5 MB
-            </Typography>
-
-            <Box
-              className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-              sx={{ height: 150, position: "relative", overflow: "hidden" }}
-            >
-              {localLogoImagePreview ? (
-                <img
-                  src={localLogoImagePreview}
-                  alt="logo preview"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <Stack alignItems="center" spacing={1}>
-                  <ImageRoundedIcon />
-                  <Typography variant="body2" className="text-slate-600">Logo / Picture</Typography>
-                </Stack>
-              )}
-
-              <input
-                id="ev-logo-image-file"
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  if (f.size > 5 * 1024 * 1024) {
-                    setToast({ open: true, type: "error", msg: "Logo image size must be less than 5MB" });
-                    return;
-                  }
-                  setLogoImageFile(f);
-                  const r = new FileReader();
-                  r.onload = (ev) =>
-                    setLocalLogoImagePreview(String(ev.target?.result || ""));
-                  r.readAsDataURL(f);
-                }}
-              />
-            </Box>
-
-            <label htmlFor="ev-logo-image-file">
-              <Button
-                component="span"
-                size="small"
-                variant="outlined"
-                startIcon={<InsertPhotoRoundedIcon />}
-                sx={{ mt: 1 }}
-              >
-                Upload Logo
-              </Button>
-            </label>
           </Box>
-
-          {/* Cover Image */}
-          <Box>
-            <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
-            <Typography variant="caption" className="text-slate-500 block mb-2">
-              Recommended 1280x720px - Max 5 MB
-            </Typography>
-
-            <Box
-              className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-              sx={{ height: 150, position: "relative", overflow: "hidden" }}
-            >
-              {localCoverImagePreview ? (
-                <img
-                  src={localCoverImagePreview}
-                  alt="cover preview"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <Stack alignItems="center" spacing={1}>
-                  <ImageRoundedIcon />
-                  <Typography variant="body2" className="text-slate-600">Cover Image</Typography>
-                </Stack>
-              )}
-
-              <input
-                id="ev-cover-image-file"
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  if (f.size > 5 * 1024 * 1024) {
-                    setToast({ open: true, type: "error", msg: "Cover image size must be less than 5MB" });
-                    return;
-                  }
-                  setCoverImageFile(f);
-                  const r = new FileReader();
-                  r.onload = (ev) =>
-                    setLocalCoverImagePreview(String(ev.target?.result || ""));
-                  r.readAsDataURL(f);
-                }}
-              />
-            </Box>
-
-            <label htmlFor="ev-cover-image-file">
-              <Button
-                component="span"
-                size="small"
-                variant="outlined"
-                startIcon={<InsertPhotoRoundedIcon />}
-                sx={{ mt: 1 }}
-              >
-                Upload Cover
-              </Button>
-            </label>
-          </Box>
-
-          {/* Waiting Room Image */}
-          <Box>
-            <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
-            <Typography variant="caption" className="text-slate-500 block mb-2">
-              Recommended 1280x720px - Max 5 MB
-            </Typography>
-
-            <Box
-              className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-              sx={{ height: 150, position: "relative", overflow: "hidden" }}
-            >
-              {localWaitingRoomImagePreview ? (
-                <img
-                  src={localWaitingRoomImagePreview}
-                  alt="waiting room preview"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <Stack alignItems="center" spacing={1}>
-                  <ImageRoundedIcon />
-                  <Typography variant="body2" className="text-slate-600">Waiting Room</Typography>
-                </Stack>
-              )}
-
-              <input
-                id="ev-waiting-room-image-file"
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  if (f.size > 5 * 1024 * 1024) {
-                    setToast({ open: true, type: "error", msg: "Waiting room image size must be less than 5MB" });
-                    return;
-                  }
-                  setWaitingRoomImageFile(f);
-                  const r = new FileReader();
-                  r.onload = (ev) =>
-                    setLocalWaitingRoomImagePreview(String(ev.target?.result || ""));
-                  r.readAsDataURL(f);
-                }}
-              />
-            </Box>
-
-            <label htmlFor="ev-waiting-room-image-file">
-              <Button
-                component="span"
-                size="small"
-                variant="outlined"
-                startIcon={<InsertPhotoRoundedIcon />}
-                sx={{ mt: 1 }}
-              >
-                Upload Waiting Room
-              </Button>
-            </label>
-
-          </Box>
-        </Box>
-
-        <Box
-          sx={{
-            mt: 2,
-            width: "100%",
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-            gap: 1.5,
-            alignItems: "center",
-          }}
-        >
-          <FormControlLabel
-            control={
-              <Switch
-                checked={waitingRoomEnabled}
-                onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
-              />
-            }
-            label="Enable Waiting Room"
-            sx={{
-              m: 0,
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 1.5,
-              "& .MuiFormControlLabel-label": { marginLeft: 0 },
-            }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={waitingRoomLoungeAllowed}
-                onChange={(e) => setWaitingRoomLoungeAllowed(e.target.checked)}
-                disabled={!waitingRoomEnabled}
-              />
-            }
-            label="Allow Social Lounge while waiting"
-            sx={{
-              m: 0,
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 1.5,
-              "& .MuiFormControlLabel-label": { marginLeft: 0 },
-            }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={waitingRoomNetworkingAllowed}
-                onChange={(e) => setWaitingRoomNetworkingAllowed(e.target.checked)}
-                disabled={!waitingRoomEnabled}
-              />
-            }
-            label="Allow Networking Tables while waiting"
-            sx={{
-              m: 0,
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 1.5,
-              "& .MuiFormControlLabel-label": { marginLeft: 0 },
-            }}
-          />
           <TextField
-            label="Auto-admit after (seconds)"
-            size="small"
+            label="Grace Period (minutes)"
             type="number"
-            value={waitingRoomAutoAdmitSeconds}
-            onChange={(e) => setWaitingRoomAutoAdmitSeconds(e.target.value)}
+            inputProps={{ min: "0", max: "1440", step: "1" }}
+            value={waitingRoomGracePeriodMinutes}
+            onChange={(e) => setWaitingRoomGracePeriodMinutes(e.target.value)}
             disabled={!waitingRoomEnabled}
             fullWidth
+            size="small"
+            sx={{ mt: 3 }}
+            helperText="Minutes after event start during which participants can join directly without waiting room approval"
+            InputProps={{
+              endAdornment: <InputAdornment position="end">minutes</InputAdornment>,
+            }}
           />
-        </Box>
-        <TextField
-          label="Grace Period (minutes)"
-          type="number"
-          inputProps={{ min: "0", max: "1440", step: "1" }}
-          value={waitingRoomGracePeriodMinutes}
-          onChange={(e) => setWaitingRoomGracePeriodMinutes(e.target.value)}
-          disabled={!waitingRoomEnabled}
-          fullWidth
-          size="small"
-          sx={{ mt: 3 }}
-          helperText="Minutes after event start during which participants can join directly without waiting room approval"
-          InputProps={{
-            endAdornment: <InputAdornment position="end">minutes</InputAdornment>,
-          }}
-        />
 
-        {/* ===== Schedule ===== */}
-        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-          <Box className="flex items-center justify-between mb-3">
-            <Typography variant="h6" className="font-semibold">Schedule</Typography>
-            <FormControlLabel
-              control={<Switch checked={isMultiDay} onChange={(e) => {
-                const v = e.target.checked;
-                setIsMultiDay(v);
-                if (v) {
-                  // If switching to Multi-Day, set Start Time to 10 minutes ahead of current time in selected timezone
-                  // and End Time to 11:59 PM (end of the final day)
-                  try {
-                    const currentTimeInTz = dayjs().tz(timezone || 'UTC');
-                    const startTimeInTz = currentTimeInTz.add(10, 'minutes').second(0).millisecond(0);
-                    const startTimeStr = startTimeInTz.format("HH:mm");
-                    setStartTime(startTimeStr);
-                    setEndTime("23:59");
-                    console.log("🕐 Multi-Day toggle ON: Set Start Time to current time + 10 minutes", {
-                      timezone,
-                      currentTime: currentTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
-                      startTime: startTimeStr,
-                      startTimeFullISO: startTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
-                    });
-                  } catch (error) {
-                    console.error("❌ Error calculating start time:", error);
-                    // Fallback to current local time if timezone calculation fails
-                    const currentTime = dayjs().add(10, 'minutes').second(0).millisecond(0);
-                    setStartTime(currentTime.format("HH:mm"));
-                    setEndTime("23:59");
+          {/* ===== Schedule ===== */}
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+            <Box className="flex items-center justify-between mb-3">
+              <Typography variant="h6" className="font-semibold">Schedule</Typography>
+              <FormControlLabel
+                control={<Switch checked={isMultiDay} onChange={(e) => {
+                  const v = e.target.checked;
+                  setIsMultiDay(v);
+                  if (v) {
+                    // If switching to Multi-Day, set Start Time to 10 minutes ahead of current time in selected timezone
+                    // and End Time to 11:59 PM (end of the final day)
+                    try {
+                      const currentTimeInTz = dayjs().tz(timezone || 'UTC');
+                      const startTimeInTz = currentTimeInTz.add(10, 'minutes').second(0).millisecond(0);
+                      const startTimeStr = startTimeInTz.format("HH:mm");
+                      setStartTime(startTimeStr);
+                      setEndTime("23:59");
+                      console.log("🕐 Multi-Day toggle ON: Set Start Time to current time + 10 minutes", {
+                        timezone,
+                        currentTime: currentTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
+                        startTime: startTimeStr,
+                        startTimeFullISO: startTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
+                      });
+                    } catch (error) {
+                      console.error("❌ Error calculating start time:", error);
+                      // Fallback to current local time if timezone calculation fails
+                      const currentTime = dayjs().add(10, 'minutes').second(0).millisecond(0);
+                      setStartTime(currentTime.format("HH:mm"));
+                      setEndTime("23:59");
+                    }
+                  } else {
+                    // If switching to Single Day, restore original single-day times and force end date to equal start date
+                    setStartTime(singleDayStartTime);
+                    setEndTime(singleDayEndTime);
+                    setEndDate(startDate);
                   }
-                } else {
-                  // If switching to Single Day, restore original single-day times and force end date to equal start date
-                  setStartTime(singleDayStartTime);
-                  setEndTime(singleDayEndTime);
-                  setEndDate(startDate);
-                }
-              }} />}
-              label="Multi-day event?"
-            />
-          </Box>
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} md={isMultiDay ? 6 : 12}>
+                }} />}
+                label="Multi-day event?"
+              />
+            </Box>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid item xs={12} md={isMultiDay ? 6 : 12}>
                 <DatePicker
                   label={isMultiDay ? "Start Date" : "Date"}
                   value={startDateValue}
@@ -1299,9 +1299,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     }
                   }}
                 />
-            </Grid>
-            {isMultiDay && (
-              <Grid item xs={12} md={6}>
+              </Grid>
+              {isMultiDay && (
+                <Grid item xs={12} md={6}>
                   <DatePicker
                     label="End Date"
                     value={endDateValue}
@@ -1320,14 +1320,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       }
                     }}
                   />
-              </Grid>
-            )}
-          </Grid>
+                </Grid>
+              )}
+            </Grid>
 
-          <Grid container spacing={2}>
-            {!isMultiDay && (
-              <>
-                <Grid item xs={12} md={4}>
+            <Grid container spacing={2}>
+              {!isMultiDay && (
+                <>
+                  <Grid item xs={12} md={4}>
                     <TimePicker
                       label="Start time *"
                       ampm
@@ -1368,8 +1368,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                         }
                       }}
                       slotProps={{ textField: { fullWidth: true, error: !!errors.startTime, helperText: errors.startTime } }} />
-                </Grid>
-                <Grid item xs={12} md={4}>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
                     <TimePicker
                       label="End time *"
                       ampm
@@ -1400,155 +1400,155 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                         setEndTime(newEnd);
                       }}
                       slotProps={{ textField: { fullWidth: true, error: !!errors.endTime, helperText: errors.endTime } }} />
-                </Grid>
-              </>
-            )}
-            <Grid item xs={12} md={4}>
-              <Autocomplete
-                fullWidth
-                options={timezoneOptions}
-                value={timezone}
-                onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Event Timezone"
-                    helperText="Times are saved in this timezone."
-                  />
-                )}
-              />
+                  </Grid>
+                </>
+              )}
+              <Grid item xs={12} md={4}>
+                <Autocomplete
+                  fullWidth
+                  options={timezoneOptions}
+                  value={timezone}
+                  onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Event Timezone"
+                      helperText="Times are saved in this timezone."
+                    />
+                  )}
+                />
+              </Grid>
             </Grid>
-          </Grid>
-        </Paper>
+          </Paper>
 
-        {/* ===== Sessions (Multi-Day Events) ===== */}
-        {isMultiDay && (
-          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <CalendarMonthRoundedIcon color="action" />
-                <Typography variant="h6" className="font-semibold">
-                  Sessions
-                </Typography>
+          {/* ===== Sessions (Multi-Day Events) ===== */}
+          {isMultiDay && (
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <CalendarMonthRoundedIcon color="action" />
+                  <Typography variant="h6" className="font-semibold">
+                    Sessions
+                  </Typography>
+                </Stack>
+                <Button
+                  size="small"
+                  startIcon={<AddRoundedIcon />}
+                  onClick={() => {
+                    setEditingSessionIndex(null);
+                    setSessionDialogOpen(true);
+                  }}
+                  sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                >
+                  Add Session
+                </Button>
               </Stack>
-              <Button
-                size="small"
-                startIcon={<AddRoundedIcon />}
-                onClick={() => {
-                  setEditingSessionIndex(null);
-                  setSessionDialogOpen(true);
-                }}
-                sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
-              >
-                Add Session
-              </Button>
+
+              <Typography variant="body2" color="text.secondary" mb={2}>
+                Break your multi-day event into individual sessions
+              </Typography>
+
+              {sessions.length > 0 && (
+                <Box mb={2}>
+                  <SessionList
+                    sessions={sessions}
+                    onEdit={(session, idx) => {
+                      setEditingSessionIndex(idx);
+                      setSessionDialogOpen(true);
+                    }}
+                    onDelete={(session, idx) => {
+                      setSessions(prev => prev.filter((_, i) => i !== idx));
+                      setToast({ open: true, type: "success", msg: "Session removed" });
+                    }}
+                  />
+                </Box>
+              )}
+            </Paper>
+          )}
+
+          {/* ===== Speakers & Hosts ===== */}
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+            <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+              <RecordVoiceOverRoundedIcon color="action" />
+              <Typography variant="h6" className="font-semibold">
+                Speakers & Hosts
+              </Typography>
             </Stack>
 
             <Typography variant="body2" color="text.secondary" mb={2}>
-              Break your multi-day event into individual sessions
+              Add speakers, moderators, or hosts for this event
             </Typography>
 
-            {sessions.length > 0 && (
+            {participants.length > 0 && (
               <Box mb={2}>
-                <SessionList
-                  sessions={sessions}
-                  onEdit={(session, idx) => {
-                    setEditingSessionIndex(idx);
-                    setSessionDialogOpen(true);
+                <ParticipantList
+                  participants={participants}
+                  onEdit={(p, idx) => {
+                    setEditingParticipantIndex(idx);
+                    setParticipantDialogOpen(true);
                   }}
-                  onDelete={(session, idx) => {
-                    setSessions(prev => prev.filter((_, i) => i !== idx));
-                    setToast({ open: true, type: "success", msg: "Session removed" });
+                  onRemove={(p, idx) => {
+                    setParticipants(prev => prev.filter((_, i) => i !== idx));
+                    toast.success("Participant removed");
                   }}
                 />
               </Box>
             )}
+
+            <Button
+              variant="outlined"
+              startIcon={<AddRoundedIcon />}
+              onClick={() => {
+                setEditingParticipantIndex(null);
+                setParticipantDialogOpen(true);
+              }}
+              fullWidth
+            >
+              Add Participant
+            </Button>
           </Paper>
-        )}
 
-        {/* ===== Speakers & Hosts ===== */}
-        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-          <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-            <RecordVoiceOverRoundedIcon color="action" />
-            <Typography variant="h6" className="font-semibold">
-              Speakers & Hosts
+          {/* ===== Attach Resources ===== */}
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+            <Typography variant="h6" className="font-semibold mb-1">Attach Resources (optional)</Typography>
+            <Typography variant="caption" className="text-slate-500">
+              You can add files, links, or videos now. They’ll be saved to this event.
             </Typography>
-          </Stack>
 
-          <Typography variant="body2" color="text.secondary" mb={2}>
-            Add speakers, moderators, or hosts for this event
-          </Typography>
-
-          {participants.length > 0 && (
-            <Box mb={2}>
-              <ParticipantList
-                participants={participants}
-                onEdit={(p, idx) => {
-                  setEditingParticipantIndex(idx);
-                  setParticipantDialogOpen(true);
-                }}
-                onRemove={(p, idx) => {
-                  setParticipants(prev => prev.filter((_, i) => i !== idx));
-                  toast.success("Participant removed");
-                }}
+            <Box className="mt-2">
+              <FormControlLabel
+                control={<Switch checked={resourcesPublishNow} onChange={(e) => setResourcesPublishNow(e.target.checked)} />}
+                label="Publish resources immediately"
               />
             </Box>
-          )}
 
-          <Button
-            variant="outlined"
-            startIcon={<AddRoundedIcon />}
-            onClick={() => {
-              setEditingParticipantIndex(null);
-              setParticipantDialogOpen(true);
-            }}
-            fullWidth
-          >
-            Add Participant
-          </Button>
-        </Paper>
-
-        {/* ===== Attach Resources ===== */}
-        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-          <Typography variant="h6" className="font-semibold mb-1">Attach Resources (optional)</Typography>
-          <Typography variant="caption" className="text-slate-500">
-            You can add files, links, or videos now. They’ll be saved to this event.
-          </Typography>
-
-          <Box className="mt-2">
-            <FormControlLabel
-              control={<Switch checked={resourcesPublishNow} onChange={(e) => setResourcesPublishNow(e.target.checked)} />}
-              label="Publish resources immediately"
-            />
-          </Box>
-
-          {/* Resource Type */}
-          <Grid container spacing={2} sx={{ mb: 1, mt: 1 }} alignItems="center">
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Resource Type"
-                select
-                value={resourceType}
-                onChange={(e) => setResourceType(e.target.value)}
-                fullWidth
-                sx={{
-                  width: "100%",
-                  minWidth: 300,
-                  "& .MuiInputBase-root": { width: "100%" },
-                  "& .MuiFormControl-root": { width: "100%" },
-                }}
-              >
-                <MenuItem value="file">File (PDF/Document)</MenuItem>
-                <MenuItem value="link">Link</MenuItem>
-                <MenuItem value="video">Video URL</MenuItem>
-              </TextField>
+            {/* Resource Type */}
+            <Grid container spacing={2} sx={{ mb: 1, mt: 1 }} alignItems="center">
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Resource Type"
+                  select
+                  value={resourceType}
+                  onChange={(e) => setResourceType(e.target.value)}
+                  fullWidth
+                  sx={{
+                    width: "100%",
+                    minWidth: 300,
+                    "& .MuiInputBase-root": { width: "100%" },
+                    "& .MuiFormControl-root": { width: "100%" },
+                  }}
+                >
+                  <MenuItem value="file">File (PDF/Document)</MenuItem>
+                  <MenuItem value="link">Link</MenuItem>
+                  <MenuItem value="video">Video URL</MenuItem>
+                </TextField>
+              </Grid>
             </Grid>
-          </Grid>
 
-          {/* Optional schedule for resources */}
-          {!resourcesPublishNow && (
-            <Grid container spacing={2} sx={{ mb: 1 }}>
-              <Grid item xs={12} md={6}>
+            {/* Optional schedule for resources */}
+            {!resourcesPublishNow && (
+              <Grid container spacing={2} sx={{ mb: 1 }}>
+                <Grid item xs={12} md={6}>
                   <DatePicker
                     label="Publish Date"
                     value={resPublishDateValue}
@@ -1562,8 +1562,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       }
                     }}
                   />
-              </Grid>
-              <Grid item xs={12} md={6}>
+                </Grid>
+                <Grid item xs={12} md={6}>
                   <TimePicker
                     label="Publish Time"
                     ampm
@@ -1572,217 +1572,217 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     onChange={(val) => setResPublishTime(val ? dayjs(val).minute(0).second(0).format("HH:mm") : resPublishTime)}
                     slotProps={{ textField: { fullWidth: true, error: !!errors.resource_publish_at } }}
                   />
+                </Grid>
+              </Grid>
+            )}
+
+            {/* NEW: Resource metadata (applies to any type) */}
+            <Grid container spacing={2} sx={{ mt: 2 }}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Title"
+                  placeholder="Enter resource title"
+                  InputLabelProps={{ shrink: true }}
+                  value={resTitle}
+                  onChange={(e) => setResTitle(e.target.value)}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Description"
+                  placeholder="Enter resource description"
+                  InputLabelProps={{ shrink: true }}
+                  value={resDesc}
+                  onChange={(e) => setResDesc(e.target.value)}
+                  fullWidth
+                  multiline
+                  minRows={1}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>Tags</Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                  <TextField size="small" placeholder="Add a tag" value={tagInput} onChange={(e) => setTagInput(e.target.value)} sx={{ flex: 1, maxWidth: 420 }} />
+                  <Button variant="outlined" onClick={addTag}>Add</Button>
+                </Stack>
+                {resTags.length > 0 && (
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                    {resTags.map((t) => (
+                      <Chip key={t} label={t} onDelete={() => setResTags((p) => p.filter((x) => x !== t))} />
+                    ))}
+                  </Stack>
+                )}
               </Grid>
             </Grid>
-          )}
 
-          {/* NEW: Resource metadata (applies to any type) */}
-          <Grid container spacing={2} sx={{ mt: 2 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Title"
-                placeholder="Enter resource title"
-                InputLabelProps={{ shrink: true }}
-                value={resTitle}
-                onChange={(e) => setResTitle(e.target.value)}
-                fullWidth
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Description"
-                placeholder="Enter resource description"
-                InputLabelProps={{ shrink: true }}
-                value={resDesc}
-                onChange={(e) => setResDesc(e.target.value)}
-                fullWidth
-                multiline
-                minRows={1}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>Tags</Typography>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <TextField size="small" placeholder="Add a tag" value={tagInput} onChange={(e) => setTagInput(e.target.value)} sx={{ flex: 1, maxWidth: 420 }} />
-                <Button variant="outlined" onClick={addTag}>Add</Button>
-              </Stack>
-              {resTags.length > 0 && (
-                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                  {resTags.map((t) => (
-                    <Chip key={t} label={t} onDelete={() => setResTags((p) => p.filter((x) => x !== t))} />
-                  ))}
+            {/* Conditionally render only the chosen resource block */}
+            {resourceType === "file" && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>Files</Typography>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button component="label" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
+                    Choose files
+                    <input hidden type="file" multiple onChange={(e) => e.target.files && setResFiles((p) => [...p, ...Array.from(e.target.files)])} />
+                  </Button>
+                  <Typography variant="caption" color="text.secondary">You can select multiple files.</Typography>
                 </Stack>
-              )}
-            </Grid>
-          </Grid>
+                {resFiles.length > 0 && (
+                  <Stack spacing={0.75} sx={{ mt: 1 }}>
+                    {resFiles.map((f, idx) => (
+                      <Stack key={`${f.name}-${idx}`} direction="row" spacing={1} alignItems="center">
+                        <Chip size="small" label={f.name} />
+                        <Button size="small" color="error" onClick={() => setResFiles((p) => p.filter((_, i) => i !== idx))}>
+                          Remove
+                        </Button>
+                      </Stack>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            )}
 
-          {/* Conditionally render only the chosen resource block */}
-          {resourceType === "file" && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>Files</Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Button component="label" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
-                  Choose files
-                  <input hidden type="file" multiple onChange={(e) => e.target.files && setResFiles((p) => [...p, ...Array.from(e.target.files)])} />
-                </Button>
-                <Typography variant="caption" color="text.secondary">You can select multiple files.</Typography>
-              </Stack>
-              {resFiles.length > 0 && (
-                <Stack spacing={0.75} sx={{ mt: 1 }}>
-                  {resFiles.map((f, idx) => (
-                    <Stack key={`${f.name}-${idx}`} direction="row" spacing={1} alignItems="center">
-                      <Chip size="small" label={f.name} />
-                      <Button size="small" color="error" onClick={() => setResFiles((p) => p.filter((_, i) => i !== idx))}>
+            {resourceType === "link" && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>Links</Typography>
+                <Stack spacing={1} sx={{ width: "100%" }}>
+                  {resLinks.map((val, idx) => (
+                    <Stack key={`link-${idx}`} direction="row" spacing={1} sx={{ width: "100%" }}>
+                      <TextField fullWidth placeholder="https://example.com/resource" value={val}
+                        onChange={(e) => setResLinks((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
+                      <Button variant="outlined" color="error" onClick={() => setResLinks((p) => p.filter((_, i) => i !== idx))}>
                         Remove
                       </Button>
                     </Stack>
                   ))}
+                  <Button size="small" onClick={() => setResLinks((p) => [...p, ""])} startIcon={<AddRoundedIcon />}>
+                    Add link
+                  </Button>
                 </Stack>
-              )}
-            </Box>
-          )}
+              </Box>
+            )}
 
-          {resourceType === "link" && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>Links</Typography>
-              <Stack spacing={1} sx={{ width: "100%" }}>
-                {resLinks.map((val, idx) => (
-                  <Stack key={`link-${idx}`} direction="row" spacing={1} sx={{ width: "100%" }}>
-                    <TextField fullWidth placeholder="https://example.com/resource" value={val}
-                      onChange={(e) => setResLinks((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
-                    <Button variant="outlined" color="error" onClick={() => setResLinks((p) => p.filter((_, i) => i !== idx))}>
-                      Remove
-                    </Button>
-                  </Stack>
-                ))}
-                <Button size="small" onClick={() => setResLinks((p) => [...p, ""])} startIcon={<AddRoundedIcon />}>
-                  Add link
-                </Button>
-              </Stack>
-            </Box>
-          )}
+            {resourceType === "video" && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>Videos</Typography>
+                <Stack spacing={1} sx={{ width: "100%" }}>
+                  {resVideos.map((val, idx) => (
+                    <Stack key={`video-${idx}`} direction="row" spacing={1} sx={{ width: "100%" }}>
+                      <TextField fullWidth placeholder="https://youtu.be/abcd…" value={val}
+                        onChange={(e) => setResVideos((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
+                      <Button variant="outlined" color="error" onClick={() => setResVideos((p) => p.filter((_, i) => i !== idx))}>
+                        Remove
+                      </Button>
+                    </Stack>
+                  ))}
+                  <Button size="small" onClick={() => setResVideos((p) => [...p, ""])} startIcon={<AddRoundedIcon />}>
+                    Add video
+                  </Button>
+                </Stack>
+              </Box>
+            )}
+          </Paper>
+        </DialogContent>
 
-          {resourceType === "video" && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>Videos</Typography>
-              <Stack spacing={1} sx={{ width: "100%" }}>
-                {resVideos.map((val, idx) => (
-                  <Stack key={`video-${idx}`} direction="row" spacing={1} sx={{ width: "100%" }}>
-                    <TextField fullWidth placeholder="https://youtu.be/abcd…" value={val}
-                      onChange={(e) => setResVideos((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
-                    <Button variant="outlined" color="error" onClick={() => setResVideos((p) => p.filter((_, i) => i !== idx))}>
-                      Remove
-                    </Button>
-                  </Stack>
-                ))}
-                <Button size="small" onClick={() => setResVideos((p) => [...p, ""])} startIcon={<AddRoundedIcon />}>
-                  Add video
-                </Button>
-              </Stack>
-            </Box>
-          )}
-        </Paper>
-      </DialogContent>
+        <DialogActions className="px-6 py-4">
+          <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
+          <Button
+            onClick={submit}
+            disabled={submitting}
+            variant="contained"
+            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          >
+            Create
+          </Button>
+        </DialogActions>
 
-      <DialogActions className="px-6 py-4">
-        <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
-        <Button
-          onClick={submit}
-          disabled={submitting}
-          variant="contained"
-          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-        >
-          Create
-        </Button>
-      </DialogActions>
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={2800}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          severity={toast.type === "error" ? "error" : "success"}
-          variant="filled"
+        <Snackbar
+          open={toast.open}
+          autoHideDuration={2800}
           onClose={() => setToast((t) => ({ ...t, open: false }))}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
-          {toast.msg}
-        </Alert>
-      </Snackbar>
+          <Alert
+            severity={toast.type === "error" ? "error" : "success"}
+            variant="filled"
+            onClose={() => setToast((t) => ({ ...t, open: false }))}
+          >
+            {toast.msg}
+          </Alert>
+        </Snackbar>
 
-      {/* Participant Form Dialog */}
-      <ParticipantForm
-        open={participantDialogOpen}
-        onClose={() => {
-          setParticipantDialogOpen(false);
-          setEditingParticipantIndex(null);
-        }}
-        onSubmit={(participantData) => {
-          if (editingParticipantIndex !== null) {
-            // Edit existing
-            setParticipants(prev => prev.map((p, i) =>
-              i === editingParticipantIndex ? { ...p, ...participantData } : p
-            ));
-            setToast({ open: true, type: "success", msg: "Participant updated" });
-          } else {
-            // Add new
-            setParticipants(prev => [...prev, participantData]);
-            setToast({ open: true, type: "success", msg: "Participant added" });
+        {/* Participant Form Dialog */}
+        <ParticipantForm
+          open={participantDialogOpen}
+          onClose={() => {
+            setParticipantDialogOpen(false);
+            setEditingParticipantIndex(null);
+          }}
+          onSubmit={(participantData) => {
+            if (editingParticipantIndex !== null) {
+              // Edit existing
+              setParticipants(prev => prev.map((p, i) =>
+                i === editingParticipantIndex ? { ...p, ...participantData } : p
+              ));
+              setToast({ open: true, type: "success", msg: "Participant updated" });
+            } else {
+              // Add new
+              setParticipants(prev => [...prev, participantData]);
+              setToast({ open: true, type: "success", msg: "Participant added" });
+            }
+            setParticipantDialogOpen(false);
+            setEditingParticipantIndex(null);
+          }}
+          initialData={
+            editingParticipantIndex !== null
+              ? participants[editingParticipantIndex]
+              : null
           }
-          setParticipantDialogOpen(false);
-          setEditingParticipantIndex(null);
-        }}
-        initialData={
-          editingParticipantIndex !== null
-            ? participants[editingParticipantIndex]
-            : null
-        }
-        existingParticipants={participants}
-      />
+          existingParticipants={participants}
+        />
 
-      {/* Session Dialog */}
-      <SessionDialog
-        open={sessionDialogOpen}
-        onClose={() => {
-          setSessionDialogOpen(false);
-          setEditingSessionIndex(null);
-        }}
-        onSubmit={(sessionData) => {
-          console.log("🟢 SessionDialog onSubmit called with sessionData:", {
-            title: sessionData.title,
-            _startTime: sessionData._startTime,
-            _endTime: sessionData._endTime,
-            startTime: sessionData.startTime,
-            endTime: sessionData.endTime,
-          });
-          if (editingSessionIndex !== null) {
-            // Edit existing
-            setSessions(prev => prev.map((s, i) =>
-              i === editingSessionIndex ? sessionData : s
-            ));
-            setToast({ open: true, type: "success", msg: "Session updated" });
-          } else {
-            // Add new
-            console.log("🟢 Adding new session. Current startTime before setSessions:", startTime);
-            setSessions(prev => {
-              console.log("🟢 Inside setSessions callback. startTime is:", startTime);
-              return [...prev, sessionData];
+        {/* Session Dialog */}
+        <SessionDialog
+          open={sessionDialogOpen}
+          onClose={() => {
+            setSessionDialogOpen(false);
+            setEditingSessionIndex(null);
+          }}
+          onSubmit={(sessionData) => {
+            console.log("🟢 SessionDialog onSubmit called with sessionData:", {
+              title: sessionData.title,
+              _startTime: sessionData._startTime,
+              _endTime: sessionData._endTime,
+              startTime: sessionData.startTime,
+              endTime: sessionData.endTime,
             });
-            setToast({ open: true, type: "success", msg: "Session added" });
+            if (editingSessionIndex !== null) {
+              // Edit existing
+              setSessions(prev => prev.map((s, i) =>
+                i === editingSessionIndex ? sessionData : s
+              ));
+              setToast({ open: true, type: "success", msg: "Session updated" });
+            } else {
+              // Add new
+              console.log("🟢 Adding new session. Current startTime before setSessions:", startTime);
+              setSessions(prev => {
+                console.log("🟢 Inside setSessions callback. startTime is:", startTime);
+                return [...prev, sessionData];
+              });
+              setToast({ open: true, type: "success", msg: "Session added" });
+            }
+            setSessionDialogOpen(false);
+            setEditingSessionIndex(null);
+          }}
+          initialData={
+            editingSessionIndex !== null
+              ? sessions[editingSessionIndex]
+              : null
           }
-          setSessionDialogOpen(false);
-          setEditingSessionIndex(null);
-        }}
-        initialData={
-          editingSessionIndex !== null
-            ? sessions[editingSessionIndex]
-            : null
-        }
-        eventStartTime={actualEventStartTime || toUTCISO(startDate, startTime, timezone)}
-        eventEndTime={actualEventEndTime || toUTCISO(endDate, endTime, timezone)}
-        timezone={timezone}
-      />
+          eventStartTime={actualEventStartTime || toUTCISO(startDate, startTime, timezone)}
+          eventEndTime={actualEventEndTime || toUTCISO(endDate, endTime, timezone)}
+          timezone={timezone}
+        />
       </Dialog>
     </LocalizationProvider>
   );
@@ -1842,17 +1842,21 @@ function AdminEventCard({
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
   const isPreEventLounge = isPreEventLoungeOpen(ev);
 
-  // If event is live OR within early-join window OR pre-event lounge, show enabled Join button
+  const isHost = Boolean(reg?.is_host);
+  // If event is live OR within early-join window OR pre-event lounge OR user is host, show enabled Join button
   const canShowActiveJoin =
     isPostEventLounge ||
-    (ev.status !== "ended" && (isLive || isWithinEarlyJoinWindow || isPreEventLounge));
-  const joinLabel = getJoinButtonText(ev, isLive, false);
+    (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
+  const rawJoinLabel = getJoinButtonText(ev, isLive, false, reg);
+  const joinLabel = isHost ? "Join as Host" : rawJoinLabel;
   const joinLabelShort =
-    joinLabel === "Join Waiting Room"
-      ? "Waiting Room"
-      : joinLabel === "Join Social Lounge"
-        ? "Lounge"
-        : joinLabel.split(" ")[0];
+    isHost
+      ? "Host"
+      : joinLabel === "Join Waiting Room"
+        ? "Waiting Room"
+        : joinLabel === "Join Social Lounge"
+          ? "Lounge"
+          : joinLabel.split(" ")[0];
 
   // Timezone logic
   const organizerTimezone = normalizeTimezoneName(ev.timezone);
@@ -2497,32 +2501,17 @@ function EventsPage() {
           setEvents(results);
           setTotalCount(count);
 
-          // 🔹 NEW: Fetch registrations for these events if not owner
-          // (Owners don't register for their own events usually, but staff do)
+          // 🔹 Build myRegistrations from the mine/ response's is_host field.
+          // The backend now annotates each event with is_host directly,
+          // so we no longer need a separate /event-registrations/ fetch per event.
           if (!isOwner && results.length > 0) {
             const newRegs = {};
-            await Promise.all(results.map(async (ev) => {
-              try {
-                const regUrl = new URL(urlJoin(API_BASE, "/event-registrations/"));
-                regUrl.searchParams.set("event", String(ev.id));
-                const rRes = await fetch(regUrl.toString(), {
-                  headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                  },
-                });
-                if (rRes.ok) {
-                  const rData = await rRes.json();
-                  const rList = asList(rData);
-                  // user sees their own registration
-                  if (rList.length > 0) {
-                    newRegs[ev.id] = rList[0];
-                  }
-                }
-              } catch (e) {
-                // ignore
+            results.forEach((ev) => {
+              // ev.is_host is provided by the mine/ endpoint via _is_event_host()
+              if (ev.is_host !== undefined) {
+                newRegs[ev.id] = { is_host: Boolean(ev.is_host) };
               }
-            }));
+            });
             if (!cancelled) {
               setMyRegistrations(newRegs);
             }
@@ -2568,7 +2557,10 @@ function EventsPage() {
     try {
       const isPreEventLounge = isPreEventLoungeOpen(ev);
       const isPostEventLounge = isPostEventLoungeOpen(ev);
-      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+      // Determine role: if the user's registration marks them as host, join as publisher
+      const myReg = myRegistrations?.[ev.id];
+      const joinRole = myReg?.is_host ? "publisher" : "audience";
+      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${joinRole}`;
       navigate(livePath, {
         state: {
           event: ev,
