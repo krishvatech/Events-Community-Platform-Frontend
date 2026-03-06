@@ -12798,10 +12798,46 @@ export default function NewLiveMeeting() {
       const userId = key.startsWith("id:") ? key.replace("id:", "") : null;
       return Boolean(userId && currentLoungeUserIds.has(String(userId)));
     };
+    const getAssignedRoleForParticipant = (p) => {
+      if (!p) return "";
+      const raw = p?._raw || p || {};
+      const participantKey = getParticipantUserKey(raw);
+      const backendUserId = getBackendUserId(raw) || getBackendUserId(p);
+      const email = String(raw?.email || p?.email || "").trim().toLowerCase();
+      const name = String(raw?.name || p?.name || "").trim().toLowerCase();
 
-    const scopedParticipants = participants.filter(
-      (p) => p.inMeeting && isInCurrentBreakoutTable(p)
+      const keys = [
+        participantKey ? String(participantKey).toLowerCase() : "",
+        backendUserId ? `id:${String(backendUserId).toLowerCase()}` : "",
+        email ? `email:${email}` : "",
+        name ? `name:${name}` : "",
+      ].filter(Boolean);
+
+      for (const key of keys) {
+        const role = assignedRoleByIdentity.get(key);
+        if (role) return role;
+      }
+      return "";
+    };
+
+    const preEventLoungeUserIds = new Set(
+      (preEventLoungeParticipants || [])
+        .map((x) => String(x?.user_id || ""))
+        .filter(Boolean)
     );
+
+    const scopedParticipants = participants.filter((p) => {
+      if (!p.inMeeting || !isInCurrentBreakoutTable(p)) return false;
+
+      // If attendee is still in pre-event lounge waiting list, keep them only in PRE-EVENT LOUNGE section.
+      if (isHost && eventData?.lounge_enabled_waiting_room && preEventLoungeUserIds.size > 0) {
+        const backendUserId = String(getBackendUserId(p?._raw || p) || getBackendUserId(p) || "");
+        if (backendUserId && preEventLoungeUserIds.has(backendUserId)) {
+          return false;
+        }
+      }
+      return true;
+    });
 
     const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || (isHost ? dyteMeeting?.self?.id : null);
     const hostUserKey = hostUserKeyRef.current;
@@ -12816,18 +12852,14 @@ export default function NewLiveMeeting() {
     // When user is in main room, hosts occupying lounge should be filtered out
     // When user is in breakout, show all participants in that room (lounge filter doesn't apply)
     let host = scopedParticipants.filter((p) => {
-      if (isHost || p.id !== dyteMeeting?.self?.id) {
-        // Only include if they're a real host (in assignedRoleByIdentity or is the effective host)
-        const userKey = getParticipantUserKey(p?._raw || p);
-        const assignedRole = (userKey ? assignedRoleByIdentity.get(String(userKey).toLowerCase()) : null) ||
-                            (p.userId || p.customParticipantId ? assignedRoleByIdentity.get(`id:${String(p.userId || p.customParticipantId)}`) : null);
+      // Classify by assigned role / resolved host identity only.
+      // Do not exclude self when the viewer joined as audience, otherwise a host user appears under Audience.
+      const assignedRole = getAssignedRoleForParticipant(p);
+      const backendUserId = String(getBackendUserId(p?._raw || p) || getBackendUserId(p) || "");
+      const isPrimaryHostByUserId = Boolean(primaryHostUserId && backendUserId && backendUserId === String(primaryHostUserId));
 
-        const isActualHost = assignedRole === "Host" || p.id === effectiveHostId;
-        if (isActualHost && (isBreakout || !p.isOccupyingLounge)) {
-          return true;
-        }
-      }
-      return false;
+      const isActualHost = assignedRole === "Host" || p.id === effectiveHostId || isPrimaryHostByUserId;
+      return Boolean(isActualHost && (isBreakout || !p.isOccupyingLounge));
     });
     if (host.length === 0 && effectiveHostId) {
       host = scopedParticipants.filter((p) => p.id === effectiveHostId && (isBreakout || !p.isOccupyingLounge));
@@ -12839,9 +12871,7 @@ export default function NewLiveMeeting() {
     const speakers = scopedParticipants.filter((p) => {
       if (hostIdSet.has(p.id)) return false; // Skip hosts
       if (isBreakout || isHost || !p.isOccupyingLounge) {
-        const userKey = getParticipantUserKey(p?._raw || p);
-        const assignedRole = (userKey ? assignedRoleByIdentity.get(String(userKey).toLowerCase()) : null) ||
-                            (p.userId || p.customParticipantId ? assignedRoleByIdentity.get(`id:${String(p.userId || p.customParticipantId)}`) : null);
+        const assignedRole = getAssignedRoleForParticipant(p);
         return assignedRole === "Speaker" || p.role === "Speaker";
       }
       return false;
@@ -12849,9 +12879,7 @@ export default function NewLiveMeeting() {
     const audience = scopedParticipants.filter((p) => {
       if (hostIdSet.has(p.id)) return false; // Skip hosts
       if (isBreakout || isHost || !p.isOccupyingLounge) {
-        const userKey = getParticipantUserKey(p?._raw || p);
-        const assignedRole = (userKey ? assignedRoleByIdentity.get(String(userKey).toLowerCase()) : null) ||
-                            (p.userId || p.customParticipantId ? assignedRoleByIdentity.get(`id:${String(p.userId || p.customParticipantId)}`) : null);
+        const assignedRole = getAssignedRoleForParticipant(p);
         // Include if assigned role is not "Speaker" or "Host", or if Dyte role is neither "Speaker" nor "Host"
         return assignedRole !== "Speaker" && assignedRole !== "Host" && p.role !== "Speaker";
       }
@@ -12899,6 +12927,9 @@ export default function NewLiveMeeting() {
     dyteMeeting?.self?.id,
     isBreakout,
     currentLoungeUserIds,
+    preEventLoungeParticipants,
+    eventData?.lounge_enabled_waiting_room,
+    primaryHostUserId,
     participantRoomMap,  // ✅ PHASE 4: Added dependency
     assignedRoleByIdentity  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
   ]);
