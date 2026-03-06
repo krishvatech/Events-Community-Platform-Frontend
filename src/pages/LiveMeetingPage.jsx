@@ -12812,26 +12812,51 @@ export default function NewLiveMeeting() {
     const effectiveHostId = hostIdExists ? hostId : (hostFromKey?.id || null);
 
     // ✅ CRITICAL FIX: Apply lounge filter to hosts when not in breakout (main room context)
+    // ✅ CRITICAL FIX: Check assignedRoleByIdentity instead of Dyte role to avoid lounge participants with HOST preset
     // When user is in main room, hosts occupying lounge should be filtered out
     // When user is in breakout, show all participants in that room (lounge filter doesn't apply)
-    let host = scopedParticipants.filter(
-      (p) =>
-        p.role === "Host" &&
-        (isBreakout || !p.isOccupyingLounge) &&
-        (isHost || p.id !== dyteMeeting?.self?.id)
-    );
+    let host = scopedParticipants.filter((p) => {
+      if (isHost || p.id !== dyteMeeting?.self?.id) {
+        // Only include if they're a real host (in assignedRoleByIdentity or is the effective host)
+        const userKey = getParticipantUserKey(p?._raw || p);
+        const assignedRole = (userKey ? assignedRoleByIdentity.get(String(userKey).toLowerCase()) : null) ||
+                            (p.userId || p.customParticipantId ? assignedRoleByIdentity.get(`id:${String(p.userId || p.customParticipantId)}`) : null);
+
+        const isActualHost = assignedRole === "Host" || p.id === effectiveHostId;
+        if (isActualHost && (isBreakout || !p.isOccupyingLounge)) {
+          return true;
+        }
+      }
+      return false;
+    });
     if (host.length === 0 && effectiveHostId) {
       host = scopedParticipants.filter((p) => p.id === effectiveHostId && (isBreakout || !p.isOccupyingLounge));
     }
 
     const hostIdSet = new Set(host.map((p) => p.id));
     // ✅ PHASE 4: Host in main room should see ALL participants (including those in breakout/lounge)
-    const speakers = scopedParticipants.filter(
-      (p) => !hostIdSet.has(p.id) && p.role === "Speaker" && (isBreakout || isHost || !p.isOccupyingLounge)
-    );
-    const audience = scopedParticipants.filter(
-      (p) => !hostIdSet.has(p.id) && p.role !== "Speaker" && (isBreakout || isHost || !p.isOccupyingLounge)
-    );
+    // ✅ CRITICAL FIX: Use assignedRoleByIdentity to determine speakers (not Dyte role, which is "Host" for lounge participants)
+    const speakers = scopedParticipants.filter((p) => {
+      if (hostIdSet.has(p.id)) return false; // Skip hosts
+      if (isBreakout || isHost || !p.isOccupyingLounge) {
+        const userKey = getParticipantUserKey(p?._raw || p);
+        const assignedRole = (userKey ? assignedRoleByIdentity.get(String(userKey).toLowerCase()) : null) ||
+                            (p.userId || p.customParticipantId ? assignedRoleByIdentity.get(`id:${String(p.userId || p.customParticipantId)}`) : null);
+        return assignedRole === "Speaker" || p.role === "Speaker";
+      }
+      return false;
+    });
+    const audience = scopedParticipants.filter((p) => {
+      if (hostIdSet.has(p.id)) return false; // Skip hosts
+      if (isBreakout || isHost || !p.isOccupyingLounge) {
+        const userKey = getParticipantUserKey(p?._raw || p);
+        const assignedRole = (userKey ? assignedRoleByIdentity.get(String(userKey).toLowerCase()) : null) ||
+                            (p.userId || p.customParticipantId ? assignedRoleByIdentity.get(`id:${String(p.userId || p.customParticipantId)}`) : null);
+        // Include if assigned role is not "Speaker" or "Host", or if Dyte role is neither "Speaker" nor "Host"
+        return assignedRole !== "Speaker" && assignedRole !== "Host" && p.role !== "Speaker";
+      }
+      return false;
+    });
 
     // ✅ PHASE 4: For host, enhance with room location
     if (isHost && !isBreakout) {
@@ -12874,7 +12899,8 @@ export default function NewLiveMeeting() {
     dyteMeeting?.self?.id,
     isBreakout,
     currentLoungeUserIds,
-    participantRoomMap  // ✅ PHASE 4: Added dependency
+    participantRoomMap,  // ✅ PHASE 4: Added dependency
+    assignedRoleByIdentity  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
   ]);
 
 
@@ -14091,8 +14117,8 @@ export default function NewLiveMeeting() {
                     </Typography>
                   </Box>
                 )}
-                {/* ✅ Phase 5: Filter controls for Host (in main room) - 2x2 Grid */}
-                {isHost && !isBreakout && (
+                {/* ✅ Phase 5: Filter controls for Host (always show all 4 options) - 2x2 Grid */}
+                {isHost && (
                   <Stack sx={{ mb: 2 }}>
                     <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
                       {[
@@ -18507,28 +18533,6 @@ export default function NewLiveMeeting() {
               </>
             )}
 
-            {/* Collapse/Expand button for host only */}
-            {isHost && (
-              <IconButton
-                onClick={() => setTimerCollapsed(!timerCollapsed)}
-                sx={{
-                  color: "#fff",
-                  ml: "auto",
-                  flexShrink: 0,
-                  width: 32,
-                  height: 32,
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" }
-                }}
-                size="small"
-                title={timerCollapsed ? "Expand timer" : "Collapse timer"}
-              >
-                {timerCollapsed ? (
-                  <ExpandMore sx={{ fontSize: 20 }} />
-                ) : (
-                  <ExpandLess sx={{ fontSize: 20 }} />
-                )}
-              </IconButton>
-            )}
 
             {/* Show just countdown when collapsed (host only) */}
             {isHost && timerCollapsed && (
