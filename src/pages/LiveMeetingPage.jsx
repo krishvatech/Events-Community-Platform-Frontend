@@ -65,6 +65,8 @@ import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import LogoutIcon from "@mui/icons-material/Logout"; // <--- ADDED for Leave Table
+import ExpandMore from "@mui/icons-material/ExpandMore"; // ✅ For timer collapse/expand
+import ExpandLess from "@mui/icons-material/ExpandLess"; // ✅ For timer collapse/expand
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import StopCircleIcon from "@mui/icons-material/StopCircle";
 import PauseCircleIcon from "@mui/icons-material/PauseCircle";
@@ -2517,6 +2519,7 @@ export default function NewLiveMeeting() {
   const [loungeCountdownTransition, setLoungeCountdownTransition] = useState("to_waiting_room");
   const [showLoungeStartDialog, setShowLoungeStartDialog] = useState(false);
   const [loungeTransitionOption, setLoungeTransitionOption] = useState("to_waiting_room");
+  const [timerCollapsed, setTimerCollapsed] = useState(false); // ✅ NEW: Track timer collapse state for host
   const [loungeCountdownSeconds, setLoungeCountdownSeconds] = useState(10);
   const loungeParticipantsSectionRef = useRef(null);
   const breakoutJoinInProgressRef = useRef(false);
@@ -6729,15 +6732,18 @@ export default function NewLiveMeeting() {
           }
         } else if (msg.type === "lounge_countdown") {
           // ✅ NEW: Handle lounge countdown notification
-          console.log("[MainSocket] Lounge countdown:", msg.countdown_seconds, "seconds, transition:", msg.transition);
+          console.log("[MainSocket] Lounge countdown:", msg.countdown_seconds, "seconds, transition:", msg.transition, "isHost:", isHostRef.current);
           setLoungeCountingDown(true);
           setLoungeCountdownValue(msg.countdown_seconds);
           setLoungeCountdownTransition(msg.transition);
 
-          // Show countdown UI in snackbar for non-host participants
-          if (!isHostRef.current) {
+          // Show snackbar message for host to confirm action
+          if (isHostRef.current) {
+            console.log("[MainSocket] Host received countdown, showing snackbar and timer");
             showSnackbar(
-              `The webinar is starting in ${msg.countdown_seconds} seconds. The Social Lounge is closing...`,
+              msg.transition === "to_main_room"
+                ? `Moving participants to Main Room in ${msg.countdown_seconds}s...`
+                : `Moving participants to Waiting Room in ${msg.countdown_seconds}s...`,
               "info",
               msg.countdown_seconds * 1000
             );
@@ -7126,6 +7132,12 @@ export default function NewLiveMeeting() {
       });
       console.log("[admitFromLounge] Sending message:", message);
       mainSocketRef.current.send(message);
+
+      // ✅ NEW: Immediately show countdown for host (since backend only sends to participants)
+      setLoungeCountingDown(true);
+      setLoungeCountdownValue(15);
+      setLoungeCountdownTransition(transition);
+
       showSnackbar(
         transition === "to_main_room"
           ? "Transition to Main Room starts in 15 seconds"
@@ -18431,44 +18443,135 @@ export default function NewLiveMeeting() {
           </DialogActions>
         </Dialog>
 
-        {/* Global lounge transition countdown overlay */}
-        <Backdrop
-          open={!isHost && loungeCountingDown && loungeCountdownValue > 0}
-          sx={{
-            zIndex: (theme) => theme.zIndex.modal + 2,
-            backdropFilter: "blur(4px)",
-            bgcolor: "rgba(2, 6, 23, 0.68)",
-          }}
-        >
+        {/* ✅ Small countdown timer at top - for both host and participants */}
+        {loungeCountingDown && loungeCountdownValue > 0 && (
           <Box
             sx={{
-              minWidth: 320,
-              maxWidth: 560,
-              px: 4,
-              py: 3,
-              borderRadius: 3,
-              border: "1px solid rgba(255,255,255,0.18)",
-              bgcolor: "rgba(10, 18, 34, 0.92)",
-              textAlign: "center",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
+              position: "fixed",
+              top: 64,
+              left: 0,
+              right: 0,
+              zIndex: (theme) => theme.zIndex.modal + 1,
+              bgcolor: "rgba(59, 130, 246, 0.95)",
+              backdropFilter: "blur(8px)",
+              borderBottom: "2px solid rgba(255,255,255,0.2)",
+              py: timerCollapsed && isHost ? 0.75 : 1.5,
+              px: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: isHost && timerCollapsed ? "flex-end" : "center",
+              gap: 2,
+              animation: "slideDown 0.3s ease-out",
+              transition: "all 0.2s ease"
             }}
           >
-            <Typography sx={{ fontSize: 13, letterSpacing: 0.5, opacity: 0.85, mb: 1 }}>
-              TRANSITION STARTING
-            </Typography>
-            <Typography sx={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, mb: 0.5 }}>
-              {loungeCountdownTransition === "to_main_room"
-                ? "Moving to Main Room"
-                : "Moving to Waiting Room"}
-            </Typography>
-            <Typography sx={{ fontSize: 56, fontWeight: 900, color: "#22d3ee", lineHeight: 1 }}>
-              {loungeCountdownValue}
-            </Typography>
-            <Typography sx={{ fontSize: 13, opacity: 0.78, mt: 1.5 }}>
-              Please wait while participants are moved.
-            </Typography>
+            {/* Show message and timer normally, hide when collapsed (host only) */}
+            {!(isHost && timerCollapsed) && (
+              <>
+                <Typography
+                  sx={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#fff",
+                    textAlign: "center",
+                    flex: 1
+                  }}
+                >
+                  {loungeCountdownTransition === "to_main_room"
+                    ? "Event about to begin — Moving to Main Room"
+                    : "Moving to Waiting Room"}
+                </Typography>
+                <Box
+                  sx={{
+                    minWidth: 48,
+                    height: 32,
+                    borderRadius: 1,
+                    bgcolor: "rgba(255,255,255,0.15)",
+                    border: "1px solid rgba(255,255,255,0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: "#fff"
+                    }}
+                  >
+                    {loungeCountdownValue}s
+                  </Typography>
+                </Box>
+              </>
+            )}
+
+            {/* Collapse/Expand button for host only */}
+            {isHost && (
+              <IconButton
+                onClick={() => setTimerCollapsed(!timerCollapsed)}
+                sx={{
+                  color: "#fff",
+                  ml: "auto",
+                  flexShrink: 0,
+                  width: 32,
+                  height: 32,
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.1)" }
+                }}
+                size="small"
+                title={timerCollapsed ? "Expand timer" : "Collapse timer"}
+              >
+                {timerCollapsed ? (
+                  <ExpandMore sx={{ fontSize: 20 }} />
+                ) : (
+                  <ExpandLess sx={{ fontSize: 20 }} />
+                )}
+              </IconButton>
+            )}
+
+            {/* Show just countdown when collapsed (host only) */}
+            {isHost && timerCollapsed && (
+              <Box
+                sx={{
+                  minWidth: 48,
+                  height: 24,
+                  borderRadius: 1,
+                  bgcolor: "rgba(255,255,255,0.15)",
+                  border: "1px solid rgba(255,255,255,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#fff"
+                  }}
+                >
+                  {loungeCountdownValue}s
+                </Typography>
+              </Box>
+            )}
           </Box>
-        </Backdrop>
+        )}
+        <style>
+          {`
+            @keyframes slideDown {
+              from {
+                transform: translateY(-100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateY(0);
+                opacity: 1;
+              }
+            }
+          `}
+        </style>
 
         {/* ✅ Participant More Menu */}
         <Menu
