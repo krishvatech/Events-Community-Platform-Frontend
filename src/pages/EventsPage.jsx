@@ -387,17 +387,22 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const navigate = useNavigate();
   const owner = isOwnerUser();
   const reg = myRegistrations?.[ev.id];
+  const isHost = Boolean(reg?.is_host);
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
   const isPreEventLounge = isPreEventLoungeOpen(ev);
   const isPostEventLounge = isPostEventLoungeOpen(ev);
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+  const canShowActiveJoin =
+    isPostEventLounge ||
+    (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
   const multiDayJoinState = ev.is_multi_day ? determineJoinState(ev) : null;
   const canJoinNow = ev.is_multi_day
     ? (multiDayJoinState?.enabled || isPreEventLounge || isPostEventLounge)
     : canShowActiveJoin;
-  const joinButtonLabel = ev.is_multi_day
+  const joinButtonLabel = isHost
+    ? "Join as Host"
+    : ev.is_multi_day
     ? (
       isPreEventLounge || isPostEventLounge
         ? getJoinButtonText(ev, isLive, false, reg)
@@ -502,7 +507,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   };
 
   const handleJoinCard = () => {
-    const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+    const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${isHost ? "publisher" : "audience"}`;
     navigate(livePath, {
       state: {
         event: ev,
@@ -905,17 +910,22 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants }) {
   const navigate = useNavigate();
   const reg = myRegistrations?.[ev.id];
+  const isHost = Boolean(reg?.is_host);
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
   const isPreEventLounge = isPreEventLoungeOpen(ev);
   const isPostEventLounge = isPostEventLoungeOpen(ev);
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+  const canShowActiveJoin =
+    isPostEventLounge ||
+    (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
   const multiDayJoinState = ev.is_multi_day ? determineJoinState(ev) : null;
   const canJoinNow = ev.is_multi_day
     ? (multiDayJoinState?.enabled || isPreEventLounge || isPostEventLounge)
     : canShowActiveJoin;
-  const joinButtonLabel = ev.is_multi_day
+  const joinButtonLabel = isHost
+    ? "Join as Host"
+    : ev.is_multi_day
     ? (
       isPreEventLounge || isPostEventLounge
         ? getJoinButtonText(ev, isLive, false, reg)
@@ -1011,7 +1021,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   };
 
   const handleJoinRow = () => {
-    const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+    const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${isHost ? "publisher" : "audience"}`;
     navigate(livePath, {
       state: {
         event: ev,
