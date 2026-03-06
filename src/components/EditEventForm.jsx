@@ -562,29 +562,26 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         }
         fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
 
-        // Add participants if any
-        if (participants.length > 0) {
-            const participantsData = participants.map((p, idx) => ({
-                type: p.participantType === "guest" ? "guest" : "staff",
-                user_id: p.participantType !== "guest" ? p.userId : undefined,
-                role: p.role,
-                name: p.participantType === "guest" ? p.guestName : undefined,
-                email: p.participantType === "guest" ? p.guestEmail : undefined,
-                bio: p.bio || "",
-                display_order: idx,
-                client_index: idx,
-            }));
+        // Always send participants so backend can replace existing list (including clearing with []).
+        const participantsData = participants.map((p, idx) => ({
+            type: p.participantType === "guest" ? "guest" : "staff",
+            user_id: p.participantType !== "guest" ? p.userId : undefined,
+            role: p.role,
+            name: p.participantType === "guest" ? p.guestName : undefined,
+            email: p.participantType === "guest" ? p.guestEmail : undefined,
+            bio: p.bio || "",
+            display_order: idx,
+            client_index: idx,
+        }));
 
-            // Backend expects JSON string for nested array
-            fd.append("participants", JSON.stringify(participantsData));
+        // Backend expects JSON string for nested array
+        fd.append("participants", JSON.stringify(participantsData));
 
-            participants.forEach((p, idx) => {
-                if (p?.imageFile) {
-                    fd.append(`participant_image_${idx}`, p.imageFile, p.imageFile.name || `participant_${idx}.jpg`);
-                }
-            });
-
-        }
+        participants.forEach((p, idx) => {
+            if (p?.imageFile) {
+                fd.append(`participant_image_${idx}`, p.imageFile, p.imageFile.name || `participant_${idx}.jpg`);
+            }
+        });
 
         try {
             const res = await fetch(`${API_ROOT}/events/${event.id}/`, {
