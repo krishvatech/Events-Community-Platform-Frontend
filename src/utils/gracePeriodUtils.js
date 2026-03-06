@@ -99,17 +99,6 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
 
   if (!event) return "Join";
 
-  // ✅ NEW: Check if user has been admitted to waiting room
-  // If user's admission_status is "admitted", they can join live (no need for waiting room)
-  if (userRegistration?.admission_status === "admitted") {
-    // Show different text based on whether event is actually live
-    if (isLive) {
-      return "Join Live";
-    } else {
-      return "Join (Not Live Yet)";
-    }
-  }
-
   // ✅ NEW: If user was rejected, show rejected state
   if (userRegistration?.admission_status === "rejected") {
     return "Application Declined";
@@ -120,15 +109,26 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
     return "Join Social Lounge";
   }
 
+  // Pre-event lounge (if configured and open) - CHECK BEFORE WAITING ROOM/ADMISSION
+  if (isPreEventLoungeOpen(event)) {
+    return "Join Social Lounge";
+  }
+
   // If waiting room will be required (e.g. grace period expired or event hasn't started),
   // always reflect that in the button label wherever a join option is shown.
   if (willGoToWaitingRoom(event)) {
     return "Join Waiting Room";
   }
 
-  // Pre-event lounge (if configured and open)
-  if (isPreEventLoungeOpen(event)) {
-    return "Join Social Lounge";
+  // ✅ Check if user has been admitted to waiting room
+  // If user's admission_status is "admitted", they can join live (no need for waiting room)
+  if (userRegistration?.admission_status === "admitted") {
+    // Show different text based on whether event is actually live
+    if (isLive) {
+      return "Join Live";
+    } else {
+      return "Join (Not Live Yet)";
+    }
   }
 
   // Event is live (or within early-join windows that allow direct join)

@@ -253,6 +253,8 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         ws.onopen = () => {
             console.log("[Lounge] WebSocket connected successfully");
             setWsStatus('open');
+            // ✅ NEW: Signal to backend that this user is now in the lounge area
+            ws.send(JSON.stringify({ action: "enter_lounge" }));
         };
 
         ws.onmessage = async (event) => {
@@ -377,6 +379,10 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             // Actually, we might want to keep it open while the dialog is open
             // but maybe close when 'open' prop turns false.
             if (!open && ws.readyState <= WebSocket.OPEN) {
+                // ✅ NEW: Signal to backend that user is exiting the lounge
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ action: "exit_lounge" }));
+                }
                 ws.close();
             }
         };
