@@ -9013,6 +9013,86 @@ export default function NewLiveMeeting() {
             console.warn("[Spotlight] Failed to broadcast spotlight-user after accept:", e);
           }
           showSnackbar(`${targetName} joined main stage`, "success");
+
+          // ✅ Auto-transfer presentation: revoke old presenter, grant to new spotlight user
+          if (hostPerms.screenShare) {
+            (async () => {
+              // Step 1: Revoke the previous presenter's screen share (if any)
+              if (approvedMainStageScreenShare) {
+                const oldTarget = approvedMainStageScreenShare;
+                await revokeMainStageScreenShare(oldTarget);
+                setApprovedMainStageScreenShare(null);
+                setPresentationTarget(null);
+                try {
+                  dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+                    requestId: `ssr-revoke-${Date.now()}`,
+                    status: "revoked",
+                    participantId: oldTarget.participantId || null,
+                    participantUserKey: oldTarget.participantUserKey || null,
+                    name: oldTarget.name,
+                    byHostId: dyteMeeting?.self?.id || null,
+                    ts: Date.now(),
+                  });
+                  dyteMeeting?.participants?.broadcastMessage?.("presentation-clear", {
+                    participantId: oldTarget.participantId || null,
+                    participantUserKey: oldTarget.participantUserKey || null,
+                    name: oldTarget.name,
+                    byHostId: dyteMeeting?.self?.id || null,
+                    ts: Date.now(),
+                  });
+                } catch (e) {
+                  console.warn("[Spotlight] Failed to broadcast screen share revoke:", e);
+                }
+              }
+
+              // Step 2: Grant presentation access to the new spotlight user
+              const newId = acceptedPayload.participantId ? String(acceptedPayload.participantId) : "";
+              const newKey = acceptedPayload.participantUserKey ? String(acceptedPayload.participantUserKey) : "";
+              const newParticipant = findParticipantByIdentity(newId, newKey);
+
+              if (!newParticipant?.id) {
+                console.warn("[Spotlight] Could not find new spotlight participant to grant presentation.");
+                return;
+              }
+
+              try {
+                await dyteMeeting.participants.updatePermissions([newParticipant.id], {
+                  canProduceScreenshare: "ALLOWED",
+                  requestProduceScreenshare: true,
+                });
+              } catch (e) {
+                console.warn("[Spotlight] Failed to grant screen share to new spotlight:", e);
+                return;
+              }
+
+              const grantedPayload = {
+                participantId: newParticipant.id || acceptedPayload.participantId || null,
+                participantUserKey: newKey || newParticipant.id || null,
+                name: newParticipant?.name || acceptedPayload.name || "Participant",
+                byHostId: dyteMeeting?.self?.id || null,
+                ts: Date.now(),
+              };
+              setApprovedMainStageScreenShare(grantedPayload);
+              setPresentationTarget(grantedPayload);
+
+              const grantRequestId = `ssr-grant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+              try {
+                dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+                  requestId: grantRequestId,
+                  status: "approved",
+                  proactive: true,
+                  participantId: grantedPayload.participantId,
+                  participantUserKey: grantedPayload.participantUserKey,
+                  name: grantedPayload.name,
+                  byHostId: dyteMeeting?.self?.id || null,
+                  ts: Date.now(),
+                });
+                dyteMeeting?.participants?.broadcastMessage?.("presentation-target", grantedPayload);
+              } catch (e) {
+                console.warn("[Spotlight] Failed to broadcast presentation grant:", e);
+              }
+            })();
+          }
         } else if (status === "declined") {
           showSnackbar(`${targetName} declined the invitation`, "info");
         } else if (status === "timeout") {
@@ -9118,16 +9198,19 @@ export default function NewLiveMeeting() {
     return () => dyteMeeting.participants?.off?.("broadcastedMessage", handleBroadcast);
   }, [
     activeTableId,
+    approvedMainStageScreenShare,
+    canManageParticipantMic,
     dyteMeeting,
+    findParticipantByIdentity,
     getJoinedParticipants,
     hostPerms.screenShare,
     isSelfElevatedRole,
-    canManageParticipantMic,
     isHost,
     isLiveEventSocialLounge,
     isScreenSharing,
     pendingSpotlightInvite,
     presentationTarget,
+    revokeMainStageScreenShare,
     selfCanProduceAudio,
     selfCanProduceVideo,
     selfAssignedRole,
@@ -9488,6 +9571,30 @@ export default function NewLiveMeeting() {
         console.log("[LiveMeeting] Auto-recording triggered by new direct participant join");
         triggerAutoRecordingIfEnabled();
       }
+
+      // ✅ Re-sync presentation-target state to new joiner (fixes presenter label showing wrong name)
+      if (approvedMainStageScreenShare && hostPerms.screenShare) {
+        try {
+          dyteMeeting?.participants?.broadcastMessage?.("presentation-target", {
+            ...approvedMainStageScreenShare,
+            ts: Date.now(),
+          });
+        } catch (e) {
+          console.warn("[Presentation] Failed to re-sync presentation-target to new joiner:", e);
+        }
+      }
+
+      // ✅ Re-sync spotlight-user state to new joiner (fixes spotlighted speaker showing wrong person)
+      if (spotlightTarget) {
+        try {
+          dyteMeeting?.participants?.broadcastMessage?.("spotlight-user", {
+            ...spotlightTarget,
+            ts: Date.now(),
+          });
+        } catch (e) {
+          console.warn("[Spotlight] Failed to re-sync spotlight-user to new joiner:", e);
+        }
+      }
     };
     dyteMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
     return () => dyteMeeting.participants.joined.off("participantJoined", handleParticipantJoined);
@@ -9502,6 +9609,7 @@ export default function NewLiveMeeting() {
     isOnBreak,
     loungeTables,
     participantRoomMap,
+    spotlightTarget,
   ]);
 
   useEffect(() => {
@@ -10506,6 +10614,37 @@ export default function NewLiveMeeting() {
       return fallback?._raw || fallback || null;
     }
 
+    // ✅ When a screen share is active, the presenter (screen sharer) takes priority over spotlight.
+    // Spotlighting another user should not override the right-panel speaker until the screen share ends.
+    if (!isBreakout && presentationTarget) {
+      const presentationId = presentationTarget.participantId ? String(presentationTarget.participantId) : "";
+      const presentationKey = presentationTarget.participantUserKey ? String(presentationTarget.participantUserKey) : "";
+
+      let presenter = null;
+      if (presentationId) {
+        presenter =
+          getJoinedParticipants().find((x) => String(x?.id) === presentationId) ||
+          participants.find((x) => String(x?.id) === presentationId) ||
+          null;
+      }
+      if (!presenter && presentationKey) {
+        presenter =
+          getJoinedParticipants().find((x) => getParticipantUserKey(x?._raw || x) === presentationKey) ||
+          participants.find((x) => getParticipantUserKey(x?._raw || x) === presentationKey) ||
+          null;
+      }
+      if (!presenter && dyteMeeting?.self) {
+        const selfKey = getParticipantUserKey(dyteMeeting.self);
+        if (
+          (presentationId && String(dyteMeeting.self.id) === presentationId) ||
+          (presentationKey && selfKey === presentationKey)
+        ) {
+          presenter = dyteMeeting.self;
+        }
+      }
+      if (presenter) return presenter?._raw || presenter;
+    }
+
     // Host-controlled spotlight: if active, force spotlighted participant as primary view for everyone.
     // This intentionally overrides canonical host pin.
     if (!isBreakout && spotlightTarget) {
@@ -10899,6 +11038,7 @@ export default function NewLiveMeeting() {
     loungePrimaryUserId,
     spotlightTarget,
     currentLoungeUserIds,
+    presentationTarget,
   ]);
 
   // Pinned “host” view data
@@ -16192,7 +16332,7 @@ export default function NewLiveMeeting() {
                             }}
                           >
                             <Typography sx={{ fontWeight: 900, fontSize: 14, textShadow: "0 2px 10px rgba(0,0,0,0.65)" }}>
-                              {activeScreenShareParticipant?.name || presentationTarget?.name || "Presentation"}
+                              {activeScreenShareParticipant?.name || "Presentation"}
                             </Typography>
                             <Typography sx={{ opacity: 0.78, fontSize: 12, textShadow: "0 2px 10px rgba(0,0,0,0.65)" }}>
                               Live presentation
@@ -16252,7 +16392,7 @@ export default function NewLiveMeeting() {
                                   {pinnedRaw?.name || meeting.host.name}
                                 </Typography>
                                 <Typography sx={{ opacity: 0.72, fontSize: 12 }}>
-                                  {pinnedIsHost ? "Host" : "Speaker"}
+                                  {pinnedIsHost ? "Host" : hasScreenshare && matchesStageTarget(presentationTarget, pinnedRaw) ? "Active presenter" : "Speaker"}
                                 </Typography>
                               </Box>
                             </Box>
@@ -16275,7 +16415,7 @@ export default function NewLiveMeeting() {
                               {pinnedRaw?.name || meeting.host.name}
                             </Typography>
                             <Typography sx={{ opacity: 0.78, fontSize: 12, textShadow: "0 2px 10px rgba(0,0,0,0.65)" }}>
-                              {pinnedIsHost ? "Host" : "Spotlighted speaker"}
+                              {pinnedIsHost ? "Host" : hasScreenshare && matchesStageTarget(presentationTarget, pinnedRaw) ? "Active presenter" : "Spotlighted speaker"}
                             </Typography>
                           </Box>
                         </Box>
