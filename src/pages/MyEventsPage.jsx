@@ -462,6 +462,29 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
             // 1) LIVE or within 15 min before start → active Join button (SINGLE-DAY EVENTS)
             if (canShowActiveJoin) {
+              const buttonText = isHost ? "Join as Host" : getJoinButtonText(ev, isLive, isJoining, reg);
+              const isNotLiveYet = buttonText === "Join (Not Live Yet)";
+
+              if (isNotLiveYet) {
+                // Show disabled button like "Event Ended"
+                return (
+                  <Button
+                    size="small"
+                    disabled
+                    variant="contained"
+                    sx={{
+                      textTransform: "none",
+                      py: 0.5,
+                      px: 1.25,
+                      borderRadius: 2,
+                      backgroundColor: "#CBD5E1",
+                    }}
+                  >
+                    {buttonText}
+                  </Button>
+                );
+              }
+
               return (
                 <Button
                   onClick={() => onJoinLive?.(ev, isHost)}
@@ -478,7 +501,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                 >
                   {isHost
                     ? (isJoining ? "Opening Host Access..." : "Join as Host")
-                    : getJoinButtonText(ev, isLive, isJoining, reg)}
+                    : buttonText}
                 </Button>
               );
             }

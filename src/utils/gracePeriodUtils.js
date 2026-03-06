@@ -102,7 +102,12 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
   // ✅ NEW: Check if user has been admitted to waiting room
   // If user's admission_status is "admitted", they can join live (no need for waiting room)
   if (userRegistration?.admission_status === "admitted") {
-    return "Join Live";
+    // Show different text based on whether event is actually live
+    if (isLive) {
+      return "Join Live";
+    } else {
+      return "Join (Not Live Yet)";
+    }
   }
 
   // ✅ NEW: If user was rejected, show rejected state
@@ -129,7 +134,8 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
   // Event is live (or within early-join windows that allow direct join)
   if (isLive) return "Join Live";
 
-  return "Join";
+  // Event hasn't started yet (no waiting room, no early join window)
+  return "Join (Not Live Yet)";
 }
 
 /**

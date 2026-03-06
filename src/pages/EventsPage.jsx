@@ -806,15 +806,32 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             <div className="flex items-center gap-2">
               {/* Show Join button for virtual/hybrid events */}
               {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
-                <Button
-                  variant="contained"
-                  size="medium"
-                  onClick={handleJoinCard}
-                  disabled={!canJoinNow}
-                  className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-                >
-                  {joinButtonLabel}
-                </Button>
+                joinButtonLabel === "Join (Not Live Yet)" ? (
+                  <Button
+                    size="small"
+                    disabled
+                    variant="contained"
+                    sx={{
+                      textTransform: "none",
+                      py: 0.5,
+                      px: 1.25,
+                      borderRadius: 2,
+                      backgroundColor: "#CBD5E1",
+                    }}
+                  >
+                    {joinButtonLabel}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="contained"
+                    size="medium"
+                    onClick={handleJoinCard}
+                    disabled={!canJoinNow}
+                    className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                  >
+                    {joinButtonLabel}
+                  </Button>
+                )
               )}
               {/* Show Cancel Registration button only for free events */}
               {ev.is_free && reg && (
@@ -1152,15 +1169,32 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                   <div className="flex flex-col items-end gap-2">
                     {/* Show Join button for virtual/hybrid events */}
                     {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
-                      <Button
-                        variant="contained"
-                        size="medium"
-                        onClick={handleJoinRow}
-                        disabled={!canJoinNow}
-                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-                      >
-                        {joinButtonLabel}
-                      </Button>
+                      joinButtonLabel === "Join (Not Live Yet)" ? (
+                        <Button
+                          size="small"
+                          disabled
+                          variant="contained"
+                          sx={{
+                            textTransform: "none",
+                            py: 0.5,
+                            px: 1.25,
+                            borderRadius: 2,
+                            backgroundColor: "#CBD5E1",
+                          }}
+                        >
+                          {joinButtonLabel}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="contained"
+                          size="medium"
+                          onClick={handleJoinRow}
+                          disabled={!canJoinNow}
+                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                        >
+                          {joinButtonLabel}
+                        </Button>
+                      )
                     )}
                     {/* Show Cancel Registration button only for free events */}
                     {ev.is_free && reg && (
