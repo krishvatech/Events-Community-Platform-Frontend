@@ -259,6 +259,10 @@ function normalizeSession(session = {}) {
 }
 
 function toCard(ev) {
+  const visibleRegisteredCount = Number(
+    ev.public_registered_count ?? ev.registrations_count ?? ev.attending_count ?? 0
+  );
+
   // map backend fields to the fields your UI already uses
   return {
     id: ev.id,
@@ -273,7 +277,7 @@ function toCard(ev) {
     end_time: ev.end_time,
     location: ev.location,
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
-    attendees: Math.max(1, Number(ev.registrations_count ?? ev.attending_count ?? 0)),
+    attendees: Math.max(0, visibleRegisteredCount),
     price: ev.price,
     is_free: ev.is_free || false,
     status: ev.status,
@@ -476,6 +480,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               ...e,
               // bump whichever field is present so toCard() shows the new number
               registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
+              public_registered_count: Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) + 1,
             }
             : e
         )
@@ -840,6 +845,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                                 0,
                                 Number(e?.registrations_count ?? e?.attending_count ?? 0) - 1
                               ),
+                              public_registered_count: Math.max(
+                                0,
+                                Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) - 1
+                              ),
                             }
                             : e
                         )
@@ -962,7 +971,11 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
       setRawEvents(prev =>
         (prev || []).map(e =>
           e.id === ev.id
-            ? { ...e, registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1 }
+            ? {
+              ...e,
+              registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
+              public_registered_count: Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) + 1,
+            }
             : e
         )
       );
@@ -1178,6 +1191,10 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                                       0,
                                       Number(e?.registrations_count ?? e?.attending_count ?? 0) - 1
                                     ),
+                                    public_registered_count: Math.max(
+                                      0,
+                                      Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) - 1
+                                    ),
                                   }
                                   : e
                               )
@@ -1330,7 +1347,9 @@ export default function EventsPage() {
       const data = await res.json();
       setParticipantList(Array.isArray(data) ? data : (data.participants || []));
       setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
-      setParticipantTotalRegisteredCount(Number(data?.total_registered_count || 0));
+      setParticipantTotalRegisteredCount(
+        Number(data?.public_registered_count ?? data?.total_registered_count ?? 0)
+      );
     } catch (err) {
       setParticipantListError(err.message);
     } finally {

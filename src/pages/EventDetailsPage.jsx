@@ -410,7 +410,9 @@ export default function EventDetailsPage() {
       const data = await res.json();
       setParticipantList(Array.isArray(data) ? data : (data.participants || []));
       setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
-      setParticipantTotalRegisteredCount(Number(data?.total_registered_count || 0));
+      setParticipantTotalRegisteredCount(
+        Number(data?.public_registered_count ?? data?.total_registered_count ?? 0)
+      );
     } catch (err) {
       setParticipantError(err.message);
     } finally {
@@ -895,7 +897,11 @@ export default function EventDetailsPage() {
 
                         {/* Participant Count */}
                         {/* Participant Count & Preview */}
-                        {Number.isFinite(event.registrations_count) && (() => {
+                        {(() => {
+                          const visibleRegisteredCount = Number(
+                            event.public_registered_count ?? event.registrations_count ?? event.attending_count
+                          );
+                          if (!Number.isFinite(visibleRegisteredCount)) return null;
                           const owner = isOwnerUser();
                           const staff = isStaffUser();
 
@@ -957,7 +963,7 @@ export default function EventDetailsPage() {
                                     </AvatarGroup>
                                     <Box>
                                       <Typography variant="body2" fontWeight={600} color="text.primary">
-                                        {event.registrations_count} people registered
+                                        {visibleRegisteredCount} people registered
                                       </Typography>
                                       <Typography variant="caption" color="text.secondary">
                                         Click to view list
@@ -974,7 +980,7 @@ export default function EventDetailsPage() {
                               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default', opacity: 0.7 }}>
                                 <GroupsIcon fontSize="small" className="text-teal-700" />
                                 <Typography variant="body2" color="text.secondary">
-                                  {event.registrations_count} registered
+                                  {visibleRegisteredCount} registered
                                 </Typography>
                               </Stack>
                             );

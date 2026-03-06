@@ -72,7 +72,7 @@ export default function ParticipantListDialog({
                             <Box sx={{ px: 2, pb: 1 }}>
                                 <Typography variant="caption" color="text.secondary">
                                     Some organizer roles are hidden for this event.
-                                    {totalRegisteredCount > 0 ? ` Showing ${participants.length} of ${totalRegisteredCount} registered.` : ""}
+                                    {totalRegisteredCount > participants.length ? ` Showing ${participants.length} of ${totalRegisteredCount} registered.` : ""}
                                 </Typography>
                             </Box>
                         )}
