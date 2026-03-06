@@ -403,12 +403,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const joinButtonLabel = isHost
     ? "Join as Host"
     : ev.is_multi_day
-    ? (
-      isPreEventLounge || isPostEventLounge
-        ? getJoinButtonText(ev, isLive, false, reg)
-        : (multiDayJoinState?.buttonText || "Join (Not Live Yet)")
-    )
-    : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
+      ? (
+        isPreEventLounge || isPostEventLounge
+          ? getJoinButtonText(ev, isLive, false, reg)
+          : (multiDayJoinState?.buttonText || "Join (Not Live Yet)")
+      )
+      : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
 
   // State for expandable "Read More" section
   const [expandSessions, setExpandSessions] = React.useState(false);
@@ -690,24 +690,28 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               else if (isAfter && ev.show_participants_after_event === false) canView = false;
             }
 
+            const label = ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet";
+
             if (canView) {
               return (
                 <div
                   className="flex items-center gap-2 cursor-pointer hover:text-teal-600 transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onShowParticipants(ev.id, ev.title);
+                    if (ev.attendees > 0) {
+                      onShowParticipants(ev.id, ev.title);
+                    }
                   }}
                 >
                   <GroupsIcon fontSize="small" className="text-teal-700" />
-                  <span>{ev.attendees} registered</span>
+                  <span>{label}</span>
                 </div>
               );
             } else {
               return (
                 <div className="flex items-center gap-2 cursor-default">
                   <GroupsIcon fontSize="small" className="text-teal-700" />
-                  <span>{ev.attendees} registered</span>
+                  <span>{label}</span>
                 </div>
               );
             }
@@ -926,12 +930,12 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const joinButtonLabel = isHost
     ? "Join as Host"
     : ev.is_multi_day
-    ? (
-      isPreEventLounge || isPostEventLounge
-        ? getJoinButtonText(ev, isLive, false, reg)
-        : (multiDayJoinState?.buttonText || "Join (Not Live Yet)")
-    )
-    : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
+      ? (
+        isPreEventLounge || isPostEventLounge
+          ? getJoinButtonText(ev, isLive, false, reg)
+          : (multiDayJoinState?.buttonText || "Join (Not Live Yet)")
+      )
+      : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
 
   // Timezone logic
   // Timezone logic
@@ -1137,24 +1141,28 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     else if (isAfter && ev.show_participants_after_event === false) canView = false;
                   }
 
+                  const label = ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet";
+
                   if (canView) {
                     return (
                       <span
                         className="inline-flex items-center gap-2 cursor-pointer hover:text-teal-600 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onShowParticipants(ev.id, ev.title);
+                          if (ev.attendees > 0) {
+                            onShowParticipants(ev.id, ev.title);
+                          }
                         }}
                       >
                         <GroupsIcon fontSize="small" className="text-teal-700" />
-                        {ev.attendees} registered
+                        {label}
                       </span>
                     );
                   } else {
                     return (
                       <span className="inline-flex items-center gap-2 cursor-default">
                         <GroupsIcon fontSize="small" className="text-teal-700" />
-                        {ev.attendees} registered
+                        {label}
                       </span>
                     );
                   }

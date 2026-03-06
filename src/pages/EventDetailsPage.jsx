@@ -916,58 +916,66 @@ export default function EventDetailsPage() {
                             else if (isAfter && event.show_participants_after_event === false) canView = false;
                           }
 
+                          const label = visibleRegisteredCount > 0
+                            ? `${visibleRegisteredCount} people registered`
+                            : "No registrations yet";
+
                           if (canView) {
                             return (
                               <Box
-                                onClick={handleShowParticipants}
+                                onClick={visibleRegisteredCount > 0 ? handleShowParticipants : undefined}
                                 sx={{
                                   mt: 1,
                                   p: 1.5,
                                   border: '1px solid',
                                   borderColor: 'grey.200',
                                   borderRadius: 2,
-                                  cursor: 'pointer',
+                                  cursor: visibleRegisteredCount > 0 ? 'pointer' : 'default',
                                   transition: 'all 0.2s',
-                                  '&:hover': {
+                                  '&:hover': visibleRegisteredCount > 0 ? {
                                     bgcolor: 'grey.50',
                                     borderColor: 'primary.main',
-                                  }
+                                  } : {}
                                 }}
                               >
                                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                                   <Stack direction="row" spacing={1.5} alignItems="center">
-                                    <AvatarGroup
-                                      max={5}
-                                      sx={{
-                                        '& .MuiAvatar-root': {
-                                          width: 32,
-                                          height: 32,
-                                          fontSize: '0.875rem',
-                                          border: '2px solid #fff'
-                                        }
-                                      }}
-                                    >
-                                      {previewParticipants.map((p) => (
-                                        <Tooltip
-                                          key={p.registration_id || p.id}
-                                          title={p.primary_role ? `${p.display_name || "User"} • ${p.role_labels?.[0] || p.primary_role}` : (p.display_name || "User")}
-                                        >
-                                          <Avatar
-                                            src={p.avatar_url}
-                                            alt={p.display_name || "User"}
+                                    {visibleRegisteredCount > 0 && (
+                                      <AvatarGroup
+                                        max={5}
+                                        sx={{
+                                          '& .MuiAvatar-root': {
+                                            width: 32,
+                                            height: 32,
+                                            fontSize: '0.875rem',
+                                            border: '2px solid #fff'
+                                          }
+                                        }}
+                                      >
+                                        {previewParticipants.map((p) => (
+                                          <Tooltip
+                                            key={p.registration_id || p.id}
+                                            title={p.primary_role ? `${p.display_name || "User"} • ${p.role_labels?.[0] || p.primary_role}` : (p.display_name || "User")}
                                           >
-                                            {(p.display_name?.[0] || "U").toUpperCase()}
-                                          </Avatar>
-                                        </Tooltip>
-                                      ))}
-                                    </AvatarGroup>
+                                            <Avatar
+                                              src={p.avatar_url}
+                                              alt={p.display_name || "User"}
+                                            >
+                                              {(p.display_name?.[0] || "U").toUpperCase()}
+                                            </Avatar>
+                                          </Tooltip>
+                                        ))}
+                                      </AvatarGroup>
+                                    )}
                                     <Box>
                                       <Typography variant="body2" fontWeight={600} color="text.primary">
-                                        {visibleRegisteredCount} people registered
+                                        {label}
                                       </Typography>
-                                      <Typography variant="caption" color="text.secondary">
-                                        Click to view list
-                                      </Typography>
+                                      {visibleRegisteredCount > 0 && (
+                                        <Typography variant="caption" color="text.secondary">
+                                          Click to view list
+                                        </Typography>
+                                      )}
                                     </Box>
                                   </Stack>
                                   <GroupsIcon sx={{ color: 'text.secondary', opacity: 0.5 }} />
@@ -980,7 +988,7 @@ export default function EventDetailsPage() {
                               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default', opacity: 0.7 }}>
                                 <GroupsIcon fontSize="small" className="text-teal-700" />
                                 <Typography variant="body2" color="text.secondary">
-                                  {visibleRegisteredCount} registered
+                                  {label}
                                 </Typography>
                               </Stack>
                             );
@@ -1150,78 +1158,79 @@ export default function EventDetailsPage() {
                         const isExpanded = Boolean(expandedSessionDescriptions[sessionKey]);
                         const isLongDescription = sessionDescription.length > 180;
                         return (
-                        <Paper key={session.id || idx} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
-                          <Stack spacing={1.5}>
-                            <Stack direction="row" justifyContent="space-between" alignItems="start">
-                              <Box>
-                                <Typography variant="subtitle1" fontWeight={700}>
-                                  {session.title || `Session ${idx + 1}`}
-                                </Typography>
-                                <Chip
-                                  size="small"
-                                  label={session.session_type ? session.session_type.charAt(0).toUpperCase() + session.session_type.slice(1) + ' Session' : 'Session'}
-                                  sx={{ mt: 1 }}
-                                />
-                              </Box>
-                            </Stack>
-
-                            <Stack direction="row" spacing={2} sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
-                              <Stack direction="row" spacing={0.5} alignItems="center">
-                                <CalendarMonthIcon fontSize="small" sx={{ color: 'teal.700' }} />
-                                <Typography variant="body2">
-                                  {dayjs(session.start_time).format("MMM D, YYYY")}
-                                </Typography>
+                          <Paper key={session.id || idx} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                            <Stack spacing={1.5}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="start">
+                                <Box>
+                                  <Typography variant="subtitle1" fontWeight={700}>
+                                    {session.title || `Session ${idx + 1}`}
+                                  </Typography>
+                                  <Chip
+                                    size="small"
+                                    label={session.session_type ? session.session_type.charAt(0).toUpperCase() + session.session_type.slice(1) + ' Session' : 'Session'}
+                                    sx={{ mt: 1 }}
+                                  />
+                                </Box>
                               </Stack>
-                              <Stack direction="row" spacing={0.5} alignItems="center">
-                                <AccessTimeIcon fontSize="small" sx={{ color: 'teal.700' }} />
-                                <Typography variant="body2">
-                                  {dayjs(session.start_time).format("h:mm A")} – {dayjs(session.end_time).format("h:mm A")}
-                                </Typography>
-                              </Stack>
-                            </Stack>
 
-                            {sessionDescription ? (
-                              <Box>
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{
-                                    ...(isExpanded
-                                      ? {}
-                                      : {
+                              <Stack direction="row" spacing={2} sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                  <CalendarMonthIcon fontSize="small" sx={{ color: 'teal.700' }} />
+                                  <Typography variant="body2">
+                                    {dayjs(session.start_time).format("MMM D, YYYY")}
+                                  </Typography>
+                                </Stack>
+                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                  <AccessTimeIcon fontSize="small" sx={{ color: 'teal.700' }} />
+                                  <Typography variant="body2">
+                                    {dayjs(session.start_time).format("h:mm A")} – {dayjs(session.end_time).format("h:mm A")}
+                                  </Typography>
+                                </Stack>
+                              </Stack>
+
+                              {sessionDescription ? (
+                                <Box>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{
+                                      ...(isExpanded
+                                        ? {}
+                                        : {
                                           display: "-webkit-box",
                                           WebkitBoxOrient: "vertical",
                                           WebkitLineClamp: 3,
                                           overflow: "hidden",
                                         }),
-                                  }}
-                                >
-                                  {sessionDescription}
-                                </Typography>
-                                {isLongDescription && (
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() =>
-                                      setExpandedSessionDescriptions((prev) => ({
-                                        ...prev,
-                                        [sessionKey]: !prev[sessionKey],
-                                      }))
-                                    }
-                                    sx={{ mt: 1, textTransform: "none", fontWeight: 700 }}
+                                    }}
                                   >
-                                    {isExpanded ? "Show less" : "Read More"}
-                                  </Button>
-                                )}
-                              </Box>
-                            ) : (
-                              <Typography variant="body2" color="text.disabled" sx={{ fontStyle: "italic" }}>
-                                No description provided.
-                              </Typography>
-                            )}
-                          </Stack>
-                        </Paper>
-                      )})}
+                                    {sessionDescription}
+                                  </Typography>
+                                  {isLongDescription && (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={() =>
+                                        setExpandedSessionDescriptions((prev) => ({
+                                          ...prev,
+                                          [sessionKey]: !prev[sessionKey],
+                                        }))
+                                      }
+                                      sx={{ mt: 1, textTransform: "none", fontWeight: 700 }}
+                                    >
+                                      {isExpanded ? "Show less" : "Read More"}
+                                    </Button>
+                                  )}
+                                </Box>
+                              ) : (
+                                <Typography variant="body2" color="text.disabled" sx={{ fontStyle: "italic" }}>
+                                  No description provided.
+                                </Typography>
+                              )}
+                            </Stack>
+                          </Paper>
+                        )
+                      })}
                     </Stack>
                   </Box>
                 </Paper>

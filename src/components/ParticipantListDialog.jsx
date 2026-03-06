@@ -127,7 +127,7 @@ export default function ParticipantListDialog({
                                                     <VerifiedIcon sx={{ fontSize: 16, color: '#22d3ee' }} />
                                                 </Tooltip>
                                             )}
-                                            {reg.primary_role && (
+                                            {reg.primary_role && !reg.is_hidden_from_public_role_display && (
                                                 <Chip
                                                     label={ROLE_CHIP_PROPS[reg.primary_role]?.label || reg.role_labels?.[0] || "Participant"}
                                                     size="small"
