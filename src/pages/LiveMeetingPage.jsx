@@ -3135,6 +3135,154 @@ export default function NewLiveMeeting() {
       : isBreakout ||
       !isSelfPresentationEligible ||
       Boolean(pendingMainStageScreenShareRequest));
+  const selfScreenShareEndedBindingRef = useRef({ track: null, handler: null });
+  const screenShareToggleInFlightRef = useRef(false);
+  const lastScreenShareStopAtRef = useRef(0);
+
+  const waitForScreenSharePeerStable = useCallback(async (timeoutMs = 2500) => {
+    const pc = dyteMeeting?.self?.peerConnection;
+    if (!pc || typeof pc.signalingState !== "string") return;
+
+    const startedAt = Date.now();
+    while (pc.signalingState !== "stable" && Date.now() - startedAt < timeoutMs) {
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  }, [dyteMeeting]);
+
+  const isScreenShareRenegotiationError = useCallback((error) => {
+    const message = String(error?.message || error || "").toLowerCase();
+    return (
+      message.includes("createoffer") ||
+      message.includes("error_content") ||
+      message.includes("failed to set remote audio description send parameters")
+    );
+  }, []);
+
+  const stopSelfScreenShareWithCleanup = useCallback(async () => {
+    try {
+      await dyteMeeting?.self?.disableScreenShare?.();
+    } catch (e) {
+      console.warn("[LiveMeeting] Failed to disable screen share during cleanup:", e);
+    } finally {
+      lastScreenShareStopAtRef.current = Date.now();
+      setIsScreenSharing(getSelfScreenShareActive());
+    }
+  }, [dyteMeeting, getSelfScreenShareActive]);
+
+  const startSelfScreenShareWithRecovery = useCallback(async () => {
+    const sinceLastStop = Date.now() - (lastScreenShareStopAtRef.current || 0);
+    if (sinceLastStop >= 0 && sinceLastStop < 450) {
+      await new Promise((r) => setTimeout(r, 450 - sinceLastStop));
+    }
+
+    await waitForScreenSharePeerStable();
+
+    try {
+      await dyteMeeting?.self?.enableScreenShare?.();
+      return;
+    } catch (e) {
+      if (!isScreenShareRenegotiationError(e)) throw e;
+
+      console.warn("[LiveMeeting] Screen share start failed due to renegotiation; retrying once", e);
+      await stopSelfScreenShareWithCleanup();
+      await waitForScreenSharePeerStable(3200);
+      await new Promise((r) => setTimeout(r, 300));
+      await dyteMeeting?.self?.enableScreenShare?.();
+    }
+  }, [
+    dyteMeeting,
+    isScreenShareRenegotiationError,
+    stopSelfScreenShareWithCleanup,
+    waitForScreenSharePeerStable,
+  ]);
+
+  const getSelfScreenShareVideoTrack = useCallback(() => {
+    const self = dyteMeeting?.self;
+    if (!self) return null;
+
+    const unwrapTrack = (candidate) => {
+      if (!candidate) return null;
+      const maybeTrack = candidate.track || candidate.mediaStreamTrack || candidate;
+      if (maybeTrack?.kind === "video") return maybeTrack;
+      return null;
+    };
+
+    const tracks =
+      self?.screenShareTracks ??
+      self?.screenshareTracks ??
+      self?.screenShareVideoTracks ??
+      self?.screenshareVideoTracks ??
+      self?.screenShareTrack ??
+      self?.screenshareTrack ??
+      null;
+
+    const directTrack =
+      unwrapTrack(tracks?.video) ||
+      unwrapTrack(tracks?.videoTrack) ||
+      unwrapTrack(tracks?.track) ||
+      unwrapTrack(tracks);
+
+    if (directTrack) return directTrack;
+
+    const candidates = [];
+    try {
+      if (Array.isArray(tracks)) {
+        candidates.push(...tracks);
+      } else if (typeof tracks?.toArray === "function") {
+        candidates.push(...(tracks.toArray() || []));
+      } else if (typeof tracks?.values === "function") {
+        candidates.push(...Array.from(tracks.values()));
+      } else if (typeof tracks?.forEach === "function") {
+        tracks.forEach((value) => candidates.push(value));
+      }
+    } catch {
+      // ignore malformed track containers
+    }
+
+    for (const candidate of candidates) {
+      const t = unwrapTrack(candidate);
+      if (t) return t;
+    }
+
+    return null;
+  }, [dyteMeeting]);
+
+  const detachSelfScreenShareEndedBinding = useCallback(() => {
+    const { track, handler } = selfScreenShareEndedBindingRef.current;
+    if (track && handler) {
+      try {
+        track.removeEventListener?.("ended", handler);
+      } catch {
+        // ignore
+      }
+    }
+    selfScreenShareEndedBindingRef.current = { track: null, handler: null };
+  }, []);
+
+  const attachSelfScreenShareEndedBinding = useCallback(() => {
+    const track = getSelfScreenShareVideoTrack();
+    if (!track) {
+      detachSelfScreenShareEndedBinding();
+      return;
+    }
+
+    const current = selfScreenShareEndedBindingRef.current;
+    if (current.track === track) return;
+
+    detachSelfScreenShareEndedBinding();
+
+    const onEnded = () => {
+      setIsScreenSharing(false);
+      stopSelfScreenShareWithCleanup();
+    };
+
+    try {
+      track.addEventListener?.("ended", onEnded, { once: true });
+      selfScreenShareEndedBindingRef.current = { track, handler: onEnded };
+    } catch {
+      // If event binding fails, polling/event sync still keeps state aligned.
+    }
+  }, [detachSelfScreenShareEndedBinding, getSelfScreenShareVideoTrack, stopSelfScreenShareWithCleanup]);
 
   const RIGHT_PANEL_W = 460;
   const APPBAR_H = 44;
@@ -3857,6 +4005,7 @@ export default function NewLiveMeeting() {
   const toggleScreenShareNow = useCallback(async () => {
     if (!dyteMeeting?.self) return;
     if (screenShareDisabled) return;
+    if (screenShareToggleInFlightRef.current) return;
 
     if (!isHost) {
       if (!isSelfPresentationEligible || isBreakout) {
@@ -3905,16 +4054,20 @@ export default function NewLiveMeeting() {
       }
     }
 
+    screenShareToggleInFlightRef.current = true;
     try {
       if (isScreenSharing) {
-        await dyteMeeting.self.disableScreenShare?.();   // stop
+        await stopSelfScreenShareWithCleanup();
       } else {
-        await dyteMeeting.self.enableScreenShare?.();    // start
+        await startSelfScreenShareWithRecovery();
       }
       setIsScreenSharing(getSelfScreenShareActive());
     } catch (e) {
       console.warn("[LiveMeeting] screenshare toggle failed:", e);
+      showSnackbar("Unable to start screen share. Please try once more.", "warning");
       setIsScreenSharing(getSelfScreenShareActive());
+    } finally {
+      screenShareToggleInFlightRef.current = false;
     }
   }, [
     canSelfScreenShare,
@@ -3928,6 +4081,8 @@ export default function NewLiveMeeting() {
     pendingMainStageScreenShareRequest,
     screenShareDisabled,
     showSnackbar,
+    startSelfScreenShareWithRecovery,
+    stopSelfScreenShareWithCleanup,
   ]);
   const canScreenShare = selfPermissions?.canProduceScreenshare === "ALLOWED";
   const shouldHideScreenShare = !isHost && (!canScreenShare || hostForceBlock);
@@ -3935,12 +4090,16 @@ export default function NewLiveMeeting() {
 
   useEffect(() => {
     if (!dyteMeeting?.self) {
+      detachSelfScreenShareEndedBinding();
       setIsScreenSharing(false);
       return;
     }
 
     const syncSelfScreenShareState = () => {
-      setIsScreenSharing(getSelfScreenShareActive());
+      const active = getSelfScreenShareActive();
+      setIsScreenSharing(active);
+      if (active) attachSelfScreenShareEndedBinding();
+      else detachSelfScreenShareEndedBinding();
     };
 
     syncSelfScreenShareState();
@@ -3967,11 +4126,17 @@ export default function NewLiveMeeting() {
 
     return () => {
       clearInterval(interval);
+      detachSelfScreenShareEndedBinding();
       cleanups.forEach((fn) => {
         try { fn(); } catch { }
       });
     };
-  }, [dyteMeeting, getSelfScreenShareActive]);
+  }, [
+    attachSelfScreenShareEndedBinding,
+    detachSelfScreenShareEndedBinding,
+    dyteMeeting,
+    getSelfScreenShareActive,
+  ]);
 
   // ---------- Host detection (for audience waiting screen) ----------
   const [hostJoined, setHostJoined] = useState(false);
@@ -8929,10 +9094,7 @@ export default function NewLiveMeeting() {
           }
           if (isScreenSharing) {
             (async () => {
-              try {
-                await dyteMeeting?.self?.disableScreenShare?.();
-              } catch { }
-              setIsScreenSharing(false);
+              await stopSelfScreenShareWithCleanup();
             })();
           }
         } else if (payload?.status === "revoked") {
@@ -8941,10 +9103,7 @@ export default function NewLiveMeeting() {
           showSnackbar("Host removed your screen sharing permission.", "info");
           if (isScreenSharing) {
             (async () => {
-              try {
-                await dyteMeeting?.self?.disableScreenShare?.();
-              } catch { }
-              setIsScreenSharing(false);
+              await stopSelfScreenShareWithCleanup();
             })();
           }
         }
@@ -8974,6 +9133,7 @@ export default function NewLiveMeeting() {
     selfAssignedRole,
     showSnackbar,
     spotlightTarget,
+    stopSelfScreenShareWithCleanup,
     role,
   ]);
 
@@ -11023,13 +11183,15 @@ export default function NewLiveMeeting() {
     }
     if (isSelfPresentationEligible || !isScreenSharing) return;
 
-    (async () => {
-      try {
-        await dyteMeeting.self.disableScreenShare?.();
-      } catch { }
-      setIsScreenSharing(false);
-    })();
-  }, [dyteMeeting, isHost, isScreenSharing, isSelfMainStageScreenShareApproved, isSelfPresentationEligible]);
+    stopSelfScreenShareWithCleanup();
+  }, [
+    dyteMeeting,
+    isHost,
+    isScreenSharing,
+    isSelfMainStageScreenShareApproved,
+    isSelfPresentationEligible,
+    stopSelfScreenShareWithCleanup,
+  ]);
 
   // If audience and host not live yet
   // ✅ Also show meeting if in breakout/lounge room (post-event)
@@ -11154,11 +11316,10 @@ export default function NewLiveMeeting() {
     setHostPerms((p) => ({ ...p, screenShare: next }));
 
     // optional safety: if host turns OFF while sharing, stop it
-    if (!next && dyteMeeting?.self?.disableScreenShare) {
-      try { await dyteMeeting.self.disableScreenShare(); } catch { }
-      setIsScreenSharing(false);
+    if (!next && isScreenSharing) {
+      await stopSelfScreenShareWithCleanup();
     }
-  }, [dyteMeeting, hostPerms.screenShare, isHost, isScreenSharing]);
+  }, [hostPerms.screenShare, isHost, isScreenSharing, stopSelfScreenShareWithCleanup]);
 
   // -------- Live chat (messaging backend) ----------
   const [chatConversationId, setChatConversationId] = useState(null);
