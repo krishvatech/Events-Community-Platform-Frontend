@@ -7574,7 +7574,6 @@ export default function NewLiveMeeting() {
     // BUT: Allow initialization if already in breakout (joined a lounge table)
     const shouldSkipInitDueToPreEventLounge = preEventLoungeOpen && !joinMainRequested &&
       (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
-      !authToken &&
       !isBreakout;  // ✅ Allow init for users in breakout rooms (joined lounge table)
     if (shouldSkipInitDueToPreEventLounge) {
       console.log("[LiveMeeting] ⏸️ Skipping init - host in pre-event lounge without making a choice");
@@ -8386,9 +8385,36 @@ export default function NewLiveMeeting() {
     [eventId]
   );
 
+  // Keep pre-event lounge list accurate in host view:
+  // if a participant is already mapped to main/breakout room, don't keep them in PRE-EVENT LOUNGE.
+  const filteredPreEventLoungeParticipants = useMemo(() => {
+    if (!Array.isArray(preEventLoungeParticipants) || preEventLoungeParticipants.length === 0) {
+      return [];
+    }
+
+    const userIdsOutsideLounge = new Set();
+    for (const [dyteParticipantId, roomInfo] of participantRoomMap.entries()) {
+      const userId = participantIdMapRef.current?.get(dyteParticipantId);
+      if (!userId) continue;
+      const roomType = String(roomInfo?.type || "").toLowerCase();
+      if (roomType && roomType !== "lounge") {
+        userIdsOutsideLounge.add(String(userId));
+      }
+    }
+
+    return preEventLoungeParticipants.filter((lp) => {
+      const userId = String(lp?.user_id || "");
+      if (!userId) return false;
+      if (userIdsOutsideLounge.has(userId)) return false;
+
+      const currentLocation = String(lp?.current_location || "").toLowerCase();
+      return currentLocation === "" || currentLocation === "social_lounge";
+    });
+  }, [preEventLoungeParticipants, participantRoomMap]);
+
   // ✅ NEW: Start Webinar with lounge transition options
   const handleStartWebinar = useCallback(async () => {
-    if (preEventLoungeParticipants.length > 0 && eventData?.lounge_enabled_waiting_room) {
+    if (filteredPreEventLoungeParticipants.length > 0 && eventData?.lounge_enabled_waiting_room) {
       // Show dialog for host to choose lounge transition
       setShowLoungeStartDialog(true);
     } else {
@@ -8396,7 +8422,7 @@ export default function NewLiveMeeting() {
       await updateLiveStatus("start");
       setDbStatus("live");
     }
-  }, [preEventLoungeParticipants.length, eventData?.lounge_enabled_waiting_room, updateLiveStatus]);
+  }, [filteredPreEventLoungeParticipants.length, eventData?.lounge_enabled_waiting_room, updateLiveStatus]);
 
   // ✅ NEW: Confirm and execute lounge transition with countdown
   const confirmStartWithLoungeTransition = useCallback(async () => {
@@ -12821,7 +12847,7 @@ export default function NewLiveMeeting() {
     };
 
     const preEventLoungeUserIds = new Set(
-      (preEventLoungeParticipants || [])
+      (filteredPreEventLoungeParticipants || [])
         .map((x) => String(x?.user_id || ""))
         .filter(Boolean)
     );
@@ -12832,7 +12858,10 @@ export default function NewLiveMeeting() {
       // If attendee is still in pre-event lounge waiting list, keep them only in PRE-EVENT LOUNGE section.
       if (isHost && eventData?.lounge_enabled_waiting_room && preEventLoungeUserIds.size > 0) {
         const backendUserId = String(getBackendUserId(p?._raw || p) || getBackendUserId(p) || "");
-        if (backendUserId && preEventLoungeUserIds.has(backendUserId)) {
+        const roomType = String(participantRoomMap.get(p?.id)?.type || "").toLowerCase();
+        // Hide from regular member groups only when user is still actually in lounge.
+        // This avoids temporary "missing from all lists" after admit when lounge polling is stale.
+        if (backendUserId && preEventLoungeUserIds.has(backendUserId) && roomType === "lounge") {
           return false;
         }
       }
@@ -12927,7 +12956,7 @@ export default function NewLiveMeeting() {
     dyteMeeting?.self?.id,
     isBreakout,
     currentLoungeUserIds,
-    preEventLoungeParticipants,
+    filteredPreEventLoungeParticipants,
     eventData?.lounge_enabled_waiting_room,
     primaryHostUserId,
     participantRoomMap,  // ✅ PHASE 4: Added dependency
@@ -14820,19 +14849,19 @@ export default function NewLiveMeeting() {
                   {/* ✅ NEW: Pre-Event Lounge Participants Section */}
                   {isHost &&
                     eventData?.lounge_enabled_waiting_room &&
-                    preEventLoungeParticipants.length > 0 &&
+                    filteredPreEventLoungeParticipants.length > 0 &&
                     (participantRoomFilter === "all" || participantRoomFilter === "lounge") && (
                     <Box sx={{ mb: 2 }}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
                         <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
-                          PRE-EVENT LOUNGE ({preEventLoungeParticipants.length})
+                          PRE-EVENT LOUNGE ({filteredPreEventLoungeParticipants.length})
                         </Typography>
                         <Stack direction="row" spacing={1}>
                           <Button
                             size="small"
                             variant="contained"
                             sx={{ fontSize: 10, bgcolor: "rgba(34, 197, 94, 0.8)" }}
-                            onClick={() => admitAllFromLounge(preEventLoungeParticipants.map(p => p.user_id))}
+                            onClick={() => admitAllFromLounge(filteredPreEventLoungeParticipants.map(p => p.user_id))}
                           >
                             Admit All to Main Room
                           </Button>
@@ -14841,7 +14870,7 @@ export default function NewLiveMeeting() {
                               size="small"
                               variant="outlined"
                               sx={{ fontSize: 10, borderColor: "rgba(250, 204, 21, 0.7)", color: "rgba(250, 204, 21, 0.95)" }}
-                              onClick={() => admitAllToWaitingFromLounge(preEventLoungeParticipants.map(p => p.user_id))}
+                              onClick={() => admitAllToWaitingFromLounge(filteredPreEventLoungeParticipants.map(p => p.user_id))}
                             >
                               Admit All to Waiting Room
                             </Button>
@@ -14851,7 +14880,7 @@ export default function NewLiveMeeting() {
 
                       <Paper variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
                         <Stack spacing={0.5} sx={{ p: 1 }}>
-                          {preEventLoungeParticipants.map(p => (
+                          {filteredPreEventLoungeParticipants.map(p => (
                             <Stack key={p.user_id} direction="row" alignItems="center" spacing={1} sx={{ py: 0.5, px: 0.75, borderRadius: 1, bgcolor: "rgba(255,255,255,0.02)" }}>
                               <Avatar sx={{ width: 24, height: 24, fontSize: 10 }}>
                                 {(p.full_name || p.user_name || "U").charAt(0).toUpperCase()}
@@ -18438,7 +18467,7 @@ export default function NewLiveMeeting() {
           }}
         >
           <DialogTitle sx={{ fontWeight: 700, color: "#ffffff" }}>
-            Social Lounge has {preEventLoungeParticipants.length} participant(s)
+            Social Lounge has {filteredPreEventLoungeParticipants.length} participant(s)
           </DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
             <Typography sx={{ mb: 2, color: "#ffffff" }}>
