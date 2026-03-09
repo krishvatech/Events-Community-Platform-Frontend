@@ -114,14 +114,9 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
     return "Join Social Lounge";
   }
 
-  // If waiting room will be required (e.g. grace period expired or event hasn't started),
-  // always reflect that in the button label wherever a join option is shown.
-  if (willGoToWaitingRoom(event)) {
-    return "Join Waiting Room";
-  }
-
   // ✅ Check if user has been admitted to waiting room
   // If user's admission_status is "admitted", they can join live (no need for waiting room)
+  // Must be checked BEFORE generic waiting-room fallback.
   if (userRegistration?.admission_status === "admitted") {
     // Show different text based on whether event is actually live
     if (isLive) {
@@ -129,6 +124,12 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
     } else {
       return "Join (Not Live Yet)";
     }
+  }
+
+  // If waiting room will be required (e.g. grace period expired or event hasn't started),
+  // always reflect that in the button label wherever a join option is shown.
+  if (willGoToWaitingRoom(event)) {
+    return "Join Waiting Room";
   }
 
   // Event is live (or within early-join windows that allow direct join)

@@ -107,6 +107,22 @@ function canEarlyJoin(ev) {
   const now = Date.now();
   return now >= startMs - EARLY_JOIN_MINUTES * 60 * 1000 && now < startMs;
 }
+
+function canViewParticipants(event, owner, staff) {
+  if (!event) return false;
+  if (owner || staff) return true;
+
+  const now = Date.now();
+  const startMs = parseDateSafe(event.start_time)?.getTime() || 0;
+  const endMs = parseDateSafe(event.end_time)?.getTime() || 0;
+  const isBefore = startMs > 0 && now < startMs;
+  const isAfter = event.status === "ended" || (endMs > 0 && now > endMs);
+
+  // For regular users, only allow pre-event list when explicitly enabled.
+  if (isBefore) return event.show_participants_before_event === true;
+  if (isAfter) return event.show_participants_after_event !== false;
+  return true;
+}
 // in computeStatus
 function computeStatus(ev) {
   const now = Date.now();
@@ -277,6 +293,7 @@ export default function EventDetailsPage() {
 
   // Participant Preview
   const [previewParticipants, setPreviewParticipants] = useState([]);
+  const [previewParticipantsForbidden, setPreviewParticipantsForbidden] = useState(false);
 
   const refreshEventFromServer = useCallback(async () => {
     if (!event?.id) return;
@@ -352,20 +369,17 @@ export default function EventDetailsPage() {
   useEffect(() => {
     if (!event?.id) return;
 
+    setPreviewParticipantsForbidden(false);
+  }, [event?.id]);
+
+  useEffect(() => {
+    if (!event?.id) return;
+    if (previewParticipantsForbidden) return;
+
     // Check visibility rules
     const owner = isOwnerUser();
     const staff = isStaffUser();
-
-    // Robust status check
-    const status = computeStatus(event);
-    const isBefore = status === 'upcoming';
-    const isAfter = status === 'past'; // includes ended manually or time passed
-
-    let canView = true;
-    if (!owner && !staff) {
-      if (isBefore && event.show_participants_before_event === false) canView = false;
-      else if (isAfter && event.show_participants_after_event === false) canView = false;
-    }
+    const canView = canViewParticipants(event, owner, staff);
 
     if (!canView) {
       setPreviewParticipants([]);
@@ -379,6 +393,11 @@ export default function EventDetailsPage() {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (cancelled) return;
+        if (res.status === 403) {
+          setPreviewParticipants([]);
+          setPreviewParticipantsForbidden(true);
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : (data.participants || data.results || []);
@@ -391,7 +410,7 @@ export default function EventDetailsPage() {
 
     fetchPreview();
     return () => { cancelled = true; };
-  }, [event?.id, token, event?.start_time, event?.end_time, event?.show_participants_before_event, event?.show_participants_after_event]);
+  }, [event?.id, token, event?.start_time, event?.end_time, event?.show_participants_before_event, event?.show_participants_after_event, previewParticipantsForbidden]);
 
 
   const handleShowParticipants = async () => {
@@ -406,6 +425,10 @@ export default function EventDetailsPage() {
       const res = await fetch(`${API_BASE}/events/${event.id}/participants/`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      if (res.status === 403) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.detail || "Participant list is not available right now.");
+      }
       if (!res.ok) throw new Error("Failed to load participants");
       const data = await res.json();
       setParticipantList(Array.isArray(data) ? data : (data.participants || []));
@@ -904,17 +927,7 @@ export default function EventDetailsPage() {
                           if (!Number.isFinite(visibleRegisteredCount)) return null;
                           const owner = isOwnerUser();
                           const staff = isStaffUser();
-
-                          // Robust status check
-                          const status = computeStatus(event);
-                          const isBefore = status === 'upcoming';
-                          const isAfter = status === 'past'; // includes ended manually or time passed
-
-                          let canView = true;
-                          if (!owner && !staff) {
-                            if (isBefore && event.show_participants_before_event === false) canView = false;
-                            else if (isAfter && event.show_participants_after_event === false) canView = false;
-                          }
+                          const canView = canViewParticipants(event, owner, staff);
 
                           const label = visibleRegisteredCount > 0
                             ? `${visibleRegisteredCount} people registered`
@@ -1058,7 +1071,7 @@ export default function EventDetailsPage() {
                             className="rounded-xl"
                             variant="contained"
                           >
-                            {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false))}
+                            {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false, registration))}
                           </Button>
                         ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" ? (
                           <Button

@@ -2501,17 +2501,41 @@ function EventsPage() {
           setEvents(results);
           setTotalCount(count);
 
-          // 🔹 Build myRegistrations from the mine/ response's is_host field.
-          // The backend now annotates each event with is_host directly,
-          // so we no longer need a separate /event-registrations/ fetch per event.
+          // Build my registrations for staff users.
+          // We need full registration payload (especially admission_status)
+          // so Join button labels are consistent with other pages.
           if (!isOwner && results.length > 0) {
             const newRegs = {};
-            results.forEach((ev) => {
-              // ev.is_host is provided by the mine/ endpoint via _is_event_host()
-              if (ev.is_host !== undefined) {
-                newRegs[ev.id] = { is_host: Boolean(ev.is_host) };
+
+            await Promise.all(results.map(async (ev) => {
+              try {
+                const regUrl = new URL(`${API_ROOT}/event-registrations/`);
+                regUrl.searchParams.set("event", String(ev.id));
+
+                const rRes = await fetch(regUrl.toString(), { headers });
+                if (rRes.ok) {
+                  const rData = await rRes.json();
+                  const rList = Array.isArray(rData) ? rData : (rData?.results ?? []);
+                  if (rList.length > 0) {
+                    newRegs[ev.id] = {
+                      ...rList[0],
+                      // Keep endpoint annotation as fallback for role
+                      is_host: rList[0]?.is_host ?? Boolean(ev.is_host),
+                    };
+                    return;
+                  }
+                }
+              } catch (err) {
+                console.warn(`[AdminEvents] Failed to fetch registration for event ${ev.id}`, err);
               }
-            });
+
+              // Fallback to event payload data when registration fetch is unavailable
+              newRegs[ev.id] = {
+                is_host: Boolean(ev.is_host),
+                admission_status: ev?.admission_status,
+              };
+            }));
+
             if (!cancelled) {
               setMyRegistrations(newRegs);
             }
