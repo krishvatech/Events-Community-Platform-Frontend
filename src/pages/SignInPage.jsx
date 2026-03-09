@@ -4,6 +4,7 @@ import HeroSection from '../components/HeroSection.jsx';
 import AuthToggle from '../components/AuthToggle.jsx';
 import SocialLogin from '../components/SocialLogin.jsx';
 import FeaturesSection from '../components/FeaturesSection.jsx';
+import WordPressLogin from '../components/WordPressLogin.jsx';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { saveLoginPayload } from "../utils/authStorage";
@@ -201,6 +202,7 @@ const SignInPage = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({ email: '', password: '' });
   const [showPwd, setShowPwd] = useState(false);
+  const [loginMethod, setLoginMethod] = useState('standard'); // 'standard' or 'wordpress'
 
   const validate = () => {
     let newErrors = { email: '', password: '' };
@@ -230,6 +232,67 @@ const SignInPage = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const handleWordPressLoginSuccess = async (wpUser) => {
+    try {
+      console.log('✅ WordPress login successful:', wpUser);
+
+      // Store WordPress user info for reference
+      localStorage.setItem("wordpress_user", JSON.stringify(wpUser));
+
+      // Get the tokens from the WordPress sync response (stored by wordpressAuth service)
+      const accessToken = localStorage.getItem('access_token');
+      const idToken = localStorage.getItem('id_token');
+      const refreshToken = localStorage.getItem('refresh_token');
+
+      if (accessToken) {
+        console.log('✅ Cognito tokens received, redirecting to platform...');
+        toast.success(`Welcome, ${wpUser.email}!`);
+
+        // Redirect to dashboard or community
+        setTimeout(() => {
+          const intended = new URLSearchParams(location.search).get("next") || "/community";
+          navigate(intended, { replace: true });
+        }, 500);
+      } else {
+        // Fallback: redirect to Cognito if no tokens in response
+        console.log('⚠️ No tokens in response, redirecting to Cognito...');
+        toast.info('Completing authentication...');
+
+        const intended = new URLSearchParams(location.search).get("next") || "/community";
+        sessionStorage.setItem("post_wordpress_cognito_redirect", intended);
+
+        setTimeout(() => {
+          const COGNITO_DOMAIN = (import.meta.env.VITE_COGNITO_DOMAIN || "").replace(/\/+$/, "");
+          const COGNITO_CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
+          const COGNITO_REDIRECT_URI = import.meta.env.VITE_COGNITO_REDIRECT_URI || "http://localhost:5173/cognito/callback";
+
+          if (!COGNITO_DOMAIN || !COGNITO_CLIENT_ID) {
+            toast.error("Cognito not configured");
+            return;
+          }
+
+          const params = new URLSearchParams({
+            response_type: "code",
+            client_id: COGNITO_CLIENT_ID,
+            redirect_uri: COGNITO_REDIRECT_URI,
+            scope: "openid email profile",
+            state: Math.random().toString(36).substring(7),
+          });
+
+          window.location.href = `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
+        }, 1000);
+      }
+    } catch (err) {
+      console.error("WordPress login redirect error:", err);
+      toast.error('Login successful but redirect failed');
+    }
+  };
+
+  const handleWordPressLoginError = (error) => {
+    console.error('❌ WordPress login error:', error);
+    toast.error(`❌ ${error}`);
   };
 
   const handleSubmit = async (e) => {
@@ -300,8 +363,8 @@ const SignInPage = () => {
 
       await updateTimezone(accessTokenForBackend);
 
-      /* 
-       * 🔔 STRICT SUSPENSION CHECK 
+      /*
+       * 🔔 STRICT SUSPENSION CHECK
        * Even if Cognito auth succeeded, the BACKEND middleware might block this user (suspended).
        * We must verify access to 'me' endpoint BEFORE navigating.
        */
@@ -493,119 +556,170 @@ const SignInPage = () => {
                 <AuthToggle />
               </Box>
 
-              {/* Form */}
-              <Box component="form" noValidate onSubmit={handleSubmit}>
-                <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
-                  Email Address
-                </Typography>
-                <TextField
-                  size="small"
-                  name="email"
-                  type="text"
-                  placeholder="your@gmail.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  fullWidth
-                  error={Boolean(errors.email)}
-                  helperText={errors.email}
-                  sx={{
-                    mb: 1.5,
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 1,
-                      '& fieldset': { borderColor: '#d1d5db' },
-                      '&:hover fieldset': { borderColor: '#155dfc' },
-                      '&.Mui-focused fieldset': { borderColor: '#155dfc' },
-                    },
-                    '& .MuiInputBase-input': {
-                      fontSize: 12,
-                      '::placeholder': { fontSize: 14, opacity: 0.6 },
-                    },
-                  }}
-                />
-
-                <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
-                  Password
-                </Typography>
-                <TextField
-                  size="small"
-                  name="password"
-                  type={showPwd ? 'text' : 'password'}
-                  placeholder="your password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  fullWidth
-                  error={Boolean(errors.password)}
-                  helperText={errors.password}
-                  sx={{
-                    mb: 1.5,
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 1,
-                      '& fieldset': { borderColor: '#d1d5db' },
-                      '&:hover fieldset': { borderColor: '#155dfc' },
-                      '&.Mui-focused fieldset': { borderColor: '#155dfc' },
-                    },
-                    '& .MuiInputBase-input': {
-                      fontSize: 12,
-                      '::placeholder': { fontSize: 14, opacity: 0.6 },
-                    },
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton edge="end" onClick={() => setShowPwd((v) => !v)}>
-                          {showPwd ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-
-                <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
-                  <Link
-                    component="button"
-                    type="button"
-                    variant="body2"
-                    underline="none"
-                    sx={{ fontSize: 14, color: '#155dfc', fontWeight: 600 }}
-                    onClick={() =>
-                      navigate('/forgot-password', {
-                        state: { email: formData.email },
-                      })
-                    }
-                  >
-                    Forgot password?
-                  </Link>
-                </Box>
-
-                {/* <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
-                  <Link
-                    component="button"
-                    type="button"
-                    variant="body2"
-                    underline="none"
-                    sx={{ fontSize: 14, color: '#155dfc', fontWeight: 600 }}
-                    onClick={() => showComingSoon('Forgot password')}
-                  >
-                    Forgot password?
-                  </Link>
-                </Box> */}
-
+              {/* Login Method Selector */}
+              <Box sx={{ mb: 3, display: 'flex', gap: 1, borderBottom: '1px solid', borderColor: 'divider', pb: 2 }}>
                 <Button
-                  type="submit"
-                  fullWidth
-                  size="large"
-                  variant="contained"
-                  disabled={loading}
-                  sx={{ py: 1, fontWeight: 600, borderRadius: 1, bgcolor: '#2c6af0ff', '&:hover': { bgcolor: '#165DFF' }, color: 'white', fontSize: 12 }}
+                  variant={loginMethod === 'standard' ? 'contained' : 'text'}
+                  onClick={() => setLoginMethod('standard')}
+                  sx={{
+                    flex: 1,
+                    py: 1,
+                    fontWeight: loginMethod === 'standard' ? 600 : 500,
+                    fontSize: 13,
+                    bgcolor: loginMethod === 'standard' ? '#2c6af0ff' : 'transparent',
+                    color: loginMethod === 'standard' ? 'white' : 'text.primary',
+                    '&:hover': { bgcolor: loginMethod === 'standard' ? '#165DFF' : '#f5f5f5' },
+                    borderRadius: 1,
+                    textTransform: 'none',
+                  }}
                 >
-                  {loading ? 'Signing in...' : 'Sign Into Your Account'}
+                  Standard Login
+                </Button>
+                <Button
+                  variant={loginMethod === 'wordpress' ? 'contained' : 'text'}
+                  onClick={() => setLoginMethod('wordpress')}
+                  sx={{
+                    flex: 1,
+                    py: 1,
+                    fontWeight: loginMethod === 'wordpress' ? 600 : 500,
+                    fontSize: 13,
+                    bgcolor: loginMethod === 'wordpress' ? '#2c6af0ff' : 'transparent',
+                    color: loginMethod === 'wordpress' ? 'white' : 'text.primary',
+                    '&:hover': { bgcolor: loginMethod === 'wordpress' ? '#165DFF' : '#f5f5f5' },
+                    borderRadius: 1,
+                    textTransform: 'none',
+                  }}
+                >
+                  IMAA Login
                 </Button>
               </Box>
 
-              {/* Social */}
-              <Box sx={{ mt: 2 }}>
-                <SocialLogin />
-              </Box>
+              {/* Conditional Form Rendering */}
+              {loginMethod === 'standard' ? (
+                <>
+                  <Box component="form" noValidate onSubmit={handleSubmit}>
+                    <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
+                      Email Address
+                    </Typography>
+                    <TextField
+                      size="small"
+                      name="email"
+                      type="text"
+                      placeholder="your@gmail.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      fullWidth
+                      error={Boolean(errors.email)}
+                      helperText={errors.email}
+                      sx={{
+                        mb: 1.5,
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 1,
+                          '& fieldset': { borderColor: '#d1d5db' },
+                          '&:hover fieldset': { borderColor: '#155dfc' },
+                          '&.Mui-focused fieldset': { borderColor: '#155dfc' },
+                        },
+                        '& .MuiInputBase-input': {
+                          fontSize: 12,
+                          '::placeholder': { fontSize: 14, opacity: 0.6 },
+                        },
+                      }}
+                    />
+
+                    <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
+                      Password
+                    </Typography>
+                    <TextField
+                      size="small"
+                      name="password"
+                      type={showPwd ? 'text' : 'password'}
+                      placeholder="your password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      fullWidth
+                      error={Boolean(errors.password)}
+                      helperText={errors.password}
+                      sx={{
+                        mb: 1.5,
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 1,
+                          '& fieldset': { borderColor: '#d1d5db' },
+                          '&:hover fieldset': { borderColor: '#155dfc' },
+                          '&.Mui-focused fieldset': { borderColor: '#155dfc' },
+                        },
+                        '& .MuiInputBase-input': {
+                          fontSize: 12,
+                          '::placeholder': { fontSize: 14, opacity: 0.6 },
+                        },
+                      }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton edge="end" onClick={() => setShowPwd((v) => !v)}>
+                              {showPwd ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+
+                    <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
+                      <Link
+                        component="button"
+                        type="button"
+                        variant="body2"
+                        underline="none"
+                        sx={{ fontSize: 14, color: '#155dfc', fontWeight: 600 }}
+                        onClick={() =>
+                          navigate('/forgot-password', {
+                            state: { email: formData.email },
+                          })
+                        }
+                      >
+                        Forgot password?
+                      </Link>
+                    </Box>
+
+                    <Button
+                      type="submit"
+                      fullWidth
+                      size="large"
+                      variant="contained"
+                      disabled={loading}
+                      sx={{ py: 1, fontWeight: 600, borderRadius: 1, bgcolor: '#2c6af0ff', '&:hover': { bgcolor: '#165DFF' }, color: 'white', fontSize: 12 }}
+                    >
+                      {loading ? 'Signing in...' : 'Sign Into Your Account'}
+                    </Button>
+                  </Box>
+
+                  {/* Social */}
+                  <Box sx={{ mt: 2 }}>
+                    <SocialLogin />
+                  </Box>
+                </>
+              ) : (
+                // WordPress IMAA Login Form
+                <Box sx={{
+                  '& .wordpress-login-container': {
+                    minHeight: 'auto',
+                    p: 0,
+                    background: 'transparent'
+                  },
+                  '& .wordpress-login-card': {
+                    p: 0,
+                    boxShadow: 'none',
+                    background: 'transparent',
+                    border: 'none',
+                    '& h2': { display: 'none' },
+                    '& .subtitle': { display: 'none' },
+                  }
+                }}>
+                  <WordPressLogin
+                    onSuccess={handleWordPressLoginSuccess}
+                    onError={handleWordPressLoginError}
+                  />
+                </Box>
+              )}
             </Paper>
 
             {/* Features */}

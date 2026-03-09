@@ -344,8 +344,19 @@ function createEmptyContactForm() {
 function buildContactFormFromLinks(links) {
   const contact = links?.contact && typeof links.contact === "object" ? links.contact : {};
   const emails = Array.isArray(contact.emails) ? contact.emails : [];
-  const phones = Array.isArray(contact.phones) ? contact.phones : [];
-  const websites = Array.isArray(contact.websites) ? contact.websites : [];
+  let phones = Array.isArray(contact.phones) ? contact.phones : [];
+  let websites = Array.isArray(contact.websites) ? contact.websites : [];
+
+  // Add synced phone from WordPress (links.phone) if no contact.phones exist
+  if (!phones.length && links?.phone && typeof links.phone === "string") {
+    phones = [{ number: links.phone, type: "professional", visibility: "private", primary: false }];
+  }
+
+  // Add synced website from WordPress (links.website) if no contact.websites exist
+  if (!websites.length && links?.website && typeof links.website === "string") {
+    websites = [{ label: "Website", url: links.website, visibility: "private" }];
+  }
+
   const scheduler = contact.scheduler && typeof contact.scheduler === "object" ? contact.scheduler : {};
   const requireVerified = !!(
     contact.require_verified ||
@@ -1276,6 +1287,7 @@ export default function ProfilePage() {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: "", sev: "success" });
 
   const [eduSaving, setEduSaving] = useState(false);
@@ -1307,6 +1319,86 @@ export default function ProfilePage() {
       }
     } catch (error) {
       showNotification("error", error.message);
+    }
+  };
+
+  // WordPress Profile Sync Handler
+  const handleSyncProfile = async () => {
+    setSyncing(true);
+    try {
+      const token =
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("access") ||
+        localStorage.getItem("jwt");
+
+      const response = await fetch(`${API_BASE}/auth/wordpress/sync-profile/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to sync profile from WordPress");
+      }
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        // Update the form with the synced profile data
+        if (data.profile) {
+          const profileData = data.profile;
+
+          // Extract first and last name from full_name if available
+          let firstName = form.first_name;
+          let lastName = form.last_name;
+
+          if (profileData.full_name) {
+            const nameParts = profileData.full_name.trim().split(/\s+/);
+            firstName = nameParts[0] || firstName;
+            lastName = nameParts.slice(1).join(" ") || lastName;
+          }
+
+          setForm(prev => {
+            // Handle social profile links
+            let linksText = prev.linksText;
+            if (profileData.links && typeof profileData.links === "object") {
+              linksText = JSON.stringify(profileData.links);
+            }
+
+            return {
+              ...prev,
+              first_name: firstName,
+              last_name: lastName,
+              full_name: profileData.full_name || prev.full_name,
+              bio: profileData.bio || prev.bio,
+              headline: profileData.headline || prev.headline,
+              job_title: profileData.job_title || prev.job_title,
+              company: profileData.company || prev.company,
+              location: profileData.location || prev.location,
+              avatar: profileData.user_image_url || prev.avatar,
+              timezone: profileData.timezone || prev.timezone,
+              linksText: linksText,
+            };
+          });
+
+          // Also update avatar preview if it changed
+          if (profileData.user_image_url && profileData.user_image_url !== form.avatar) {
+            setAvatarPreview(profileData.user_image_url);
+          }
+        }
+        showNotification("success", "✓ Profile synced from WordPress!");
+      } else {
+        showNotification("error", data.message || "Failed to sync profile");
+      }
+    } catch (error) {
+      showNotification("error", error.message || "Error syncing profile from WordPress");
+      console.error("Sync error:", error);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -3290,6 +3382,24 @@ export default function ProfilePage() {
                         >
                           View as Public
                         </Button>
+                        <Tooltip title="Sync profile from WordPress">
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleSyncProfile}
+                            disabled={syncing}
+                            sx={{ textTransform: "none", borderRadius: 2 }}
+                          >
+                            {syncing ? (
+                              <>
+                                <CircularProgress size={16} sx={{ mr: 0.5 }} />
+                                Syncing...
+                              </>
+                            ) : (
+                              "Sync Profile"
+                            )}
+                          </Button>
+                        </Tooltip>
                         <Tooltip title="Identity Details">
                           <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
                             <EditRoundedIcon fontSize="small" />

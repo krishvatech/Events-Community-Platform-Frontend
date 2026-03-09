@@ -48,9 +48,14 @@ const CognitoOAuthCallback = () => {
     const code = params.get("code");
     const state = params.get("state");
 
+    // Check if user came from WordPress login (has higher priority)
+    const wpRedirect = sessionStorage.getItem("post_wordpress_cognito_redirect");
+
     const redirectKey = `post_login_redirect_${state}`;
-    const intended = sessionStorage.getItem(redirectKey) || "/account/profile";
+    const intended = wpRedirect || sessionStorage.getItem(redirectKey) || "/account/profile";
+
     sessionStorage.removeItem(redirectKey);
+    sessionStorage.removeItem("post_wordpress_cognito_redirect");
 
     if (!code || !state) {
       toast.error("❌ Missing code/state from Cognito.");
