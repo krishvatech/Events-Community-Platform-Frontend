@@ -1,11 +1,11 @@
 import React from 'react';
-import { FaGoogle, FaLinkedinIn } from 'react-icons/fa';
+import { FaGoogle, FaLinkedinIn, FaGraduationCap } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-import { Box, Divider, Typography, Button } from '@mui/material';
+import { Box, Typography, Button } from '@mui/material';
 import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
-const SocialLogin = () => {
+const SocialLogin = ({ onIMAA }) => {
   const COGNITO_DOMAIN = (import.meta.env.VITE_COGNITO_DOMAIN || "").replace(/\/+$/, "");
   const COGNITO_CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
   const COGNITO_REDIRECT_URI = import.meta.env.VITE_COGNITO_REDIRECT_URI || "http://localhost:5173/cognito/callback";
@@ -154,6 +154,24 @@ const SocialLogin = () => {
         >
           LinkedIn
         </Button>
+
+        {onIMAA ? (
+          <Button
+            fullWidth
+            variant="outlined"
+            startIcon={<FaGraduationCap />}
+            onClick={onIMAA}
+            sx={{
+              textTransform: 'none',
+              bgcolor: '#fff',
+              color: 'black',
+              borderColor: 'divider',
+              '&:hover': { bgcolor: 'grey.50' },
+            }}
+          >
+            IMAA
+          </Button>
+        ) : null}
       </Box>
     </Box>
   );

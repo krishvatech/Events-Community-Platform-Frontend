@@ -36,6 +36,7 @@ export function useWordPressAuth() {
       // Store user data
       wordpressAuthService.storeUser({
         id: result.user_id,
+        username: result.username,
         email: result.email,
         created: result.created,
       });

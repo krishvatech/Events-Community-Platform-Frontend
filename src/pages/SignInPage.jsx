@@ -4,13 +4,13 @@ import HeroSection from '../components/HeroSection.jsx';
 import AuthToggle from '../components/AuthToggle.jsx';
 import SocialLogin from '../components/SocialLogin.jsx';
 import FeaturesSection from '../components/FeaturesSection.jsx';
-import WordPressLogin from '../components/WordPressLogin.jsx';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { saveLoginPayload } from "../utils/authStorage";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cognitoSignIn } from "../utils/cognitoAuth";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
+import { wordpressAuthService } from "../services/wordpressAuth";
 
 
 
@@ -202,7 +202,6 @@ const SignInPage = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({ email: '', password: '' });
   const [showPwd, setShowPwd] = useState(false);
-  const [loginMethod, setLoginMethod] = useState('standard'); // 'standard' or 'wordpress'
 
   const validate = () => {
     let newErrors = { email: '', password: '' };
@@ -295,6 +294,22 @@ const SignInPage = () => {
     toast.error(`❌ ${error}`);
   };
 
+  const handleContinueWithIMAA = async () => {
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      const result = await wordpressAuthService.loginWithWordPress(
+        formData.email,
+        formData.password
+      );
+      await handleWordPressLoginSuccess(result);
+    } catch (err) {
+      handleWordPressLoginError(err?.message || "IMAA login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -306,26 +321,95 @@ const SignInPage = () => {
       let data = null;
 
       if (AUTH_PROVIDER === "cognito") {
-        // NOTE: this works only if your pool allows Email as sign-in alias
-        const res = await cognitoSignIn({
-          usernameOrEmail: formData.email,
-          password: formData.password,
-        });
+        const wpUserRaw = localStorage.getItem("wordpress_user");
+        let wpUsername = "";
+        if (wpUserRaw) {
+          try {
+            wpUsername = JSON.parse(wpUserRaw)?.username || "";
+          } catch {
+            wpUsername = "";
+          }
+        }
+        const emailLocalPart = (formData.email || "").split("@")[0] || "";
 
-        const idToken = res.idToken || "";         // ✅ use for backend (has email + verified)
-        const accessToken = res.accessToken || ""; // keep for groups / optional cognito calls
+        // NOTE: this works only if your pool allows Email as sign-in alias
+        let res = null;
+        try {
+          res = await cognitoSignIn({
+            usernameOrEmail: formData.email,
+            password: formData.password,
+            candidates: [wpUsername, emailLocalPart],
+          });
+        } catch (authErr) {
+          // Fallback path for IMAA users: re-sync via backend WP auth and use returned tokens.
+          if (authErr?.code === "NotAuthorizedException") {
+            const syncRes = await fetch(`${API_BASE}/auth/wordpress/sync/`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: formData.email, password: formData.password }),
+            });
+            const syncData = await syncRes.json().catch(() => ({}));
+            if (!syncRes.ok) {
+              throw authErr;
+            }
+            localStorage.setItem("wordpress_user", JSON.stringify({
+              id: syncData.user_id,
+              username: syncData.username,
+              email: syncData.email,
+              created: syncData.created,
+            }));
+            res = {
+              idToken: syncData.id_token || syncData.access_token || "",
+              accessToken: syncData.access_token || "",
+              refreshToken: syncData.refresh_token || "",
+              payload: {},
+            };
+          } else {
+            throw authErr;
+          }
+        }
+
+        const cognitoEmail = String(res?.payload?.email || "").toLowerCase();
+        const loginEmail = String(formData.email || "").toLowerCase();
+
+        // Keep Standard Login consistent with IMAA flow:
+        // if Cognito currently resolves to placeholder/other email, attempt a silent WP sync.
+        if (
+          loginEmail &&
+          cognitoEmail &&
+          cognitoEmail !== loginEmail
+        ) {
+          try {
+            const syncRes = await fetch(`${API_BASE}/auth/wordpress/sync/`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: formData.email, password: formData.password }),
+            });
+            const syncData = await syncRes.json().catch(() => ({}));
+            if (syncRes.ok && (syncData.id_token || syncData.access_token)) {
+              res = {
+                idToken: syncData.id_token || syncData.access_token || res.idToken || "",
+                accessToken: syncData.access_token || res.accessToken || "",
+                refreshToken: syncData.refresh_token || res.refreshToken || "",
+                payload: { ...(res.payload || {}), email: syncData.email || loginEmail },
+              };
+            }
+          } catch {
+            // Best-effort reconciliation only; continue with Cognito tokens.
+          }
+        }
 
         // store both (optional but useful)
-        if (accessToken) localStorage.setItem("cognito_access_token", accessToken);
-        if (idToken) localStorage.setItem("id_token", idToken);
+        if (res.accessToken) localStorage.setItem("cognito_access_token", res.accessToken);
+        if (res.idToken) localStorage.setItem("id_token", res.idToken);
 
         // ✅ backend should receive idToken
         data = {
-          access: accessToken,          // keep for cognito groups logic
-          access_token: idToken,        // ✅ used by your API everywhere (localStorage access_token)
+          access: res.accessToken || "",          // keep for cognito groups logic
+          access_token: res.idToken || "",        // ✅ used by your API everywhere (localStorage access_token)
           refresh: res.refreshToken,
           user: res.payload,
-          id_token: idToken,
+          id_token: res.idToken || "",
         };
 
       } else {
@@ -556,47 +640,7 @@ const SignInPage = () => {
                 <AuthToggle />
               </Box>
 
-              {/* Login Method Selector */}
-              <Box sx={{ mb: 3, display: 'flex', gap: 1, borderBottom: '1px solid', borderColor: 'divider', pb: 2 }}>
-                <Button
-                  variant={loginMethod === 'standard' ? 'contained' : 'text'}
-                  onClick={() => setLoginMethod('standard')}
-                  sx={{
-                    flex: 1,
-                    py: 1,
-                    fontWeight: loginMethod === 'standard' ? 600 : 500,
-                    fontSize: 13,
-                    bgcolor: loginMethod === 'standard' ? '#2c6af0ff' : 'transparent',
-                    color: loginMethod === 'standard' ? 'white' : 'text.primary',
-                    '&:hover': { bgcolor: loginMethod === 'standard' ? '#165DFF' : '#f5f5f5' },
-                    borderRadius: 1,
-                    textTransform: 'none',
-                  }}
-                >
-                  Standard Login
-                </Button>
-                <Button
-                  variant={loginMethod === 'wordpress' ? 'contained' : 'text'}
-                  onClick={() => setLoginMethod('wordpress')}
-                  sx={{
-                    flex: 1,
-                    py: 1,
-                    fontWeight: loginMethod === 'wordpress' ? 600 : 500,
-                    fontSize: 13,
-                    bgcolor: loginMethod === 'wordpress' ? '#2c6af0ff' : 'transparent',
-                    color: loginMethod === 'wordpress' ? 'white' : 'text.primary',
-                    '&:hover': { bgcolor: loginMethod === 'wordpress' ? '#165DFF' : '#f5f5f5' },
-                    borderRadius: 1,
-                    textTransform: 'none',
-                  }}
-                >
-                  IMAA Login
-                </Button>
-              </Box>
-
-              {/* Conditional Form Rendering */}
-              {loginMethod === 'standard' ? (
-                <>
+              <>
                   <Box component="form" noValidate onSubmit={handleSubmit}>
                     <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
                       Email Address
@@ -694,32 +738,9 @@ const SignInPage = () => {
 
                   {/* Social */}
                   <Box sx={{ mt: 2 }}>
-                    <SocialLogin />
+                    <SocialLogin onIMAA={handleContinueWithIMAA} />
                   </Box>
-                </>
-              ) : (
-                // WordPress IMAA Login Form
-                <Box sx={{
-                  '& .wordpress-login-container': {
-                    minHeight: 'auto',
-                    p: 0,
-                    background: 'transparent'
-                  },
-                  '& .wordpress-login-card': {
-                    p: 0,
-                    boxShadow: 'none',
-                    background: 'transparent',
-                    border: 'none',
-                    '& h2': { display: 'none' },
-                    '& .subtitle': { display: 'none' },
-                  }
-                }}>
-                  <WordPressLogin
-                    onSuccess={handleWordPressLoginSuccess}
-                    onError={handleWordPressLoginError}
-                  />
-                </Box>
-              )}
+              </>
             </Paper>
 
             {/* Features */}

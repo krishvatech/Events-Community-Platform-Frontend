@@ -40,10 +40,9 @@ export function cognitoConfirmSignUp({ username, code }) {
   });
 }
 
-export function cognitoSignIn({ usernameOrEmail, password }) {
+function cognitoAuthenticateSingle({ usernameOrEmail, password }) {
   return new Promise((resolve, reject) => {
     const user = new CognitoUser({ Username: usernameOrEmail, Pool: pool });
-
     const authDetails = new AuthenticationDetails({
       Username: usernameOrEmail,
       Password: password,
@@ -55,12 +54,31 @@ export function cognitoSignIn({ usernameOrEmail, password }) {
           idToken: session.getIdToken().getJwtToken(),
           accessToken: session.getAccessToken().getJwtToken(),
           refreshToken: session.getRefreshToken().getToken(),
-          payload: session.getIdToken().decodePayload(), // contains email, given_name, family_name
+          payload: session.getIdToken().decodePayload(),
         });
       },
       onFailure: (err) => reject(err),
     });
   });
+}
+
+export async function cognitoSignIn({ usernameOrEmail, password, candidates = [] }) {
+  const identifiers = [usernameOrEmail, ...candidates].filter(Boolean);
+  const deduped = [...new Set(identifiers.map((v) => String(v).trim()).filter(Boolean))];
+
+  let lastErr = null;
+  for (const identifier of deduped) {
+    try {
+      return await cognitoAuthenticateSingle({ usernameOrEmail: identifier, password });
+    } catch (err) {
+      lastErr = err;
+      const code = err?.code || "";
+      if (code === "UserDisabledException" || code === "PasswordResetRequiredException") {
+        throw err;
+      }
+    }
+  }
+  throw lastErr || new Error("Login failed");
 }
 
 
@@ -111,4 +129,3 @@ export function cognitoRefreshSession({ username, refreshToken }) {
     });
   });
 }
-

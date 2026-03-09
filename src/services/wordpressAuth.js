@@ -3,7 +3,7 @@
  * Handles login, token management, and profile sync
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
 export const wordpressAuthService = {
   /**
@@ -22,7 +22,7 @@ export const wordpressAuthService = {
       const syncResponse = await fetch(`${API_BASE}/auth/wordpress/sync/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!syncResponse.ok) {
@@ -51,6 +51,7 @@ export const wordpressAuthService = {
 
       return {
         user_id: syncData.user_id,
+        username: syncData.username,
         email: syncData.email,
         created: syncData.created,
         status: 'success',
