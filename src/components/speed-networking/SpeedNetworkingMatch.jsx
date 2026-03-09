@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, LinearProgress, Collapse, Chip, Avatar, Divider, IconButton, TextField, CircularProgress } from '@mui/material';
+import { Box, Typography, Button, LinearProgress, Collapse, Chip, Avatar, Divider, IconButton, TextField, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, Stack } from '@mui/material';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -7,9 +7,23 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import SendIcon from '@mui/icons-material/Send';
+import SettingsIcon from '@mui/icons-material/Settings';
+import BlurOnRoundedIcon from '@mui/icons-material/BlurOnRounded';
+import WallpaperRoundedIcon from '@mui/icons-material/WallpaperRounded';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
 import { DyteMeeting, defaultConfig } from '@dytesdk/react-ui-kit';
 import InterestDisplay from './InterestDisplay';
+import {
+    VIRTUAL_BG_FEATURE_ENABLED,
+    VIRTUAL_BG_PRESETS,
+    applyBackgroundSelection,
+    initializeVirtualBackgroundMiddleware,
+    loadStoredBackgroundSelection,
+    readFileAsDataUrl,
+    saveBackgroundSelection,
+    validateBackgroundUpload
+} from '../../utils/dyteBackground.js';
 
 // Style to ensure Dyte UI controls don't overflow
 const dyteStyles = `
@@ -85,10 +99,17 @@ export default function SpeedNetworkingMatch({
     const [chatMessages, setChatMessages] = useState([]);
     const [chatInput, setChatInput] = useState('');
     const [chatSending, setChatSending] = useState(false);
+    const [showVirtualBgDialog, setShowVirtualBgDialog] = useState(false);
+    const [virtualBgSelection, setVirtualBgSelection] = useState(() => loadStoredBackgroundSelection());
+    const [virtualBgError, setVirtualBgError] = useState('');
+    const [virtualBgSupported, setVirtualBgSupported] = useState(true);
     const chatBottomRef = useRef(null);
     const autoAdvanceTriggeredRef = useRef(false);
     const matchStartMsRef = useRef(Date.now());
     const speedNetworkingUiConfigRef = useRef(null);
+    const virtualBgReadyRef = useRef(false);
+    const virtualBgMeetingRef = useRef(null);
+    const virtualBgUploadInputRef = useRef(null);
 
     if (!speedNetworkingUiConfigRef.current) {
         // Start from Dyte defaults and only remove the 4 requested controls.
@@ -170,6 +191,105 @@ export default function SpeedNetworkingMatch({
             };
         }
     }, [meeting]);
+
+    useEffect(() => {
+        if (!VIRTUAL_BG_FEATURE_ENABLED || !meeting?.self) return;
+        let cancelled = false;
+
+        const bootstrapVirtualBackground = async () => {
+            const meetingChanged = virtualBgMeetingRef.current !== meeting;
+            if (meetingChanged) {
+                virtualBgMeetingRef.current = meeting;
+                virtualBgReadyRef.current = false;
+            }
+
+            if (virtualBgReadyRef.current) return;
+
+            const initResult = await initializeVirtualBackgroundMiddleware(meeting);
+            if (cancelled) return;
+
+            if (!initResult.supported) {
+                setVirtualBgSupported(false);
+                setVirtualBgError("Virtual background isn't supported on this browser/device.");
+                return;
+            }
+
+            if (!initResult.ok) {
+                console.warn("[SpeedNetworkingMatch] virtual background middleware-init-failed:", initResult.error);
+                setVirtualBgSupported(true);
+                setVirtualBgError("Virtual background setup failed. Camera will continue normally.");
+                return;
+            }
+
+            virtualBgReadyRef.current = true;
+            setVirtualBgSupported(true);
+            setVirtualBgError('');
+
+            const applyResult = await applyBackgroundSelection(meeting, virtualBgSelection);
+            if (cancelled) return;
+            if (!applyResult.ok) {
+                console.warn("[SpeedNetworkingMatch] virtual background middleware-apply-failed:", applyResult.error);
+                setVirtualBgError("Unable to apply virtual background right now.");
+            }
+        };
+
+        bootstrapVirtualBackground();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [meeting, virtualBgSelection]);
+
+    const applyAndPersistVirtualBackground = async (nextSelection) => {
+        const savedSelection = saveBackgroundSelection(nextSelection);
+        setVirtualBgSelection(savedSelection);
+        setVirtualBgError('');
+
+        if (!VIRTUAL_BG_FEATURE_ENABLED || !meeting?.self || !virtualBgReadyRef.current) {
+            return;
+        }
+
+        const result = await applyBackgroundSelection(meeting, savedSelection);
+        if (!result.ok) {
+            console.warn("[SpeedNetworkingMatch] virtual background middleware-apply-failed:", result.error);
+            if (!result.supported) {
+                setVirtualBgSupported(false);
+                setVirtualBgError("Virtual background isn't supported on this browser/device.");
+            } else {
+                setVirtualBgError("Unable to apply virtual background right now.");
+            }
+            return;
+        }
+
+        setVirtualBgSupported(true);
+        setVirtualBgError('');
+    };
+
+    const handleVirtualBgUpload = async (event) => {
+        const file = event?.target?.files?.[0];
+        if (event?.target) {
+            event.target.value = '';
+        }
+
+        const validation = validateBackgroundUpload(file);
+        if (!validation.ok) {
+            console.warn("[SpeedNetworkingMatch] virtual background upload-invalid:", validation.error);
+            setVirtualBgError(validation.error);
+            return;
+        }
+
+        try {
+            const imageUrl = await readFileAsDataUrl(file);
+            await applyAndPersistVirtualBackground({
+                mode: 'image',
+                source: 'upload',
+                imageUrl
+            });
+        } catch (error) {
+            console.warn("[SpeedNetworkingMatch] virtual background upload-invalid:", error);
+            setVirtualBgError(error?.message || 'Failed to process uploaded image.');
+        }
+    };
 
     // Track whether partner has actually joined the Dyte room
     useEffect(() => {
@@ -536,6 +656,25 @@ export default function SpeedNetworkingMatch({
                                     config={speedNetworkingUiConfigRef.current}
                                 />
                             </DyteProvider>
+                            {VIRTUAL_BG_FEATURE_ENABLED && (
+                                <IconButton
+                                    onClick={() => setShowVirtualBgDialog(true)}
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 12,
+                                        right: 12,
+                                        zIndex: 12,
+                                        color: '#fff',
+                                        bgcolor: 'rgba(0,0,0,0.55)',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' }
+                                    }}
+                                    size="small"
+                                    aria-label="Virtual background settings"
+                                >
+                                    <SettingsIcon fontSize="small" />
+                                </IconButton>
+                            )}
                             {!hasRemoteParticipant && (
                                 <Box
                                     sx={{
@@ -720,6 +859,103 @@ export default function SpeedNetworkingMatch({
                     Leave Session
                 </Button>
             </Box>
+
+            {VIRTUAL_BG_FEATURE_ENABLED && (
+                <Dialog
+                    open={showVirtualBgDialog}
+                    onClose={() => setShowVirtualBgDialog(false)}
+                    maxWidth="sm"
+                    fullWidth
+                    PaperProps={{
+                        sx: {
+                            bgcolor: '#0b1220',
+                            color: '#fff',
+                            border: '1px solid rgba(255,255,255,0.16)',
+                            borderRadius: 2
+                        }
+                    }}
+                >
+                    <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+                        <WallpaperRoundedIcon fontSize="small" />
+                        Virtual Background
+                        {!virtualBgSupported && (
+                            <Chip label="Unsupported" size="small" sx={{ height: 18, fontSize: 10, bgcolor: 'rgba(239,68,68,0.2)', color: '#fecaca' }} />
+                        )}
+                    </DialogTitle>
+                    <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+                            <Button
+                                size="small"
+                                variant={virtualBgSelection.mode === 'none' ? 'contained' : 'outlined'}
+                                onClick={() => applyAndPersistVirtualBackground({ mode: 'none' })}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                None
+                            </Button>
+                            <Button
+                                size="small"
+                                startIcon={<BlurOnRoundedIcon />}
+                                variant={virtualBgSelection.mode === 'blur' && virtualBgSelection.blurLevel === 'low' ? 'contained' : 'outlined'}
+                                onClick={() => applyAndPersistVirtualBackground({ mode: 'blur', blurLevel: 'low' })}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Blur (Low)
+                            </Button>
+                            <Button
+                                size="small"
+                                startIcon={<BlurOnRoundedIcon />}
+                                variant={virtualBgSelection.mode === 'blur' && virtualBgSelection.blurLevel === 'high' ? 'contained' : 'outlined'}
+                                onClick={() => applyAndPersistVirtualBackground({ mode: 'blur', blurLevel: 'high' })}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Blur (High)
+                            </Button>
+                            <Button
+                                size="small"
+                                startIcon={<UploadFileRoundedIcon />}
+                                variant={virtualBgSelection.mode === 'image' && virtualBgSelection.source === 'upload' ? 'contained' : 'outlined'}
+                                onClick={() => virtualBgUploadInputRef.current?.click()}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Upload
+                            </Button>
+                            <input
+                                ref={virtualBgUploadInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleVirtualBgUpload}
+                                style={{ display: 'none' }}
+                            />
+                        </Stack>
+                        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+                            {VIRTUAL_BG_PRESETS.map((preset) => {
+                                const isActive = virtualBgSelection.mode === 'image' && virtualBgSelection.imageUrl === preset.imageUrl;
+                                return (
+                                    <Button
+                                        key={preset.id}
+                                        size="small"
+                                        variant={isActive ? 'contained' : 'outlined'}
+                                        onClick={() => applyAndPersistVirtualBackground({ mode: 'image', source: 'preset', imageUrl: preset.imageUrl })}
+                                        sx={{ textTransform: 'none', minWidth: 88 }}
+                                    >
+                                        {preset.label}
+                                    </Button>
+                                );
+                            })}
+                        </Stack>
+                        {(virtualBgError || !virtualBgSupported) && (
+                            <Typography sx={{ fontSize: 12, color: '#fca5a5' }}>
+                                {virtualBgError || "Virtual background isn't supported on this browser/device."}
+                            </Typography>
+                        )}
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2 }}>
+                        <Button onClick={() => setShowVirtualBgDialog(false)} sx={{ color: '#fff', textTransform: 'none' }}>
+                            Close
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            )}
 
         </Box>
     );

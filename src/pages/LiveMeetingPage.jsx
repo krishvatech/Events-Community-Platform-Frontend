@@ -98,6 +98,9 @@ import DirectionsWalkIcon from "@mui/icons-material/DirectionsWalk";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import BlurOnRoundedIcon from "@mui/icons-material/BlurOnRounded";
+import WallpaperRoundedIcon from "@mui/icons-material/WallpaperRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import SupportAgentIcon from "@mui/icons-material/SupportAgent";
@@ -130,6 +133,16 @@ import { getUserName } from "../utils/authStorage.js";
 import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
+import {
+  VIRTUAL_BG_FEATURE_ENABLED,
+  VIRTUAL_BG_PRESETS,
+  applyBackgroundSelection,
+  initializeVirtualBackgroundMiddleware,
+  loadStoredBackgroundSelection,
+  readFileAsDataUrl,
+  saveBackgroundSelection,
+  validateBackgroundUpload,
+} from "../utils/dyteBackground.js";
 
 // ================ Custom Lounge Icon ================
 const SocialLoungeIcon = (props) => (
@@ -2302,10 +2315,18 @@ export default function NewLiveMeeting() {
   const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState("");
   const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState("");
   const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+  const [showVirtualBgDialog, setShowVirtualBgDialog] = useState(false);
   const [deviceSwitchError, setDeviceSwitchError] = useState("");
+  const [virtualBgSelection, setVirtualBgSelection] = useState(() => loadStoredBackgroundSelection());
+  const [virtualBgError, setVirtualBgError] = useState("");
+  const [virtualBgSupported, setVirtualBgSupported] = useState(true);
   const activeAudioStreamRef = useRef(null); // Track audio stream for device switching
   const activeVideoStreamRef = useRef(null); // Track video stream for device switching
   const remoteAudioRef = useRef(null); // Reference to remote audio element for output device selection
+  const virtualBgReadyRef = useRef(false);
+  const virtualBgMeetingRef = useRef(null);
+  const virtualBgUploadInputRef = useRef(null);
+  const virtualBgQuickUploadInputRef = useRef(null);
 
   // ============ POLL CREATION STATE ============
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
@@ -3410,6 +3431,105 @@ export default function NewLiveMeeting() {
       dyteMeeting.self.off("videoUpdate", handler);
     };
   }, [dyteMeeting, initDone]);
+
+  useEffect(() => {
+    if (!VIRTUAL_BG_FEATURE_ENABLED || !dyteMeeting?.self) return;
+    let cancelled = false;
+
+    const bootstrapVirtualBackground = async () => {
+      const meetingChanged = virtualBgMeetingRef.current !== dyteMeeting;
+      if (meetingChanged) {
+        virtualBgMeetingRef.current = dyteMeeting;
+        virtualBgReadyRef.current = false;
+      }
+
+      if (virtualBgReadyRef.current) return;
+
+      const initResult = await initializeVirtualBackgroundMiddleware(dyteMeeting);
+      if (cancelled) return;
+
+      if (!initResult.supported) {
+        setVirtualBgSupported(false);
+        setVirtualBgError("Virtual background isn't supported on this browser/device.");
+        return;
+      }
+
+      if (!initResult.ok) {
+        console.warn("[LiveMeeting] virtual background middleware-init-failed:", initResult.error);
+        setVirtualBgSupported(true);
+        setVirtualBgError("Virtual background setup failed. Camera will continue normally.");
+        return;
+      }
+
+      virtualBgReadyRef.current = true;
+      setVirtualBgSupported(true);
+      setVirtualBgError("");
+
+      const applyResult = await applyBackgroundSelection(dyteMeeting, virtualBgSelection);
+      if (cancelled) return;
+      if (!applyResult.ok) {
+        console.warn("[LiveMeeting] virtual background middleware-apply-failed:", applyResult.error);
+        setVirtualBgError("Unable to apply virtual background right now.");
+      }
+    };
+
+    bootstrapVirtualBackground();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dyteMeeting, virtualBgSelection]);
+
+  const applyAndPersistVirtualBackground = useCallback(async (nextSelection) => {
+    const savedSelection = saveBackgroundSelection(nextSelection);
+    setVirtualBgSelection(savedSelection);
+    setVirtualBgError("");
+
+    if (!VIRTUAL_BG_FEATURE_ENABLED || !dyteMeeting?.self || !virtualBgReadyRef.current) {
+      return;
+    }
+
+    const result = await applyBackgroundSelection(dyteMeeting, savedSelection);
+    if (!result.ok) {
+      console.warn("[LiveMeeting] virtual background middleware-apply-failed:", result.error);
+      if (!result.supported) {
+        setVirtualBgSupported(false);
+        setVirtualBgError("Virtual background isn't supported on this browser/device.");
+      } else {
+        setVirtualBgError("Unable to apply virtual background right now.");
+      }
+      return;
+    }
+
+    setVirtualBgSupported(true);
+    setVirtualBgError("");
+  }, [dyteMeeting]);
+
+  const handleVirtualBgUpload = useCallback(async (event) => {
+    const file = event?.target?.files?.[0];
+    if (event?.target) {
+      event.target.value = "";
+    }
+
+    const validation = validateBackgroundUpload(file);
+    if (!validation.ok) {
+      console.warn("[LiveMeeting] virtual background upload-invalid:", validation.error);
+      setVirtualBgError(validation.error);
+      return;
+    }
+
+    try {
+      const imageUrl = await readFileAsDataUrl(file);
+      await applyAndPersistVirtualBackground({
+        mode: "image",
+        source: "upload",
+        imageUrl,
+      });
+    } catch (error) {
+      console.warn("[LiveMeeting] virtual background upload-invalid:", error);
+      setVirtualBgError(error?.message || "Failed to process uploaded image.");
+    }
+  }, [applyAndPersistVirtualBackground]);
 
   /**
    * Switch to a different audio device
@@ -16925,6 +17045,22 @@ export default function NewLiveMeeting() {
                       {camOn ? <VideocamIcon /> : <VideocamOffIcon />}
                     </IconButton>
                   </Tooltip>
+
+                  {VIRTUAL_BG_FEATURE_ENABLED && (
+                    <Tooltip title="Virtual Background">
+                      <IconButton
+                        onClick={() => setShowVirtualBgDialog(true)}
+                        sx={{
+                          bgcolor: "rgba(255,255,255,0.06)",
+                          "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                          mx: 0.5,
+                        }}
+                        aria-label="Virtual Background"
+                      >
+                        <WallpaperRoundedIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                   {(isHost || (!isBreakout && isSelfPresentationEligible)) && (
                     <Tooltip
                       title={
@@ -17531,6 +17667,86 @@ export default function NewLiveMeeting() {
               )}
             </Box>
 
+            {VIRTUAL_BG_FEATURE_ENABLED && (
+              <Box>
+                <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                  <WallpaperRoundedIcon fontSize="small" />
+                  Virtual Background
+                  {!virtualBgSupported && (
+                    <Chip label="Unsupported" size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(244,67,54,0.2)", color: "#ef9a9a" }} />
+                  )}
+                </Typography>
+
+                <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", rowGap: 1 }}>
+                  <Button
+                    size="small"
+                    variant={virtualBgSelection.mode === "none" ? "contained" : "outlined"}
+                    onClick={() => applyAndPersistVirtualBackground({ mode: "none" })}
+                    sx={{ textTransform: "none" }}
+                  >
+                    None
+                  </Button>
+                  <Button
+                    size="small"
+                    startIcon={<BlurOnRoundedIcon />}
+                    variant={virtualBgSelection.mode === "blur" && virtualBgSelection.blurLevel === "low" ? "contained" : "outlined"}
+                    onClick={() => applyAndPersistVirtualBackground({ mode: "blur", blurLevel: "low" })}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Blur (Low)
+                  </Button>
+                  <Button
+                    size="small"
+                    startIcon={<BlurOnRoundedIcon />}
+                    variant={virtualBgSelection.mode === "blur" && virtualBgSelection.blurLevel === "high" ? "contained" : "outlined"}
+                    onClick={() => applyAndPersistVirtualBackground({ mode: "blur", blurLevel: "high" })}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Blur (High)
+                  </Button>
+                  <Button
+                    size="small"
+                    startIcon={<UploadFileRoundedIcon />}
+                    variant={virtualBgSelection.mode === "image" && virtualBgSelection.source === "upload" ? "contained" : "outlined"}
+                    onClick={() => virtualBgUploadInputRef.current?.click()}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Upload
+                  </Button>
+                  <input
+                    ref={virtualBgUploadInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleVirtualBgUpload}
+                    style={{ display: "none" }}
+                  />
+                </Stack>
+
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+                  {VIRTUAL_BG_PRESETS.map((preset) => {
+                    const isActive = virtualBgSelection.mode === "image" && virtualBgSelection.imageUrl === preset.imageUrl;
+                    return (
+                      <Button
+                        key={preset.id}
+                        size="small"
+                        onClick={() => applyAndPersistVirtualBackground({ mode: "image", source: "preset", imageUrl: preset.imageUrl })}
+                        variant={isActive ? "contained" : "outlined"}
+                        sx={{ textTransform: "none", minWidth: 88 }}
+                      >
+                        {preset.label}
+                      </Button>
+                    );
+                  })}
+                </Stack>
+
+                {(virtualBgError || !virtualBgSupported) && (
+                  <Typography sx={{ mt: 1, fontSize: 12, color: "#ff8a80" }}>
+                    {virtualBgError || "Virtual background isn't supported on this browser/device."}
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             {/* Speaker/Headphone Selection */}
             <Box>
               <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
@@ -17604,6 +17820,110 @@ export default function NewLiveMeeting() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {VIRTUAL_BG_FEATURE_ENABLED && (
+          <Dialog
+            open={showVirtualBgDialog}
+            onClose={() => setShowVirtualBgDialog(false)}
+            maxWidth="sm"
+            fullWidth
+            PaperProps={MODAL_PAPER_PROPS}
+          >
+            <DialogTitle sx={{ pb: 1, pt: 2, px: 2, fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 1 }}>
+              <WallpaperRoundedIcon fontSize="small" />
+              Virtual Background
+              {!virtualBgSupported && (
+                <Chip label="Unsupported" size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(244,67,54,0.2)", color: "#ef9a9a" }} />
+              )}
+            </DialogTitle>
+
+            <DialogContent sx={{ px: 2, py: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Stack direction="row" spacing={1} sx={{ mb: 0.5, flexWrap: "wrap", rowGap: 1 }}>
+                <Button
+                  size="small"
+                  variant={virtualBgSelection.mode === "none" ? "contained" : "outlined"}
+                  onClick={() => applyAndPersistVirtualBackground({ mode: "none" })}
+                  sx={{ textTransform: "none" }}
+                >
+                  None
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={<BlurOnRoundedIcon />}
+                  variant={virtualBgSelection.mode === "blur" && virtualBgSelection.blurLevel === "low" ? "contained" : "outlined"}
+                  onClick={() => applyAndPersistVirtualBackground({ mode: "blur", blurLevel: "low" })}
+                  sx={{ textTransform: "none" }}
+                >
+                  Blur (Low)
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={<BlurOnRoundedIcon />}
+                  variant={virtualBgSelection.mode === "blur" && virtualBgSelection.blurLevel === "high" ? "contained" : "outlined"}
+                  onClick={() => applyAndPersistVirtualBackground({ mode: "blur", blurLevel: "high" })}
+                  sx={{ textTransform: "none" }}
+                >
+                  Blur (High)
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={<UploadFileRoundedIcon />}
+                  variant={virtualBgSelection.mode === "image" && virtualBgSelection.source === "upload" ? "contained" : "outlined"}
+                  onClick={() => virtualBgQuickUploadInputRef.current?.click()}
+                  sx={{ textTransform: "none" }}
+                >
+                  Upload
+                </Button>
+                <input
+                  ref={virtualBgQuickUploadInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleVirtualBgUpload}
+                  style={{ display: "none" }}
+                />
+              </Stack>
+
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+                {VIRTUAL_BG_PRESETS.map((preset) => {
+                  const isActive = virtualBgSelection.mode === "image" && virtualBgSelection.imageUrl === preset.imageUrl;
+                  return (
+                    <Button
+                      key={preset.id}
+                      size="small"
+                      onClick={() => applyAndPersistVirtualBackground({ mode: "image", source: "preset", imageUrl: preset.imageUrl })}
+                      variant={isActive ? "contained" : "outlined"}
+                      sx={{ textTransform: "none", minWidth: 88 }}
+                    >
+                      {preset.label}
+                    </Button>
+                  );
+                })}
+              </Stack>
+
+              {(virtualBgError || !virtualBgSupported) && (
+                <Typography sx={{ mt: 0.5, fontSize: 12, color: "#ff8a80" }}>
+                  {virtualBgError || "Virtual background isn't supported on this browser/device."}
+                </Typography>
+              )}
+            </DialogContent>
+
+            <DialogActions sx={{ px: 2, py: 2, gap: 1 }}>
+              <Button
+                onClick={() => setShowVirtualBgDialog(false)}
+                variant="outlined"
+                sx={{
+                  borderColor: "rgba(255,255,255,0.2)",
+                  color: "#fff",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.3)" },
+                }}
+              >
+                Close
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
 
         <Dialog
           open={Boolean(incomingSpotlightInvite)}
