@@ -23,6 +23,7 @@ import {
   InputAdornment,
   IconButton,
   CssBaseline,
+  Backdrop,
 } from '@mui/material';
 
 import { Visibility, VisibilityOff } from '@mui/icons-material';
@@ -733,6 +734,45 @@ const SignInPage = () => {
           </Box>
         </Box>
       </Box>
+
+      <Backdrop
+        open={loading}
+        sx={{
+          zIndex: (theme) => theme.zIndex.modal + 10,
+          color: "#fff",
+          backgroundColor: "rgba(17, 24, 39, 0.28)",
+          backdropFilter: "blur(4px)",
+        }}
+      >
+        <Box
+          sx={{
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            border: "3px solid rgba(255,255,255,0.25)",
+            borderTopColor: "#ffffff",
+            position: "relative",
+            boxShadow: "0 0 28px rgba(255,255,255,0.35)",
+            animation: "spinModern 0.9s linear infinite",
+            "@keyframes spinModern": {
+              "0%": { transform: "rotate(0deg)" },
+              "100%": { transform: "rotate(360deg)" },
+            },
+            "&::after": {
+              content: '""',
+              position: "absolute",
+              top: -6,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #60a5fa, #34d399)",
+              boxShadow: "0 0 14px rgba(96,165,250,0.9)",
+            },
+          }}
+        />
+      </Backdrop>
 
       {/* Toasts */}
       <ToastContainer
