@@ -10,7 +10,6 @@ import { saveLoginPayload } from "../utils/authStorage";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cognitoSignIn } from "../utils/cognitoAuth";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
-import { wordpressAuthService } from "../services/wordpressAuth";
 
 
 
@@ -292,22 +291,6 @@ const SignInPage = () => {
   const handleWordPressLoginError = (error) => {
     console.error('❌ WordPress login error:', error);
     toast.error(`❌ ${error}`);
-  };
-
-  const handleContinueWithIMAA = async () => {
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      const result = await wordpressAuthService.loginWithWordPress(
-        formData.email,
-        formData.password
-      );
-      await handleWordPressLoginSuccess(result);
-    } catch (err) {
-      handleWordPressLoginError(err?.message || "IMAA login failed");
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -738,7 +721,7 @@ const SignInPage = () => {
 
                   {/* Social */}
                   <Box sx={{ mt: 2 }}>
-                    <SocialLogin onIMAA={handleContinueWithIMAA} />
+                    <SocialLogin />
                   </Box>
               </>
             </Paper>
