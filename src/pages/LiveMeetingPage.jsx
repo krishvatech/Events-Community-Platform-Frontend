@@ -3815,11 +3815,11 @@ export default function NewLiveMeeting() {
   const handleToggleMic = useCallback(async () => {
     if (!dyteMeeting?.self) return;
 
-    // ✅ SCREEN SHARE AUDIO LOCK: Prevent mic toggle while screen sharing with audio
-    if (isScreenSharing) {
-      showSnackbar("Cannot toggle audio while screen sharing. Stop screen share first.", "warning");
-      return;
-    }
+    // // ✅ SCREEN SHARE AUDIO LOCK: Prevent mic toggle while screen sharing with audio
+    // if (isScreenSharing) {
+    //   showSnackbar("Cannot toggle audio while screen sharing. Stop screen share first.", "warning");
+    //   return;
+    // }
 
     // ✅ STATE PRIORITY FIX: Allow mic toggle in lounge rooms during break
     // Only enforce break media lock on main stage users, not lounge participants
