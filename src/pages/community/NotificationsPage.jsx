@@ -183,8 +183,12 @@ async function fetchStandardNotifications(url) {
         friend_request_id: n.data?.friend_request_id,
         profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
         eventId: n.data?.event_id || n.data?.eventId,
+        eventTitle: n.data?.event_title || "",
         postId: n.data?.post_id || n.data?.postId,
         groupSlug: n.data?.group_slug,
+        inviteSourceType: n.data?.invite_source_type || "",
+        inviteSourceId: n.data?.invite_source_id || null,
+        inviteSourceName: n.data?.invite_source_name || "",
       },
     })),
     next: j?.next || null
@@ -708,25 +712,29 @@ function NotificationRow({
       );
     }
     if (item.kind === "event") {
+      const sourceName = item.context?.inviteSourceName || item.actor?.name || "System";
+      const eventTitle = item.context?.eventTitle || item.title.replace(/^Invitation:\s*/i, "");
+      const sourceIsPerson = item.context?.inviteSourceType !== "group";
       return (
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography
             variant="body2"
-            sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+            sx={sourceIsPerson ? { fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } } : { fontWeight: 700 }}
             onClick={(e) => {
+              if (!sourceIsPerson) return;
               e.stopPropagation();
               onAvatarClick?.(item);
             }}
           >
-            {item.actor?.name || "System"}
+            {sourceName}
           </Typography>
           <Typography variant="body2">
-            invited you to
+            invited you to event:
           </Typography>
           <Stack direction="row" spacing={0.5} alignItems="center">
             <EventRoundedIcon sx={{ fontSize: 16, color: "primary.main" }} />
             <Typography variant="body2" sx={{ fontWeight: 600, color: "primary.main" }}>
-              {item.title.replace(/^Invitation:\s*/i, "")}
+              {eventTitle}
             </Typography>
           </Stack>
         </Stack>

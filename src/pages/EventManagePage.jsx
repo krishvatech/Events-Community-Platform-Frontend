@@ -4976,6 +4976,7 @@ export default function EventManagePage() {
               open={inviteUsersOpen}
               onClose={() => setInviteUsersOpen(false)}
               eventId={eventId}
+              eventTitle={event?.title || ""}
             />
             <InviteEmailsDialog
               open={inviteEmailsOpen}

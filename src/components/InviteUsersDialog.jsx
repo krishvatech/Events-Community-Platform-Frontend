@@ -18,6 +18,8 @@ import {
     Box,
     InputAdornment,
     CircularProgress,
+    FormControlLabel,
+    Checkbox as MuiCheckbox,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import GroupIcon from "@mui/icons-material/Group";
@@ -29,14 +31,18 @@ import { toast } from "react-toastify";
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
+const buildDefaultInviteMessage = (eventTitle) =>
+    `You are invited to${eventTitle ? ` ${eventTitle}` : " this event"}. Please check the event details and register if you would like to join.`;
 
-export default function InviteUsersDialog({ open, onClose, eventId }) {
+export default function InviteUsersDialog({ open, onClose, eventId, eventTitle = "" }) {
     const [tab, setTab] = useState(0); // 0 = Users, 1 = Groups
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState([]);
     const [selectedUsers, setSelectedUsers] = useState(new Set());
     const [selectedGroups, setSelectedGroups] = useState(new Set());
+    const [alsoSendMessage, setAlsoSendMessage] = useState(true);
+    const [inviteMessage, setInviteMessage] = useState("");
 
     // Debounced search
     useEffect(() => {
@@ -45,6 +51,9 @@ export default function InviteUsersDialog({ open, onClose, eventId }) {
             setSearchQuery("");
             return;
         }
+
+        setAlsoSendMessage(true);
+        setInviteMessage(buildDefaultInviteMessage(eventTitle));
 
         const timer = setTimeout(() => {
             if (searchQuery.trim().length >= 2) {
@@ -139,6 +148,10 @@ export default function InviteUsersDialog({ open, onClose, eventId }) {
             toast.warning("Please select at least one user or group.");
             return;
         }
+        if (alsoSendMessage && !inviteMessage.trim()) {
+            toast.warning("Enter a message or turn off the message option.");
+            return;
+        }
 
         setLoading(true);
         try {
@@ -146,6 +159,8 @@ export default function InviteUsersDialog({ open, onClose, eventId }) {
             const payload = {
                 user_ids: Array.from(selectedUsers),
                 group_ids: Array.from(selectedGroups),
+                send_message: alsoSendMessage,
+                invite_message: inviteMessage.trim(),
             };
 
             const res = await fetch(`${API_ROOT}/events/${eventId}/invite_users/`, {
@@ -167,6 +182,8 @@ export default function InviteUsersDialog({ open, onClose, eventId }) {
                 setSelectedGroups(new Set());
                 setSearchQuery("");
                 setResults([]);
+                setAlsoSendMessage(true);
+                setInviteMessage("");
             } else {
                 toast.error(json.detail || "Failed to send invitations.");
             }
@@ -215,6 +232,33 @@ export default function InviteUsersDialog({ open, onClose, eventId }) {
                         }}
                         size="small"
                     />
+                </Box>
+
+                <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "grey.50" }}>
+                    <FormControlLabel
+                        control={
+                            <MuiCheckbox
+                                checked={alsoSendMessage}
+                                onChange={(e) => setAlsoSendMessage(e.target.checked)}
+                            />
+                        }
+                        label="Also send an event message"
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: alsoSendMessage ? 1 : 0 }}>
+                        Invite notifications will still be sent. This adds a direct message linked to the event.
+                    </Typography>
+                    {alsoSendMessage && (
+                        <TextField
+                            fullWidth
+                            multiline
+                            minRows={3}
+                            maxRows={6}
+                            size="small"
+                            placeholder={eventTitle ? `Message about ${eventTitle}` : "Write a message for invited users"}
+                            value={inviteMessage}
+                            onChange={(e) => setInviteMessage(e.target.value)}
+                        />
+                    )}
                 </Box>
 
                 {results.length > 0 && (
