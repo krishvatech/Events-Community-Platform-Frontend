@@ -125,6 +125,7 @@ import BreakConfigDialog from "../components/live-meeting/BreakConfigDialog.jsx"
 import HostBreakControls from "../components/live-meeting/HostBreakControls.jsx";
 import WaitingRoomAnnouncements from "../components/live-meeting/WaitingRoomAnnouncements.jsx";
 import WaitingRoomControls from "../components/live-meeting/WaitingRoomControls.jsx";
+import { AttendeeSupportDialog, HostSupportInbox } from "../components/live-meeting/SupportPanel.jsx";
 import LoungeSettingsDialog from "../components/live-meeting/LoungeSettingsDialog.jsx";
 import RoomLocationBadge from "../components/RoomLocationBadge.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
@@ -180,6 +181,7 @@ const API_ROOT = (
 ).replace(/\/$/, "");
 const SPOTLIGHT_INVITE_TIMEOUT_MS = 10000;
 const SPOTLIGHT_INVITE_WARNING_SECONDS = 5;
+const SUPPORT_TAB_INDEX = 4;
 
 function getToken() {
   return (
@@ -987,6 +989,7 @@ function WaitingForHost({
   loungeAvailable = false,
   onOpenLounge,
   loungeStatusLabel = "",
+  supportDialogProps = null,
 }) {
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
 
@@ -1253,47 +1256,11 @@ function WaitingForHost({
         </Typography>
       </Typography>
 
-      {/* Coming Soon Support Dialog */}
-      <Dialog
+      <AttendeeSupportDialog
         open={supportDialogOpen}
         onClose={() => setSupportDialogOpen(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            bgcolor: "rgba(15, 23, 42, 0.95)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            backdropFilter: "blur(12px)",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 800,
-            fontSize: 18,
-            color: "rgba(255,255,255,0.92)",
-          }}
-        >
-          Support Features Coming Soon
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: "rgba(255,255,255,0.70)", mt: 1 }}>
-            We're working on comprehensive support features to help you with any issues. This feature will be available soon!
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setSupportDialogOpen(false)}
-            sx={{
-              color: "rgba(255,255,255,0.85)",
-              "&:hover": {
-                bgcolor: "rgba(255,255,255,0.08)",
-              },
-            }}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {...supportDialogProps}
+      />
     </Box>
   );
 }
@@ -1317,6 +1284,7 @@ function PreEventLoungeGate({
   pendingHostChoice = null,
   onConfirmHostChoice,
   onCancelHostChoice,
+  supportDialogProps = null,
 }) {
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
 
@@ -1672,47 +1640,11 @@ function PreEventLoungeGate({
         </Typography>
       </Typography>
 
-      {/* Coming Soon Support Dialog */}
-      <Dialog
+      <AttendeeSupportDialog
         open={supportDialogOpen}
         onClose={() => setSupportDialogOpen(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            bgcolor: "rgba(15, 23, 42, 0.95)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            backdropFilter: "blur(12px)",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 800,
-            fontSize: 18,
-            color: "rgba(255,255,255,0.92)",
-          }}
-        >
-          Support Features Coming Soon
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: "rgba(255,255,255,0.70)", mt: 1 }}>
-            We're working on comprehensive support features to help you with any issues. This feature will be available soon!
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setSupportDialogOpen(false)}
-            sx={{
-              color: "rgba(255,255,255,0.85)",
-              "&:hover": {
-                bgcolor: "rgba(255,255,255,0.08)",
-              },
-            }}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {...supportDialogProps}
+      />
 
       {/* Host Choice Confirmation Dialog */}
       <Dialog
@@ -1818,6 +1750,7 @@ function WaitingRoomScreen({
   waitingCount = 0,
   announcementsRef = null,
   isOnBreak = false,
+  supportDialogProps = null,
 }) {
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
 
@@ -2106,47 +2039,11 @@ function WaitingRoomScreen({
         </Typography>
       </Typography>
 
-      {/* Coming Soon Support Dialog */}
-      <Dialog
+      <AttendeeSupportDialog
         open={supportDialogOpen}
         onClose={() => setSupportDialogOpen(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            bgcolor: "rgba(15, 23, 42, 0.95)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            backdropFilter: "blur(12px)",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 800,
-            fontSize: 18,
-            color: "rgba(255,255,255,0.92)",
-          }}
-        >
-          Support Features Coming Soon
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: "rgba(255,255,255,0.70)", mt: 1 }}>
-            We're working on comprehensive support features to help you with any issues. This feature will be available soon!
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setSupportDialogOpen(false)}
-            sx={{
-              color: "rgba(255,255,255,0.85)",
-              "&:hover": {
-                bgcolor: "rgba(255,255,255,0.08)",
-              },
-            }}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {...supportDialogProps}
+      />
     </Box>
   );
 }
@@ -2663,7 +2560,11 @@ export default function NewLiveMeeting() {
 
   const handleContactSupport = () => {
     handleCloseMoreMenu();
-    showSnackbar("Contact support feature coming soon!", "info");
+    if (canReceiveSupportRequestsRef.current) {
+      openHostSupportPanel();
+      return;
+    }
+    setSupportDialogOpen(true);
   };
   // -------------------------------------
   const [micOn, setMicOn] = useState(true);
@@ -2803,6 +2704,8 @@ export default function NewLiveMeeting() {
   const isHost = role === "publisher";
   const roleRef = useRef(role);
   const isHostRef = useRef(isHost);
+  const canReceiveSupportRequestsRef = useRef(false);
+  const waitingRoomQueueRef = useRef([]);
 
   const [authToken, setAuthToken] = useState("");
   const mainAuthTokenRef = useRef("");
@@ -2858,6 +2761,9 @@ export default function NewLiveMeeting() {
   const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
   const [mainRoomSupportStatus, setMainRoomSupportStatus] = useState(null);
   const [assistanceCooldownUntil, setAssistanceCooldownUntil] = useState(0);
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [supportRequests, setSupportRequests] = useState([]);
+  const [attendeeSupportFeedback, setAttendeeSupportFeedback] = useState({ kind: "idle", reason: "" });
   const currentUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
 
   useEffect(() => {
@@ -2914,6 +2820,14 @@ export default function NewLiveMeeting() {
     () => assignedRoleByIdentity.get(`id:${String(currentUserId)}`) || "",
     [assignedRoleByIdentity, currentUserId]
   );
+  const canReceiveSupportRequests = useMemo(
+    () => isHost || ["Host", "Moderator"].includes(selfAssignedRole),
+    [isHost, selfAssignedRole]
+  );
+  useEffect(() => {
+    canReceiveSupportRequestsRef.current = canReceiveSupportRequests;
+  }, [canReceiveSupportRequests]);
+  const isSupportPanelActive = isPanelOpen && tab === SUPPORT_TAB_INDEX && canReceiveSupportRequests;
   const canManageParticipantMic = useMemo(
     () =>
       isHost ||
@@ -2966,6 +2880,14 @@ export default function NewLiveMeeting() {
   const assistanceCooldownRemaining = Math.max(
     0,
     Math.ceil((assistanceCooldownUntil - Date.now()) / 1000)
+  );
+  const unresolvedSupportRequests = useMemo(
+    () => supportRequests.filter((request) => request.status !== "resolved"),
+    [supportRequests]
+  );
+  const unreadSupportRequests = useMemo(
+    () => supportRequests.filter((request) => request.status === "new"),
+    [supportRequests]
   );
 
   const breakoutOnlyTables = useMemo(() =>
@@ -3025,7 +2947,6 @@ export default function NewLiveMeeting() {
     });
     return ids;
   }, [activeTableId, loungeTables]);
-
 
   const [scheduledLabel, setScheduledLabel] = useState("--");
   const [durationLabel, setDurationLabel] = useState("--");
@@ -6344,36 +6265,83 @@ export default function NewLiveMeeting() {
         } else if (msg.type === "assistance_requested") {
           // Hosts/moderators receive high-priority assistance alerts.
           const requesterName = msg.requester_name || "A participant";
-          showSnackbar(`${requesterName} needs assistance in the Main Room.`, "warning");
+          const requesterId = msg.requester_id != null ? String(msg.requester_id) : "";
+          const waitingQueue = waitingRoomQueueRef.current || [];
+          const isInWaitingRoom = waitingQueue.some(
+            (entry) => String(entry?.user_id ?? entry?.id ?? "") === requesterId
+          );
+          setSupportRequests((prev) => {
+            const requestId = msg.request_id || `${requesterId || requesterName}-${msg.timestamp || Date.now()}`;
+            const nextRequest = {
+              id: String(requestId),
+              requesterId,
+              requesterName,
+              location: isInWaitingRoom ? "waiting_room" : "main_room",
+              createdAt: msg.timestamp || new Date().toISOString(),
+              status: "new",
+            };
+            const withoutExisting = prev.filter((request) => String(request.id) !== String(nextRequest.id));
+            return [nextRequest, ...withoutExisting];
+          });
+          showSnackbar(
+            `${requesterName} needs assistance in the ${isInWaitingRoom ? "Waiting Room" : "Main Room"}.`,
+            "warning"
+          );
         } else if (msg.type === "assistance_request_ack") {
           if (msg.ok) {
             const seconds = Number(msg.cooldown_seconds || 60);
             setAssistanceCooldownUntil(Date.now() + seconds * 1000);
+            setAttendeeSupportFeedback({ kind: "sent", reason: "" });
             showSnackbar("Assistance request sent to hosts/moderators.", "success");
           } else if (msg.reason === "cooldown_active") {
             const seconds = Number(msg.cooldown_seconds || 60);
             setAssistanceCooldownUntil(Date.now() + seconds * 1000);
+            setAttendeeSupportFeedback({ kind: "idle", reason: "cooldown_active" });
             showSnackbar(`Please wait ${seconds}s before requesting again.`, "info");
           } else if (msg.reason === "no_active_hosts_or_moderators") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "no_active_hosts_or_moderators" });
             showSnackbar("No active host/moderator is currently available.", "warning");
           } else if (msg.reason === "privileged_user_not_allowed") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "privileged_user_not_allowed" });
             showSnackbar("Hosts/Moderators cannot use Request Assistance.", "info");
           } else if (msg.reason === "not_in_main_room") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "not_in_main_room" });
             showSnackbar("Request Assistance is available only in the Main Room.", "info");
           } else if (msg.reason === "not_registered") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "not_registered" });
             showSnackbar("You are not registered for this event.", "error");
           } else if (msg.reason === "not_online") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "not_online" });
             showSnackbar("Your presence is still syncing. Please try again.", "warning");
           } else if (msg.reason === "event_ended") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "event_ended" });
             showSnackbar("This event has ended.", "info");
           } else if (msg.reason === "rejected") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "rejected" });
             showSnackbar("You are not eligible to request assistance for this event.", "error");
           } else if (msg.reason === "banned") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "banned" });
             showSnackbar("Assistance request is unavailable for this account.", "error");
           } else if (msg.reason === "server_error") {
+            setAttendeeSupportFeedback({ kind: "idle", reason: "server_error" });
             showSnackbar("Server error while sending assistance request.", "error");
           } else {
+            setAttendeeSupportFeedback({ kind: "idle", reason: msg.reason || "unknown" });
             showSnackbar(`Unable to send assistance request (${msg.reason || "unknown"}).`, "error");
+          }
+        } else if (msg.type === "assistance_resolved") {
+          setAttendeeSupportFeedback({
+            kind: "resolved",
+            reason: "",
+            resolverName: msg.resolver_name || "A host",
+          });
+          showSnackbar(
+            `${msg.resolver_name || "A host"} marked your support request as resolved.`,
+            "success"
+          );
+        } else if (msg.type === "assistance_resolve_ack") {
+          if (!msg.ok) {
+            showSnackbar("Unable to resolve support request right now.", "error");
           }
         } else if (msg.type === "breakout_timer") {
           // ✅ PHASE 3: ENHANCED DUAL-TIMER WEBSOCKET PROTOCOL
@@ -7107,17 +7075,152 @@ export default function NewLiveMeeting() {
     return false;
   }, []);
 
+  const markSupportRequestsViewed = useCallback(() => {
+    setSupportRequests((prev) =>
+      prev.map((request) =>
+        request.status === "new" ? { ...request, status: "viewed" } : request
+      )
+    );
+  }, []);
+
+  const handleResolveSupportRequest = useCallback((requestId) => {
+    const request = supportRequests.find((entry) => String(entry.id) === String(requestId));
+    const resolvedRequestName = request?.requesterName || "participant";
+    const resolvedRequesterId = request?.requesterId || "";
+    if (!resolvedRequesterId) {
+      showSnackbar("Missing requester information for this support request.", "error");
+      return;
+    }
+    const sent = sendMainSocketAction({
+      action: "resolve_assistance_request",
+      request_id: requestId,
+      requester_id: resolvedRequesterId,
+    });
+    if (!sent) {
+      showSnackbar("Connection is re-establishing. Resolve action queued.", "warning");
+      return;
+    }
+    setSupportRequests((prev) =>
+      prev.map((entry) =>
+        String(entry.id) !== String(requestId)
+          ? entry
+          : {
+              ...entry,
+              status: "resolved",
+              resolvedAt: new Date().toISOString(),
+            }
+      )
+    );
+    showSnackbar(
+      `${resolvedRequestName}'s support request was marked resolved.`,
+      "success"
+    );
+  }, [sendMainSocketAction, showSnackbar, supportRequests]);
+
+  const openHostSupportPanel = useCallback(() => {
+    toggleRightPanel(SUPPORT_TAB_INDEX);
+    markSupportRequestsViewed();
+  }, [markSupportRequestsViewed, toggleRightPanel]);
+
+  useEffect(() => {
+    if (isSupportPanelActive) {
+      markSupportRequestsViewed();
+    }
+  }, [isSupportPanelActive, markSupportRequestsViewed]);
+
+  const getAttendeeSupportInfoText = useCallback(() => {
+    if (attendeeSupportFeedback.kind === "queued") {
+      return "Connection is recovering. Your request is queued and will send automatically.";
+    }
+    if (attendeeSupportFeedback.kind === "resolved") {
+      return `${attendeeSupportFeedback.resolverName || "A host"} marked your request as resolved. Send another request if you still need help.`;
+    }
+    if (attendeeSupportFeedback.kind === "sent") {
+      return "Your request has been sent to the host team.";
+    }
+    if (attendeeSupportFeedback.reason === "no_active_hosts_or_moderators") {
+      return "No active host or moderator is available right now.";
+    }
+    if (attendeeSupportFeedback.reason === "not_in_main_room") {
+      return "Support requests are temporarily limited while you're outside the main room.";
+    }
+    if (attendeeSupportFeedback.reason === "not_online") {
+      return "Your session is still syncing. Please try again in a moment.";
+    }
+    if (attendeeSupportFeedback.reason === "server_error") {
+      return "The support request could not be sent due to a server error.";
+    }
+    if (attendeeSupportFeedback.reason === "banned" || attendeeSupportFeedback.reason === "rejected") {
+      return "Support requests are unavailable for this account.";
+    }
+    if (!waitingRoomActive && isMainRoomSupportMissing) {
+      return "No active host or moderator is currently in the main room.";
+    }
+    return "";
+  }, [attendeeSupportFeedback.kind, attendeeSupportFeedback.reason, attendeeSupportFeedback.resolverName, isMainRoomSupportMissing, waitingRoomActive]);
+
+  const attendeeSupportStatusText = useMemo(() => {
+    if (attendeeSupportFeedback.kind === "resolved") {
+      return "Your previous support request was resolved";
+    }
+    if (attendeeSupportFeedback.kind === "sent") {
+      return waitingRoomActive ? "Waiting for host response from the waiting room" : "Waiting for host response";
+    }
+    if (attendeeSupportFeedback.kind === "queued") {
+      return "Request queued while reconnecting";
+    }
+    if (assistanceCooldownRemaining > 0) {
+      return `You can send another request in ${assistanceCooldownRemaining}s`;
+    }
+    return "No active request";
+  }, [assistanceCooldownRemaining, attendeeSupportFeedback.kind, waitingRoomActive]);
+
   const requestMainRoomAssistance = useCallback(() => {
     if (isHost || isBreakout) return;
     if (assistanceCooldownRemaining > 0) {
       showSnackbar(`Please wait ${assistanceCooldownRemaining}s before requesting again.`, "info");
       return;
     }
+    setAttendeeSupportFeedback({ kind: "pending", reason: "" });
     const sent = sendMainSocketAction({ action: "request_assistance" });
     if (!sent) {
+      setAttendeeSupportFeedback({ kind: "queued", reason: "" });
       showSnackbar("Connection is re-establishing. Assistance request queued.", "warning");
     }
-  }, [isHost, isBreakout, assistanceCooldownRemaining, sendMainSocketAction]);
+  }, [isHost, isBreakout, assistanceCooldownRemaining, sendMainSocketAction, showSnackbar]);
+
+  const attendeeSupportDialogProps = useMemo(() => ({
+    onRequestAssistance: requestMainRoomAssistance,
+    requestDisabled: assistanceCooldownRemaining > 0,
+    requestLabel:
+      assistanceCooldownRemaining > 0
+        ? `Request Assistance (${assistanceCooldownRemaining}s)`
+        : attendeeSupportFeedback.kind === "resolved"
+          ? "Request Again"
+        : attendeeSupportFeedback.kind === "sent"
+          ? "Request Sent"
+          : attendeeSupportFeedback.kind === "queued"
+            ? "Queued"
+            : "Request Assistance",
+    statusText: attendeeSupportStatusText,
+    helperText: "Need help? Notify the host team and we'll get to you shortly.",
+    infoText: getAttendeeSupportInfoText(),
+    infoSeverity:
+      attendeeSupportFeedback.reason === "server_error" ||
+      attendeeSupportFeedback.reason === "banned" ||
+      attendeeSupportFeedback.reason === "rejected"
+        ? "error"
+        : attendeeSupportFeedback.reason === "no_active_hosts_or_moderators"
+          ? "warning"
+          : "info",
+  }), [
+    assistanceCooldownRemaining,
+    attendeeSupportFeedback.kind,
+    attendeeSupportFeedback.reason,
+    attendeeSupportStatusText,
+    getAttendeeSupportInfoText,
+    requestMainRoomAssistance,
+  ]);
 
   // ✅ Handle assignment from notification history
   const handleAssignFromHistory = useCallback((participantId, roomId) => {
@@ -7451,6 +7554,10 @@ export default function NewLiveMeeting() {
 
     return filtered;
   }, [waitingRoomQueue, loungeTables]);
+
+  useEffect(() => {
+    waitingRoomQueueRef.current = filteredWaitingRoomQueue || [];
+  }, [filteredWaitingRoomQueue]);
 
   const filteredWaitingRoomCount = filteredWaitingRoomQueue.length;
 
@@ -13483,6 +13590,8 @@ export default function NewLiveMeeting() {
   const showAnyPanelDot = showAnyChatDot;
 
   const showMembersDot = showPrivateDot;
+  const showSupportDot = canReceiveSupportRequests && unresolvedSupportRequests.length > 0;
+  const showSupportPulse = canReceiveSupportRequests && unreadSupportRequests.length > 0 && !isSupportPanelActive;
 
 
   // ================= SIDEBAR COMPONENTS =================
@@ -13755,6 +13864,7 @@ export default function NewLiveMeeting() {
                   : "Q&A")}
               {tab === 2 && "Polls"}
               {tab === 3 && "Participants"}
+              {tab === SUPPORT_TAB_INDEX && "Support"}
             </Typography>
 
             <IconButton onClick={closeRightPanel} size="small" aria-label="Close panel">
@@ -15396,6 +15506,13 @@ export default function NewLiveMeeting() {
                 </Stack>
               </Box>
             </TabPanel>
+
+            <TabPanel value={tab} index={SUPPORT_TAB_INDEX}>
+              <HostSupportInbox
+                requests={unresolvedSupportRequests}
+                onResolve={handleResolveSupportRequest}
+              />
+            </TabPanel>
           </Box>
         </>
       )}
@@ -15508,6 +15625,46 @@ export default function NewLiveMeeting() {
           </Badge>
         </IconButton>
       </Tooltip>
+
+      {canReceiveSupportRequests && (
+        <Tooltip title={tab === SUPPORT_TAB_INDEX && rightPanelOpen ? "Close Support" : "Open Support"} placement="left" arrow>
+          <Box
+            sx={{
+              borderRadius: "50%",
+              animation: showSupportPulse ? "supportPulse 1.3s ease-in-out infinite" : "none",
+              "@keyframes supportPulse": {
+                "0%, 100%": { boxShadow: "0 0 0 0 rgba(239,68,68,0.0)" },
+                "50%": { boxShadow: "0 0 0 8px rgba(239,68,68,0.16)" },
+              },
+            }}
+          >
+            <IconButton
+              onClick={() => {
+                if (rightPanelOpen && tab === SUPPORT_TAB_INDEX) {
+                  if (isMdUp) setRightPanelOpen(false);
+                  else setRightOpen(false);
+                } else {
+                  openHostSupportPanel();
+                }
+              }}
+              sx={{
+                width: 44,
+                height: 44,
+                bgcolor: tab === SUPPORT_TAB_INDEX && rightPanelOpen ? "rgba(20,184,177,0.15)" : "transparent",
+                color: tab === SUPPORT_TAB_INDEX && rightPanelOpen ? "#14b8b1" : "rgba(255,255,255,0.55)",
+                border: tab === SUPPORT_TAB_INDEX && rightPanelOpen ? "1px solid rgba(20,184,177,0.3)" : "1px solid transparent",
+                "&:hover": { bgcolor: "rgba(20,184,177,0.08)", color: "#fff" },
+                transition: "all 0.2s",
+              }}
+            >
+              <Badge variant="dot" color="error" invisible={!showSupportDot}>
+                <SupportAgentIcon />
+              </Badge>
+            </IconButton>
+          </Box>
+        </Tooltip>
+      )}
+
       {/* Speed Networking Icon (New) */}
       <Tooltip title="Networking" placement="left" arrow>
         <IconButton
@@ -15587,6 +15744,7 @@ export default function NewLiveMeeting() {
         pendingHostChoice={pendingHostChoice}
         onConfirmHostChoice={handleConfirmHostChoice}
         onCancelHostChoice={handleCancelHostChoice}
+        supportDialogProps={attendeeSupportDialogProps}
       />
     );
   }
@@ -15752,6 +15910,7 @@ export default function NewLiveMeeting() {
           waitingCount={filteredWaitingRoomCount || 0}
           announcementsRef={waitingRoomAnnouncementsRef}
           isOnBreak={isOnBreak}
+          supportDialogProps={attendeeSupportDialogProps}
         />
         <LoungeOverlay
           open={loungeOpen}
@@ -15954,6 +16113,7 @@ export default function NewLiveMeeting() {
         roleLabel={role === "publisher" ? "Host" : "Audience"}
         waitingRoomImage={eventData?.waiting_room_image || null}
         timezone={getBrowserTimezone()}
+        supportDialogProps={attendeeSupportDialogProps}
       />
     );
   }
@@ -17303,6 +17463,42 @@ export default function NewLiveMeeting() {
                     </Tooltip>
                   )}
 
+                  {canReceiveSupportRequests && (
+                    <Tooltip title={isSupportPanelActive ? "Close Support" : "Open Support"}>
+                      <Box
+                        sx={{
+                          borderRadius: "50%",
+                          animation: showSupportPulse ? "supportPulse 1.3s ease-in-out infinite" : "none",
+                          "@keyframes supportPulse": {
+                            "0%, 100%": { boxShadow: "0 0 0 0 rgba(239,68,68,0.0)" },
+                            "50%": { boxShadow: "0 0 0 8px rgba(239,68,68,0.16)" },
+                          },
+                        }}
+                      >
+                        <IconButton
+                          onClick={() => {
+                            if (isSupportPanelActive) closeRightPanel();
+                            else openHostSupportPanel();
+                          }}
+                          sx={{
+                            bgcolor: isSupportPanelActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                            "&:hover": { bgcolor: isSupportPanelActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                            mx: 0.5,
+                          }}
+                        >
+                          <Badge
+                            variant="dot"
+                            color="error"
+                            overlap="circular"
+                            invisible={!showSupportDot}
+                          >
+                            <SupportAgentIcon />
+                          </Badge>
+                        </IconButton>
+                      </Box>
+                    </Tooltip>
+                  )}
+
                   {!isHost &&
                     !isBreakout &&
                     !isEventOwner &&
@@ -17310,19 +17506,17 @@ export default function NewLiveMeeting() {
                       <Tooltip
                         title={
                           assistanceCooldownRemaining > 0
-                            ? `Request Assistance (${assistanceCooldownRemaining}s)`
-                            : "Request Assistance"
+                            ? `Support (${assistanceCooldownRemaining}s)`
+                            : "Support"
                         }
                       >
                         <span>
                           <IconButton
-                            onClick={requestMainRoomAssistance}
-                            disabled={assistanceCooldownRemaining > 0}
+                            onClick={() => setSupportDialogOpen(true)}
                             sx={{
                               bgcolor: "rgba(255,255,255,0.06)",
                               "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
                               mx: 0.5,
-                              "&.Mui-disabled": { opacity: 0.45 },
                             }}
                           >
                             <SupportAgentIcon />
@@ -17563,6 +17757,14 @@ export default function NewLiveMeeting() {
               >
                 {RightPanelContent}
               </Drawer>
+            )}
+
+            {!canReceiveSupportRequests && (
+              <AttendeeSupportDialog
+                open={supportDialogOpen}
+                onClose={() => setSupportDialogOpen(false)}
+                {...attendeeSupportDialogProps}
+              />
             )}
           </Box>
         )}
