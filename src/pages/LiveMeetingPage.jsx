@@ -3191,8 +3191,45 @@ export default function NewLiveMeeting() {
 
     await waitForScreenSharePeerStable();
 
+    // ✅ PREEMPTIVE AUDIO DISABLE: Disable audio BEFORE screen share to prevent ERROR_CONTENT
+    try {
+      console.log("[LiveMeeting] Disabling audio before screen share...");
+      await dyteMeeting?.self?.disableAudio?.();
+
+      // Also disable at WebRTC level
+      const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+        (s) => s.track?.kind === "audio"
+      ) || [];
+      for (const sender of audioSenders) {
+        if (sender.track) {
+          sender.track.enabled = false;
+        }
+      }
+    } catch (e) {
+      console.warn("[LiveMeeting] Failed to disable audio before screen share:", e);
+    }
+
     try {
       await dyteMeeting?.self?.enableScreenShare?.();
+
+      // ✅ RE-ENABLE AUDIO after screen share is active (300ms delay for stability)
+      setTimeout(async () => {
+        try {
+          console.log("[LiveMeeting] Re-enabling audio after screen share active...");
+          await dyteMeeting?.self?.enableAudio?.();
+          const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+            (s) => s.track?.kind === "audio"
+          ) || [];
+          for (const sender of audioSenders) {
+            if (sender.track) {
+              sender.track.enabled = true;
+            }
+          }
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to re-enable audio after screen share:", e);
+        }
+      }, 300);
+
       return;
     } catch (e) {
       if (!isScreenShareRenegotiationError(e)) throw e;
@@ -3201,7 +3238,40 @@ export default function NewLiveMeeting() {
       await stopSelfScreenShareWithCleanup();
       await waitForScreenSharePeerStable(3200);
       await new Promise((r) => setTimeout(r, 300));
+
+      // ✅ Disable audio again before retry
+      try {
+        await dyteMeeting?.self?.disableAudio?.();
+        const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+          (s) => s.track?.kind === "audio"
+        ) || [];
+        for (const sender of audioSenders) {
+          if (sender.track) {
+            sender.track.enabled = false;
+          }
+        }
+      } catch (e) {
+        console.warn("[LiveMeeting] Failed to disable audio on retry:", e);
+      }
+
       await dyteMeeting?.self?.enableScreenShare?.();
+
+      // ✅ Re-enable audio after retry succeeds
+      setTimeout(async () => {
+        try {
+          await dyteMeeting?.self?.enableAudio?.();
+          const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+            (s) => s.track?.kind === "audio"
+          ) || [];
+          for (const sender of audioSenders) {
+            if (sender.track) {
+              sender.track.enabled = true;
+            }
+          }
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to re-enable audio after retry:", e);
+        }
+      }, 300);
     }
   }, [
     dyteMeeting,
@@ -3744,6 +3814,13 @@ export default function NewLiveMeeting() {
 
   const handleToggleMic = useCallback(async () => {
     if (!dyteMeeting?.self) return;
+
+    // ✅ SCREEN SHARE AUDIO LOCK: Prevent mic toggle while screen sharing with audio
+    if (isScreenSharing) {
+      showSnackbar("Cannot toggle audio while screen sharing. Stop screen share first.", "warning");
+      return;
+    }
+
     // ✅ STATE PRIORITY FIX: Allow mic toggle in lounge rooms during break
     // Only enforce break media lock on main stage users, not lounge participants
     if (isOnBreak && !isBreakout) {
@@ -3870,7 +3947,7 @@ export default function NewLiveMeeting() {
       userMediaPreferenceRef.current.mic = newState;
       if (!isBreakout) setMainMicHardMuted(!newState);
     }
-  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak, isBreakout]);
+  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak, isBreakout, isScreenSharing]);
 
   const requestMicUnmute = useCallback(() => {
     if (!dyteMeeting?.self) return;
