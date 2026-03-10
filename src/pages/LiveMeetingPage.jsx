@@ -9624,8 +9624,9 @@ export default function NewLiveMeeting() {
     }
 
     const onParticipantLeft = (p) => {
+      if (!p?.id) return;
+
       const hostId = hostIdHint || pinnedHost?.id;
-      if (!hostId || !p?.id) return;
 
       // Host left MAIN meeting => show waiting state (do not end)
       if (p.id === hostId) {
@@ -9633,6 +9634,21 @@ export default function NewLiveMeeting() {
         setHostJoined(false);
         setPinnedHost(null);
       }
+
+      // Remove departed participant from lounge tables
+      setLoungeTables((prev) =>
+        prev.map((table) => ({
+          ...table,
+          participants: Object.fromEntries(
+            Object.entries(table.participants || {}).filter(
+              ([_, participant]) => String(participant?.user_id) !== String(p.id)
+            )
+          ),
+        }))
+      );
+
+      // Track participant departure
+      departedParticipantIdsRef.current.add(p.id);
     };
 
     dyteMeeting.participants?.joined?.on?.("participantLeft", onParticipantLeft);
@@ -9644,7 +9660,7 @@ export default function NewLiveMeeting() {
       dyteMeeting.participants?.off?.("participantLeft", onParticipantLeft);
       dyteMeeting?.off?.("participantLeft", onParticipantLeft);
     };
-  }, [dyteMeeting, getJoinedParticipants, isHost, isBreakout, hostIdHint, pinnedHost, handleMeetingEnd]);
+  }, [dyteMeeting, getJoinedParticipants, isHost, isBreakout, hostIdHint, pinnedHost, handleMeetingEnd, setLoungeTables]);
 
   // If pinned host is no longer present, clear pinned state
   useEffect(() => {
@@ -9803,6 +9819,7 @@ export default function NewLiveMeeting() {
   // ---------- Build participants list for your NEW UI ----------
   const [participantsTick, setParticipantsTick] = useState(0);
   const observedParticipantsRef = useRef(new Map()); // fallback map from events
+  const departedParticipantIdsRef = useRef(new Set()); // track departed participants to prevent stale data
 
   useEffect(() => {
     if (!dyteMeeting) return;
@@ -10028,12 +10045,32 @@ export default function NewLiveMeeting() {
     const upsert = (p) => {
       if (p?.id) {
         observedParticipantsRef.current.set(p.id, p);
+        // Remove from departed set if participant rejoins
+        departedParticipantIdsRef.current.delete(p.id);
+        if (p?.userId) departedParticipantIdsRef.current.delete(p.userId);
+        if (p?.customId) departedParticipantIdsRef.current.delete(p.customId);
+        if (p?.clientSpecificId) departedParticipantIdsRef.current.delete(p.clientSpecificId);
+        if (p?._raw?.user_id) departedParticipantIdsRef.current.delete(String(p._raw.user_id));
+        if (p?._raw?.clientSpecificId) departedParticipantIdsRef.current.delete(p._raw.clientSpecificId);
         bump();
       }
     };
     const remove = (p) => {
-      if (p?.id && observedParticipantsRef.current.has(p.id)) {
-        observedParticipantsRef.current.delete(p.id);
+      if (p?.id) {
+        console.log(`[ParticipantRemove] Removing participant: ${p.name} (id: ${p.id})`);
+        if (observedParticipantsRef.current.has(p.id)) {
+          observedParticipantsRef.current.delete(p.id);
+        }
+        // Track departed participants with multiple ID formats to prevent stale data in UI
+        departedParticipantIdsRef.current.add(p.id);
+        // Also track alternative ID fields for cross-system compatibility
+        if (p?.userId) departedParticipantIdsRef.current.add(p.userId);
+        if (p?.customId) departedParticipantIdsRef.current.add(p.customId);
+        if (p?.clientSpecificId) departedParticipantIdsRef.current.add(p.clientSpecificId);
+        if (p?._raw?.user_id) departedParticipantIdsRef.current.add(String(p._raw.user_id));
+        if (p?._raw?.clientSpecificId) departedParticipantIdsRef.current.add(p._raw.clientSpecificId);
+
+        console.log(`[DepartedTrack] Added to departed set, total departed: ${departedParticipantIdsRef.current.size}`);
         bump();
       }
     };
@@ -10241,9 +10278,32 @@ export default function NewLiveMeeting() {
     const deduped = [];
     const seenKeys = new Set();
     let idx = 0;
+
+    // Debug departed participants
+    if (participantsTick % 10 === 0 && departedParticipantIdsRef.current.size > 0) {
+      console.log(`[DepartedParticipants] Size: ${departedParticipantIdsRef.current.size}, IDs: ${Array.from(departedParticipantIdsRef.current).join(", ")}`);
+    }
+
     for (const p of list) {
       const key = getParticipantUserKey(p) || `id:${String(p?.id || "")}`;
       if (!key || seenKeys.has(key)) continue;
+
+      // ✅ Filter out departed participants to prevent stale data - check multiple ID formats
+      const isDeparted =
+        (p?.id && departedParticipantIdsRef.current.has(p.id)) ||
+        (p?.userId && departedParticipantIdsRef.current.has(p.userId)) ||
+        (p?.customId && departedParticipantIdsRef.current.has(p.customId)) ||
+        (p?.clientSpecificId && departedParticipantIdsRef.current.has(p.clientSpecificId)) ||
+        (p?._raw?.user_id && departedParticipantIdsRef.current.has(String(p._raw.user_id))) ||
+        (p?._raw?.clientSpecificId && departedParticipantIdsRef.current.has(p._raw.clientSpecificId));
+
+      if (isDeparted) {
+        if (participantsTick % 10 === 0) {
+          console.log(`[DepartedFilter] Filtering out departed: ${p.name} (id: ${p.id})`);
+        }
+        continue;
+      }
+
       seenKeys.add(key);
 
       // Attach inMeeting flag
