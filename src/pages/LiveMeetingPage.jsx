@@ -2855,18 +2855,6 @@ export default function NewLiveMeeting() {
 
   const [loungeTables, setLoungeTables] = useState([]);
   const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
-  const isPostEventLoungeOpenStatus = useCallback((status) => {
-    if (status?.status !== "OPEN") return false;
-    const reason = String(status?.reason || "").toLowerCase();
-    const hasPostEventReason = reason.includes("post-event") || reason.includes("post event");
-    if (hasPostEventReason) return true;
-
-    // Fallback: backend reason text can vary briefly; treat OPEN + next_change as post-event
-    // unless it explicitly looks like pre-event or live-event windows.
-    const hasPreEventReason = reason.includes("pre-event") || reason.includes("pre event");
-    const hasLiveReason = reason.includes("event is live") || reason.includes("on break");
-    return Boolean(status?.next_change) && !hasPreEventReason && !hasLiveReason;
-  }, []);
   const isLoungeCurrentlyOpen = loungeOpenStatus?.status === "OPEN";
   const isPreEventLoungeStatus = Boolean(loungeOpenStatus?.reason?.includes("Pre-event"));
   const loungeNextChangeTs = useMemo(() => {
@@ -2885,8 +2873,8 @@ export default function NewLiveMeeting() {
   );
   const shouldHonorOpenLoungeFromState = openLoungeFromState && !attendeeWaitingRoomOverridesPreEventLounge;
   const isPostEventWindowOpen = useMemo(
-    () => isPostEventLoungeOpenStatus(loungeOpenStatus),
-    [isPostEventLoungeOpenStatus, loungeOpenStatus]
+    () => loungeOpenStatus?.status === "OPEN" && loungeOpenStatus?.reason?.includes("Post-event"),
+    [loungeOpenStatus?.status, loungeOpenStatus?.reason]
   );
 
   const loungeOnlyTables = useMemo(() =>
@@ -8643,39 +8631,31 @@ export default function NewLiveMeeting() {
         return;
       }
 
-      // Retry lounge-state briefly to avoid race where meeting ended just now but backend
-      // has not fully propagated live_ended_at/lounge window yet.
-      const pollAttempts = explicitEnd ? 6 : 4;
-      for (let attempt = 1; attempt <= pollAttempts; attempt += 1) {
-        try {
-          console.log(`[LiveMeeting] Fetching lounge-state (attempt ${attempt}/${pollAttempts})...`);
-          const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
-            headers: authHeader(),
-          });
-          if (res.ok) {
-            const data = await res.json().catch(() => null);
-            if (data?.lounge_open_status) {
-              loungeStatus = data.lounge_open_status;
-              setLoungeOpenStatus(data.lounge_open_status);
-              console.log("[LiveMeeting] ✅ Lounge status after meeting end:", loungeStatus);
-            } else {
-              console.log("[LiveMeeting] No lounge_open_status in response:", data);
-            }
+      try {
+        console.log("[LiveMeeting] Fetching lounge-state...");
+        const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
+          headers: authHeader(),
+        });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data?.lounge_open_status) {
+            loungeStatus = data.lounge_open_status;
+            console.log("[LiveMeeting] ✅ Lounge status after meeting end:", loungeStatus);
           } else {
-            console.warn("[LiveMeeting] Lounge state fetch failed:", res.status);
+            console.log("[LiveMeeting] No lounge_open_status in response:", data);
           }
-        } catch (err) {
-          // Use existing loungeOpenStatus if fetch fails
-          console.error("[LiveMeeting] Error fetching lounge-state:", err);
+        } else {
+          console.warn("[LiveMeeting] Lounge state fetch failed:", res.status);
         }
-
-        if (isPostEventLoungeOpenStatus(loungeStatus)) break;
-        if (attempt < pollAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 800));
-        }
+      } catch (err) {
+        // Use existing loungeOpenStatus if fetch fails
+        console.error("[LiveMeeting] Error fetching lounge-state:", err);
       }
 
-      const isPostEventWindowOpen = isPostEventLoungeOpenStatus(loungeStatus);
+      // ✅ FIXED: Check if lounge is OPEN with post-event reason
+      // The backend ensures "Post-event" is in the reason only for post-event lounge windows
+      const isPostEventWindowOpen = loungeStatus?.status === "OPEN" &&
+        loungeStatus?.reason?.includes("Post-event");
 
       console.log("[LiveMeeting] Checking lounge availability:");
       console.log("  - loungeStatus?.status:", loungeStatus?.status);
@@ -8691,8 +8671,6 @@ export default function NewLiveMeeting() {
           navigationTimeoutRef.current = null;
         }
         // Show post-event lounge immediately and don't schedule a redirect
-        setShowEndStateMessage(false);
-        setLoungeHasEnded(false);
         setIsPostEventLounge(true);
         setPostEventLoungeClosingTime(loungeStatus.next_change);
         return; // prevent scheduling a fallback redirect below
@@ -8712,7 +8690,7 @@ export default function NewLiveMeeting() {
         };
       }
     },
-    [navigateAfterMeetingExit, updateLiveStatus, dyteMeeting, isBanned, eventId, role, loungeOpenStatus, isPostEventLoungeOpenStatus]
+    [navigateAfterMeetingExit, updateLiveStatus, dyteMeeting, isBanned, eventId, role, loungeOpenStatus]
   );
 
   // ✅ Handler for exiting post-event lounge
