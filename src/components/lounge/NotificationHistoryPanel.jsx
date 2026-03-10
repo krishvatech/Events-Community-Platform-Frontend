@@ -4,14 +4,11 @@ import {
   Typography,
   Button,
   Divider,
-  Stack,
   Chip,
   IconButton,
   List,
   ListItem,
   ListItemIcon,
-  ListItemText,
-  ListItemSecondaryAction,
   Menu,
   MenuItem,
   CircularProgress,
@@ -19,7 +16,6 @@ import {
 import PersonIcon from '@mui/icons-material/Person';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
-import DeleteIcon from '@mui/icons-material/Delete';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -34,6 +30,14 @@ const NotificationHistoryPanel = ({
 }) => {
   const [assignMenuAnchor, setAssignMenuAnchor] = useState(null);
   const [assigningNotifId, setAssigningNotifId] = useState(null);
+  const selectedNotification = notifications.find(
+    (notif) => notif.participant_id === assigningNotifId
+  );
+  const preferredRoomId = selectedNotification?.previous_room_id;
+  const filteredBreakoutRooms = preferredRoomId
+    ? breakoutRooms.filter((room) => String(room.id) === String(preferredRoomId))
+    : breakoutRooms;
+
   const formatTime = (isoString) => {
     if (!isoString) return 'Unknown';
     try {
@@ -100,7 +104,7 @@ const NotificationHistoryPanel = ({
                       <PersonIcon fontSize="small" />
                     </ListItemIcon>
                     <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, color: 'white' }}>
                           {notif.participant_name || 'Unknown Participant'}
                         </Typography>
@@ -116,6 +120,20 @@ const NotificationHistoryPanel = ({
                             fontSize: '0.7rem',
                           }}
                         />
+                        {notif.previous_room_name && (
+                          <Chip
+                            label={`Previous: ${notif.previous_room_name}`}
+                            size="small"
+                            sx={{
+                              bgcolor: 'rgba(90, 120, 255, 0.18)',
+                              color: '#9db2ff',
+                              border: '1px solid rgba(90, 120, 255, 0.55)',
+                              height: 20,
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                            }}
+                          />
+                        )}
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, color: 'rgba(255,255,255,0.6)' }}>
                         <AccessTimeIcon sx={{ fontSize: 14 }} />
@@ -215,6 +233,7 @@ const NotificationHistoryPanel = ({
             bgcolor: '#1f2937',
             border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: 1,
+            minWidth: 320,
             '& .MuiMenuItem-root': {
               color: 'white',
               fontSize: '0.875rem',
@@ -226,11 +245,13 @@ const NotificationHistoryPanel = ({
         }}
       >
         <MenuItem disabled sx={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
-          Select Breakout Room
+          {selectedNotification?.previous_room_name
+            ? `Reassign to ${selectedNotification.previous_room_name}`
+            : 'Select Breakout Room'}
         </MenuItem>
         <Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)', my: 0.5 }} />
-        {breakoutRooms && breakoutRooms.length > 0 ? (
-          breakoutRooms.map((room) => (
+        {filteredBreakoutRooms && filteredBreakoutRooms.length > 0 ? (
+          filteredBreakoutRooms.map((room) => (
             <MenuItem
               key={room.id}
               onClick={() => handleAssignToRoom(room.id)}
@@ -255,7 +276,9 @@ const NotificationHistoryPanel = ({
           ))
         ) : (
           <MenuItem disabled sx={{ color: 'rgba(255,255,255,0.5)' }}>
-            No breakout rooms available
+            {selectedNotification?.previous_room_name
+              ? `Previous room ${selectedNotification.previous_room_name} is not available`
+              : 'No breakout rooms available'}
           </MenuItem>
         )}
       </Menu>

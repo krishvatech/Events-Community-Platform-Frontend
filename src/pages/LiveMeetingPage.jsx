@@ -2184,6 +2184,14 @@ export default function NewLiveMeeting() {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [notifAnchorEl, setNotifAnchorEl] = useState(null);
   const [assigningParticipantId, setAssigningParticipantId] = useState(null);
+  const notifButtonRef = useRef(null);
+
+  const openNotificationHistory = useCallback((anchorEl = null) => {
+    const nextAnchor = anchorEl || notifButtonRef.current;
+    if (!nextAnchor) return;
+    setNotifAnchorEl(nextAnchor);
+    setUnreadNotifCount(0);
+  }, []);
 
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up("md"));
@@ -6369,7 +6377,7 @@ export default function NewLiveMeeting() {
             showSnackbar(
               `${notif.participant_name} joined and is in the Main Room.`,
               "info",
-              { onClick: () => setLoungeOpen(true) }
+              { onClick: () => openNotificationHistory() }
             );
 
             // ✅ Add to notification history
@@ -16162,11 +16170,11 @@ export default function NewLiveMeeting() {
             {isHost && (
               <Tooltip title="Notification History">
                 <IconButton
+                  ref={notifButtonRef}
                   sx={headerIconBtnSx}
                   aria-label="Notification History"
                   onClick={(e) => {
-                    setNotifAnchorEl(e.currentTarget);
-                    setUnreadNotifCount(0);
+                    openNotificationHistory(e.currentTarget);
                   }}
                 >
                   <Badge badgeContent={unreadNotifCount} color="error" max={99}>
@@ -18482,7 +18490,8 @@ export default function NewLiveMeeting() {
               bgcolor: '#111827',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 2,
-              width: 340,
+              width: 460,
+              maxWidth: 'calc(100vw - 24px)',
               maxHeight: 480,
             },
           }}
@@ -18491,7 +18500,7 @@ export default function NewLiveMeeting() {
             notifications={notificationHistory}
             onClearAll={() => setNotificationHistory([])}
             onClose={() => setNotifAnchorEl(null)}
-            breakoutRooms={loungeTables}
+            breakoutRooms={breakoutOnlyTables}
             onAssign={handleAssignFromHistory}
             assigningParticipantId={assigningParticipantId}
           />
