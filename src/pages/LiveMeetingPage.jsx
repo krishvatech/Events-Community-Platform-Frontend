@@ -2266,13 +2266,6 @@ export default function NewLiveMeeting() {
   const [incomingMainStageScreenShareRequest, setIncomingMainStageScreenShareRequest] = useState(null); // Host-side pending request
   const [approvedMainStageScreenShare, setApprovedMainStageScreenShare] = useState(null); // { participantId, participantUserKey, name, ts }
   const [isSelfMainStageScreenShareApproved, setIsSelfMainStageScreenShareApproved] = useState(false);
-  const [isStageSpeakerCollapsed, setIsStageSpeakerCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem("live_meeting_stage_speaker_collapsed") === "1";
-    } catch {
-      return false;
-    }
-  });
   const [isStageContentFullscreen, setIsStageContentFullscreen] = useState(false);
 
   const [isBreakoutControlsOpen, setIsBreakoutControlsOpen] = useState(false);
@@ -2409,14 +2402,6 @@ export default function NewLiveMeeting() {
       console.error("Stage fullscreen error:", e);
     }
   }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("live_meeting_stage_speaker_collapsed", isStageSpeakerCollapsed ? "1" : "0");
-    } catch {
-      // ignore storage failures
-    }
-  }, [isStageSpeakerCollapsed]);
 
   useEffect(() => {
     const onFsChange = () => {
@@ -11284,6 +11269,40 @@ export default function NewLiveMeeting() {
   // -------------------------
   const [activeScreenShareParticipant, setActiveScreenShareParticipant] = useState(null);
 
+  const isParticipantCameraActive = useCallback((p) => {
+    if (!p) return false;
+
+    const cameraEnabled =
+      p?.videoEnabled ??
+      p?.camEnabled ??
+      p?.cameraEnabled ??
+      p?.isVideoEnabled ??
+      p?.isCameraEnabled ??
+      p?.videoOn ??
+      p?.camOn;
+
+    if (cameraEnabled) return true;
+
+    const tracks =
+      p?.videoTracks ??
+      p?.videoTrack ??
+      p?.video ??
+      p?.cameraTrack ??
+      p?.cameraTracks ??
+      null;
+
+    try {
+      if (Array.isArray(tracks) && tracks.length > 0) return true;
+      if (typeof tracks?.size === "number" && tracks.size > 0) return true;
+      if (typeof tracks?.length === "number" && tracks.length > 0) return true;
+      if (typeof tracks?.toArray === "function") return (tracks.toArray()?.length ?? 0) > 0;
+    } catch {
+      // ignore
+    }
+
+    return false;
+  }, []);
+
   const isParticipantScreenSharing = useCallback((p) => {
     if (!p) return false;
 
@@ -11434,9 +11453,14 @@ export default function NewLiveMeeting() {
   }, [dyteMeeting, findActiveScreenShareParticipant]);
 
   const hasScreenshare = !!activeScreenShareParticipant;
+  const activeScreensharePresenterHasCamera = isParticipantCameraActive(activeScreenShareParticipant);
   const stageHasVideo = pinnedHasVideo || hasScreenshare;
   const hasStageSpeaker = Boolean(pinnedRaw);
-  const showSplitStage = !isBreakout && hasScreenshare && hasStageSpeaker && !isStageSpeakerCollapsed;
+  const showSplitStage =
+    !isBreakout &&
+    hasScreenshare &&
+    hasStageSpeaker &&
+    activeScreensharePresenterHasCamera;
   const isSelfSpotlighted = useMemo(() => {
     return matchesStageTarget(spotlightTarget, dyteMeeting?.self);
   }, [spotlightTarget, dyteMeeting]);
@@ -16472,22 +16496,6 @@ export default function NewLiveMeeting() {
                       gap: 0.75,
                     }}
                   >
-                    {hasStageSpeaker && (
-                      <Tooltip title={isStageSpeakerCollapsed ? "Show speaker" : "Hide speaker"}>
-                        <IconButton
-                          size="small"
-                          onClick={() => setIsStageSpeakerCollapsed((prev) => !prev)}
-                          sx={{
-                            bgcolor: "rgba(15,23,42,0.72)",
-                            color: "#fff",
-                            border: "1px solid rgba(255,255,255,0.12)",
-                            "&:hover": { bgcolor: "rgba(15,23,42,0.92)" },
-                          }}
-                        >
-                          {isStageSpeakerCollapsed ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
-                        </IconButton>
-                      </Tooltip>
-                    )}
                     <Tooltip title={isStageContentFullscreen ? "Exit content fullscreen" : "Fullscreen content"}>
                       <IconButton
                         size="small"
