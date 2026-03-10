@@ -2151,6 +2151,67 @@ function WaitingRoomScreen({
   );
 }
 
+function BreakCountdownBanner({
+  isOnBreak = false,
+  remainingSeconds = 0,
+  visible = true,
+}) {
+  if (!isOnBreak || !visible) return null;
+
+  const safeSeconds = Math.max(0, Number(remainingSeconds) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  const isEndingSoon = safeSeconds <= 60;
+
+  return (
+    <Box
+      sx={{
+        position: "fixed",
+        top: { xs: 8, sm: 12 },
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 1700,
+        px: 1.5,
+        py: 0.75,
+        borderRadius: 999,
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        bgcolor: "rgba(0,0,0,0.72)",
+        border: "1px solid rgba(255,255,255,0.16)",
+        backdropFilter: "blur(8px)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+      }}
+    >
+      <CoffeeIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.88)" }} />
+      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.88)" }}>
+        Break ends in
+      </Typography>
+      <Box
+        sx={{
+          px: 1,
+          py: 0.25,
+          borderRadius: 1.5,
+          bgcolor: "rgba(255,255,255,0.1)",
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 800,
+            minWidth: 38,
+            textAlign: "center",
+            fontVariantNumeric: "tabular-nums",
+            color: isEndingSoon ? "#ffb4b4" : "#b8ffcf",
+          }}
+        >
+          {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
 
 
 export default function NewLiveMeeting() {
@@ -15637,6 +15698,11 @@ export default function NewLiveMeeting() {
   if (waitingRoomActive && !isBreakout) {
     return (
       <>
+        <BreakCountdownBanner
+          isOnBreak={isOnBreak}
+          remainingSeconds={breakRemainingSeconds ?? 0}
+          visible={!isHost && dbStatus === "live"}
+        />
         <WaitingRoomScreen
           onBack={handleBack}
           eventTitle={eventTitle}
@@ -15951,6 +16017,11 @@ export default function NewLiveMeeting() {
 
   return (
     <DyteProvider value={dyteMeeting}>
+      <BreakCountdownBanner
+        isOnBreak={isOnBreak}
+        remainingSeconds={breakRemainingSeconds ?? 0}
+        visible={!isHost && dbStatus === "live"}
+      />
       {/* Wrap audio in a ref to capture all participant audio elements */}
       <div
         ref={remoteAudioRef}
