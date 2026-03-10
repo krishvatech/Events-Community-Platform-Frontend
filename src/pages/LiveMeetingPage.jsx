@@ -2834,6 +2834,12 @@ export default function NewLiveMeeting() {
   const [cancelRecordingStep, setCancelRecordingStep] = useState(1);
   const [cancelRecordingText, setCancelRecordingText] = useState("");
   const [autoRecordOnAdmit, setAutoRecordOnAdmit] = useState(true);
+
+  // ✅ Refs for auto-pause/resume recording during Speed Networking
+  const isRecordingRef = useRef(false);
+  const isRecordingPausedRef = useRef(false);
+  const recordingPausedBySpeedNetworkingRef = useRef(false);
+
   const [activeTableId, setActiveTableId] = useState(null);
   const activeTableIdRef = useRef(null); // ✅ Ref for socket access
   const [activeTableName, setActiveTableName] = useState("");
@@ -2858,6 +2864,15 @@ export default function NewLiveMeeting() {
     roleRef.current = role;
     isHostRef.current = role === "publisher";
   }, [role]);
+
+  // ✅ Keep recording refs in sync to avoid stale closures in WS handlers
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+  useEffect(() => {
+    isRecordingPausedRef.current = isRecordingPaused;
+  }, [isRecordingPaused]);
+
   const primaryHostUserId = useMemo(
     () => String(eventData?.created_by_id || ""),
     [eventData?.created_by_id]
@@ -6839,6 +6854,13 @@ export default function NewLiveMeeting() {
             timestamp: Date.now()
           });
           setShowNetworkingPrompt(true);
+
+          // ✅ Auto-pause recording when Speed Networking starts (host only, privacy protection)
+          if (isHostRef.current && isRecordingRef.current && !isRecordingPausedRef.current) {
+            recordingPausedBySpeedNetworkingRef.current = true;
+            handlePauseRecording();
+          }
+
           showSnackbar("Speed Networking has started! Join now to network with others.", "success");
         } else if (msg.type === "speed_networking_match_found") {
           // ✅ NEW: Handle Speed Networking Match Found (for participants already in networking)
@@ -6850,6 +6872,13 @@ export default function NewLiveMeeting() {
           console.log("[MainSocket] Networking session ended");
           setShowNetworkingPrompt(false);
           setNetworkingSessionId(null);
+
+          // ✅ Auto-resume recording when Speed Networking ends (only if we paused it)
+          if (isHostRef.current && recordingPausedBySpeedNetworkingRef.current && isRecordingRef.current) {
+            recordingPausedBySpeedNetworkingRef.current = false;
+            handleResumeRecording();
+          }
+
           showSnackbar("Speed Networking session has ended", "info");
         } else if (msg.type === "break_started") {
           console.log("[MainSocket] Break started:", msg);
