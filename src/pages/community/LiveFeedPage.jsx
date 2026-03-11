@@ -133,6 +133,20 @@ function SuggestedConnections({ list = [] }) {
     return toMediaUrl(raw);
   }
 
+  function isVerifiedStatus(raw) {
+    const value = String(raw || "").trim().toLowerCase();
+    return value === "approved" || value === "verified";
+  }
+
+  function userIsVerified(u) {
+    return isVerifiedStatus(
+      u?.kyc_status ||
+      u?.kycStatus ||
+      u?.profile?.kyc_status ||
+      u?.profile?.kycStatus
+    );
+  }
+
   // cache resolved avatar by user id
   const [avatarByUser, setAvatarByUser] = React.useState({});
 
@@ -282,9 +296,14 @@ function SuggestedConnections({ list = [] }) {
                   <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto", mb: 0.75 }}>
                     {(userName(u) || "U").slice(0, 1)}
                   </Avatar>
-                  <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                    {userName(u)}
-                  </Typography>
+                  <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center" sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
+                      {userName(u)}
+                    </Typography>
+                    {userIsVerified(u) && (
+                      <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />
+                    )}
+                  </Stack>
                   {/* Mutual friends avatars (only if > 0) */}
                   {u.mutuals > 0 && (
                     <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="center" sx={{ mt: 0.5 }}>
@@ -346,12 +365,18 @@ function SuggestedConnections({ list = [] }) {
                           return (
                             <Paper key={u.id} variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
                               <Stack direction="row" spacing={1} alignItems="center">
-                                <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>                                  {(userName(u) || "U").slice(0, 1)}
+                                <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>
+                                  {(userName(u) || "U").slice(0, 1)}
                                 </Avatar>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                                    {userName(u)}
-                                  </Typography>
+                                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                                    <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
+                                      {userName(u)}
+                                    </Typography>
+                                    {userIsVerified(u) && (
+                                      <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />
+                                    )}
+                                  </Stack>
                                   {u.mutuals > 0 && (
                                     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.25 }}>
                                       <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 18, height: 18, fontSize: 10 } }}>
@@ -435,7 +460,7 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
           Groups you may like
         </Typography>
-        <Chip size="small" label="Based on your friends" variant="outlined" />
+        <Chip size="small" label="Based on your contacts" variant="outlined" />
       </Stack>
 
       <Grid container spacing={1}>
@@ -450,22 +475,35 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
               </Paper>
             </Grid>
           ))
-          : items.map((g) => (
+          : items.map((g) => {
+            const groupImage = g.logo || g.cover_image || "";
+            const groupDisplayName = String(g.name || "").trim().split(/\s+/)[0] || g.name || "";
+            return (
             <Grid key={g.id} item xs={12} sm={6} md={3}>
-              <Paper variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1,
+                  borderRadius: 2,
+                  borderColor: BORDER,
+                  textAlign: "center",
+                }}
+              >
                 <Box
                   sx={{
+                    width: 64,
                     height: 64,
-                    borderRadius: 1.5,
+                    borderRadius: "50%",
                     overflow: "hidden",
                     mb: 1,
                     bgcolor: "grey.100",
+                    mx: "auto",
                   }}
                 >
-                  {g.cover_image ? (
+                  {groupImage ? (
                     <Box
                       component="img"
-                      src={toMediaUrl(g.cover_image)}
+                      src={toMediaUrl(groupImage)}
                       alt={g.name}
                       sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                     />
@@ -474,16 +512,30 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
                   )}
                 </Box>
 
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
-                  {g.name}
-                </Typography>
+                <Tooltip title={g.name || ""} arrow>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 700,
+                      lineHeight: 1.25,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      mb: 0.25,
+                      cursor: "default",
+                    }}
+                  >
+                    {groupDisplayName}
+                  </Typography>
+                </Tooltip>
 
                 <Typography variant="caption" color="text.secondary">
                   {(g.member_count || 0).toLocaleString()} members
                 </Typography>
 
                 {Number(g.mutuals || 0) > 0 && (
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                  <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mt: 0.5 }}>
                     <AvatarGroup
                       max={3}
                       sx={{ "& .MuiAvatar-root": { width: 22, height: 22, fontSize: 11 } }}
@@ -501,10 +553,9 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
                 )}
 
                 <Button
-                  fullWidth
                   size="small"
                   variant="contained"
-                  sx={{ mt: 1 }}
+                  sx={{ mt: 1, minWidth: 124 }}
                   disabled={joiningId === g.id}
                   onClick={() => joinGroup(g.id)}
                 >
@@ -512,7 +563,8 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
                 </Button>
               </Paper>
             </Grid>
-          ))}
+            );
+          })}
       </Grid>
     </Paper>
   );
