@@ -179,7 +179,7 @@ const SocialLoungeIcon = (props) => (
 const API_ROOT = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 ).replace(/\/$/, "");
-const SPOTLIGHT_INVITE_TIMEOUT_MS = 10000;
+const SPOTLIGHT_INVITE_TIMEOUT_MS = 15000;
 const SPOTLIGHT_INVITE_WARNING_SECONDS = 5;
 const SUPPORT_TAB_INDEX = 4;
 
@@ -4779,7 +4779,7 @@ export default function NewLiveMeeting() {
     } catch (e) {
       console.warn("[Spotlight] Failed to broadcast spotlight-invite:", e);
     }
-    showSnackbar(`Invitation sent to ${payload.name}`, "info");
+    showSnackbar(`Invitation sent to ${payload.name}. They have 15 seconds to accept.`, "info");
   };
 
   const handleClearSpotlight = () => {
@@ -18492,7 +18492,7 @@ export default function NewLiveMeeting() {
                   spotlightTarget.participantUserKey === getParticipantUserKey(participantMenuTarget?._raw || participantMenuTarget))
                 ? "Already Spotlighted"
                 : pendingSpotlightInvite
-                  ? "Invitation Pending"
+                  ? "Invitation Pending (15s)"
                   : "Spotlight Speaker"}
             </ListItemText>
           </MenuItem>
