@@ -33,6 +33,7 @@ export default function LoungeSettingsDialog({ open, onClose, event, onSaved }) 
         lounge_before_buffer: 30,
         lounge_enabled_during: true,
         lounge_enabled_breaks: false,
+        lounge_enabled_speed_networking: false,
         lounge_enabled_after: false,
         lounge_after_buffer: 30,
     });
@@ -47,6 +48,7 @@ export default function LoungeSettingsDialog({ open, onClose, event, onSaved }) 
                 lounge_before_buffer: event.lounge_before_buffer ?? 30,
                 lounge_enabled_during: event.lounge_enabled_during ?? true,
                 lounge_enabled_breaks: event.lounge_enabled_breaks ?? false,
+                lounge_enabled_speed_networking: event.lounge_enabled_speed_networking ?? false,
                 lounge_enabled_after: event.lounge_enabled_after ?? false,
                 lounge_after_buffer: event.lounge_after_buffer ?? 30,
             });
@@ -212,6 +214,29 @@ export default function LoungeSettingsDialog({ open, onClose, event, onSaved }) 
                                     <Typography sx={{ fontWeight: 500 }}>Open During Breaks</Typography>
                                     <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
                                         Allow networking during intermissions
+                                    </Typography>
+                                </Box>
+                            }
+                        />
+                    </Box>
+
+                    <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
+
+                    {/* During Speed Networking */}
+                    <Box>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.lounge_enabled_speed_networking}
+                                    onChange={(e) => handleChange("lounge_enabled_speed_networking", e.target.checked)}
+                                    color="primary"
+                                />
+                            }
+                            label={
+                                <Box>
+                                    <Typography sx={{ fontWeight: 500 }}>Available After Leaving Speed Networking</Typography>
+                                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                                        Show Social Lounge as an option when participants leave Speed Networking
                                     </Typography>
                                 </Box>
                             }

@@ -68,13 +68,17 @@ export default function SpeedNetworkingZone({
     eventId,
     isAdmin,
     onClose,
+    onNavigateMainRoom,
+    onNavigateSocialLounge,
+    onNavigateEventEnded,
     dyteMeeting,
     onEnterMatch,
     onNetworkingStateChange,
     lastMessage,
     onMemberInfo,
     onPrivateChat,
-    autoJoinOnOpen = false
+    autoJoinOnOpen = false,
+    loungeEnabledSpeedNetworking = false // ✅ NEW: Flag to show "Go to Social Lounge" button
 }) {
     const [session, setSession] = useState(null);
     const [currentMatch, setCurrentMatch] = useState(null);
@@ -85,6 +89,7 @@ export default function SpeedNetworkingZone({
     const [error, setError] = useState(null);
     const [showInterestSelector, setShowInterestSelector] = useState(false);
     const [hasInterestTags, setHasInterestTags] = useState(null);
+    const [exitNavigation, setExitNavigation] = useState(null);
     const myMatchPollInFlightRef = useRef(false);
     const myMatchAbortRef = useRef(null);
     const sessionPollInFlightRef = useRef(false);
@@ -336,6 +341,61 @@ export default function SpeedNetworkingZone({
         }
     }, [lastMessage, onEnterMatch, fetchActiveSession, currentMatch, session, currentUser?.id, eventId]);
 
+    const applyNavigationDecision = useCallback((navigation, { preserveDialog = false } = {}) => {
+        if (!navigation || !navigation.target) return;
+
+        if (navigation.target === 'speed_networking_exit_options') {
+            setExitNavigation(navigation);
+            setInQueue(false);
+            setCurrentMatch(null);
+            setTransitionMatch(null);
+            return;
+        }
+
+        setExitNavigation(null);
+
+        if (navigation.target === 'main_room') {
+            if (onNavigateMainRoom) {
+                onNavigateMainRoom(navigation);
+            } else if (!preserveDialog) {
+                onClose?.();
+            }
+            return;
+        }
+
+        if (navigation.target === 'social_lounge') {
+            if (onNavigateSocialLounge) {
+                onNavigateSocialLounge(navigation);
+            } else if (!preserveDialog) {
+                onClose?.();
+            }
+            return;
+        }
+
+        if (navigation.target === 'event_ended') {
+            if (onNavigateEventEnded) {
+                onNavigateEventEnded(navigation);
+            } else if (!preserveDialog) {
+                onClose?.();
+            }
+        }
+    }, [onClose, onNavigateEventEnded, onNavigateMainRoom, onNavigateSocialLounge]);
+
+    const fetchNavigationState = useCallback(async () => {
+        if (!session?.id) return null;
+        try {
+            let url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/navigation-state/`.replace(/([^:]\/)\/+/g, "$1");
+            url = addCacheBust(url);
+            const res = await fetch(url, { headers: authHeader() });
+            if (!res.ok) return null;
+            const data = await res.json();
+            return data?.navigation || null;
+        } catch (err) {
+            console.warn('[SpeedNetworking] Failed to fetch navigation state:', err);
+            return null;
+        }
+    }, [eventId, session?.id]);
+
     // Monitor match status changes (fallback: detect when match ended server-side)
     useEffect(() => {
         if (!currentMatch || !session?.id) return;
@@ -395,8 +455,16 @@ export default function SpeedNetworkingZone({
             setCurrentMatch(null);
             setTransitionMatch(null);
             setInQueue(false);
+            if (exitNavigation?.target !== 'speed_networking_exit_options') {
+                (async () => {
+                    const navigation = await fetchNavigationState();
+                    if (navigation) {
+                        applyNavigationDecision(navigation);
+                    }
+                })();
+            }
         }
-    }, [session?.status]);
+    }, [session?.status, fetchNavigationState, applyNavigationDecision, exitNavigation?.target]);
 
     const fetchMyMatch = useCallback(async () => {
         if (!session?.id) return { matched: false, error: false };
@@ -451,6 +519,7 @@ export default function SpeedNetworkingZone({
 
         try {
             setLoading(true);
+            setExitNavigation(null);
             const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/join/`.replace(/([^:]\/)\/+/g, "$1");
             const res = await fetch(url, {
                 method: 'POST',
@@ -469,10 +538,12 @@ export default function SpeedNetworkingZone({
                     setTransitionMatch(data.match);
                     setCurrentMatch(data.match);
                     setInQueue(false);
+                    setExitNavigation(null);
                 } else {
                     setCurrentMatch(data.match);
                     setTransitionMatch(null);
                     setInQueue(false);
+                    setExitNavigation(null);
                     // Join Dyte room for this match
                     if (onEnterMatch) {
                         onEnterMatch(data.match);
@@ -480,6 +551,7 @@ export default function SpeedNetworkingZone({
                 }
             } else {
                 setInQueue(true);
+                setExitNavigation(null);
             }
             setLoading(false);
         } catch (err) {
@@ -510,6 +582,7 @@ export default function SpeedNetworkingZone({
     // Show interest selector before joining queue (or join directly if no interest matching)
     const handleJoinQueue = useCallback(async () => {
         if (!session) return;
+        setExitNavigation(null);
 
         // Only show interest selector if interest matching is enabled in criteria_config
         const interestMatchingEnabled = session.criteria_config?.interest_based?.enabled;
@@ -548,11 +621,16 @@ export default function SpeedNetworkingZone({
                 headers: authHeader()
             });
 
-            if (!res.ok) throw new Error('Failed to leave queue');
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || 'Failed to leave queue');
 
             setInQueue(false);
             setCurrentMatch(null);
             setTransitionMatch(null);
+
+            if (data?.navigation) {
+                applyNavigationDecision(data.navigation);
+            }
         } catch (err) {
             console.error('[SpeedNetworking] Error leaving queue:', err);
             setError(err.message);
@@ -855,7 +933,72 @@ export default function SpeedNetworkingZone({
 
             {/* Main Content */}
             <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                {transitionMatch ? (
+                {exitNavigation ? (
+                    <Box sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        p: 4
+                    }}>
+                        <Typography variant="h5" sx={{ color: '#fff', mb: 2, fontWeight: 700 }}>
+                            You're out of the queue
+                        </Typography>
+                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', mb: 4, textAlign: 'center', maxWidth: 520 }}>
+                            {exitNavigation.reason || 'Choose what you want to do next.'}
+                        </Typography>
+                        <Box sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 2,
+                            width: '100%',
+                            maxWidth: 400,
+                            alignItems: 'center'
+                        }}>
+                            {(exitNavigation.options || []).some((opt) => opt.action === 'rejoin_speed_networking') && (
+                                <Button
+                                    variant="contained"
+                                    fullWidth
+                                    onClick={handleJoinQueue}
+                                    sx={{ bgcolor: '#22c55e', '&:hover': { bgcolor: '#16a34a' } }}
+                                >
+                                    Rejoin Speed Networking
+                                </Button>
+                            )}
+                            {(exitNavigation.options || []).some((opt) => opt.action === 'go_to_main_room') && (
+                                <Button
+                                    variant="outlined"
+                                    fullWidth
+                                    onClick={() => applyNavigationDecision({ target: 'main_room' })}
+                                    sx={{ borderColor: 'rgba(255,255,255,0.25)', color: '#fff' }}
+                                >
+                                    Return to Main Room
+                                </Button>
+                            )}
+                            {(exitNavigation.options || []).some((opt) => opt.action === 'wait_for_main_room') && (
+                                <Button
+                                    variant="outlined"
+                                    fullWidth
+                                    disabled
+                                    sx={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.5)' }}
+                                >
+                                    Wait for Main Room
+                                </Button>
+                            )}
+                            {(exitNavigation.options || []).some((opt) => opt.action === 'go_to_social_lounge') && (
+                                <Button
+                                    variant="contained"
+                                    fullWidth
+                                    onClick={() => applyNavigationDecision({ target: 'social_lounge' })}
+                                    sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
+                                >
+                                    Go to Social Lounge
+                                </Button>
+                            )}
+                        </Box>
+                    </Box>
+                ) : transitionMatch ? (
                     <SpeedNetworkingTransition
                         match={transitionMatch}
                         session={session}
@@ -893,32 +1036,90 @@ export default function SpeedNetworkingZone({
                         <Typography variant="h5" sx={{ color: '#fff', mb: 2, fontWeight: 700 }}>
                             Ready to Network?
                         </Typography>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', mb: 4, textAlign: 'center', maxWidth: 400 }}>
+                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', mb: 6, textAlign: 'center', maxWidth: 400 }}>
                             Join the speed networking session to meet other participants one-on-one for {session.duration_minutes}-minute conversations.
                         </Typography>
-                        <Button
-                            variant="contained"
-                            size="large"
-                            onClick={handleJoinQueue}
-                            disabled={loading || session.status !== 'ACTIVE'}
-                            sx={{
-                                bgcolor: '#22c55e',
-                                '&:hover': { bgcolor: '#16a34a' },
-                                px: 6,
-                                py: 1.5,
-                                fontSize: 16,
-                                fontWeight: 700,
-                                borderRadius: 3,
-                                '&.Mui-disabled': {
-                                    bgcolor: 'rgba(255,255,255,0.1)',
-                                    color: 'rgba(255,255,255,0.3)'
-                                }
-                            }}
-                        >
-                            {loading ? <CircularProgress size={24} /> :
-                                session.status === 'PENDING' ? 'Waiting for host to start...' :
-                                    'Join Speed Networking'}
-                        </Button>
+
+                        {/* ✅ NEW: Three Navigation Options */}
+                        <Box sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 2,
+                            width: '100%',
+                            maxWidth: 400,
+                            alignItems: 'center'
+                        }}>
+                            {/* Join Speed Networking Button */}
+                            <Button
+                                variant="contained"
+                                size="large"
+                                onClick={handleJoinQueue}
+                                disabled={loading || session.status !== 'ACTIVE'}
+                                fullWidth
+                                sx={{
+                                    bgcolor: '#22c55e',
+                                    '&:hover': { bgcolor: '#16a34a' },
+                                    py: 1.5,
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    borderRadius: 2,
+                                    '&.Mui-disabled': {
+                                        bgcolor: 'rgba(255,255,255,0.1)',
+                                        color: 'rgba(255,255,255,0.3)'
+                                    }
+                                }}
+                            >
+                                {loading ? <CircularProgress size={24} /> :
+                                    session.status === 'PENDING' ? 'Waiting for host to start...' :
+                                        'Join Speed Networking'}
+                            </Button>
+
+                            {/* Return to Main Room Button */}
+                            <Button
+                                variant="outlined"
+                                size="large"
+                                onClick={onNavigateMainRoom}
+                                fullWidth
+                                sx={{
+                                    borderColor: 'rgba(255,255,255,0.3)',
+                                    color: '#fff',
+                                    py: 1.5,
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    borderRadius: 2,
+                                    '&:hover': {
+                                        borderColor: 'rgba(255,255,255,0.6)',
+                                        bgcolor: 'rgba(255,255,255,0.05)'
+                                    }
+                                }}
+                            >
+                                Return to Main Room
+                            </Button>
+
+                            {/* Go to Social Lounge Button - Only show if enabled */}
+                            {loungeEnabledSpeedNetworking && (
+                                <Button
+                                    variant="outlined"
+                                    size="large"
+                                    onClick={onNavigateSocialLounge}
+                                    fullWidth
+                                    sx={{
+                                        borderColor: '#3b82f6',
+                                        color: '#3b82f6',
+                                        py: 1.5,
+                                        fontSize: 16,
+                                        fontWeight: 700,
+                                        borderRadius: 2,
+                                        '&:hover': {
+                                            borderColor: '#2563eb',
+                                            bgcolor: 'rgba(59,130,246,0.1)'
+                                        }
+                                    }}
+                                >
+                                    Go to Social Lounge
+                                </Button>
+                            )}
+                        </Box>
                     </Box>
                 )}
             </Box>

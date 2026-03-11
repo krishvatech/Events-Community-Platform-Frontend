@@ -334,6 +334,7 @@ export default function EventManagePage() {
     lounge_before_buffer: 30,
     lounge_enabled_during: true,
     lounge_enabled_breaks: false,
+    lounge_enabled_speed_networking: false,
     lounge_enabled_after: false,
     lounge_after_buffer: 30,
   });
@@ -452,8 +453,6 @@ export default function EventManagePage() {
 
     if (initialEvent && String(initialEvent.id) === String(eventId)) {
       setEvent(initialEvent);
-      setEventLoading(false);
-      return;
     }
 
     const controller = new AbortController();
@@ -498,6 +497,7 @@ export default function EventManagePage() {
         lounge_before_buffer: event.lounge_before_buffer ?? 30,
         lounge_enabled_during: event.lounge_enabled_during ?? true,
         lounge_enabled_breaks: event.lounge_enabled_breaks ?? false,
+        lounge_enabled_speed_networking: event.lounge_enabled_speed_networking ?? false,
         lounge_enabled_after: event.lounge_enabled_after ?? false,
         lounge_after_buffer: event.lounge_after_buffer ?? 30,
       });
@@ -2204,6 +2204,33 @@ export default function EventManagePage() {
                 InputProps={{ inputProps: { min: 0 } }}
               />
             )}
+          </Box>
+
+          {/* Available After Leaving Speed Networking */}
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={loungeSettings.lounge_enabled_speed_networking}
+                  onChange={(e) =>
+                    setLoungeSettings((prev) => ({
+                      ...prev,
+                      lounge_enabled_speed_networking: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Available After Leaving Speed Networking
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Allow participants to go to Social Lounge when they leave Speed Networking
+                  </Typography>
+                </Box>
+              }
+            />
           </Box>
 
           <Divider />

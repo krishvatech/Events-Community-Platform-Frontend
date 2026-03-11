@@ -254,8 +254,9 @@ export default function MainRoomPeek({
         };
     }, [primaryParticipant]);
 
-    // Only show when in breakout room and main meeting is available
-    if (!isInBreakout || !mainDyteMeeting) return null;
+    // Only show when in breakout room.
+    // Render a loading/fallback shell even if main meeting is not ready yet.
+    if (!isInBreakout) return null;
 
     return (
         <Box sx={{
@@ -328,7 +329,24 @@ export default function MainRoomPeek({
             {!isFolded && (
                 <>
                     <Box sx={{ flex: 1, position: 'relative', bgcolor: '#000', overflow: 'hidden' }}>
-                        {primaryParticipant ? (
+                        {!mainDyteMeeting ? (
+                            <Box sx={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 1
+                            }}>
+                                <Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 600 }}>
+                                    Connecting main room preview...
+                                </Typography>
+                                <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>
+                                    Please wait
+                                </Typography>
+                            </Box>
+                        ) : primaryParticipant ? (
                             <>
                                 <video
                                     ref={videoRef}
@@ -391,7 +409,7 @@ export default function MainRoomPeek({
                     <Box sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
                         <Typography sx={{ color: '#22c55e', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#22c55e' }} />
-                            {primaryParticipant ? `LIVE: ${primaryParticipant.name || 'Main Stage'}` : 'MAIN STAGE'}
+                            {!mainDyteMeeting ? 'CONNECTING MAIN STAGE' : (primaryParticipant ? `LIVE: ${primaryParticipant.name || 'Main Stage'}` : 'MAIN STAGE')}
                         </Typography>
                     </Box>
                 </>

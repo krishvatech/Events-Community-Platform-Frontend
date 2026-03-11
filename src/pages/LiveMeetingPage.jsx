@@ -413,11 +413,25 @@ function matchesStageTarget(target, participant) {
 function getBackendUserId(participant) {
   if (!participant) return null;
 
+  const raw = participant._raw || participant;
+  const parsedCustomData =
+    typeof raw?.customParticipantData === "string"
+      ? (() => {
+        try { return JSON.parse(raw.customParticipantData); } catch { return {}; }
+      })()
+      : (raw?.customParticipantData || {});
+
   return (
     participant.customParticipantId ||
     participant._raw?.customParticipantId ||
     participant.clientSpecificId ||
+    participant._raw?.clientSpecificId ||
     participant._raw?.client_specific_id ||
+    participant.userId ||
+    participant._raw?.userId ||
+    participant._raw?.user_id ||
+    parsedCustomData?.user_id ||
+    parsedCustomData?.userId ||
     null
   );
 }
@@ -3078,6 +3092,7 @@ export default function NewLiveMeeting() {
   const [isInBreakoutRoom, setIsInBreakoutRoom] = useState(false);
   const [mainRoomPeekVisible, setMainRoomPeekVisible] = useState(true);
   const [showMainRoomPeek, setShowMainRoomPeek] = useState(true);
+  const isInBreakoutForPeek = Boolean(isBreakout || isInBreakoutRoom);
   const [mainRoomPeekPosition, setMainRoomPeekPosition] = useState({ x: 0, y: 80 });
   const [hasMovedMainRoomPeek, setHasMovedMainRoomPeek] = useState(false);
   const [isDraggingMainRoomPeek, setIsDraggingMainRoomPeek] = useState(false);
@@ -3085,6 +3100,7 @@ export default function NewLiveMeeting() {
   const mainRoomPeekDragRef = useRef({ active: false, offsetX: 0, offsetY: 0 });
   const isInBreakoutRoomRef = useRef(false); // ✅ Ref for socket access
   const leaveBreakoutInFlightRef = useRef(false);
+  const mainPeekTokenFetchInFlightRef = useRef(false);
   const preEventLoungeWasOpenRef = useRef(false);
   const preEventLoungePhaseRef = useRef(false);
   const fetchLoungeStateRef = useRef(null); // ✅ Ref to store fetchLoungeState for calling from handleLeaveBreakout
@@ -4402,6 +4418,7 @@ export default function NewLiveMeeting() {
         if (tableId) {
           console.log("[LiveMeeting] Setting activeTableId FIRST:", tableId);
           loungeJoinTimestampRef.current = Date.now(); // ✅ Mark when user joins lounge
+          setJoinMainRequested(false);
           setActiveTableId(tableId);
           setActiveTableName(tableName || `Room ${tableId}`);
           setActiveTableLogoUrl(logoUrl || ""); // ✅ Store the logo URL
@@ -4539,15 +4556,15 @@ export default function NewLiveMeeting() {
   }, [eventId, mainRoomPeekPrefKey, mainRoomPeekVisible]);
 
   useEffect(() => {
-    if (activeTableId && isInBreakoutRoom) {
+    if (activeTableId && isInBreakoutForPeek) {
       setShowMainRoomPeek(true);
       setMainRoomPeekVisible(true);
       setHasMovedMainRoomPeek(false);
     }
-  }, [activeTableId, isInBreakoutRoom]);
+  }, [activeTableId, isInBreakoutForPeek]);
 
   useEffect(() => {
-    if (!showMainRoomPeek || !activeTableId || !isInBreakoutRoom) return;
+    if (!showMainRoomPeek || !activeTableId || !isInBreakoutForPeek) return;
     if (hasMovedMainRoomPeek) return;
 
     const applyDefaultPosition = () => {
@@ -4561,14 +4578,14 @@ export default function NewLiveMeeting() {
     activeTableId,
     getMainRoomPeekDefaultPosition,
     hasMovedMainRoomPeek,
-    isInBreakoutRoom,
+    isInBreakoutForPeek,
     rightOpen,
     rightPanelOpen,
     showMainRoomPeek,
   ]);
 
   useEffect(() => {
-    if (!showMainRoomPeek || !activeTableId || !isInBreakoutRoom) return;
+    if (!showMainRoomPeek || !activeTableId || !isInBreakoutForPeek) return;
 
     const handleResize = () => {
       setMainRoomPeekPosition((prev) => clampMainRoomPeekPosition(prev.x, prev.y));
@@ -4576,7 +4593,7 @@ export default function NewLiveMeeting() {
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [activeTableId, clampMainRoomPeekPosition, isInBreakoutRoom, showMainRoomPeek]);
+  }, [activeTableId, clampMainRoomPeekPosition, isInBreakoutForPeek, showMainRoomPeek]);
 
   useEffect(() => {
     if (!isDraggingMainRoomPeek) return;
@@ -5967,6 +5984,18 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] Skipping token fetch - breakout join in progress");
       return;
     }
+    const loungeFlowDuringNetworking = Boolean(
+      role !== "publisher" &&
+      !joinMainRequested &&
+      eventData?.lounge_enabled_speed_networking &&
+      networkingSessionId &&
+      (loungeOpen || isBreakout || Boolean(activeTableId))
+    );
+    if (loungeFlowDuringNetworking) {
+      console.log("[LiveMeeting] Skipping token fetch - in Social Lounge during active Speed Networking");
+      setLoadingJoin(false);
+      return;
+    }
     if (((preEventLoungeOpen && !attendeeWaitingRoomOverridesPreEventLounge) || shouldHonorOpenLoungeFromState || isPostEventWindowOpen) && !joinMainRequested &&
       (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
       !authToken && !mainAuthTokenRef.current) {
@@ -6068,7 +6097,7 @@ export default function NewLiveMeeting() {
         }
       }
     })();
-  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, attendeeWaitingRoomOverridesPreEventLounge, shouldHonorOpenLoungeFromState, isPostEventWindowOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly]);
+  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, attendeeWaitingRoomOverridesPreEventLounge, shouldHonorOpenLoungeFromState, isPostEventWindowOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly, networkingSessionId, loungeOpen, activeTableId]);
 
   useEffect(() => {
     if (!eventId || !waitingRoomActive) return;
@@ -6724,6 +6753,47 @@ export default function NewLiveMeeting() {
             setParticipantRoomMap(newRoomMap);
           }
 
+          // Keep local viewer room state aligned with backend location updates.
+          // This prevents stale "still in lounge" UI when backend has already moved user to main room.
+          const myId = String(currentUserId || "");
+          if (myId) {
+            const myUpdate = msg.updates.find(
+              (u) => String(u?.user_id || "") === myId
+            );
+            if (myUpdate) {
+              const myRoomType = String(myUpdate?.current_room?.type || "").toLowerCase();
+              const movedToMainLike =
+                myRoomType === "main" ||
+                myRoomType === "main_room" ||
+                myRoomType === "waiting_room" ||
+                myRoomType === "pre_event";
+
+              // ✅ CRITICAL FIX: Don't clear activeTableId if user just joined Social Lounge during Speed Networking
+              // The server location data may be stale and show the user in main_room, but the client has
+              // already placed them in a Social Lounge during Speed Networking. Wait for server to catch up.
+              const userJustJoinedLoungeDuringNetworking = Boolean(
+                activeTableIdRef.current &&
+                networkingSessionId &&
+                eventData?.lounge_enabled_speed_networking &&
+                loungeJoinTimestampRef.current &&
+                Date.now() - loungeJoinTimestampRef.current < 5000 // 5 second grace period
+              );
+
+              if (movedToMainLike && !userJustJoinedLoungeDuringNetworking) {
+                setActiveTableId(null);
+                setActiveTableName("");
+                setRoomChatConversationId(null);
+                if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+                  applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                    console.warn("[MainSocket] Failed to force breakout exit on location_update:", e);
+                  });
+                }
+              } else if (movedToMainLike && userJustJoinedLoungeDuringNetworking) {
+                console.log("[MainSocket] ⏳ User just joined Social Lounge during Speed Networking - preserving activeTableId despite stale server location");
+              }
+            }
+          }
+
         } else if (msg.type === "participant_location_sync") {
           // ✅ PHASE 2: Full sync (on reconnect or initial load)
           console.log("[MainSocket] Received participant location sync:", msg);
@@ -6754,6 +6824,42 @@ export default function NewLiveMeeting() {
           lastParticipantSyncRef.current = Date.now();
           console.log("[MainSocket] Participant location sync complete");
 
+          // Reconcile local viewer state after full sync as a fallback if socket transition was missed.
+          const myId = String(currentUserId || "");
+          if (myId) {
+            const me = msg.participants.find((p) => String(p?.user_id || "") === myId);
+            const myRoomType = String(me?.current_room?.type || "").toLowerCase();
+            const movedToMainLike =
+              myRoomType === "main" ||
+              myRoomType === "main_room" ||
+              myRoomType === "waiting_room" ||
+              myRoomType === "pre_event";
+
+            // ✅ CRITICAL FIX: Don't clear activeTableId if user just joined Social Lounge during Speed Networking
+            // The server location data may be stale and show the user in main_room, but the client has
+            // already placed them in a Social Lounge during Speed Networking. Wait for server to catch up.
+            const userJustJoinedLoungeDuringNetworking = Boolean(
+              activeTableIdRef.current &&
+              networkingSessionId &&
+              eventData?.lounge_enabled_speed_networking &&
+              loungeJoinTimestampRef.current &&
+              Date.now() - loungeJoinTimestampRef.current < 5000 // 5 second grace period
+            );
+
+            if (movedToMainLike && !userJustJoinedLoungeDuringNetworking) {
+              setActiveTableId(null);
+              setActiveTableName("");
+              setRoomChatConversationId(null);
+              if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+                applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                  console.warn("[MainSocket] Failed to force breakout exit on location_sync:", e);
+                });
+              }
+            } else if (movedToMainLike && userJustJoinedLoungeDuringNetworking) {
+              console.log("[MainSocket] ⏳ User just joined Social Lounge during Speed Networking - preserving activeTableId despite stale server location");
+            }
+          }
+
         } else if (msg.type === "lounge_state" || msg.type === "welcome") {
           if (msg.online_users) setOnlineUsers(msg.online_users);
           const tableState =
@@ -6769,16 +6875,33 @@ export default function NewLiveMeeting() {
             setMainRoomSupportStatus(msg.main_room_support_status);
           }
 
-          // ✅ FIX: Don't clear active table state while participant is in breakout room
-          // This prevents race conditions where lounge_state broadcast conflicts with breakout join.
-          // When a participant joins a breakout, we need to preserve activeTableId and activeTableName
-          // so that the breakout state remains consistent. Without this guard, the WebSocket lounge_state
-          // broadcast (which fires immediately after join) would clear these values, causing the Dyte SDK
-          // to lose track of the participant's breakout assignment and auto-rejoin the main meeting.
-          if (!isBreakoutRef.current) {
+          // Do not clear active table just because a generic lounge_state arrived.
+          // Only clear when server explicitly says user is in main/waiting (or no lounge table).
+          const userInLoungeByMessage =
+            String(msg.current_location || "").toLowerCase() === "social_lounge" &&
+            Boolean(msg.user_lounge_table_id);
+          const explicitMainOrWaiting =
+            ["main_room", "waiting_room"].includes(
+              String(msg.current_location || "").toLowerCase()
+            );
+
+          // ✅ CRITICAL FIX: Don't clear activeTableId if user just joined Social Lounge during Speed Networking
+          // The server location data may be stale, but the client has already placed them in a Social Lounge
+          // during Speed Networking. Wait for server to catch up.
+          const userJustJoinedLoungeDuringNetworking = Boolean(
+            activeTableIdRef.current &&
+            networkingSessionId &&
+            eventData?.lounge_enabled_speed_networking &&
+            loungeJoinTimestampRef.current &&
+            Date.now() - loungeJoinTimestampRef.current < 5000 // 5 second grace period
+          );
+
+          if (!isBreakoutRef.current && !userInLoungeByMessage && explicitMainOrWaiting && !userJustJoinedLoungeDuringNetworking) {
             setActiveTableId(null);
             setActiveTableName("");
             setRoomChatConversationId(null);
+          } else if (!isBreakoutRef.current && explicitMainOrWaiting && userJustJoinedLoungeDuringNetworking) {
+            console.log("[MainSocket] ⏳ User just joined Social Lounge during Speed Networking - preserving activeTableId despite explicit main_room message");
           }
 
           // Restore break state on reconnect (welcome message includes break state)
@@ -7002,29 +7125,32 @@ export default function NewLiveMeeting() {
           setLoungeCountingDown(false);
           setLoungeCountdownValue(0);
 
-          if (!isHostRef.current) {
-            if (msg.transition === "to_main_room") {
-              // Participant is now admitted - main room will load
-              setWaitingRoomActive(false);
-              setLoungeOpen(false);
-              setJoinMainRequested(true);
-              setHostChoseLoungeOnly(false);
-              setJoinRequestTick((v) => v + 1);
-              showSnackbar("You've been moved to the Main Room!", "success");
-            } else {
-              // Participant moved to waiting room
-              if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
-                applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
-                  console.warn("[MainSocket] Failed to return from breakout before waiting room:", e);
-                });
-              }
-              setWaitingRoomActive(true);
-              setLoungeOpen(false);
-              setWaitingRoomStatus("waiting");
-              setJoinMainRequested(false);
-              setHostChoseLoungeOnly(false);
-              showSnackbar("The Social Lounge has closed. Waiting for host admission...", "info");
+          if (msg.transition === "to_main_room") {
+            // All users (including host) should return to main room.
+            setWaitingRoomActive(false);
+            setLoungeOpen(false);
+            setJoinMainRequested(true);
+            setHostChoseLoungeOnly(false);
+            setJoinRequestTick((v) => v + 1);
+            if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+              applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                console.warn("[MainSocket] Failed to force return to main room after lounge_stopped:", e);
+              });
             }
+            showSnackbar("You've been moved to the Main Room!", "success");
+          } else {
+            // Moved to waiting room
+            if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+              applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                console.warn("[MainSocket] Failed to return from breakout before waiting room:", e);
+              });
+            }
+            setWaitingRoomActive(true);
+            setLoungeOpen(false);
+            setWaitingRoomStatus("waiting");
+            setJoinMainRequested(false);
+            setHostChoseLoungeOnly(false);
+            showSnackbar("The Social Lounge has closed. Waiting for host admission...", "info");
           }
 
           // Refresh lounge state to clear tables
@@ -8236,6 +8362,18 @@ export default function NewLiveMeeting() {
         console.log("[LiveMeeting] Recent lounge rejoin in progress, waiting");
         return;
       }
+      // Critical guard: do not attempt main-room join while user is intentionally
+      // in Social Lounge during active Speed Networking.
+      const loungeFlowDuringNetworking = Boolean(
+        role !== "publisher" &&
+        eventData?.lounge_enabled_speed_networking &&
+        networkingSessionId &&
+        (loungeOpen || isBreakoutRef.current || activeTableIdRef.current)
+      );
+      if (loungeFlowDuringNetworking) {
+        console.log("[LiveMeeting] Skipping joinRoom() - in Social Lounge during active Speed Networking");
+        return;
+      }
 
       joinedOnceRef.current = true;
       joinInFlightRef.current = true;
@@ -8259,9 +8397,15 @@ export default function NewLiveMeeting() {
       } catch (e) {
         console.error("[LiveMeeting] ❌ joinRoom failed:", e?.message || e);
 
-        // ✅ Only retry if not recently rejoin from lounge (to avoid retry loops)
-        if (rejoinFromLoungeRef.current) {
-          console.warn("[LiveMeeting] Skipping join retry due to lounge rejoin");
+        // Do not retry while lounge flow is active; retries create repeated "Joining meeting..." loops.
+        const loungeFlowDuringNetworking = Boolean(
+          role !== "publisher" &&
+          eventData?.lounge_enabled_speed_networking &&
+          networkingSessionId &&
+          (loungeOpen || isBreakoutRef.current || activeTableIdRef.current)
+        );
+        if (rejoinFromLoungeRef.current || loungeFlowDuringNetworking) {
+          console.warn("[LiveMeeting] Skipping join retry due to lounge flow");
           setJoinError(e?.message || "Failed to join Dyte room");
           return;
         }
@@ -8286,7 +8430,7 @@ export default function NewLiveMeeting() {
     return () => {
       dyteMeeting.self.off?.("roomJoined", onRoomJoined);
     };
-  }, [dyteMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick]);
+  }, [dyteMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick, eventData?.lounge_enabled_speed_networking, networkingSessionId, loungeOpen]);
 
   // On lounge/breakout -> main transition, some SDKs recreate audio senders asynchronously.
   // Keep forcing hard mute briefly while mic UI is OFF to prevent ghost audio transmission.
@@ -8332,9 +8476,11 @@ export default function NewLiveMeeting() {
     if (!mainRoomAuthToken) return; // Need main token
     if (mainDyteMeeting) return; // Already initialized
     if (mainInitInFlightRef.current) return; // Already in flight
-    if (!roomJoined) return; // Wait for breakout room to be fully joined first
+    // ✅ CRITICAL FIX: Do NOT check roomJoined for lounge flow
+    // The main room peek is read-only and doesn't need lounge join to complete first
+    // It initializes independently to show live main room activity
 
-    console.log("[LiveMeeting] Initializing main room peek connection (delayed after breakout join)");
+    console.log("[LiveMeeting] ✅ Initializing main room peek connection");
     mainInitInFlightRef.current = true;
 
     (async () => {
@@ -8342,19 +8488,56 @@ export default function NewLiveMeeting() {
         await initMainMeeting({
           authToken: mainRoomAuthToken,
           defaults: {
-            // Peek connection should be receive-only (never publish mic/cam)
             audio: false,
             video: false,
           },
         });
-        console.log("[LiveMeeting] ✅ Main room peek connection initialized successfully");
+        console.log("[LiveMeeting] ✅ Main room peek initialized successfully");
       } catch (e) {
-        console.error("[LiveMeeting] Failed to initialize main room peek:", e);
+        console.error("[LiveMeeting] ❌ Main room peek init failed:", e?.message || e);
       } finally {
         mainInitInFlightRef.current = false;
       }
     })();
-  }, [isBreakout, mainRoomAuthToken, mainDyteMeeting, roomJoined, initMainMeeting]);
+  }, [isBreakout, mainRoomAuthToken, mainDyteMeeting, initMainMeeting]);
+
+  // Ensure main-room token exists for Main Room Peek even when main token fetch is skipped in lounge flow.
+  useEffect(() => {
+    if (!eventId) return;
+    if (!isBreakout) return;
+    if (mainRoomAuthToken || mainAuthTokenRef.current) return;
+    if (mainPeekTokenFetchInFlightRef.current) return;
+
+    mainPeekTokenFetchInFlightRef.current = true;
+    console.log("[LiveMeeting] Fetching main-room token for lounge peek");
+    (async () => {
+      try {
+        // ✅ CRITICAL FIX: Use /dyte/join/ endpoint (same as main token fetch) to get a valid token
+        // The endpoint auto-detects if user is host based on event permissions
+        // Token will be used for receive-only main room peek
+        const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `HTTP ${res.status}`);
+        }
+        const data = await res.json().catch(() => null);
+        if (data?.authToken) {
+          mainAuthTokenRef.current = data.authToken;
+          setMainRoomAuthToken(data.authToken);
+          console.log("[LiveMeeting] ✅ Main-room token fetched for peek");
+        } else {
+          throw new Error("No authToken in response");
+        }
+      } catch (e) {
+        console.warn("[LiveMeeting] Failed to fetch main-room token for peek:", e?.message || e);
+      } finally {
+        mainPeekTokenFetchInFlightRef.current = false;
+      }
+    })();
+  }, [eventId, isBreakout, mainRoomAuthToken]);
 
   // ---------- Join timer (shows how long THIS user has been in the meeting) ----------
   useEffect(() => {
@@ -8414,6 +8597,7 @@ export default function NewLiveMeeting() {
 
       if (activeSession) {
         console.log('[LiveMeeting] ✅ Auto-detected active Speed Networking session, opening zone');
+        setNetworkingSessionId(activeSession.id);
         // Mark as auto-joined to prevent repeated attempts
         speedNetworkingAutoJoinedRef.current = true;
 
@@ -8846,6 +9030,31 @@ export default function NewLiveMeeting() {
   const navigateAfterMeetingExit = useCallback(() => {
     navigate(defaultMeetingExitPath, { replace: true });
   }, [defaultMeetingExitPath, navigate]);
+
+  const handleSpeedNetworkingNavigateMainRoom = useCallback(() => {
+    setShowSpeedNetworking(false);
+    setMainMeetingIsolationForSpeedNetworking(false);
+  }, [setMainMeetingIsolationForSpeedNetworking]);
+
+  const handleSpeedNetworkingNavigateSocialLounge = useCallback(() => {
+    setShowSpeedNetworking(false);
+    setMainMeetingIsolationForSpeedNetworking(false);
+    setJoinMainRequested(false);
+    setLoungeOpen(true);
+  }, [setMainMeetingIsolationForSpeedNetworking]);
+
+  const handleSpeedNetworkingNavigateEventEnded = useCallback(() => {
+    setShowSpeedNetworking(false);
+    setMainMeetingIsolationForSpeedNetworking(false);
+    setShowEndStateMessage(true);
+
+    if (navigationTimeoutRef.current) {
+      clearTimeout(navigationTimeoutRef.current);
+    }
+    navigationTimeoutRef.current = setTimeout(() => {
+      navigateAfterMeetingExit();
+    }, 4000);
+  }, [navigateAfterMeetingExit, setMainMeetingIsolationForSpeedNetworking]);
 
   const handleMeetingEnd = useCallback(
     async (state, options = {}) => {
@@ -10613,7 +10822,7 @@ export default function NewLiveMeeting() {
 
           // Find the corresponding Dyte participant
           const dyteParticipant = participants.find(p => {
-            const pUserId = getBackendUserId(p);
+            const pUserId = getBackendUserId(p) || participantIdMapRef.current?.get(p.id);
             return pUserId && String(pUserId) === userId;
           });
 
@@ -10940,6 +11149,15 @@ export default function NewLiveMeeting() {
     if (role === "publisher") return; // Hosts don't auto-rejoin
     if (!isBreakout) return; // Only applies to users in breakout/lounge
 
+    // If Speed Networking is active and event setting allows lounge during networking,
+    // do not force rejoin to main room even when regular lounge status appears CLOSED.
+    const loungeAllowedDuringNetworking = Boolean(
+      networkingSessionId && eventData?.lounge_enabled_speed_networking
+    );
+    if (loungeAllowedDuringNetworking) {
+      return;
+    }
+
     // ✅ CRITICAL FIX: Do not force rejoin if user is in ANY table
     // This check happens FIRST before anything else to prevent premature rejoin
     if (activeTableId) {
@@ -10998,6 +11216,8 @@ export default function NewLiveMeeting() {
     loungeOpenStatus?.status,
     isPostEventLounge,
     activeTableId,
+    networkingSessionId,
+    eventData?.lounge_enabled_speed_networking,
     forceRejoinMainFromLounge,
     shouldTriggerLoungeRejoin,
   ]);
@@ -18813,12 +19033,16 @@ export default function NewLiveMeeting() {
             eventId={eventId}
             isAdmin={isHost}
             onClose={handleCloseSpeedNetworking}
+            onNavigateMainRoom={handleSpeedNetworkingNavigateMainRoom}
+            onNavigateSocialLounge={handleSpeedNetworkingNavigateSocialLounge}
+            onNavigateEventEnded={handleSpeedNetworkingNavigateEventEnded}
             dyteMeeting={dyteMeeting}
             autoJoinOnOpen={speedNetworkingAutoJoinTrigger}
             onNetworkingStateChange={handleSpeedNetworkingStateChange}
             // Passing down the last WebSocket message to handle matching events
             lastMessage={lastMessage}
             onMemberInfo={openMemberInfo}
+            loungeEnabledSpeedNetworking={eventData?.lounge_enabled_speed_networking}
           />
         </Dialog>
 
@@ -18860,7 +19084,7 @@ export default function NewLiveMeeting() {
           >
             <MainRoomPeek
               mainDyteMeeting={mainDyteMeeting}
-              isInBreakout={isInBreakoutRoom}
+              isInBreakout={isInBreakoutForPeek}
               onClose={() => setMainRoomPeekVisible(false)}
               onHeaderPointerDown={handleMainRoomPeekDragStart}
               isDragging={isDraggingMainRoomPeek}
