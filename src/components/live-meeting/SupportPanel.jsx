@@ -236,7 +236,7 @@ export function AttendeeSupportDialog({
   );
 }
 
-export function HostSupportInbox({ requests, onResolve }) {
+export function HostSupportInbox({ requests, onResolve, onMessage }) {
   const allRequests = Array.isArray(requests) ? requests : [];
   const activeRequests = allRequests.filter((request) => request.status !== "resolved");
   const resolvedRequests = allRequests
@@ -258,7 +258,7 @@ export function HostSupportInbox({ requests, onResolve }) {
           Support requests
         </Typography>
         <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.62)" }}>
-          Resolving a request removes it from the active queue and notifies the attendee that a host handled it.
+          Open a direct message to help the attendee, then resolve the request once you have handled it.
         </Typography>
       </Paper>
 
@@ -331,24 +331,42 @@ export function HostSupportInbox({ requests, onResolve }) {
                 </Typography>
               </Stack>
 
-              <Button
-                onClick={() => onResolve?.(request.id)}
-                variant="outlined"
-                size="small"
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 700,
-                  px: 1.5,
-                  borderColor: "rgba(20,184,177,0.35)",
-                  color: "#99f6e4",
-                  "&:hover": {
-                    borderColor: "rgba(20,184,177,0.55)",
-                    bgcolor: "rgba(20,184,177,0.08)",
-                  },
-                }}
-              >
-                Resolve
-              </Button>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {onMessage ? (
+                  <Button
+                    onClick={() => onMessage(request)}
+                    variant="contained"
+                    size="small"
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 700,
+                      px: 1.6,
+                      bgcolor: "#14b8b1",
+                      "&:hover": { bgcolor: "#0f9a94" },
+                    }}
+                  >
+                    Message
+                  </Button>
+                ) : null}
+                <Button
+                  onClick={() => onResolve?.(request.id)}
+                  variant="outlined"
+                  size="small"
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 700,
+                    px: 1.5,
+                    borderColor: "rgba(20,184,177,0.35)",
+                    color: "#99f6e4",
+                    "&:hover": {
+                      borderColor: "rgba(20,184,177,0.55)",
+                      bgcolor: "rgba(20,184,177,0.08)",
+                    },
+                  }}
+                >
+                  Resolve
+                </Button>
+              </Stack>
             </Box>
           </Stack>
         </Paper>

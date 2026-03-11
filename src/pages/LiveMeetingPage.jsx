@@ -12239,6 +12239,23 @@ export default function NewLiveMeeting() {
     setPrivateMessages([]);
   };
 
+  const handleMessageSupportRequester = useCallback((request) => {
+    if (!request?.requesterId) {
+      showSnackbar("Missing requester information for this support request.", "error");
+      return;
+    }
+
+    handleOpenPrivateChat({
+      id: request.requesterId,
+      name: request.requesterName || "Participant",
+      picture: request.requesterPicture || "",
+      role: "Audience",
+      _raw: {
+        customParticipantId: request.requesterId,
+      },
+    });
+  }, [handleOpenPrivateChat, showSnackbar]);
+
   const sendPrivateMessage = async () => {
     const text = privateInput.trim();
     if (!text || !privateConversationId) return;
@@ -15646,7 +15663,8 @@ export default function NewLiveMeeting() {
 
             <TabPanel value={tab} index={SUPPORT_TAB_INDEX}>
               <HostSupportInbox
-                requests={unresolvedSupportRequests}
+                requests={supportRequests}
+                onMessage={handleMessageSupportRequester}
                 onResolve={handleResolveSupportRequest}
               />
             </TabPanel>
