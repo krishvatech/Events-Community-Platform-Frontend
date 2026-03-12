@@ -881,7 +881,7 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick, onT
   );
 }
 
-function JoiningMeetingScreen({ onBack, brandText = "IMAA Connect" }) {
+function JoiningMeetingScreen({ onBack, brandText = "IMAA Connect", status = "Joining meeting..." }) {
   return (
     <Box
       sx={{
@@ -955,7 +955,7 @@ function JoiningMeetingScreen({ onBack, brandText = "IMAA Connect" }) {
         <CircularProgress size={36} sx={{ color: "rgba(255,255,255,0.65)", mb: 1.5 }} />
 
         <Typography sx={{ fontWeight: 800, letterSpacing: 0.2, color: "rgba(255,255,255,0.88)" }}>
-          Joining meeting...
+          {status}
         </Typography>
 
         <Typography sx={{ mt: 0.5, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
@@ -2452,6 +2452,25 @@ export default function NewLiveMeeting() {
   const [speedNetworkingAutoJoinTrigger, setSpeedNetworkingAutoJoinTrigger] = useState(0);
   const [speedNetworkingNotification, setSpeedNetworkingNotification] = useState(null); // ✅ Notification message
 
+  // ✅ SPEED NETWORKING STOP FLOW STATE MACHINE
+  const [speedNetworkingState, setSpeedNetworkingState] = useState('idle');
+  const [stopFlowTransitionId, setStopFlowTransitionId] = useState(null);
+  const [stopFlowStartTimestamp, setStopFlowStartTimestamp] = useState(null);
+  const speedNetworkingStateRef = useRef('idle');
+  const stopFlowTransitionIdRef = useRef(null);
+  const stopFlowTimeoutRef = useRef(null);
+  const stopFlowLogRef = useRef([]);
+  const speedNetworkingStopPhaseRef = useRef('idle');
+  const dyteLoungeRoomConnectingRef = useRef(false);
+
+  useEffect(() => {
+    speedNetworkingStateRef.current = speedNetworkingState;
+  }, [speedNetworkingState]);
+
+  useEffect(() => {
+    stopFlowTransitionIdRef.current = stopFlowTransitionId;
+  }, [stopFlowTransitionId]);
+
   // ✅ NEW: Speed Networking Session Prompt State
   const [sessionStartNotification, setSessionStartNotification] = useState(null); // {sessionId, durationMinutes, timestamp}
   const [showNetworkingPrompt, setShowNetworkingPrompt] = useState(false); // Show/hide modal
@@ -3720,6 +3739,21 @@ export default function NewLiveMeeting() {
     setShowSpeedNetworking(false);
     setMainMeetingIsolationForSpeedNetworking(false);
   }, [setMainMeetingIsolationForSpeedNetworking]);
+
+  // ✅ LOGGING HELPER FOR STOP FLOW TRACKING
+  const logStopFlow = useCallback((phase, message, data = {}) => {
+    if (!stopFlowTransitionId) return;
+
+    const now = Date.now();
+    const elapsedMs = stopFlowStartTimestamp ? now - stopFlowStartTimestamp : 0;
+    const entry = { timestamp: now, elapsedMs, phase, message, data };
+
+    stopFlowLogRef.current.push(entry);
+    console.log(
+      `[StopFlow:${stopFlowTransitionId}] +${elapsedMs}ms | ${phase} | ${message}`,
+      Object.keys(data).length ? data : ''
+    );
+  }, [stopFlowTransitionId, stopFlowStartTimestamp]);
 
   const enforceSelfBreakMediaLock = useCallback(async () => {
     // ✅ STATE PRIORITY FIX: Skip lock enforcement for lounge users during break
@@ -7031,10 +7065,68 @@ export default function NewLiveMeeting() {
           // This will be handled by SpeedNetworkingZone component
           setLastMessage(msg);
         } else if (msg.type === "speed_networking_session_ended") {
-          // ✅ NEW: Handle Speed Networking Session Ended
-          console.log("[MainSocket] Networking session ended");
+          console.log("[MainSocket] 🛑 Networking session ended");
+
+          const existingTransitionId = stopFlowTransitionIdRef.current;
+          const transitionId = existingTransitionId || `sn-server-stop-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          const timestamp = Date.now();
+
+          // Only proceed if not already in a stop flow (avoid double-triggering)
+          if (!existingTransitionId) {
+            setStopFlowTransitionId(transitionId);
+            setStopFlowStartTimestamp(timestamp);
+            setSpeedNetworkingState('stopping');
+            speedNetworkingStopPhaseRef.current = 'stopping';
+
+            console.log(`[StopFlow:${transitionId}] ▶️ SERVER-INITIATED STOP`);
+          } else {
+            console.log(`[StopFlow:${transitionId}] ℹ️ SERVER STOP received during active stop-flow (${speedNetworkingStateRef.current}), deduplicating`);
+          }
+
+          // Always execute state cleanup when message arrives
           setShowNetworkingPrompt(false);
           setNetworkingSessionId(null);
+          setShowSpeedNetworking(false);
+          setLoungeOpen(false);
+          setLoadingJoin(true);
+          setJoinError("");
+          setMainMeetingIsolationForSpeedNetworking(false);
+
+          // If host-click flow already moved us to rejoining/joined, skip duplicate token work.
+          if (existingTransitionId && ['rejoining_main', 'joined_main'].includes(speedNetworkingStateRef.current)) {
+            console.log(`[StopFlow:${transitionId}] ✅ Already ${speedNetworkingStateRef.current}; skipping duplicate server stop transition`);
+            showSnackbar("Speed Networking session has ended. Returning to main meeting...", "info");
+            return;
+          }
+
+          // Explicitly leave lounge room with logging
+          if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+            (async () => {
+              try {
+                const loungeExitPhaseStartTime = Date.now();
+                console.log(`[StopFlow:${transitionId}] 📤 Leaving lounge from server message... [elapsed: ${loungeExitPhaseStartTime - timestamp}ms]`);
+                speedNetworkingStopPhaseRef.current = 'leaving_lounge_room';
+                await applyBreakoutTokenRef.current(null, null, null, null);
+                const loungeExitDuration = Date.now() - loungeExitPhaseStartTime;
+                console.log(`[StopFlow:${transitionId}] ✅ Left lounge room [phase: ${loungeExitDuration}ms | total: ${Date.now() - timestamp}ms]`);
+
+                setSpeedNetworkingState('rejoining_main');
+                forceFreshMainTokenForStopFlow(transitionId).catch((err) => {
+                  console.error(`[StopFlow:${transitionId}] ❌ Fresh token fetch failed after lounge exit:`, err?.message || err);
+                  setJoinError(err?.message || "Failed to refresh meeting token");
+                });
+              } catch (e) {
+                console.warn(`[StopFlow:${transitionId}] ⚠️ Error leaving lounge [total: ${Date.now() - timestamp}ms]:`, e?.message);
+              }
+            })();
+          } else {
+            // No lounge, directly request main (FAST PATH)
+            setSpeedNetworkingState('rejoining_main');
+            forceFreshMainTokenForStopFlow(transitionId).catch((err) => {
+              console.error(`[StopFlow:${transitionId}] ❌ Fresh token fetch failed (no lounge):`, err?.message || err);
+              setJoinError(err?.message || "Failed to refresh meeting token");
+            });
+          }
 
           // ✅ Auto-resume recording when Speed Networking ends (only if we paused it)
           if (isHostRef.current && recordingPausedBySpeedNetworkingRef.current && isRecordingRef.current) {
@@ -7042,7 +7134,7 @@ export default function NewLiveMeeting() {
             handleResumeRecording();
           }
 
-          showSnackbar("Speed Networking session has ended", "info");
+          showSnackbar("Speed Networking session has ended. Returning to main meeting...", "info");
         } else if (msg.type === "break_started") {
           console.log("[MainSocket] Break started:", msg);
           setIsOnBreak(true);
@@ -8275,8 +8367,36 @@ export default function NewLiveMeeting() {
     console.log("[LiveMeeting] ✅ Join effect triggered! dyteMeeting.self exists and initDone is true");
 
     const onRoomJoined = async () => {
+      // ✅ NEW: Mark stop flow as successfully joined
+      if (speedNetworkingStopPhaseRef.current !== 'joined_main') {
+        console.log(`[StopFlow] Room joined, marking as completed`);
+        speedNetworkingStopPhaseRef.current = 'joined_main';
+        setSpeedNetworkingState('joined_main');
+        speedNetworkingStateRef.current = 'joined_main';
+
+        // Clear timeout since we succeeded
+        if (stopFlowTimeoutRef.current) {
+          clearTimeout(stopFlowTimeoutRef.current);
+          stopFlowTimeoutRef.current = null;
+        }
+
+        // Clear stop flow ID so new stops can happen
+        if (stopFlowTransitionId) {
+          console.log(`[StopFlow:${stopFlowTransitionId}] ✅ COMPLETED`);
+          setStopFlowTransitionId(null);
+          setStopFlowStartTimestamp(null);
+          stopFlowTransitionIdRef.current = null;
+        }
+
+        // Reset to idle now that main room is active
+        setSpeedNetworkingState('idle');
+        speedNetworkingStateRef.current = 'idle';
+      }
+
       console.log("[LiveMeeting] ✅ roomJoined event received!");
       setRoomJoined(true);
+      // Clear stale departed tracking after successful rejoin so host tiles are not incorrectly filtered.
+      departedParticipantIdsRef.current.clear();
       if (isBreakoutRef.current) {
         breakoutJoinInProgressRef.current = false;
         if (breakoutJoinTimeoutRef.current) {
@@ -8409,6 +8529,18 @@ export default function NewLiveMeeting() {
       } catch (e) {
         console.error("[LiveMeeting] ❌ joinRoom failed:", e?.message || e);
 
+        // During stop-flow recovery, stale tokens are common; force a fresh token immediately.
+        if (speedNetworkingState === 'rejoining_main') {
+          try {
+            const retryTag = stopFlowTransitionId || `sn-rejoin-retry-${Date.now()}`;
+            console.warn(`[StopFlow:${retryTag}] joinRoom failed during rejoin, forcing fresh token retry`);
+            await forceFreshMainTokenForStopFlow(retryTag);
+            return;
+          } catch (retryErr) {
+            console.error("[LiveMeeting] Fresh-token retry failed:", retryErr?.message || retryErr);
+          }
+        }
+
         // Do not retry while lounge flow is active; retries create repeated "Joining meeting..." loops.
         const loungeFlowDuringNetworking = Boolean(
           role !== "publisher" &&
@@ -8442,7 +8574,7 @@ export default function NewLiveMeeting() {
     return () => {
       dyteMeeting.self.off?.("roomJoined", onRoomJoined);
     };
-  }, [dyteMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick, eventData?.lounge_enabled_speed_networking, networkingSessionId, loungeOpen]);
+  }, [dyteMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick, eventData?.lounge_enabled_speed_networking, networkingSessionId, loungeOpen, speedNetworkingState, stopFlowTransitionId]);
 
   // On lounge/breakout -> main transition, some SDKs recreate audio senders asynchronously.
   // Keep forcing hard mute briefly while mic UI is OFF to prevent ghost audio transmission.
@@ -9046,6 +9178,143 @@ export default function NewLiveMeeting() {
   const handleSpeedNetworkingNavigateMainRoom = useCallback(() => {
     setShowSpeedNetworking(false);
     setMainMeetingIsolationForSpeedNetworking(false);
+    setLoungeOpen(false);
+    setLoadingJoin(true);
+    setJoinError("");
+    setJoinMainRequested(true);
+
+    if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+      applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+        console.warn("[LiveMeeting] Failed to force return to main room after speed networking navigation:", e);
+      });
+    }
+  }, [setMainMeetingIsolationForSpeedNetworking]);
+
+  async function forceFreshMainTokenForStopFlow(transitionId) {
+    const tag = transitionId || `sn-stop-refresh-${Date.now()}`;
+    console.log(`[StopFlow:${tag}] 🔄 Requesting fresh main-room token via dyte/join`);
+
+    // Never reuse cached token for stop-flow recovery.
+    mainAuthTokenRef.current = "";
+    setMainRoomAuthToken(null);
+    setAuthToken("");
+    setInitDone(false);
+    setRoomJoined(false);
+    joinedOnceRef.current = false;
+    setJoinMainRequested(true);
+
+    const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+
+    if (data?.waiting) {
+      setWaitingRoomActive(true);
+      setWaitingRoomStatus(data?.admission_status || "waiting");
+      setLoadingJoin(false);
+      console.log(`[StopFlow:${tag}] ⚠️ Fresh token response routed to waiting room`);
+      return false;
+    }
+
+    if (!data?.authToken) {
+      throw new Error("No auth token returned");
+    }
+
+    mainAuthTokenRef.current = data.authToken;
+    if (!mainRoomAuthToken) setMainRoomAuthToken(data.authToken);
+    setWaitingRoomActive(false);
+    setAuthToken(data.authToken);
+    setJoinRequestTick((v) => v + 1);
+    console.log(`[StopFlow:${tag}] ✅ Fresh main token applied`);
+    return true;
+  }
+
+  const handleSpeedNetworkingStopping = useCallback(() => {
+    const transitionId = `sn-stop-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const timestamp = Date.now();
+
+    // ✅ PHASE 1: IMMEDIATELY set "stopping" state to show transition UI
+    setStopFlowTransitionId(transitionId);
+    setStopFlowStartTimestamp(timestamp);
+    setSpeedNetworkingState('stopping');
+    stopFlowTransitionIdRef.current = transitionId;
+    speedNetworkingStateRef.current = 'stopping';
+    speedNetworkingStopPhaseRef.current = 'stopping';
+
+    // Log start of stop flow
+    console.log(`[StopFlow] ▶️ INITIATED ${transitionId}`);
+
+    // ✅ PHASE 2: Force immediate transition UI
+    setShowSpeedNetworking(false);  // Close dialog
+    setMainMeetingIsolationForSpeedNetworking(false);
+    setLoungeOpen(false);
+    setLoadingJoin(true);  // Force JoiningMeetingScreen to show
+    setJoinError("");
+
+    // ✅ PHASE 3: Force explicit Dyte room leave if in breakout
+    if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+      (async () => {
+        try {
+          speedNetworkingStopPhaseRef.current = 'leaving_lounge_room';
+          console.log(`[StopFlow:${transitionId}] Leaving lounge Dyte room...`);
+
+          dyteLoungeRoomConnectingRef.current = true;
+          await applyBreakoutTokenRef.current(null, null, null, null);
+
+          console.log(`[StopFlow:${transitionId}] ✅ Left lounge room`);
+        } catch (e) {
+          console.warn(`[StopFlow:${transitionId}] ⚠️ Error leaving lounge:`, e?.message);
+        } finally {
+          dyteLoungeRoomConnectingRef.current = false;
+
+          // ✅ PHASE 4: After lounge exit, IMMEDIATELY rejoin main room
+          speedNetworkingStopPhaseRef.current = 'requesting_main_join';
+          console.log(`[StopFlow:${transitionId}] Requesting main room join...`);
+          setSpeedNetworkingState('rejoining_main');
+          speedNetworkingStateRef.current = 'rejoining_main';
+          forceFreshMainTokenForStopFlow(transitionId).catch((e) => {
+            console.error(`[StopFlow:${transitionId}] ❌ Fresh token fetch failed:`, e?.message || e);
+            setJoinError(e?.message || "Failed to refresh meeting token");
+          });
+
+          // ✅ PHASE 5: Set timeout for safety
+          if (stopFlowTimeoutRef.current) clearTimeout(stopFlowTimeoutRef.current);
+          stopFlowTimeoutRef.current = setTimeout(() => {
+            if (speedNetworkingStopPhaseRef.current !== 'joined_main') {
+              console.error(`[StopFlow:${transitionId}] ❌ TIMEOUT: Failed to rejoin after 8s`);
+              setSpeedNetworkingState('error');
+              setJoinError('Reconnection timeout. Please refresh.');
+            }
+          }, 8000);
+        }
+      })();
+    } else {
+      // No lounge, directly request main join (FAST PATH)
+      speedNetworkingStopPhaseRef.current = 'requesting_main_join';
+
+      setSpeedNetworkingState('rejoining_main');
+      speedNetworkingStateRef.current = 'rejoining_main';
+      forceFreshMainTokenForStopFlow(transitionId).catch((e) => {
+        console.error(`[StopFlow:${transitionId}] ❌ Fresh token fetch failed:`, e?.message || e);
+        setJoinError(e?.message || "Failed to refresh meeting token");
+      });
+
+      // Set timeout for safety
+      if (stopFlowTimeoutRef.current) clearTimeout(stopFlowTimeoutRef.current);
+      stopFlowTimeoutRef.current = setTimeout(() => {
+        if (speedNetworkingStopPhaseRef.current !== 'joined_main') {
+          console.error(`[StopFlow:${transitionId}] ❌ TIMEOUT: Failed to rejoin after 8s`);
+          setSpeedNetworkingState('error');
+          setJoinError('Reconnection timeout. Please refresh.');
+        }
+      }, 8000);
+    }
   }, [setMainMeetingIsolationForSpeedNetworking]);
 
   const handleSpeedNetworkingNavigateSocialLounge = useCallback(() => {
@@ -9332,20 +9601,37 @@ export default function NewLiveMeeting() {
       const designatedHostId = hostIdRef.current || hostIdHint || null;
       const primaryHostKey = primaryHostUserId ? `id:${primaryHostUserId}` : "";
       const participantKey = getParticipantUserKey(participant?._raw || participant);
+      const knownHostKey = hostUserKeyRef.current || primaryHostKey || "";
+      const participantBackendUserId = String(getBackendUserId(participant?._raw || participant) || "");
+      const isPrimaryHostParticipant = Boolean(
+        primaryHostUserId && participantBackendUserId === String(primaryHostUserId)
+      );
+      const matchesKnownHostIdentity = Boolean(knownHostKey && participantKey && participantKey === knownHostKey);
       const isPublisher =
         preset.includes("host") ||
         preset.includes("publisher") ||
         preset.includes("admin") ||
         preset.includes("presenter") ||
-        (hostIdHint && participant.id === hostIdHint);
+        (hostIdHint && participant.id === hostIdHint) ||
+        isPrimaryHostParticipant ||
+        matchesKnownHostIdentity;
 
-      // If we already have a designated host ID, only pin that participant.
-      if (designatedHostId && participant.id !== designatedHostId) return;
+      // If we already have a designated host ID, still allow canonical host identity
+      // because Dyte participant IDs can change after room switches/rejoins.
+      if (
+        designatedHostId &&
+        participant.id !== designatedHostId &&
+        !isPrimaryHostParticipant &&
+        !matchesKnownHostIdentity
+      ) return;
       // If we don't have designated host yet but know creator ID, only accept creator as canonical host.
-      if (!designatedHostId && primaryHostKey && participantKey !== primaryHostKey) return;
+      if (!designatedHostId && primaryHostKey && participantKey !== primaryHostKey && !isPrimaryHostParticipant) return;
 
       if (isPublisher) {
-        if (!designatedHostId) setHostIdHint(participant.id || null);
+        if (!designatedHostId || (participant.id && participant.id !== designatedHostId)) {
+          setHostIdHint(participant.id || null);
+        }
+        if (participantKey) hostUserKeyRef.current = participantKey;
         setHostJoined(true);
         setPinnedHost(participant);
         enforceSpotlightLayout();
@@ -11391,6 +11677,12 @@ export default function NewLiveMeeting() {
       if (spotlighted) return spotlighted?._raw || spotlighted;
     }
 
+    const participantInCurrentDyteRoom = (participant) => {
+      if (!participant?.id) return false;
+      if (dyteMeeting?.self?.id && participant.id === dyteMeeting.self.id) return true;
+      return getJoinedParticipants().some((x) => x?.id === participant.id);
+    };
+
     // Canonical host pin: when creator is present, everyone must pin the same creator participant.
     if (!isBreakout && primaryHostUserId) {
       const primaryHostKey = `id:${primaryHostUserId}`;
@@ -11398,9 +11690,9 @@ export default function NewLiveMeeting() {
         getJoinedParticipants().find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
         participants.find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
         (dyteMeeting?.self && getParticipantUserKey(dyteMeeting.self) === primaryHostKey ? dyteMeeting.self : null);
-      // ✅ FIX: Don't pin creator host if they're occupying a breakout room
-      // In main view, only pin if they're actually in main room
-      if (creatorHost && !creatorHost.isOccupyingLounge) {
+      // Prefer current Dyte room presence over lounge metadata (location flags can be stale during transitions).
+      const creatorInCurrentRoom = participantInCurrentDyteRoom(creatorHost);
+      if (creatorHost && (creatorInCurrentRoom || !creatorHost.isOccupyingLounge)) {
         console.log("[LatestPinnedHost] ✅ Pinning creator host from main room:", creatorHost.name);
         return creatorHost?._raw || creatorHost;
       } else if (creatorHost && creatorHost.isOccupyingLounge) {
@@ -11458,9 +11750,23 @@ export default function NewLiveMeeting() {
 
     // Keep all clients aligned to the same designated host when available.
     if (!isBreakout && designatedHostId) {
+      const primaryHostKey = primaryHostUserId ? `id:${primaryHostUserId}` : "";
+      const knownHostKey = hostUserKeyRef.current || primaryHostKey || "";
       const designated =
         getJoinedParticipants().find((x) => x?.id === designatedHostId) ||
+        (knownHostKey
+          ? getJoinedParticipants().find((x) => getParticipantUserKey(x?._raw || x) === knownHostKey)
+          : null) ||
+        (primaryHostUserId
+          ? getJoinedParticipants().find((x) => String(getBackendUserId(x?._raw || x) || "") === String(primaryHostUserId))
+          : null) ||
         participants.find((x) => x?.id === designatedHostId) ||
+        (knownHostKey
+          ? participants.find((x) => getParticipantUserKey(x?._raw || x) === knownHostKey)
+          : null) ||
+        (primaryHostUserId
+          ? participants.find((x) => String(getBackendUserId(x?._raw || x) || "") === String(primaryHostUserId))
+          : null) ||
         (dyteMeeting?.self?.id === designatedHostId ? dyteMeeting.self : null);
       if (designated) p = designated;
     }
@@ -11519,7 +11825,8 @@ export default function NewLiveMeeting() {
             inMeeting: hostParticipant.inMeeting,
             preset: hostParticipant.presetName
           });
-          if (!hostParticipant.isOccupyingLounge) {
+          const hostInCurrentRoom = participantInCurrentDyteRoom(hostParticipant);
+          if (hostInCurrentRoom || !hostParticipant.isOccupyingLounge) {
             console.log("[LatestPinnedHost] ✅ PINNING: Found host in main room, using as pinned host:", hostParticipant.name);
             p = hostParticipant;
           } else {
@@ -11647,7 +11954,7 @@ export default function NewLiveMeeting() {
     // ✅ CRITICAL FIX: When viewing main room (!isBreakout), only show main room participants
     // If all participants are in lounges, show null (no participant in main stage)
     if (!isBreakout && p) {
-      const pinnedIsInLounge = p.isOccupyingLounge;
+      const pinnedIsInLounge = p.isOccupyingLounge && !participantInCurrentDyteRoom(p);
       if (pinnedIsInLounge) {
         console.log("[MainRoomFilter] Pinned participant is in lounge, not showing in main room view");
         // Try to find a main room participant
@@ -16190,8 +16497,22 @@ export default function NewLiveMeeting() {
     );
   }
 
-  if (loadingJoin) {
-    return <JoiningMeetingScreen onBack={handleBack} />;
+  // ✅ Show joining screen if:
+  // 1. loadingJoin is true, OR
+  // 2. In the process of stopping speed networking
+  if (loadingJoin || speedNetworkingState === 'stopping' || speedNetworkingState === 'rejoining_main') {
+    return (
+      <JoiningMeetingScreen
+        onBack={handleBack}
+        status={
+          speedNetworkingState === 'stopping'
+            ? 'Stopping networking...'
+            : speedNetworkingState === 'rejoining_main'
+            ? 'Returning to main meeting...'
+            : 'Joining meeting...'
+        }
+      />
+    );
   }
 
   // ✅ If lounge has ended and user gets "Event ended" error, show thank you page instead
@@ -19071,6 +19392,7 @@ export default function NewLiveMeeting() {
             onNavigateMainRoom={handleSpeedNetworkingNavigateMainRoom}
             onNavigateSocialLounge={handleSpeedNetworkingNavigateSocialLounge}
             onNavigateEventEnded={handleSpeedNetworkingNavigateEventEnded}
+            onSessionStopping={handleSpeedNetworkingStopping}
             dyteMeeting={dyteMeeting}
             autoJoinOnOpen={speedNetworkingAutoJoinTrigger}
             onNetworkingStateChange={handleSpeedNetworkingStateChange}
@@ -19889,6 +20211,16 @@ function MemberInfoContent({ selectedMember, onClose }) {
       alive = false;
     };
   }, [selectedMember]);
+
+  // ✅ CLEANUP: Clear stop flow timeout on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup timeout on component unmount
+      if (stopFlowTimeoutRef.current) {
+        clearTimeout(stopFlowTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // 2. Send request
   const handleConnect = async () => {

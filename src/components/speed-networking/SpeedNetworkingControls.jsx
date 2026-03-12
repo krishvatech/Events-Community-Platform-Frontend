@@ -15,7 +15,8 @@ export default function SpeedNetworkingControls({
     eventId,
     session,
     onSessionCreated,
-    onSessionUpdated
+    onSessionUpdated,
+    onSessionStopping
 }) {
     const [createOpen, setCreateOpen] = useState(false);
     const [sessionName, setSessionName] = useState('Speed Networking');
@@ -195,6 +196,7 @@ export default function SpeedNetworkingControls({
         if (!session) return;
 
         try {
+            if (onSessionStopping) onSessionStopping();
             setLoading(true);
             const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/stop/`.replace(/([^:]\/)\/+/g, "$1");
             const res = await fetch(url, {

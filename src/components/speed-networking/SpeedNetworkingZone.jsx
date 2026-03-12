@@ -78,7 +78,8 @@ export default function SpeedNetworkingZone({
     onMemberInfo,
     onPrivateChat,
     autoJoinOnOpen = false,
-    loungeEnabledSpeedNetworking = false // ✅ NEW: Flag to show "Go to Social Lounge" button
+    loungeEnabledSpeedNetworking = false, // ✅ NEW: Flag to show "Go to Social Lounge" button
+    onSessionStopping
 }) {
     const [session, setSession] = useState(null);
     const [currentMatch, setCurrentMatch] = useState(null);
@@ -823,7 +824,7 @@ export default function SpeedNetworkingZone({
             } finally {
                 sessionPollInFlightRef.current = false;
             }
-        }, 20000); // OPTIMIZATION: Increased from 5s to 20s for 100+ user scalability
+        }, 2000); // Fast fallback so participants exit speed networking quickly even if WS event is missed.
 
         return () => clearInterval(pollInterval);
     }, [session?.id, eventId]);
@@ -888,6 +889,7 @@ export default function SpeedNetworkingZone({
                     <SpeedNetworkingControls
                         eventId={eventId}
                         onSessionCreated={fetchActiveSession}
+                        onSessionStopping={onSessionStopping}
                     />
                 )}
                 <Button
@@ -1135,6 +1137,7 @@ export default function SpeedNetworkingZone({
                             eventId={eventId}
                             session={session}
                             onSessionUpdated={fetchActiveSession}
+                            onSessionStopping={onSessionStopping}
                         />
                     </Box>
                     {session.status === 'ACTIVE' && (
