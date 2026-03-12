@@ -320,6 +320,11 @@ const pickAvatarUrl = (u) => {
   if (!u) return "";
   const cands = [
     u.avatar_url,                       // from /users/roster/
+    u.avatar,
+    u.user_image,
+    u.user_image_url,
+    u.image,
+    u.photo,
     u.profile?.user_image,              // your DB column
     u.profile?.avatar,
     u.profile?.photo,
@@ -3293,6 +3298,21 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       last_name: u?.last_name ?? x?.last_name ?? "",
       full_name: u?.full_name ?? x?.full_name ?? "",
       name: u?.name ?? x?.name ?? "",
+      avatar_url:
+        u?.avatar_url ??
+        u?.avatar ??
+        u?.user_image ??
+        u?.user_image_url ??
+        u?.image ??
+        u?.photo ??
+        x?.avatar_url ??
+        x?.avatar ??
+        x?.user_image ??
+        x?.user_image_url ??
+        x?.image ??
+        x?.photo ??
+        "",
+      kyc_status: u?.kyc_status ?? u?.profile?.kyc_status ?? x?.kyc_status ?? "",
       profile: u?.profile ?? x?.profile ?? null,
     };
   }
@@ -4397,7 +4417,18 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                             </Avatar>
                           </ListItemAvatar>
                           <ListItemText
-                            primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{name}</Typography>}
+                            primary={
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {name}
+                                </Typography>
+                                {isVerifiedStatus(f?.kyc_status || f?.profile?.kyc_status) && (
+                                  <Tooltip title="Verified Member">
+                                    <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 16 }} />
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            }
                             secondary={<Typography variant="caption" color="text.secondary">{f?.email || ""}</Typography>}
                           />
                         </ListItem>
