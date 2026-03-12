@@ -1764,10 +1764,7 @@ function WaitingRoomScreen({
   waitingCount = 0,
   announcementsRef = null,
   isOnBreak = false,
-  supportDialogProps = null,
 }) {
-  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
-
   // ✅ NEW: Initialize announcements component
   const announcementHelper = WaitingRoomAnnouncements({});
 
@@ -2032,32 +2029,8 @@ function WaitingRoomScreen({
       </Paper>
 
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-        Having trouble? Check your connection or{" "}
-        <Typography
-          component="span"
-          onClick={() => setSupportDialogOpen(true)}
-          sx={{
-            fontSize: "inherit",
-            lineHeight: "inherit",
-            whiteSpace: "nowrap",
-            color: "rgba(100, 200, 255, 0.85)",
-            cursor: "pointer",
-            fontWeight: 600,
-            "&:hover": {
-              color: "rgba(150, 220, 255, 1)",
-            },
-          }}
-        >
-          <SupportAgentIcon sx={{ fontSize: 14, verticalAlign: "text-bottom", mr: 0.4 }} />
-          contact support
-        </Typography>
+        Support request is temporarily unavailable while you are in the waiting room.
       </Typography>
-
-      <AttendeeSupportDialog
-        open={supportDialogOpen}
-        onClose={() => setSupportDialogOpen(false)}
-        {...supportDialogProps}
-      />
     </Box>
   );
 }
@@ -6398,6 +6371,7 @@ export default function NewLiveMeeting() {
             const seconds = Number(msg.cooldown_seconds || 60);
             setAssistanceCooldownUntil(Date.now() + seconds * 1000);
             setAttendeeSupportFeedback({ kind: "sent", reason: "" });
+            setSupportDialogOpen(false);
             showSnackbar("Assistance request sent to hosts/moderators.", "success");
           } else if (msg.reason === "cooldown_active") {
             const seconds = Number(msg.cooldown_seconds || 60);
@@ -6448,6 +6422,27 @@ export default function NewLiveMeeting() {
         } else if (msg.type === "assistance_resolve_ack") {
           if (!msg.ok) {
             showSnackbar("Unable to resolve support request right now.", "error");
+          }
+        } else if (msg.type === "support_chat_started") {
+          setSupportDialogOpen(false);
+          setAttendeeSupportFeedback({
+            kind: "chat_started",
+            reason: "",
+            resolverName: msg.host_name || "A host",
+          });
+          openPrivateChatRef.current?.({
+            id: msg.host_id,
+            name: msg.host_name || "Host",
+            picture: "",
+            role: "Host",
+            _raw: {
+              customParticipantId: msg.host_id,
+            },
+          });
+          showSnackbar(`${msg.host_name || "A host"} started a direct support chat with you.`, "info");
+        } else if (msg.type === "support_chat_started_ack") {
+          if (!msg.ok) {
+            showSnackbar("Unable to notify attendee about support chat yet.", "error");
           }
         } else if (msg.type === "breakout_timer") {
           // ✅ PHASE 3: ENHANCED DUAL-TIMER WEBSOCKET PROTOCOL
@@ -7335,6 +7330,9 @@ export default function NewLiveMeeting() {
     if (attendeeSupportFeedback.kind === "queued") {
       return "Connection is recovering. Your request is queued and will send automatically.";
     }
+    if (attendeeSupportFeedback.kind === "chat_started") {
+      return `${attendeeSupportFeedback.resolverName || "A host"} opened a direct chat with you. Please continue there.`;
+    }
     if (attendeeSupportFeedback.kind === "resolved") {
       return `${attendeeSupportFeedback.resolverName || "A host"} marked your request as resolved. Send another request if you still need help.`;
     }
@@ -7363,6 +7361,9 @@ export default function NewLiveMeeting() {
   }, [attendeeSupportFeedback.kind, attendeeSupportFeedback.reason, attendeeSupportFeedback.resolverName, isMainRoomSupportMissing, waitingRoomActive]);
 
   const attendeeSupportStatusText = useMemo(() => {
+    if (attendeeSupportFeedback.kind === "chat_started") {
+      return "Host replied in direct chat";
+    }
     if (attendeeSupportFeedback.kind === "resolved") {
       return "Your previous support request was resolved";
     }
@@ -7384,6 +7385,7 @@ export default function NewLiveMeeting() {
       showSnackbar(`Please wait ${assistanceCooldownRemaining}s before requesting again.`, "info");
       return;
     }
+    setSupportDialogOpen(false);
     setAttendeeSupportFeedback({ kind: "pending", reason: "" });
     const sent = sendMainSocketAction({ action: "request_assistance" });
     if (!sent) {
@@ -7393,11 +7395,20 @@ export default function NewLiveMeeting() {
   }, [isHost, isBreakout, assistanceCooldownRemaining, sendMainSocketAction, showSnackbar]);
 
   const attendeeSupportDialogProps = useMemo(() => ({
-    onRequestAssistance: requestMainRoomAssistance,
+    onRequestAssistance:
+      attendeeSupportFeedback.kind === "chat_started"
+        ? () => {
+            setSupportDialogOpen(false);
+            if (isMdUp) setRightPanelOpen(true);
+            else setRightOpen(true);
+          }
+        : requestMainRoomAssistance,
     requestDisabled: assistanceCooldownRemaining > 0,
     requestLabel:
       assistanceCooldownRemaining > 0
         ? `Request Assistance (${assistanceCooldownRemaining}s)`
+        : attendeeSupportFeedback.kind === "chat_started"
+          ? "Open Chat"
         : attendeeSupportFeedback.kind === "resolved"
           ? "Request Again"
         : attendeeSupportFeedback.kind === "sent"
@@ -7422,6 +7433,7 @@ export default function NewLiveMeeting() {
     attendeeSupportFeedback.reason,
     attendeeSupportStatusText,
     getAttendeeSupportInfoText,
+    isMdUp,
     requestMainRoomAssistance,
   ]);
 
@@ -12387,6 +12399,7 @@ export default function NewLiveMeeting() {
   const [editingMsgId, setEditingMsgId] = useState(null);
   const [editText, setEditText] = useState("");
   const privateChatBottomRef = useRef(null); // To auto-scroll
+  const openPrivateChatRef = useRef(null);
   const [privateEventMetaById, setPrivateEventMetaById] = useState({});
 
   const handleOpenPrivateChat = async (member) => {
@@ -12446,12 +12459,18 @@ export default function NewLiveMeeting() {
         const msgs = await msgRes.json();
         setPrivateMessages(msgs);
       }
+      return convData.id;
     } catch (e) {
       console.error("Private chat error:", e);
+      return null;
     } finally {
       setPrivateChatLoading(false);
     }
   };
+
+  useEffect(() => {
+    openPrivateChatRef.current = handleOpenPrivateChat;
+  }, [handleOpenPrivateChat]);
 
   const handleClosePrivateChat = () => {
     setPrivateChatUser(null);
@@ -12460,13 +12479,13 @@ export default function NewLiveMeeting() {
     setPrivateMessages([]);
   };
 
-  const handleMessageSupportRequester = useCallback((request) => {
+  const handleMessageSupportRequester = useCallback(async (request) => {
     if (!request?.requesterId) {
       showSnackbar("Missing requester information for this support request.", "error");
       return;
     }
 
-    handleOpenPrivateChat({
+    const conversationId = await handleOpenPrivateChat({
       id: request.requesterId,
       name: request.requesterName || "Participant",
       picture: request.requesterPicture || "",
@@ -12475,7 +12494,22 @@ export default function NewLiveMeeting() {
         customParticipantId: request.requesterId,
       },
     });
-  }, [handleOpenPrivateChat, showSnackbar]);
+    if (!conversationId) {
+      showSnackbar("Unable to open support chat right now.", "error");
+      return;
+    }
+
+    const sent = sendMainSocketAction({
+      action: "start_support_chat",
+      request_id: request.id,
+      requester_id: request.requesterId,
+    });
+    if (!sent) {
+      showSnackbar("Connection is re-establishing. Support chat notification queued.", "warning");
+      return;
+    }
+    showSnackbar(`Opening direct chat with ${request.requesterName || "participant"}.`, "info");
+  }, [handleOpenPrivateChat, sendMainSocketAction, showSnackbar]);
 
   const sendPrivateMessage = async () => {
     const text = privateInput.trim();
