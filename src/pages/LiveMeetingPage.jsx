@@ -12087,12 +12087,13 @@ export default function NewLiveMeeting() {
     (role !== "publisher" && (dbStatus === "live" || roomJoined));
   const hasMainToken = Boolean(mainAuthTokenRef.current || authToken);
   // ✅ Show gate/lounge if in pre-event lounge and (for hosts) haven't chosen main yet
+  // PRE-EVENT LOUNGE TAKES PRIORITY over waiting room during its active window
   // Allow breakout display if loungeOpen (user joined a table)
   // Hosts see gate initially (!hostChoiceMade=true) or when they've chosen lounge (hostChoseLoungeOnly=true)
+  // ✅ CRITICAL FIX: Removed !waitingRoomActive and !attendeeWaitingRoomOverridesPreEventLounge
+  // During pre-event lounge time, participants should NEVER see waiting room or main room interface
   const shouldShowPreEventLoungeGate =
     preEventLoungeOpen && !joinMainRequested &&
-    !waitingRoomActive &&
-    !attendeeWaitingRoomOverridesPreEventLounge &&
     (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
     (!isBreakout || loungeOpen);
 
@@ -19071,7 +19072,8 @@ export default function NewLiveMeeting() {
         />
 
         {/* ✅ Main Room Peek (when seated at a lounge table) */}
-        {activeTableId && dyteMeeting && !isPostEventLounge && mainRoomPeekVisible && showMainRoomPeek && (
+        {/* ✅ CRITICAL: Hide main room peek during pre-event lounge - attendees should only see lounge */}
+        {activeTableId && dyteMeeting && !isPostEventLounge && !preEventLoungeOpen && mainRoomPeekVisible && showMainRoomPeek && (
           <Box
             ref={mainRoomPeekRef}
             sx={{
