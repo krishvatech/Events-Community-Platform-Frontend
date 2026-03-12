@@ -46,7 +46,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 
-import { isOwnerUser, isStaffUser } from "../utils/adminRole";
+import { isOwnerUser, isStaffUser, canEditProfilesUser } from "../utils/adminRole";
 import { apiClient, createWagtailSession, getSaleorDashboardUrl } from "../utils/api";
 import { clearAuth } from "../utils/authStorage";
 
@@ -152,6 +152,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
 
     const userIsOwner = isOwnerUser();
     const userIsStaff = isStaffUser(); // This is true for BOTH Staff and SuperUser(Platform Admin) usually?
+    const userCanEditProfiles = canEditProfilesUser();
     // Check utils/adminRole implementation references:
     // AdminSidebar says: const owner = isOwnerUser(); const staffOnly = !owner && isStaffUser();
 
@@ -211,6 +212,9 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
+        adminItems = userCanEditProfiles
+            ? [{ label: "Staff", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }]
+            : [];
         // Prompt says "My Posts - Community/MyPostPage.jsx" for Staff.
         // Prompt says "My Events - AdminEvents.jsx" for Staff.
         // Prompt says "Notifications - Community/NotificationsPage.jsx" for Staff.
@@ -466,7 +470,11 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
 
         const fetchUser = () => {
             apiClient.get("/users/me/").then((res) => {
-                if (active) setUser(res.data);
+                if (!active) return;
+                setUser(res.data);
+                try {
+                    localStorage.setItem("user", JSON.stringify(res.data || {}));
+                } catch { }
             }).catch(() => { });
         };
 

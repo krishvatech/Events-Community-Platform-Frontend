@@ -243,6 +243,9 @@ export const listAdminUsers = (params = {}) =>
 export const patchStaff = (id, is_staff) =>
   apiClient.patch(`${ADMIN_USERS_BASE}/${id}/`, { is_staff }).then((r) => r.data);
 
+export const patchAdminUser = (id, data) =>
+  apiClient.patch(`${ADMIN_USERS_BASE}/${id}/`, data).then((r) => r.data);
+
 export const bulkSetStaff = (ids, is_staff) =>
   apiClient.post(`${ADMIN_USERS_BASE}/bulk-set-staff/`, { ids, is_staff }).then((r) => r.data);
 
@@ -254,6 +257,57 @@ export const updateAdminUser = (id, data) =>
 
 export const deleteAdminUser = (id) =>
   apiClient.delete(`${ADMIN_USERS_BASE}/${id}/`).then((r) => r.data);
+
+const adminUserBase = (userId) => `${ADMIN_USERS_BASE}/${userId}`;
+
+const adminSub = (userId, resource) => {
+  const base = `${adminUserBase(userId)}/${resource}/`;
+  return {
+    list: () => apiClient.get(base).then((r) => r.data),
+    create: (data, config = undefined) => apiClient.post(base, data, config).then((r) => r.data),
+    update: (id, data, config = undefined) => apiClient.patch(`${base}${id}/`, data, config).then((r) => r.data),
+    remove: (id, config = undefined) => apiClient.delete(`${base}${id}/`, config).then((r) => r.data),
+  };
+};
+
+const adminDocApi = (userId, resource) => {
+  const base = `${adminUserBase(userId)}/${resource}/`;
+  return {
+    upload: (formData) =>
+      apiClient.post(base, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      }).then((r) => r.data),
+    remove: (id) => apiClient.delete(`${base}${id}/`).then((r) => r.data),
+  };
+};
+
+export const getAdminUserProfile = (userId) =>
+  apiClient.get(`${adminUserBase(userId)}/profile/`).then((r) => r.data);
+
+export const patchAdminUserProfile = (userId, data) =>
+  apiClient.patch(`${adminUserBase(userId)}/profile/`, data).then((r) => r.data);
+
+export const uploadAdminUserAvatar = (userId, file) => {
+  const formData = new FormData();
+  formData.append("avatar", file);
+  return apiClient.post(`${adminUserBase(userId)}/avatar/`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  }).then((r) => r.data);
+};
+
+export const adminUserEducations = (userId) => adminSub(userId, "educations");
+export const adminUserExperiences = (userId) => adminSub(userId, "experiences");
+export const adminUserTrainings = (userId) => adminSub(userId, "trainings");
+export const adminUserCertifications = (userId) => adminSub(userId, "certifications");
+export const adminUserMemberships = (userId) => adminSub(userId, "memberships");
+export const adminUserSkills = (userId) => adminSub(userId, "skills");
+export const adminUserLanguages = (userId) => adminSub(userId, "languages");
+export const adminUserLanguageCertificates = (userId) => adminSub(userId, "language-certificates");
+
+export const adminUserEduDocApi = (userId) => adminDocApi(userId, "education-documents");
+export const adminUserTrainingDocApi = (userId) => adminDocApi(userId, "training-documents");
+export const adminUserCertDocApi = (userId) => adminDocApi(userId, "certification-documents");
+export const adminUserMembershipDocApi = (userId) => adminDocApi(userId, "membership-documents");
 
 
 

@@ -1,6 +1,6 @@
 // src/pages/ProfilePage.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Avatar, Box, Button, Container, Divider, Grid, LinearProgress, Paper,
   Snackbar, Alert, TextField, Typography, Card, CardHeader, CardContent,
@@ -39,7 +39,7 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
-import { startKYC, submitNameChangeRequest } from "../utils/api";
+
 import { isFutureDate, isFutureMonth, isFutureYear } from "../utils/dateValidation";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
@@ -48,6 +48,7 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import RichProfile from "./community/RichProfile";
+import { isOwnerUser } from "../utils/adminRole";
 
 // -------------------- Constants for Dropdowns --------------------
 const CEFR_OPTIONS = [
@@ -132,12 +133,12 @@ const tokenHeader = () => {
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
-async function uploadEducationDocApi(educationId, file) {
+async function uploadEducationDocApi(userId, educationId, file) {
   const fd = new FormData();
   fd.append("education", educationId);
   fd.append("file", file);
   // Uses API_BASE defined in your file
-  const r = await fetch(`${API_BASE}/auth/me/education-documents/`, {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/education-documents/`, {
     method: "POST",
     headers: tokenHeader(), // Let browser set Content-Type for FormData
     body: fd
@@ -146,16 +147,16 @@ async function uploadEducationDocApi(educationId, file) {
   return await r.json();
 }
 
-async function deleteEducationDocApi(docId) {
-  const r = await fetch(`${API_BASE}/auth/me/education-documents/${docId}/`, {
+async function deleteEducationDocApi(userId, docId) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/education-documents/${docId}/`, {
     method: "DELETE",
     headers: tokenHeader()
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
 }
 
-async function addTrainingApi(payload) {
-  const r = await fetch(`${API_BASE}/auth/me/trainings/`, {
+async function addTrainingApi(userId, payload) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/trainings/`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...tokenHeader() },
     body: JSON.stringify(payload),
@@ -164,8 +165,8 @@ async function addTrainingApi(payload) {
   return await r.json();
 }
 
-async function updateTrainingApi(id, payload) {
-  const r = await fetch(`${API_BASE}/auth/me/trainings/${id}/`, {
+async function updateTrainingApi(userId, id, payload) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/trainings/${id}/`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...tokenHeader() },
     body: JSON.stringify(payload),
@@ -174,19 +175,19 @@ async function updateTrainingApi(id, payload) {
   return await r.json();
 }
 
-async function deleteTrainingApi(id) {
-  const r = await fetch(`${API_BASE}/auth/me/trainings/${id}/`, {
+async function deleteTrainingApi(userId, id) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/trainings/${id}/`, {
     method: "DELETE",
     headers: tokenHeader(),
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete training");
 }
 
-async function uploadTrainingDocApi(trainingId, file) {
+async function uploadTrainingDocApi(userId, trainingId, file) {
   const fd = new FormData();
   fd.append("training", trainingId);
   fd.append("file", file);
-  const r = await fetch(`${API_BASE}/auth/me/training-documents/`, {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/training-documents/`, {
     method: "POST",
     headers: tokenHeader(),
     body: fd
@@ -195,16 +196,16 @@ async function uploadTrainingDocApi(trainingId, file) {
   return await r.json();
 }
 
-async function deleteTrainingDocApi(docId) {
-  const r = await fetch(`${API_BASE}/auth/me/training-documents/${docId}/`, {
+async function deleteTrainingDocApi(userId, docId) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/training-documents/${docId}/`, {
     method: "DELETE",
     headers: tokenHeader()
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
 }
 
-async function addCertificationApi(payload) {
-  const r = await fetch(`${API_BASE}/auth/me/certifications/`, {
+async function addCertificationApi(userId, payload) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/certifications/`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...tokenHeader() },
     body: JSON.stringify(payload),
@@ -213,8 +214,8 @@ async function addCertificationApi(payload) {
   return await r.json();
 }
 
-async function updateCertificationApi(id, payload) {
-  const r = await fetch(`${API_BASE}/auth/me/certifications/${id}/`, {
+async function updateCertificationApi(userId, id, payload) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/certifications/${id}/`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...tokenHeader() },
     body: JSON.stringify(payload),
@@ -223,16 +224,16 @@ async function updateCertificationApi(id, payload) {
   return await r.json();
 }
 
-async function deleteCertificationApi(id) {
-  const r = await fetch(`${API_BASE}/auth/me/certifications/${id}/`, {
+async function deleteCertificationApi(userId, id) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/certifications/${id}/`, {
     method: "DELETE",
     headers: tokenHeader(),
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete certification");
 }
 
-async function addMembershipApi(payload) {
-  const r = await fetch(`${API_BASE}/auth/me/memberships/`, {
+async function addMembershipApi(userId, payload) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/memberships/`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...tokenHeader() },
     body: JSON.stringify(payload),
@@ -241,8 +242,8 @@ async function addMembershipApi(payload) {
   return await r.json();
 }
 
-async function updateMembershipApi(id, payload) {
-  const r = await fetch(`${API_BASE}/auth/me/memberships/${id}/`, {
+async function updateMembershipApi(userId, id, payload) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/memberships/${id}/`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...tokenHeader() },
     body: JSON.stringify(payload),
@@ -251,19 +252,19 @@ async function updateMembershipApi(id, payload) {
   return await r.json();
 }
 
-async function deleteMembershipApi(id) {
-  const r = await fetch(`${API_BASE}/auth/me/memberships/${id}/`, {
+async function deleteMembershipApi(userId, id) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/memberships/${id}/`, {
     method: "DELETE",
     headers: tokenHeader(),
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete membership");
 }
 
-async function uploadMembershipDocApi(membershipId, file) {
+async function uploadMembershipDocApi(userId, membershipId, file) {
   const fd = new FormData();
   fd.append("membership", membershipId);
   fd.append("file", file);
-  const r = await fetch(`${API_BASE}/auth/me/membership-documents/`, {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/membership-documents/`, {
     method: "POST",
     headers: tokenHeader(),
     body: fd
@@ -272,20 +273,20 @@ async function uploadMembershipDocApi(membershipId, file) {
   return await r.json();
 }
 
-async function deleteMembershipDocApi(docId) {
-  const r = await fetch(`${API_BASE}/auth/me/membership-documents/${docId}/`, {
+async function deleteMembershipDocApi(userId, docId) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/membership-documents/${docId}/`, {
     method: "DELETE",
     headers: tokenHeader()
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
 }
 
-async function uploadCertificationDocApi(certificationId, file) {
+async function uploadCertificationDocApi(userId, certificationId, file) {
   const formData = new FormData();
   formData.append("certification", certificationId);
   formData.append("file", file);
 
-  const r = await fetch(`${API_BASE}/auth/me/certification-documents/`, {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/certification-documents/`, {
     method: "POST",
     headers: tokenHeader(),
     body: formData,
@@ -294,8 +295,8 @@ async function uploadCertificationDocApi(certificationId, file) {
   return await r.json();
 }
 
-async function deleteCertificationDocApi(docId) {
-  const r = await fetch(`${API_BASE}/auth/me/certification-documents/${docId}/`, {
+async function deleteCertificationDocApi(userId, docId) {
+  const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/certification-documents/${docId}/`, {
     method: "DELETE",
     headers: tokenHeader(),
   });
@@ -1023,9 +1024,9 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
   };
   async function uploadAvatarApi(theFile) {
     const candidates = [
-      { url: `${API_BASE}/users/me/avatar/`, method: "POST", field: "avatar" },
-      { url: `${API_BASE}/auth/me/avatar/`, method: "POST", field: "avatar" },
-      { url: `${API_BASE}/users/me/`, method: "PATCH", field: "avatar" },
+      { url: `${API_BASE}/auth/admin/users/${userId}/avatar/`, method: "POST", field: "avatar" },
+      { url: `${API_BASE}/auth/admin/users/${userId}/avatar/`, method: "POST", field: "avatar" },
+      { url: `${API_BASE}/auth/admin/users/${userId}/profile/`, method: "PATCH", field: "avatar" },
     ];
     for (const c of candidates) {
       try {
@@ -1074,7 +1075,7 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
 // -----------------------------------------------------------------------------
 // Basic Info Dialog (Header Trigger) - Identity & Name Change Entry
 // -----------------------------------------------------------------------------
-function BasicInfoDialog({ open, onClose, profile, onRequestNameChange, onStartKYC }) {
+function BasicInfoDialog({ open, onClose, profile }) {
   // Determine status from profile
   const kycStatus = profile?.kyc_status || "not_started";
   const isVerified = kycStatus === "approved";
@@ -1106,30 +1107,6 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange, onStartK
             <TextField label="Last Name" fullWidth disabled value={profile?.last_name || ""} />
           </Box>
 
-          {/* ACTIONS */}
-          <Box sx={{ display: 'flex', gap: 2, pt: 1 }}>
-            {/* Show "Verify Identity" if not verified yet */}
-            {!isVerified && !isPending && (
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={onStartKYC}
-              >
-                Verify Identity
-              </Button>
-            )}
-
-            {/* Show "Request Name Change" ONLY if verified/locked */}
-            {isVerified && (
-              <Button
-                variant="outlined"
-                startIcon={<HistoryEduRoundedIcon />}
-                onClick={onRequestNameChange}
-              >
-                Request Name Change
-              </Button>
-            )}
-          </Box>
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -1280,8 +1257,11 @@ function IsoLanguageAutocomplete({ value, onChange }) {
 }
 
 // -------------------- Page --------------------
-export default function ProfilePage() {
+export default function AdminUserProfileEditPage() {
   const theme = useTheme();
+  const { userId } = useParams();
+  const navigate = useNavigate();
+  const canEditPrivacy = isOwnerUser();
   // Public View Toggle State
   const [isPublicView, setIsPublicView] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -1307,19 +1287,7 @@ export default function ProfilePage() {
 
   // KYC Verification Handler
   const handleStartKYC = async () => {
-    try {
-      showNotification("info", "Initiating verification...");
-      const data = await startKYC();
-
-      if (data.url) {
-        // Redirect user to Didit
-        window.location.href = data.url;
-      } else {
-        showNotification("error", "Could not start verification. Please try again.");
-      }
-    } catch (error) {
-      showNotification("error", error.message);
-    }
+    showNotification("info", "KYC is managed from the admin verification section.");
   };
 
   // WordPress Profile Sync Handler
@@ -1332,7 +1300,7 @@ export default function ProfilePage() {
         localStorage.getItem("access") ||
         localStorage.getItem("jwt");
 
-      const response = await fetch(`${API_BASE}/auth/wordpress/sync-profile/`, {
+      const response = await fetch(`${API_BASE}/auth/admin/users/${userId}/sync-profile/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1341,18 +1309,15 @@ export default function ProfilePage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || "Failed to sync profile from WordPress");
       }
 
       const data = await response.json();
 
       if (data.status === "success") {
-        // Update the form with the synced profile data
         if (data.profile) {
           const profileData = data.profile;
-
-          // Extract first and last name from full_name if available
           let firstName = form.first_name;
           let lastName = form.last_name;
 
@@ -1362,8 +1327,7 @@ export default function ProfilePage() {
             lastName = nameParts.slice(1).join(" ") || lastName;
           }
 
-          setForm(prev => {
-            // Handle social profile links
+          setForm((prev) => {
             let linksText = prev.linksText;
             if (profileData.links && typeof profileData.links === "object") {
               linksText = JSON.stringify(profileData.links);
@@ -1381,15 +1345,15 @@ export default function ProfilePage() {
               location: profileData.location || prev.location,
               avatar: profileData.user_image_url || prev.avatar,
               timezone: profileData.timezone || prev.timezone,
-              linksText: linksText,
+              linksText,
             };
           });
 
-          // Also update avatar preview if it changed
           if (profileData.user_image_url && profileData.user_image_url !== form.avatar) {
             setAvatarPreview(profileData.user_image_url);
           }
         }
+
         showNotification("success", "✓ Profile synced from WordPress!");
       } else {
         showNotification("error", data.message || "Failed to sync profile");
@@ -1525,7 +1489,7 @@ export default function ProfilePage() {
   // 1. Load Languages
   async function loadLanguages() {
     try {
-      const r = await fetch(`${API_BASE}/auth/me/languages/`, { headers: tokenHeader() });
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/languages/`, { headers: tokenHeader() });
       if (r.ok) {
         const data = await r.json();
         // Check if data is an array or a paginated object
@@ -1572,8 +1536,8 @@ export default function ProfilePage() {
       };
 
       const url = editLangId
-        ? `${API_BASE}/auth/me/languages/${editLangId}/`
-        : `${API_BASE}/auth/me/languages/`;
+        ? `${API_BASE}/auth/admin/users/${userId}/languages/${editLangId}/`
+        : `${API_BASE}/auth/admin/users/${userId}/languages/`;
 
       const method = editLangId ? "PATCH" : "POST";
 
@@ -1594,7 +1558,7 @@ export default function ProfilePage() {
           const fd = new FormData();
           fd.append("user_language", langId);
           fd.append("file", file);
-          await fetch(`${API_BASE}/auth/me/language-certificates/`, {
+          await fetch(`${API_BASE}/auth/admin/users/${userId}/language-certificates/`, {
             method: "POST",
             headers: tokenHeader(),
             body: fd
@@ -1859,7 +1823,7 @@ export default function ProfilePage() {
     (async () => {
       try {
         setLoading(true);
-        const url = `${API_BASE}/users/me/`;
+        const url = `${API_BASE}/auth/admin/users/${userId}/profile/`;
         const r = await fetch(url, { headers: tokenHeader(), signal: ctrl.signal });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
@@ -1905,7 +1869,7 @@ export default function ProfilePage() {
     // selectedSkills: [{ uri, label, proficiency_level? }, ...]
     try {
       // 1. Load current skills from backend to compare (for deletions)
-      const resp = await fetch(`${API_BASE}/auth/me/skills/`, {
+      const resp = await fetch(`${API_BASE}/auth/admin/users/${userId}/skills/`, {
         headers: {
           "Content-Type": "application/json",
           ...tokenHeader(),
@@ -1938,7 +1902,7 @@ export default function ProfilePage() {
 
       await Promise.all(
         deletions.map((item) =>
-          fetch(`${API_BASE}/auth/me/skills/${item.id}/`, {
+          fetch(`${API_BASE}/auth/admin/users/${userId}/skills/${item.id}/`, {
             method: "DELETE",
             headers: {
               ...tokenHeader(),
@@ -1950,7 +1914,7 @@ export default function ProfilePage() {
       // 3. Upsert each selected skill
       await Promise.all(
         (selectedSkills || []).map((s) =>
-          fetch(`${API_BASE}/auth/me/skills/`, {
+          fetch(`${API_BASE}/auth/admin/users/${userId}/skills/`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -1982,7 +1946,7 @@ export default function ProfilePage() {
 
   async function loadUserSkills() {
     try {
-      const r = await fetch(`${API_BASE}/auth/me/skills/`, {
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/skills/`, {
         headers: {
           "Content-Type": "application/json",
           ...tokenHeader(),
@@ -2127,7 +2091,7 @@ export default function ProfilePage() {
     try {
       setSaving(true);
       const payload = { sector: workForm.sector, industry: workForm.industry, number_of_employees: workForm.employees };
-      const r = await fetch(`${API_BASE}/auth/me/experiences/${latestExp.id}/`, { method: "PATCH", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/experiences/${latestExp.id}/`, { method: "PATCH", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Failed to update work details");
       showNotification("success", "Work details updated");
       setWorkOpen(false);
@@ -2192,10 +2156,10 @@ export default function ProfilePage() {
     setDeleteLoading(true);
     try {
       let url = "";
-      if (type === "edu") url = `${API_BASE}/auth/me/educations/${id}/`;
-      else if (type === "exp") url = `${API_BASE}/auth/me/experiences/${id}/`;
-      else if (type === "language") url = `${API_BASE}/auth/me/languages/${id}/`;
-      else if (type === "certificate") url = `${API_BASE}/auth/me/language-certificates/${id}/`;
+      if (type === "edu") url = `${API_BASE}/auth/admin/users/${userId}/educations/${id}/`;
+      else if (type === "exp") url = `${API_BASE}/auth/admin/users/${userId}/experiences/${id}/`;
+      else if (type === "language") url = `${API_BASE}/auth/admin/users/${userId}/languages/${id}/`;
+      else if (type === "certificate") url = `${API_BASE}/auth/admin/users/${userId}/language-certificates/${id}/`;
 
       const r = await fetch(url, {
         method: "DELETE",
@@ -2250,19 +2214,19 @@ export default function ProfilePage() {
       setDeletingDoc(true);
 
       if (type === "edu") {
-        await deleteEducationDocApi(doc.id);
+        await deleteEducationDocApi(userId, doc.id);
         setEduForm((prev) => ({
           ...prev,
           documents: (prev.documents || []).filter((d) => d.id !== doc.id),
         }));
       } else if (type === "training") {
-        await deleteTrainingDocApi(doc.id);
+        await deleteTrainingDocApi(userId, doc.id);
         setTrainingForm((prev) => ({
           ...prev,
           documents: (prev.documents || []).filter((d) => d.id !== doc.id),
         }));
       } else if (type === "cert") {
-        await deleteCertificationDocApi(doc.id);
+        await deleteCertificationDocApi(userId, doc.id);
         setCertForm((prev) => ({
           ...prev,
           documents: (prev.documents || []).filter((d) => d.id !== doc.id),
@@ -2318,8 +2282,8 @@ export default function ProfilePage() {
         },
       };
 
-      const r = await fetch(`${API_BASE}/users/me/`, {
-        method: "PUT",
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/profile/`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           ...tokenHeader(),
@@ -2484,7 +2448,7 @@ export default function ProfilePage() {
           links: newLinks,
         },
       };
-      const r = await fetch(`${API_BASE}/users/me/`, { method: "PUT", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/profile/`, { method: "PATCH", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Save failed");
       setForm(prev => ({ ...prev, linksText: Object.keys(newLinks).length > 0 ? JSON.stringify(newLinks) : "" }));
 
@@ -2505,19 +2469,18 @@ export default function ProfilePage() {
     if (!email) return;
     try {
       setVerifyingEmail(true);
-      const r = await fetch(`${API_BASE}/users/me/email/initiate/`, {
-        method: "POST",
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/profile/`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json", ...tokenHeader() },
-        body: JSON.stringify({ new_email: email }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await r.json();
-      if (!r.ok) throw new Error(data.detail || "Failed to initiate email change");
+      if (!r.ok) throw new Error(data.detail || "Failed to update primary email");
 
-      setPendingNewEmail(email);
-      setVerificationCode("");
-      setEmailVerificationOpen(true);
-      if (data.detail) showNotification("success", data.detail);
+      setForm((prev) => ({ ...prev, email }));
+      showNotification("success", "Primary email updated");
+      closeContactEditor();
 
     } catch (e) {
       showNotification("error", e.message);
@@ -2527,35 +2490,7 @@ export default function ProfilePage() {
   }
 
   async function onVerifyCode() {
-    if (!verificationCode || verificationCode.length !== 6) {
-      showNotification("error", "Please enter a valid 6-digit code");
-      return;
-    }
-    try {
-      setVerifyingEmail(true);
-      const r = await fetch(`${API_BASE}/users/me/email/confirm/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenHeader() },
-        body: JSON.stringify({ new_email: pendingNewEmail, code: verificationCode }),
-      });
-
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.detail || "Verification failed");
-
-      showNotification("success", "Your account Main Email Changed Successfully.");
-
-      // Close dialogs
-      setEmailVerificationOpen(false);
-      setContactOpen(false);
-
-      // Reload profile to reflect changes
-      await loadMeExtras();
-
-    } catch (e) {
-      showNotification("error", e.message);
-    } finally {
-      setVerifyingEmail(false);
-    }
+    setEmailVerificationOpen(false);
   }
 
   async function saveLocation() {
@@ -2580,8 +2515,8 @@ export default function ProfilePage() {
           links: parseLinks(form.linksText),
         },
       };
-      const r = await fetch(`${API_BASE}/users/me/`, {
-        method: "PUT",
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/profile/`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json", ...tokenHeader() },
         body: JSON.stringify(payload),
       });
@@ -2621,8 +2556,8 @@ export default function ProfilePage() {
         },
       };
 
-      const r = await fetch(`${API_BASE}/users/me/`, {
-        method: "PUT",
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/profile/`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json", ...tokenHeader() },
         body: JSON.stringify(payload),
       });
@@ -2688,8 +2623,8 @@ export default function ProfilePage() {
       };
 
       const url = editEduId
-        ? `${API_BASE}/auth/me/educations/${editEduId}/`
-        : `${API_BASE}/auth/me/educations/`;
+        ? `${API_BASE}/auth/admin/users/${userId}/educations/${editEduId}/`
+        : `${API_BASE}/auth/admin/users/${userId}/educations/`;
 
       const payload = {
         school: (eduForm.school || "").trim(),
@@ -2714,7 +2649,7 @@ export default function ProfilePage() {
       // 2. Upload Files (if any)
       if (eduFiles.length > 0 && activeId) {
         for (const file of eduFiles) {
-          await uploadEducationDocApi(activeId, file);
+          await uploadEducationDocApi(userId, activeId, file);
         }
       }
 
@@ -2783,8 +2718,8 @@ export default function ProfilePage() {
       setExpSaving(true);
 
       const url = editExpId
-        ? `${API_BASE}/auth/me/experiences/${editExpId}/`
-        : `${API_BASE}/auth/me/experiences/`;
+        ? `${API_BASE}/auth/admin/users/${userId}/experiences/${editExpId}/`
+        : `${API_BASE}/auth/admin/users/${userId}/experiences/`;
 
       const r = await fetch(url, {
         method: editExpId ? "PATCH" : "POST",
@@ -2827,8 +2762,8 @@ export default function ProfilePage() {
               links: parseLinks(form.linksText),
             },
           };
-          const resp = await fetch(`${API_BASE}/users/me/`, {
-            method: "PUT",
+          const resp = await fetch(`${API_BASE}/auth/admin/users/${userId}/profile/`, {
+            method: "PATCH",
             headers: { "Content-Type": "application/json", ...tokenHeader() },
             body: JSON.stringify(payload),
           });
@@ -2921,16 +2856,16 @@ export default function ProfilePage() {
       };
       let finalTrainingId = editTrainingId;
       if (editTrainingId) {
-        await updateTrainingApi(editTrainingId, payload);
+        await updateTrainingApi(userId, editTrainingId, payload);
       } else {
-        const res = await addTrainingApi(payload);
+        const res = await addTrainingApi(userId, payload);
         finalTrainingId = res.id;
       }
 
       // Handle document uploads
       if (trainingFiles.length > 0 && finalTrainingId) {
         await Promise.all(
-          trainingFiles.map((file) => uploadTrainingDocApi(finalTrainingId, file))
+          trainingFiles.map((file) => uploadTrainingDocApi(userId, finalTrainingId, file))
         );
       }
 
@@ -3013,15 +2948,15 @@ export default function ProfilePage() {
       };
       let activeId = editCertId;
       if (editCertId) {
-        await updateCertificationApi(editCertId, payload);
+        await updateCertificationApi(userId, editCertId, payload);
       } else {
-        const savedCert = await addCertificationApi(payload);
+        const savedCert = await addCertificationApi(userId, payload);
         activeId = savedCert.id;
       }
 
       if (certFiles.length > 0) {
         for (const file of certFiles) {
-          await uploadCertificationDocApi(activeId, file);
+          await uploadCertificationDocApi(userId, activeId, file);
         }
       }
 
@@ -3102,16 +3037,16 @@ export default function ProfilePage() {
       };
       let finalMemberId = editMemberId;
       if (editMemberId) {
-        await updateMembershipApi(editMemberId, payload);
+        await updateMembershipApi(userId, editMemberId, payload);
       } else {
-        const res = await addMembershipApi(payload);
+        const res = await addMembershipApi(userId, payload);
         finalMemberId = res.id;
       }
 
       // Handle document uploads
       if (memberFiles.length > 0 && finalMemberId) {
         await Promise.all(
-          memberFiles.map((file) => uploadMembershipDocApi(finalMemberId, file))
+          memberFiles.map((file) => uploadMembershipDocApi(userId, finalMemberId, file))
         );
       }
 
@@ -3130,9 +3065,11 @@ export default function ProfilePage() {
 
   async function loadMeExtras() {
     try {
-      const r = await fetch(`${API_BASE}/auth/me/profile/`, { headers: tokenHeader() });
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/profile/`, { headers: tokenHeader() });
       if (r.ok) {
         const data = await r.json();
+        setPostsCount(Number(data?.posts_count) || 0);
+        setFriendCount(Number(data?.contacts_count) || 0);
         setEduList(Array.isArray(data.educations) ? data.educations : []);
         setExpList(Array.isArray(data.experiences) ? data.experiences : []);
         setTrainingList(Array.isArray(data.trainings) ? data.trainings : []);
@@ -3143,11 +3080,11 @@ export default function ProfilePage() {
     } catch { }
     try {
       const [e1, e2, t1, c1, m1] = await Promise.all([
-        fetch(`${API_BASE}/auth/me/educations/`, { headers: tokenHeader() }),
-        fetch(`${API_BASE}/auth/me/experiences/`, { headers: tokenHeader() }),
-        fetch(`${API_BASE}/auth/me/trainings/`, { headers: tokenHeader() }),
-        fetch(`${API_BASE}/auth/me/certifications/`, { headers: tokenHeader() }),
-        fetch(`${API_BASE}/auth/me/memberships/`, { headers: tokenHeader() }),
+        fetch(`${API_BASE}/auth/admin/users/${userId}/educations/`, { headers: tokenHeader() }),
+        fetch(`${API_BASE}/auth/admin/users/${userId}/experiences/`, { headers: tokenHeader() }),
+        fetch(`${API_BASE}/auth/admin/users/${userId}/trainings/`, { headers: tokenHeader() }),
+        fetch(`${API_BASE}/auth/admin/users/${userId}/certifications/`, { headers: tokenHeader() }),
+        fetch(`${API_BASE}/auth/admin/users/${userId}/memberships/`, { headers: tokenHeader() }),
       ]);
       if (e1.ok) { const d = await e1.json(); setEduList(Array.isArray(d) ? d : d.results || []); }
       if (e2.ok) { const d = await e2.json(); setExpList(Array.isArray(d) ? d : d.results || []); }
@@ -3319,6 +3256,47 @@ export default function ProfilePage() {
               ) : (
                 // ================= NORMAL VIEW (YOUR EXISTING PREVIEW UI) ============
                 <Box>
+                  <Box
+                    sx={{
+                      mb: 2,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1,
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      onClick={() => navigate("/admin/staff")}
+                      sx={{ alignSelf: "flex-start", px: 0, minWidth: 0, textTransform: "none" }}
+                    >
+                      ← Back to Staff
+                    </Button>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      alignItems={{ xs: "flex-start", sm: "center" }}
+                      useFlexGap
+                      flexWrap="wrap"
+                    >
+                      <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                        Editing: {fullName}
+                      </Typography>
+                      {form.kyc_status === "approved" && (
+                        <Tooltip title="Identity Verified">
+                          <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
+                        </Tooltip>
+                      )}
+                      <Chip size="small" label={form.email || "No email"} />
+                      {form.is_superuser ? (
+                        <Chip size="small" color="secondary" label="Superuser" />
+                      ) : form.is_staff ? (
+                        <Chip size="small" color="success" variant="outlined" label="Staff" />
+                      ) : (
+                        <Chip size="small" variant="outlined" label="User" />
+                      )}
+                    </Stack>
+                  </Box>
+
                   {/* --- HEADER CARD (Matching HomePage) --- */}
                   <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
@@ -3338,17 +3316,10 @@ export default function ProfilePage() {
                       </Box>
 
                       <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
-                        <Stack direction="row" alignItems="center" spacing={1}>
+                        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
                           <Typography variant="h6" sx={{ fontWeight: 600 }}>
                             {fullName}
                           </Typography>
-
-                          {/* Verified Badge */}
-                          {form.kyc_status === 'approved' && (
-                            <Tooltip title="Identity Verified">
-                              <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
-                            </Tooltip>
-                          )}
                         </Stack>
                         {latestExp ? (
                           <Typography variant="body2" color="text.secondary">
@@ -3370,24 +3341,22 @@ export default function ProfilePage() {
                         >
                           View as Public
                         </Button>
-                        <Tooltip title="Sync profile from WordPress">
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={handleSyncProfile}
-                            disabled={syncing}
-                            sx={{ textTransform: "none", borderRadius: 2 }}
-                          >
-                            {syncing ? (
-                              <>
-                                <CircularProgress size={16} sx={{ mr: 0.5 }} />
-                                Syncing...
-                              </>
-                            ) : (
-                              "Sync Profile"
-                            )}
-                          </Button>
-                        </Tooltip>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={handleSyncProfile}
+                          disabled={syncing}
+                          sx={{ textTransform: "none", borderRadius: 2 }}
+                        >
+                          {syncing ? (
+                            <>
+                              <CircularProgress size={16} sx={{ mr: 0.5 }} />
+                              Syncing...
+                            </>
+                          ) : (
+                            "Sync Profile"
+                          )}
+                        </Button>
                         <Tooltip title="Identity Details">
                           <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
                             <EditRoundedIcon fontSize="small" />
@@ -3410,12 +3379,6 @@ export default function ProfilePage() {
                   <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
                     {/* LEFT COLUMN */}
                     <Grid item xs={12} lg={6}>
-                      <VerificationCard
-                        status={form.kyc_status}
-                        pendingRequest={form.pending_verification_request}
-                        onVerify={handleStartKYC}
-                        onRenew={() => setRenewalOpen(true)}
-                      />
                       <SectionCard
                         title="About"
                         action={
@@ -4118,6 +4081,7 @@ export default function ProfilePage() {
                         </Box>
                       </SectionCard>
 
+                      {canEditPrivacy && (
                       <SectionCard
                         sx={{ mt: 2 }}
                         title="Privacy Settings"
@@ -4241,6 +4205,7 @@ export default function ProfilePage() {
                           </DialogActions>
                         </Dialog>
                       </SectionCard>
+                      )}
 
 
                       <SectionCard
@@ -4499,15 +4464,10 @@ export default function ProfilePage() {
       />
 
       {/* --- NEW DIALOG: Identity (Header Trigger) --- */}
-      < BasicInfoDialog
+      <BasicInfoDialog
         open={basicInfoOpen}
         onClose={() => setBasicInfoOpen(false)}
         profile={form}
-        onRequestNameChange={() => {
-          setBasicInfoOpen(false);
-          setNameChangeOpen(true);
-        }}
-        onStartKYC={handleStartKYC}
       />
 
       {/* --- NEW DIALOG: Edit About Work --- */}
@@ -5899,7 +5859,7 @@ export default function ProfilePage() {
                           size="small"
                           onClick={() => {
                             // Note: We use a simplified implementation: immediately delete
-                            deleteMembershipDocApi(doc.id)
+                            deleteMembershipDocApi(userId, doc.id)
                               .then(() => {
                                 setMemberForm((prev) => ({
                                   ...prev,
@@ -5989,7 +5949,7 @@ export default function ProfilePage() {
               if (deletingTraining) return;
               setDeletingTraining(true);
               try {
-                await deleteTrainingApi(trainingDeleteId);
+                await deleteTrainingApi(userId, trainingDeleteId);
                 await loadMeExtras();
                 showNotification("success", "Training deleted.");
                 setTrainingDeleteId(null);
@@ -6034,7 +5994,7 @@ export default function ProfilePage() {
               if (deletingCert) return;
               setDeletingCert(true);
               try {
-                await deleteCertificationApi(certDeleteId);
+                await deleteCertificationApi(userId, certDeleteId);
                 await loadMeExtras();
                 showNotification("success", "Certification deleted.");
                 setCertDeleteId(null);
@@ -6079,7 +6039,7 @@ export default function ProfilePage() {
               if (deletingMember) return;
               setDeletingMember(true);
               try {
-                await deleteMembershipApi(memberDeleteId);
+                await deleteMembershipApi(userId, memberDeleteId);
                 await loadMeExtras();
                 showNotification("success", "Membership deleted.");
                 setMemberDeleteId(null);
@@ -6301,7 +6261,7 @@ function RenewalDialog({ open, onClose, showToast }) {
     }
     setLoading(true);
     try {
-      const r = await fetch(`${API_BASE}/users/me/verification-request/`, {
+      const r = await fetch(`${API_BASE}/auth/admin/users/${userId}/profile/verification-request/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tokenHeader() },
         body: JSON.stringify({ reason }),

@@ -121,5 +121,12 @@ export const isStaffUser = () => {
   return !isOwnerUser() && (dbIsStaff || hasStaffGroup);
 };
 
+export const canEditProfilesUser = () => {
+  const dbUser = getBackendUserFromStorage();
+  const directFlag = truthyFlag(dbUser?.can_edit_profiles);
+  const profileFlag = truthyFlag(dbUser?.profile?.can_edit_profiles);
+  return directFlag || profileFlag;
+};
+
 // generic "some level of admin"
 export const isAdminUser = () => isOwnerUser() || isStaffUser();

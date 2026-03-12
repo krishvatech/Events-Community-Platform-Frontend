@@ -38,6 +38,7 @@ import AdminGroups from "./pages/AdminGroups.jsx";
 import AdminNotificationsPage from "./pages/AdminNotificationsPage.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx"
+import AdminUserProfileEditPage from "./pages/AdminUserProfileEditPage.jsx";
 import AdminRecordingsPage from "./pages/AdminRecordingsPage.jsx";
 import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
 import AdminModerationPage from "./pages/AdminModerationPage.jsx";
@@ -223,6 +224,7 @@ const AppShell = () => {
             <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
             <Route path="carts" element={<AdminCarts />} />
             <Route path="staff" element={<AdminStaffPage />} />
+            <Route path="users/:userId/edit-profile" element={<AdminUserProfileEditPage />} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />

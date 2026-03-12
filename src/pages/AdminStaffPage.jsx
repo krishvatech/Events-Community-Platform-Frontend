@@ -1,5 +1,5 @@
 import * as React from "react";
-import { isOwnerUser, getCurrentUserCandidate } from "../utils/adminRole";
+import { isOwnerUser, canEditProfilesUser, getCurrentUserCandidate } from "../utils/adminRole";
 import {
     Box, Container, Typography, TextField, InputAdornment,
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
@@ -7,7 +7,7 @@ import {
     CircularProgress, Pagination, Avatar, Skeleton,
     Dialog, DialogTitle, DialogContent, DialogActions,
     FormControlLabel, Checkbox, FormControl, FormLabel,
-    Alert
+    Alert, Snackbar
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import VerifiedIcon from "@mui/icons-material/Verified";
@@ -18,9 +18,10 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
-import { listAdminUsers, patchStaff, bulkSetStaff, createAdminUser, updateAdminUser, deleteAdminUser } from "../utils/api";
-import { useLocation, useParams } from "react-router-dom";
+import { listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, updateAdminUser, deleteAdminUser } from "../utils/api";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
 // Simple Dialog for Creating/Editing Users/staff
@@ -166,14 +167,16 @@ function UserDialog({ open, onClose, mode, initialData, onSave, loading }) {
 export default function AdminStaffPage() {
 
     const location = useLocation();
+    const navigate = useNavigate();
     const owner = isOwnerUser();
+    const profileEditor = canEditProfilesUser();
+    const canAccessPage = owner || profileEditor;
 
-    // Only owners/superadmins can view this page
-    if (!owner) {
+    if (!canAccessPage) {
         return (
             <Container maxWidth="md" sx={{ py: 6 }}>
                 <Typography variant="h6" align="center">
-                    Only owners can manage staff.
+                    You do not have access to this page.
                 </Typography>
             </Container>
         );
@@ -205,6 +208,8 @@ export default function AdminStaffPage() {
     const [dialogMode, setDialogMode] = React.useState("create"); // 'create' | 'edit'
     const [editingUser, setEditingUser] = React.useState(null);
     const [actionLoading, setActionLoading] = React.useState(false);
+    const [toggleBusyId, setToggleBusyId] = React.useState(null);
+    const [snack, setSnack] = React.useState({ open: false, message: "", severity: "warning" });
 
     // Delete Dialog State
     const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
@@ -275,9 +280,46 @@ export default function AdminStaffPage() {
             setDeleteDialogOpen(false);
             setUserToDelete(null);
         } catch (err) {
-            alert("Failed to delete user: " + (err.response?.data?.detail || err.message));
+            setSnack({
+                open: true,
+                severity: "error",
+                message: "Failed to delete user: " + (err.response?.data?.detail || err.message),
+            });
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleToggleEditProfiles = async (user, checked) => {
+        if (checked && !user.is_staff) {
+            setSnack({
+                open: true,
+                severity: "warning",
+                message: "Please make this user a staff user first.",
+            });
+            return;
+        }
+
+        setToggleBusyId(user.id);
+        try {
+            await patchAdminUser(user.id, { can_edit_profiles: checked });
+            setRows((prev) => prev.map((row) => (
+                row.id === user.id
+                    ? {
+                        ...row,
+                        can_edit_profiles: checked,
+                        profile: { ...(row.profile || {}), can_edit_profiles: checked },
+                    }
+                    : row
+            )));
+        } catch (err) {
+            setSnack({
+                open: true,
+                severity: "error",
+                message: "Failed to update edit-profile permission: " + (err.response?.data?.detail || err.message),
+            });
+        } finally {
+            setToggleBusyId(null);
         }
     };
 
@@ -313,10 +355,12 @@ export default function AdminStaffPage() {
 
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="h5" className="font-extrabold">
-                                Staff Management
+                                {owner ? "Staff Management" : "User Profile Access"}
                             </Typography>
                             <Typography className="text-slate-500">
-                                Be careful! Granting staff or superuser access gives significant permissions.
+                                {owner
+                                    ? "Be careful! Granting staff or superuser access gives significant permissions."
+                                    : "You can open and edit profile pages for regular users only."}
                             </Typography>
                         </Box>
 
@@ -330,15 +374,17 @@ export default function AdminStaffPage() {
                                 gap: 1,
                             }}
                         >
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={<AddIcon />}
-                                onClick={handleOpenCreate}
-                                sx={{ borderRadius: 8, textTransform: "none" }}
-                            >
-                                Invite User
-                            </Button>
+                            {owner && (
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<AddIcon />}
+                                    onClick={handleOpenCreate}
+                                    sx={{ borderRadius: 8, textTransform: "none" }}
+                                >
+                                    Invite User
+                                </Button>
+                            )}
                         </Box>
                     </Box>
 
@@ -368,6 +414,7 @@ export default function AdminStaffPage() {
                                     <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
                                         Last Login
                                     </TableCell>
+                                    {owner && <TableCell align="center">Can Edit Profiles</TableCell>}
                                     <TableCell align="center">Status</TableCell>
                                     <TableCell align="right">Actions</TableCell>
                                 </TableRow>
@@ -382,7 +429,9 @@ export default function AdminStaffPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    paginatedRows.map((u) => (
+                                    paginatedRows
+                                        .filter((u) => owner || (!u.is_staff && !u.is_superuser))
+                                        .map((u) => (
                                         <TableRow key={u.id} hover>
 
                                             {/* User */}
@@ -428,6 +477,20 @@ export default function AdminStaffPage() {
                                                 {u.last_login ? new Date(u.last_login).toLocaleString() : "—"}
                                             </TableCell>
 
+                                            {owner && (
+                                                <TableCell align="center">
+                                                    {u.is_superuser ? (
+                                                        "—"
+                                                    ) : (
+                                                        <Switch
+                                                            checked={Boolean(u.can_edit_profiles ?? u.profile?.can_edit_profiles)}
+                                                            onChange={(e) => handleToggleEditProfiles(u, e.target.checked)}
+                                                            disabled={toggleBusyId === u.id}
+                                                        />
+                                                    )}
+                                                </TableCell>
+                                            )}
+
                                                 {/* Status instead of Switch */}
                                                 <TableCell align="center">
                                                     {u.is_superuser ? (
@@ -447,9 +510,20 @@ export default function AdminStaffPage() {
                                                                 <IconButton 
                                                                     size="small" 
                                                                     onClick={() => handleOpenEdit(u)}
-                                                                    disabled={currentUser && currentUser.id === u.id}
+                                                                    disabled={!owner || (currentUser && currentUser.id === u.id)}
                                                                 >
                                                                     <EditIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                        <Tooltip title="Edit Profile">
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="primary"
+                                                                    onClick={() => navigate(`/admin/users/${u.id}/edit-profile`)}
+                                                                >
+                                                                    <ManageAccountsIcon fontSize="small" />
                                                                 </IconButton>
                                                             </span>
                                                         </Tooltip>
@@ -459,7 +533,7 @@ export default function AdminStaffPage() {
                                                                     size="small" 
                                                                     color="error" 
                                                                     onClick={() => confirmDeleteUser(u)}
-                                                                    disabled={currentUser && currentUser.id === u.id}
+                                                                    disabled={!owner || (currentUser && currentUser.id === u.id)}
                                                                 >
                                                                     <DeleteIcon fontSize="small" />
                                                                 </IconButton>
@@ -472,7 +546,7 @@ export default function AdminStaffPage() {
                                 )}
                                 {!loading && paginatedRows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                        <TableCell colSpan={owner ? 7 : 6} align="center" sx={{ py: 4 }}>
                                             <Typography color="text.secondary">No users found.</Typography>
                                         </TableCell>
                                     </TableRow>
@@ -536,6 +610,22 @@ export default function AdminStaffPage() {
                             </Button>
                         </DialogActions>
                     </Dialog>
+
+                    <Snackbar
+                        open={snack.open}
+                        autoHideDuration={3500}
+                        onClose={() => setSnack((prev) => ({ ...prev, open: false }))}
+                        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                    >
+                        <Alert
+                            onClose={() => setSnack((prev) => ({ ...prev, open: false }))}
+                            severity={snack.severity}
+                            variant="filled"
+                            sx={{ minWidth: 320, boxShadow: 6, alignItems: "center" }}
+                        >
+                            {snack.message}
+                        </Alert>
+                    </Snackbar>
                 </Box>
             </Box>
         </Container>
