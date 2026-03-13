@@ -65,7 +65,19 @@ export default function MainRoomPeek({
 }) {
     const [primaryParticipant, setPrimaryParticipant] = useState(null);
     const [isFolded, setIsFolded] = useState(false);
+    const [mainRoomConnectTimedOut, setMainRoomConnectTimedOut] = useState(false);
     const videoRef = useRef(null);
+
+    useEffect(() => {
+        if (mainDyteMeeting) {
+            setMainRoomConnectTimedOut(false);
+            return;
+        }
+        const timeout = setTimeout(() => {
+            setMainRoomConnectTimedOut(true);
+        }, 4000);
+        return () => clearTimeout(timeout);
+    }, [mainDyteMeeting]);
 
     useEffect(() => {
         if (!mainDyteMeeting?.participants) return;
@@ -340,11 +352,13 @@ export default function MainRoomPeek({
                                 gap: 1
                             }}>
                                 <Typography sx={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 600 }}>
-                                    Connecting main room preview...
+                                    {mainRoomConnectTimedOut ? 'No active participants on stage' : 'Connecting main room preview...'}
                                 </Typography>
-                                <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>
-                                    Please wait
-                                </Typography>
+                                {!mainRoomConnectTimedOut && (
+                                    <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>
+                                        Please wait
+                                    </Typography>
+                                )}
                             </Box>
                         ) : primaryParticipant ? (
                             <>
@@ -409,7 +423,9 @@ export default function MainRoomPeek({
                     <Box sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
                         <Typography sx={{ color: '#22c55e', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#22c55e' }} />
-                            {!mainDyteMeeting ? 'CONNECTING MAIN STAGE' : (primaryParticipant ? `LIVE: ${primaryParticipant.name || 'Main Stage'}` : 'MAIN STAGE')}
+                            {!mainDyteMeeting
+                                ? (mainRoomConnectTimedOut ? 'MAIN STAGE' : 'CONNECTING MAIN STAGE')
+                                : (primaryParticipant ? `LIVE: ${primaryParticipant.name || 'Main Stage'}` : 'MAIN STAGE')}
                         </Typography>
                     </Box>
                 </>

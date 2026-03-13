@@ -10681,6 +10681,8 @@ export default function NewLiveMeeting() {
     // Reset fallback caches when switching between main and breakout rooms
     observedParticipantsRef.current.clear();
     participantJoinedAtRef.current.clear();
+    departedParticipantIdsRef.current.clear();
+    setParticipantsTick((v) => v + 1);
   }, [authToken]);
 
   // Explicit poll via SDK helper (getAll) for SDK variants that don't expose collections
@@ -11177,9 +11179,9 @@ export default function NewLiveMeeting() {
     }
 
     // 2. ✅ SPECIAL HANDLING FOR DURING-EVENT LOUNGE (non-post-event)
-    // When user/host leaves a lounge table during an event, show the lounge overlay again
-    // This allows them to rejoin tables or return to main meeting
-    if (!isPostEventLounge && loungeOpenStatus?.status === "OPEN") {
+    // Keep host behavior: returning to lounge overlay is useful for host table management.
+    // Audience should skip lounge overlay and go directly to main meeting (handled in step 3).
+    if (!isPostEventLounge && loungeOpenStatus?.status === "OPEN" && isHost) {
       console.log("[LiveMeeting] During-event lounge - returning to lounge overlay after leaving table");
       try {
         if (dyteMeeting) {
@@ -11289,7 +11291,7 @@ export default function NewLiveMeeting() {
         leaveBreakoutInFlightRef.current = false;
       }, 300);
     }
-  }, [dyteMeeting, isPostEventLounge, loungeOpenStatus?.status]);
+  }, [dyteMeeting, isPostEventLounge, loungeOpenStatus?.status, isHost]);
 
   const forceRejoinMainFromLounge = useCallback(async () => {
     // Close lounge UI and force a fresh join via API (to respect waiting room/grace rules)
@@ -11540,6 +11542,27 @@ export default function NewLiveMeeting() {
       const userId = key.startsWith("id:") ? key.replace("id:", "") : null;
       return Boolean(userId && currentLoungeUserIds.has(String(userId)));
     };
+    const suppressHostPresenceInMainRoom =
+      !isHost && !isBreakout && isMainRoomSupportMissing;
+    const isLikelyHostParticipant = (participant) => {
+      if (!participant) return false;
+      const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || null;
+      const backendUserId = String(getBackendUserId(participant?._raw || participant) || getBackendUserId(participant) || "");
+      const role = String(participant?.role || participant?._raw?.role || "").toLowerCase();
+      const preset = String(participant?.presetName || participant?._raw?.presetName || "").toLowerCase();
+      return Boolean(
+        role.includes("host") ||
+        role.includes("publisher") ||
+        role.includes("admin") ||
+        role.includes("presenter") ||
+        preset.includes("host") ||
+        preset.includes("publisher") ||
+        preset.includes("admin") ||
+        preset.includes("presenter") ||
+        (hostId && participant?.id === hostId) ||
+        (primaryHostUserId && backendUserId && backendUserId === String(primaryHostUserId))
+      );
+    };
 
     if (isLiveEventSocialLounge) {
       if (loungePrimaryUserId) {
@@ -11591,7 +11614,9 @@ export default function NewLiveMeeting() {
           presenter = dyteMeeting.self;
         }
       }
-      if (presenter) return presenter?._raw || presenter;
+      if (presenter && !(suppressHostPresenceInMainRoom && isLikelyHostParticipant(presenter))) {
+        return presenter?._raw || presenter;
+      }
     }
 
     // Host-controlled spotlight: if active, force spotlighted participant as primary view for everyone.
@@ -11620,7 +11645,9 @@ export default function NewLiveMeeting() {
         }
       }
 
-      if (spotlighted) return spotlighted?._raw || spotlighted;
+      if (spotlighted && !(suppressHostPresenceInMainRoom && isLikelyHostParticipant(spotlighted))) {
+        return spotlighted?._raw || spotlighted;
+      }
     }
 
     const participantInCurrentDyteRoom = (participant) => {
@@ -11639,6 +11666,9 @@ export default function NewLiveMeeting() {
       // Prefer current Dyte room presence over lounge metadata (location flags can be stale during transitions).
       const creatorInCurrentRoom = participantInCurrentDyteRoom(creatorHost);
       if (creatorHost && (creatorInCurrentRoom || !creatorHost.isOccupyingLounge)) {
+        if (suppressHostPresenceInMainRoom && isLikelyHostParticipant(creatorHost)) {
+          return null;
+        }
         console.log("[LatestPinnedHost] ✅ Pinning creator host from main room:", creatorHost.name);
         return creatorHost?._raw || creatorHost;
       } else if (creatorHost && creatorHost.isOccupyingLounge) {
@@ -11717,6 +11747,10 @@ export default function NewLiveMeeting() {
       if (designated) p = designated;
     }
 
+    if (suppressHostPresenceInMainRoom && p && isLikelyHostParticipant(p)) {
+      p = null;
+    }
+
     // ✅ CRITICAL FIX: In breakout rooms, verify pinned host is actually in the current room
     // If the pinned host is from the main room (not in this breakout table), reset and find a local participant instead
     // This fixes the issue where host from main room shows blank video in the lounge breakout room
@@ -11733,7 +11767,7 @@ export default function NewLiveMeeting() {
     // ✅ FIX: If pinnedHost is null but there IS a host participant connected, find and use them
     // This fixes the issue where host appears in Participants list but shows as "disconnected" in pinned area
     // CRITICAL: In breakout rooms, verify the host is actually in the current room (not in main room)
-    if (!p && (!isHost || !isPrimaryBroadcastHost)) {
+    if (!p && (!isHost || !isPrimaryBroadcastHost) && !suppressHostPresenceInMainRoom) {
       // ✅ CRITICAL FIX: In social lounges, host may be in a different lounge table
       // Search in the full participants array, not just getJoinedParticipants()
       // This ensures audience can find the host even if they're in separate lounge tables
@@ -11905,7 +11939,11 @@ export default function NewLiveMeeting() {
         console.log("[MainRoomFilter] Pinned participant is in lounge, not showing in main room view");
         // Try to find a main room participant
         const mainRoomParticipants = participants.filter(
-          (x) => x.id && !x.isOccupyingLounge && x.id !== dyteMeeting?.self?.id
+          (x) =>
+            x.id &&
+            !x.isOccupyingLounge &&
+            x.id !== dyteMeeting?.self?.id &&
+            (!suppressHostPresenceInMainRoom || !isLikelyHostParticipant(x))
         );
         if (mainRoomParticipants.length > 0) {
           console.log("[MainRoomFilter] Found main room participant:", mainRoomParticipants[0].name);
@@ -11991,6 +12029,9 @@ export default function NewLiveMeeting() {
       });
     }
 
+    if (suppressHostPresenceInMainRoom && isLikelyHostParticipant(result)) {
+      return null;
+    }
     return result;
   }, [
     pinnedHost,
@@ -12009,6 +12050,7 @@ export default function NewLiveMeeting() {
     spotlightTarget,
     currentLoungeUserIds,
     presentationTarget,
+    isMainRoomSupportMissing,
   ]);
 
   // Pinned “host” view data
@@ -13891,6 +13933,7 @@ export default function NewLiveMeeting() {
     // ✅ CRITICAL FIX: Check assignedRoleByIdentity instead of Dyte role to avoid lounge participants with HOST preset
     // When user is in main room, hosts occupying lounge should be filtered out
     // When user is in breakout, show all participants in that room (lounge filter doesn't apply)
+    const suppressHostPresenceInMainRoom = !isHost && !isBreakout && isMainRoomSupportMissing;
     let host = scopedParticipants.filter((p) => {
       // Classify by assigned role / resolved host identity only.
       // Do not exclude self when the viewer joined as audience, otherwise a host user appears under Audience.
@@ -13899,9 +13942,9 @@ export default function NewLiveMeeting() {
       const isPrimaryHostByUserId = Boolean(primaryHostUserId && backendUserId && backendUserId === String(primaryHostUserId));
 
       const isActualHost = assignedRole === "Host" || p.id === effectiveHostId || isPrimaryHostByUserId;
-      return Boolean(isActualHost && (isBreakout || !p.isOccupyingLounge));
+      return Boolean(isActualHost && !suppressHostPresenceInMainRoom && (isBreakout || !p.isOccupyingLounge));
     });
-    if (host.length === 0 && effectiveHostId) {
+    if (host.length === 0 && effectiveHostId && !suppressHostPresenceInMainRoom) {
       host = scopedParticipants.filter((p) => p.id === effectiveHostId && (isBreakout || !p.isOccupyingLounge));
     }
 
@@ -13970,6 +14013,7 @@ export default function NewLiveMeeting() {
     filteredPreEventLoungeParticipants,
     eventData?.lounge_enabled_waiting_room,
     primaryHostUserId,
+    isMainRoomSupportMissing,
     participantRoomMap,  // ✅ PHASE 4: Added dependency
     assignedRoleByIdentity  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
   ]);
@@ -14122,6 +14166,26 @@ export default function NewLiveMeeting() {
   // Others only (Audience + Speaker), host is pinned already
   const stageOthers = useMemo(() => {
     const pinnedKey = latestPinnedHost ? getParticipantUserKey(latestPinnedHost?._raw || latestPinnedHost) : "";
+    const suppressHostPresenceInMainRoom = !isHost && !isBreakout && isMainRoomSupportMissing;
+    const isLikelyHostParticipant = (participant) => {
+      if (!participant) return false;
+      const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || null;
+      const backendUserId = String(getBackendUserId(participant?._raw || participant) || getBackendUserId(participant) || "");
+      const role = String(participant?.role || participant?._raw?.role || "").toLowerCase();
+      const preset = String(participant?.presetName || participant?._raw?.presetName || "").toLowerCase();
+      return Boolean(
+        role.includes("host") ||
+        role.includes("publisher") ||
+        role.includes("admin") ||
+        role.includes("presenter") ||
+        preset.includes("host") ||
+        preset.includes("publisher") ||
+        preset.includes("admin") ||
+        preset.includes("presenter") ||
+        (hostId && participant?.id === hostId) ||
+        (primaryHostUserId && backendUserId && backendUserId === String(primaryHostUserId))
+      );
+    };
     if (isBreakout) {
       // ✅ CRITICAL FIX: In breakout/lounge, show ONLY participants actually in the current room
       // When user joins a lounge table (breakout), they enter a separate Dyte room
@@ -14159,9 +14223,10 @@ export default function NewLiveMeeting() {
       const key = getParticipantUserKey(p?._raw || p);
       if (pinnedKey && key && key === pinnedKey) return false;
       if (!isBreakout && p.isOccupyingLounge) return false;
+      if (suppressHostPresenceInMainRoom && isLikelyHostParticipant(p)) return false;
       return true;
     });
-  }, [participants, isBreakout, latestPinnedHost, dyteMeeting?.self?.id, currentLoungeUserIds]);
+  }, [participants, isBreakout, latestPinnedHost, dyteMeeting?.self?.id, currentLoungeUserIds, isHost, isMainRoomSupportMissing, pinnedHost?.id, hostIdHint, primaryHostUserId]);
 
   // Strip should be only others (no host duplicate)
   const stageStrip = stageOthers;
