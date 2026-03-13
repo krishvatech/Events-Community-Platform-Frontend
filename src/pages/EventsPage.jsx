@@ -1426,20 +1426,6 @@ export default function EventsPage() {
   // Force re-render every second to keep join button text current
   useSecondTick();
 
-  const handlePostEventClick = () => {
-    if (isOwnerUser()) {
-      navigate("/admin/events");
-      return;
-    }
-
-    if (isStaffUser()) {
-      toast.error("Only platform admins can post an event.");
-      return;
-    }
-
-    toast.error("You are not allowing to Post an Event");
-  };
-
   useEffect(() => {
     let mounted = true;
 
@@ -1949,7 +1935,6 @@ export default function EventsPage() {
   const defaultButtons = [
     { key: "primary", label: "Explore events", url: "/events" },
     { key: "secondary", label: "Join Community", url: "/signup" },
-    { key: "tertiary", label: "Post an event", url: "/signup" },
   ];
   const ctaButtons =
     Array.isArray(cmsPage?.cta_buttons) && cmsPage.cta_buttons.length
@@ -1984,27 +1969,11 @@ export default function EventsPage() {
                     const label = String(btn?.label || "").trim();
                     const url = String(btn?.url || "").trim() || "#";
                     const isExternal = /^https?:\/\//i.test(url);
-                    const isPostEvent =
-                      btn?.key === "tertiary" ||
-                      label.toLowerCase() === "post an event";
 
                     const baseProps = {
                       key: btn?.key || label,
                       size: "large",
                     };
-
-                    if (isPostEvent) {
-                      return (
-                        <Button
-                          {...baseProps}
-                          onClick={handlePostEventClick}
-                          variant="outlined"
-                          className="normal-case rounded-xl border-white/30 text-white hover:border-white hover:bg-white/10"
-                        >
-                          {label}
-                        </Button>
-                      );
-                    }
 
                     if (btn?.key === "primary") {
                       return (
