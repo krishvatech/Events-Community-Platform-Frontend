@@ -20212,15 +20212,6 @@ function MemberInfoContent({ selectedMember, onClose }) {
     };
   }, [selectedMember]);
 
-  // ✅ CLEANUP: Clear stop flow timeout on unmount
-  useEffect(() => {
-    return () => {
-      // Cleanup timeout on component unmount
-      if (stopFlowTimeoutRef.current) {
-        clearTimeout(stopFlowTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // 2. Send request
   const handleConnect = async () => {
