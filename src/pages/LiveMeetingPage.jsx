@@ -1003,10 +1003,7 @@ function WaitingForHost({
   loungeAvailable = false,
   onOpenLounge,
   loungeStatusLabel = "",
-  supportDialogProps = null,
 }) {
-  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
-
   return (
     <Box
       sx={{
@@ -1247,34 +1244,10 @@ function WaitingForHost({
         )}
       </Paper>
 
-      {/* Footer */}
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-        Having trouble? Check your connection or{" "}
-        <Typography
-          component="span"
-          onClick={() => setSupportDialogOpen(true)}
-          sx={{
-            fontSize: "inherit",
-            lineHeight: "inherit",
-            whiteSpace: "nowrap",
-            color: "rgba(100, 200, 255, 0.85)",
-            cursor: "pointer",
-            fontWeight: 600,
-            "&:hover": {
-              color: "rgba(150, 220, 255, 1)",
-            },
-          }}
-        >
-          <SupportAgentIcon sx={{ fontSize: 14, verticalAlign: "text-bottom", mr: 0.4 }} />
-          contact support
-        </Typography>
+        Support request is temporarily unavailable while you are in the waiting room.
       </Typography>
 
-      <AttendeeSupportDialog
-        open={supportDialogOpen}
-        onClose={() => setSupportDialogOpen(false)}
-        {...supportDialogProps}
-      />
     </Box>
   );
 }
@@ -1298,10 +1271,7 @@ function PreEventLoungeGate({
   pendingHostChoice = null,
   onConfirmHostChoice,
   onCancelHostChoice,
-  supportDialogProps = null,
 }) {
-  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
-
   return (
     <Box
       sx={{
@@ -1631,34 +1601,9 @@ function PreEventLoungeGate({
         )}
       </Paper>
 
-      {/* Footer */}
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-        Having trouble? Check your connection or{" "}
-        <Typography
-          component="span"
-          onClick={() => setSupportDialogOpen(true)}
-          sx={{
-            fontSize: "inherit",
-            lineHeight: "inherit",
-            whiteSpace: "nowrap",
-            color: "rgba(100, 200, 255, 0.85)",
-            cursor: "pointer",
-            fontWeight: 600,
-            "&:hover": {
-              color: "rgba(150, 220, 255, 1)",
-            },
-          }}
-        >
-          <SupportAgentIcon sx={{ fontSize: 14, verticalAlign: "text-bottom", mr: 0.4 }} />
-          contact support
-        </Typography>
+        Support request is temporarily unavailable while you are in the waiting room.
       </Typography>
-
-      <AttendeeSupportDialog
-        open={supportDialogOpen}
-        onClose={() => setSupportDialogOpen(false)}
-        {...supportDialogProps}
-      />
 
       {/* Host Choice Confirmation Dialog */}
       <Dialog
@@ -2031,6 +1976,7 @@ function WaitingRoomScreen({
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
         Support request is temporarily unavailable while you are in the waiting room.
       </Typography>
+
     </Box>
   );
 }
@@ -16461,7 +16407,6 @@ export default function NewLiveMeeting() {
         pendingHostChoice={pendingHostChoice}
         onConfirmHostChoice={handleConfirmHostChoice}
         onCancelHostChoice={handleCancelHostChoice}
-        supportDialogProps={attendeeSupportDialogProps}
       />
     );
   }
@@ -16641,7 +16586,6 @@ export default function NewLiveMeeting() {
           waitingCount={filteredWaitingRoomCount || 0}
           announcementsRef={waitingRoomAnnouncementsRef}
           isOnBreak={isOnBreak}
-          supportDialogProps={attendeeSupportDialogProps}
         />
         <LoungeOverlay
           open={loungeOpen}
@@ -16844,7 +16788,6 @@ export default function NewLiveMeeting() {
         roleLabel={role === "publisher" ? "Host" : "Audience"}
         waitingRoomImage={eventData?.waiting_room_image || null}
         timezone={getBrowserTimezone()}
-        supportDialogProps={attendeeSupportDialogProps}
       />
     );
   }
