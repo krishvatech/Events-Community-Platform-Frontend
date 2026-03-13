@@ -329,6 +329,47 @@ function formatClockTime(ts) {
   }
 }
 
+function normalizeSupportRequest(request, fallbackStatus = "sent") {
+  if (!request) return null;
+  const requesterId = request.requesterId ?? request.requester_id ?? "";
+  const requesterName = request.requesterName ?? request.requester_name ?? "Participant";
+  const createdAt = request.createdAt ?? request.created_at ?? new Date().toISOString();
+  const requestId =
+    request.id ??
+    request.request_id ??
+    `${String(requesterId || requesterName)}-${String(createdAt)}`;
+
+  return {
+    id: String(requestId),
+    requesterId: requesterId != null ? String(requesterId) : "",
+    requesterName,
+    location: request.location || "main_room",
+    createdAt,
+    status: request.status || fallbackStatus,
+    resolvedAt: request.resolvedAt ?? request.resolved_at,
+  };
+}
+
+function mergeSupportRequests(existingRequests, incomingRequests, fallbackStatus = "sent") {
+  const next = new Map();
+
+  (Array.isArray(existingRequests) ? existingRequests : []).forEach((request) => {
+    const normalized = normalizeSupportRequest(request, fallbackStatus);
+    if (normalized) next.set(normalized.id, normalized);
+  });
+
+  (Array.isArray(incomingRequests) ? incomingRequests : []).forEach((request) => {
+    const normalized = normalizeSupportRequest(request, fallbackStatus);
+    if (!normalized) return;
+    const previous = next.get(normalized.id);
+    next.set(normalized.id, previous ? { ...previous, ...normalized } : normalized);
+  });
+
+  return Array.from(next.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
 function getParticipantUserKey(participant) {
   if (!participant) return "";
 
@@ -6329,19 +6370,14 @@ export default function NewLiveMeeting() {
           const isInWaitingRoom = waitingQueue.some(
             (entry) => String(entry?.user_id ?? entry?.id ?? "") === requesterId
           );
-          setSupportRequests((prev) => {
-            const requestId = msg.request_id || `${requesterId || requesterName}-${msg.timestamp || Date.now()}`;
-            const nextRequest = {
-              id: String(requestId),
-              requesterId,
-              requesterName,
-              location: isInWaitingRoom ? "waiting_room" : "main_room",
-              createdAt: msg.timestamp || new Date().toISOString(),
-              status: "new",
-            };
-            const withoutExisting = prev.filter((request) => String(request.id) !== String(nextRequest.id));
-            return [nextRequest, ...withoutExisting];
-          });
+          setSupportRequests((prev) => mergeSupportRequests(prev, [{
+            id: msg.request_id,
+            requesterId,
+            requesterName,
+            location: isInWaitingRoom ? "waiting_room" : "main_room",
+            createdAt: msg.timestamp || new Date().toISOString(),
+            status: "new",
+          }], "new"));
           showSnackbar(
             `${requesterName} needs assistance in the ${isInWaitingRoom ? "Waiting Room" : "Main Room"}.`,
             "warning"
@@ -6350,17 +6386,23 @@ export default function NewLiveMeeting() {
           if (msg.ok) {
             const seconds = Number(msg.cooldown_seconds || 60);
             setAssistanceCooldownUntil(Date.now() + seconds * 1000);
-            setAttendeeSupportFeedback({ kind: "sent", reason: "" });
+            const queuedForFollowUp = Boolean(msg.queued_for_follow_up || msg.delivered_live === false);
+            setAttendeeSupportFeedback({
+              kind: "sent",
+              reason: queuedForFollowUp ? "queued_for_follow_up" : "",
+            });
             setSupportDialogOpen(false);
-            showSnackbar("Assistance request sent to hosts/moderators.", "success");
+            showSnackbar(
+              queuedForFollowUp
+                ? "No host is online right now. Your request was saved for follow-up."
+                : "Assistance request sent to hosts/moderators.",
+              queuedForFollowUp ? "info" : "success"
+            );
           } else if (msg.reason === "cooldown_active") {
             const seconds = Number(msg.cooldown_seconds || 60);
             setAssistanceCooldownUntil(Date.now() + seconds * 1000);
             setAttendeeSupportFeedback({ kind: "idle", reason: "cooldown_active" });
             showSnackbar(`Please wait ${seconds}s before requesting again.`, "info");
-          } else if (msg.reason === "no_active_hosts_or_moderators") {
-            setAttendeeSupportFeedback({ kind: "idle", reason: "no_active_hosts_or_moderators" });
-            showSnackbar("No active host/moderator is currently available.", "warning");
           } else if (msg.reason === "privileged_user_not_allowed") {
             setAttendeeSupportFeedback({ kind: "idle", reason: "privileged_user_not_allowed" });
             showSnackbar("Hosts/Moderators cannot use Request Assistance.", "info");
@@ -6848,6 +6890,9 @@ export default function NewLiveMeeting() {
           }
           if (msg.main_room_support_status) {
             setMainRoomSupportStatus(msg.main_room_support_status);
+          }
+          if (Array.isArray(msg.support_requests) && canReceiveSupportRequestsRef.current) {
+            setSupportRequests((prev) => mergeSupportRequests(prev, msg.support_requests, "sent"));
           }
 
           // Do not clear active table just because a generic lounge_state arrived.
@@ -7375,10 +7420,10 @@ export default function NewLiveMeeting() {
       return `${attendeeSupportFeedback.resolverName || "A host"} marked your request as resolved. Send another request if you still need help.`;
     }
     if (attendeeSupportFeedback.kind === "sent") {
+      if (attendeeSupportFeedback.reason === "queued_for_follow_up") {
+        return "No host was online, but your request was saved and will appear when one returns.";
+      }
       return "Your request has been sent to the host team.";
-    }
-    if (attendeeSupportFeedback.reason === "no_active_hosts_or_moderators") {
-      return "No active host or moderator is available right now.";
     }
     if (attendeeSupportFeedback.reason === "not_in_main_room") {
       return "Support requests are temporarily limited while you're outside the main room.";
@@ -7406,6 +7451,9 @@ export default function NewLiveMeeting() {
       return "Your previous support request was resolved";
     }
     if (attendeeSupportFeedback.kind === "sent") {
+      if (attendeeSupportFeedback.reason === "queued_for_follow_up") {
+        return "Saved for host follow-up";
+      }
       return waitingRoomActive ? "Waiting for host response from the waiting room" : "Waiting for host response";
     }
     if (attendeeSupportFeedback.kind === "queued") {
@@ -7462,7 +7510,7 @@ export default function NewLiveMeeting() {
       attendeeSupportFeedback.reason === "banned" ||
       attendeeSupportFeedback.reason === "rejected"
         ? "error"
-        : attendeeSupportFeedback.reason === "no_active_hosts_or_moderators"
+        : attendeeSupportFeedback.reason === "queued_for_follow_up"
           ? "warning"
           : "info",
   }), [
