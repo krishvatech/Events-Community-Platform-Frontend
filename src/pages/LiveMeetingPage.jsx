@@ -14166,6 +14166,22 @@ export default function NewLiveMeeting() {
   // Others only (Audience + Speaker), host is pinned already
   const stageOthers = useMemo(() => {
     const pinnedKey = latestPinnedHost ? getParticipantUserKey(latestPinnedHost?._raw || latestPinnedHost) : "";
+    const selfId = dyteMeeting?.self?.id || null;
+    const pinnedId = latestPinnedHost?.id ? String(latestPinnedHost.id) : "";
+    const pinnedBackendUserId = latestPinnedHost
+      ? String(getBackendUserId(latestPinnedHost?._raw || latestPinnedHost) || "")
+      : "";
+    const isPinnedParticipant = (participant) => {
+      if (!participant || !latestPinnedHost) return false;
+      const candidateId = participant?.id ? String(participant.id) : "";
+      const candidateKey = getParticipantUserKey(participant?._raw || participant);
+      const candidateBackendUserId = String(getBackendUserId(participant?._raw || participant) || "");
+      return Boolean(
+        (pinnedId && candidateId && candidateId === pinnedId) ||
+        (pinnedKey && candidateKey && candidateKey === pinnedKey) ||
+        (pinnedBackendUserId && candidateBackendUserId && candidateBackendUserId === pinnedBackendUserId)
+      );
+    };
     const suppressHostPresenceInMainRoom = !isHost && !isBreakout && isMainRoomSupportMissing;
     const isLikelyHostParticipant = (participant) => {
       if (!participant) return false;
@@ -14195,7 +14211,11 @@ export default function NewLiveMeeting() {
       // Fix: Late joiners who are manually assigned now appear correctly in the grid
       return participants.filter((p) => {
         if (!p.inMeeting) return false;
-        if (p.id === latestPinnedHost?.id) return false;
+        if (isPinnedParticipant(p)) return false;
+        const isSelfParticipant = Boolean(selfId && p?.id === selfId);
+        // Audience breakout view should not render host in strip tiles.
+        // Host is already represented by pinned/main participant area.
+        if (!isHost && isLikelyHostParticipant(p) && !isSelfParticipant) return false;
 
         // ✅ FIX: Use currentLoungeUserIds for ALL breakout contexts
         // This set contains user_id from the current table's LoungeParticipant records
@@ -14203,15 +14223,13 @@ export default function NewLiveMeeting() {
           const key = getParticipantUserKey(p?._raw || p);
           const userId = key.startsWith("id:") ? key.replace("id:", "") : null;
           // Show only if the participant is actually in THIS breakout room
-          if (!userId || !currentLoungeUserIds.has(String(userId))) return false;
+          if ((!userId || !currentLoungeUserIds.has(String(userId))) && !isSelfParticipant) return false;
         } else {
           // If we don't have participant data yet (data still syncing), don't filter
           // The video grid will show empty and update once data arrives
           console.warn("[stageOthers] Empty currentLoungeUserIds in breakout - waiting for sync");
         }
 
-        const key = getParticipantUserKey(p?._raw || p);
-        if (pinnedKey && key && key === pinnedKey) return false;
         return true;
       });
     }
@@ -14219,9 +14237,7 @@ export default function NewLiveMeeting() {
     // (So if there are multiple hosts, they show up here)
     return participants.filter((p) => {
       if (!p.inMeeting) return false;
-      if (p.id === latestPinnedHost?.id) return false;
-      const key = getParticipantUserKey(p?._raw || p);
-      if (pinnedKey && key && key === pinnedKey) return false;
+      if (isPinnedParticipant(p)) return false;
       if (!isBreakout && p.isOccupyingLounge) return false;
       if (suppressHostPresenceInMainRoom && isLikelyHostParticipant(p)) return false;
       return true;
@@ -14287,6 +14303,17 @@ export default function NewLiveMeeting() {
     const h = Math.round(stageTileW * ratio);
     return Math.max(70, Math.min(82, h));
   }, [stageTileW]);
+
+  const breakoutFallbackParticipant = useMemo(() => {
+    if (!isBreakout || latestPinnedHost || participants.length === 0) return null;
+    const selfId = dyteMeeting?.self?.id || null;
+    return (
+      participants.find((p) => p?.id && p.id !== selfId && p.inMeeting) ||
+      participants.find((p) => p?.id === selfId) ||
+      participants[0] ||
+      null
+    );
+  }, [isBreakout, latestPinnedHost, participants, dyteMeeting?.self?.id]);
 
 
   // When right panel is open on desktop, make tiles more compact
@@ -17698,10 +17725,10 @@ export default function NewLiveMeeting() {
                   {!stageHasVideo && (
                     <>
                       {/* ✅ FIRST PARTICIPANT TILE: Show first participant when alone in lounge instead of welcome message */}
-                      {isBreakout && !latestPinnedHost && breakoutParticipantCount <= 1 && participants.length > 0 ? (
+                      {isBreakout && !latestPinnedHost && breakoutFallbackParticipant ? (
                         <>
                           <Avatar
-                            src={participants[0]?.picture}
+                            src={breakoutFallbackParticipant?.picture}
                             sx={{
                               width: 76,
                               height: 76,
@@ -17709,10 +17736,10 @@ export default function NewLiveMeeting() {
                               bgcolor: "rgba(255,255,255,0.12)",
                             }}
                           >
-                            {initialsFromName(participants[0]?.name || "Participant")}
+                            {initialsFromName(breakoutFallbackParticipant?.name || "Participant")}
                           </Avatar>
                           <Typography sx={{ fontWeight: 800, fontSize: 18, textAlign: "center" }}>
-                            {participants[0]?.name || "Participant"}
+                            {breakoutFallbackParticipant?.name || "Participant"}
                           </Typography>
                           <Typography sx={{ opacity: 0.7, fontSize: 13, textAlign: "center" }}>
                             Member

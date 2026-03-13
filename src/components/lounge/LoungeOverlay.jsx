@@ -77,24 +77,48 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const normalizeTables = useCallback(
         (list) => (Array.isArray(list) ? list : []).map((t) => {
             const participants = t?.participants || {};
-            const normalizedParticipants = Object.fromEntries(
-                Object.entries(participants).map(([seat, p]) => {
-                    if (!p) return [seat, p];
-                    const avatar =
-                        p.avatar_url ||
-                        p.user_image_url ||
-                        p.user_image ||
-                        p.avatar ||
-                        "";
-                    return [
-                        seat,
-                        {
-                            ...p,
-                            avatar_url: resolveMediaUrl(avatar),
-                        },
-                    ];
-                })
-            );
+            const seenParticipantKeys = new Set();
+            const normalizedEntries = [];
+
+            Object.entries(participants).forEach(([seat, p]) => {
+                if (!p) {
+                    normalizedEntries.push([seat, p]);
+                    return;
+                }
+
+                const dedupeKey = String(
+                    p.user_id ||
+                    p.userId ||
+                    p.clientSpecificId ||
+                    p.client_specific_id ||
+                    p.username ||
+                    p.email ||
+                    ""
+                ).trim().toLowerCase();
+
+                // Guard against backend seat-map race where same participant appears on multiple seats.
+                if (dedupeKey && seenParticipantKeys.has(dedupeKey)) {
+                    return;
+                }
+                if (dedupeKey) seenParticipantKeys.add(dedupeKey);
+
+                const avatar =
+                    p.avatar_url ||
+                    p.user_image_url ||
+                    p.user_image ||
+                    p.avatar ||
+                    "";
+
+                normalizedEntries.push([
+                    seat,
+                    {
+                        ...p,
+                        avatar_url: resolveMediaUrl(avatar),
+                    },
+                ]);
+            });
+
+            const normalizedParticipants = Object.fromEntries(normalizedEntries);
             return {
                 ...t,
                 icon_url: resolveMediaUrl(t?.icon_url),
