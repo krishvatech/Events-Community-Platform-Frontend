@@ -429,6 +429,22 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
 
         // 1. (Removed explicit leaveRoom to avoid exiting the main meeting too)
         // The token switch in LiveMeetingPage will automatically handle the room switch.
+        // 1.5 Ensure backend table state is cleared even if WS action is missed.
+        try {
+            const url = `${API_RAW}/events/${eventId}/lounge-leave-table/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${getToken()}`,
+                    "Content-Type": "application/json",
+                },
+            });
+            if (!res.ok) {
+                console.warn("[Lounge] REST leave-table fallback failed:", res.status);
+            }
+        } catch (err) {
+            console.warn("[Lounge] REST leave-table fallback error:", err);
+        }
 
 
         // 2. Send WebSocket message to update backend state

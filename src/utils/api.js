@@ -130,6 +130,24 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // ──── GUEST BRANCH: Skip Cognito refresh for guest tokens ────────────────
+    const isGuest = localStorage.getItem("is_guest") === "true";
+    if (isGuest) {
+      // Only clear guest session on 401 (Unauthorized/expired token)
+      // 403 is permission denied, which is normal for guest users on restricted endpoints
+      if (status === 401) {
+        console.warn("[Auth] Guest token expired (401). Clearing guest session.");
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("is_guest");
+        localStorage.removeItem("guest_email");
+        localStorage.removeItem("guest_name");
+        localStorage.removeItem("guest_id");
+        window.location.href = "/signin";
+      }
+      return Promise.reject(error);
+    }
+    // ──── END GUEST BRANCH ────────────────────────────────────────────────────
+
     // prevent infinite loop
     if (original._retry) {
       return Promise.reject(error);

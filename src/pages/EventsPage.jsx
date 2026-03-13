@@ -8,6 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { Link, useNavigate } from "react-router-dom";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
+import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import {
   Box,
   Avatar,
@@ -383,7 +384,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 // ————————————————————————————————————————
 // Card (thumbnail view)
 // ————————————————————————————————————————
-function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants }) {
+function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested }) {
   const navigate = useNavigate();
   const owner = isOwnerUser();
   const reg = myRegistrations?.[ev.id];
@@ -432,12 +433,14 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const userTimezoneName = getBrowserTimezone();
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
   const showYourTime = ev.event_format === 'virtual' && organizerTimezone && timesDiffer;
+  const token =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access");
+  const isAuthenticated = Boolean(token);
+  const isFreeEvent = Boolean(ev.is_free) || Number(ev.price) === 0;
 
   const handleRegisterCard = async () => {
-    const token =
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("access");
     if (!token) {
       navigate("/signin");
       return;
@@ -518,9 +521,27 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     });
   };
 
+  const handleCardClick = (e) => {
+    // Don't navigate if clicking on a button or link
+    if (e.target.closest('button') || e.target.closest('a')) {
+      return;
+    }
+    // Prevent event propagation
+    e.stopPropagation();
+
+    // Navigate to event details page with full event data
+    const eventDetailsPath = `/events/${ev.slug || ev.id}`;
+    console.log(`[EventsPage] Navigating to event details:`, eventDetailsPath, ev);
+    navigate(eventDetailsPath, {
+      state: { event: ev, fromEventsList: true },
+      replace: false
+    });
+  };
+
   return (
     <MUICard
       elevation={0}
+      onClick={handleCardClick}
       className="group h-full w-full flex flex-col rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
                 transition-all duration-300 hover:shadow-xl hover:-translate-y-2.5
                 hover:ring-1 hover:ring-teal-200 overflow-hidden cursor-pointer"
@@ -684,18 +705,23 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             const isBefore = s && now < s;
             const isAfter = e && now > e;
 
-            let canView = true;
-            if (!owner && !staff) {
-              if (isBefore && ev.show_participants_before_event === false) canView = false;
-              else if (isAfter && ev.show_participants_after_event === false) canView = false;
-            }
+                  let canView = true;
+                  if (!owner && !staff) {
+                    if (isBefore && ev.show_participants_before_event === false) canView = false;
+                    else if (isAfter && ev.show_participants_after_event === false) canView = false;
+                  }
+                  const token = localStorage.getItem("access_token") ||
+                    localStorage.getItem("access") ||
+                    localStorage.getItem("access_token");
+                  const isGuest = localStorage.getItem("is_guest") === "true";
+                  const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
-            const label = ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet";
+                  const label = ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet";
 
-            if (canView) {
-              return (
-                <div
-                  className="flex items-center gap-2 cursor-pointer hover:text-teal-600 transition-colors"
+                  if (canOpenParticipants) {
+                    return (
+                      <div
+                        className="flex items-center gap-2 cursor-pointer hover:text-teal-600 transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (ev.attendees > 0) {
@@ -707,10 +733,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   <span>{label}</span>
                 </div>
               );
-            } else {
-              return (
-                <div className="flex items-center gap-2 cursor-default">
-                  <GroupsIcon fontSize="small" className="text-teal-700" />
+                  } else {
+                    return (
+                      <div className="flex items-center gap-2 cursor-default">
+                        <GroupsIcon fontSize="small" className="text-teal-700" />
                   <span>{label}</span>
                 </div>
               );
@@ -890,15 +916,28 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               )}
             </div>
           ) : (
-            <Button
-              variant="contained"
-              size="medium"
-              color="primary"
-              onClick={handleRegisterCard}
-              className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-            >
-              Register Now
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="contained"
+                size="medium"
+                color="primary"
+                onClick={handleRegisterCard}
+                className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+              >
+                Register Now
+              </Button>
+              {!isAuthenticated && isFreeEvent && (
+                <Button
+                  variant="outlined"
+                  size="medium"
+                  color="primary"
+                  onClick={() => onGuestJoinRequested(ev)}
+                  className="normal-case rounded-full px-4"
+                >
+                  Join as Guest
+                </Button>
+              )}
+            </div>
           )
         )}
       </div>
@@ -911,7 +950,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 // ————————————————————————————————————————
 // Row (details/list view)
 // ————————————————————————————————————————
-function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants }) {
+function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested }) {
   const navigate = useNavigate();
   const reg = myRegistrations?.[ev.id];
   const isHost = Boolean(reg?.is_host);
@@ -956,12 +995,14 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const userTimezoneName = getBrowserTimezone();
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
   const showYourTime = ev.event_format === 'virtual' && organizerTimezone && timesDiffer;
+  const token =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access");
+  const isAuthenticated = Boolean(token);
+  const isFreeEvent = Boolean(ev.is_free) || Number(ev.price) === 0;
 
   const handleRegisterRow = async () => {
-    const token =
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("access");
     if (!token) {
       navigate("/signin");
       return;
@@ -1140,10 +1181,15 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     if (isBefore && ev.show_participants_before_event === false) canView = false;
                     else if (isAfter && ev.show_participants_after_event === false) canView = false;
                   }
+                  const token = localStorage.getItem("access_token") ||
+                    localStorage.getItem("access") ||
+                    localStorage.getItem("access_token");
+                  const isGuest = localStorage.getItem("is_guest") === "true";
+                  const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
                   const label = ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet";
 
-                  if (canView) {
+                  if (canOpenParticipants) {
                     return (
                       <span
                         className="inline-flex items-center gap-2 cursor-pointer hover:text-teal-600 transition-colors"
@@ -1262,15 +1308,28 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     )}
                   </div>
                 ) : (
-                  <Button
-                    variant="contained"
-                    size="medium"
-                    color="primary"
-                    onClick={handleRegisterRow}
-                    className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-                  >
-                    Register Now
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="contained"
+                      size="medium"
+                      color="primary"
+                      onClick={handleRegisterRow}
+                      className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                    >
+                      Register Now
+                    </Button>
+                    {!isAuthenticated && isFreeEvent && (
+                      <Button
+                        variant="outlined"
+                        size="medium"
+                        color="primary"
+                        onClick={() => onGuestJoinRequested(ev)}
+                        className="normal-case rounded-full px-4"
+                      >
+                        Join as Guest
+                      </Button>
+                    )}
+                  </div>
                 )
               )}
             </div>
@@ -1371,8 +1430,30 @@ export default function EventsPage() {
   const [participantEventTitle, setParticipantEventTitle] = useState("");
   const [participantHiddenRolesCount, setParticipantHiddenRolesCount] = useState(0);
   const [participantTotalRegisteredCount, setParticipantTotalRegisteredCount] = useState(0);
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
+  const [guestJoinEvent, setGuestJoinEvent] = useState(null);
+
+  const handleGuestJoinRequested = React.useCallback((eventData) => {
+    setGuestJoinEvent(eventData);
+    setGuestModalOpen(true);
+  }, []);
 
   const handleShowParticipants = React.useCallback(async (eventId, eventTitle) => {
+    const token = localStorage.getItem("access_token") ||
+      localStorage.getItem("access") ||
+      localStorage.getItem("access_token");
+    const isGuest = localStorage.getItem("is_guest") === "true";
+
+    if (!token) {
+      toast.info("Sign in to view participant list.");
+      return;
+    }
+
+    if (isGuest) {
+      toast.info("Participant list is unavailable for guest access.");
+      return;
+    }
+
     setParticipantEventTitle(eventTitle);
     setParticipantDialogOpen(true);
     setParticipantListLoading(true);
@@ -1382,9 +1463,6 @@ export default function EventsPage() {
     setParticipantTotalRegisteredCount(0);
 
     try {
-      const token = localStorage.getItem("access_token") ||
-        localStorage.getItem("access") ||
-        localStorage.getItem("access_token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await fetch(`${EVENTS_URL}${eventId}/participants/`, { headers });
 
@@ -2511,7 +2589,14 @@ export default function EventsPage() {
                   ))
                   : events.map((ev) => (
                     <Box key={ev.id}>
-                      <EventCard ev={ev} myRegistrations={myRegistrations} setMyRegistrations={setMyRegistrations} setRawEvents={setRawEvents} onShowParticipants={handleShowParticipants} />
+                      <EventCard
+                        ev={ev}
+                        myRegistrations={myRegistrations}
+                        setMyRegistrations={setMyRegistrations}
+                        setRawEvents={setRawEvents}
+                        onShowParticipants={handleShowParticipants}
+                        onGuestJoinRequested={handleGuestJoinRequested}
+                      />
                     </Box>
                   ))}
               </Box>
@@ -2525,7 +2610,14 @@ export default function EventsPage() {
                   ))
                   : events.map((ev) => (
                     <Grid item key={ev.id} xs={12}>
-                      <EventRow ev={ev} myRegistrations={myRegistrations} setMyRegistrations={setMyRegistrations} setRawEvents={setRawEvents} onShowParticipants={handleShowParticipants} />
+                      <EventRow
+                        ev={ev}
+                        myRegistrations={myRegistrations}
+                        setMyRegistrations={setMyRegistrations}
+                        setRawEvents={setRawEvents}
+                        onShowParticipants={handleShowParticipants}
+                        onGuestJoinRequested={handleGuestJoinRequested}
+                      />
                     </Grid>
                   ))}
               </Grid>
@@ -2778,6 +2870,17 @@ export default function EventsPage() {
         hiddenRolesCount={participantHiddenRolesCount}
         totalRegisteredCount={participantTotalRegisteredCount}
       />
+      {guestJoinEvent && (
+        <GuestJoinModal
+          open={guestModalOpen}
+          onClose={() => {
+            setGuestModalOpen(false);
+            setGuestJoinEvent(null);
+          }}
+          event={guestJoinEvent}
+          livePath={`/live/${guestJoinEvent.slug || guestJoinEvent.id}?id=${guestJoinEvent.id}&role=audience`}
+        />
+      )}
       <ToastContainer
         position="top-center"
         autoClose={2000}

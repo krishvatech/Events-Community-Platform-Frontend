@@ -108,7 +108,12 @@ function EventIdRedirect() {
 
 // Auth helper
 const getAccessToken = () => localStorage.getItem("access_token");
-const isAuthed = () => !!getAccessToken();
+const isAuthed = () => {
+  // Treat guest sessions as NOT authenticated for dashboard/sidebar sections.
+  // Guests are only allowed on /live/* via RequireAuth special handling.
+  if (localStorage.getItem("is_guest") === "true") return false;
+  return !!getAccessToken();
+};
 
 const AppShell = () => {
   const location = useLocation();
@@ -231,7 +236,7 @@ const AppShell = () => {
           <Route path="/events/:slug" element={<EventDetailsPage />} />
           <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />
-          <Route path="/community" element={<CommunityHubPage />} />
+          <Route path="/community" element={<RequireAuth><CommunityHubPage /></RequireAuth>} />
           <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
           <Route path="/community/mygroups" element={<RequireAuth><MyGroupsPage /></RequireAuth>} />
           <Route path="/community/mygroups/:groupId" element={<RequireAuth><GroupDetailsPage /></RequireAuth>} />

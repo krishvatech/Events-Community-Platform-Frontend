@@ -134,6 +134,8 @@ import { getUserName } from "../utils/authStorage.js";
 import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
+import GuestBanner from "../components/GuestBanner.jsx";
+import GuestRegistrationModal from "../components/GuestRegistrationModal.jsx";
 import {
   VIRTUAL_BG_FEATURE_ENABLED,
   VIRTUAL_BG_PRESETS,
@@ -2145,6 +2147,11 @@ export default function NewLiveMeeting() {
   const defaultMuteAppliedRef = useRef(false);
   const defaultCameraLockAppliedRef = useRef(false);
 
+  // ✅ Guest Registration Modal
+  const [guestRegModalOpen, setGuestRegModalOpen] = useState(false);
+  const isGuest = localStorage.getItem("is_guest") === "true";
+  const [guestBannerVisible, setGuestBannerVisible] = useState(isGuest);
+
   // ✅ Settings menu anchor
   const [permAnchorEl, setPermAnchorEl] = useState(null);
   const permMenuOpen = Boolean(permAnchorEl);
@@ -2602,6 +2609,10 @@ export default function NewLiveMeeting() {
 
   const fetchAndCacheKycStatus = useCallback((userId) => {
     if (!userId || participantKycCache[userId] !== undefined) return; // Already cached
+    if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
+      setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
+      return;
+    }
 
     const headers = { accept: "application/json", ...authHeader() };
     const urls = [
@@ -2864,11 +2875,13 @@ export default function NewLiveMeeting() {
     isLoungeCurrentlyOpen
   );
   const showSocialLoungeToolbarAction = isHost || participantCanAccessSocialLounge;
+  const [hasLiveSupportPresenceInMainRoom, setHasLiveSupportPresenceInMainRoom] = useState(false);
   const isMainRoomSupportMissing = Boolean(
     !isBreakout &&
     role !== "publisher" &&
     mainRoomSupportStatus &&
-    mainRoomSupportStatus.has_host_or_moderator_in_main_room === false
+    mainRoomSupportStatus.has_host_or_moderator_in_main_room === false &&
+    !hasLiveSupportPresenceInMainRoom
   );
   const assistanceCooldownRemaining = Math.max(
     0,
@@ -3365,6 +3378,8 @@ export default function NewLiveMeeting() {
 
   const RIGHT_PANEL_W = 460;
   const APPBAR_H = 44;
+  const GUEST_BANNER_H = guestBannerVisible ? 48 : 0;
+  const LAYOUT_TOP_OFFSET = APPBAR_H + GUEST_BANNER_H;
 
   const clampMainRoomPeekPosition = useCallback((x, y) => {
     const el = mainRoomPeekRef.current;
@@ -7041,7 +7056,7 @@ export default function NewLiveMeeting() {
             durationMinutes: msg.data.duration_minutes,
             timestamp: Date.now()
           });
-          setShowNetworkingPrompt(true);
+          if (!isGuest) setShowNetworkingPrompt(true);
 
           // ✅ Auto-pause recording when Speed Networking starts (host only, privacy protection)
           if (isHostRef.current && isRecordingRef.current && !isRecordingPausedRef.current) {
@@ -7049,7 +7064,9 @@ export default function NewLiveMeeting() {
             handlePauseRecording();
           }
 
-          showSnackbar("Speed Networking has started! Join now to network with others.", "success");
+          if (!isGuest) {
+            showSnackbar("Speed Networking has started! Join now to network with others.", "success");
+          }
         } else if (msg.type === "speed_networking_match_found") {
           // ✅ NEW: Handle Speed Networking Match Found (for participants already in networking)
           console.log("[MainSocket] 🤝 Match found!", msg.data);
@@ -7295,7 +7312,7 @@ export default function NewLiveMeeting() {
       console.log("[MainSocket] Cleanup function called - closing WebSocket");
       if (ws.readyState <= WebSocket.OPEN) ws.close();
     };
-  }, [eventId]);
+  }, [eventId, isGuest]);
 
   // ✅ Additional polling for lounge status while in breakout (more frequent)
   // Ensures lounge close is detected quickly even if WebSocket updates are delayed
@@ -8698,6 +8715,7 @@ export default function NewLiveMeeting() {
 
   // Helper function to check and auto-join Speed Networking
   const checkAndAutoJoinSpeedNetworking = useCallback(async () => {
+    if (isGuest) return;
     try {
       const token = getToken();
       if (!token) {
@@ -8809,14 +8827,14 @@ export default function NewLiveMeeting() {
     } catch (err) {
       console.error('[LiveMeeting] Error checking for active Speed Networking session:', err);
     }
-  }, [eventId]);
+  }, [eventId, isGuest]);
 
   // Trigger auto-join when user is in room - handles both new joins and refresh cases
   useEffect(() => {
     console.log('[LiveMeeting] Auto-join check:', { roomJoined, eventId, alreadyAutoJoined: speedNetworkingAutoJoinedRef.current });
 
     // Skip if not ready
-    if (!roomJoined || !eventId) {
+    if (!roomJoined || !eventId || isGuest) {
       console.log('[LiveMeeting] Auto-join skipped: roomJoined=' + roomJoined + ', eventId=' + eventId);
       return;
     }
@@ -8833,7 +8851,7 @@ export default function NewLiveMeeting() {
       console.log('[LiveMeeting] Triggering auto-join for roomJoined=true, eventId=' + eventId);
       checkAndAutoJoinSpeedNetworking();
     }
-  }, [roomJoined, eventId, checkAndAutoJoinSpeedNetworking]);
+  }, [roomJoined, eventId, isGuest, checkAndAutoJoinSpeedNetworking]);
 
   // Keep local button state in sync with Dyte actual state
 
@@ -11094,6 +11112,109 @@ export default function NewLiveMeeting() {
     });
   }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity, moodMap]);
 
+  const hostVirtualAudienceMembers = useMemo(() => {
+    if (!isHost || isBreakout || !Array.isArray(onlineUsers) || onlineUsers.length === 0) return [];
+
+    const presentKeys = new Set(
+      (participants || [])
+        .map((p) => String(getBackendUserId(p?._raw || p) || "").trim())
+        .filter(Boolean)
+    );
+
+    const toRoomLocation = (u) => {
+      const raw = String(u?.current_location || "").toLowerCase();
+      if (raw === "social_lounge") {
+        return {
+          type: "lounge",
+          roomId: u?.lounge_table_id ? String(u.lounge_table_id) : null,
+          roomName: u?.lounge_table_name || "Social Lounge",
+          roomCategory: "LOUNGE",
+        };
+      }
+      if (raw === "breakout_room") {
+        return {
+          type: "breakout",
+          roomId: u?.lounge_table_id ? String(u.lounge_table_id) : null,
+          roomName: u?.lounge_table_name || "Breakout Room",
+          roomCategory: "BREAKOUT",
+        };
+      }
+      return {
+        type: "main",
+        roomId: null,
+        roomName: "Main Room",
+        roomCategory: null,
+      };
+    };
+
+    return onlineUsers
+      .filter((u) => {
+        const userId = String(u?.user_id || "").trim();
+        if (!userId) return false;
+        if (presentKeys.has(userId)) return false;
+        return true;
+      })
+      .map((u) => ({
+        id: `virtual:${String(u.user_id)}`,
+        name: u.full_name || u.username || String(u.user_id),
+        role: "Audience",
+        presetName: "",
+        mic: false,
+        cam: false,
+        active: false,
+        joinedAtTs: Date.now(),
+        picture: "",
+        inMeeting: false,
+        isOccupyingLounge: ["social_lounge", "breakout_room"].includes(String(u.current_location || "").toLowerCase()),
+        mood: null,
+        isVirtual: true,
+        _roomLocation: toRoomLocation(u),
+        _raw: {
+          customParticipantId: String(u.user_id),
+          userId: String(u.user_id),
+          user_id: String(u.user_id),
+          is_guest: Boolean(u?.is_guest),
+        },
+      }));
+  }, [isHost, isBreakout, onlineUsers, participants]);
+
+  useEffect(() => {
+    if (isBreakout) {
+      setHasLiveSupportPresenceInMainRoom(false);
+      return;
+    }
+
+    const isSupportLike = (participant) => {
+      if (!participant) return false;
+      const raw = participant?._raw || participant || {};
+      const preset = String(participant?.presetName || raw?.presetName || "").toLowerCase();
+      const role = String(participant?.role || raw?.role || "").toLowerCase();
+      return (
+        preset.includes("host") ||
+        preset.includes("publisher") ||
+        preset.includes("admin") ||
+        preset.includes("presenter") ||
+        preset.includes("moderator") ||
+        role.includes("host") ||
+        role.includes("publisher") ||
+        role.includes("admin") ||
+        role.includes("presenter") ||
+        role.includes("moderator")
+      );
+    };
+
+    const nextValue = participants.some((participant) => {
+      if (!participant?.id) return false;
+      if (participant?.isOccupyingLounge) return false;
+      const inCurrentMainRoom =
+        Boolean(participant?.inMeeting) ||
+        Boolean(dyteMeeting?.self?.id && participant.id === dyteMeeting.self.id);
+      return inCurrentMainRoom && isSupportLike(participant);
+    });
+
+    setHasLiveSupportPresenceInMainRoom(nextValue);
+  }, [isBreakout, participants, dyteMeeting?.self?.id]);
+
   // ✅ Phase 3: Sync loungeTables with participantRoomMap
   useEffect(() => {
     if (loungeTables.length === 0 || !participants || participants.length === 0) return;
@@ -11220,13 +11341,33 @@ export default function NewLiveMeeting() {
       clearTimeout(breakoutJoinTimeoutRef.current);
       breakoutJoinTimeoutRef.current = null;
     }
-    // 1. Notify backend via MAIN socket (same endpoint as lounge)
+    // 1. Ensure backend table state is cleared (works even if socket is not connected).
+    try {
+      const url = `${API_ROOT}/events/${eventId}/lounge-leave-table/`.replace(/([^:]\/)\/+/g, "$1");
+      const token = getToken();
+      if (token) {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!res.ok) {
+          console.warn("[LiveMeeting] REST leave-table fallback failed:", res.status);
+        }
+      }
+    } catch (e) {
+      console.warn("[LiveMeeting] REST leave-table fallback error:", e);
+    }
+
+    // 2. Notify backend via MAIN socket (same endpoint as lounge)
     if (mainSocketRef.current?.readyState === WebSocket.OPEN) {
       console.log("[LiveMeeting] Sending leave_table via main socket");
       mainSocketRef.current.send(JSON.stringify({ action: "leave_table" }));
     }
 
-    // 2. ✅ SPECIAL HANDLING FOR DURING-EVENT LOUNGE (non-post-event)
+    // 3. ✅ SPECIAL HANDLING FOR DURING-EVENT LOUNGE (non-post-event)
     // Keep host behavior: returning to lounge overlay is useful for host table management.
     // Audience should skip lounge overlay and go directly to main meeting (handled in step 3).
     if (!isPostEventLounge && loungeOpenStatus?.status === "OPEN" && isHost) {
@@ -11264,7 +11405,7 @@ export default function NewLiveMeeting() {
       return;
     }
 
-    // 3. ✅ SPECIAL HANDLING FOR POST-EVENT LOUNGE
+    // 4. ✅ SPECIAL HANDLING FOR POST-EVENT LOUNGE
     // If in post-event mode, don't try to return to main meeting (it's ended)
     // Just reset breakout state and show PostEventLoungeScreen again
     if (isPostEventLounge) {
@@ -11339,7 +11480,7 @@ export default function NewLiveMeeting() {
         leaveBreakoutInFlightRef.current = false;
       }, 300);
     }
-  }, [dyteMeeting, isPostEventLounge, loungeOpenStatus?.status, isHost]);
+  }, [dyteMeeting, eventId, isPostEventLounge, loungeOpenStatus?.status, isHost]);
 
   const forceRejoinMainFromLounge = useCallback(async () => {
     // Close lounge UI and force a fresh join via API (to respect waiting room/grace rules)
@@ -12998,6 +13139,7 @@ export default function NewLiveMeeting() {
 
   // ✅ Auto-load new messages while Private Chat is OPEN (active DM)
   useEffect(() => {
+    if (isGuest) return;
     if (!privateChatUser || !privateConversationId) return;
 
     let alive = true;
@@ -13054,10 +13196,11 @@ export default function NewLiveMeeting() {
       alive = false;
       clearInterval(t);
     };
-  }, [privateChatUser, privateConversationId]);
+  }, [privateChatUser, privateConversationId, isGuest]);
 
   // ✅ WebSocket listener for real-time edit/delete updates on private messages
   useEffect(() => {
+    if (isGuest) return;
     if (!privateChatUser || !privateConversationId) return;
 
     let alive = true;
@@ -13107,7 +13250,7 @@ export default function NewLiveMeeting() {
     } catch (e) {
       console.warn("[PrivateChat WS] Failed to connect:", e);
     }
-  }, [privateChatUser, privateConversationId]);
+  }, [privateChatUser, privateConversationId, isGuest]);
 
   useEffect(() => {
     if (!hostPerms.chat) return;
@@ -13155,6 +13298,7 @@ export default function NewLiveMeeting() {
   }, [
     eventId,
     activeTableId,
+    isGuest,
     hostPerms.chat,
     isChatActive,
     activeChatConversationId,
@@ -13757,7 +13901,7 @@ export default function NewLiveMeeting() {
     };
 
     return () => ws.close();
-  }, [tab, isPanelOpen, eventId, activeTableId]); // Re-connect when activeTableId changes
+  }, [tab, isPanelOpen, eventId, activeTableId, isGuest]); // Re-connect when activeTableId changes
 
   const submitQuestion = async () => {
     const content = newQuestion.trim();
@@ -14019,32 +14163,35 @@ export default function NewLiveMeeting() {
 
     // ✅ PHASE 4: For host, enhance with room location
     if (isHost && !isBreakout) {
+      const hostWithLocation = host.map(p => ({
+        ...p,
+        _roomLocation: participantRoomMap.get(p.id) || {
+          type: "main",
+          roomId: null,
+          roomName: "Main Room"
+        }
+      }));
+      const speakersWithLocation = speakers.map(p => ({
+        ...p,
+        _roomLocation: participantRoomMap.get(p.id) || {
+          type: "main",
+          roomId: null,
+          roomName: "Main Room"
+        }
+      }));
+      const audienceWithLocation = audience.map(p => ({
+        ...p,
+        _roomLocation: participantRoomMap.get(p.id) || {
+          type: "main",
+          roomId: null,
+          roomName: "Main Room"
+        }
+      }));
       // Host in main room: show all with locations
       return {
-        host: host.map(p => ({
-          ...p,
-          _roomLocation: participantRoomMap.get(p.id) || {
-            type: "main",
-            roomId: null,
-            roomName: "Main Room"
-          }
-        })),
-        speakers: speakers.map(p => ({
-          ...p,
-          _roomLocation: participantRoomMap.get(p.id) || {
-            type: "main",
-            roomId: null,
-            roomName: "Main Room"
-          }
-        })),
-        audience: audience.map(p => ({
-          ...p,
-          _roomLocation: participantRoomMap.get(p.id) || {
-            type: "main",
-            roomId: null,
-            roomName: "Main Room"
-          }
-        }))
+        host: hostWithLocation,
+        speakers: speakersWithLocation,
+        audience: [...audienceWithLocation, ...hostVirtualAudienceMembers]
       };
     }
 
@@ -14063,7 +14210,8 @@ export default function NewLiveMeeting() {
     primaryHostUserId,
     isMainRoomSupportMissing,
     participantRoomMap,  // ✅ PHASE 4: Added dependency
-    assignedRoleByIdentity  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
+    assignedRoleByIdentity,  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
+    hostVirtualAudienceMembers
   ]);
 
 
@@ -16134,9 +16282,9 @@ export default function NewLiveMeeting() {
                                       <span>
                                         <Typography
                                           noWrap
-                                          sx={{ fontWeight: 700, fontSize: 13, cursor: isSelfMember(m) ? "default" : "pointer" }}
+                                          sx={{ fontWeight: 700, fontSize: 13, cursor: (isSelfMember(m) || m.isVirtual) ? "default" : "pointer" }}
                                           onClick={() => {
-                                            if (!isSelfMember(m)) openMemberInfo(m);
+                                            if (!isSelfMember(m) && !m.isVirtual) openMemberInfo(m);
                                           }}
                                         >
                                           {m.name}{isSelfMember(m) ? " (You)" : ""}
@@ -16175,6 +16323,7 @@ export default function NewLiveMeeting() {
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
                                           e.stopPropagation();
+                                          if (m.isVirtual) return;
                                           if (isSelfMember(m)) {
                                             handleToggleMic();
                                             return;
@@ -16185,7 +16334,7 @@ export default function NewLiveMeeting() {
                                             })();
                                           }
                                         }}
-                                        disabled={isOnBreak || (!isSelfMember(m) && !canManageParticipantMic)}
+                                        disabled={Boolean(m.isVirtual) || isOnBreak || (!isSelfMember(m) && !canManageParticipantMic)}
                                         sx={{
                                           bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                           border: "1px solid",
@@ -16210,13 +16359,14 @@ export default function NewLiveMeeting() {
                                         onMouseDown={(e) => e.stopPropagation()}
                                         onClick={(e) => {
                                           e.stopPropagation();
+                                          if (m.isVirtual) return;
                                           if (isSelfMember(m)) {
                                             handleToggleCamera();
                                             return;
                                           }
                                           if (isHost) forceToggleCameraParticipant(m);
                                         }}
-                                        disabled={isOnBreak || (!isSelfMember(m) && !isHost)}
+                                        disabled={Boolean(m.isVirtual) || isOnBreak || (!isSelfMember(m) && !isHost)}
                                         sx={{
                                           bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                           border: "1px solid",
@@ -16238,7 +16388,7 @@ export default function NewLiveMeeting() {
                                       <Tooltip title={isOnBreak ? "Disabled during break" : "Send Direct Message"}>
                                         <IconButton
                                           size="small"
-                                          disabled={isOnBreak}
+                                          disabled={Boolean(m.isVirtual) || isOnBreak}
                                           sx={{ color: "#fff" }}
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -16270,10 +16420,11 @@ export default function NewLiveMeeting() {
                                       <Tooltip title={isOnBreak ? "Disabled during break" : "Open Profile"}>
                                         <IconButton
                                           size="small"
-                                          disabled={isOnBreak}
+                                          disabled={Boolean(m.isVirtual) || isOnBreak}
                                           sx={{ color: "rgba(255,255,255,0.9)" }}
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            if (m.isVirtual) return;
                                             openMemberInfo(m);
                                           }}
                                         >
@@ -16286,7 +16437,7 @@ export default function NewLiveMeeting() {
                                     {isHost && !isSelfMember(m) && (
                                       <IconButton
                                         size="small"
-                                        disabled={isOnBreak}
+                                        disabled={Boolean(m.isVirtual) || isOnBreak}
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleOpenParticipantMenu(e, m);
@@ -16469,7 +16620,7 @@ export default function NewLiveMeeting() {
       )}
 
       {/* Speed Networking Icon (New) */}
-      <Tooltip title="Networking" placement="left" arrow>
+      {!isGuest && <Tooltip title="Networking" placement="left" arrow>
         <IconButton
           onClick={() => setShowSpeedNetworking(true)}
           sx={{
@@ -16484,7 +16635,7 @@ export default function NewLiveMeeting() {
         >
           <Diversity3Icon />
         </IconButton>
-      </Tooltip>
+      </Tooltip>}
     </Box>
   );
 
@@ -16570,6 +16721,17 @@ export default function NewLiveMeeting() {
           handleEnterBreakout(tableId);
         }}
         onLeaveTable={() => {
+          const url = `${API_ROOT}/events/${eventId}/lounge-leave-table/`.replace(/([^:]\/)\/+/g, "$1");
+          const token = getToken();
+          if (token) {
+            fetch(url, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }).catch((e) => console.warn("[LiveMeeting] Post-event leave-table fallback failed:", e));
+          }
           mainSocketRef.current?.send(JSON.stringify({ action: "leave_table" }));
         }}
         currentUserId={getMyUserIdFromJwt()}
@@ -17071,6 +17233,20 @@ export default function NewLiveMeeting() {
           "& .MuiSvgIcon-root": { color: "rgba(255,255,255,0.90)" },
         }}
       >
+        {/* Guest Banner - shown for guest attendees */}
+        {isGuest && guestBannerVisible && (
+          <GuestBanner
+            onRegister={() => setGuestRegModalOpen(true)}
+            onClose={() => setGuestBannerVisible(false)}
+          />
+        )}
+
+        {/* Guest Registration Modal */}
+        <GuestRegistrationModal
+          open={guestRegModalOpen}
+          onClose={() => setGuestRegModalOpen(false)}
+        />
+
         {/* Top Bar */}
         <AppBar
           position="sticky"
@@ -17527,12 +17703,12 @@ export default function NewLiveMeeting() {
         {/* Main Layout - Hidden if Speed Networking is active */}
         {!showSpeedNetworking && (
           <Box
-            sx={{
-              display: "flex",
-              height: `calc(100vh - ${APPBAR_H}px)`,
-              overflow: "hidden",
-            }}
-          >
+              sx={{
+                display: "flex",
+                height: `calc(100vh - ${LAYOUT_TOP_OFFSET}px)`,
+                overflow: "hidden",
+              }}
+            >
             {/* Left/Main */}
             <Box
               sx={{
@@ -18512,7 +18688,7 @@ export default function NewLiveMeeting() {
 
             {/* Right Panel (Desktop) */}
             {isMdUp && (
-              <Box sx={{ display: "flex", flexDirection: "row", height: `calc(100vh - ${APPBAR_H}px)`, position: "sticky", top: APPBAR_H }}>
+              <Box sx={{ display: "flex", flexDirection: "row", height: `calc(100vh - ${LAYOUT_TOP_OFFSET}px)`, position: "sticky", top: LAYOUT_TOP_OFFSET }}>
                 {/* Content Panel (Collapsible) */}
                 {rightPanelOpen && (
                   <Box
@@ -19464,7 +19640,7 @@ export default function NewLiveMeeting() {
         {/* ✅ Speed Networking Dialog */}
         <Dialog
           fullScreen
-          open={showSpeedNetworking}
+          open={showSpeedNetworking && !isGuest}
           onClose={handleCloseSpeedNetworking}
           sx={{ zIndex: 1250 }} // Above lounge but below snackbars
         >
@@ -19488,7 +19664,7 @@ export default function NewLiveMeeting() {
 
         {/* ✅ Speed Networking Session Prompt Modal */}
         <SpeedNetworkingSessionPrompt
-          open={showNetworkingPrompt}
+          open={showNetworkingPrompt && !isGuest}
           sessionData={sessionStartNotification}
           onJoinNetworking={() => {
             console.log("[Modal] Redirecting to Speed Networking screen and auto-joining queue");
@@ -20153,6 +20329,8 @@ function MemberInfoContent({ selectedMember, onClose }) {
   const [connLoading, setConnLoading] = useState(false);
   const [profileInfo, setProfileInfo] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const memberUserId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
+  const isGuestMember = typeof memberUserId === "string" && /^guest[_:-]/i.test(memberUserId);
 
   // 1. Check friendship status on mount
   useEffect(() => {
@@ -20161,6 +20339,10 @@ function MemberInfoContent({ selectedMember, onClose }) {
       // Use DB ID if available, else Dyte ID (though friends API needs DB ID usually)
       const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
       if (!userId) {
+        if (alive) setConnStatus("none");
+        return;
+      }
+      if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
         if (alive) setConnStatus("none");
         return;
       }
@@ -20190,6 +20372,16 @@ function MemberInfoContent({ selectedMember, onClose }) {
     const userId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
     if (!userId) {
       setProfileInfo(null);
+      setProfileLoading(false);
+      return () => { };
+    }
+    if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
+      setProfileInfo({
+        jobTitle: "Guest attendee",
+        company: "",
+        location: "",
+        kycStatus: "",
+      });
       setProfileLoading(false);
       return () => { };
     }
@@ -20520,7 +20712,9 @@ function MemberInfoContent({ selectedMember, onClose }) {
           fullWidth
           variant="outlined"
           startIcon={<Box component="span" sx={{ fontSize: 18, display: "flex" }}>👤</Box>}
+          disabled={isGuestMember}
           onClick={() => {
+            if (isGuestMember) return;
             window.open(profileLink, "_blank");
           }}
           sx={{
@@ -20538,11 +20732,11 @@ function MemberInfoContent({ selectedMember, onClose }) {
             },
           }}
         >
-          View Profile
+          {isGuestMember ? "Guest Profile" : "View Profile"}
         </Button>
 
         {/* Connect Button */}
-        {connStatus === "none" && (
+        {!isGuestMember && connStatus === "none" && (
           <Button
             fullWidth
             variant="contained"
@@ -20564,7 +20758,7 @@ function MemberInfoContent({ selectedMember, onClose }) {
           </Button>
         )}
 
-        {connStatus === "pending_outgoing" && (
+        {!isGuestMember && connStatus === "pending_outgoing" && (
           <Button
             fullWidth
             disabled
@@ -20583,7 +20777,7 @@ function MemberInfoContent({ selectedMember, onClose }) {
           </Button>
         )}
 
-        {connStatus === "friends" && (
+        {!isGuestMember && connStatus === "friends" && (
           <Button
             fullWidth
             disabled

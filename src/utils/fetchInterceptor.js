@@ -69,9 +69,29 @@ window.fetch = async (...args) => {
         return Promise.reject(error);
     }
 
+    const readAuthHeader = (headers) => {
+        if (!headers) return "";
+        if (headers instanceof Headers) {
+            return headers.get("Authorization") || "";
+        }
+        return headers.Authorization || headers.authorization || "";
+    };
+
     // 2. Check for 401 (Unauthorized Token) or 403 (Forbidden - might be expired token or actual ban).
-    // We attempt refresh for both statuses. If 403 persists after refresh, it's a real ban.
-    if (response.status === 401 || response.status === 403) {
+    // Refresh should only run for authenticated, non-guest sessions.
+    const authHeader = readAuthHeader(requestConfig?.headers);
+    const requestToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const storedAccessToken = getToken();
+    const hasAuthenticatedSession = Boolean(requestToken || storedAccessToken);
+
+    // GUEST EXCEPTION: For guest users, treat both 401/403 as terminal for that request.
+    const isGuest = localStorage.getItem("is_guest") === "true";
+    const shouldAttemptRefresh =
+        hasAuthenticatedSession &&
+        !isGuest &&
+        (response.status === 401 || response.status === 403);
+
+    if (shouldAttemptRefresh) {
         // Check if we are already refreshing
         if (isRefreshing) {
             return new Promise((resolve, reject) => {
@@ -132,6 +152,12 @@ window.fetch = async (...args) => {
 
             if (!refreshToken || !username) {
                 console.error("[Global Fetch] Missing refresh token or username. Cannot refresh.");
+                if (statusCode === 403) {
+                    // Missing refresh metadata on 403 means this is likely a true permission denial.
+                    processQueue(new Error("Forbidden"), null);
+                    isRefreshing = false;
+                    return response;
+                }
                 throw new Error("No refresh token or username");
             }
 

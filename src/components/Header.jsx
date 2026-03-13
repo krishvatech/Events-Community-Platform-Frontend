@@ -30,8 +30,6 @@ const apiBase =
 
 const getAccessToken = () => localStorage.getItem("access_token");
 
-const isAuthed = () => !!getAccessToken();
-
 const getCookie = (name) =>
   document.cookie
     .split("; ")
@@ -56,6 +54,14 @@ const decodeJwtPayload = (token) => {
     return JSON.parse(atob(b64));
   } catch { return null; }
 };
+
+const isGuestSession = () => {
+  if (localStorage.getItem("is_guest") === "true") return true;
+  const claims = decodeJwtPayload(getAccessToken());
+  return claims?.token_type === "guest";
+};
+
+const isAuthed = () => !!getAccessToken() && !isGuestSession();
 
 const readLocalUser = () => {
   try {
@@ -217,7 +223,8 @@ const Header = () => {
     const guard = () => {
       const path = location.pathname || "/";
       const onProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
-      if (!isAuthed() && onProtected) {
+      const isGuestOnLive = isGuestSession() && path.startsWith("/live");
+      if (!isAuthed() && onProtected && !isGuestOnLive) {
         const nextPath = encodeURIComponent((location.pathname + location.search) || "/");
         navigate(`/signin?next=${nextPath}`, { replace: true });
       }

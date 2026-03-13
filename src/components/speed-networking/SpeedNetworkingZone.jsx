@@ -64,6 +64,18 @@ function matchIncludesUser(match, userId) {
     return p1 === me || p2 === me;
 }
 
+function isGuestNotSupportedError(errorText) {
+    const text = String(errorText || '').toLowerCase();
+    return text.includes('guest_not_supported') || text.includes('registered users only');
+}
+
+function getFriendlyErrorMessage(errorText) {
+    if (isGuestNotSupportedError(errorText)) {
+        return 'Speed Networking is available for registered users only. Please register/sign in to participate.';
+    }
+    return String(errorText || 'Something went wrong.');
+}
+
 export default function SpeedNetworkingZone({
     eventId,
     isAdmin,
@@ -531,7 +543,7 @@ export default function SpeedNetworkingZone({
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to join queue');
+                throw new Error(data.detail || data.error || 'Failed to join queue');
             }
 
             if (data.status === 'matched') {
@@ -623,7 +635,7 @@ export default function SpeedNetworkingZone({
             });
 
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.error || 'Failed to leave queue');
+            if (!res.ok) throw new Error(data?.detail || data?.error || 'Failed to leave queue');
 
             setInQueue(false);
             setCurrentMatch(null);
@@ -665,7 +677,7 @@ export default function SpeedNetworkingZone({
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to get next match');
+                throw new Error(data.detail || data.error || 'Failed to get next match');
             }
 
             // CRITICAL: Refresh session immediately after match end
@@ -845,6 +857,8 @@ export default function SpeedNetworkingZone({
     }
 
     if (error) {
+        const friendlyMessage = getFriendlyErrorMessage(error);
+        const guestBlocked = isGuestNotSupportedError(error);
         return (
             <Box sx={{
                 width: '100%',
@@ -857,15 +871,25 @@ export default function SpeedNetworkingZone({
                 p: 4
             }}>
                 <Typography sx={{ color: '#ef4444', mb: 2 }}>
-                    Error: {error}
+                    {friendlyMessage}
                 </Typography>
-                <Button
-                    variant="contained"
-                    onClick={fetchActiveSession}
-                    sx={{ bgcolor: '#5a78ff' }}
-                >
-                    Retry
-                </Button>
+                {guestBlocked ? (
+                    <Button
+                        variant="contained"
+                        onClick={onClose}
+                        sx={{ bgcolor: '#5a78ff' }}
+                    >
+                        Back to Meeting
+                    </Button>
+                ) : (
+                    <Button
+                        variant="contained"
+                        onClick={fetchActiveSession}
+                        sx={{ bgcolor: '#5a78ff' }}
+                    >
+                        Retry
+                    </Button>
+                )}
             </Box>
         );
     }

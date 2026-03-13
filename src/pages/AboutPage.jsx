@@ -113,7 +113,27 @@ export default function AboutPage() {
 
     (async () => {
       try {
-        const res = await apiClient.get("/cms/pages/about/");
+        const candidates = ["about", "about-us", "aboutus"];
+        let res = null;
+        let lastErr = null;
+
+        for (const slug of candidates) {
+          try {
+            res = await apiClient.get(`/cms/pages/${slug}/`);
+            break;
+          } catch (e) {
+            lastErr = e;
+            const status = e?.response?.status;
+            if (status !== 404) {
+              throw e;
+            }
+          }
+        }
+
+        if (!res) {
+          throw lastErr || new Error("About page not found");
+        }
+
         if (!mounted) return;
         setPage(res.data);
         setError("");

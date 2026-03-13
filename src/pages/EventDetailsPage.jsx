@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
+import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
@@ -291,6 +292,9 @@ export default function EventDetailsPage() {
   // ✅ NEW: Real-time admission status updates
   const [admissionStatus, setAdmissionStatus] = useState(null);
 
+  // Guest Join Modal
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
+
   // Participant Preview
   const [previewParticipants, setPreviewParticipants] = useState([]);
   const [previewParticipantsForbidden, setPreviewParticipantsForbidden] = useState(false);
@@ -375,6 +379,17 @@ export default function EventDetailsPage() {
   useEffect(() => {
     if (!event?.id) return;
     if (previewParticipantsForbidden) return;
+    if (!token) {
+      setPreviewParticipants([]);
+      return;
+    }
+
+    // Skip participant preview for guests (they don't have permission)
+    const isGuest = localStorage.getItem("is_guest") === "true";
+    if (isGuest) {
+      setPreviewParticipants([]);
+      return;
+    }
 
     // Check visibility rules
     const owner = isOwnerUser();
@@ -1056,12 +1071,19 @@ export default function EventDetailsPage() {
                           </Button>
                         ) : canShowActiveJoin && canJoinEventNow ? (
                           <Button
-                            component={Link}
-                            to={livePath}
-                            state={{
-                              event,
-                              openLounge: shouldOpenLoungeOnEntry,
-                              preEventLounge: isPreEventLounge,
+                            onClick={() => {
+                              // If not authenticated, show guest modal; otherwise navigate
+                              if (!token) {
+                                setGuestModalOpen(true);
+                              } else {
+                                navigate(livePath, {
+                                  state: {
+                                    event,
+                                    openLounge: shouldOpenLoungeOnEntry,
+                                    preEventLounge: isPreEventLounge,
+                                  },
+                                });
+                              }
                             }}
                             sx={{
                               textTransform: "none",
@@ -1274,6 +1296,16 @@ export default function EventDetailsPage() {
         hiddenRolesCount={participantHiddenRolesCount}
         totalRegisteredCount={participantTotalRegisteredCount}
       />
+
+      {/* Guest Join Modal */}
+      {event && (
+        <GuestJoinModal
+          open={guestModalOpen}
+          onClose={() => setGuestModalOpen(false)}
+          event={event}
+          livePath={livePath}
+        />
+      )}
     </div>
   );
 }

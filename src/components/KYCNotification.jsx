@@ -5,6 +5,22 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { apiClient, startKYC, getToken } from "../utils/api";
 
+const decodeJwtPayload = (token) => {
+  try {
+    const b64 = (token?.split(".")[1] || "").replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(b64));
+  } catch {
+    return null;
+  }
+};
+
+const isGuestSession = () => {
+  if (localStorage.getItem("is_guest") === "true") return true;
+  const token = getToken();
+  const claims = decodeJwtPayload(token);
+  return claims?.token_type === "guest";
+};
+
 export default function KYCNotification() {
   const [status, setStatus] = useState(null); // 'not_started', 'pending', 'approved', 'declined'
   const [isSuperUser, setIsSuperUser] = useState(false);
@@ -35,8 +51,8 @@ export default function KYCNotification() {
       return;
     }
 
-    // ✅ don’t call /users/me/ when logged out
-    if (!getToken()) {
+    // ✅ don’t call /users/me/ when logged out or in guest session
+    if (!getToken() || isGuestSession()) {
       setStatus(null);
       setIsSuperUser(false);
       return;
@@ -83,7 +99,7 @@ export default function KYCNotification() {
   // Logic: 
   // 1. If Superuser (Admin) -> Return Null (Hidden)
   // 2. If Staff or Normal -> Check Status -> Show Banner
-  if (!getToken()) return null;
+  if (!getToken() || isGuestSession()) return null;
   if (isSuperUser || !status) return null;
 
   // --- Configuration ---
