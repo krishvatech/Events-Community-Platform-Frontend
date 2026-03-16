@@ -194,6 +194,8 @@ export default function AdminRecordingDetailsPage() {
 
                 if (alive) {
                     setEvent(evData);
+                    // ℹ️ NOTE: Do NOT filter hosts here - attendance tabs should show ALL users
+                    // Filtering is only done in Replay Notifications section
                     setRegistrations(regData);
                     setTotalPages(Math.ceil(totalCount / PER_PAGE));
                 }
@@ -450,7 +452,17 @@ export default function AdminRecordingDetailsPage() {
         const sourceList = allRegistrations.length > 0 ? allRegistrations : [];
 
         return sourceList.filter((reg) => {
+            // ✅ EXCLUDE HOSTS/ADMINS FIRST
+            // Don't show notifications for hosts, creators, or admins
+            if (reg.is_host) {
+                return false;
+            }
+
             const category = getAttendanceCategory(reg);
+            // ✅ Also exclude if attendance_category is null (backup check)
+            if (category === null) {
+                return false;  // Exclude hosts/creators/admins
+            }
             return category === notificationAttendanceFilter;
         });
     }, [allRegistrations, notificationAttendanceFilter]);
