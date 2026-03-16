@@ -93,6 +93,47 @@ export default function AdminRecordingDetailsPage() {
     const [sendingNotifs, setSendingNotifs] = useState(false);
     const [notifSent, setNotifSent] = useState(false);
 
+    // --- Attendance Category Filter State (for Replay Notifications section) ---
+    const [notificationAttendanceFilter, setNotificationAttendanceFilter] = useState("all"); // all, noshow, partial, full
+    const [allRegistrations, setAllRegistrations] = useState([]); // Store ALL registrations for attendance filtering
+
+    // Fetch all registrations when in attendance filter mode
+    useEffect(() => {
+        let alive = true;
+
+        // Only fetch all registrations when attendance filter is active
+        if (notificationAttendanceFilter !== "all" && event?.replay_available) {
+            const loadAllRegistrations = async () => {
+                setListLoading(true);
+                try {
+                    const url = new URL(`${API}/events/${id}/registrations/`);
+                    url.searchParams.set("limit", 1000); // Fetch all registrations
+
+                    const res = await fetch(url.toString(), {
+                        headers: getTokenHeader(),
+                    });
+
+                    if (res.ok) {
+                        const json = await res.json();
+                        const regData = json.results || (Array.isArray(json) ? json : []);
+                        if (alive) {
+                            setAllRegistrations(regData);
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Could not load all registrations:", err);
+                } finally {
+                    if (alive) setListLoading(false);
+                }
+            };
+            loadAllRegistrations();
+        }
+
+        return () => {
+            alive = false;
+        };
+    }, [notificationAttendanceFilter, event?.replay_available, id]);
+
     useEffect(() => {
         let alive = true;
         const load = async () => {
@@ -118,9 +159,12 @@ export default function AdminRecordingDetailsPage() {
                 url.searchParams.set("limit", PER_PAGE);
                 url.searchParams.set("offset", offset);
 
-                if (filterTab === 1) url.searchParams.set("status", "joined_live");
-                if (filterTab === 2) url.searchParams.set("status", "watched_replay");
-                if (filterTab === 3) url.searchParams.set("status", "did_not_attend");
+                // Apply filterTab status filter for the main list (ONLY if not using attendance filter)
+                if (notificationAttendanceFilter === "all") {
+                    if (filterTab === 1) url.searchParams.set("status", "joined_live");
+                    if (filterTab === 2) url.searchParams.set("status", "watched_replay");
+                    if (filterTab === 3) url.searchParams.set("status", "did_not_attend");
+                }
 
                 const resReg = await fetch(url.toString(), {
                     headers: getTokenHeader(),
@@ -161,7 +205,7 @@ export default function AdminRecordingDetailsPage() {
         return () => {
             alive = false;
         };
-    }, [id, page, filterTab]);
+    }, [id, page, filterTab, notificationAttendanceFilter]);
 
     // Load notification preview when replay becomes available
     useEffect(() => {
@@ -174,6 +218,11 @@ export default function AdminRecordingDetailsPage() {
     const handleTabChange = (e, newValue) => {
         setFilterTab(newValue);
         setPage(1);
+    };
+
+    // Handle attendance filter selection (completely independent from main tabs)
+    const handleAttendanceFilterChange = (category) => {
+        setNotificationAttendanceFilter(notificationAttendanceFilter === category ? "all" : category);
     };
 
     const handleExport = async () => {
@@ -347,20 +396,38 @@ export default function AdminRecordingDetailsPage() {
         }
     };
 
-    // We no longer client-side filter for the list, but we rely on backend results.
-    // However, stats need total counts which we don't get from a single page of results easily 
-    // without a separate stats endpoint or loading all (which defeats pagination).
-    // For now, let's assume the user is okay with the list being paginated. 
-    // The stats cards (Total, Live, Replay) technically require "All" count. 
-    // The current pagination endpoint returns "count" which is the total for the *current filter*.
-    // So if I am on "Joined Live" tab, I know total joined live.
-    // But I lose visibility of other counts. 
-    // To fix this properly, I'd need a separate stats endpoint.
-    // For now, I will just accept that the cards might not update fully until you switch tabs, 
-    // OR (better) I can fetch stats separately once. 
-    // Let's stick to the user request about PAGINATION of the list.
-    // I will remove the `filteredRegistrations` logic effectively since `registrations` IS now filtered/paginated.
-    const displayList = registrations;
+    // Helper function to determine attendance category
+    // Note: The backend now calculates this in the serializer, but we also support client-side calculation
+    const getAttendanceCategory = (registration) => {
+        // If the backend already calculated it, use that
+        if (registration.attendance_category) {
+            return registration.attendance_category;
+        }
+
+        // Fallback client-side calculation
+        if (!registration.joined_live) {
+            return "noshow"; // No Attendees
+        }
+
+        // Without duration info, mark as partial
+        return "partial"; // Partial Attendee
+    };
+
+    // Filter registrations for Replay Notification section
+    // This is completely independent from the main participant list
+    const replayNotificationFilteredList = useMemo(() => {
+        if (notificationAttendanceFilter === "all") {
+            return [];
+        }
+
+        // Use allRegistrations when attendance filter is active
+        const sourceList = allRegistrations.length > 0 ? allRegistrations : [];
+
+        return sourceList.filter((reg) => {
+            const category = getAttendanceCategory(reg);
+            return category === notificationAttendanceFilter;
+        });
+    }, [allRegistrations, notificationAttendanceFilter]);
 
 
     const stats = useMemo(() => {
@@ -526,21 +593,129 @@ export default function AdminRecordingDetailsPage() {
                             {notifLoading && <CircularProgress size={24} />}
 
                             {notifPreview && !notifLoading && (
-                                <Box className="mb-4">
-                                    <Box className="flex gap-3 mb-3">
-                                        <Chip label={`${notifPreview.noshow_count} No-Shows`} color="error" variant="outlined" size="small" />
-                                        <Chip label={`${notifPreview.partial_count} Partial Attendees`} color="warning" variant="outlined" size="small" />
-                                        <Chip label={`${notifPreview.full_count} Full Attendees (skipped)`} color="success" variant="outlined" size="small" />
-                                    </Box>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {notifPreview.total_to_notify} participants will receive an email + in-app notification.
-                                    </Typography>
-                                    {notifPreview.already_sent && (
-                                        <Typography variant="body2" color="warning.main" className="mt-1">
-                                            Notifications were already sent on {new Date(notifPreview.sent_at).toLocaleString()}.
+                                <>
+                                    <Box className="mb-4">
+                                        <Typography variant="body2" color="text.secondary" className="mb-2">
+                                            Filter participants by attendance type:
                                         </Typography>
+                                        <Box className="flex gap-2 mb-3 flex-wrap">
+                                            <Tooltip title="Registered but never joined the webinar">
+                                                <Chip
+                                                    label={`${notifPreview.noshow_count} No Attendees`}
+                                                    color="error"
+                                                    variant={notificationAttendanceFilter === "noshow" ? "filled" : "outlined"}
+                                                    size="small"
+                                                    onClick={() => handleAttendanceFilterChange("noshow")}
+                                                    sx={{ cursor: "pointer" }}
+                                                />
+                                            </Tooltip>
+                                            <Tooltip title="Joined but left before the event ended or attended less than 80%">
+                                                <Chip
+                                                    label={`${notifPreview.partial_count} Partial Attendees`}
+                                                    color="warning"
+                                                    variant={notificationAttendanceFilter === "partial" ? "filled" : "outlined"}
+                                                    size="small"
+                                                    onClick={() => handleAttendanceFilterChange("partial")}
+                                                    sx={{ cursor: "pointer" }}
+                                                />
+                                            </Tooltip>
+                                            <Tooltip title="Joined and stayed for 80% or more of the event">
+                                                <Chip
+                                                    label={`${notifPreview.full_count} Full Attendees`}
+                                                    color="success"
+                                                    variant={notificationAttendanceFilter === "full" ? "filled" : "outlined"}
+                                                    size="small"
+                                                    onClick={() => handleAttendanceFilterChange("full")}
+                                                    sx={{ cursor: "pointer" }}
+                                                />
+                                            </Tooltip>
+                                        </Box>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {notificationAttendanceFilter === "all"
+                                                ? `${notifPreview.total_to_notify} participants will receive an email + in-app notification.`
+                                                : `Showing ${notificationAttendanceFilter === "noshow" ? "no attendees" : notificationAttendanceFilter === "partial" ? "partial attendees" : "full attendees"}`
+                                            }
+                                        </Typography>
+                                        {notifPreview.already_sent && (
+                                            <Typography variant="body2" color="warning.main" className="mt-2">
+                                                ⚠️ Notifications were already sent on {new Date(notifPreview.sent_at).toLocaleString()}.
+                                            </Typography>
+                                        )}
+                                    </Box>
+
+                                    {/* Filtered Participant List for Replay Notifications */}
+                                    {notificationAttendanceFilter !== "all" && (
+                                        <Paper elevation={0} className="border border-blue-100 bg-blue-50 rounded-xl p-3 mb-4">
+                                            <Typography variant="subtitle2" className="font-semibold mb-3 text-blue-900">
+                                                📋 {notificationAttendanceFilter === "noshow" ? "No Attendees" : notificationAttendanceFilter === "partial" ? "Partial Attendees" : "Full Attendees"} ({replayNotificationFilteredList.length})
+                                            </Typography>
+                                            <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+                                                {replayNotificationFilteredList.length === 0 ? (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        No participants in this category.
+                                                    </Typography>
+                                                ) : (
+                                                    <Box className="space-y-2">
+                                                        {replayNotificationFilteredList.map((reg) => (
+                                                            <Box
+                                                                key={reg.id}
+                                                                className="flex items-center justify-between p-2 bg-white rounded border border-blue-100 hover:border-blue-300"
+                                                            >
+                                                                <Box className="flex items-center gap-2 flex-1 min-w-0">
+                                                                    <Avatar src={reg.user_avatar_url} sx={{ width: 28, height: 28 }}>
+                                                                        {(reg.user_name?.[0] || "U").toUpperCase()}
+                                                                    </Avatar>
+                                                                    <Box className="min-w-0">
+                                                                        <Typography variant="subtitle2" className="leading-tight truncate text-sm">
+                                                                            {reg.user_name}
+                                                                        </Typography>
+                                                                        <Typography variant="caption" color="text.secondary" className="truncate">
+                                                                            {reg.user_email}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                </Box>
+                                                                <Chip
+                                                                    label={
+                                                                        reg.attendance_category === "noshow"
+                                                                            ? "No Attendee"
+                                                                            : reg.attendance_category === "partial"
+                                                                                ? "Partial"
+                                                                                : "Full"
+                                                                    }
+                                                                    size="small"
+                                                                    color={
+                                                                        reg.attendance_category === "noshow"
+                                                                            ? "error"
+                                                                            : reg.attendance_category === "partial"
+                                                                                ? "warning"
+                                                                                : "success"
+                                                                    }
+                                                                    variant="outlined"
+                                                                    sx={{ height: 20, fontSize: "0.65rem", flexShrink: 0 }}
+                                                                />
+                                                            </Box>
+                                                        ))}
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        </Paper>
                                     )}
-                                </Box>
+
+                                    <Box className="flex gap-2">
+                                        <Button
+                                            variant="contained"
+                                            startIcon={<NotificationsRoundedIcon />}
+                                            onClick={() => handleSendNotifications(false)}
+                                            disabled={
+                                                sendingNotifs ||
+                                                notifSent ||
+                                                (notifPreview?.already_sent && !notifSent)
+                                            }
+                                        >
+                                            {sendingNotifs ? "Sending..." : notifSent ? "Sent!" : "Send Notifications"}
+                                        </Button>
+                                    </Box>
+                                </>
                             )}
 
                             {!notifPreview && !notifLoading && (
@@ -548,35 +723,6 @@ export default function AdminRecordingDetailsPage() {
                                     Load Notification Preview
                                 </Button>
                             )}
-
-                            <Box className="flex gap-2">
-                                <Button
-                                    variant="contained"
-                                    startIcon={<NotificationsRoundedIcon />}
-                                    onClick={() => handleSendNotifications(false)}
-                                    disabled={
-                                        sendingNotifs ||
-                                        notifSent ||
-                                        (notifPreview?.already_sent && !notifSent)
-                                    }
-                                >
-                                    {sendingNotifs ? "Sending..." : notifSent ? "Sent!" : "Send Notifications"}
-                                </Button>
-
-                                {notifPreview?.already_sent && (
-                                    <Tooltip title="Resend even though notifications were already sent">
-                                        <Button
-                                            variant="outlined"
-                                            color="warning"
-                                            size="small"
-                                            onClick={() => handleSendNotifications(true)}
-                                            disabled={sendingNotifs}
-                                        >
-                                            Resend (Force)
-                                        </Button>
-                                    </Tooltip>
-                                )}
-                            </Box>
                         </Paper>
                     )}
 
@@ -620,7 +766,7 @@ export default function AdminRecordingDetailsPage() {
                         </Box>
 
                         <Box className="flex-1 overflow-auto p-0" sx={{ opacity: listLoading ? 0.6 : 1, transition: "opacity 0.2s" }}>
-                            {displayList.length === 0 && !listLoading ? (
+                            {registrations.length === 0 && !listLoading ? (
                                 <Box className="p-6 text-center text-slate-500">
                                     No users found in this category.
                                 </Box>
@@ -633,7 +779,7 @@ export default function AdminRecordingDetailsPage() {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {displayList.map((reg) => (
+                                        {registrations.map((reg) => (
                                             <TableRow key={reg.id} hover>
                                                 <TableCell>
                                                     <Box className="flex items-center gap-2">
@@ -663,6 +809,7 @@ export default function AdminRecordingDetailsPage() {
                                                 </TableCell>
                                                 <TableCell align="right">
                                                     <Box className="flex flex-col gap-1 items-end">
+                                                        {/* Standard status chips */}
                                                         {reg.joined_live && (
                                                             <Chip
                                                                 icon={<CheckCircleIcon style={{ fontSize: 14 }} />}
@@ -683,7 +830,7 @@ export default function AdminRecordingDetailsPage() {
                                                                 sx={{ height: 20, fontSize: "0.65rem" }}
                                                             />
                                                         )}
-                                                        {!reg.joined_live && !reg.watched_replay && (
+                                                        {!reg.joined_live && !reg.watched_replay && !event?.replay_available && (
                                                             <Chip label="Registered Only" size="small" sx={{ height: 20, fontSize: "0.65rem" }} />
                                                         )}
                                                     </Box>

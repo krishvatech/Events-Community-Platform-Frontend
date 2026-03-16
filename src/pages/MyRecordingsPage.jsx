@@ -168,7 +168,12 @@ export default function MyRecordingsPage() {
         const past = asList(json)
           .map((r) => r?.event || null)
           .filter(Boolean)
-          .filter(isPast);
+          .filter(isPast)
+          .filter((ev) => {
+            // Only show recordings that are visible to participants
+            // If replay_visible_to_participants is false, hide it (host is still processing)
+            return ev?.replay_visible_to_participants !== false;
+          });
 
         if (!alive) return;
         setItems(past);
