@@ -93,6 +93,11 @@ export default function AdminRecordingDetailsPage() {
     const [sendingNotifs, setSendingNotifs] = useState(false);
     const [notifSent, setNotifSent] = useState(false);
 
+    // --- Publish Replay State ---
+    const [publishing, setPublishing] = useState(false);
+    const [publishSuccess, setPublishSuccess] = useState(false);
+    const [publishError, setPublishError] = useState("");
+
     // --- Attendance Category Filter State (for Replay Notifications section) ---
     const [notificationAttendanceFilter, setNotificationAttendanceFilter] = useState("all"); // all, noshow, partial, full
     const [allRegistrations, setAllRegistrations] = useState([]); // Store ALL registrations for attendance filtering
@@ -359,6 +364,27 @@ export default function AdminRecordingDetailsPage() {
         }
     };
 
+    const handlePublishReplay = async () => {
+        setPublishing(true);
+        setPublishError("");
+        try {
+            const res = await fetch(`${API}/events/${id}/publish-replay/`, {
+                method: "POST",
+                headers: { ...getTokenHeader(), "Content-Type": "application/json" },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error || "Failed to publish replay");
+            setPublishSuccess(true);
+            setEvent((prev) => ({ ...prev, replay_visible_to_participants: true }));
+            // Reload notification preview now that it's published
+            await loadNotifPreview();
+        } catch (err) {
+            setPublishError(err.message);
+        } finally {
+            setPublishing(false);
+        }
+    };
+
     const loadNotifPreview = async () => {
         setNotifLoading(true);
         try {
@@ -554,15 +580,45 @@ export default function AdminRecordingDetailsPage() {
                             <Typography color="error" variant="body2">{uploadError}</Typography>
                         )}
 
-                        {uploadSuccess && (
+                        {uploadSuccess && !publishSuccess && (
+                            <Typography color="info.main" variant="body2">
+                                Replay uploaded successfully. Click "Publish Recording" below to make it visible to participants.
+                            </Typography>
+                        )}
+                        {publishSuccess && (
                             <Typography color="success.main" variant="body2">
-                                Replay uploaded successfully. The recording has been updated.
+                                Recording published. Participants can now access the replay.
                             </Typography>
                         )}
                     </Paper>
 
-                    {/* --- Message: Upload replay before notifications --- */}
-                    {event?.replay_available && !notifPreview?.visible_to_participants && (
+                    {/* --- Publish / upload prompt --- */}
+                    {event?.replay_available && !notifPreview?.visible_to_participants && hasRec && (
+                        <Paper elevation={0} className="border border-amber-200 bg-amber-50 rounded-2xl p-4 mb-6">
+                            <Box className="flex items-center justify-between gap-3">
+                                <Box className="flex items-center gap-2">
+                                    <CloudUploadRoundedIcon color="warning" />
+                                    <Typography variant="body2" color="text.secondary">
+                                        This recording is visible only to you. Publish it to make it available to all participants.
+                                    </Typography>
+                                </Box>
+                                <Button
+                                    variant="contained"
+                                    color="warning"
+                                    onClick={handlePublishReplay}
+                                    disabled={publishing}
+                                    startIcon={publishing ? <CircularProgress size={16} /> : null}
+                                    sx={{ whiteSpace: "nowrap" }}
+                                >
+                                    {publishing ? "Publishing..." : "Publish Recording"}
+                                </Button>
+                            </Box>
+                            {publishError && (
+                                <Typography color="error" variant="body2" sx={{ mt: 1 }}>{publishError}</Typography>
+                            )}
+                        </Paper>
+                    )}
+                    {event?.replay_available && !notifPreview?.visible_to_participants && !hasRec && (
                         <Paper elevation={0} className="border border-blue-200 bg-blue-50 rounded-2xl p-4 mb-6">
                             <Box className="flex items-center gap-2">
                                 <CloudUploadRoundedIcon color="primary" />
