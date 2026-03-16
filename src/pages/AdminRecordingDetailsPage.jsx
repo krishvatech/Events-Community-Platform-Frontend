@@ -22,6 +22,8 @@ import {
     IconButton,
     Pagination,
     Skeleton,
+    LinearProgress,
+    Tooltip,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
@@ -31,6 +33,8 @@ import PersonIcon from "@mui/icons-material/Person";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
+import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
@@ -75,6 +79,19 @@ export default function AdminRecordingDetailsPage() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const PER_PAGE = 5;
+
+    // --- Upload Replay State ---
+    const [uploadFile, setUploadFile] = useState(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState("");
+    const [uploadSuccess, setUploadSuccess] = useState(false);
+
+    // --- Notification Preview State ---
+    const [notifPreview, setNotifPreview] = useState(null);
+    const [notifLoading, setNotifLoading] = useState(false);
+    const [sendingNotifs, setSendingNotifs] = useState(false);
+    const [notifSent, setNotifSent] = useState(false);
 
     useEffect(() => {
         let alive = true;
@@ -146,6 +163,13 @@ export default function AdminRecordingDetailsPage() {
         };
     }, [id, page, filterTab]);
 
+    // Load notification preview when replay becomes available
+    useEffect(() => {
+        if (event?.replay_available) {
+            loadNotifPreview();
+        }
+    }, [event?.replay_available]);
+
     // Reset page to 1 when filter changes
     const handleTabChange = (e, newValue) => {
         setFilterTab(newValue);
@@ -204,6 +228,122 @@ export default function AdminRecordingDetailsPage() {
         } catch (err) {
             console.error("Download failed:", err);
             alert(`Failed to download recording: ${err.message}`);
+        }
+    };
+
+    const handleFileSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const allowed = ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"];
+        if (!allowed.includes(file.type)) {
+            setUploadError("Unsupported file type. Please upload an MP4, WebM, MOV, or AVI file.");
+            return;
+        }
+        setUploadFile(file);
+        setUploadError("");
+        setUploadSuccess(false);
+    };
+
+    const handleUploadReplay = async () => {
+        if (!uploadFile) return;
+        setUploading(true);
+        setUploadProgress(0);
+        setUploadError("");
+
+        try {
+            // Step 1: Get presigned PUT URL from backend
+            const urlRes = await fetch(`${API}/events/${id}/generate-replay-upload-url/`, {
+                method: "POST",
+                headers: { ...getTokenHeader(), "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    filename: uploadFile.name,
+                    content_type: uploadFile.type,
+                }),
+            });
+            const urlData = await urlRes.json();
+            if (!urlRes.ok) throw new Error(urlData?.error || "Failed to get upload URL");
+
+            const { upload_url, s3_key, content_type } = urlData;
+
+            // Step 2: Upload directly to S3 via XMLHttpRequest (for progress tracking)
+            await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open("PUT", upload_url, true);
+                xhr.setRequestHeader("Content-Type", content_type);
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        setUploadProgress(Math.round((e.loaded / e.total) * 100));
+                    }
+                };
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) resolve();
+                    else reject(new Error(`S3 upload failed: HTTP ${xhr.status}`));
+                };
+                xhr.onerror = () => reject(new Error("Network error during S3 upload"));
+                xhr.send(uploadFile);
+            });
+
+            // Step 3: Confirm upload with backend (no auto-notify — let host choose)
+            const confirmRes = await fetch(`${API}/events/${id}/confirm-replay-upload/`, {
+                method: "POST",
+                headers: { ...getTokenHeader(), "Content-Type": "application/json" },
+                body: JSON.stringify({ s3_key, send_notifications: false }),
+            });
+            const confirmData = await confirmRes.json();
+            if (!confirmRes.ok) throw new Error(confirmData?.error || "Failed to confirm upload");
+
+            setUploadSuccess(true);
+            setUploadProgress(100);
+            // Refresh event data to show new recording
+            setEvent((prev) => ({
+                ...prev,
+                recording_url: s3_key,
+                replay_available: true,
+            }));
+
+            // Load notification preview
+            await loadNotifPreview();
+        } catch (err) {
+            setUploadError(err.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const loadNotifPreview = async () => {
+        setNotifLoading(true);
+        try {
+            const res = await fetch(`${API}/events/${id}/send-replay-notifications/`, {
+                headers: getTokenHeader(),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setNotifPreview(data);
+            }
+        } catch (err) {
+            console.warn("Could not load notification preview:", err);
+        } finally {
+            setNotifLoading(false);
+        }
+    };
+
+    const handleSendNotifications = async (force = false) => {
+        setSendingNotifs(true);
+        try {
+            const res = await fetch(`${API}/events/${id}/send-replay-notifications/`, {
+                method: "POST",
+                headers: { ...getTokenHeader(), "Content-Type": "application/json" },
+                body: JSON.stringify({ force }),
+            });
+            const data = await res.json();
+            if (!res.ok && res.status !== 409)
+                throw new Error(data?.error || "Failed to send notifications");
+            setNotifSent(true);
+            setNotifPreview(data);
+        } catch (err) {
+            alert(`Failed to send notifications: ${err.message}`);
+        } finally {
+            setSendingNotifs(false);
         }
     };
 
@@ -298,6 +438,135 @@ export default function AdminRecordingDetailsPage() {
                             </Box>
                         )}
                     </Paper>
+
+                    {/* --- Upload Replay Section --- */}
+                    <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
+                        <Typography variant="subtitle1" className="font-semibold mb-3">
+                            Upload Edited Replay
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" className="mb-3">
+                            Upload an edited version of the recording (MP4, WebM, MOV).
+                            Large files upload directly to storage without passing through the server.
+                        </Typography>
+
+                        <Box className="flex items-center gap-3 mb-3">
+                            <Button
+                                component="label"
+                                variant="outlined"
+                                startIcon={<CloudUploadRoundedIcon />}
+                                disabled={uploading}
+                            >
+                                {uploadFile ? uploadFile.name : "Choose Video File"}
+                                <input
+                                    type="file"
+                                    hidden
+                                    accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
+                                    onChange={handleFileSelect}
+                                />
+                            </Button>
+                            {uploadFile && !uploading && !uploadSuccess && (
+                                <Button
+                                    variant="contained"
+                                    onClick={handleUploadReplay}
+                                >
+                                    Upload Replay
+                                </Button>
+                            )}
+                        </Box>
+
+                        {uploading && (
+                            <Box className="mb-2">
+                                <LinearProgress variant="determinate" value={uploadProgress} />
+                                <Typography variant="caption" color="text.secondary">
+                                    Uploading... {uploadProgress}%
+                                </Typography>
+                            </Box>
+                        )}
+
+                        {uploadError && (
+                            <Typography color="error" variant="body2">{uploadError}</Typography>
+                        )}
+
+                        {uploadSuccess && (
+                            <Typography color="success.main" variant="body2">
+                                Replay uploaded successfully. The recording has been updated.
+                            </Typography>
+                        )}
+                    </Paper>
+
+                    {/* --- Notification Preview & Send --- */}
+                    {event?.replay_available && (
+                        <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
+                            <Box className="flex items-center justify-between mb-3">
+                                <Typography variant="subtitle1" className="font-semibold">
+                                    Replay Notifications
+                                </Typography>
+                                <Button
+                                    size="small"
+                                    variant="text"
+                                    onClick={loadNotifPreview}
+                                    disabled={notifLoading}
+                                >
+                                    Refresh Preview
+                                </Button>
+                            </Box>
+
+                            {notifLoading && <CircularProgress size={24} />}
+
+                            {notifPreview && !notifLoading && (
+                                <Box className="mb-4">
+                                    <Box className="flex gap-3 mb-3">
+                                        <Chip label={`${notifPreview.noshow_count} No-Shows`} color="error" variant="outlined" size="small" />
+                                        <Chip label={`${notifPreview.partial_count} Partial Attendees`} color="warning" variant="outlined" size="small" />
+                                        <Chip label={`${notifPreview.full_count} Full Attendees (skipped)`} color="success" variant="outlined" size="small" />
+                                    </Box>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {notifPreview.total_to_notify} participants will receive an email + in-app notification.
+                                    </Typography>
+                                    {notifPreview.already_sent && (
+                                        <Typography variant="body2" color="warning.main" className="mt-1">
+                                            Notifications were already sent on {new Date(notifPreview.sent_at).toLocaleString()}.
+                                        </Typography>
+                                    )}
+                                </Box>
+                            )}
+
+                            {!notifPreview && !notifLoading && (
+                                <Button variant="text" onClick={loadNotifPreview} startIcon={<NotificationsRoundedIcon />}>
+                                    Load Notification Preview
+                                </Button>
+                            )}
+
+                            <Box className="flex gap-2">
+                                <Button
+                                    variant="contained"
+                                    startIcon={<NotificationsRoundedIcon />}
+                                    onClick={() => handleSendNotifications(false)}
+                                    disabled={
+                                        sendingNotifs ||
+                                        notifSent ||
+                                        (notifPreview?.already_sent && !notifSent)
+                                    }
+                                >
+                                    {sendingNotifs ? "Sending..." : notifSent ? "Sent!" : "Send Notifications"}
+                                </Button>
+
+                                {notifPreview?.already_sent && (
+                                    <Tooltip title="Resend even though notifications were already sent">
+                                        <Button
+                                            variant="outlined"
+                                            color="warning"
+                                            size="small"
+                                            onClick={() => handleSendNotifications(true)}
+                                            disabled={sendingNotifs}
+                                        >
+                                            Resend (Force)
+                                        </Button>
+                                    </Tooltip>
+                                )}
+                            </Box>
+                        </Paper>
+                    )}
 
                     <Box className="flex gap-4 mb-6">
                         {/* Stats Cards */}
