@@ -494,8 +494,20 @@ export default function AdminRecordingDetailsPage() {
                         )}
                     </Paper>
 
+                    {/* --- Message: Upload replay before notifications --- */}
+                    {event?.replay_available && !notifPreview?.visible_to_participants && (
+                        <Paper elevation={0} className="border border-blue-200 bg-blue-50 rounded-2xl p-4 mb-6">
+                            <Box className="flex items-center gap-2">
+                                <CloudUploadRoundedIcon color="primary" />
+                                <Typography variant="body2" color="primary">
+                                    Upload your edited replay above to make it visible to participants and send notifications.
+                                </Typography>
+                            </Box>
+                        </Paper>
+                    )}
+
                     {/* --- Notification Preview & Send --- */}
-                    {event?.replay_available && (
+                    {event?.replay_available && notifPreview?.visible_to_participants && (
                         <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
                             <Box className="flex items-center justify-between mb-3">
                                 <Typography variant="subtitle1" className="font-semibold">
