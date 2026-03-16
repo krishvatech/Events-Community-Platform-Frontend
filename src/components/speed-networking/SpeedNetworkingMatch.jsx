@@ -160,7 +160,7 @@ export default function SpeedNetworkingMatch({
         }
     }, [match?.id, match?.dyte_token, initMeeting]);
 
-    // Log participants when meeting changes
+    // Log participants when meeting changes and listen for real-time join/leave
     useEffect(() => {
         if (meeting) {
             console.log("[SpeedNetworkingMatch] Meeting joined. Participants:", {
@@ -172,10 +172,17 @@ export default function SpeedNetworkingMatch({
             // Listen for participant events
             const handleParticipantJoined = (event) => {
                 console.log("[SpeedNetworkingMatch] Participant joined:", event);
+                // Immediately update state when partner joins (don't wait for polling)
+                setHasRemoteParticipant(true);
             };
 
             const handleParticipantLeft = (event) => {
                 console.log("[SpeedNetworkingMatch] Participant left:", event);
+                // Check if any remote participants remain
+                const selfId = meeting?.self?.id != null ? String(meeting.self.id) : null;
+                const joined = (meeting.participants?.joined?.toArray?.() || meeting.participants?.joined?.participants || []);
+                const remoteExists = joined.some((p) => String(p?.id) !== selfId);
+                setHasRemoteParticipant(remoteExists);
             };
 
             if (meeting.participants) {
