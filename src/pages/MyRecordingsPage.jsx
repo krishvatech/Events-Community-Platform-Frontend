@@ -171,8 +171,8 @@ export default function MyRecordingsPage() {
           .filter(isPast)
           .filter((ev) => {
             // Only show recordings that are visible to participants
-            // If replay_visible_to_participants is false, hide it (host is still processing)
-            return ev?.replay_visible_to_participants !== false;
+            // MUST be explicitly true - if false, null, or undefined, hide it
+            return ev?.replay_visible_to_participants === true;
           });
 
         if (!alive) return;
