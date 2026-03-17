@@ -136,6 +136,7 @@ import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
 import GuestBanner from "../components/GuestBanner.jsx";
 import GuestRegistrationModal from "../components/GuestRegistrationModal.jsx";
+import GuestRestrictionOverlay from "../components/GuestRestrictionOverlay.jsx";
 import {
   VIRTUAL_BG_FEATURE_ENABLED,
   VIRTUAL_BG_PRESETS,
@@ -13010,6 +13011,9 @@ export default function NewLiveMeeting() {
   }, [handleOpenPrivateChat, sendMainSocketAction, showSnackbar]);
 
   const sendPrivateMessage = async () => {
+    // ✅ Guard: prevent guests from sending private messages
+    if (isGuest) return;
+
     const text = privateInput.trim();
     if (!text || !privateConversationId) return;
 
@@ -13400,6 +13404,9 @@ export default function NewLiveMeeting() {
   }, [ensureActiveConversation, fetchChatMessages, markChatAllRead]);
 
   const sendChatMessage = useCallback(async () => {
+    // ✅ Guard: prevent guests from sending chat messages
+    if (isGuest) return;
+
     const text = chatInput.trim();
     if (!text || chatSending) return;
     setChatSending(true);
@@ -13918,6 +13925,9 @@ export default function NewLiveMeeting() {
   }, [tab, isPanelOpen, eventId, activeTableId, isGuest]); // Re-connect when activeTableId changes
 
   const submitQuestion = async () => {
+    // ✅ Guard: prevent guests from submitting Q&A questions
+    if (isGuest) return;
+
     const content = newQuestion.trim();
     if (!content || !eventId) return;
 
@@ -14592,214 +14602,221 @@ export default function NewLiveMeeting() {
             <IconButton onClick={closeRightPanel} size="small"><CloseIcon fontSize="small" /></IconButton>
           </Box>
 
-          {/* 2. Private Chat Messages Area */}
-          <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
-            {privateChatLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : privateMessages.length === 0 ? (
-              <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5, flexDirection: "column" }}>
-                <ChatBubbleOutlineIcon sx={{ fontSize: 40, mb: 1 }} />
-                <Typography fontSize={13}>Start a private conversation</Typography>
-              </Box>
-            ) : (
-              <Stack spacing={1.25}>
-                {privateTimelineItems.map((item) => {
-                  if (item.type === "system") {
-                    return (
-                      <Box key={item.key} sx={{ display: "flex", justifyContent: "center", py: 0.75 }}>
-                        <Typography
-                          sx={{
-                            fontSize: 11,
-                            px: 1.5,
-                            py: 0.5,
-                            borderRadius: 999,
-                            color: "rgba(255,255,255,0.7)",
-                            border: "1px solid rgba(255,255,255,0.14)",
-                            bgcolor: "rgba(255,255,255,0.04)",
-                          }}
-                        >
-                          {item.text}
-                        </Typography>
-                      </Box>
-                    );
-                  }
-
-                  const m = item.msg;
-                  return (
-                    <Stack key={item.key} alignItems={m.mine ? "flex-end" : "flex-start"} spacing={0.25}>
-                      {/* Edit mode */}
-                      {editingMsgId === m.id ? (
-                        <Paper
-                          variant="outlined"
-                          sx={{
-                            p: 1.25,
-                            maxWidth: "85%",
-                            bgcolor: "rgba(20,184,177,0.1)",
-                            borderColor: "rgba(20,184,177,0.4)",
-                            borderRadius: 2,
-                          }}
-                        >
-                          <TextField
-                            fullWidth
-                            multiline
-                            maxRows={4}
-                            size="small"
-                            value={editText}
-                            onChange={(e) => setEditText(e.target.value)}
+          {/* 2. Private Chat Messages Area + 3. Input — wrapped for guest restriction */}
+          <GuestRestrictionOverlay
+            visible={isGuest}
+            message="In order to benefit from chatting with other participants, please register on our website."
+            onSignUp={() => setGuestRegModalOpen(true)}
+          >
+            {/* Message scroll area */}
+            <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+              {privateChatLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : privateMessages.length === 0 ? (
+                <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.5, flexDirection: "column" }}>
+                  <ChatBubbleOutlineIcon sx={{ fontSize: 40, mb: 1 }} />
+                  <Typography fontSize={13}>Start a private conversation</Typography>
+                </Box>
+              ) : (
+                <Stack spacing={1.25}>
+                  {privateTimelineItems.map((item) => {
+                    if (item.type === "system") {
+                      return (
+                        <Box key={item.key} sx={{ display: "flex", justifyContent: "center", py: 0.75 }}>
+                          <Typography
                             sx={{
-                              mb: 1,
-                              "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.05)" },
+                              fontSize: 11,
+                              px: 1.5,
+                              py: 0.5,
+                              borderRadius: 999,
+                              color: "rgba(255,255,255,0.7)",
+                              border: "1px solid rgba(255,255,255,0.14)",
+                              bgcolor: "rgba(255,255,255,0.04)",
                             }}
-                          />
-                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={handleCancelEdit}
-                              sx={{ fontSize: "11px", px: 1 }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              onClick={() => handleSaveEdit(m.id)}
-                              disabled={!editText.trim()}
-                              sx={{ fontSize: "11px", px: 1 }}
-                            >
-                              Save
-                            </Button>
-                          </Stack>
-                        </Paper>
-                      ) : (
-                        <Box
-                          sx={{
-                            position: "relative",
-                            display: "flex",
-                            justifyContent: m.mine ? "flex-end" : "flex-start",
-                            alignItems: "flex-start",
-                            gap: 0.5,
-                            "&:hover .edit-delete-buttons": {
-                              opacity: 1,
-                            },
-                          }}
-                        >
-                          {/* Edit/Delete menu for own messages (before message on hover) */}
-                          {m.mine && !m.is_deleted && (
-                            <Stack
-                              className="edit-delete-buttons"
-                              direction="row"
-                              spacing={0.25}
-                              sx={{
-                                opacity: 0,
-                                transition: "opacity 0.2s",
-                                pt: 0.25,
-                              }}
-                            >
-                              <IconButton
-                                size="small"
-                                onClick={() => handleStartEdit(m)}
-                                sx={{
-                                  width: 24,
-                                  height: 24,
-                                  p: 0.25,
-                                  color: "rgba(255,255,255,0.6)",
-                                  "&:hover": { color: "rgba(255,255,255,1)", bgcolor: "rgba(255,255,255,0.1)" },
-                                }}
-                                title="Edit message"
-                              >
-                                <EditRoundedIcon sx={{ fontSize: 14 }} />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDeleteMessage(m.id)}
-                                sx={{
-                                  width: 24,
-                                  height: 24,
-                                  p: 0.25,
-                                  color: "rgba(255,255,255,0.6)",
-                                  "&:hover": { color: "#f44336", bgcolor: "rgba(244,67,54,0.15)" },
-                                }}
-                                title="Delete message"
-                              >
-                                <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
-                              </IconButton>
-                            </Stack>
-                          )}
+                          >
+                            {item.text}
+                          </Typography>
+                        </Box>
+                      );
+                    }
 
+                    const m = item.msg;
+                    return (
+                      <Stack key={item.key} alignItems={m.mine ? "flex-end" : "flex-start"} spacing={0.25}>
+                        {/* Edit mode */}
+                        {editingMsgId === m.id ? (
                           <Paper
                             variant="outlined"
                             sx={{
                               p: 1.25,
                               maxWidth: "85%",
-                              bgcolor: m.mine ? "rgba(20,184,177,0.15)" : "rgba(255,255,255,0.03)",
-                              borderColor: m.mine ? "rgba(20,184,177,0.3)" : "rgba(255,255,255,0.08)",
+                              bgcolor: "rgba(20,184,177,0.1)",
+                              borderColor: "rgba(20,184,177,0.4)",
                               borderRadius: 2,
-                              opacity: m.is_deleted ? 0.6 : 1,
                             }}
                           >
-                            {/* Message body with deleted/edited states */}
-                            <Typography
+                            <TextField
+                              fullWidth
+                              multiline
+                              maxRows={4}
+                              size="small"
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
                               sx={{
-                                fontSize: 13,
-                                opacity: m.is_deleted ? 0.6 : 0.9,
-                                fontStyle: m.is_deleted ? "italic" : "normal",
-                                color: m.is_deleted ? "#999" : "inherit",
+                                mb: 1,
+                                "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.05)" },
                               }}
-                            >
-                              {m.body}
-                            </Typography>
-
-                            {/* Edited label */}
-                            {!m.is_deleted && m.is_edited && (
-                              <Typography sx={{ fontSize: 9, opacity: 0.5, mt: 0.25 }}>Edited</Typography>
+                            />
+                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={handleCancelEdit}
+                                sx={{ fontSize: "11px", px: 1 }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                onClick={() => handleSaveEdit(m.id)}
+                                disabled={!editText.trim()}
+                                sx={{ fontSize: "11px", px: 1 }}
+                              >
+                                Save
+                              </Button>
+                            </Stack>
+                          </Paper>
+                        ) : (
+                          <Box
+                            sx={{
+                              position: "relative",
+                              display: "flex",
+                              justifyContent: m.mine ? "flex-end" : "flex-start",
+                              alignItems: "flex-start",
+                              gap: 0.5,
+                              "&:hover .edit-delete-buttons": {
+                                opacity: 1,
+                              },
+                            }}
+                          >
+                            {/* Edit/Delete menu for own messages (before message on hover) */}
+                            {m.mine && !m.is_deleted && (
+                              <Stack
+                                className="edit-delete-buttons"
+                                direction="row"
+                                spacing={0.25}
+                                sx={{
+                                  opacity: 0,
+                                  transition: "opacity 0.2s",
+                                  pt: 0.25,
+                                }}
+                              >
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleStartEdit(m)}
+                                  sx={{
+                                    width: 24,
+                                    height: 24,
+                                    p: 0.25,
+                                    color: "rgba(255,255,255,0.6)",
+                                    "&:hover": { color: "rgba(255,255,255,1)", bgcolor: "rgba(255,255,255,0.1)" },
+                                  }}
+                                  title="Edit message"
+                                >
+                                  <EditRoundedIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeleteMessage(m.id)}
+                                  sx={{
+                                    width: 24,
+                                    height: 24,
+                                    p: 0.25,
+                                    color: "rgba(255,255,255,0.6)",
+                                    "&:hover": { color: "#f44336", bgcolor: "rgba(244,67,54,0.15)" },
+                                  }}
+                                  title="Delete message"
+                                >
+                                  <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Stack>
                             )}
 
-                            {/* Timestamp */}
-                            <Typography sx={{ fontSize: 10, opacity: 0.5, textAlign: "right", mt: 0.5, whiteSpace: "nowrap" }}>
-                              {formatPrivateMessageTimestamp(m, item.prevMessage)}
-                            </Typography>
-                          </Paper>
-                        </Box>
-                      )}
-                    </Stack>
-                  )
-                })}
-                <div ref={privateChatBottomRef} />
-              </Stack>
-            )}
-          </Box>
+                            <Paper
+                              variant="outlined"
+                              sx={{
+                                p: 1.25,
+                                maxWidth: "85%",
+                                bgcolor: m.mine ? "rgba(20,184,177,0.15)" : "rgba(255,255,255,0.03)",
+                                borderColor: m.mine ? "rgba(20,184,177,0.3)" : "rgba(255,255,255,0.08)",
+                                borderRadius: 2,
+                                opacity: m.is_deleted ? 0.6 : 1,
+                              }}
+                            >
+                              {/* Message body with deleted/edited states */}
+                              <Typography
+                                sx={{
+                                  fontSize: 13,
+                                  opacity: m.is_deleted ? 0.6 : 0.9,
+                                  fontStyle: m.is_deleted ? "italic" : "normal",
+                                  color: m.is_deleted ? "#999" : "inherit",
+                                }}
+                              >
+                                {m.body}
+                              </Typography>
 
-          {/* 3. Private Chat Input */}
-          <Box sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-            <TextField
-              fullWidth
-              placeholder={`Message ${privateChatUser.name}...`}
-              size="small"
-              value={privateInput}
-              onChange={(e) => setPrivateInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendPrivateMessage();
-                }
-              }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={sendPrivateMessage} disabled={!privateInput.trim() || !privateConversationId}>
-                      <SendIcon fontSize="small" />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.03)", borderRadius: 2 },
-              }}
-            />
-          </Box>
+                              {/* Edited label */}
+                              {!m.is_deleted && m.is_edited && (
+                                <Typography sx={{ fontSize: 9, opacity: 0.5, mt: 0.25 }}>Edited</Typography>
+                              )}
+
+                              {/* Timestamp */}
+                              <Typography sx={{ fontSize: 10, opacity: 0.5, textAlign: "right", mt: 0.5, whiteSpace: "nowrap" }}>
+                                {formatPrivateMessageTimestamp(m, item.prevMessage)}
+                              </Typography>
+                            </Paper>
+                          </Box>
+                        )}
+                      </Stack>
+                    )
+                  })}
+                  <div ref={privateChatBottomRef} />
+                </Stack>
+              )}
+            </Box>
+
+            {/* Input box */}
+            <Box sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <TextField
+                fullWidth
+                placeholder={`Message ${privateChatUser.name}...`}
+                size="small"
+                value={privateInput}
+                onChange={(e) => setPrivateInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendPrivateMessage();
+                  }
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={sendPrivateMessage} disabled={!privateInput.trim() || !privateConversationId}>
+                        <SendIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.03)", borderRadius: 2 },
+                }}
+              />
+            </Box>
+          </GuestRestrictionOverlay>
         </>
       ) : (
         // ================= EXISTING TABS BODY (REUSED) =================
@@ -15054,7 +15071,18 @@ export default function NewLiveMeeting() {
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
 
                 <Box sx={{ p: 2 }}>
-                  {isBreakout && !isRoomChatActive && !preEventLoungeOpen ? (
+                  {isGuest ? (
+                    <GuestRestrictionOverlay
+                      visible={true}
+                      message="In order to benefit from chatting with other participants, please register on our website."
+                      onSignUp={() => setGuestRegModalOpen(true)}
+                    >
+                      <Box sx={{ display: "flex", gap: 1, p: 2 }}>
+                        <Box sx={{ flex: 1, height: 44, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 2, border: "1px solid rgba(255,255,255,0.08)" }} />
+                        <Box sx={{ width: 44, height: 44, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 2, border: "1px solid rgba(255,255,255,0.08)" }} />
+                      </Box>
+                    </GuestRestrictionOverlay>
+                  ) : isBreakout && !isRoomChatActive && !preEventLoungeOpen ? (
                     <Alert severity="warning" sx={{ mb: 2 }}>
                       Public chat is disabled while you are in a breakout room. Return to the main room to participate.
                     </Alert>
@@ -15177,300 +15205,299 @@ export default function NewLiveMeeting() {
 
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
-              {/* <Box sx={{ p: 2, pb: 0 }}>
-                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5 }}>
-                  Q&A: {activeTableId && loungeTables.find(t => t.id === activeTableId)?.name ? loungeTables.find(t => t.id === activeTableId).name : "Main Room"}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
-                  {activeTableId
-                    ? `Room Q&A is limited to people seated in ${activeRoomLabel || "this room"}.`
-                    : "Questions here are visible to everyone in the main room."}
-                </Typography>
-              </Box> */}
-
-              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
-                {qnaError && (
-                  <Typography color="error" sx={{ mb: 1 }}>
-                    {qnaError}
-                  </Typography>
-                )}
-
-                {qnaLoading ? (
-                  <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                    <CircularProgress size={22} />
-                  </Box>
-                ) : qaSorted.length === 0 ? (
-                  <Typography sx={{ opacity: 0.75 }}>No questions yet. Be the first to ask!</Typography>
-                ) : (
-                  <Stack spacing={1.5}>
-                    {qaSorted.map((q) => {
-                      const voters = q.upvoters ?? [];
-                      const votes = q.upvote_count ?? voters.length;
-                      const hasVoted = Boolean(q.user_upvoted);
-                      const canViewVoters = isHost;
-
-                      // Check if self
-                      const self = dyteMeeting?.self;
-                      const selfCsid = self?.clientSpecificId || self?.customParticipantId;
-                      // Fallback to myUserIdRef if CSID not available/matching
-                      const meId = myUserIdRef.current;
-
-                      // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
-                      let qUserId = q.user_id ?? q.user;
-                      if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
-
-                      const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
-
-                      const askedBy = isSelfQuestion
-                        ? "You"
-                        : q.user_name ||
-                        q.user_display ||
-                        q.user ||
-                        q.user?.name ||
-                        participants.find((p) => {
-                          const raw = p?._raw || {};
-                          const csid = raw.clientSpecificId ?? raw.client_specific_id;
-                          return csid != null && String(csid) === String(q.user_id);
-                        })?.name ||
-                        (q.user_id ? `User ${q.user_id}` : "Audience");
-
-                      const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
-
-                      const canManage = isHost || isSelfQuestion;
-                      const isEditing = qnaEditingId === q.id;
-
-                      return (
-                        <Paper
-                          key={q.id}
-                          variant="outlined"
-                          sx={{
-                            p: 1.5,
-                            bgcolor: q.is_hidden
-                              ? "rgba(251, 191, 36, 0.08)"
-                              : "rgba(255,255,255,0.03)",
-                            borderColor: q.is_hidden
-                              ? "rgba(251, 191, 36, 0.3)"
-                              : "rgba(255,255,255,0.08)",
-                            borderRadius: 2,
-                            position: "relative",
-                            ...(q.is_hidden && {
-                              "&::before": {
-                                content: '"HIDDEN"',
-                                position: "absolute",
-                                top: 8,
-                                right: 8,
-                                fontSize: 10,
-                                fontWeight: 700,
-                                color: "#fbbf24",
-                                bgcolor: "rgba(251, 191, 36, 0.15)",
-                                px: 1,
-                                py: 0.25,
-                                borderRadius: 1,
-                                border: "1px solid rgba(251, 191, 36, 0.3)"
-                              }
-                            })
-                          }}
-                        >
-                          {isEditing ? (
-                            <Box component="form" onSubmit={(e) => { e.preventDefault(); handleQnaEditSubmit(q.id); }}>
-                              <TextField
-                                fullWidth
-                                size="small"
-                                autoFocus
-                                value={qnaEditContent}
-                                onChange={(e) => setQnaEditContent(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Escape") {
-                                    setQnaEditingId(null);
-                                  }
-                                }}
-                                sx={{
-                                  mb: 1,
-                                  "& .MuiOutlinedInput-root": {
-                                    color: "#fff",
-                                    bgcolor: "rgba(255,255,255,0.1)",
-                                    "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
-                                  }
-                                }}
-                              />
-                              <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                <Button
-                                  size="small"
-                                  onClick={() => setQnaEditingId(null)}
-                                  sx={{ color: "rgba(255,255,255,0.7)" }}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button type="submit" size="small" variant="contained">
-                                  Save
-                                </Button>
-                              </Stack>
-                            </Box>
-                          ) : (
-                            <>
-                              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
-
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Tooltip
-                                    arrow
-                                    placement="left"
-                                    onOpen={() => {
-                                      if (isHost) loadQuestions({ silent: true });
-                                    }}
-                                    title={
-                                      canViewVoters ? (
-                                        <Box sx={{ p: 1 }}>
-                                          <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
-                                          {votes ? (
-                                            <Stack spacing={0.25}>
-                                              {voters.slice(0, 8).map((voter, idx) => (
-                                                <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
-                                                  {voter?.name || voter?.username || voter?.id || "User"}
-                                                </Typography>
-                                              ))}
-                                              {votes > 8 && (
-                                                <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
-                                              )}
-                                            </Stack>
-                                          ) : (
-                                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
-                                          )}
-                                        </Box>
-                                      ) : hasVoted ? (
-                                        "Remove your vote"
-                                      ) : (
-                                        "Vote for this question"
-                                      )
-                                    }
-                                    componentsProps={{
-                                      tooltip: {
-                                        sx: {
-                                          bgcolor: "rgba(0,0,0,0.92)",
-                                          border: "1px solid rgba(255,255,255,0.10)",
-                                          borderRadius: 2,
-                                        },
-                                      },
-                                    }}
-                                  >
-                                    <Box>
-                                      <Chip
-                                        size="small"
-                                        clickable
-                                        onClick={() => upvoteQuestion(q.id)}
-                                        icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
-                                        label={votes}
-                                        sx={{
-                                          bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                                          border: "1px solid rgba(255,255,255,0.10)",
-                                          "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
-                                        }}
-                                      />
-                                    </Box>
-                                  </Tooltip>
-
-                                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
-                                </Stack>
-                              </Stack>
-
-                              <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{q.content}</Typography>
-
-                              <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
-                                <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
-
-                                {canManage && (
-                                  <Stack direction="row" spacing={0}>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        setQnaEditingId(q.id);
-                                        setQnaEditContent(q.content);
-                                      }}
-                                      sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
-                                    >
-                                      <EditRoundedIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                    {isHost && (
-                                      <Tooltip title={q.is_hidden ? "Unhide Question" : "Hide Question"}>
-                                        <IconButton
-                                          size="small"
-                                          onClick={() => toggleQuestionVisibility(q.id)}
-                                          sx={{
-                                            color: q.is_hidden ? "rgba(251, 191, 36, 0.7)" : "rgba(255,255,255,0.5)",
-                                            p: 0.5,
-                                            "&:hover": {
-                                              color: q.is_hidden ? "#fbbf24" : "rgba(255,255,255,0.9)"
-                                            }
-                                          }}
-                                        >
-                                          {q.is_hidden ? <VisibilityIcon sx={{ fontSize: 16 }} /> : <VisibilityOffIcon sx={{ fontSize: 16 }} />}
-                                        </IconButton>
-                                      </Tooltip>
-                                    )}
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => handleQnaDelete(q.id)}
-                                      sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
-                                    >
-                                      <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  </Stack>
-                                )}
-                              </Stack>
-                            </>
-                          )}
-                        </Paper>
-                      );
-                    })}
-                  </Stack>
-                )}
-              </Box>
-
-              <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
-
-              <Box
-                component="form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submitQuestion();
-                }}
-                sx={{ p: 2 }}
+              <GuestRestrictionOverlay
+                visible={isGuest}
+                message="In order to benefit from chatting with other participants, please register on our website."
+                onSignUp={() => setGuestRegModalOpen(true)}
               >
-                <TextField
-                  fullWidth
-                  placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
-                  size="small"
-                  value={newQuestion}
-                  disabled={qnaSubmitting}
-                  onChange={(e) => setNewQuestion(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                {/* Q&A Messages Area */}
+                <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
+                  {qnaError && (
+                    <Typography color="error" sx={{ mb: 1 }}>
+                      {qnaError}
+                    </Typography>
+                  )}
+
+                  {qnaLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                      <CircularProgress size={22} />
+                    </Box>
+                  ) : qaSorted.length === 0 ? (
+                    <Typography sx={{ opacity: 0.75 }}>No questions yet. Be the first to ask!</Typography>
+                  ) : (
+                    <Stack spacing={1.5}>
+                      {qaSorted.map((q) => {
+                        const voters = q.upvoters ?? [];
+                        const votes = q.upvote_count ?? voters.length;
+                        const hasVoted = Boolean(q.user_upvoted);
+                        const canViewVoters = isHost;
+
+                        // Check if self
+                        const self = dyteMeeting?.self;
+                        const selfCsid = self?.clientSpecificId || self?.customParticipantId;
+                        // Fallback to myUserIdRef if CSID not available/matching
+                        const meId = myUserIdRef.current;
+
+                        // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
+                        let qUserId = q.user_id ?? q.user;
+                        if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
+
+                        const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
+
+                        const askedBy = isSelfQuestion
+                          ? "You"
+                          : q.user_name ||
+                          q.user_display ||
+                          q.user ||
+                          q.user?.name ||
+                          participants.find((p) => {
+                            const raw = p?._raw || {};
+                            const csid = raw.clientSpecificId ?? raw.client_specific_id;
+                            return csid != null && String(csid) === String(q.user_id);
+                          })?.name ||
+                          (q.user_id ? `User ${q.user_id}` : "Audience");
+
+                        const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
+
+                        const canManage = isHost || isSelfQuestion;
+                        const isEditing = qnaEditingId === q.id;
+
+                        return (
+                          <Paper
+                            key={q.id}
+                            variant="outlined"
+                            sx={{
+                              p: 1.5,
+                              bgcolor: q.is_hidden
+                                ? "rgba(251, 191, 36, 0.08)"
+                                : "rgba(255,255,255,0.03)",
+                              borderColor: q.is_hidden
+                                ? "rgba(251, 191, 36, 0.3)"
+                                : "rgba(255,255,255,0.08)",
+                              borderRadius: 2,
+                              position: "relative",
+                              ...(q.is_hidden && {
+                                "&::before": {
+                                  content: '"HIDDEN"',
+                                  position: "absolute",
+                                  top: 8,
+                                  right: 8,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: "#fbbf24",
+                                  bgcolor: "rgba(251, 191, 36, 0.15)",
+                                  px: 1,
+                                  py: 0.25,
+                                  borderRadius: 1,
+                                  border: "1px solid rgba(251, 191, 36, 0.3)"
+                                }
+                              })
+                            }}
+                          >
+                            {isEditing ? (
+                              <Box component="form" onSubmit={(e) => { e.preventDefault(); handleQnaEditSubmit(q.id); }}>
+                                <TextField
+                                  fullWidth
+                                  size="small"
+                                  autoFocus
+                                  value={qnaEditContent}
+                                  onChange={(e) => setQnaEditContent(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                      setQnaEditingId(null);
+                                    }
+                                  }}
+                                  sx={{
+                                    mb: 1,
+                                    "& .MuiOutlinedInput-root": {
+                                      color: "#fff",
+                                      bgcolor: "rgba(255,255,255,0.1)",
+                                      "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                                    }
+                                  }}
+                                />
+                                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                  <Button
+                                    size="small"
+                                    onClick={() => setQnaEditingId(null)}
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button type="submit" size="small" variant="contained">
+                                    Save
+                                  </Button>
+                                </Stack>
+                              </Box>
+                            ) : (
+                              <>
+                                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                  <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
+
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Tooltip
+                                      arrow
+                                      placement="left"
+                                      onOpen={() => {
+                                        if (isHost) loadQuestions({ silent: true });
+                                      }}
+                                      title={
+                                        canViewVoters ? (
+                                          <Box sx={{ p: 1 }}>
+                                            <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
+                                            {votes ? (
+                                              <Stack spacing={0.25}>
+                                                {voters.slice(0, 8).map((voter, idx) => (
+                                                  <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
+                                                    {voter?.name || voter?.username || voter?.id || "User"}
+                                                  </Typography>
+                                                ))}
+                                                {votes > 8 && (
+                                                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
+                                                )}
+                                              </Stack>
+                                            ) : (
+                                              <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
+                                            )}
+                                          </Box>
+                                        ) : hasVoted ? (
+                                          "Remove your vote"
+                                        ) : (
+                                          "Vote for this question"
+                                        )
+                                      }
+                                      componentsProps={{
+                                        tooltip: {
+                                          sx: {
+                                            bgcolor: "rgba(0,0,0,0.92)",
+                                            border: "1px solid rgba(255,255,255,0.10)",
+                                            borderRadius: 2,
+                                          },
+                                        },
+                                      }}
+                                    >
+                                      <Box>
+                                        <Chip
+                                          size="small"
+                                          clickable
+                                          onClick={() => upvoteQuestion(q.id)}
+                                          icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
+                                          label={votes}
+                                          sx={{
+                                            bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                                            border: "1px solid rgba(255,255,255,0.10)",
+                                            "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                                          }}
+                                        />
+                                      </Box>
+                                    </Tooltip>
+
+                                    <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
+                                  </Stack>
+                                </Stack>
+
+                                <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{q.content}</Typography>
+
+                                <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                                  <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+
+                                  {canManage && (
+                                    <Stack direction="row" spacing={0}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setQnaEditingId(q.id);
+                                          setQnaEditContent(q.content);
+                                        }}
+                                        sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                      >
+                                        <EditRoundedIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                      {isHost && (
+                                        <Tooltip title={q.is_hidden ? "Unhide Question" : "Hide Question"}>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => toggleQuestionVisibility(q.id)}
+                                            sx={{
+                                              color: q.is_hidden ? "rgba(251, 191, 36, 0.7)" : "rgba(255,255,255,0.5)",
+                                              p: 0.5,
+                                              "&:hover": {
+                                                color: q.is_hidden ? "#fbbf24" : "rgba(255,255,255,0.9)"
+                                              }
+                                            }}
+                                          >
+                                            {q.is_hidden ? <VisibilityIcon sx={{ fontSize: 16 }} /> : <VisibilityOffIcon sx={{ fontSize: 16 }} />}
+                                          </IconButton>
+                                        </Tooltip>
+                                      )}
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => handleQnaDelete(q.id)}
+                                        sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                      >
+                                        <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </Stack>
+                                  )}
+                                </Stack>
+                              </>
+                            )}
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Box>
+
+                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+
+                {/* Q&A Input Area */}
+                {!isGuest && (
+                  <Box
+                    component="form"
+                    onSubmit={(e) => {
                       e.preventDefault();
                       submitQuestion();
-                    }
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          size="small"
-                          aria-label="Send question"
-                          onClick={submitQuestion}
-                          disabled={qnaSubmitting || newQuestion.trim().length === 0}
-                        >
-                          {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      bgcolor: "rgba(255,255,255,0.03)",
-                      borderRadius: 2,
-                    },
-                  }}
-                />
-              </Box>
+                    }}
+                    sx={{ p: 2 }}
+                  >
+                    <TextField
+                      fullWidth
+                      placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
+                      size="small"
+                      value={newQuestion}
+                      disabled={qnaSubmitting}
+                      onChange={(e) => setNewQuestion(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          submitQuestion();
+                        }
+                      }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              size="small"
+                              aria-label="Send question"
+                              onClick={submitQuestion}
+                              disabled={qnaSubmitting || newQuestion.trim().length === 0}
+                            >
+                              {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          bgcolor: "rgba(255,255,255,0.03)",
+                          borderRadius: 2,
+                        },
+                      }}
+                    />
+                  </Box>
+                )}
+              </GuestRestrictionOverlay>
             </TabPanel>
 
             {/* POLLS (Hidden) */}
@@ -18790,6 +18817,8 @@ export default function NewLiveMeeting() {
               <MemberInfoContent
                 selectedMember={selectedMember}
                 onClose={closeMemberInfo}
+                isGuest={isGuest}
+                onSignUp={() => setGuestRegModalOpen(true)}
               />
             ) : (
               <Box sx={{ py: 4, textAlign: "center", opacity: 0.5 }}>
@@ -20338,13 +20367,16 @@ export default function NewLiveMeeting() {
 }
 
 // ✅ Separate sub-component to handle async friendship logic locally
-function MemberInfoContent({ selectedMember, onClose }) {
+function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp = () => {} }) {
   const [connStatus, setConnStatus] = useState("loading"); // "loading" | "none" | "friends" | "pending_outgoing" | "pending_incoming"
   const [connLoading, setConnLoading] = useState(false);
   const [profileInfo, setProfileInfo] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const memberUserId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
   const isGuestMember = typeof memberUserId === "string" && /^guest[_:-]/i.test(memberUserId);
+
+  // ✅ Current user is guest AND viewed member is a registered user → blur their profile
+  const showProfileRestriction = isGuest && !isGuestMember;
 
   // 1. Check friendship status on mount
   useEffect(() => {
@@ -20623,194 +20655,200 @@ function MemberInfoContent({ selectedMember, onClose }) {
         )}
       </Box>
 
-      {/* 2. Name */}
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.8, mb: 0.5 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 18 }}>
-          {selectedMember.name}
-        </Typography>
-        {profileInfo?.kycStatus === "approved" && (
-          <VerifiedRoundedIcon
-            sx={{
-              fontSize: 20,
-              color: "#14b8a6",
-              flexShrink: 0,
-            }}
-          />
-        )}
-      </Box>
-
-      {/* 3. Role Chip */}
-      <Chip
-        label={selectedMember.role}
-        size="small"
-        icon={
-          <Box
-            sx={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              bgcolor: selectedMember.role === "Host" ? "#ffb300" : "#22c55e", // Gold or Green dot
-              ml: 0.5,
-            }}
-          />
-        }
-        sx={{
-          bgcolor: "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          height: 24,
-          "& .MuiChip-label": { px: 1.5, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" },
-          "& .MuiChip-icon": { order: -1, mr: -0.5 }, // Move dot to start
-        }}
-      />
-
-      {/* 4. Profile Details (under role chip) */}
-      {(hasProfileInfo || profileLoading) && (
-        <Box sx={{ mt: 2, textAlign: "center", width: "100%" }}>
-          {hasProfileInfo ? (
-            <>
-              {jobTitle && (
-                <Typography sx={{ fontWeight: 400, fontSize: 14, color: "rgba(255,255,255,0.95)" }}>
-                  {jobTitle}
-                </Typography>
-              )}
-              {companyName && (
-                <Typography sx={{ fontWeight: 700, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-                  {companyName}
-                </Typography>
-              )}
-              {locationLabel && (
-                <Stack
-                  direction="row"
-                  spacing={0.6}
-                  alignItems="center"
-                  justifyContent="center"
-                  sx={{ mt: 1 }}
-                >
-                  <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.7)" }} />
-                  <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-                    {locationLabel}
-                  </Typography>
-                </Stack>
-              )}
-            </>
-          ) : (
-            <>
-              <Skeleton
-                variant="text"
-                width={120}
-                height={20}
-                sx={{ bgcolor: "rgba(255,255,255,0.12)", mx: "auto" }}
-              />
-              <Skeleton
-                variant="text"
-                width={90}
-                height={18}
-                sx={{ bgcolor: "rgba(255,255,255,0.10)", mx: "auto", mt: 0.5 }}
-              />
-              <Skeleton
-                variant="text"
-                width={140}
-                height={18}
-                sx={{ bgcolor: "rgba(255,255,255,0.10)", mx: "auto", mt: 0.8 }}
-              />
-            </>
+      <GuestRestrictionOverlay
+        visible={showProfileRestriction}
+        message="In order to benefit from viewing profiles of other participants and being able to connect and chat with them, please register as a user."
+        onSignUp={onSignUp}
+      >
+        {/* 2. Name */}
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.8, mb: 0.5 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 18 }}>
+            {selectedMember.name}
+          </Typography>
+          {profileInfo?.kycStatus === "approved" && (
+            <VerifiedRoundedIcon
+              sx={{
+                fontSize: 20,
+                color: "#14b8a6",
+                flexShrink: 0,
+              }}
+            />
           )}
         </Box>
-      )}
 
-
-      {/* 5. Actions: View Profile + Connect */}
-      <Stack direction="row" spacing={1.5} sx={{ mt: 3, width: "100%" }}>
-        {/* View Profile */}
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<Box component="span" sx={{ fontSize: 18, display: "flex" }}>👤</Box>}
-          disabled={isGuestMember}
-          onClick={() => {
-            if (isGuestMember) return;
-            window.open(profileLink, "_blank");
-          }}
+        {/* 3. Role Chip */}
+        <Chip
+          label={selectedMember.role}
+          size="small"
+          icon={
+            <Box
+              sx={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                bgcolor: selectedMember.role === "Host" ? "#ffb300" : "#22c55e", // Gold or Green dot
+                ml: 0.5,
+              }}
+            />
+          }
           sx={{
-            py: 1.5,
-            borderRadius: 3,
-            borderColor: "rgba(255,255,255,0.2)",
-            color: "#fff",
-            textTransform: "none",
-            fontWeight: 600,
-            fontSize: 14,
-            bgcolor: "rgba(255,255,255,0.02)",
-            "&:hover": {
-              bgcolor: "rgba(255,255,255,0.08)",
-              borderColor: "#fff",
-            },
+            bgcolor: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            height: 24,
+            "& .MuiChip-label": { px: 1.5, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" },
+            "& .MuiChip-icon": { order: -1, mr: -0.5 }, // Move dot to start
           }}
-        >
-          {isGuestMember ? "Guest Profile" : "View Profile"}
-        </Button>
+        />
 
-        {/* Connect Button */}
-        {!isGuestMember && connStatus === "none" && (
+        {/* 4. Profile Details (under role chip) */}
+        {(hasProfileInfo || profileLoading) && (
+          <Box sx={{ mt: 2, textAlign: "center", width: "100%" }}>
+            {hasProfileInfo ? (
+              <>
+                {jobTitle && (
+                  <Typography sx={{ fontWeight: 400, fontSize: 14, color: "rgba(255,255,255,0.95)" }}>
+                    {jobTitle}
+                  </Typography>
+                )}
+                {companyName && (
+                  <Typography sx={{ fontWeight: 700, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                    {companyName}
+                  </Typography>
+                )}
+                {locationLabel && (
+                  <Stack
+                    direction="row"
+                    spacing={0.6}
+                    alignItems="center"
+                    justifyContent="center"
+                    sx={{ mt: 1 }}
+                  >
+                    <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.7)" }} />
+                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                      {locationLabel}
+                    </Typography>
+                  </Stack>
+                )}
+              </>
+            ) : (
+              <>
+                <Skeleton
+                  variant="text"
+                  width={120}
+                  height={20}
+                  sx={{ bgcolor: "rgba(255,255,255,0.12)", mx: "auto" }}
+                />
+                <Skeleton
+                  variant="text"
+                  width={90}
+                  height={18}
+                  sx={{ bgcolor: "rgba(255,255,255,0.10)", mx: "auto", mt: 0.5 }}
+                />
+                <Skeleton
+                  variant="text"
+                  width={140}
+                  height={18}
+                  sx={{ bgcolor: "rgba(255,255,255,0.10)", mx: "auto", mt: 0.8 }}
+                />
+              </>
+            )}
+          </Box>
+        )}
+
+
+        {/* 5. Actions: View Profile + Connect */}
+        <Stack direction="row" spacing={1.5} sx={{ mt: 3, width: "100%" }}>
+          {/* View Profile */}
           <Button
             fullWidth
-            variant="contained"
-            disabled={connLoading}
-            onClick={handleConnect}
-            startIcon={<PersonAddAlt1RoundedIcon />}
+            variant="outlined"
+            startIcon={<Box component="span" sx={{ fontSize: 18, display: "flex" }}>👤</Box>}
+            disabled={isGuestMember}
+            onClick={() => {
+              if (isGuestMember) return;
+              window.open(profileLink, "_blank");
+            }}
             sx={{
               py: 1.5,
               borderRadius: 3,
-              bgcolor: "#14b8b1",
+              borderColor: "rgba(255,255,255,0.2)",
               color: "#fff",
               textTransform: "none",
-              fontWeight: 700,
-              fontSize: 14,
-              "&:hover": { bgcolor: "#0e8e88" },
-            }}
-          >
-            {connLoading ? "Sending..." : "Connect"}
-          </Button>
-        )}
-
-        {!isGuestMember && connStatus === "pending_outgoing" && (
-          <Button
-            fullWidth
-            disabled
-            variant="contained"
-            sx={{
-              py: 1.5,
-              borderRadius: 3,
-              bgcolor: "rgba(255,255,255,0.1) !important",
-              color: "rgba(255,255,255,0.5) !important",
-              textTransform: "none",
               fontWeight: 600,
               fontSize: 14,
+              bgcolor: "rgba(255,255,255,0.02)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.08)",
+                borderColor: "#fff",
+              },
             }}
           >
-            Request Sent
+            {isGuestMember ? "Guest Profile" : "View Profile"}
           </Button>
-        )}
 
-        {!isGuestMember && connStatus === "friends" && (
-          <Button
-            fullWidth
-            disabled
-            variant="outlined"
-            startIcon={<CheckRoundedIcon />}
-            sx={{
-              py: 1.5,
-              borderRadius: 3,
-              borderColor: "rgba(20,184,177,0.5) !important",
-              color: "#14b8b1 !important",
-              textTransform: "none",
-              fontWeight: 600,
-              fontSize: 14,
-            }}
-          >
-            Connected
-          </Button>
-        )}
-      </Stack>
+          {/* Connect Button */}
+          {!isGuestMember && connStatus === "none" && (
+            <Button
+              fullWidth
+              variant="contained"
+              disabled={connLoading}
+              onClick={handleConnect}
+              startIcon={<PersonAddAlt1RoundedIcon />}
+              sx={{
+                py: 1.5,
+                borderRadius: 3,
+                bgcolor: "#14b8b1",
+                color: "#fff",
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: 14,
+                "&:hover": { bgcolor: "#0e8e88" },
+              }}
+            >
+              {connLoading ? "Sending..." : "Connect"}
+            </Button>
+          )}
+
+          {!isGuestMember && connStatus === "pending_outgoing" && (
+            <Button
+              fullWidth
+              disabled
+              variant="contained"
+              sx={{
+                py: 1.5,
+                borderRadius: 3,
+                bgcolor: "rgba(255,255,255,0.1) !important",
+                color: "rgba(255,255,255,0.5) !important",
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              Request Sent
+            </Button>
+          )}
+
+          {!isGuestMember && connStatus === "friends" && (
+            <Button
+              fullWidth
+              disabled
+              variant="outlined"
+              startIcon={<CheckRoundedIcon />}
+              sx={{
+                py: 1.5,
+                borderRadius: 3,
+                borderColor: "rgba(20,184,177,0.5) !important",
+                color: "#14b8b1 !important",
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              Connected
+            </Button>
+          )}
+        </Stack>
+      </GuestRestrictionOverlay>
     </Box>
   );
 }
