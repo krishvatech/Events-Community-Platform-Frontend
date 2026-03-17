@@ -15422,293 +15422,295 @@ export default function NewLiveMeeting() {
                 message="In order to benefit from chatting with other participants, please register on our website."
                 onSignUp={() => setGuestRegModalOpen(true)}
               >
-                {/* Q&A Messages Area */}
-                <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
-                  {qnaError && (
-                    <Typography color="error" sx={{ mb: 1 }}>
-                      {qnaError}
-                    </Typography>
-                  )}
+                <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                  {/* Q&A Messages Area */}
+                  <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
+                    {qnaError && (
+                      <Typography color="error" sx={{ mb: 1 }}>
+                        {qnaError}
+                      </Typography>
+                    )}
 
-                  {qnaLoading ? (
-                    <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                      <CircularProgress size={22} />
-                    </Box>
-                  ) : qaSorted.length === 0 ? (
-                    <Typography sx={{ opacity: 0.75 }}>No questions yet. Be the first to ask!</Typography>
-                  ) : (
-                    <Stack spacing={1.5}>
-                      {qaSorted.map((q) => {
-                        const voters = q.upvoters ?? [];
-                        const votes = q.upvote_count ?? voters.length;
-                        const hasVoted = Boolean(q.user_upvoted);
-                        const canViewVoters = isHost;
+                    {qnaLoading ? (
+                      <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                        <CircularProgress size={22} />
+                      </Box>
+                    ) : qaSorted.length === 0 ? (
+                      <Typography sx={{ opacity: 0.75 }}>No questions yet. Be the first to ask!</Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {qaSorted.map((q) => {
+                          const voters = q.upvoters ?? [];
+                          const votes = q.upvote_count ?? voters.length;
+                          const hasVoted = Boolean(q.user_upvoted);
+                          const canViewVoters = isHost;
 
-                        // Check if self
-                        const self = dyteMeeting?.self;
-                        const selfCsid = self?.clientSpecificId || self?.customParticipantId;
-                        // Fallback to myUserIdRef if CSID not available/matching
-                        const meId = myUserIdRef.current;
+                          // Check if self
+                          const self = dyteMeeting?.self;
+                          const selfCsid = self?.clientSpecificId || self?.customParticipantId;
+                          // Fallback to myUserIdRef if CSID not available/matching
+                          const meId = myUserIdRef.current;
 
-                        // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
-                        let qUserId = q.user_id ?? q.user;
-                        if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
+                          // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
+                          let qUserId = q.user_id ?? q.user;
+                          if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
 
-                        const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
+                          const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
 
-                        const askedBy = isSelfQuestion
-                          ? "You"
-                          : q.user_name ||
-                          q.user_display ||
-                          q.user ||
-                          q.user?.name ||
-                          participants.find((p) => {
-                            const raw = p?._raw || {};
-                            const csid = raw.clientSpecificId ?? raw.client_specific_id;
-                            return csid != null && String(csid) === String(q.user_id);
-                          })?.name ||
-                          (q.user_id ? `User ${q.user_id}` : "Audience");
+                          const askedBy = isSelfQuestion
+                            ? "You"
+                            : q.user_name ||
+                            q.user_display ||
+                            q.user ||
+                            q.user?.name ||
+                            participants.find((p) => {
+                              const raw = p?._raw || {};
+                              const csid = raw.clientSpecificId ?? raw.client_specific_id;
+                              return csid != null && String(csid) === String(q.user_id);
+                            })?.name ||
+                            (q.user_id ? `User ${q.user_id}` : "Audience");
 
-                        const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
+                          const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
 
-                        const canManage = isHost || isSelfQuestion;
-                        const isEditing = qnaEditingId === q.id;
+                          const canManage = isHost || isSelfQuestion;
+                          const isEditing = qnaEditingId === q.id;
 
-                        return (
-                          <Paper
-                            key={q.id}
-                            variant="outlined"
-                            sx={{
-                              p: 1.5,
-                              bgcolor: q.is_hidden
-                                ? "rgba(251, 191, 36, 0.08)"
-                                : "rgba(255,255,255,0.03)",
-                              borderColor: q.is_hidden
-                                ? "rgba(251, 191, 36, 0.3)"
-                                : "rgba(255,255,255,0.08)",
-                              borderRadius: 2,
-                              position: "relative",
-                              ...(q.is_hidden && {
-                                "&::before": {
-                                  content: '"HIDDEN"',
-                                  position: "absolute",
-                                  top: 8,
-                                  right: 8,
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  color: "#fbbf24",
-                                  bgcolor: "rgba(251, 191, 36, 0.15)",
-                                  px: 1,
-                                  py: 0.25,
-                                  borderRadius: 1,
-                                  border: "1px solid rgba(251, 191, 36, 0.3)"
-                                }
-                              })
-                            }}
-                          >
-                            {isEditing ? (
-                              <Box component="form" onSubmit={(e) => { e.preventDefault(); handleQnaEditSubmit(q.id); }}>
-                                <TextField
-                                  fullWidth
-                                  size="small"
-                                  autoFocus
-                                  value={qnaEditContent}
-                                  onChange={(e) => setQnaEditContent(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Escape") {
-                                      setQnaEditingId(null);
-                                    }
-                                  }}
-                                  sx={{
-                                    mb: 1,
-                                    "& .MuiOutlinedInput-root": {
-                                      color: "#fff",
-                                      bgcolor: "rgba(255,255,255,0.1)",
-                                      "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
-                                    }
-                                  }}
-                                />
-                                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                  <Button
+                          return (
+                            <Paper
+                              key={q.id}
+                              variant="outlined"
+                              sx={{
+                                p: 1.5,
+                                bgcolor: q.is_hidden
+                                  ? "rgba(251, 191, 36, 0.08)"
+                                  : "rgba(255,255,255,0.03)",
+                                borderColor: q.is_hidden
+                                  ? "rgba(251, 191, 36, 0.3)"
+                                  : "rgba(255,255,255,0.08)",
+                                borderRadius: 2,
+                                position: "relative",
+                                ...(q.is_hidden && {
+                                  "&::before": {
+                                    content: '"HIDDEN"',
+                                    position: "absolute",
+                                    top: 8,
+                                    right: 8,
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    color: "#fbbf24",
+                                    bgcolor: "rgba(251, 191, 36, 0.15)",
+                                    px: 1,
+                                    py: 0.25,
+                                    borderRadius: 1,
+                                    border: "1px solid rgba(251, 191, 36, 0.3)"
+                                  }
+                                })
+                              }}
+                            >
+                              {isEditing ? (
+                                <Box component="form" onSubmit={(e) => { e.preventDefault(); handleQnaEditSubmit(q.id); }}>
+                                  <TextField
+                                    fullWidth
                                     size="small"
-                                    onClick={() => setQnaEditingId(null)}
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button type="submit" size="small" variant="contained">
-                                    Save
-                                  </Button>
-                                </Stack>
-                              </Box>
-                            ) : (
-                              <>
-                                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                  <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
-
-                                  <Stack direction="row" spacing={1} alignItems="center">
-                                    <Tooltip
-                                      arrow
-                                      placement="left"
-                                      onOpen={() => {
-                                        if (isHost) loadQuestions({ silent: true });
-                                      }}
-                                      title={
-                                        canViewVoters ? (
-                                          <Box sx={{ p: 1 }}>
-                                            <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
-                                            {votes ? (
-                                              <Stack spacing={0.25}>
-                                                {voters.slice(0, 8).map((voter, idx) => (
-                                                  <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
-                                                    {voter?.name || voter?.username || voter?.id || "User"}
-                                                  </Typography>
-                                                ))}
-                                                {votes > 8 && (
-                                                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
-                                                )}
-                                              </Stack>
-                                            ) : (
-                                              <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
-                                            )}
-                                          </Box>
-                                        ) : hasVoted ? (
-                                          "Remove your vote"
-                                        ) : (
-                                          "Vote for this question"
-                                        )
+                                    autoFocus
+                                    value={qnaEditContent}
+                                    onChange={(e) => setQnaEditContent(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Escape") {
+                                        setQnaEditingId(null);
                                       }
-                                      componentsProps={{
-                                        tooltip: {
-                                          sx: {
-                                            bgcolor: "rgba(0,0,0,0.92)",
-                                            border: "1px solid rgba(255,255,255,0.10)",
-                                            borderRadius: 2,
-                                          },
-                                        },
-                                      }}
+                                    }}
+                                    sx={{
+                                      mb: 1,
+                                      "& .MuiOutlinedInput-root": {
+                                        color: "#fff",
+                                        bgcolor: "rgba(255,255,255,0.1)",
+                                        "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                                      }
+                                    }}
+                                  />
+                                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                    <Button
+                                      size="small"
+                                      onClick={() => setQnaEditingId(null)}
+                                      sx={{ color: "rgba(255,255,255,0.7)" }}
                                     >
-                                      <Box>
-                                        <Chip
-                                          size="small"
-                                          clickable
-                                          onClick={() => upvoteQuestion(q.id)}
-                                          icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
-                                          label={votes}
-                                          sx={{
-                                            bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                                            border: "1px solid rgba(255,255,255,0.10)",
-                                            "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
-                                          }}
-                                        />
-                                      </Box>
-                                    </Tooltip>
-
-                                    <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
+                                      Cancel
+                                    </Button>
+                                    <Button type="submit" size="small" variant="contained">
+                                      Save
+                                    </Button>
                                   </Stack>
-                                </Stack>
+                                </Box>
+                              ) : (
+                                <>
+                                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                    <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
 
-                                <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{q.content}</Typography>
-
-                                <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
-                                  <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
-
-                                  {canManage && (
-                                    <Stack direction="row" spacing={0}>
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => {
-                                          setQnaEditingId(q.id);
-                                          setQnaEditContent(q.content);
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                      <Tooltip
+                                        arrow
+                                        placement="left"
+                                        onOpen={() => {
+                                          if (isHost) loadQuestions({ silent: true });
                                         }}
-                                        sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                        title={
+                                          canViewVoters ? (
+                                            <Box sx={{ p: 1 }}>
+                                              <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
+                                              {votes ? (
+                                                <Stack spacing={0.25}>
+                                                  {voters.slice(0, 8).map((voter, idx) => (
+                                                    <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
+                                                      {voter?.name || voter?.username || voter?.id || "User"}
+                                                    </Typography>
+                                                  ))}
+                                                  {votes > 8 && (
+                                                    <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
+                                                  )}
+                                                </Stack>
+                                              ) : (
+                                                <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
+                                              )}
+                                            </Box>
+                                          ) : hasVoted ? (
+                                            "Remove your vote"
+                                          ) : (
+                                            "Vote for this question"
+                                          )
+                                        }
+                                        componentsProps={{
+                                          tooltip: {
+                                            sx: {
+                                              bgcolor: "rgba(0,0,0,0.92)",
+                                              border: "1px solid rgba(255,255,255,0.10)",
+                                              borderRadius: 2,
+                                            },
+                                          },
+                                        }}
                                       >
-                                        <EditRoundedIcon sx={{ fontSize: 16 }} />
-                                      </IconButton>
-                                      {isHost && (
-                                        <Tooltip title={q.is_hidden ? "Unhide Question" : "Hide Question"}>
-                                          <IconButton
+                                        <Box>
+                                          <Chip
                                             size="small"
-                                            onClick={() => toggleQuestionVisibility(q.id)}
+                                            clickable
+                                            onClick={() => upvoteQuestion(q.id)}
+                                            icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
+                                            label={votes}
                                             sx={{
-                                              color: q.is_hidden ? "rgba(251, 191, 36, 0.7)" : "rgba(255,255,255,0.5)",
-                                              p: 0.5,
-                                              "&:hover": {
-                                                color: q.is_hidden ? "#fbbf24" : "rgba(255,255,255,0.9)"
-                                              }
+                                              bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                                              border: "1px solid rgba(255,255,255,0.10)",
+                                              "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
                                             }}
-                                          >
-                                            {q.is_hidden ? <VisibilityIcon sx={{ fontSize: 16 }} /> : <VisibilityOffIcon sx={{ fontSize: 16 }} />}
-                                          </IconButton>
-                                        </Tooltip>
-                                      )}
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => handleQnaDelete(q.id)}
-                                        sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
-                                      >
-                                        <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                                      </IconButton>
+                                          />
+                                        </Box>
+                                      </Tooltip>
+
+                                      <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
                                     </Stack>
-                                  )}
-                                </Stack>
-                              </>
-                            )}
-                          </Paper>
-                        );
-                      })}
-                    </Stack>
+                                  </Stack>
+
+                                  <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{q.content}</Typography>
+
+                                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                                    <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+
+                                    {canManage && (
+                                      <Stack direction="row" spacing={0}>
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => {
+                                            setQnaEditingId(q.id);
+                                            setQnaEditContent(q.content);
+                                          }}
+                                          sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                        >
+                                          <EditRoundedIcon sx={{ fontSize: 16 }} />
+                                        </IconButton>
+                                        {isHost && (
+                                          <Tooltip title={q.is_hidden ? "Unhide Question" : "Hide Question"}>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => toggleQuestionVisibility(q.id)}
+                                              sx={{
+                                                color: q.is_hidden ? "rgba(251, 191, 36, 0.7)" : "rgba(255,255,255,0.5)",
+                                                p: 0.5,
+                                                "&:hover": {
+                                                  color: q.is_hidden ? "#fbbf24" : "rgba(255,255,255,0.9)"
+                                                }
+                                              }}
+                                            >
+                                              {q.is_hidden ? <VisibilityIcon sx={{ fontSize: 16 }} /> : <VisibilityOffIcon sx={{ fontSize: 16 }} />}
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => handleQnaDelete(q.id)}
+                                          sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                        >
+                                          <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                                        </IconButton>
+                                      </Stack>
+                                    )}
+                                  </Stack>
+                                </>
+                              )}
+                            </Paper>
+                          );
+                        })}
+                      </Stack>
+                    )}
+                  </Box>
+
+                  <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+
+                  {/* Q&A Input Area */}
+                  {!isGuest && (
+                    <Box
+                      component="form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        submitQuestion();
+                      }}
+                      sx={{ p: 2 }}
+                    >
+                      <TextField
+                        fullWidth
+                        placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
+                        size="small"
+                        value={newQuestion}
+                        disabled={qnaSubmitting}
+                        onChange={(e) => setNewQuestion(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            submitQuestion();
+                          }
+                        }}
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                size="small"
+                                aria-label="Send question"
+                                onClick={submitQuestion}
+                                disabled={qnaSubmitting || newQuestion.trim().length === 0}
+                              >
+                                {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            bgcolor: "rgba(255,255,255,0.03)",
+                            borderRadius: 2,
+                          },
+                        }}
+                      />
+                    </Box>
                   )}
                 </Box>
-
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
-
-                {/* Q&A Input Area */}
-                {!isGuest && (
-                  <Box
-                    component="form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      submitQuestion();
-                    }}
-                    sx={{ p: 2 }}
-                  >
-                    <TextField
-                      fullWidth
-                      placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
-                      size="small"
-                      value={newQuestion}
-                      disabled={qnaSubmitting}
-                      onChange={(e) => setNewQuestion(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          submitQuestion();
-                        }
-                      }}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              size="small"
-                              aria-label="Send question"
-                              onClick={submitQuestion}
-                              disabled={qnaSubmitting || newQuestion.trim().length === 0}
-                            >
-                              {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          bgcolor: "rgba(255,255,255,0.03)",
-                          borderRadius: 2,
-                        },
-                      }}
-                    />
-                  </Box>
-                )}
               </GuestRestrictionOverlay>
             </TabPanel>
 

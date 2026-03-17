@@ -20,10 +20,14 @@ export default function GuestRestrictionOverlay({
   children,
 }) {
   return (
-    <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
+    <Box sx={{ position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Blurred background content */}
       <Box
         sx={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
           filter: visible ? "blur(6px)" : "none",
           userSelect: "none",
           pointerEvents: visible ? "none" : "auto",
