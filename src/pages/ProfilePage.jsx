@@ -48,6 +48,10 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import RichProfile from "./community/RichProfile";
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 
 // -------------------- Constants for Dropdowns --------------------
 const CEFR_OPTIONS = [
@@ -5528,48 +5532,59 @@ export default function ProfilePage() {
       <Dialog open={trainingOpen} onClose={() => setTrainingOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editTrainingId ? "Edit Training" : "Add Training"}</DialogTitle>
         <DialogContent dividers>
-          <Stack spacing={2}>
-            <TextField
-              label="Program / Training Title"
-              fullWidth
-              value={trainingForm.program_title || ""}
-              onChange={(e) => setTrainingForm((p) => ({ ...p, program_title: e.target.value }))}
-              error={!!trainingReqErrors.program_title}
-              helperText={trainingReqErrors.program_title || ""}
-            />
-            <TextField
-              label="Provider / Institution"
-              fullWidth
-              value={trainingForm.provider || ""}
-              onChange={(e) => setTrainingForm((p) => ({ ...p, provider: e.target.value }))}
-              error={!!trainingReqErrors.provider}
-              helperText={trainingReqErrors.provider || ""}
-            />
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Stack spacing={2}>
               <TextField
-                label="Start Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
+                label="Program / Training Title"
                 fullWidth
-                value={trainingForm.start_month || ""}
-                onChange={(e) => setTrainingForm((p) => ({ ...p, start_month: e.target.value }))}
-                error={!!trainingReqErrors.start_month}
-                helperText={trainingReqErrors.start_month || ""}
+                value={trainingForm.program_title || ""}
+                onChange={(e) => setTrainingForm((p) => ({ ...p, program_title: e.target.value }))}
+                error={!!trainingReqErrors.program_title}
+                helperText={trainingReqErrors.program_title || ""}
               />
               <TextField
-                label="End Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
-                disabled={!!trainingForm.currently_ongoing}
+                label="Provider / Institution"
                 fullWidth
-                value={trainingForm.end_month || ""}
-                onChange={(e) => setTrainingForm((p) => ({ ...p, end_month: e.target.value }))}
-                error={!!trainingReqErrors.end_month}
-                helperText={trainingReqErrors.end_month || ""}
+                value={trainingForm.provider || ""}
+                onChange={(e) => setTrainingForm((p) => ({ ...p, provider: e.target.value }))}
+                error={!!trainingReqErrors.provider}
+                helperText={trainingReqErrors.provider || ""}
               />
-            </Box>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <DatePicker
+                  label="Start Month"
+                  views={['year', 'month']}
+                  value={trainingForm.start_month ? dayjs(trainingForm.start_month) : null}
+                  onChange={(date) => setTrainingForm((p) => ({
+                    ...p,
+                    start_month: date ? date.format('YYYY-MM') : ''
+                  }))}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!trainingReqErrors.start_month,
+                      helperText: trainingReqErrors.start_month || ''
+                    }
+                  }}
+                />
+                <DatePicker
+                  label="End Month"
+                  views={['year', 'month']}
+                  disabled={!!trainingForm.currently_ongoing}
+                  value={trainingForm.end_month ? dayjs(trainingForm.end_month) : null}
+                  onChange={(date) => setTrainingForm((p) => ({
+                    ...p,
+                    end_month: date ? date.format('YYYY-MM') : ''
+                  }))}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!trainingReqErrors.end_month,
+                      helperText: trainingReqErrors.end_month || ''
+                    }
+                  }}
+                />
+              </Box>
             <FormControlLabel
               control={
                 <Checkbox
@@ -5663,7 +5678,8 @@ export default function ProfilePage() {
                 </Stack>
               )}
             </Box>
-          </Stack>
+            </Stack>
+          </LocalizationProvider>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setTrainingOpen(false)} disabled={savingTraining}>Cancel</Button>
@@ -5677,48 +5693,59 @@ export default function ProfilePage() {
       <Dialog open={certOpen} onClose={() => setCertOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editCertId ? "Edit Certification" : "Add Certification"}</DialogTitle>
         <DialogContent dividers>
-          <Stack spacing={2}>
-            <TextField
-              label="Certification Name"
-              fullWidth
-              value={certForm.certification_name || ""}
-              onChange={(e) => setCertForm((p) => ({ ...p, certification_name: e.target.value }))}
-              error={!!certReqErrors.certification_name}
-              helperText={certReqErrors.certification_name || ""}
-            />
-            <TextField
-              label="Issuing Organization"
-              fullWidth
-              value={certForm.issuing_organization || ""}
-              onChange={(e) => setCertForm((p) => ({ ...p, issuing_organization: e.target.value }))}
-              error={!!certReqErrors.issuing_organization}
-              helperText={certReqErrors.issuing_organization || ""}
-            />
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Stack spacing={2}>
               <TextField
-                label="Issue Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
+                label="Certification Name"
                 fullWidth
-                value={certForm.issue_month || ""}
-                onChange={(e) => setCertForm((p) => ({ ...p, issue_month: e.target.value }))}
-                error={!!certReqErrors.issue_month}
-                helperText={certReqErrors.issue_month || ""}
+                value={certForm.certification_name || ""}
+                onChange={(e) => setCertForm((p) => ({ ...p, certification_name: e.target.value }))}
+                error={!!certReqErrors.certification_name}
+                helperText={certReqErrors.certification_name || ""}
               />
               <TextField
-                label="Expiration Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
-                disabled={!!certForm.no_expiration}
+                label="Issuing Organization"
                 fullWidth
-                value={certForm.expiration_month || ""}
-                onChange={(e) => setCertForm((p) => ({ ...p, expiration_month: e.target.value }))}
-                error={!!certReqErrors.expiration_month}
-                helperText={certReqErrors.expiration_month || ""}
+                value={certForm.issuing_organization || ""}
+                onChange={(e) => setCertForm((p) => ({ ...p, issuing_organization: e.target.value }))}
+                error={!!certReqErrors.issuing_organization}
+                helperText={certReqErrors.issuing_organization || ""}
               />
-            </Box>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <DatePicker
+                  label="Issue Month"
+                  views={['year', 'month']}
+                  value={certForm.issue_month ? dayjs(certForm.issue_month) : null}
+                  onChange={(date) => setCertForm((p) => ({
+                    ...p,
+                    issue_month: date ? date.format('YYYY-MM') : ''
+                  }))}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!certReqErrors.issue_month,
+                      helperText: certReqErrors.issue_month || ''
+                    }
+                  }}
+                />
+                <DatePicker
+                  label="Expiration Month"
+                  views={['year', 'month']}
+                  disabled={!!certForm.no_expiration}
+                  value={certForm.expiration_month ? dayjs(certForm.expiration_month) : null}
+                  onChange={(date) => setCertForm((p) => ({
+                    ...p,
+                    expiration_month: date ? date.format('YYYY-MM') : ''
+                  }))}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!certReqErrors.expiration_month,
+                      helperText: certReqErrors.expiration_month || ''
+                    }
+                  }}
+                />
+              </Box>
             <FormControlLabel
               control={
                 <Checkbox
@@ -5790,7 +5817,8 @@ export default function ProfilePage() {
                 }}
               />
             </Button>
-          </Stack>
+            </Stack>
+          </LocalizationProvider>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCertOpen(false)} disabled={savingCert}>Cancel</Button>
@@ -5804,56 +5832,67 @@ export default function ProfilePage() {
       <Dialog open={memberOpen} onClose={() => setMemberOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editMemberId ? "Edit Membership" : "Add Membership"}</DialogTitle>
         <DialogContent dividers>
-          <Stack spacing={2}>
-            <TextField
-              label="Organization / Community Name"
-              fullWidth
-              value={memberForm.organization_name || ""}
-              onChange={(e) => setMemberForm((p) => ({ ...p, organization_name: e.target.value }))}
-              error={!!memberReqErrors.organization_name}
-              helperText={memberReqErrors.organization_name || ""}
-            />
-
-            <TextField
-              select
-              label="Role / Type"
-              fullWidth
-              value={memberForm.role_type || "Member"}
-              onChange={(e) => setMemberForm((p) => ({ ...p, role_type: e.target.value }))}
-              error={!!memberReqErrors.role_type}
-              helperText={memberReqErrors.role_type || ""}
-            >
-              <MenuItem value="Member">Member</MenuItem>
-              <MenuItem value="Admin">Admin</MenuItem>
-              <MenuItem value="Volunteer">Volunteer</MenuItem>
-              <MenuItem value="Fellow">Fellow</MenuItem>
-            </TextField>
-
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Stack spacing={2}>
               <TextField
-                label="Start Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
+                label="Organization / Community Name"
                 fullWidth
-                value={memberForm.start_month || ""}
-                onChange={(e) => setMemberForm((p) => ({ ...p, start_month: e.target.value }))}
-                error={!!memberReqErrors.start_month}
-                helperText={memberReqErrors.start_month || ""}
+                value={memberForm.organization_name || ""}
+                onChange={(e) => setMemberForm((p) => ({ ...p, organization_name: e.target.value }))}
+                error={!!memberReqErrors.organization_name}
+                helperText={memberReqErrors.organization_name || ""}
               />
+
               <TextField
-                label="End Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
-                disabled={!!memberForm.ongoing}
+                select
+                label="Role / Type"
                 fullWidth
-                value={memberForm.end_month || ""}
-                onChange={(e) => setMemberForm((p) => ({ ...p, end_month: e.target.value }))}
-                error={!!memberReqErrors.end_month}
-                helperText={memberReqErrors.end_month || ""}
-              />
-            </Box>
+                value={memberForm.role_type || "Member"}
+                onChange={(e) => setMemberForm((p) => ({ ...p, role_type: e.target.value }))}
+                error={!!memberReqErrors.role_type}
+                helperText={memberReqErrors.role_type || ""}
+              >
+                <MenuItem value="Member">Member</MenuItem>
+                <MenuItem value="Admin">Admin</MenuItem>
+                <MenuItem value="Volunteer">Volunteer</MenuItem>
+                <MenuItem value="Fellow">Fellow</MenuItem>
+              </TextField>
+
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                <DatePicker
+                  label="Start Month"
+                  views={['year', 'month']}
+                  value={memberForm.start_month ? dayjs(memberForm.start_month) : null}
+                  onChange={(date) => setMemberForm((p) => ({
+                    ...p,
+                    start_month: date ? date.format('YYYY-MM') : ''
+                  }))}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!memberReqErrors.start_month,
+                      helperText: memberReqErrors.start_month || ''
+                    }
+                  }}
+                />
+                <DatePicker
+                  label="End Month"
+                  views={['year', 'month']}
+                  disabled={!!memberForm.ongoing}
+                  value={memberForm.end_month ? dayjs(memberForm.end_month) : null}
+                  onChange={(date) => setMemberForm((p) => ({
+                    ...p,
+                    end_month: date ? date.format('YYYY-MM') : ''
+                  }))}
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!memberReqErrors.end_month,
+                      helperText: memberReqErrors.end_month || ''
+                    }
+                  }}
+                />
+              </Box>
 
             <FormControlLabel
               control={
@@ -5952,7 +5991,8 @@ export default function ProfilePage() {
                 </Stack>
               )}
             </Box>
-          </Stack>
+            </Stack>
+          </LocalizationProvider>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMemberOpen(false)} disabled={savingMember}>Cancel</Button>
