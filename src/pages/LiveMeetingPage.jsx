@@ -84,6 +84,7 @@ import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
@@ -137,6 +138,7 @@ import { getBrowserTimezone } from "../utils/timezoneUtils.js";
 import GuestBanner from "../components/GuestBanner.jsx";
 import GuestRegistrationModal from "../components/GuestRegistrationModal.jsx";
 import GuestRestrictionOverlay from "../components/GuestRestrictionOverlay.jsx";
+import GuestNetworkingModal from "../components/GuestNetworkingModal.jsx";
 import {
   VIRTUAL_BG_FEATURE_ENABLED,
   VIRTUAL_BG_PRESETS,
@@ -2470,6 +2472,7 @@ export default function NewLiveMeeting() {
   const [sessionStartNotification, setSessionStartNotification] = useState(null); // {sessionId, durationMinutes, timestamp}
   const [showNetworkingPrompt, setShowNetworkingPrompt] = useState(false); // Show/hide modal
   const [networkingSessionId, setNetworkingSessionId] = useState(null); // Current session ID
+  const [showGuestNetworkingModal, setShowGuestNetworkingModal] = useState(false); // Guest networking restriction modal
 
   const [lastMessage, setLastMessage] = useState(null);
   const [isPostEventLounge, setIsPostEventLounge] = useState(false); // ✅ Track post-event lounge mode
@@ -7057,7 +7060,11 @@ export default function NewLiveMeeting() {
             durationMinutes: msg.data.duration_minutes,
             timestamp: Date.now()
           });
-          if (!isGuest) setShowNetworkingPrompt(true);
+          if (isGuest) {
+            setShowGuestNetworkingModal(true);
+          } else {
+            setShowNetworkingPrompt(true);
+          }
 
           // ✅ Auto-pause recording when Speed Networking starts (host only, privacy protection)
           if (isHostRef.current && isRecordingRef.current && !isRecordingPausedRef.current) {
@@ -7094,6 +7101,7 @@ export default function NewLiveMeeting() {
 
           // Always execute state cleanup when message arrives
           setShowNetworkingPrompt(false);
+          setShowGuestNetworkingModal(false);
           setNetworkingSessionId(null);
           setShowSpeedNetworking(false);
           setLoungeOpen(false);
@@ -16660,23 +16668,56 @@ export default function NewLiveMeeting() {
         </Tooltip>
       )}
 
-      {/* Speed Networking Icon (New) */}
-      {!isGuest && <Tooltip title="Networking" placement="left" arrow>
-        <IconButton
-          onClick={() => setShowSpeedNetworking(true)}
-          sx={{
-            width: 44,
-            height: 44,
-            bgcolor: showSpeedNetworking ? "rgba(20,184,177,0.15)" : "transparent",
-            color: showSpeedNetworking ? "#14b8b1" : "rgba(255,255,255,0.55)",
-            border: showSpeedNetworking ? "1px solid rgba(20,184,177,0.3)" : "1px solid transparent",
-            "&:hover": { bgcolor: "rgba(20,184,177,0.08)", color: "#fff" },
-            transition: "all 0.2s",
-          }}
-        >
-          <Diversity3Icon />
-        </IconButton>
-      </Tooltip>}
+      {/* Speed Networking Icon — visible but locked for guests during active session */}
+      {isGuest ? (
+        networkingSessionId && (
+          <Tooltip title="Networking (Registered users only)" placement="left" arrow>
+            <span>
+              <IconButton
+                onClick={() => setShowGuestNetworkingModal(true)}
+                sx={{
+                  width: 44,
+                  height: 44,
+                  bgcolor: "transparent",
+                  color: "rgba(255,255,255,0.30)",
+                  border: "1px dashed rgba(255,255,255,0.15)",
+                  "&:hover": { bgcolor: "rgba(20,184,177,0.06)", color: "rgba(255,255,255,0.55)" },
+                  transition: "all 0.2s",
+                  position: "relative",
+                }}
+              >
+                <Diversity3Icon />
+                <LockOutlinedIcon
+                  sx={{
+                    fontSize: 12,
+                    position: "absolute",
+                    bottom: 6,
+                    right: 6,
+                    color: "#14b8a6",
+                  }}
+                />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )
+      ) : (
+        <Tooltip title="Networking" placement="left" arrow>
+          <IconButton
+            onClick={() => setShowSpeedNetworking(true)}
+            sx={{
+              width: 44,
+              height: 44,
+              bgcolor: showSpeedNetworking ? "rgba(20,184,177,0.15)" : "transparent",
+              color: showSpeedNetworking ? "#14b8b1" : "rgba(255,255,255,0.55)",
+              border: showSpeedNetworking ? "1px solid rgba(20,184,177,0.3)" : "1px solid transparent",
+              "&:hover": { bgcolor: "rgba(20,184,177,0.08)", color: "#fff" },
+              transition: "all 0.2s",
+            }}
+          >
+            <Diversity3Icon />
+          </IconButton>
+        </Tooltip>
+      )}
     </Box>
   );
 
@@ -17286,6 +17327,16 @@ export default function NewLiveMeeting() {
         <GuestRegistrationModal
           open={guestRegModalOpen}
           onClose={() => setGuestRegModalOpen(false)}
+        />
+
+        {/* Guest Networking Restriction Modal */}
+        <GuestNetworkingModal
+          open={showGuestNetworkingModal}
+          onClose={() => setShowGuestNetworkingModal(false)}
+          onSignUp={() => {
+            setShowGuestNetworkingModal(false);
+            setGuestRegModalOpen(true);
+          }}
         />
 
         {/* Top Bar */}
