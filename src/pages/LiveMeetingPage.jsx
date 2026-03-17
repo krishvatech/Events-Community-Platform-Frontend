@@ -826,23 +826,25 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick, onT
           </Box>
         )}
 
-        {/* Avatar overlay (show always, matches your UI) */}
-        <Avatar
-          src={p.picture} // ✅ Use profile picture
-          sx={{
-            position: "absolute",
-            top: isSmall ? 6 : 8,
-            left: "50%",
-            transform: "translateX(-50%)",
-            bgcolor: "rgba(255,255,255,0.14)",
-            width: isSmall ? 30 : 34,
-            height: isSmall ? 30 : 34,
-            fontSize: isSmall ? 11 : 12,
-            zIndex: 1,
-          }}
-        >
-          {initialsFromName(p.name)}
-        </Avatar>
+        {/* Avatar overlay (hide when video is active) */}
+        {!showVideo && (
+          <Avatar
+            src={p.picture} // ✅ Use profile picture
+            sx={{
+              position: "absolute",
+              top: isSmall ? 6 : 8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              bgcolor: "rgba(255,255,255,0.14)",
+              width: isSmall ? 30 : 34,
+              height: isSmall ? 30 : 34,
+              fontSize: isSmall ? 11 : 12,
+              zIndex: 1,
+            }}
+          >
+            {initialsFromName(p.name)}
+          </Avatar>
+        )}
 
         <Typography
           noWrap
