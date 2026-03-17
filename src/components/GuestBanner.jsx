@@ -13,8 +13,8 @@ import CloseIcon from "@mui/icons-material/Close";
  * Persistent banner displayed at top of LiveMeetingPage when user is a guest.
  * Shows guest name and CTA to register and save connections.
  */
-export default function GuestBanner({ onRegister, onClose }) {
-  const guestName = localStorage.getItem("guest_name") || "Guest";
+export default function GuestBanner({ guestName, onRegister, onClose }) {
+  const displayName = guestName || localStorage.getItem("guest_name") || "Guest";
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
@@ -77,7 +77,7 @@ export default function GuestBanner({ onRegister, onClose }) {
             textOverflow: "ellipsis",
           }}
         >
-          You're attending as <strong>{guestName}</strong> (Guest)
+          You're attending as <strong>{displayName}</strong> (Guest)
         </Typography>
         <Typography
           variant="body2"

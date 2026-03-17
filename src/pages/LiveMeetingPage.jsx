@@ -2156,6 +2156,7 @@ export default function NewLiveMeeting() {
   const [guestRegModalOpen, setGuestRegModalOpen] = useState(false);
   const isGuest = localStorage.getItem("is_guest") === "true";
   const [guestBannerVisible, setGuestBannerVisible] = useState(isGuest);
+  const [currentGuestName, setCurrentGuestName] = useState(localStorage.getItem("guest_name") || "Guest");
 
   // ✅ Settings menu anchor
   const [permAnchorEl, setPermAnchorEl] = useState(null);
@@ -2204,6 +2205,17 @@ export default function NewLiveMeeting() {
   const [participantMenuTarget, setParticipantMenuTarget] = useState(null);
   const [bannedDialogOpen, setBannedDialogOpen] = useState(false);
   const [isBanned, setIsBanned] = useState(false);
+
+  // Guest Profile Edit Dialog
+  const [guestProfileEditOpen, setGuestProfileEditOpen] = useState(false);
+  const [guestProfileForm, setGuestProfileForm] = useState({
+    first_name: "",
+    last_name: "",
+    company: "",
+    job_title: "",
+    email: "",
+  });
+  const [guestProfileLoading, setGuestProfileLoading] = useState(false);
 
   // Custom Confirmation State
   const [kickConfirmOpen, setKickConfirmOpen] = useState(false);
@@ -4788,6 +4800,156 @@ export default function NewLiveMeeting() {
   const handleCloseParticipantMenu = () => {
     setParticipantMenuAnchor(null);
     setParticipantMenuTarget(null);
+  };
+
+  // ✅ NEW: Guest Profile Edit Handler
+  const handleOpenGuestProfileEdit = async () => {
+    if (!isSelfMember(dyteMeeting?.self)) return;
+
+    setGuestProfileLoading(true);
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+      const token = localStorage.getItem("access_token");
+
+      const response = await fetch(`${API_BASE}/events/${eventId}/guest-profile/`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to fetch profile");
+      }
+
+      const result = await response.json();
+      const guest = result.guest;
+
+      // Populate form with fetched data
+      setGuestProfileForm({
+        first_name: guest.first_name || "",
+        last_name: guest.last_name || "",
+        company: guest.company || "",
+        job_title: guest.job_title || "",
+        email: guest.email || "",
+      });
+
+      setGuestProfileEditOpen(true);
+    } catch (error) {
+      console.error("[GuestProfileFetch] Error:", error);
+      showSnackbar(error.message || "Failed to fetch profile", "error");
+    } finally {
+      setGuestProfileLoading(false);
+    }
+  };
+
+  const handleCloseGuestProfileEdit = () => {
+    setGuestProfileEditOpen(false);
+    setGuestProfileForm({
+      first_name: "",
+      last_name: "",
+      company: "",
+      job_title: "",
+      email: "",
+    });
+  };
+
+  const handleGuestProfileFormChange = (field, value) => {
+    setGuestProfileForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSaveGuestProfile = async () => {
+    // Validate required fields
+    if (!guestProfileForm.first_name.trim()) {
+      showSnackbar("First name is required", "error");
+      return;
+    }
+    if (!guestProfileForm.last_name.trim()) {
+      showSnackbar("Last name is required", "error");
+      return;
+    }
+    if (!guestProfileForm.email.trim()) {
+      showSnackbar("Email is required", "error");
+      return;
+    }
+
+    setGuestProfileLoading(true);
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+      const token = localStorage.getItem("access_token");
+
+      const response = await fetch(`${API_BASE}/events/${eventId}/guest-profile/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          first_name: guestProfileForm.first_name.trim(),
+          last_name: guestProfileForm.last_name.trim(),
+          email: guestProfileForm.email.trim(),
+          company: guestProfileForm.company.trim(),
+          job_title: guestProfileForm.job_title.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update profile");
+      }
+
+      const result = await response.json();
+
+      // Update Dyte participant data
+      if (dyteMeeting?.self) {
+        dyteMeeting.self.name = result.guest.name;
+        if (dyteMeeting.self._raw) {
+          dyteMeeting.self._raw.guest_first_name = result.guest.first_name;
+          dyteMeeting.self._raw.guest_last_name = result.guest.last_name;
+          dyteMeeting.self._raw.guest_company = result.guest.company;
+          dyteMeeting.self._raw.guest_job_title = result.guest.job_title;
+          dyteMeeting.self._raw.guest_email = result.guest.email;
+        }
+      }
+
+      // ✅ Update localStorage and state so the banner updates
+      localStorage.setItem("guest_name", result.guest.name);
+      setCurrentGuestName(result.guest.name);
+
+      // ✅ Broadcast profile update to all participants so host sees the change
+      try {
+        const broadcastPayload = {
+          type: "guest_profile_updated",
+          guest_id: result.guest.id,
+          participant_id: dyteMeeting?.self?.id,
+          name: result.guest.name,
+          first_name: result.guest.first_name,
+          last_name: result.guest.last_name,
+          email: result.guest.email,
+          company: result.guest.company,
+          job_title: result.guest.job_title,
+          timestamp: Date.now(),
+        };
+        dyteMeeting?.participants?.broadcastMessage?.("guest_profile_updated", broadcastPayload);
+      } catch (e) {
+        console.warn("[GuestProfileUpdate] Failed to broadcast update:", e);
+      }
+
+      showSnackbar("Profile updated successfully!", "success");
+      handleCloseGuestProfileEdit();
+
+      // Trigger re-render of participants list
+      setParticipantsTick(v => v + 1);
+    } catch (error) {
+      console.error("[GuestProfileUpdate] Error:", error);
+      showSnackbar(error.message || "Failed to update profile", "error");
+    } finally {
+      setGuestProfileLoading(false);
+    }
   };
 
   const handleSpotlightParticipant = () => {
@@ -10160,6 +10322,30 @@ export default function NewLiveMeeting() {
 
       if (type === "mood-updated" && payload?.userKey) {
         setMoodMap((prev) => ({ ...prev, [payload.userKey]: payload?.mood || null }));
+      }
+
+      // ✅ Handle guest profile update broadcast
+      if (type === "guest_profile_updated" && payload?.participant_id) {
+        // Find the participant and update their name
+        const participant = getJoinedParticipants()?.find(
+          (p) => p.id === payload.participant_id || getParticipantUserKey(p) === payload.participant_id
+        );
+
+        if (participant) {
+          // Update the participant name in Dyte
+          participant.name = payload.name;
+          if (participant._raw) {
+            participant._raw.guest_first_name = payload.first_name;
+            participant._raw.guest_last_name = payload.last_name;
+            participant._raw.guest_company = payload.company;
+            participant._raw.guest_job_title = payload.job_title;
+            participant._raw.guest_email = payload.email;
+          }
+
+          // Trigger re-render of participants list
+          setParticipantsTick((v) => v + 1);
+          console.log("[GuestProfileUpdate] Participant name updated:", payload.name);
+        }
       }
     };
 
@@ -16329,19 +16515,43 @@ export default function NewLiveMeeting() {
                               primary={
                                 <Stack spacing={1}>
                                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                                    <Tooltip title="View Profile" disableHoverListener={isSelfMember(m)}>
+                                    <Tooltip title={isSelfMember(m) ? "Edit your profile" : "View Profile"} disableHoverListener={false}>
                                       <span>
                                         <Typography
                                           noWrap
-                                          sx={{ fontWeight: 700, fontSize: 13, cursor: (isSelfMember(m) || m.isVirtual) ? "default" : "pointer" }}
+                                          sx={{ fontWeight: 700, fontSize: 13, cursor: (isSelfMember(m) || m.isVirtual) ? "pointer" : "pointer" }}
                                           onClick={() => {
-                                            if (!isSelfMember(m) && !m.isVirtual) openMemberInfo(m);
+                                            if (isSelfMember(m) && !m.isVirtual) {
+                                              handleOpenGuestProfileEdit();
+                                            } else if (!isSelfMember(m) && !m.isVirtual) {
+                                              openMemberInfo(m);
+                                            }
                                           }}
                                         >
                                           {m.name}{isSelfMember(m) ? " (You)" : ""}
                                         </Typography>
                                       </span>
                                     </Tooltip>
+                                    {isSelfMember(m) && !m.isVirtual && (
+                                      <Tooltip title="Edit profile">
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenGuestProfileEdit();
+                                          }}
+                                          sx={{
+                                            color: "rgba(255,255,255,0.7)",
+                                            padding: "2px",
+                                            "&:hover": {
+                                              color: "rgba(255,255,255,0.95)"
+                                            }
+                                          }}
+                                        >
+                                          <EditRoundedIcon fontSize="small" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    )}
                                     {(() => {
                                       const userId = m._raw?.customParticipantId || m.id;
                                       if (userId && !participantKycCache[userId]) {
@@ -17320,6 +17530,7 @@ export default function NewLiveMeeting() {
         {/* Guest Banner - shown for guest attendees */}
         {isGuest && guestBannerVisible && (
           <GuestBanner
+            guestName={currentGuestName}
             onRegister={() => setGuestRegModalOpen(true)}
             onClose={() => setGuestBannerVisible(false)}
           />
@@ -19556,6 +19767,123 @@ export default function NewLiveMeeting() {
             </Button>
             <Button onClick={executeBan} variant="contained" color="error">
               Ban User
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ✅ NEW: Guest Profile Edit Dialog */}
+        <Dialog
+          open={guestProfileEditOpen}
+          onClose={handleCloseGuestProfileEdit}
+          PaperProps={MODAL_PAPER_PROPS}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Edit Your Profile</DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <Stack spacing={2}>
+              <TextField
+                fullWidth
+                label="First Name"
+                value={guestProfileForm.first_name}
+                onChange={(e) => handleGuestProfileFormChange("first_name", e.target.value)}
+                disabled={guestProfileLoading}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "rgba(255,255,255,0.95)",
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.5)" },
+                    "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                  },
+                  "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.5)", opacity: 1 },
+                  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.7)" },
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Last Name"
+                value={guestProfileForm.last_name}
+                onChange={(e) => handleGuestProfileFormChange("last_name", e.target.value)}
+                disabled={guestProfileLoading}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "rgba(255,255,255,0.95)",
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.5)" },
+                    "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                  },
+                  "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.5)", opacity: 1 },
+                  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.7)" },
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Email"
+                type="email"
+                value={guestProfileForm.email}
+                onChange={(e) => handleGuestProfileFormChange("email", e.target.value)}
+                disabled={guestProfileLoading}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "rgba(255,255,255,0.95)",
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.5)" },
+                    "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                  },
+                  "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.5)", opacity: 1 },
+                  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.7)" },
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Company"
+                value={guestProfileForm.company}
+                onChange={(e) => handleGuestProfileFormChange("company", e.target.value)}
+                disabled={guestProfileLoading}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "rgba(255,255,255,0.95)",
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.5)" },
+                    "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                  },
+                  "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.5)", opacity: 1 },
+                  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.7)" },
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Job Title"
+                value={guestProfileForm.job_title}
+                onChange={(e) => handleGuestProfileFormChange("job_title", e.target.value)}
+                disabled={guestProfileLoading}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "rgba(255,255,255,0.95)",
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.5)" },
+                    "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                  },
+                  "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.5)", opacity: 1 },
+                  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.7)" },
+                }}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button
+              onClick={handleCloseGuestProfileEdit}
+              sx={{ color: "rgba(255,255,255,0.7)" }}
+              disabled={guestProfileLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveGuestProfile}
+              variant="contained"
+              disabled={guestProfileLoading}
+            >
+              {guestProfileLoading ? "Saving..." : "Save"}
             </Button>
           </DialogActions>
         </Dialog>
