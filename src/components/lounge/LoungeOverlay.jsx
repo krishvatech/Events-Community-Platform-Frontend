@@ -46,6 +46,8 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const [isRemoving, setIsRemoving] = useState(false);
     const [countdownSeconds, setCountdownSeconds] = useState(10);
     const socketRef = useRef(null);
+    const leftBreakoutAtRef = useRef(null); // ✅ Track when user leaves breakout to suppress waiting message
+    const userIntentionallyOpenedLoungeRef = useRef(false); // ✅ Track if user intentionally opened lounge
 
     useEffect(() => {
         const token = getToken();
@@ -159,6 +161,20 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             return () => clearInterval(interval);
         }
     }, [open, fetchLoungeState]);
+
+    // ✅ CLEAR STALE WAITING STATE: Reset isWaitingForAssignment when overlay opens
+    // This prevents showing "Waiting for room assignment" after user leaves breakout room
+    useEffect(() => {
+        if (open) {
+            console.log("[Lounge] Overlay opened - user intentionally joined lounge, suppressing waiting message");
+            setIsWaitingForAssignment(false);
+            leftBreakoutAtRef.current = null; // Reset grace period on new open
+            userIntentionallyOpenedLoungeRef.current = true; // Mark that user intentionally opened lounge
+        } else {
+            // When overlay closes, reset the intent flag
+            userIntentionallyOpenedLoungeRef.current = false;
+        }
+    }, [open]);
 
     // ✅ NEW: Handle lounge closure - when status changes from OPEN to CLOSED
     useEffect(() => {
@@ -315,6 +331,24 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         msg.notification
                     ]);
                 } else if (msg.type === "waiting_for_breakout_assignment") {
+                    // ✅ INTENT-BASED SUPPRESSION: Don't show waiting message if user intentionally opened lounge
+                    // User explicitly chose to join the lounge instead of waiting for assignment
+                    if (userIntentionallyOpenedLoungeRef.current) {
+                        console.log(`[Lounge] 🚫 Suppressing waiting_for_breakout_assignment - user intentionally in lounge`);
+                        return; // Don't show waiting message, user is actively browsing lounge
+                    }
+
+                    // ✅ GRACE PERIOD: Also don't show if user just left a breakout room
+                    const timeSinceLeftBreakout = leftBreakoutAtRef.current
+                        ? Date.now() - leftBreakoutAtRef.current
+                        : Infinity;
+                    const GRACE_PERIOD_MS = 10000; // 10 second grace period after leaving breakout
+
+                    if (timeSinceLeftBreakout < GRACE_PERIOD_MS) {
+                        console.log(`[Lounge] ⏳ Ignoring waiting_for_breakout_assignment (${Math.round(timeSinceLeftBreakout)}ms since leaving breakout, grace period: ${GRACE_PERIOD_MS}ms)`);
+                        return; // Skip this message, don't show waiting state
+                    }
+
                     // Participant receives message that they are waiting for assignment
                     console.log("[Lounge] Participant is waiting for breakout assignment");
                     setIsWaitingForAssignment(true);
@@ -427,6 +461,13 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const handleLeaveTable = async (dyteMeeting) => {
         console.log("[Lounge] Starting leave table process...");
 
+        // ✅ CLEAR WAITING STATE: User is no longer waiting for assignment
+        setIsWaitingForAssignment(false);
+        // ✅ RECORD LEAVE TIME: Mark when user leaves breakout to suppress waiting message for grace period
+        leftBreakoutAtRef.current = Date.now();
+        // ✅ MAINTAIN INTENT: User is still intentionally in the lounge, browsing tables
+        userIntentionallyOpenedLoungeRef.current = true;
+
         // 1. (Removed explicit leaveRoom to avoid exiting the main meeting too)
         // The token switch in LiveMeetingPage will automatically handle the room switch.
         // 1.5 Ensure backend table state is cleared even if WS action is missed.
@@ -497,6 +538,8 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     const tableName = table?.name || `Room ${tableId}`;
                     const logoUrl = table?.icon_url || ""; // ✅ Get table logo URL
                     console.log("[Lounge] Joining breakout meeting with token");
+                    // ✅ CLEAR WAITING STATE: User is no longer waiting for assignment
+                    setIsWaitingForAssignment(false);
                     onEnterBreakout(data.token, tableId, tableName, logoUrl); // ✅ Pass logo URL
                     onClose(); // Auto-close overlay after joining
                 }
