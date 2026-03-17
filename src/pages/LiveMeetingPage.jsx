@@ -14522,6 +14522,14 @@ export default function NewLiveMeeting() {
           size="small"
           onClick={(e) => {
             e.stopPropagation();
+            if (isGuest) {
+              showSnackbar(
+                "In order to benefit from chatting with other participants, please register on our website.",
+                "info",
+                { onClick: () => setGuestRegModalOpen(true) }
+              );
+              return;
+            }
             setMoodAnchorEl(e.currentTarget);
           }}
           sx={{ p: 0.1 }}
@@ -14539,6 +14547,14 @@ export default function NewLiveMeeting() {
         variant="outlined"
         onClick={(e) => {
           e.stopPropagation();
+          if (isGuest) {
+            showSnackbar(
+              "In order to benefit from chatting with other participants, please register on our website.",
+              "info",
+              { onClick: () => setGuestRegModalOpen(true) }
+            );
+            return;
+          }
           setMoodAnchorEl(e.currentTarget);
         }}
         sx={{
