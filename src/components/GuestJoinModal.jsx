@@ -31,6 +31,7 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
     last_name: "",
     email: "",
     job_title: "",
+    company_name: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -78,6 +79,7 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
           last_name: parsed.last_name || "",
           email: parsed.email || "",
           job_title: parsed.job_title || "",
+          company_name: parsed.company_name || "",
         });
         setIsReturningGuest(true);
       } else {
@@ -130,6 +132,7 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
           last_name: form.last_name.trim(),
           email: form.email.trim().toLowerCase(),
           job_title: form.job_title.trim(),
+          company_name: form.company_name.trim(),
         }),
       });
 
@@ -167,6 +170,7 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
         last_name: form.last_name.trim(),
         email: form.email.trim().toLowerCase(),
         job_title: form.job_title.trim(),
+        company_name: form.company_name.trim(),
       };
       localStorage.setItem("guest_session_cache", JSON.stringify(cacheData));
       console.debug("[GuestJoinModal] Saved guest_session_cache:", cacheData);
@@ -186,7 +190,7 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
 
   const handleClearGuestSession = () => {
     localStorage.removeItem("guest_session_cache");
-    setForm({ first_name: "", last_name: "", email: "", job_title: "" });
+    setForm({ first_name: "", last_name: "", email: "", job_title: "", company_name: "" });
     setIsReturningGuest(false);
     setError("");
   };
@@ -269,6 +273,16 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
             placeholder="e.g., Software Engineer"
             value={form.job_title}
             onChange={handleInputChange("job_title")}
+            disabled={loading}
+          />
+
+          <TextField
+            label="Company Name"
+            fullWidth
+            size="small"
+            placeholder="e.g., Acme Corporation"
+            value={form.company_name}
+            onChange={handleInputChange("company_name")}
             disabled={loading}
           />
 
