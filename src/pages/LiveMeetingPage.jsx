@@ -15070,27 +15070,33 @@ export default function NewLiveMeeting() {
             {/* CHAT */}
             {hostPerms.chat && (
               <TabPanel value={tab} index={0}>
-                <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
-                  {/* {isRoomChatActive && (
-                    <Typography sx={{ fontSize: 12, opacity: 0.7, mb: 1 }}>
-                      Room chat is limited to people seated in {activeRoomLabel || "this room"}.
-                    </Typography>
-                  )} */}
-                  {chatError && (
-                    <Typography color="error" sx={{ mb: 1 }}>
-                      {chatError}
-                    </Typography>
-                  )}
+                <GuestRestrictionOverlay
+                  visible={isGuest}
+                  message="In order to benefit from chatting with other participants, please register on our website."
+                  onSignUp={() => setGuestRegModalOpen(true)}
+                >
+                  <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                    <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+                      {/* {isRoomChatActive && (
+                        <Typography sx={{ fontSize: 12, opacity: 0.7, mb: 1 }}>
+                          Room chat is limited to people seated in {activeRoomLabel || "this room"}.
+                        </Typography>
+                      )} */}
+                      {chatError && (
+                        <Typography color="error" sx={{ mb: 1 }}>
+                          {chatError}
+                        </Typography>
+                      )}
 
-                  {chatLoading ? (
-                    <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                      <CircularProgress size={22} />
-                    </Box>
-                  ) : chatMessages.length === 0 ? (
-                    <Typography sx={{ opacity: 0.75 }}>No messages yet. Start the conversation!</Typography>
-                  ) : (
-                    <Stack spacing={1.25}>
-                      {chatMessages.map((m) => (
+                      {chatLoading ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                          <CircularProgress size={22} />
+                        </Box>
+                      ) : chatMessages.length === 0 ? (
+                        <Typography sx={{ opacity: 0.75 }}>No messages yet. Start the conversation!</Typography>
+                      ) : (
+                        <Stack spacing={1.25}>
+                          {chatMessages.map((m) => (
                         <Paper
                           key={m.id}
                           variant="outlined"
@@ -15277,70 +15283,61 @@ export default function NewLiveMeeting() {
                     </Stack>
                   )}
 
-                  <Box ref={chatBottomRef} />
-                </Box>
+                      <Box ref={chatBottomRef} />
+                    </Box>
 
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+                    <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
 
-                <Box sx={{ p: 2 }}>
-                  {isGuest ? (
-                    <GuestRestrictionOverlay
-                      visible={true}
-                      message="In order to benefit from chatting with other participants, please register on our website."
-                      onSignUp={() => setGuestRegModalOpen(true)}
-                    >
-                      <Box sx={{ display: "flex", gap: 1, p: 2 }}>
-                        <Box sx={{ flex: 1, height: 44, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 2, border: "1px solid rgba(255,255,255,0.08)" }} />
-                        <Box sx={{ width: 44, height: 44, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 2, border: "1px solid rgba(255,255,255,0.08)" }} />
-                      </Box>
-                    </GuestRestrictionOverlay>
-                  ) : isBreakout && !isRoomChatActive && !preEventLoungeOpen ? (
-                    <Alert severity="warning" sx={{ mb: 2 }}>
-                      Public chat is disabled while you are in a breakout room. Return to the main room to participate.
-                    </Alert>
-                  ) : (
-                    <TextField
-                      fullWidth
-                      placeholder={
-                        isRoomChatActive
-                          ? "Type to room..."
-                          : preEventLoungeOpen && isBreakout
-                            ? "Connecting to lounge chat..."
-                            : "Type a message..."
-                      }
-                      size="small"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          sendChatMessage();
-                        }
-                      }}
-                      disabled={preEventLoungeOpen && isBreakout && !isRoomChatActive}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              size="small"
-                              aria-label="Send message"
-                              onClick={sendChatMessage}
-                              disabled={chatSending || !chatInput.trim() || (preEventLoungeOpen && isBreakout && !isRoomChatActive)}
-                            >
-                              {chatSending ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          bgcolor: "rgba(255,255,255,0.03)",
-                          borderRadius: 2,
-                        },
-                      }}
-                    />
-                  )}
-                </Box>
+                    <Box sx={{ p: 2 }}>
+                      {isBreakout && !isRoomChatActive && !preEventLoungeOpen ? (
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                          Public chat is disabled while you are in a breakout room. Return to the main room to participate.
+                        </Alert>
+                      ) : (
+                        <TextField
+                          fullWidth
+                          placeholder={
+                            isRoomChatActive
+                              ? "Type to room..."
+                              : preEventLoungeOpen && isBreakout
+                                ? "Connecting to lounge chat..."
+                                : "Type a message..."
+                          }
+                          size="small"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              sendChatMessage();
+                            }
+                          }}
+                          disabled={preEventLoungeOpen && isBreakout && !isRoomChatActive}
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  size="small"
+                                  aria-label="Send message"
+                                  onClick={sendChatMessage}
+                                  disabled={chatSending || !chatInput.trim() || (preEventLoungeOpen && isBreakout && !isRoomChatActive)}
+                                >
+                                  {chatSending ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              bgcolor: "rgba(255,255,255,0.03)",
+                              borderRadius: 2,
+                            },
+                          }}
+                        />
+                      )}
+                    </Box>
+                  </Box>
+                </GuestRestrictionOverlay>
               </TabPanel>
             )}
 
