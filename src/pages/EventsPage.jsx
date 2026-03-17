@@ -437,7 +437,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     localStorage.getItem("access_token") ||
     localStorage.getItem("access_token") ||
     localStorage.getItem("access");
-  const isAuthenticated = Boolean(token);
+  const isGuest = localStorage.getItem("is_guest") === "true";
+  // Authenticated regular user (not guest) - guests can still rejoin
+  const isAuthenticatedUser = Boolean(token) && !isGuest;
   const isFreeEvent = Boolean(ev.is_free) || Number(ev.price) === 0;
 
   const handleRegisterCard = async () => {
@@ -926,7 +928,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               >
                 Register Now
               </Button>
-              {!isAuthenticated && isFreeEvent && (
+              {!isAuthenticatedUser && isFreeEvent && (
                 <Button
                   variant="outlined"
                   size="medium"
@@ -934,7 +936,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   onClick={() => onGuestJoinRequested(ev)}
                   className="normal-case rounded-full px-4"
                 >
-                  Join as Guest
+                  {isGuest ? "Continue as Guest" : "Join as Guest"}
                 </Button>
               )}
             </div>
@@ -999,7 +1001,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
     localStorage.getItem("access_token") ||
     localStorage.getItem("access_token") ||
     localStorage.getItem("access");
-  const isAuthenticated = Boolean(token);
+  const isGuest = localStorage.getItem("is_guest") === "true";
+  // Authenticated regular user (not guest) - guests can still rejoin
+  const isAuthenticatedUser = Boolean(token) && !isGuest;
   const isFreeEvent = Boolean(ev.is_free) || Number(ev.price) === 0;
 
   const handleRegisterRow = async () => {
@@ -1318,7 +1322,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     >
                       Register Now
                     </Button>
-                    {!isAuthenticated && isFreeEvent && (
+                    {!isAuthenticatedUser && isFreeEvent && (
                       <Button
                         variant="outlined"
                         size="medium"
@@ -1326,7 +1330,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                         onClick={() => onGuestJoinRequested(ev)}
                         className="normal-case rounded-full px-4"
                       >
-                        Join as Guest
+                        {isGuest ? "Continue as Guest" : "Join as Guest"}
                       </Button>
                     )}
                   </div>
@@ -1434,8 +1438,10 @@ export default function EventsPage() {
   const [guestJoinEvent, setGuestJoinEvent] = useState(null);
 
   const handleGuestJoinRequested = React.useCallback((eventData) => {
+    console.debug("[EventsPage] handleGuestJoinRequested called with event:", eventData);
     setGuestJoinEvent(eventData);
     setGuestModalOpen(true);
+    console.debug("[EventsPage] Modal state set - guestJoinEvent and guestModalOpen=true");
   }, []);
 
   const handleShowParticipants = React.useCallback(async (eventId, eventTitle) => {

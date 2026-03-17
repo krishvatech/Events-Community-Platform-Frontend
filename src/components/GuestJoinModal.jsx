@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -34,6 +34,61 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isReturningGuest, setIsReturningGuest] = useState(false);
+
+  // Detect and pre-fill form for returning guest on modal open
+  useEffect(() => {
+    console.debug("[GuestJoinModal useEffect] open=", open, "event.id=", event?.id, "event=", event);
+
+    if (!open) {
+      console.debug("[GuestJoinModal] Modal closed, skipping pre-fill");
+      return;
+    }
+
+    if (!event?.id) {
+      console.debug("[GuestJoinModal] No event ID, skipping pre-fill");
+      return;
+    }
+
+    console.debug("[GuestJoinModal] Checking for returning guest. event.id=", event.id, "event type:", typeof event.id);
+    const cached = localStorage.getItem("guest_session_cache");
+    console.debug("[GuestJoinModal] guest_session_cache exists?", !!cached);
+
+    if (!cached) {
+      console.debug("[GuestJoinModal] No cache found");
+      setIsReturningGuest(false);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(cached);
+      console.debug("[GuestJoinModal] Parsed cache:", parsed, "cached event_id type:", typeof parsed.event_id);
+      console.debug("[GuestJoinModal] Event ID comparison: ", {
+        cached: parsed.event_id,
+        current: event.id,
+        match: parsed.event_id === event.id,
+        stringMatch: String(parsed.event_id) === String(event.id)
+      });
+
+      // Compare as numbers to handle type mismatches
+      if (Number(parsed.event_id) === Number(event.id)) {
+        console.debug("[GuestJoinModal] Event ID match! Pre-filling form");
+        setForm({
+          first_name: parsed.first_name || "",
+          last_name: parsed.last_name || "",
+          email: parsed.email || "",
+          job_title: parsed.job_title || "",
+        });
+        setIsReturningGuest(true);
+      } else {
+        console.debug("[GuestJoinModal] Event ID mismatch - cached:", parsed.event_id, "current:", event.id);
+        setIsReturningGuest(false);
+      }
+    } catch (err) {
+      console.error("[GuestJoinModal] Failed to parse guest_session_cache:", err);
+      setIsReturningGuest(false);
+    }
+  }, [open, event?.id]);
 
   const handleInputChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -105,6 +160,17 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
       localStorage.setItem("guest_name", data.name);
       localStorage.setItem("guest_id", String(data.guest_id));
 
+      // Store persistent guest session cache (survives token expiry)
+      const cacheData = {
+        event_id: event.id,
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        email: form.email.trim().toLowerCase(),
+        job_title: form.job_title.trim(),
+      };
+      localStorage.setItem("guest_session_cache", JSON.stringify(cacheData));
+      console.debug("[GuestJoinModal] Saved guest_session_cache:", cacheData);
+
       // Notify auth system of change
       window.dispatchEvent(new Event("auth:changed"));
 
@@ -118,18 +184,31 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
     }
   };
 
-  const handleSignInClick = () => {
+  const handleClearGuestSession = () => {
+    localStorage.removeItem("guest_session_cache");
+    setForm({ first_name: "", last_name: "", email: "", job_title: "" });
+    setIsReturningGuest(false);
+    setError("");
+  };
+
+  const handleModalClose = () => {
+    setIsReturningGuest(false);
+    setError("");
     onClose();
+  };
+
+  const handleSignInClick = () => {
+    handleModalClose();
     navigate("/signin");
   };
 
   const handleSignUpClick = () => {
-    onClose();
+    handleModalClose();
     navigate("/signup");
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={handleModalClose} maxWidth="xs" fullWidth>
       <DialogTitle>Join Event as Guest</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
@@ -139,8 +218,16 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
             </Alert>
           )}
 
+          {isReturningGuest && (
+            <Alert severity="info" sx={{ py: 0.5 }}>
+              Welcome back! Your details have been pre-filled.
+            </Alert>
+          )}
+
           <Typography variant="body2" color="textSecondary">
-            Experience the event first, then register to save your connections.
+            {isReturningGuest
+              ? "Continue your event experience or update your details."
+              : "Experience the event first, then register to save your connections."}
           </Typography>
 
           <Stack direction="row" spacing={1}>
@@ -194,10 +281,30 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
           >
             {loading ? (
               <CircularProgress size={20} color="inherit" />
+            ) : isReturningGuest ? (
+              "Continue as Guest"
             ) : (
               "Join as Guest"
             )}
           </Button>
+
+          {isReturningGuest && (
+            <Typography variant="caption" align="center" sx={{ display: "block", mt: -1 }}>
+              Not you?{" "}
+              <Box
+                component="span"
+                onClick={handleClearGuestSession}
+                sx={{
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  color: "primary.main",
+                  "&:hover": { fontWeight: 500 },
+                }}
+              >
+                Clear and start fresh
+              </Box>
+            </Typography>
+          )}
 
           <Divider sx={{ my: 1 }}>or</Divider>
 

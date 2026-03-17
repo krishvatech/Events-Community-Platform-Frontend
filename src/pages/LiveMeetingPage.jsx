@@ -9375,6 +9375,20 @@ export default function NewLiveMeeting() {
         await dyteMeeting?.leaveRoom?.();
         await dyteMeeting?.leave?.();
         console.log("[LiveMeeting] Left Dyte room");
+
+        // ✅ Clear guest session when leaving meeting
+        // This ensures Events page shows all events, not filtered by guest token
+        const isGuest = localStorage.getItem("is_guest") === "true";
+        if (isGuest) {
+          console.log("[LiveMeeting] Clearing guest session for event:", eventId);
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("is_guest");
+          localStorage.removeItem("guest_email");
+          localStorage.removeItem("guest_name");
+          localStorage.removeItem("guest_id");
+          // Dispatch auth change event to notify app of session change
+          window.dispatchEvent(new Event("auth:changed"));
+        }
       } catch (e) {
         console.warn("[LiveMeeting] Error leaving Dyte room:", e);
       }
