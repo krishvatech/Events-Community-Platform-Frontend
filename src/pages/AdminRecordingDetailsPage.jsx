@@ -24,6 +24,12 @@ import {
     Skeleton,
     LinearProgress,
     Tooltip,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Alert,
+    TextField,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
@@ -35,6 +41,8 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import InfoIcon from "@mui/icons-material/Info";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
@@ -58,9 +66,53 @@ const fmtDate = (iso) => {
     });
 };
 
+const fmtDateDDMMYYYY = (iso) => {
+    if (!iso) return "";
+    const date = new Date(iso);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
+};
+
 const isVerifiedStatus = (raw) => {
     const v = String(raw || "").toLowerCase();
     return v === "approved" || v === "verified";
+};
+
+const getExpiryInfo = (event) => {
+    // Need either end_time or live_ended_at
+    const eventEndTime = event?.end_time || event?.live_ended_at;
+    if (!eventEndTime) return null;
+
+    // If no duration set, use default of 7 days
+    const durationStr = event?.replay_availability_duration || "7";
+    const days = parseInt(durationStr);
+    if (isNaN(days) || days <= 0) return null;
+
+    const endTime = new Date(eventEndTime).getTime();
+    const expiryTime = endTime + (days * 24 * 60 * 60 * 1000);
+    const now = Date.now();
+
+    if (now > expiryTime) {
+        return { status: "expired", message: "Replay has expired" };
+    }
+
+    const remainingMs = expiryTime - now;
+    const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+    const remainingHours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const expiryDate = fmtDateDDMMYYYY(new Date(expiryTime));
+
+    return {
+        status: "active",
+        days: remainingDays,
+        hours: remainingHours,
+        formattedDate: expiryDate,
+        message: `Expires in ${remainingDays}d ${remainingHours}h (${expiryDate})`
+    };
 };
 
 export default function AdminRecordingDetailsPage() {
@@ -97,6 +149,17 @@ export default function AdminRecordingDetailsPage() {
     const [publishing, setPublishing] = useState(false);
     const [publishSuccess, setPublishSuccess] = useState(false);
     const [publishError, setPublishError] = useState("");
+
+    // --- Publishing Mode State ---
+    const [replayPublishingMode, setReplayPublishingMode] = useState("manual_review");
+    const [updatingMode, setUpdatingMode] = useState(false);
+    const [modeUpdateError, setModeUpdateError] = useState("");
+
+    // --- Expiry Duration Edit State ---
+    const [editingExpiry, setEditingExpiry] = useState(false);
+    const [expiryDays, setExpiryDays] = useState(7);
+    const [expiryError, setExpiryError] = useState("");
+    const [savingExpiry, setSavingExpiry] = useState(false);
 
     // --- Attendance Category Filter State (for Replay Notifications section) ---
     const [notificationAttendanceFilter, setNotificationAttendanceFilter] = useState("all"); // all, noshow, partial, full
@@ -194,6 +257,10 @@ export default function AdminRecordingDetailsPage() {
 
                 if (alive) {
                     setEvent(evData);
+                    // Sync publishing mode from event data
+                    if (evData?.replay_publishing_mode) {
+                        setReplayPublishingMode(evData.replay_publishing_mode);
+                    }
                     // ℹ️ NOTE: Do NOT filter hosts here - attendance tabs should show ALL users
                     // Filtering is only done in Replay Notifications section
                     setRegistrations(regData);
@@ -220,6 +287,13 @@ export default function AdminRecordingDetailsPage() {
             loadNotifPreview();
         }
     }, [event?.replay_available]);
+
+    // Sync expiry days when event loads
+    useEffect(() => {
+        if (event?.replay_availability_duration) {
+            setExpiryDays(parseInt(event.replay_availability_duration) || 7);
+        }
+    }, [event?.replay_availability_duration]);
 
     // Reset page to 1 when filter changes
     const handleTabChange = (e, newValue) => {
@@ -424,6 +498,58 @@ export default function AdminRecordingDetailsPage() {
         }
     };
 
+    const handleUpdatePublishingMode = async (newMode) => {
+        setUpdatingMode(true);
+        setModeUpdateError("");
+        try {
+            const res = await fetch(`${API}/events/${id}/`, {
+                method: "PATCH",
+                headers: { ...getTokenHeader(), "Content-Type": "application/json" },
+                body: JSON.stringify({ replay_publishing_mode: newMode }),
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data?.error || "Failed to update publishing mode");
+            }
+            setReplayPublishingMode(newMode);
+            // Update event data to reflect the change
+            setEvent(prev => prev ? { ...prev, replay_publishing_mode: newMode } : null);
+        } catch (err) {
+            setModeUpdateError(err.message);
+            console.error("Failed to update publishing mode:", err);
+        } finally {
+            setUpdatingMode(false);
+        }
+    };
+
+    const handleUpdateExpiryDuration = async () => {
+        if (expiryDays < 1) {
+            setExpiryError("Duration must be at least 1 day");
+            return;
+        }
+        setSavingExpiry(true);
+        setExpiryError("");
+        try {
+            const res = await fetch(`${API}/events/${id}/`, {
+                method: "PATCH",
+                headers: { ...getTokenHeader(), "Content-Type": "application/json" },
+                body: JSON.stringify({ replay_availability_duration: String(expiryDays) }),
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data?.error || "Failed to update expiry duration");
+            }
+            // Update event data to reflect the change
+            setEvent(prev => prev ? { ...prev, replay_availability_duration: String(expiryDays) } : null);
+            setEditingExpiry(false);
+        } catch (err) {
+            setExpiryError(err.message);
+            console.error("Failed to update expiry:", err);
+        } finally {
+            setSavingExpiry(false);
+        }
+    };
+
     // Helper function to determine attendance category
     // Note: The backend now calculates this in the serializer, but we also support client-side calculation
     const getAttendanceCategory = (registration) => {
@@ -544,6 +670,138 @@ export default function AdminRecordingDetailsPage() {
                         )}
                     </Paper>
 
+                    {/* --- Publishing Mode Configuration --- */}
+                    <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
+                        <Typography variant="subtitle1" className="font-semibold mb-3">
+                            Replay Publishing Settings
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" className="mb-4">
+                            Choose how the recording will be published to participants.
+                        </Typography>
+
+                        <FormControl fullWidth size="small" sx={{ mb: 3 }}>
+                            <InputLabel id="publishing-mode-label">Publishing Mode</InputLabel>
+                            <Select
+                                labelId="publishing-mode-label"
+                                value={replayPublishingMode}
+                                label="Publishing Mode"
+                                onChange={(e) => handleUpdatePublishingMode(e.target.value)}
+                                disabled={updatingMode}
+                            >
+                                <MenuItem value="manual_review">Manual Review - I'll review and publish</MenuItem>
+                                <MenuItem value="auto_publish">Auto Publish - Publish automatically when ready</MenuItem>
+                            </Select>
+                        </FormControl>
+
+                        {modeUpdateError && (
+                            <Alert severity="error" sx={{ mb: 2 }}>{modeUpdateError}</Alert>
+                        )}
+
+                        {replayPublishingMode === "auto_publish" && (
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                Your recording will be automatically published to participants once it's uploaded and ready.
+                            </Alert>
+                        )}
+                        {replayPublishingMode === "manual_review" && (
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                Your recording will remain private until you manually review and publish it.
+                            </Alert>
+                        )}
+
+                        {/* --- Expiry Timeline Info --- */}
+                        {(event?.replay_available || (event?.end_time || event?.live_ended_at)) && getExpiryInfo(event)?.status === "active" && (
+                            <Box sx={{
+                                mt: 3,
+                                pt: 3,
+                                borderTop: "1px solid #e5e7eb",
+                                display: "flex",
+                                alignItems: "flex-start",
+                                justifyContent: "space-between",
+                                gap: 2
+                            }}>
+                                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, flex: 1 }}>
+                                    <AccessTimeIcon sx={{ color: "warning.main", mt: 0.5 }} />
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="body2" className="font-semibold">
+                                            {getExpiryInfo(event).message}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Replay will be available to participants until {getExpiryInfo(event).formattedDate}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                                <Box sx={{ ml: 2 }}>
+                                    {!editingExpiry ? (
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => setEditingExpiry(true)}
+                                        >
+                                            Edit
+                                        </Button>
+                                    ) : (
+                                        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                                            <TextField
+                                                type="number"
+                                                size="small"
+                                                label="Days"
+                                                value={expiryDays}
+                                                onChange={(e) => setExpiryDays(parseInt(e.target.value) || 7)}
+                                                inputProps={{ min: 1, max: 365 }}
+                                                sx={{ width: 80 }}
+                                            />
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                onClick={handleUpdateExpiryDuration}
+                                                disabled={savingExpiry}
+                                            >
+                                                {savingExpiry ? "Saving..." : "Save"}
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                onClick={() => {
+                                                    setEditingExpiry(false);
+                                                    setExpiryDays(parseInt(event?.replay_availability_duration) || 7);
+                                                    setExpiryError("");
+                                                }}
+                                                disabled={savingExpiry}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </Box>
+                                    )}
+                                    {expiryError && (
+                                        <Typography variant="caption" color="error" sx={{ display: "block", mt: 1 }}>
+                                            {expiryError}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </Box>
+                        )}
+                        {(event?.replay_available || (event?.end_time || event?.live_ended_at)) && getExpiryInfo(event)?.status === "expired" && (
+                            <Box sx={{
+                                mt: 3,
+                                pt: 3,
+                                borderTop: "1px solid #e5e7eb",
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 2
+                            }}>
+                                <InfoIcon sx={{ color: "error.main", mt: 0.5 }} />
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography variant="body2" className="font-semibold" color="error">
+                                        Replay Access Has Expired
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Participants can no longer access this replay
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        )}
+                    </Paper>
+
                     {/* --- Upload Replay Section --- */}
                     <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
                         <Typography variant="subtitle1" className="font-semibold mb-3">
@@ -593,14 +851,16 @@ export default function AdminRecordingDetailsPage() {
                         )}
 
                         {uploadSuccess && !publishSuccess && (
-                            <Typography color="info.main" variant="body2">
-                                Replay uploaded successfully. Click "Publish Recording" below to make it visible to participants.
-                            </Typography>
+                            <Alert severity={replayPublishingMode === "auto_publish" ? "success" : "info"} className="mt-2">
+                                {replayPublishingMode === "auto_publish"
+                                    ? "✓ Replay uploaded and published successfully! Participants can now access it."
+                                    : "Replay uploaded successfully. Click \"Publish Recording\" below to make it visible to participants."}
+                            </Alert>
                         )}
                         {publishSuccess && (
-                            <Typography color="success.main" variant="body2">
-                                Recording published. Participants can now access the replay.
-                            </Typography>
+                            <Alert severity="success" className="mt-2">
+                                ✓ Recording published. Participants can now access the replay.
+                            </Alert>
                         )}
                     </Paper>
 

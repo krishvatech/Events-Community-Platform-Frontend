@@ -45,6 +45,46 @@ const fmtDateRange = (startISO, endISO) => {
   } catch { return ""; }
 };
 
+const getDaysAgo = (dateISO) => {
+  if (!dateISO) return null;
+  try {
+    const now = new Date();
+    const then = new Date(dateISO);
+    const diffMs = now.getTime() - then.getTime();
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (days === 0) return "Today";
+    if (days === 1) return "1 day ago";
+    return `${days} days ago`;
+  } catch { return null; }
+};
+
+const computeReplayState = (ev) => {
+  const hasRec = !!ev.recording_url;
+  const isVisible = ev.replay_visible_to_participants === true;
+  const isAvailable = ev.replay_available === true;
+
+  // Check if expired
+  let isExpired = false;
+  if (isAvailable && ev.replay_availability_duration && ev.replay_availability_duration !== "Unlimited") {
+    const days = parseInt(ev.replay_availability_duration);
+    if (!isNaN(days) && days > 0) {
+      const endTime = ev.end_time ? new Date(ev.end_time).getTime() : (ev.live_ended_at ? new Date(ev.live_ended_at).getTime() : 0);
+      if (endTime > 0) {
+        const expiryTime = endTime + (days * 24 * 60 * 60 * 1000);
+        if (Date.now() > expiryTime) {
+          isExpired = true;
+        }
+      }
+    }
+  }
+
+  // Determine state
+  if (hasRec && isVisible && !isExpired) return "available";      // can watch
+  if (hasRec && isVisible && isExpired) return "expired";
+  if (isAvailable && !isVisible) return "pending_review";         // host reviewing
+  return "processing";                                            // not yet ready (default for all other past events)
+};
+
 const handleDownload = async (recordingUrl) => {
   if (!recordingUrl || recordingUrl === "[null]") {
     alert("No recording available for this event");
@@ -168,12 +208,7 @@ export default function MyRecordingsPage() {
         const past = asList(json)
           .map((r) => r?.event || null)
           .filter(Boolean)
-          .filter(isPast)
-          .filter((ev) => {
-            // Only show recordings that are visible to participants
-            // MUST be explicitly true - if false, null, or undefined, hide it
-            return ev?.replay_visible_to_participants === true;
-          });
+          .filter(isPast);
 
         if (!alive) return;
         setItems(past);
@@ -269,28 +304,12 @@ export default function MyRecordingsPage() {
                   sx={{ alignItems: "stretch" }}
                 >
                   {paged.map((ev) => {
+                    const replayState = computeReplayState(ev);
+                    const canWatch = replayState === "available";
+                    const daysAgoEnded = getDaysAgo(ev.live_ended_at || ev.end_time);
                     const hasRec = !!ev.recording_url;
-
-                    // Check availability
-                    const isReplayAllowed = ev.replay_available;
-
-                    // Check expiration
-                    let isExpired = false;
-                    if (isReplayAllowed && ev.replay_availability_duration && ev.replay_availability_duration !== "Unlimited") {
-                      const days = parseInt(ev.replay_availability_duration);
-                      if (!isNaN(days) && days > 0) {
-                        // End time of event
-                        const endTime = ev.end_time ? new Date(ev.end_time).getTime() : (ev.live_ended_at ? new Date(ev.live_ended_at).getTime() : 0);
-                        if (endTime > 0) {
-                          const expiryTime = endTime + (days * 24 * 60 * 60 * 1000);
-                          if (Date.now() > expiryTime) {
-                            isExpired = true;
-                          }
-                        }
-                      }
-                    }
-
-                    const canWatch = hasRec && isReplayAllowed && !isExpired;
+                    const isAvailable = ev.replay_available === true;
+                    const isVisible = ev.replay_visible_to_participants === true;
 
                     return (
                       <Grid
@@ -348,9 +367,10 @@ export default function MyRecordingsPage() {
                                 }}
                               >
                                 <span>
-                                  {!hasRec ? "Recording not uploaded"
-                                    : !isReplayAllowed ? "Replay unavailable"
-                                      : "Replay has expired"}
+                                  {replayState === "available" && "Replay available"}
+                                  {replayState === "expired" && "Replay has expired"}
+                                  {replayState === "pending_review" && "Replay will be made available soon"}
+                                  {replayState === "processing" && "Replay will be made available soon"}
                                 </span>
                               </Box>
                             )}
@@ -380,13 +400,33 @@ export default function MyRecordingsPage() {
                               </Box>
                             )}
 
-                            {/* Duration Badge if applicable */}
-                            {isReplayAllowed && hasRec && ev.replay_availability_duration && (
+                            {/* Timing and Duration Info */}
+                            {(replayState === "processing" || replayState === "pending_review") && daysAgoEnded && (
                               <Box className="mt-2">
                                 <Chip
                                   size="small"
-                                  label={isExpired ? "Expired" : `Available for ${ev.replay_availability_duration}`}
-                                  color={isExpired ? "default" : "primary"}
+                                  label={`Event ended ${daysAgoEnded}`}
+                                  variant="outlined"
+                                  className="text-xs"
+                                />
+                              </Box>
+                            )}
+                            {replayState === "available" && ev.replay_availability_duration && (
+                              <Box className="mt-2">
+                                <Chip
+                                  size="small"
+                                  label={`Available for ${ev.replay_availability_duration}`}
+                                  color="primary"
+                                  variant="outlined"
+                                  className="text-xs"
+                                />
+                              </Box>
+                            )}
+                            {replayState === "expired" && (
+                              <Box className="mt-2">
+                                <Chip
+                                  size="small"
+                                  label="Expired"
                                   variant="outlined"
                                   className="text-xs"
                                 />
@@ -405,7 +445,7 @@ export default function MyRecordingsPage() {
                                 alignItems: { xs: "stretch", sm: "center" },
                               }}
                             >
-                              {canWatch ? (
+                              {replayState === "available" ? (
                                 <>
                                   <Button
                                     size="small"
@@ -439,14 +479,11 @@ export default function MyRecordingsPage() {
                                   </Button>
                                 </>
                               ) : (
-                                <Chip
-                                  size="small"
-                                  label={!hasRec ? "No recording" : "Unavailable"}
-                                  sx={{
-                                    width: { xs: "100%", sm: "auto" },
-                                    textAlign: "center",
-                                  }}
-                                />
+                                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
+                                  {replayState === "pending_review" && "Replay will be made available soon. We'll notify you when it's ready."}
+                                  {replayState === "processing" && "Replay will be made available soon. We'll notify you when it's ready."}
+                                  {replayState === "expired" && "This replay has expired"}
+                                </Typography>
                               )}
                             </Box>
                           </CardContent>
@@ -472,7 +509,7 @@ export default function MyRecordingsPage() {
               <Paper elevation={0} className="rounded-2xl border border-slate-200 p-8 text-center">
                 <Typography variant="h6" className="font-semibold mb-1">No past events yet</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  You’ll see your past events here after you attend.
+                  You’ll see your past events and their recordings here once you attend them.
                 </Typography>
               </Paper>
             )}
