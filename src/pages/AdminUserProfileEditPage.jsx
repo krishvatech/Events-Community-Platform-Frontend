@@ -41,6 +41,10 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 
 import { isFutureDate, isFutureMonth, isFutureYear } from "../utils/dateValidation";
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
@@ -5487,6 +5491,7 @@ export default function AdminUserProfileEditPage() {
       {/* Training Add/Edit */}
       <Dialog open={trainingOpen} onClose={() => setTrainingOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editTrainingId ? "Edit Training" : "Add Training"}</DialogTitle>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
@@ -5506,28 +5511,38 @@ export default function AdminUserProfileEditPage() {
               helperText={trainingReqErrors.provider || ""}
             />
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-              <TextField
+              <DatePicker
                 label="Start Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
-                fullWidth
-                value={trainingForm.start_month || ""}
-                onChange={(e) => setTrainingForm((p) => ({ ...p, start_month: e.target.value }))}
-                error={!!trainingReqErrors.start_month}
-                helperText={trainingReqErrors.start_month || ""}
+                views={['year', 'month']}
+                value={trainingForm.start_month ? dayjs(trainingForm.start_month) : null}
+                onChange={(date) => setTrainingForm((p) => ({
+                  ...p,
+                  start_month: date ? date.format('YYYY-MM') : ''
+                }))}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!trainingReqErrors.start_month,
+                    helperText: trainingReqErrors.start_month || ""
+                  }
+                }}
               />
-              <TextField
+              <DatePicker
                 label="End Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
+                views={['year', 'month']}
                 disabled={!!trainingForm.currently_ongoing}
-                fullWidth
-                value={trainingForm.end_month || ""}
-                onChange={(e) => setTrainingForm((p) => ({ ...p, end_month: e.target.value }))}
-                error={!!trainingReqErrors.end_month}
-                helperText={trainingReqErrors.end_month || ""}
+                value={trainingForm.end_month ? dayjs(trainingForm.end_month) : null}
+                onChange={(date) => setTrainingForm((p) => ({
+                  ...p,
+                  end_month: date ? date.format('YYYY-MM') : ''
+                }))}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!trainingReqErrors.end_month,
+                    helperText: trainingReqErrors.end_month || ""
+                  }
+                }}
               />
             </Box>
             <FormControlLabel
@@ -5625,6 +5640,7 @@ export default function AdminUserProfileEditPage() {
             </Box>
           </Stack>
         </DialogContent>
+        </LocalizationProvider>
         <DialogActions>
           <Button onClick={() => setTrainingOpen(false)} disabled={savingTraining}>Cancel</Button>
           <Button variant="contained" onClick={saveTraining} disabled={savingTraining}>
@@ -5636,6 +5652,7 @@ export default function AdminUserProfileEditPage() {
       {/* Certification Add/Edit */}
       <Dialog open={certOpen} onClose={() => setCertOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editCertId ? "Edit Certification" : "Add Certification"}</DialogTitle>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
@@ -5655,28 +5672,38 @@ export default function AdminUserProfileEditPage() {
               helperText={certReqErrors.issuing_organization || ""}
             />
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-              <TextField
+              <DatePicker
                 label="Issue Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
-                fullWidth
-                value={certForm.issue_month || ""}
-                onChange={(e) => setCertForm((p) => ({ ...p, issue_month: e.target.value }))}
-                error={!!certReqErrors.issue_month}
-                helperText={certReqErrors.issue_month || ""}
+                views={['year', 'month']}
+                value={certForm.issue_month ? dayjs(certForm.issue_month) : null}
+                onChange={(date) => setCertForm((p) => ({
+                  ...p,
+                  issue_month: date ? date.format('YYYY-MM') : ''
+                }))}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!certReqErrors.issue_month,
+                    helperText: certReqErrors.issue_month || ""
+                  }
+                }}
               />
-              <TextField
+              <DatePicker
                 label="Expiration Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
+                views={['year', 'month']}
                 disabled={!!certForm.no_expiration}
-                fullWidth
-                value={certForm.expiration_month || ""}
-                onChange={(e) => setCertForm((p) => ({ ...p, expiration_month: e.target.value }))}
-                error={!!certReqErrors.expiration_month}
-                helperText={certReqErrors.expiration_month || ""}
+                value={certForm.expiration_month ? dayjs(certForm.expiration_month) : null}
+                onChange={(date) => setCertForm((p) => ({
+                  ...p,
+                  expiration_month: date ? date.format('YYYY-MM') : ''
+                }))}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!certReqErrors.expiration_month,
+                    helperText: certReqErrors.expiration_month || ""
+                  }
+                }}
               />
             </Box>
             <FormControlLabel
@@ -5752,6 +5779,7 @@ export default function AdminUserProfileEditPage() {
             </Button>
           </Stack>
         </DialogContent>
+        </LocalizationProvider>
         <DialogActions>
           <Button onClick={() => setCertOpen(false)} disabled={savingCert}>Cancel</Button>
           <Button variant="contained" onClick={saveCert} disabled={savingCert}>
@@ -5763,6 +5791,7 @@ export default function AdminUserProfileEditPage() {
       {/* Membership Add/Edit */}
       <Dialog open={memberOpen} onClose={() => setMemberOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editMemberId ? "Edit Membership" : "Add Membership"}</DialogTitle>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
@@ -5790,28 +5819,38 @@ export default function AdminUserProfileEditPage() {
             </TextField>
 
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-              <TextField
+              <DatePicker
                 label="Start Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
-                fullWidth
-                value={memberForm.start_month || ""}
-                onChange={(e) => setMemberForm((p) => ({ ...p, start_month: e.target.value }))}
-                error={!!memberReqErrors.start_month}
-                helperText={memberReqErrors.start_month || ""}
+                views={['year', 'month']}
+                value={memberForm.start_month ? dayjs(memberForm.start_month) : null}
+                onChange={(date) => setMemberForm((p) => ({
+                  ...p,
+                  start_month: date ? date.format('YYYY-MM') : ''
+                }))}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!memberReqErrors.start_month,
+                    helperText: memberReqErrors.start_month || ""
+                  }
+                }}
               />
-              <TextField
+              <DatePicker
                 label="End Month"
-                type="month"
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ lang: "en-US" }}
+                views={['year', 'month']}
                 disabled={!!memberForm.ongoing}
-                fullWidth
-                value={memberForm.end_month || ""}
-                onChange={(e) => setMemberForm((p) => ({ ...p, end_month: e.target.value }))}
-                error={!!memberReqErrors.end_month}
-                helperText={memberReqErrors.end_month || ""}
+                value={memberForm.end_month ? dayjs(memberForm.end_month) : null}
+                onChange={(date) => setMemberForm((p) => ({
+                  ...p,
+                  end_month: date ? date.format('YYYY-MM') : ''
+                }))}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!memberReqErrors.end_month,
+                    helperText: memberReqErrors.end_month || ""
+                  }
+                }}
               />
             </Box>
 
@@ -5914,6 +5953,7 @@ export default function AdminUserProfileEditPage() {
             </Box>
           </Stack>
         </DialogContent>
+        </LocalizationProvider>
         <DialogActions>
           <Button onClick={() => setMemberOpen(false)} disabled={savingMember}>Cancel</Button>
           <Button variant="contained" onClick={saveMember} disabled={savingMember}>
