@@ -64,6 +64,7 @@ const REPORT_REASONS = [
 const NOOP = () => { };
 
 function SuggestedConnections({ list = [] }) {
+  const navigate = useNavigate();
   const [connected, setConnected] = React.useState(() => new Set());
 
   // --- friend status (same idea as RichProfile) ---
@@ -293,17 +294,21 @@ function SuggestedConnections({ list = [] }) {
                     hydrateAvatar(u.id);
                   }}
                 >
-                  <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto", mb: 0.75 }}>
-                    {(userName(u) || "U").slice(0, 1)}
-                  </Avatar>
-                  <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center" sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
-                      {userName(u)}
-                    </Typography>
-                    {userIsVerified(u) && (
-                      <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />
-                    )}
-                  </Stack>
+                  <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer", mb: 0.75 }}>
+                    <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto" }}>
+                      {(userName(u) || "U").slice(0, 1)}
+                    </Avatar>
+                  </Box>
+                  <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer" }}>
+                    <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center" sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
+                        {userName(u)}
+                      </Typography>
+                      {userIsVerified(u) && (
+                        <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />
+                      )}
+                    </Stack>
+                  </Box>
                   {/* Mutual friends avatars (only if > 0) */}
                   {u.mutuals > 0 && (
                     <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="center" sx={{ mt: 0.5 }}>
@@ -365,10 +370,12 @@ function SuggestedConnections({ list = [] }) {
                           return (
                             <Paper key={u.id} variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
                               <Stack direction="row" spacing={1} alignItems="center">
-                                <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>
-                                  {(userName(u) || "U").slice(0, 1)}
-                                </Avatar>
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer" }}>
+                                  <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>
+                                    {(userName(u) || "U").slice(0, 1)}
+                                  </Avatar>
+                                </Box>
+                                <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => navigate(`/community/rich-profile/${u.id}`)}>
                                   <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
                                     <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
                                       {userName(u)}
