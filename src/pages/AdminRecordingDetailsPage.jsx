@@ -43,6 +43,7 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import InfoIcon from "@mui/icons-material/Info";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
@@ -461,6 +462,26 @@ export default function AdminRecordingDetailsPage() {
         }
     };
 
+    const handleRefreshEvent = async () => {
+        try {
+            const res = await fetch(`${API}/events/${id}/`, {
+                headers: getTokenHeader(),
+            });
+            if (res.ok) {
+                const evData = await res.json();
+                setEvent(evData);
+                if (evData.replay_publishing_mode) {
+                    setReplayPublishingMode(evData.replay_publishing_mode);
+                }
+                if (evData.replay_available) {
+                    await loadNotifPreview();
+                }
+            }
+        } catch (err) {
+            console.warn("Failed to refresh event:", err);
+        }
+    };
+
     const loadNotifPreview = async () => {
         setNotifLoading(true);
         try {
@@ -608,6 +629,10 @@ export default function AdminRecordingDetailsPage() {
         ? resolveRecordingUrl(event.recording_url)
         : null;
 
+    // Determine if recording is still being processed
+    const meetingEnded = !!(event?.live_ended_at || event?.status === "ended" || event?.end_time);
+    const isRecordingProcessing = meetingEnded && !hasRec && !event?.replay_available;
+
     const handleBack = () => {
         if (location.state?.from === "admin") {
             // Came from Admin Events page
@@ -635,7 +660,14 @@ export default function AdminRecordingDetailsPage() {
                         {fmtDate(event?.start_time)}
                     </Typography>
                 </Box>
-                <Box className="ml-auto">
+                <Box className="ml-auto flex items-center gap-2">
+                    <IconButton
+                        title="Refresh event data"
+                        onClick={handleRefreshEvent}
+                        size="small"
+                    >
+                        <RefreshRoundedIcon />
+                    </IconButton>
                     <Button
                         variant="outlined"
                         startIcon={<DownloadRoundedIcon />}
@@ -658,6 +690,17 @@ export default function AdminRecordingDetailsPage() {
                                     style={{ width: "100%", height: "100%" }}
                                 />
                             </Box>
+                        ) : isRecordingProcessing ? (
+                            <Box className="p-10 text-center bg-amber-50 flex flex-col items-center justify-center" sx={{ minHeight: "300px" }}>
+                                <CircularProgress size={40} sx={{ mb: 2 }} />
+                                <Typography variant="h6" className="font-semibold">Recording is Being Processed</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+                                    Your recording is being processed. This may take a few minutes. Refresh to check if it's ready.
+                                </Typography>
+                                <Button variant="outlined" size="small" onClick={handleRefreshEvent}>
+                                    Refresh Now
+                                </Button>
+                            </Box>
                         ) : (
                             <Box className="p-10 text-center bg-slate-100">
                                 <Typography color="text.secondary">No recording available</Typography>
@@ -670,136 +713,99 @@ export default function AdminRecordingDetailsPage() {
                         )}
                     </Paper>
 
-                    {/* --- Publishing Mode Configuration --- */}
+                    {/* --- Expiry Timeline Info --- */}
                     <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
-                        <Typography variant="subtitle1" className="font-semibold mb-3">
-                            Replay Publishing Settings
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" className="mb-4">
-                            Choose how the recording will be published to participants.
-                        </Typography>
-
-                        <FormControl fullWidth size="small" sx={{ mb: 3 }}>
-                            <InputLabel id="publishing-mode-label">Publishing Mode</InputLabel>
-                            <Select
-                                labelId="publishing-mode-label"
-                                value={replayPublishingMode}
-                                label="Publishing Mode"
-                                onChange={(e) => handleUpdatePublishingMode(e.target.value)}
-                                disabled={updatingMode}
-                            >
-                                <MenuItem value="manual_review">Manual Review - I'll review and publish</MenuItem>
-                                <MenuItem value="auto_publish">Auto Publish - Publish automatically when ready</MenuItem>
-                            </Select>
-                        </FormControl>
-
-                        {modeUpdateError && (
-                            <Alert severity="error" sx={{ mb: 2 }}>{modeUpdateError}</Alert>
-                        )}
-
-                        {replayPublishingMode === "auto_publish" && (
-                            <Alert severity="info" sx={{ mb: 2 }}>
-                                Your recording will be automatically published to participants once it's uploaded and ready.
-                            </Alert>
-                        )}
-                        {replayPublishingMode === "manual_review" && (
-                            <Alert severity="info" sx={{ mb: 2 }}>
-                                Your recording will remain private until you manually review and publish it.
-                            </Alert>
-                        )}
-
-                        {/* --- Expiry Timeline Info --- */}
-                        {(event?.replay_available || (event?.end_time || event?.live_ended_at)) && getExpiryInfo(event)?.status === "active" && (
-                            <Box sx={{
-                                mt: 3,
-                                pt: 3,
-                                borderTop: "1px solid #e5e7eb",
-                                display: "flex",
-                                alignItems: "flex-start",
-                                justifyContent: "space-between",
-                                gap: 2
-                            }}>
-                                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, flex: 1 }}>
-                                    <AccessTimeIcon sx={{ color: "warning.main", mt: 0.5 }} />
-                                    <Box sx={{ flex: 1 }}>
-                                        <Typography variant="body2" className="font-semibold">
-                                            {getExpiryInfo(event).message}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Replay will be available to participants until {getExpiryInfo(event).formattedDate}
-                                        </Typography>
-                                    </Box>
+                    {(event?.replay_available || (event?.end_time || event?.live_ended_at)) && getExpiryInfo(event)?.status === "active" && (
+                        <Box sx={{
+                            mt: 0,
+                            pt: 0,
+                            borderTop: "none",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            justifyContent: "space-between",
+                            gap: 2
+                        }}>
+                            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, flex: 1 }}>
+                                <AccessTimeIcon sx={{ color: "warning.main", mt: 0.5 }} />
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography variant="body2" className="font-semibold">
+                                        {getExpiryInfo(event).message}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Replay will be available to participants until {getExpiryInfo(event).formattedDate}
+                                    </Typography>
                                 </Box>
-                                <Box sx={{ ml: 2 }}>
-                                    {!editingExpiry ? (
+                            </Box>
+                            <Box sx={{ ml: 2 }}>
+                                {!editingExpiry ? (
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => setEditingExpiry(true)}
+                                    >
+                                        EDIT
+                                    </Button>
+                                ) : (
+                                    <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                                        <TextField
+                                            type="number"
+                                            size="small"
+                                            label="Days"
+                                            value={expiryDays}
+                                            onChange={(e) => setExpiryDays(parseInt(e.target.value) || 7)}
+                                            inputProps={{ min: 1, max: 365 }}
+                                            sx={{ width: 80 }}
+                                        />
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            onClick={handleUpdateExpiryDuration}
+                                            disabled={savingExpiry}
+                                        >
+                                            {savingExpiry ? "Saving..." : "Save"}
+                                        </Button>
                                         <Button
                                             size="small"
                                             variant="outlined"
-                                            onClick={() => setEditingExpiry(true)}
+                                            onClick={() => {
+                                                setEditingExpiry(false);
+                                                setExpiryDays(parseInt(event?.replay_availability_duration) || 7);
+                                                setExpiryError("");
+                                            }}
+                                            disabled={savingExpiry}
                                         >
-                                            Edit
+                                            Cancel
                                         </Button>
-                                    ) : (
-                                        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                                            <TextField
-                                                type="number"
-                                                size="small"
-                                                label="Days"
-                                                value={expiryDays}
-                                                onChange={(e) => setExpiryDays(parseInt(e.target.value) || 7)}
-                                                inputProps={{ min: 1, max: 365 }}
-                                                sx={{ width: 80 }}
-                                            />
-                                            <Button
-                                                size="small"
-                                                variant="contained"
-                                                onClick={handleUpdateExpiryDuration}
-                                                disabled={savingExpiry}
-                                            >
-                                                {savingExpiry ? "Saving..." : "Save"}
-                                            </Button>
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                onClick={() => {
-                                                    setEditingExpiry(false);
-                                                    setExpiryDays(parseInt(event?.replay_availability_duration) || 7);
-                                                    setExpiryError("");
-                                                }}
-                                                disabled={savingExpiry}
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </Box>
-                                    )}
-                                    {expiryError && (
-                                        <Typography variant="caption" color="error" sx={{ display: "block", mt: 1 }}>
-                                            {expiryError}
-                                        </Typography>
-                                    )}
-                                </Box>
-                            </Box>
-                        )}
-                        {(event?.replay_available || (event?.end_time || event?.live_ended_at)) && getExpiryInfo(event)?.status === "expired" && (
-                            <Box sx={{
-                                mt: 3,
-                                pt: 3,
-                                borderTop: "1px solid #e5e7eb",
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: 2
-                            }}>
-                                <InfoIcon sx={{ color: "error.main", mt: 0.5 }} />
-                                <Box sx={{ flex: 1 }}>
-                                    <Typography variant="body2" className="font-semibold" color="error">
-                                        Replay Access Has Expired
+                                    </Box>
+                                )}
+                                {expiryError && (
+                                    <Typography variant="caption" color="error" sx={{ display: "block", mt: 1 }}>
+                                        {expiryError}
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Participants can no longer access this replay
-                                    </Typography>
-                                </Box>
+                                )}
                             </Box>
-                        )}
+                        </Box>
+                    )}
+                    {(event?.replay_available || (event?.end_time || event?.live_ended_at)) && getExpiryInfo(event)?.status === "expired" && (
+                        <Box sx={{
+                            mt: 0,
+                            pt: 0,
+                            borderTop: "none",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 2
+                        }}>
+                            <InfoIcon sx={{ color: "error.main", mt: 0.5 }} />
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" className="font-semibold" color="error">
+                                    Replay Access Has Expired
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Participants can no longer access this replay
+                                </Typography>
+                            </Box>
+                        </Box>
+                    )}
                     </Paper>
 
                     {/* --- Upload Replay Section --- */}
@@ -864,8 +870,8 @@ export default function AdminRecordingDetailsPage() {
                         )}
                     </Paper>
 
-                    {/* --- Publish / upload prompt --- */}
-                    {event?.replay_available && !notifPreview?.visible_to_participants && hasRec && (
+                    {/* --- Publish / upload prompt (only for manual_review mode) --- */}
+                    {event?.replay_available && !notifPreview?.visible_to_participants && hasRec && replayPublishingMode === "manual_review" && (
                         <Paper elevation={0} className="border border-amber-200 bg-amber-50 rounded-2xl p-4 mb-6">
                             <Box className="flex items-center justify-between gap-3">
                                 <Box className="flex items-center gap-2">
@@ -888,6 +894,18 @@ export default function AdminRecordingDetailsPage() {
                             {publishError && (
                                 <Typography color="error" variant="body2" sx={{ mt: 1 }}>{publishError}</Typography>
                             )}
+                        </Paper>
+                    )}
+
+                    {/* --- Auto Publish status (when in auto_publish mode but not yet visible) --- */}
+                    {event?.replay_available && !event?.replay_visible_to_participants && hasRec && replayPublishingMode === "auto_publish" && (
+                        <Paper elevation={0} className="border border-blue-200 bg-blue-50 rounded-2xl p-4 mb-6">
+                            <Box className="flex items-center gap-2">
+                                <CircularProgress size={18} />
+                                <Typography variant="body2" color="primary">
+                                    Recording is being auto-published. It will be available to participants shortly...
+                                </Typography>
+                            </Box>
                         </Paper>
                     )}
                     {event?.replay_available && !notifPreview?.visible_to_participants && !hasRec && (

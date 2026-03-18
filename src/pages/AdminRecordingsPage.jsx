@@ -52,6 +52,23 @@ const isPast = (ev) => {
   return end && Date.now() > end;
 };
 
+const getRecordingStatus = (ev) => {
+  if (ev?.recording_url) {
+    if (ev?.replay_visible_to_participants) {
+      return { label: "Published", color: "success" };
+    }
+    return { label: "Pending Review", color: "warning" };
+  }
+  const ended =
+    ev?.live_ended_at ||
+    ev?.status === "ended" ||
+    (ev?.end_time && new Date(ev.end_time) < new Date());
+  if (ended) {
+    return { label: "Processing", color: "info" };
+  }
+  return { label: "No Recording", color: "default" };
+};
+
 const fmtDateRange = (startISO, endISO) => {
   try {
     const s = new Date(startISO);
@@ -446,13 +463,42 @@ export default function AdminRecordingsPage() {
 
                       <Divider className="my-3" />
 
-                      <Box className="flex items-center gap-1.5 flex-wrap mt-auto">
-                        {hasRec ? (
-                          <>
+                      <Box className="flex items-center gap-1.5 flex-wrap mt-auto w-full">
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", flex: 1 }}>
+                          {hasRec ? (
+                            <>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={<PlayCircleOutlineRoundedIcon />}
+                                onClick={() => navigate(`/admin/recordings/${ev.id}`)}
+                                sx={{
+                                  textTransform: "none",
+                                  borderRadius: 2,
+                                }}
+                              >
+                                View Details
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<DownloadRoundedIcon />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownload(ev.recording_url);
+                                }}
+                                sx={{
+                                  textTransform: "none",
+                                  borderRadius: 2,
+                                }}
+                              >
+                                Download
+                              </Button>
+                            </>
+                          ) : (
                             <Button
                               size="small"
-                              variant="contained"
-                              startIcon={<PlayCircleOutlineRoundedIcon />}
+                              variant="outlined"
                               onClick={() => navigate(`/admin/recordings/${ev.id}`)}
                               sx={{
                                 textTransform: "none",
@@ -461,25 +507,15 @@ export default function AdminRecordingsPage() {
                             >
                               View Details
                             </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<DownloadRoundedIcon />}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownload(ev.recording_url);
-                              }}
-                              sx={{
-                                textTransform: "none",
-                                borderRadius: 2,
-                              }}
-                            >
-                              Download
-                            </Button>
-                          </>
-                        ) : (
-                          <Chip size="small" label="No recording yet" />
-                        )}
+                          )}
+                        </Box>
+                        <Chip
+                          size="small"
+                          label={getRecordingStatus(ev).label}
+                          color={getRecordingStatus(ev).color}
+                          variant="outlined"
+                          sx={{ flexShrink: 0 }}
+                        />
                       </Box>
                     </CardContent>
                   </MUICard>

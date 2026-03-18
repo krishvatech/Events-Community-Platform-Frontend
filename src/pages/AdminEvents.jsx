@@ -238,6 +238,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   // Replay Options
   const [replayAvailable, setReplayAvailable] = React.useState(false);
   const [replayDuration, setReplayDuration] = React.useState("");
+  const [autoPublish, setAutoPublish] = React.useState(true);
 
   // Resources
   const [resourceType, setResourceType] = React.useState("file"); // 'file' | 'link' | 'video'
@@ -513,6 +514,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("start_time", startISO);
     fd.append("end_time", endISO);
     fd.append("recording_url", "");
+
+    const publishMode = autoPublish ? "auto_publish" : "manual_review";
+    console.log("🔍 AdminEvents - Creating event with replay_publishing_mode:", publishMode, "autoPublish:", autoPublish);
+
+    fd.append("replay_publishing_mode", publishMode);
 
     if (replayAvailable) {
       fd.append("replay_available", "true");
@@ -803,7 +809,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           {(format === "virtual" || format === "hybrid") && (
             <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
               <Typography variant="h6" className="font-semibold mb-3">Replay Options</Typography>
-              <Stack direction="row" spacing={3} alignItems="center">
+              <Stack direction="column" spacing={2}>
                 <FormControlLabel
                   control={
                     <Switch
@@ -812,7 +818,43 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     />
                   }
                   label="Replay will be available"
+                  sx={{ m: 0 }}
                 />
+
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={autoPublish}
+                        onChange={(e) => setAutoPublish(e.target.checked)}
+                      />
+                    }
+                    label="Auto Publish"
+                    sx={{
+                      m: 0,
+                      justifyContent: "flex-start",
+                      gap: 1.5,
+                      "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                    }}
+                  />
+                  <Chip
+                    label={autoPublish ? "Auto Publish: ON" : "Auto Publish: OFF"}
+                    color={autoPublish ? "success" : "default"}
+                    variant={autoPublish ? "filled" : "outlined"}
+                    size="small"
+                    sx={{
+                      fontWeight: 600,
+                      minWidth: 150
+                    }}
+                  />
+                </Box>
+
+                <Typography variant="caption" color="text.secondary">
+                  {autoPublish
+                    ? "✓ Recording will be automatically published to participants when ready"
+                    : "Recording will remain private until you manually publish it"}
+                </Typography>
+
                 {replayAvailable && (
                   <TextField
                     select

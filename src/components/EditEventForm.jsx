@@ -155,6 +155,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
     const [replayAvailable, setReplayAvailable] = React.useState(false);
     const [replayDuration, setReplayDuration] = React.useState("");
+    const [autoPublish, setAutoPublish] = React.useState(true); // ✅ Default true, sync from event in useEffect
 
     // Memoize dayjs objects to prevent DatePicker from snapping back while navigating calendar
     const startDateValue = useMemo(() => startDate ? dayjs(startDate) : null, [startDate]);
@@ -267,6 +268,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         // Init replay options
         setReplayAvailable(!!event?.replay_available);
         setReplayDuration(event?.replay_availability_duration || "");
+        console.log("🔍 EditEventForm - replay_publishing_mode from event:", event?.replay_publishing_mode);
+        setAutoPublish(event?.replay_publishing_mode === "auto_publish" ? true : false);
 
         setParticipants(normalizeParticipantsFromEvent(event));
 
@@ -542,6 +545,11 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("start_time", combineToISO(startDate, startTime));
         fd.append("end_time", combineToISO(isMultiDay ? endDate : startDate, endTime));
 
+        // Send replay publishing mode regardless of replay_available status
+        const publishMode = autoPublish ? "auto_publish" : "manual_review";
+        console.log("🔍 EditEventForm - Updating event with replay_publishing_mode:", publishMode, "autoPublish:", autoPublish);
+        fd.append("replay_publishing_mode", publishMode);
+
         // Send replay update - explicitly send 'true'/'false' and duration (or empty string/null)
         if (replayAvailable) {
             fd.append("replay_available", "true");
@@ -686,7 +694,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             {(format === "virtual" || format === "hybrid") && (
                 <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
                     <Typography variant="h6" className="font-semibold mb-3">Replay Options</Typography>
-                    <Stack direction="row" spacing={3} alignItems="center">
+                    <Stack direction="column" spacing={2}>
                         <FormControlLabel
                             control={
                                 <Switch
@@ -695,7 +703,43 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                 />
                             }
                             label="Replay will be available"
+                            sx={{ m: 0 }}
                         />
+
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 2 }}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={autoPublish}
+                                        onChange={(e) => setAutoPublish(e.target.checked)}
+                                    />
+                                }
+                                label="Auto Publish"
+                                sx={{
+                                    m: 0,
+                                    justifyContent: "flex-start",
+                                    gap: 1.5,
+                                    "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                                }}
+                            />
+                            <Chip
+                                label={autoPublish ? "Auto Publish: ON" : "Auto Publish: OFF"}
+                                color={autoPublish ? "success" : "default"}
+                                variant={autoPublish ? "filled" : "outlined"}
+                                size="small"
+                                sx={{
+                                    fontWeight: 600,
+                                    minWidth: 150
+                                }}
+                            />
+                        </Box>
+
+                        <Typography variant="caption" color="text.secondary">
+                            {autoPublish
+                                ? "✓ Recording will be automatically published to participants when ready"
+                                : "Recording will remain private until you manually publish it"}
+                        </Typography>
+
                         {replayAvailable && (
                             <TextField
                                 select
