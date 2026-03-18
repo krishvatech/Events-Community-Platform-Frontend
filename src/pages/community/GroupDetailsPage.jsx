@@ -396,7 +396,7 @@ function mapFeedItem(item) {
     return {
       ...base,
       type: "link",
-      text: m.text || "",
+      text: m.description || m.text || "",
       url: m.url,
       url_title: m.url_title,
       url_desc: m.url_desc,

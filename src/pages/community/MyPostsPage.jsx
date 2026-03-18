@@ -563,16 +563,23 @@ function PostCard({
               <ClampedText text={post.content} maxLines={5} />
             )}
 
-            {post.type === "link" && post.link && (
-              <Button
-                size="small"
-                href={post.link}
-                target="_blank"
-                rel="noreferrer"
-                sx={{ mt: 1, textTransform: "none" }}
-              >
-                {post.link}
-              </Button>
+            {post.type === "link" && (
+              <>
+                {post.content && (
+                  <ClampedText text={post.content} maxLines={5} />
+                )}
+                {post.link && (
+                  <Button
+                    size="small"
+                    href={post.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    sx={{ mt: 1, textTransform: "none" }}
+                  >
+                    {post.link}
+                  </Button>
+                )}
+              </>
             )}
 
             {post.type === "image" && post.images?.length > 0 && (
