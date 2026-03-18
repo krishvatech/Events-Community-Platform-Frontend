@@ -164,9 +164,9 @@ function RecordingCardSkeleton() {
 function RecordingsGridSkeleton({ count = 6 }) {
   return (
     <>
-      <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }} sx={{ alignItems: "stretch" }}>
+      <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
         {Array.from({ length: count }).map((_, idx) => (
-          <Grid key={idx} item xs={12} sm={4} md={4} lg={4}>
+          <Grid key={idx} size={{ xs: 4, sm: 4, md: 4 }}>
             <RecordingCardSkeleton />
           </Grid>
         ))}
@@ -300,8 +300,8 @@ export default function MyRecordingsPage() {
               <>
                 <Grid
                   container
-                  spacing={{ xs: 2, sm: 2.5, md: 3 }}
-                  sx={{ alignItems: "stretch" }}
+                  spacing={{ xs: 2, md: 3 }}
+                  columns={{ xs: 4, sm: 12, md: 12 }}
                 >
                   {paged.map((ev) => {
                     const replayState = computeReplayState(ev);
@@ -314,11 +314,7 @@ export default function MyRecordingsPage() {
                     return (
                       <Grid
                         key={ev.id}
-                        item
-                        xs={12}   // 1 card per row on small mobiles (<600px)
-                        sm={4}    // 3 cards per row on 768px tablet (>=600px)
-                        md={4}    // 3 cards per row on 1024px and desktops
-                        lg={4}    // 3 per row on large screens too
+                        size={{ xs: 4, sm: 4, md: 4 }}
                       >
                         <MUICard
                           elevation={0}
