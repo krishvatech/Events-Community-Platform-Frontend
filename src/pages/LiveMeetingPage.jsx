@@ -16547,7 +16547,7 @@ export default function NewLiveMeeting() {
                                         </Typography>
                                       </span>
                                     </Tooltip>
-                                    {isSelfMember(m) && !m.isVirtual && (
+                                    {isSelfMember(m) && !m.isVirtual && isGuest && (
                                       <Tooltip title="Edit profile">
                                         <IconButton
                                           size="small"
