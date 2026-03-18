@@ -401,6 +401,16 @@ export default function MyCartPage() {
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           {/* MAIN */}
           <main className="col-span-12">
+            {/* Page Header */}
+            <div className="mb-6">
+              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
+                My Cart
+              </h1>
+              <p className="text-slate-600">
+                Manage your shopping cart and view your orders.
+              </p>
+            </div>
+
             {/* Tabs row (Cart | Orders | Addresses | Account details) */}
             <Paper
               elevation={0}
