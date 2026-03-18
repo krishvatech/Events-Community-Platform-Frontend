@@ -1296,7 +1296,7 @@ function SharesDialog({ open, postId, onClose }) {
 
 // --- NEW COMPONENT: Share To Friend Dialog ---
 // --- UPDATED COMPONENT: Share To Friend/Group Dialog ---
-function ShareToFriendDialog({ open, onClose, postId }) {
+function ShareToFriendDialog({ open, onClose, postId, onSharedSuccessfully }) {
   const [tab, setTab] = React.useState(0);
   const [friends, setFriends] = React.useState([]);
   const [groups, setGroups] = React.useState([]);
@@ -1414,6 +1414,10 @@ function ShareToFriendDialog({ open, onClose, postId }) {
         headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify(payload)
       });
+      // Increment share count in parent component
+      if (onSharedSuccessfully) {
+        onSharedSuccessfully(postId, selected.length);
+      }
       onClose();
       setSelected([]);
     } catch (e) {
@@ -1659,6 +1663,21 @@ export default function MyPostsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleShareSuccess = (postId, shareCount) => {
+    setPosts(prevPosts =>
+      prevPosts.map(post =>
+        post.id === postId
+          ? {
+              ...post,
+              metrics: {
+                ...post.metrics,
+                shares: (post.metrics?.shares || 0) + shareCount,
+              },
+            }
+          : post
+      )
+    );
+  };
 
   React.useEffect(() => {
     async function init() {
@@ -1954,6 +1973,7 @@ export default function MyPostsPage() {
         open={!!shareActionPostId}
         postId={shareActionPostId}
         onClose={() => setShareActionPostId(null)}
+        onSharedSuccessfully={handleShareSuccess}
       />
       {showScrollTop && (
         <Box
