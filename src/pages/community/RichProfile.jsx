@@ -648,6 +648,8 @@ function RichPostCard({
       setShareCount(counts.shares ?? 0);
       setCommentCount(counts.comments ?? 0);
       setLiked(!!counts.user_has_liked);
+      // Reload likers to reflect the updated reaction in the UI
+      await loadTopLikers();
     } catch (e) {
       console.error("Failed to toggle reaction", e);
       // counts re-sync keeps likeCount correct even if there’s an error
@@ -657,6 +659,8 @@ function RichPostCard({
         setShareCount(counts.shares ?? 0);
         setCommentCount(counts.comments ?? 0);
         setLiked(!!counts.user_has_liked);
+        // Reload likers on error recovery too
+        await loadTopLikers();
       } catch { }
     }
   };
