@@ -1879,10 +1879,17 @@ export default function MyPostsPage() {
 
   return (
     <Box sx={{ width: "100%", pl: 0, pt: 0, pr: 1, pb: 3 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h4">My Posts</Typography>
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <div>
+          <Typography variant="h4">
+            My Posts
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Share your thoughts, connect with the community, and manage your posts.
+          </Typography>
+        </div>
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)}>Create Post</Button>
-      </Stack>
+      </div>
 
       {loading ? (
         // 🔹 Initial loading → show 4 skeleton cards instead of spinner
