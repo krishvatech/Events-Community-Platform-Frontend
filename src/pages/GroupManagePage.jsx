@@ -305,11 +305,13 @@ function PollVotersDialog({ open, onClose, option, postId }) {
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
             <DialogTitle sx={{ pb: 1 }}>
-                <Typography variant="h6">Voters</Typography>
+                Voters
+            </DialogTitle>
+            <Box sx={{ px: 3, pb: 1 }}>
                 <Typography variant="subtitle2" color="text.secondary" noWrap>
                     For: {option?.label || option?.text || "Option"}
                 </Typography>
-            </DialogTitle>
+            </Box>
             <DialogContent dividers>
                 {loading ? (
                     <Stack alignItems="center" py={3}><CircularProgress size={24} /></Stack>
@@ -3180,7 +3182,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                 <List dense disablePadding>
                     {/* Group chat item */}
                     <ListItem
-                        button
+                        component="button"
                         selected={activePeer.type === "group"}
                         onClick={() => {
                             setActivePeer({ type: "group", user: null });
@@ -3204,7 +3206,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                     {memberList.map((m) => (
                         <ListItem
                             key={m.user.id}
-                            button
+                            component="button"
                             selected={
                                 activePeer.type === "dm" &&
                                 activePeer.user &&
