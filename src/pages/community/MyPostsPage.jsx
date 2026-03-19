@@ -2,6 +2,7 @@
 import * as React from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
+  Alert,
   Avatar,
   AvatarGroup,
   Box,
@@ -27,6 +28,7 @@ import {
   ListItemAvatar,
   ListItemText,
   ListItemSecondaryAction,
+  Snackbar,
   Stack,
   Tab,
   Tabs,
@@ -1512,44 +1514,161 @@ function ShareToFriendDialog({ open, onClose, postId, onSharedSuccessfully }) {
 
 function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) ... */
   const [saving, setSaving] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState("");
+  const [errorOpen, setErrorOpen] = React.useState(false);
   const type = post?.type || "text";
   const [textContent, setTextContent] = React.useState(post?.content || "");
   const [linkUrl, setLinkUrl] = React.useState(post?.link || "");
   const [imageCaption, setImageCaption] = React.useState(post?.content || "");
   const [imageFile, setImageFile] = React.useState(null);
   const [pollOptions, setPollOptions] = React.useState(post?.type === "poll" ? post.options?.map((o) => (typeof o === "string" ? o : o.text || o.label || "")) || ["", ""] : ["", ""]);
+  const MAX_CHAR_LIMIT = 1000;
   React.useEffect(() => { if (!open || !post) return; const t = post.type || "text"; setTextContent(post.content || ""); setImageCaption(post.content || ""); setLinkUrl(post.link || ""); if (t === "poll") { setPollOptions(post.options?.map((o) => (typeof o === "string" ? o : o.text || o.label || "")) || ["", ""]); } else { setPollOptions(["", ""]); } setImageFile(null); }, [open, post]);
-  const handleSave = async () => { if (!post) return; setSaving(true); let options = { method: "PATCH", headers: { ...authHeader() } }; let body; let url; try { if (type === "poll") { const pollId = post.raw_metadata?.poll_id; if (!pollId) throw new Error("Missing poll_id"); url = `${API_ROOT}/activity/feed/polls/${pollId}/`; const validOptions = pollOptions.map((o) => o.trim()).filter(Boolean); if (!textContent.trim() || validOptions.length < 2) { alert("Poll must have a question and at least 2 options."); setSaving(false); return; } options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ question: textContent, options: validOptions }); } else { const communityId = post.raw_metadata?.community_id || post.community_id; if (!communityId) throw new Error("Missing community id"); url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/edit/`; if (type === "text") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ content: textContent }); } else if (type === "link") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ url: linkUrl, description: textContent }); } else if (type === "image") { const fd = new FormData(); fd.append("caption", imageCaption || ""); if (imageFile) fd.append("image", imageFile); body = fd; } } options.body = body; const res = await fetch(url, options); if (!res.ok) throw new Error("Update failed"); const data = await res.json(); let updated = { ...post }; if (type === "poll") { updated.content = data.question; updated.options = data.options; } else { const meta = data.metadata || post.raw_metadata || {}; if (type === "text") updated.content = meta.text || textContent; if (type === "link") { updated.content = meta.description; updated.link = meta.url; } if (type === "image") updated.content = meta.caption; } onSaved(updated); onClose(); } catch (e) { alert("Failed to update post: " + e.message); } finally { setSaving(false); } };
+  const handleSave = async () => { if (!post) return; setSaving(true); let options = { method: "PATCH", headers: { ...authHeader() } }; let body; let url; try { if (type === "poll") { const pollId = post.raw_metadata?.poll_id; if (!pollId) throw new Error("Missing poll_id"); url = `${API_ROOT}/activity/feed/polls/${pollId}/`; const validOptions = pollOptions.map((o) => o.trim()).filter(Boolean); if (!textContent.trim() || validOptions.length < 2) { setErrorMessage("Poll must have a question and at least 2 options."); setErrorOpen(true); setSaving(false); return; } options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ question: textContent, options: validOptions }); } else { const communityId = post.raw_metadata?.community_id || post.community_id; if (!communityId) throw new Error("Missing community id"); url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/edit/`; if (type === "text") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ content: textContent }); } else if (type === "link") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ url: linkUrl, description: textContent }); } else if (type === "image") { const fd = new FormData(); fd.append("caption", imageCaption || ""); if (imageFile) fd.append("image", imageFile); body = fd; } } options.body = body; const res = await fetch(url, options); if (!res.ok) { const data = await res.json(); const errorMessages = []; if (typeof data === "object" && data !== null) { Object.entries(data).forEach(([field, errors]) => { if (Array.isArray(errors)) { errors.forEach(err => errorMessages.push(typeof err === "string" ? err : err.detail || "Unknown error")); } else if (typeof errors === "string") { errorMessages.push(errors); } }); } throw new Error(errorMessages.length > 0 ? errorMessages.join("\n") : "Update failed"); } const data = await res.json(); let updated = { ...post }; if (type === "poll") { updated.content = data.question; updated.options = data.options; } else { const meta = data.metadata || post.raw_metadata || {}; if (type === "text") updated.content = meta.text || textContent; if (type === "link") { updated.content = meta.description; updated.link = meta.url; } if (type === "image") updated.content = meta.caption; } onSaved(updated); onClose(); } catch (e) { setErrorMessage(e.message); setErrorOpen(true); } finally { setSaving(false); } };
   const renderBody = () => {
-    if (type === "poll") return <><TextField fullWidth multiline minRows={3} label="Question" value={textContent} onChange={(e) => setTextContent(e.target.value)} sx={{ mb: 2 }} /><Stack spacing={1}><Typography variant="subtitle2">Options</Typography>{pollOptions.map((opt, i) => (<Stack key={i} direction="row" spacing={1}><TextField fullWidth size="small" value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} /><IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon fontSize="small" /></IconButton></Stack>))}<Button startIcon={<AddRoundedIcon />} onClick={() => setPollOptions((o) => [...o, ""])} size="small" sx={{ alignSelf: "flex-start" }}>Add Option</Button></Stack></>; if (type === "link") return <>
-      <TextField fullWidth label="Link URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} sx={{ mb: 2 }} />
-      <TextField fullWidth multiline minRows={3} label="Description" value={textContent} onChange={e => setTextContent(e.target.value)} />
-      {textContent && (
-        <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
-          <Typography variant="caption" color="text.secondary">Preview</Typography>
-          <ClampedText text={textContent} maxLines={5} />
-        </Box>
-      )}
-    </>; if (type === "image") return <Stack spacing={2}>
-      <TextField fullWidth multiline minRows={3} label="Caption" value={imageCaption} onChange={e => setImageCaption(e.target.value)} />
-      {imageCaption && (
-        <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
-          <Typography variant="caption" color="text.secondary">Preview</Typography>
-          <ClampedText text={imageCaption} maxLines={5} />
-        </Box>
-      )}
-      <Button variant="outlined" component="label">Change image<input hidden type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} /></Button>
-    </Stack>; return <>
-      <TextField fullWidth multiline minRows={3} label="Content" value={textContent} onChange={e => setTextContent(e.target.value)} />
-      {textContent && (
-        <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
-          <Typography variant="caption" color="text.secondary">Preview</Typography>
-          <ClampedText text={textContent} maxLines={5} />
-        </Box>
-      )}
-    </>;
+    const getCharCountColor = (count) => count > MAX_CHAR_LIMIT ? "#ef4444" : count > 800 ? "#f97316" : "text.secondary";
+
+    if (type === "poll") return (
+      <>
+        <TextField
+          fullWidth
+          multiline
+          minRows={3}
+          label="Question"
+          value={textContent}
+          onChange={(e) => setTextContent(e.target.value)}
+          sx={{ mb: 1 }}
+        />
+        <Typography variant="caption" sx={{ display: "block", mb: 2, color: getCharCountColor(textContent.length) }}>
+          {textContent.length} / {MAX_CHAR_LIMIT} characters
+        </Typography>
+        <Stack spacing={1}>
+          <Typography variant="subtitle2">Options</Typography>
+          {pollOptions.map((opt, i) => (
+            <Stack key={i} direction="row" spacing={1}>
+              <TextField
+                fullWidth
+                size="small"
+                value={opt}
+                onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }}
+              />
+              <IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}>
+                <RemoveRoundedIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+          ))}
+          <Button startIcon={<AddRoundedIcon />} onClick={() => setPollOptions((o) => [...o, ""])} size="small" sx={{ alignSelf: "flex-start" }}>
+            Add Option
+          </Button>
+        </Stack>
+      </>
+    );
+
+    if (type === "link") return (
+      <>
+        <TextField fullWidth label="Link URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} sx={{ mb: 2 }} />
+        <TextField
+          fullWidth
+          multiline
+          minRows={3}
+          label="Description"
+          value={textContent}
+          onChange={e => setTextContent(e.target.value)}
+          sx={{ mb: 1 }}
+        />
+        <Typography variant="caption" sx={{ display: "block", mb: 2, color: getCharCountColor(textContent.length) }}>
+          {textContent.length} / {MAX_CHAR_LIMIT} characters
+        </Typography>
+        {textContent && (
+          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+            <Typography variant="caption" color="text.secondary">Preview</Typography>
+            <ClampedText text={textContent} maxLines={5} />
+          </Box>
+        )}
+      </>
+    );
+
+    if (type === "image") return (
+      <Stack spacing={2}>
+        <div>
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            label="Caption"
+            value={imageCaption}
+            onChange={e => setImageCaption(e.target.value)}
+            sx={{ mb: 1 }}
+          />
+          <Typography variant="caption" sx={{ display: "block", mb: 2, color: getCharCountColor(imageCaption.length) }}>
+            {imageCaption.length} / {MAX_CHAR_LIMIT} characters
+          </Typography>
+        </div>
+        {imageCaption && (
+          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+            <Typography variant="caption" color="text.secondary">Preview</Typography>
+            <ClampedText text={imageCaption} maxLines={5} />
+          </Box>
+        )}
+        <Button variant="outlined" component="label">
+          Change image
+          <input hidden type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} />
+        </Button>
+      </Stack>
+    );
+
+    return (
+      <>
+        <TextField
+          fullWidth
+          multiline
+          minRows={3}
+          label="Content"
+          value={textContent}
+          onChange={e => setTextContent(e.target.value)}
+          sx={{ mb: 1 }}
+        />
+        <Typography variant="caption" sx={{ display: "block", mb: 2, color: getCharCountColor(textContent.length) }}>
+          {textContent.length} / {MAX_CHAR_LIMIT} characters
+        </Typography>
+        {textContent && (
+          <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+            <Typography variant="caption" color="text.secondary">Preview</Typography>
+            <ClampedText text={textContent} maxLines={5} />
+          </Box>
+        )}
+      </>
+    );
   };
-  return <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"><DialogTitle>Edit Post</DialogTitle><DialogContent dividers>{renderBody()}</DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></DialogActions></Dialog>;
+  return (
+    <>
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+        <DialogTitle>Edit Post</DialogTitle>
+        <DialogContent dividers>{renderBody()}</DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Snackbar
+        open={errorOpen}
+        autoHideDuration={6000}
+        onClose={() => setErrorOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert
+          onClose={() => setErrorOpen(false)}
+          severity="error"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {errorMessage}
+        </Alert>
+      </Snackbar>
+    </>
+  );
 }
 
 function PostDeleteConfirm({ open, post, onClose, onDeleted }) {
