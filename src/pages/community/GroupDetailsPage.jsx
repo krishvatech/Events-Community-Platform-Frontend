@@ -1270,6 +1270,18 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
       metrics: { ...local.metrics, likes: nextLikes }
     };
     setLocal(nextState);
+
+    // Update likerPreview to reflect the reaction change
+    setLikerPreview(prev => {
+      // Remove current user's old reaction
+      const filtered = prev.filter(u => u.id !== viewerId);
+      // Add back with new reaction if not null
+      if (nextReaction && viewerId) {
+        return [{ id: viewerId, name: "You", reactionId: nextReaction }, ...filtered];
+      }
+      return filtered;
+    });
+
     onReact(local.id, reactionId); // Call parent to sync API
   };
 
