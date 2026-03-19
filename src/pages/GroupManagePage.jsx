@@ -282,10 +282,14 @@ function PollVotersDialog({ open, onClose, option, postId }) {
                     const raw = Array.isArray(data.results) ? data.results : [];
                     setRows(raw.map(r => {
                         const u = r.user || r.voter || r;
+                        const firstName = u.first_name || "";
+                        const lastName = u.last_name || "";
+                        const fullName = (firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || u.name || u.username || `User #${u.id}`).trim();
                         return {
                             id: u.id || u.user_id,
-                            name: u.name || u.full_name || u.username || `User #${u.id}`,
-                            avatar: toAbs(u.avatar || u.photo || u.profile_image || ""),
+                            name: fullName,
+                            avatar: toAbs(u.user_image_url || u.user_image || u.avatar || u.photo || u.profile_image || ""),
+                            kyc_status: u.kyc_status || u.profile?.kyc_status || null,
                             votedAt: r.voted_at || r.created_at
                         };
                     }));
@@ -321,7 +325,12 @@ function PollVotersDialog({ open, onClose, option, postId }) {
                                     <Avatar src={u.avatar}>{(u.name || "?")[0]}</Avatar>
                                 </ListItemAvatar>
                                 <ListItemText
-                                    primary={u.name}
+                                    primary={
+                                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                                            <span>{u.name}</span>
+                                            {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                                        </Stack>
+                                    }
                                     secondary={u.votedAt ? new Date(u.votedAt).toLocaleDateString() : null}
                                 />
                             </ListItem>
