@@ -1233,7 +1233,6 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
     new Set(
       [
         ...likerPreview.map(u => u.reactionId).filter(Boolean),
-        myReactionId,
       ].filter(Boolean)
     )
   );
@@ -1682,10 +1681,32 @@ function PostsTab({ groupId, group, moderatorCanI }) {
     try {
       const p = posts.find(x => x.id === postId);
       const target = engageTargetOf(p);
-      await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+      const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ target_type: target.type || "activity_feed.feeditem", target_id: target.id, reaction: reactionId })
       });
+      if (res.ok) {
+        const data = await res.json();
+        const isSame = p.my_reaction === reactionId;
+        const nextReaction = isSame ? null : reactionId;
+
+        // Update just this post without reloading the entire tab
+        setPosts(curr => curr.map(post =>
+          post.id === postId
+            ? {
+                ...post,
+                my_reaction: nextReaction,
+                user_has_liked: !!nextReaction,
+                metrics: {
+                  ...post.metrics,
+                  likes: nextReaction && !p.my_reaction ? post.metrics.likes + 1 :
+                         !nextReaction && p.my_reaction ? Math.max(0, post.metrics.likes - 1) :
+                         post.metrics.likes
+                }
+              }
+            : post
+        ));
+      }
     } catch (e) { console.error(e); }
   };
 
