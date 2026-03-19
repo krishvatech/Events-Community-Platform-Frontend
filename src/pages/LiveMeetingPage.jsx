@@ -6594,7 +6594,7 @@ export default function NewLiveMeeting() {
             showSnackbar("Request Assistance is available only in the Main Room.", "info");
           } else if (msg.reason === "not_registered") {
             setAttendeeSupportFeedback({ kind: "idle", reason: "not_registered" });
-            showSnackbar("You are not registered for this event.", "error");
+            showSnackbar("Support assistance is not available to guest users. Register now to enjoy enhanced features, networking, and more benefits.", "error");
           } else if (msg.reason === "not_online") {
             setAttendeeSupportFeedback({ kind: "idle", reason: "not_online" });
             showSnackbar("Your presence is still syncing. Please try again.", "warning");
