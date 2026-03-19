@@ -1828,7 +1828,12 @@ function PostSocialBar({ communityId, post, onCounts }) {
         u?.avatar_url || u?.user_image_url || u?.user_image ||
         u?.avatar || u?.photo || u?.image || u?.profile?.avatar_url || u?.profile?.avatar ||
         r.user_image || r.user_image_url || r.avatar || "";
-      return id ? { id, name, avatar: absMedia(rawAvatar) } : null;
+
+      // Extract reaction info
+      const reactionId = r.reaction || r.reaction_type || r.kind || "like";
+      const reactionDef = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0];
+
+      return id ? { id, name, avatar: absMedia(rawAvatar), reactionId, reactionEmoji: reactionDef.emoji, reactionLabel: reactionDef.label } : null;
     }).filter(Boolean);
   };
 
@@ -1918,40 +1923,47 @@ function PostSocialBar({ communityId, post, onCounts }) {
 
   return (
     <>
-      {/* Meta strip: avatars + "Name and N others"  |  counts on the right */}
+      {/* Meta strip: avatars + "reacted by" text + emoji | shares count */}
       <Box sx={{ px: 1.25, pt: 0.75, pb: 0.5 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          {/* Left: liker avatars + sentence */}
+          {/* Left: emoji avatars + "reacted by" text */}
           <Stack
             direction="row"
-            spacing={1}
+            spacing={0.75}
             alignItems="center"
             sx={{ cursor: "pointer" }}
             onClick={() => setLikesOpen(true)}
           >
+            {/* Emoji avatars */}
             <AvatarGroup
-              max={3}
-              sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}
+              max={2}
+              sx={{ "& .MuiAvatar-root": { width: 28, height: 28, fontSize: 14 } }}
             >
-              {(likers || []).slice(0, 3).map((u) => (
-                <Avatar key={u.id || u.name} src={u.avatar} alt={u.name}>
-                  {(u.name || "U").slice(0, 1)}
+              {likers.length > 0 && likers[0].reactionEmoji && (
+                <Tooltip title={likers[0].reactionLabel}>
+                  <Avatar sx={{ bgcolor: "transparent" }}>
+                    {likers[0].reactionEmoji}
+                  </Avatar>
+                </Tooltip>
+              )}
+              {likers.length > 1 && likers[1].avatar && (
+                <Avatar src={likers[1].avatar}>
+                  {(likers[1].name || "U").slice(0, 1)}
                 </Avatar>
-              ))}
+              )}
             </AvatarGroup>
 
+            {/* "reacted by" text */}
             <Typography variant="body2">
-              {/* If we have specific names, show them, otherwise generic count */}
               {likers.length > 0 ? (
                 <>
-                  Reacted by {likers[0].name}
+                  reacted by {likers[0].name}
                   {likeCount > 1 && ` and ${Math.max(0, likeCount - 1).toLocaleString()} others`}
                 </>
               ) : (
                 `${(likeCount || 0).toLocaleString()} reactions`
               )}
             </Typography>
-
           </Stack>
 
           {/* Right: shares */}
