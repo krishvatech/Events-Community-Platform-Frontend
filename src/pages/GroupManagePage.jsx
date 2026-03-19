@@ -347,7 +347,7 @@ function PollVotersDialog({ open, onClose, option, postId }) {
     );
 }
 
-function PollResultsBlock({ post }) {
+function PollResultsBlock({ post, onVote }) {
     const options = Array.isArray(post?.options) ? post.options : [];
     const userVotes = Array.isArray(post?.user_votes) ? post.user_votes : [];
     const totalVotes = options.reduce(
@@ -355,6 +355,7 @@ function PollResultsBlock({ post }) {
         0
     );
     const question = post?.question || post?.text || "";
+    const canVote = !post?.is_closed;
 
     const [votersOpen, setVotersOpen] = React.useState(false);
     const [scannedOption, setScannedOption] = React.useState(null);
@@ -362,6 +363,13 @@ function PollResultsBlock({ post }) {
     const handleOpenVoters = (opt) => {
         setScannedOption(opt);
         setVotersOpen(true);
+    };
+
+    const tryVote = (optionId, meta) => {
+        if (!canVote || !optionId) return;
+        const chosen = userVotes.includes(optionId);
+        if (chosen) return;
+        onVote?.(optionId, meta);
     };
 
     return (
@@ -388,11 +396,16 @@ function PollResultsBlock({ post }) {
                             <Paper
                                 key={optionId ?? `${label}-${idx}`}
                                 variant="outlined"
+                                onClick={() => tryVote(optionId, { label, idx })}
+                                role="button"
+                                tabIndex={0}
                                 sx={{
                                     p: 1,
                                     borderRadius: 2,
                                     borderColor: "#e2e8f0",
                                     bgcolor: chosen ? "action.selected" : "background.paper",
+                                    cursor: canVote && !chosen ? "pointer" : "default",
+                                    "&:hover": canVote && !chosen ? { borderColor: "primary.main" } : undefined,
                                 }}
                             >
                                 <Stack spacing={0.5}>
@@ -421,7 +434,10 @@ function PollResultsBlock({ post }) {
                                                     size="small"
                                                     variant="outlined"
                                                     sx={{ py: 0, px: 1, minWidth: "auto", height: 24, fontSize: "0.7rem", textTransform: "none" }}
-                                                    onClick={() => handleOpenVoters(opt)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenVoters(opt);
+                                                    }}
                                                 >
                                                     Voters
                                                 </Button>
@@ -4469,6 +4485,51 @@ export default function GroupManagePage() {
         }
     }, [canSeeNotificationsTab, canReviewRequests, tab, fetchRequests, fetchPromotionRequests]);
 
+    // VOTE on poll
+    const voteOnPoll = async (post, optionId, meta) => {
+        // Resolve optionId if missing (by label/index from the UI)
+        if (!optionId) {
+            const byIdx = (meta && Number.isInteger(meta.idx)) ? post.options?.[meta.idx] : null;
+            const byLabel = (post.options || []).find(o => (o.label || o.text) === meta?.label);
+            const picked = byIdx || byLabel || null;
+            optionId = picked?.id || picked?.option_id || null;
+            if (!optionId) { alert("Could not resolve option id"); return; }
+        }
+
+        const headers = {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+
+        try {
+            const url = `${API_ROOT}/activity/feed/${post.id}/poll/vote/`;
+            const res = await fetch(url, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ option_ids: [optionId] }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const payload = await res.json();
+
+            // Backend may return { ok, poll: {...} } or a flat poll-like object
+            const p = payload.poll || payload;
+            const updated = {
+                ...post,
+                is_closed: Boolean(p.is_closed),
+                user_votes: Array.isArray(p.user_votes) ? p.user_votes : post.user_votes || [],
+                options: (p.options || []).map(o => ({
+                    id: o.id || o.option_id,
+                    label: o.text || o.label,
+                    votes: o.vote_count ?? o.votes ?? 0,
+                })),
+            };
+            setPosts(curr => curr.map(x => (x.id === post.id ? updated : x)));
+        } catch (err) {
+            console.error(err);
+            alert("Failed to vote: " + err.message);
+        }
+    };
+
     // Helpers for poll options
     const updatePollOption = (idx, val) => {
         setPollOptions((prev) => {
@@ -6042,7 +6103,7 @@ export default function GroupManagePage() {
                                                                                 )}
                                                                             </>
                                                                         ) : p.type === "poll" ? (
-                                                                            <PollResultsBlock post={p} />
+                                                                            <PollResultsBlock post={p} onVote={(optionId, meta) => voteOnPoll(p, optionId, meta)} />
 
                                                                         ) : (
                                                                             <ClampedText text={p.text || ""} />
