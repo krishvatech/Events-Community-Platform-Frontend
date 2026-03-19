@@ -15910,8 +15910,8 @@ export default function NewLiveMeeting() {
                                         </IconButton>
                                       </Tooltip>
 
-                                      {/* Audience can DM Host; Host should NOT see message icon on own name */}
-                                      {!isHost && (
+                                      {/* Audience can DM Host; Host should NOT see message icon on own name; Guest attendees cannot DM */}
+                                      {!isHost && !/^guest[_:-]/i.test(String(m._raw?.customParticipantId || m.id)) && (
                                         <Tooltip title={isOnBreak ? "Disabled during break" : "Send Direct Message"}>
                                           <IconButton
                                             size="small"
@@ -16659,8 +16659,8 @@ export default function NewLiveMeeting() {
                                       </IconButton>
                                     </Tooltip>
 
-                                    {/* MESSAGE ICON */}
-                                    {!isSelfMember(m) && (
+                                    {/* MESSAGE ICON - Hide for guest attendees */}
+                                    {!isSelfMember(m) && !/^guest[_:-]/i.test(String(m._raw?.customParticipantId || m.id)) && (
                                       <Tooltip title={isOnBreak ? "Disabled during break" : "Send Direct Message"}>
                                         <IconButton
                                           size="small"
