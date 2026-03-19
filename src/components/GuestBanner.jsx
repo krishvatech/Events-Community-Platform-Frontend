@@ -89,7 +89,7 @@ export default function GuestBanner({ guestName, onRegister, onClose }) {
             display: { xs: "none", md: "block" },
           }}
         >
-          Register to save networking connections and access recordings
+          Register now to enjoy enhanced features, networking, and more benefits.
         </Typography>
       </Stack>
       <Button

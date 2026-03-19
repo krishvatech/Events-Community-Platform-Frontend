@@ -162,6 +162,23 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
       localStorage.setItem("guest_email", data.email);
       localStorage.setItem("guest_name", data.name);
       localStorage.setItem("guest_id", String(data.guest_id));
+      // Store company and job_title from API response (ensures sync with backend)
+      localStorage.setItem("guest_company", data.company || form.company_name.trim());
+      localStorage.setItem("guest_job_title", data.job_title || form.job_title.trim());
+
+      // ✅ DEBUG: Log stored values
+      console.debug("[GuestJoinModal] API Response:", {
+        company: data.company,
+        job_title: data.job_title,
+      });
+      console.debug("[GuestJoinModal] Form values:", {
+        company_name: form.company_name.trim(),
+        job_title: form.job_title.trim(),
+      });
+      console.debug("[GuestJoinModal] Stored in localStorage:", {
+        guest_company: localStorage.getItem("guest_company"),
+        guest_job_title: localStorage.getItem("guest_job_title"),
+      });
 
       // Store persistent guest session cache (survives token expiry)
       const cacheData = {

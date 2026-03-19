@@ -4826,13 +4826,22 @@ export default function NewLiveMeeting() {
       const result = await response.json();
       const guest = result.guest;
 
-      // Populate form with fetched data
+      // ✅ Store fetched profile data in Dyte participant's _raw object for other participants to see
+      if (dyteMeeting?.self && dyteMeeting.self._raw) {
+        dyteMeeting.self._raw.guest_first_name = guest.first_name;
+        dyteMeeting.self._raw.guest_last_name = guest.last_name;
+        dyteMeeting.self._raw.guest_company = guest.company;
+        dyteMeeting.self._raw.guest_job_title = guest.job_title;
+        dyteMeeting.self._raw.guest_email = guest.email;
+      }
+
+      // Populate form with fetched data (with fallback to cached values from Dyte and localStorage)
       setGuestProfileForm({
-        first_name: guest.first_name || "",
-        last_name: guest.last_name || "",
-        company: guest.company || "",
-        job_title: guest.job_title || "",
-        email: guest.email || "",
+        first_name: guest.first_name ?? dyteMeeting?.self?._raw?.guest_first_name ?? "",
+        last_name: guest.last_name ?? dyteMeeting?.self?._raw?.guest_last_name ?? "",
+        company: guest.company ?? dyteMeeting?.self?._raw?.guest_company ?? localStorage.getItem("guest_company") ?? "",
+        job_title: guest.job_title ?? dyteMeeting?.self?._raw?.guest_job_title ?? localStorage.getItem("guest_job_title") ?? "",
+        email: guest.email ?? dyteMeeting?.self?._raw?.guest_email ?? "",
       });
 
       setGuestProfileEditOpen(true);
@@ -4918,6 +4927,8 @@ export default function NewLiveMeeting() {
 
       // ✅ Update localStorage and state so the banner updates
       localStorage.setItem("guest_name", result.guest.name);
+      localStorage.setItem("guest_company", result.guest.company || "");
+      localStorage.setItem("guest_job_title", result.guest.job_title || "");
       setCurrentGuestName(result.guest.name);
 
       // ✅ Broadcast profile update to all participants so host sees the change
@@ -10962,6 +10973,57 @@ export default function NewLiveMeeting() {
     setParticipantsTick((v) => v + 1);
   }, [authToken]);
 
+  // ✅ Initialize guest profile data when guest joins the meeting
+  useEffect(() => {
+    if (!isGuest || !roomJoined || !dyteMeeting?.self || !eventId) return;
+
+    let mounted = true;
+    const initializeGuestProfile = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        if (!token) return;
+
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+        const response = await fetch(`${API_BASE}/events/${eventId}/guest-profile/`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) return;
+
+        const result = await response.json();
+        const guest = result.guest;
+
+        if (!mounted) return;
+
+        // Store guest profile data in Dyte participant's _raw object for visibility to other participants
+        if (dyteMeeting?.self && dyteMeeting.self._raw) {
+          dyteMeeting.self._raw.guest_first_name = guest.first_name;
+          dyteMeeting.self._raw.guest_last_name = guest.last_name;
+          dyteMeeting.self._raw.guest_company = guest.company;
+          dyteMeeting.self._raw.guest_job_title = guest.job_title;
+          dyteMeeting.self._raw.guest_email = guest.email;
+        }
+
+        // Update localStorage as well
+        localStorage.setItem("guest_company", guest.company || "");
+        localStorage.setItem("guest_job_title", guest.job_title || "");
+
+        console.log("[GuestProfileInit] Initialized guest profile data:", {
+          company: guest.company,
+          job_title: guest.job_title,
+        });
+      } catch (error) {
+        console.warn("[GuestProfileInit] Error initializing guest profile:", error);
+      }
+    };
+
+    initializeGuestProfile();
+    return () => { mounted = false; };
+  }, [isGuest, roomJoined, dyteMeeting, eventId]);
+
   // Explicit poll via SDK helper (getAll) for SDK variants that don't expose collections
   useEffect(() => {
     if (!dyteMeeting?.participants) return;
@@ -11385,6 +11447,8 @@ export default function NewLiveMeeting() {
           userId: String(u.user_id),
           user_id: String(u.user_id),
           is_guest: Boolean(u?.is_guest),
+          guest_company: u?.company || "",
+          guest_job_title: u?.job_title || "",
         },
       }));
   }, [isHost, isBreakout, onlineUsers, participants]);
@@ -19098,6 +19162,7 @@ export default function NewLiveMeeting() {
                 onClose={closeMemberInfo}
                 isGuest={isGuest}
                 onSignUp={() => setGuestRegModalOpen(true)}
+                eventId={eventId}
               />
             ) : (
               <Box sx={{ py: 4, textAlign: "center", opacity: 0.5 }}>
@@ -20763,7 +20828,7 @@ export default function NewLiveMeeting() {
 }
 
 // ✅ Separate sub-component to handle async friendship logic locally
-function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp = () => {} }) {
+function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp = () => {}, eventId = null }) {
   const [connStatus, setConnStatus] = useState("loading"); // "loading" | "none" | "friends" | "pending_outgoing" | "pending_incoming"
   const [connLoading, setConnLoading] = useState(false);
   const [profileInfo, setProfileInfo] = useState(null);
@@ -20818,13 +20883,76 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
       return () => { };
     }
     if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
-      setProfileInfo({
-        jobTitle: "Guest attendee",
-        company: "",
-        location: "",
-        kycStatus: "",
-      });
-      setProfileLoading(false);
+      // For guests, try to fetch profile data from backend
+      const fetchGuestProfile = async () => {
+        try {
+          setProfileLoading(true);
+
+          console.debug("[MemberInfoContent] Guest participant detected:", { userId, eventId });
+
+          // Extract guest_id from userId (format: "guest_123" or "guest:123" or "guest-123")
+          const guestIdMatch = userId.match(/^guest[_:-]?(\d+)/i);
+          const guestId = guestIdMatch ? guestIdMatch[1] : null;
+
+          console.debug("[MemberInfoContent] Guest ID extraction:", { userId, guestId, match: guestIdMatch });
+
+          if (!guestId) {
+            console.debug("[MemberInfoContent] No guest ID extracted, using fallback");
+            // Fallback: use _raw data or localStorage
+            const jobTitleFromRaw = selectedMember?._raw?.guest_job_title;
+            const companyFromRaw = selectedMember?._raw?.guest_company;
+            setProfileInfo({
+              jobTitle: jobTitleFromRaw ?? localStorage.getItem("guest_job_title") ?? "Guest attendee",
+              company: companyFromRaw ?? localStorage.getItem("guest_company") ?? "",
+              location: "",
+              kycStatus: "",
+            });
+            setProfileLoading(false);
+            return;
+          }
+
+          const headers = { accept: "application/json", ...authHeader() };
+          const url = toApiUrl(`events/${eventId}/guests/${guestId}/profile/`);
+
+          console.debug("[MemberInfoContent] Fetching guest profile from:", url);
+
+          const res = await fetch(url, { headers });
+          const responseText = await res.text();
+
+          console.debug("[MemberInfoContent] API response status:", res.status, "body:", responseText);
+
+          if (!res.ok) {
+            throw new Error(`Failed to fetch guest profile: ${res.status} - ${responseText}`);
+          }
+
+          const data = JSON.parse(responseText);
+          if (!alive) return;
+
+          console.debug("[MemberInfoContent] Guest profile data:", data);
+
+          setProfileInfo({
+            jobTitle: data.guest?.job_title || selectedMember?._raw?.guest_job_title || "Guest attendee",
+            company: data.guest?.company || selectedMember?._raw?.guest_company || "",
+            location: "",
+            kycStatus: "",
+          });
+        } catch (error) {
+          console.error("[MemberInfoContent] Error fetching guest profile:", error);
+          // Fallback to _raw or localStorage
+          const jobTitleFromRaw = selectedMember?._raw?.guest_job_title;
+          const companyFromRaw = selectedMember?._raw?.guest_company;
+          setProfileInfo({
+            jobTitle: jobTitleFromRaw ?? localStorage.getItem("guest_job_title") ?? "Guest attendee",
+            company: companyFromRaw ?? localStorage.getItem("guest_company") ?? "",
+            location: "",
+            kycStatus: "",
+          });
+        } finally {
+          setProfileLoading(false);
+        }
+      };
+
+      fetchGuestProfile();
       return () => { };
     }
 
