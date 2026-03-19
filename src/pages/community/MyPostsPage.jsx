@@ -371,12 +371,17 @@ function PostCard({
         const rows = rawResults.map(r => {
           const u = r.user || r.voter || r;
           const uId = u.id || u.user_id;
-          const uName = u.name || u.full_name || u.username || `User #${uId}`;
+          const firstName = u.first_name || "";
+          const lastName = u.last_name || "";
+          const displayName = firstName || lastName ? `${firstName} ${lastName}`.trim() : (u.name || u.full_name || u.username || `User #${uId}`);
           const uAvatar = toAbsolute(u.avatar || u.user_image || u.user_image_url);
           return {
             id: uId,
-            name: uName,
+            firstName,
+            lastName,
+            name: displayName,
             avatar: uAvatar,
+            kycStatus: u.kyc_status || null,
             votedAt: r.voted_at || r.created_at
           };
         });
@@ -858,7 +863,16 @@ function PostCard({
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
-                    primary={u.name}
+                    primary={
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography variant="body2" fontWeight={500}>{u.name}</Typography>
+                        {u.kycStatus === "approved" && (
+                          <Tooltip title="KYC Verified">
+                            <VerifiedIcon sx={{ fontSize: "1rem", color: "#1976d2" }} />
+                          </Tooltip>
+                        )}
+                      </Stack>
+                    }
                     secondary={u.votedAt ? new Date(u.votedAt).toLocaleDateString() : null}
                   />
                 </ListItem>
