@@ -2676,13 +2676,10 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
         }
     }
 
-    // Unique reaction types for emoji bubbles
+    // Unique reaction types for emoji bubbles (only from people who reacted)
     const reactionIds = Array.from(
         new Set(
-            [
-                ...likerPreview.map(u => u.reactionId).filter(Boolean),
-                myReaction,
-            ].filter(Boolean)
+            likerPreview.map(u => u.reactionId).filter(Boolean)
         )
     );
 
