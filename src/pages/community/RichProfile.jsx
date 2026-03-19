@@ -61,6 +61,7 @@ import EventIcon from "@mui/icons-material/Event";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FlagIcon from "@mui/icons-material/Flag";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ReportProfileDialog from "../../components/ReportProfileDialog.jsx";
 import { Menu, MenuItem } from "@mui/material";
 import { isAdminUser } from "../../utils/adminRole";
@@ -717,6 +718,7 @@ function RichPostCard({
               post.options.length > 0 &&
               (() => {
                 // Normalise options and compute totals (same logic style as HomePage)
+                const userVotes = Array.isArray(post.user_votes) ? post.user_votes : [];
                 const normalized = post.options.map((opt, idx) => {
                   const optionId =
                     typeof opt === "object"
@@ -756,6 +758,7 @@ function RichPostCard({
                         totalVotes > 0
                           ? Math.round((votes / totalVotes) * 100)
                           : 0;
+                      const userVoted = optionId && userVotes.includes(optionId);
 
                       return (
                         <Box
@@ -780,7 +783,18 @@ function RichPostCard({
                             alignItems="center"
                             sx={{ mb: 0.5 }}
                           >
-                            <Typography variant="body2">{label}</Typography>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Typography variant="body2">{label}</Typography>
+                              {userVoted && (
+                                <Chip
+                                  size="small"
+                                  icon={<CheckCircleOutlineIcon sx={{ fontSize: 16 }} />}
+                                  label="Your vote"
+                                  color="success"
+                                  variant="outlined"
+                                />
+                              )}
+                            </Stack>
                             <Typography variant="body2" fontWeight={600}>
                               {pct}%
                             </Typography>
@@ -2277,6 +2291,22 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
         if (!res.ok) {
           console.error("Poll vote failed:", res.status);
+          return;
+        }
+
+        const data = await res.json().catch(() => null);
+        if (data?.poll && data.ok) {
+          setPosts((prev) =>
+            prev.map((p) =>
+              p.id === postId
+                ? {
+                    ...p,
+                    options: data.poll.options || p.options,
+                    user_votes: data.poll.user_votes || [],
+                  }
+                : p
+            )
+          );
         }
       } catch (err) {
         console.error("Poll vote error:", err);
@@ -2515,6 +2545,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         row.liked_by_me
       );
 
+    const user_votes = Array.isArray(m.user_votes) ? m.user_votes : Array.isArray(row.user_votes) ? row.user_votes : [];
+
     return {
       id,
       type,
@@ -2529,6 +2561,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       comment_count,
       share_count,
       liked_by_me,
+      user_votes,
       moderation_status: row.moderation_status ?? m.moderation_status ?? row.moderationStatus ?? m.moderationStatus ?? row.status ?? m.status ?? null,
       is_removed: row.is_removed ?? m.is_removed ?? (row.moderation_status === "removed") ?? (m.moderationStatus === "removed") ?? (m.status === "removed") ?? (row.status === "removed") ?? false,
     };
