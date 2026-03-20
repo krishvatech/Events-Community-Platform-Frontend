@@ -589,8 +589,8 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
             )}
           </Stack>
 
-          {/* Status Badge (Accepted/Declined/Pending) */}
-          {renderStatus()}
+          {/* Status Badge (Accepted/Declined/Pending) - Don't show for moderation reports */}
+          {!isModerationReport && renderStatus()}
         </Stack>
       </Stack>
     </Paper>
