@@ -1481,6 +1481,7 @@ export default function AdminUserProfileEditPage() {
     skillsText: "", linksText: "", avatar: "", kyc_status: "not_started",
     legal_name_locked: false, kyc_decline_reason: "", directory_hidden: false,
     connections_hidden: false, hide_from_others_connections: false,
+    anonymous_profile_views: false,
     pending_verification_request: false,
   });
 
@@ -1713,6 +1714,7 @@ export default function AdminUserProfileEditPage() {
     directory_hidden: false,
     connections_hidden: false,
     hide_from_others_connections: false,
+    anonymous_profile_views: false,
   });
 
   // --- Email Verification State ---
@@ -1854,6 +1856,7 @@ export default function AdminUserProfileEditPage() {
           directory_hidden: prof.directory_hidden || false,
           connections_hidden: prof.connections_hidden || false,
           hide_from_others_connections: prof.hide_from_others_connections || false,
+          anonymous_profile_views: prof.anonymous_profile_views || false,
           pending_verification_request: prof.pending_verification_request || false,
         });
         setPostsCount(Number(data?.posts_count) || 0);
@@ -2542,6 +2545,7 @@ export default function AdminUserProfileEditPage() {
       directory_hidden: form.directory_hidden || false,
       connections_hidden: form.connections_hidden || false,
       hide_from_others_connections: form.hide_from_others_connections || false,
+      anonymous_profile_views: form.anonymous_profile_views || false,
     });
     setPrivacyOpen(true);
   }
@@ -2557,6 +2561,7 @@ export default function AdminUserProfileEditPage() {
           directory_hidden: privacySettings.directory_hidden,
           connections_hidden: privacySettings.connections_hidden,
           hide_from_others_connections: privacySettings.hide_from_others_connections,
+          anonymous_profile_views: privacySettings.anonymous_profile_views,
         },
       };
 
@@ -4197,6 +4202,20 @@ export default function AdminUserProfileEditPage() {
                                 />
                                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                                   Turn ON to remove your name from other members&apos; visible connection lists.
+                                </Typography>
+                              </Box>
+                              <Box>
+                                <FormControlLabel
+                                  control={
+                                    <Switch
+                                      checked={privacySettings.anonymous_profile_views}
+                                      onChange={(e) => setPrivacySettings((prev) => ({ ...prev, anonymous_profile_views: e.target.checked }))}
+                                    />
+                                  }
+                                  label="Don't disclose which profiles I have visited"
+                                />
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                  Turn ON to hide your identity when viewing other profiles. You'll appear as "Someone" to profile owners instead of your name.
                                 </Typography>
                               </Box>
                             </Stack>

@@ -2412,6 +2412,10 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
 
+  // --- VISITORS STATE ---
+  const [visitors, setVisitors] = useState([]);
+  const [visitorsLoading, setVisitorsLoading] = useState(false);
+
   const [visiblePostCount, setVisiblePostCount] = useState(4);
   const [isLoadingMorePosts, setIsLoadingMorePosts] = useState(false);
   const postsObserverRef = React.useRef(null);
@@ -2456,6 +2460,35 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       setVisiblePostCount(4);
     }
   }, [postsLoading]);
+
+  // Fetch visitors when visitors tab is opened (tab === 2)
+  useEffect(() => {
+    if (!isMe || !viewerIsStaff || tab !== 2) {
+      return;
+    }
+
+    setVisitorsLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/users/me/profile-visitors/`, {
+          headers: { ...tokenHeader(), Accept: "application/json" },
+          credentials: "include",
+        });
+        if (!res.ok) {
+          console.error("Failed to fetch visitors:", res.status);
+          setVisitors([]);
+        } else {
+          const data = await res.json().catch(() => []);
+          setVisitors(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Error fetching visitors:", err);
+        setVisitors([]);
+      } finally {
+        setVisitorsLoading(false);
+      }
+    })();
+  }, [isMe, viewerIsStaff, tab]);
 
   function normalizePost(row = {}) {
     // unwrap + metadata (your API enriches feed rows here)
@@ -3647,6 +3680,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                   >
                     <Tab label="Posts" />
                     <Tab label="About" />
+                    {isMe && viewerIsStaff && <Tab label="Visitors" />}
                   </Tabs>
                   <Divider />
                   {tab === 0 && (
@@ -4298,6 +4332,78 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           )}
                         </Section>
                       </Stack>
+                    </CardContent>
+                  )}
+                  {isMe && viewerIsStaff && tab === 2 && (
+                    <CardContent>
+                      {visitorsLoading ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                          <CircularProgress size={32} />
+                        </Box>
+                      ) : visitors.length === 0 ? (
+                        <Box sx={{ textAlign: "center", py: 4 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            No profile visitors yet.
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <List disablePadding>
+                          {visitors.map((visitor) => (
+                            <ListItem
+                              key={visitor.id || Math.random()}
+                              disableGutters
+                              sx={{
+                                py: 1.5,
+                                px: 0,
+                                borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                                "&:last-child": { borderBottom: "none" },
+                              }}
+                            >
+                              <ListItemAvatar>
+                                <Avatar
+                                  src={visitor.avatar_url || ""}
+                                  sx={{ width: 40, height: 40, bgcolor: "primary.main" }}
+                                >
+                                  {visitor.avatar_url ? null : (visitor.full_name || visitor.username || "?").slice(0, 1).toUpperCase()}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText
+                                primary={
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    {visitor.is_anonymous ? "Someone" : visitor.full_name || visitor.username}
+                                  </Typography>
+                                }
+                                secondary={
+                                  <Stack spacing={0.5}>
+                                    {!visitor.is_anonymous && (
+                                      <>
+                                        {visitor.headline && (
+                                          <Typography variant="caption" color="text.secondary">
+                                            {visitor.headline}
+                                          </Typography>
+                                        )}
+                                        {visitor.company && (
+                                          <Typography variant="caption" color="text.secondary">
+                                            {visitor.company}
+                                          </Typography>
+                                        )}
+                                      </>
+                                    )}
+                                    {visitor.country && (
+                                      <Typography variant="caption" color="text.secondary">
+                                        📍 {visitor.country}
+                                      </Typography>
+                                    )}
+                                    <Typography variant="caption" color="text.secondary">
+                                      {new Date(visitor.viewed_at).toLocaleDateString()} {new Date(visitor.viewed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    </Typography>
+                                  </Stack>
+                                }
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      )}
                     </CardContent>
                   )}
                 </Card>
