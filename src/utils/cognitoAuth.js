@@ -73,7 +73,14 @@ export async function cognitoSignIn({ usernameOrEmail, password, candidates = []
     } catch (err) {
       lastErr = err;
       const code = err?.code || "";
-      if (code === "UserDisabledException" || code === "PasswordResetRequiredException") {
+      const message = err?.message || "";
+      // Throw immediately for terminal errors (disabled, password reset required, etc.)
+      // Also check message for "disabled" since Cognito returns NotAuthorizedException with that message
+      if (
+        code === "UserDisabledException" ||
+        code === "PasswordResetRequiredException" ||
+        message?.toLowerCase().includes("disabled")
+      ) {
         throw err;
       }
     }

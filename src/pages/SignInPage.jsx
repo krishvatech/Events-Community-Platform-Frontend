@@ -536,7 +536,12 @@ const SignInPage = () => {
       console.error("Login error:", err);
       let msg = err.message || 'Login failed. Please try again.';
 
-      if (err.code === 'UserDisabledException') {
+      // Check for disabled accounts (Cognito returns "User is disabled" in message)
+      const isDisabledAccount =
+        err.code === 'UserDisabledException' ||
+        err.message?.toLowerCase().includes('disabled');
+
+      if (isDisabledAccount) {
         msg = 'Your account has been suspended. Please contact support.';
       } else if (err.code === 'NotAuthorizedException') {
         msg = 'Incorrect username or password.';
