@@ -2420,6 +2420,11 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   const [isLoadingMorePosts, setIsLoadingMorePosts] = useState(false);
   const postsObserverRef = React.useRef(null);
 
+  // Reset tab to About (1) when userId changes
+  useEffect(() => {
+    setTab(1);
+  }, [userId]);
+
   const visiblePosts = useMemo(
     () => posts.slice(0, visiblePostCount),
     [posts, visiblePostCount]
@@ -4352,11 +4357,17 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                             <ListItem
                               key={visitor.id || Math.random()}
                               disableGutters
+                              onClick={() => !visitor.is_anonymous && navigate(`/community/rich-profile/${visitor.id}`)}
                               sx={{
                                 py: 1.5,
                                 px: 0,
                                 borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
                                 "&:last-child": { borderBottom: "none" },
+                                cursor: !visitor.is_anonymous ? "pointer" : "default",
+                                "&:hover": !visitor.is_anonymous ? {
+                                  backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                } : {},
+                                transition: "background-color 0.2s",
                               }}
                             >
                               <ListItemAvatar>
@@ -4369,9 +4380,16 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               </ListItemAvatar>
                               <ListItemText
                                 primary={
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                    {visitor.is_anonymous ? "Someone" : visitor.full_name || visitor.username}
-                                  </Typography>
+                                  <Stack direction="row" alignItems="center" gap={0.5}>
+                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                      {visitor.is_anonymous ? "Someone" : `${visitor.first_name || ""} ${visitor.last_name || ""}`.trim() || visitor.full_name || visitor.username}
+                                    </Typography>
+                                    {!visitor.is_anonymous && isVerifiedStatus(visitor.kyc_status || visitor.profile?.kyc_status) && (
+                                      <Tooltip title="Verified Member">
+                                        <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 16 }} />
+                                      </Tooltip>
+                                    )}
+                                  </Stack>
                                 }
                                 secondary={
                                   <Stack spacing={0.5}>
