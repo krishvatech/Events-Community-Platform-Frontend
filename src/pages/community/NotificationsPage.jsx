@@ -93,6 +93,15 @@ function isKycNotification(item) {
   return false;
 }
 
+// Helper to detect if a notification is a content report
+function isContentReport(item) {
+  if (item.kind === "system") {
+    const title = String(item?.title || "").toLowerCase();
+    if (title.includes("report")) return true;
+  }
+  return false;
+}
+
 // Keep Community Notifications page scoped to verification items only
 // - API notifications: kind="event" with data.type in ["kyc", "name_change"]
 // - Local identity request (pending only): kind="name_change" (_source="identity")
@@ -1043,6 +1052,8 @@ function NotificationRow({
           {(() => {
             const s = (item.state || "").toLowerCase();
             if (!s) return null;
+            // Don't show status badge for content reports
+            if (isContentReport(item)) return null;
 
             const common = {
               size: "small",
