@@ -27,6 +27,8 @@ export default function CommunityHubPage() {
   const renderContent = () => {
     switch (view) {
       case "home":
+        return <DashboardPage />;
+      case "profile":
         return <HomePage />;
       case "myposts":
         return <MyPostsPage />;
@@ -58,23 +60,7 @@ export default function CommunityHubPage() {
         boxSizing: "border-box",
       }}
     >
-      {view === "home" ? (
-        <DashboardPage />
-      ) : view === "profile" ? (
-        <HomePage />
-      ) : view === "myposts" ? (
-        <MyPostsPage />
-      ) : view === "live" ? (
-        <LiveFeedPage />
-      ) : view === "notify" ? (
-        <NotificationsPage />
-      ) : view === "messages" ? (
-        <MessagesPage />
-      ) : view === "members" ? (
-        <MembersPage />
-      ) : (
-        <GroupsPage />
-      )}
+      {renderContent()}
     </Box>
   );
 }
