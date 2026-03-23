@@ -14185,9 +14185,6 @@ export default function NewLiveMeeting() {
   }, [tab, isPanelOpen, eventId, activeTableId, isGuest]); // Re-connect when activeTableId changes
 
   const submitQuestion = async () => {
-    // ✅ Guard: prevent guests from submitting Q&A questions
-    if (isGuest) return;
-
     const content = newQuestion.trim();
     if (!content || !eventId) return;
 
@@ -15478,12 +15475,7 @@ export default function NewLiveMeeting() {
 
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
-              <GuestRestrictionOverlay
-                visible={isGuest}
-                message="In order to benefit from chatting with other participants, please register on our website."
-                onSignUp={() => setGuestRegModalOpen(true)}
-              >
-                <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                   {/* Q&A Messages Area */}
                   <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
                     {qnaError && (
@@ -15726,53 +15718,50 @@ export default function NewLiveMeeting() {
                   <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
 
                   {/* Q&A Input Area */}
-                  {!isGuest && (
-                    <Box
-                      component="form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        submitQuestion();
+                  <Box
+                    component="form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      submitQuestion();
+                    }}
+                    sx={{ p: 2 }}
+                  >
+                    <TextField
+                      fullWidth
+                      placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
+                      size="small"
+                      value={newQuestion}
+                      disabled={qnaSubmitting}
+                      onChange={(e) => setNewQuestion(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          submitQuestion();
+                        }
                       }}
-                      sx={{ p: 2 }}
-                    >
-                      <TextField
-                        fullWidth
-                        placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
-                        size="small"
-                        value={newQuestion}
-                        disabled={qnaSubmitting}
-                        onChange={(e) => setNewQuestion(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            submitQuestion();
-                          }
-                        }}
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                size="small"
-                                aria-label="Send question"
-                                onClick={submitQuestion}
-                                disabled={qnaSubmitting || newQuestion.trim().length === 0}
-                              >
-                                {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            bgcolor: "rgba(255,255,255,0.03)",
-                            borderRadius: 2,
-                          },
-                        }}
-                      />
-                    </Box>
-                  )}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              size="small"
+                              aria-label="Send question"
+                              onClick={submitQuestion}
+                              disabled={qnaSubmitting || newQuestion.trim().length === 0}
+                            >
+                              {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          bgcolor: "rgba(255,255,255,0.03)",
+                          borderRadius: 2,
+                        },
+                      }}
+                    />
+                  </Box>
                 </Box>
-              </GuestRestrictionOverlay>
             </TabPanel>
 
             {/* POLLS (Hidden) */}
