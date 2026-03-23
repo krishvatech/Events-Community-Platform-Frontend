@@ -603,6 +603,9 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
   const role = roleLabel(g);
   const memberStatus = membershipLabel(g);
   const accent = g.color || hashColor(g.name);
+  const category = g.category || null;
+  const subcategory = g.subcategory || null;
+  const desc = g.description || g.desc || null;
 
   const visibility = (g.visibility || "").toLowerCase();
   const jp = (g.join_policy || "").toLowerCase();
@@ -772,7 +775,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
               "&:hover": { textDecoration: (pending || joined) ? "none" : "underline" }
             }}
           >
-            {ctaLabel} {!joined && !pending && "→"}
+            {ctaText} {!joined && !pending && "→"}
           </Box>
         )}
         {canEdit && (
