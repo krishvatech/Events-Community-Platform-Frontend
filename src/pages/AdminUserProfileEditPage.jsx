@@ -52,7 +52,7 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import RichProfile from "./community/RichProfile";
-import { isOwnerUser } from "../utils/adminRole";
+import { isOwnerUser, getCurrentUserCandidate } from "../utils/adminRole";
 
 // -------------------- Constants for Dropdowns --------------------
 const CEFR_OPTIONS = [
@@ -1016,7 +1016,7 @@ function CompanyAutocomplete({ value, onChange, error, helperText }) {
 // -----------------------------------------------------------------------------
 // Avatar Upload Dialog
 // -----------------------------------------------------------------------------
-function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, onClose, onSaved, setSaving }) {
+function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, onClose, onSaved, setSaving, userId }) {
   const inputRef = useRef(null);
   const handleChoose = () => inputRef.current?.click();
   const handleFileChange = (e) => {
@@ -1053,8 +1053,12 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
     setSaving(false);
     if (!newUrl) { alert("Could not update photo."); return; }
     const finalUrl = `${newUrl}${newUrl.includes("?") ? "&" : "?"}_=${Date.now()}`;
-    // Dispatch event so Sidebar updates immediately
-    window.dispatchEvent(new CustomEvent("profile:avatar-updated", { detail: { avatar: finalUrl } }));
+    // Dispatch event only if user is editing their own profile (not admin editing someone else)
+    const currentUser = getCurrentUserCandidate();
+    const currentUserId = String(currentUser?.id || currentUser?.sub || currentUser?.user_id || "");
+    if (currentUserId === String(userId)) {
+      window.dispatchEvent(new CustomEvent("profile:avatar-updated", { detail: { avatar: finalUrl } }));
+    }
     onSaved(finalUrl);
   };
   return (
@@ -4484,6 +4488,7 @@ export default function AdminUserProfileEditPage() {
           setAvatarPreview("");
         }}
         setSaving={setAvatarSaving}
+        userId={userId}
       />
 
       {/* --- NEW DIALOG: Identity (Header Trigger) --- */}
