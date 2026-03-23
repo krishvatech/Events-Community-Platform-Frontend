@@ -16583,13 +16583,13 @@ export default function NewLiveMeeting() {
                               primary={
                                 <Stack spacing={1}>
                                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                                    <Tooltip title={isSelfMember(m) ? "Edit your profile" : "View Profile"} disableHoverListener={false}>
+                                    <Tooltip title={isSelfMember(m) && isGuest ? "Edit your profile" : ""} disableHoverListener={!isSelfMember(m) || !isGuest}>
                                       <span>
                                         <Typography
                                           noWrap
                                           sx={{ fontWeight: 700, fontSize: 13, cursor: (isSelfMember(m) || m.isVirtual) ? "pointer" : "pointer" }}
                                           onClick={() => {
-                                            if (isSelfMember(m) && !m.isVirtual) {
+                                            if (isSelfMember(m) && !m.isVirtual && isGuest) {
                                               handleOpenGuestProfileEdit();
                                             } else if (!isSelfMember(m) && !m.isVirtual) {
                                               openMemberInfo(m);
