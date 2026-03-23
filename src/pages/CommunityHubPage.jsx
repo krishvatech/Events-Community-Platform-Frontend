@@ -43,6 +43,8 @@ export default function CommunityHubPage() {
       case "contacts":
         return <MyContacts />;
       case "groups":
+        return <GroupsPage />;
+      case "forum":
       case "feed":
       default:
         return <GroupsPage />;

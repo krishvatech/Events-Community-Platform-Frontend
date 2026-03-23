@@ -175,8 +175,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         { label: "Dashboard", to: "/community?view=home", icon: HomeRoundedIcon },
         { label: "Upcoming Events", to: "/events", icon: EventNoteRoundedIcon },
         { label: "Live Feed", to: "/community?view=live", icon: LiveTvRoundedIcon },
-        { label: "Discussion Forum", to: "/community?view=feed", icon: ForumRoundedIcon },
-        { label: "Explore Groups", to: "/community?view=feed", icon: GroupsRoundedIcon },
+        { label: "Discussion Forum", to: "/community?view=forum", icon: ForumRoundedIcon },
+        { label: "Explore Groups", to: "/community?view=groups", icon: GroupsRoundedIcon },
         { label: "Explore Members", to: "/community?view=members", icon: Diversity3RoundedIcon },
     ];
 
