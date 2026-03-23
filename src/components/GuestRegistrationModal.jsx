@@ -216,26 +216,46 @@ export default function GuestRegistrationModal({ open, onClose }) {
     }
   };
 
+  const DARK_MODAL_PAPER_PROPS = {
+    sx: {
+      backgroundColor: "#1a1a1a",
+      backgroundImage: "none",
+      color: "rgba(255,255,255,0.95)",
+    },
+  };
+
+  const textFieldSx = {
+    "& .MuiOutlinedInput-root": {
+      color: "rgba(255,255,255,0.95)",
+      "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+      "&:hover fieldset": { borderColor: "rgba(255,255,255,0.5)" },
+      "&.Mui-focused fieldset": { borderColor: "primary.main" },
+    },
+    "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.5)", opacity: 1 },
+    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.7)" },
+    "& .MuiInputLabel-root.Mui-focused": { color: "primary.main" },
+  };
+
   // Success screen: verified and linked
   if (stage === "done") {
     return (
-      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-        <DialogTitle>Registration Complete</DialogTitle>
+      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={DARK_MODAL_PAPER_PROPS}>
+        <DialogTitle sx={{ fontWeight: 700, color: "rgba(255,255,255,0.95)" }}>Registration Complete</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 2 }}>
-            <Typography variant="body1">
+            <Typography variant="body1" sx={{ color: "rgba(255,255,255,0.95)" }}>
               Your account has been verified for{" "}
-              <Typography component="span" sx={{ fontWeight: 600 }}>
+              <Typography component="span" sx={{ fontWeight: 600, color: "rgba(255,255,255,0.95)" }}>
                 {form.email}
               </Typography>
               .
             </Typography>
 
-            <Typography variant="body2" color="textSecondary">
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.6)" }}>
               You can continue the event now and sign in anytime with this account.
             </Typography>
 
-            <Alert severity="info">
+            <Alert severity="info" sx={{ backgroundColor: "rgba(25, 103, 210, 0.1)", color: "#64B5F6" }}>
               Account setup completed successfully.
             </Alert>
 
@@ -248,7 +268,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
                 setPendingUsername("");
                 onClose();
               }}
-              sx={{ py: 1 }}
+              sx={{ py: 1, color: "#ffffff", fontWeight: 600 }}
             >
               Join Meeting Again
             </Button>
@@ -259,17 +279,17 @@ export default function GuestRegistrationModal({ open, onClose }) {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Complete Your Registration</DialogTitle>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={DARK_MODAL_PAPER_PROPS}>
+      <DialogTitle sx={{ fontWeight: 700, color: "rgba(255,255,255,0.95)" }}>Complete Your Registration</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           {error && (
-            <Alert severity="error" onClose={() => setError("")}>
+            <Alert severity="error" onClose={() => setError("")} sx={{ backgroundColor: "rgba(244, 67, 54, 0.1)", color: "#EF5350" }}>
               {error}
             </Alert>
           )}
 
-          <Typography variant="body2" color="textSecondary">
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.6)" }}>
             {stage === "confirm"
               ? "Enter the verification code sent to your email."
               : "Create an account to save your connections and access recordings."}
@@ -283,6 +303,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
             value={form.first_name}
             onChange={handleInputChange("first_name")}
             disabled={loading || stage === "confirm"}
+            sx={textFieldSx}
           />
           <TextField
             label="Last Name"
@@ -292,6 +313,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
             value={form.last_name}
             onChange={handleInputChange("last_name")}
             disabled={loading || stage === "confirm"}
+            sx={textFieldSx}
           />
           <TextField
             label="Email"
@@ -302,6 +324,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
             value={form.email}
             onChange={handleInputChange("email")}
             disabled={loading || stage === "confirm"}
+            sx={textFieldSx}
           />
 
           {/* Password field */}
@@ -314,6 +337,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
             value={form.password}
             onChange={handleInputChange("password")}
             disabled={loading || stage === "confirm"}
+            sx={textFieldSx}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
@@ -321,6 +345,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
                     onClick={() => setShowPassword(!showPassword)}
                     edge="end"
                     size="small"
+                    sx={{ color: "rgba(255,255,255,0.6)" }}
                   >
                     {showPassword ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
@@ -339,6 +364,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
             value={form.confirm_password}
             onChange={handleInputChange("confirm_password")}
             disabled={loading || stage === "confirm"}
+            sx={textFieldSx}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
@@ -346,6 +372,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
                     onClick={() => setShowConfirm(!showConfirm)}
                     edge="end"
                     size="small"
+                    sx={{ color: "rgba(255,255,255,0.6)" }}
                   >
                     {showConfirm ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
@@ -363,6 +390,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
               value={verifyCode}
               onChange={(e) => setVerifyCode(e.target.value.replace(/\s/g, ""))}
               disabled={loading}
+              sx={textFieldSx}
             />
           )}
 
@@ -378,7 +406,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
               !form.password ||
               !form.confirm_password
             }
-            sx={{ py: 1 }}
+            sx={{ py: 1, color: "#ffffff", fontWeight: 600 }}
           >
             {loading ? (
               <CircularProgress size={20} color="inherit" />
@@ -387,7 +415,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
             )}
           </Button>
 
-          <Typography variant="caption" color="textSecondary" sx={{ textAlign: "center" }}>
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
             {stage === "confirm"
               ? `Code sent to ${form.email}`
               : "Password must be at least 8 characters"}

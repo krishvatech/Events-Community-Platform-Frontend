@@ -19939,13 +19939,31 @@ export default function NewLiveMeeting() {
               />
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
             <Button
               onClick={handleCloseGuestProfileEdit}
               sx={{ color: "rgba(255,255,255,0.7)" }}
               disabled={guestProfileLoading}
             >
               Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                handleCloseGuestProfileEdit();
+                setGuestRegModalOpen(true);
+              }}
+              variant="outlined"
+              disabled={guestProfileLoading}
+              sx={{
+                borderColor: "rgba(76, 175, 80, 0.5)",
+                color: "#4CAF50",
+                "&:hover": {
+                  borderColor: "#4CAF50",
+                  bgcolor: "rgba(76, 175, 80, 0.05)",
+                },
+              }}
+            >
+              Sign Up
             </Button>
             <Button
               onClick={handleSaveGuestProfile}
