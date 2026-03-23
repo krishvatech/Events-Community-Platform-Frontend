@@ -242,8 +242,6 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
             { label: "My Orders", to: "/account/cart", icon: ShoppingCartRoundedIcon },
-            { label: "My Resources", to: "/account/resources", icon: LibraryBooksRoundedIcon },
-            { label: "My Recordings", to: "/account/recordings", icon: OndemandVideoRoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
     }
