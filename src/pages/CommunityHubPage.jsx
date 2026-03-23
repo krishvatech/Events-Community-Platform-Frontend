@@ -3,6 +3,7 @@ import * as React from "react";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { Box } from "@mui/material";
 
+import DashboardPage from "./DashboardPage.jsx";
 import HomePage from "./community/HomePage.jsx";
 import LiveFeedPage from "./community/LiveFeedPage.jsx";
 import NotificationsPage from "./community/NotificationsPage.jsx";
@@ -50,14 +51,30 @@ export default function CommunityHubPage() {
     <Box
       sx={{
         width: "100%",
-        maxWidth: 1200,
+        maxWidth: view === "home" ? "100%" : 1200,
         mx: "auto",
-        px: { xs: 2, md: 3 },
-        py: 3,
+        px: view === "home" ? 0 : { xs: 2, md: 3 },
+        py: view === "home" ? 0 : 3,
         boxSizing: "border-box",
       }}
     >
-      {renderContent()}
+      {view === "home" ? (
+        <DashboardPage />
+      ) : view === "profile" ? (
+        <HomePage />
+      ) : view === "myposts" ? (
+        <MyPostsPage />
+      ) : view === "live" ? (
+        <LiveFeedPage />
+      ) : view === "notify" ? (
+        <NotificationsPage />
+      ) : view === "messages" ? (
+        <MessagesPage />
+      ) : view === "members" ? (
+        <MembersPage />
+      ) : (
+        <GroupsPage />
+      )}
     </Box>
   );
 }

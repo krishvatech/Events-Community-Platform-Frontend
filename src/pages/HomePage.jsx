@@ -1,385 +1,279 @@
+﻿// src/pages/HomePage.jsx
 import React, { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "../utils/api";
-
-// MUI (structure only; Tailwind keeps the visual look)
+import AuthModal from "../components/AuthModal.jsx";
 import {
-  Container,
-  Grid,
-  Card as MUICard,
-  CardContent,
-  Paper,
-  InputBase,
-  Button,
   Box,
-  Skeleton,
+  Container,
+  Button,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
 } from "@mui/material";
+import {
+  EventNote as EventNoteIcon,
+  Group as GroupIcon,
+  LibraryBooks as LibraryIcon,
+  TrendingUp as TrendingIcon,
+  VerifiedUser as VerifiedIcon,
+  Groups as GroupsIcon,
+} from "@mui/icons-material";
 
-// Keeping your exact search icon for identical visuals
-import { FaSearch } from "react-icons/fa";
+const getAccessToken = () => localStorage.getItem("access_token");
+const isAuthed = () => !!getAccessToken();
 
-const SectionTitle = ({ children }) => (
-  <h2 className="text-2xl md:text-3xl font-bold text-neutral-900">{children}</h2>
+const NAVY = "#1B2A4A";
+const TEAL = "#0A9396";
+const ORANGE = "#E8532F";
+
+const ChevronPattern = () => (
+  <Box
+    sx={{
+      position: "absolute", right: 0, top: 0, bottom: 0,
+      width: { xs: 0, md: "42%" }, overflow: "hidden", pointerEvents: "none",
+    }}
+    aria-hidden
+  >
+    {[
+      { top: "8%", size: 280, colors: ["#38BDF8", "#34D399"] },
+      { top: "38%", size: 220, colors: ["#FBBF24", "#F97316"] },
+      { top: "62%", size: 170, colors: ["#A78BFA", "#EC4899"] },
+    ].map(({ top, size, colors }, i) => (
+      <svg key={i} style={{ position: "absolute", top, right: -size * 0.2 }}
+        width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <polyline points="20,50 50,20 80,50 50,80" fill="none"
+          stroke={`url(#g${i})`} strokeWidth="10" strokeLinecap="round"
+          strokeLinejoin="round" opacity="0.65" />
+        <defs>
+          <linearGradient id={`g${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={colors[0]} />
+            <stop offset="100%" stopColor={colors[1]} />
+          </linearGradient>
+        </defs>
+      </svg>
+    ))}
+  </Box>
 );
 
-const FeaturedCard = ({ image, title, desc, linkUrl }) => {
-  const content = (
-    <Box
-      component="article"
-      className="bg-white rounded-2xl overflow-hidden shadow-sm card-hover-effect h-full flex flex-col"
-    >
-      <Box className="w-full overflow-hidden">
-        {/* shorter image on mobile, taller on desktop */}
-        <img
-          src={image}
-          alt={title}
-          loading="lazy"
-          className="w-full h-40 sm:h-48 md:h-56 object-cover"
-        />
-      </Box>
-
-      <Box className="p-5 flex-1 flex flex-col">
-        <div className="font-semibold text-neutral-900">{title}</div>
-        <p className="mt-2 text-sm text-neutral-600">{desc}</p>
-      </Box>
+const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
+  <Card elevation={0} sx={{
+    border: "1px solid #E2E8F0", borderRadius: 3, p: 3, height: "100%",
+    transition: "box-shadow .2s, transform .2s",
+    "&:hover": { boxShadow: "0 8px 24px rgba(0,0,0,.08)", transform: "translateY(-4px)" },
+  }}>
+    <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: iconColor + "1A",
+      display: "flex", alignItems: "center", justifyContent: "center", mb: 2 }}>
+      <Icon sx={{ color: iconColor, fontSize: 24 }} />
     </Box>
-  );
+    <Typography sx={{ fontWeight: 700, fontSize: 15, color: NAVY, mb: 1 }}>{title}</Typography>
+    <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.7 }}>{desc}</Typography>
+  </Card>
+);
 
-  if (!linkUrl) return content;
-
-  return (
-    <a href={linkUrl} className="block h-full">
-      {content}
-    </a>
-  );
-};
-
-const MiniCard = ({ image, title, desc, linkUrl }) => {
-  const content = (
-    <MUICard elevation={0} className="neumorphic-shadow bg-white rounded-2xl">
-      <Box className="p-5 pb-0">
-        <div className="rounded-2xl overflow-hidden">
-          {/* scale image height responsively */}
-          <img
-            src={image}
-            alt={title}
-            loading="lazy"
-            className="w-full h-48 sm:h-56 md:h-64 object-cover"
-          />
-        </div>
+const EventCard = ({ image, title, desc, linkUrl }) => (
+  <Card elevation={0} component={linkUrl ? "a" : "div"} href={linkUrl || undefined}
+    sx={{
+      border: "1px solid #E2E8F0", borderRadius: 3, overflow: "hidden",
+      height: "100%", display: "flex", flexDirection: "column",
+      textDecoration: "none", transition: "box-shadow .2s, transform .2s",
+      "&:hover": { boxShadow: "0 8px 24px rgba(0,0,0,.08)", transform: "translateY(-4px)" },
+    }}
+  >
+    {image && (
+      <Box sx={{ height: 180, overflow: "hidden", flexShrink: 0 }}>
+        <img src={image} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy"
+          onError={(e) => { e.target.style.display = "none"; }} />
       </Box>
+    )}
+    <CardContent sx={{ flex: 1, p: 2.5 }}>
+      <Typography sx={{ fontWeight: 600, fontSize: 15, color: NAVY, mb: 0.5 }}>{title}</Typography>
+      <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.6 }}>{desc}</Typography>
+    </CardContent>
+  </Card>
+);
 
-      <CardContent className="p-5">
-        <div className="font-semibold text-neutral-900">{title}</div>
-        <p className="mt-2 text-sm text-neutral-600">{desc}</p>
-      </CardContent>
-    </MUICard>
-  );
-
-  if (!linkUrl) return content;
-
-  return (
-    <a href={linkUrl} className="block h-full">
-      {content}
-    </a>
-  );
-};
-
-const HomePageSkeleton = () => {
-  return (
-    <>
-      <section className="relative h-[50vh] min-h-[380px] md:h-[60vh] md:min-h-[480px] flex items-center justify-center text-center bg-cover bg-center">
-        <div className="absolute inset-0 bg-black/10" />
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6 z-10">
-          <Skeleton variant="text" sx={{ mx: "auto" }} width="70%" height={70} />
-          <Skeleton variant="text" sx={{ mx: "auto", mt: 2 }} width="80%" height={28} />
-          <Skeleton variant="text" sx={{ mx: "auto" }} width="60%" height={28} />
-          <Skeleton variant="rounded" sx={{ mx: "auto", mt: 3 }} width={180} height={48} />
-        </Container>
-      </section>
-
-      <Container maxWidth="lg" disableGutters className="-mt-6 md:-mt-8 relative z-20 px-4 md:px-6">
-        <Skeleton variant="rounded" height={64} />
-      </Container>
-
-      <section className="py-12 md:py-24">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <Skeleton variant="text" sx={{ mx: "auto" }} width="35%" height={40} />
-          <div className="mt-8 md:mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 xl:gap-8">
-            {[0, 1, 2].map((i) => (
-              <Box key={`sk-feature-${i}`} className="h-full">
-                <Skeleton variant="rounded" height={260} />
-              </Box>
-            ))}
-          </div>
-        </Container>
-      </section>
-
-      <section className="py-12 md:py-24">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <Skeleton variant="text" sx={{ mx: "auto" }} width="40%" height={40} />
-          <div className="mt-8 md:mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 xl:gap-8">
-            {[0, 1, 2].map((i) => (
-              <Box key={`sk-community-${i}`} className="h-full">
-                <Skeleton variant="rounded" height={320} />
-              </Box>
-            ))}
-          </div>
-        </Container>
-      </section>
-
-      <section className="py-12 md:py-24">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6 text-center">
-          <Skeleton variant="text" sx={{ mx: "auto" }} width="55%" height={40} />
-          <Skeleton variant="text" sx={{ mx: "auto", mt: 2 }} width="70%" height={28} />
-          <Skeleton variant="rounded" sx={{ mx: "auto", mt: 4 }} width="60%" height={56} />
-        </Container>
-      </section>
-    </>
-  );
-};
-
-const HomePage = () => {
-  const [loading, setLoading] = useState(true);
+export default function HomePage() {
+  const [searchParams] = useSearchParams();
+  const authed = isAuthed();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState("login");
   const [page, setPage] = useState(null);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    let mounted = true;
+    const m = searchParams.get("openModal");
+    if (m === "login" || m === "signup") { setModalMode(m); setModalOpen(true); }
+  }, [searchParams]);
 
-    (async () => {
-      try {
-        const res = await apiClient.get("/cms/pages/home/");
-        if (!mounted) return;
-        setPage(res.data);
-        setError("");
-      } catch (e) {
-        if (!mounted) return;
-        setError(e?.response?.data?.detail || e?.message || "Failed to load home page");
-        setPage(null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
+  useEffect(() => {
+    apiClient.get("/cms/pages/home/").then(r => setPage(r.data)).catch(() => null);
   }, []);
 
-  if (loading) {
-    return <HomePageSkeleton />;
-  }
+  const openLogin = () => { setModalMode("login"); setModalOpen(true); };
+  const openSignup = () => { setModalMode("signup"); setModalOpen(true); };
 
-  const heroBg =
-    page?.hero_image_url ||
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCERO0mJRa0C5b8nfoEbZ02WYWLNgo1q1K9SdRDbgkWeuFTn9uR-WFnEl4leicScEd1-Nq77ffXT3ZygGPVXuF84_Jqsjx7EjTlVasqorCu40Ue1zQ-iHrokMzCd-WPkMG1OABR1lzOYx8pOC_PXo8xQPlx2uqRHLCOyRyRMegnAWV2gkZlJ9szW7-8z-16SCxoniaJHsxJxaubkZzRyXGiFH6SEHYrSBiM71UGQ4JYW2oSy_BjFesDJoYPo5Hy-1E_I5tqqIMIeA";
-  const heroTitle =
-    page?.hero_title || "Connect, Collaborate, and Grow Your M&A Network";
-  const heroSubtitle =
-    page?.hero_subtitle ||
-    "IMAA Connect is the premier platform for M&A professionals to discover events, engage with peers, and access valuable resources.";
-  const heroCtaLabel = page?.hero_cta_label || "Explore Events";
-  const heroCtaUrl = page?.hero_cta_url || "/events";
-  const searchPlaceholder =
-    page?.search_placeholder || "Search for events by keyword or location";
-  const featuredTitle = page?.featured_events_title || "Featured Events";
-  const communityTitle = page?.community_title || "Community Highlights";
-  const newsletterTitle =
-    page?.newsletter_title || "Stay Updated with Our Newsletter";
-  const newsletterSubtitle =
-    page?.newsletter_subtitle ||
-    "Get the latest news, event announcements, and exclusive content delivered straight to your inbox.";
-  const newsletterEmailPlaceholder =
-    page?.newsletter_email_placeholder || "Enter your email";
-  const newsletterButtonLabel =
-    page?.newsletter_button_label || "Subscribe";
+  const heroTitle = page?.hero_title || "The network that moves deals forward";
+  const heroSubtitle = page?.hero_subtitle ||
+    "IMAA Connect brings together M&A professionals worldwide — events, community, resources and more.";
+  const heroImage = page?.hero_image_url || "";
+  const useLightHero = !heroImage;
 
-  const featuredFallback = [
-    {
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuBHKjDgAAMcSOy6ZsGC9_IG-SmJR4XLhvxvQGjuOs4Vuj9EicNWSohpqOz76rcop0_KtYJrD--JYG3XgdfGUjjLTc3VGAcREdHC66b7TYZ4fPy8Y127xDhvRyqXhdIPcLHnc3HOlh5-AMjErYzkAy0kfaaB9WwKYbooqpeoZ6iKUZbT5fdW_JOy4Qxs-rxvaw3uA-K7_vFbg1N1_yZcmCEZ-PISeaU89b1Noeujcgstqz_vZozsyNQS0PlCf6gSc1ZgeVqz2-06iw",
-      title: "The Annual M&A Summit",
-      desc:
-        "Join industry leaders for a comprehensive discussion on the latest trends and strategies in M&A.",
-      link_url: "",
-    },
-    {
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuC7qbyvHcPpq_a2ygXhgDS0hwTjng9aqdknkd-88U7vRbfjLylj6lT-CcfNgN3o22jXfQO2FmQw3EnBy5wkeRmBBqQm2BjmIXNOnU-iy6L2HfsFG83nh8SnY7UmZlHpm5dD83jG9ZK4vbT8BHxf4mOJNny4e_xLTbFFIZLJHgZIQiT5CuXSSiwFgLRlhSJRQfonxdF9g0aS6zi6Ds2T34s6gEVkm2YQt5uI0X_Gn11HdCYl9czQSWyL40jEpHFF7VPUf5K4eV2nmw",
-      title: "Networking Mixer for Dealmakers",
-      desc: "Connect with fellow M&A professionals in a relaxed and informal setting.",
-      link_url: "",
-    },
-    {
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuB_vYOi0Vx1itEKNE1xoWbuGSfhITt0QckUhELW-KUQ5tF-XfqqVlX0EBdPftpzh_lylwhZulVLWeR3fgM65aDuH1GZCZXVlyH5rfhb2uGRl1Tf_EZxDU3hC1HzoAgqKm6HvpGwOXlxtn-ZWs3OFNY6RrIhzQiodfsFp9e0SBGBksjVA6vHjdoOFhwlKF8U4bAPkY7N3RO-nxcaal6XSiEhPcNOwE-lyVZVon33K62EV3zS_9DVE20b4AxVgH70UcScGFiONOGOFQ",
-      title: "Advanced Valuation Techniques",
-      desc:
-        "Enhance your skills with this hands-on workshop led by experienced valuation experts.",
-      link_url: "",
-    },
-  ];
-
-  const communityFallback = [
-    {
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuDdSPl7HlGanqF5RiHaWSVQ9QI2CYal_9-3lhgFRuUcj0LJ7FyigScYCf42bDup4QYrla0Aln-C46uqeXJhIAksFjdBMKfMlx_XL76mZWGp5BfQfXPY5QK2DoXBXPXXgOu-5o9NfaoHXbPutMkZQKI90QZLq2rz60xJrX6Ai2ZtuTA-p3Z7OmGbaSqKCuLIgLgHHa3cZbj2wjcEa2RzvP2CsMOmz4Ele0pUh4DmzsREvZpWCqFWyomvrXSxSqxYLdpE8Rqhp6NOVw",
-      title: "Member Spotlight: Sarah Chen",
-      desc: "Learn about Sarah Chen's journey and insights in the M&A industry.",
-      link_url: "",
-    },
-    {
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuCQW-ZoVKENpsFY1tjGkibf08ZkqKxluVLOwsfGJgAXDPQe3ARaxI0Fpq8kvwyPzBs_xUqZ99oTq0tCiEIBdPjYmlXmuJaQ_NNWaJJ4Slt0Is4kMTPG7EBC4DGWIkdkjA4PG8kTikw8UF-U_yf8mdO89_yz10W74VT6tRaEJwPFzMHfhN_pJTYCN4vP9c8p67yFfQrKgTOqNZs_u7vwTAVuNqlWDxuMSUDiOoVQ4RjquGzVTeIuaFu1lUidUFC-Z1pk7-ZY-j9M8A",
-      title: "Upcoming Community Meetup",
-      desc: "Join us for an informal gathering to discuss current market trends.",
-      link_url: "",
-    },
-    {
-      image:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuDpUlccQRm1PXSS0loNs-FKCqJTs4a7F_YMYhd-hWRaPT2NmhXcGfJSEbAEXEiV1YJWFOPV2ZFhpmcXmvvCxdK8LvzQevucug9zBpmskeywIkcStxazGqZ6pNPZk3PCYgx7DTh5lMxamy0J8FQ91lyswO3lzn5ReWAmmE9XvkrBuHhhaK3K9f97ozDa_VcaF_Jnhf-cdNxLVeU85fS7w_5zed_VX1KW1lhohLNn2fXdZs4djuNERHa-la-kQoGfpE36EWIB4qn3oQ",
-      title: "Ask Me Anything with David Lee",
-      desc: "Get your questions answered by David Lee, a seasoned M&A advisor.",
-      link_url: "",
-    },
-  ];
-
-  const featuredEvents =
-    Array.isArray(page?.featured_events) && page.featured_events.length
-      ? page.featured_events
-      : featuredFallback;
-  const communityCards =
-    Array.isArray(page?.community_cards) && page.community_cards.length
-      ? page.community_cards
-      : communityFallback;
+  const featuredEvents = (Array.isArray(page?.featured_events) && page.featured_events.length)
+    ? page.featured_events
+    : [
+        { title: "The Annual M&A Summit", desc: "Industry leaders gather to discuss the latest M&A trends and strategies.", image: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&q=80" },
+        { title: "Networking Mixer for Dealmakers", desc: "Connect with professionals in a relaxed informal setting.", image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80" },
+        { title: "Advanced Valuation Techniques", desc: "Hands-on workshop led by experienced valuation experts.", image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&q=80" },
+      ];
 
   return (
-    <>
-      {/* Header */}
-      {/* Header handled by App.jsx */}
+    <Box sx={{ minHeight: "100vh", bgcolor: "#FFFFFF" }}>
 
-      {/* HERO (shorter on phones, taller on desktop) */}
-      <section
-        id="hero"
-        className="relative h-[50vh] min-h-[380px] md:h-[60vh] md:min-h-[480px] flex items-center justify-center text-center text-white bg-cover bg-center hero-image-overlay"
-        style={{
-          backgroundImage: `linear-gradient(rgba(17,33,32,0.5), rgba(17,33,32,0.7)), url("${heroBg}")`,
-        }}
-      >
-        <div className="absolute inset-0 bg-black/30" />
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6 z-10">
-          <h1 className="text-3xl md:text-6xl font-semibold leading-tight">
-            {heroTitle}
-          </h1>
-          <p className="mt-3 md:mt-4 text-base md:text-xl max-w-3xl mx-auto text-white/90">
-            {heroSubtitle}
-          </p>
-          <a
-            href={heroCtaUrl}
-            className="btn-glow mt-6 md:mt-8 inline-flex px-6 md:px-8 py-3 rounded-xl text-base md:text-lg font-bold bg-teal-600 text-white hover:bg-teal-700"
-          >
-            {heroCtaLabel}
-          </a>
+      {/* HERO */}
+      <Box component="section" sx={{
+        position: "relative", minHeight: { xs: 480, md: 580 }, overflow: "hidden",
+        display: "flex", alignItems: "center",
+        background: heroImage
+          ? `linear-gradient(rgba(15,32,64,.55),rgba(15,32,64,.65)), url(${heroImage}) center/cover no-repeat`
+          : "linear-gradient(120deg, #E0F2FE 0%, #ECFDF5 55%, #F8FAFC 100%)",
+      }}>
+        {useLightHero && <ChevronPattern />}
+        <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1, py: { xs: 8, md: 10 } }}>
+          <Box sx={{ maxWidth: { xs: "100%", md: "52%" } }}>
+            <Box sx={{
+              display: "inline-flex", alignItems: "center", gap: 1,
+              bgcolor: useLightHero ? TEAL + "1A" : "rgba(255,255,255,.15)",
+              color: useLightHero ? TEAL : "#E0F2FE",
+              border: `1px solid ${useLightHero ? TEAL + "33" : "rgba(255,255,255,.3)"}`,
+              borderRadius: 100, px: 1.5, py: 0.5, fontSize: 11, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: "0.06em", mb: 3,
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: useLightHero ? TEAL : "#34D399" }} />
+              IMAA Connect
+            </Box>
+
+            <Typography variant="h1" sx={{
+              fontSize: { xs: 34, md: 52 }, fontWeight: 800, lineHeight: 1.1,
+              color: useLightHero ? NAVY : "#FFFFFF", mb: 2.5, letterSpacing: "-0.02em",
+            }}>
+              {heroTitle}
+            </Typography>
+
+            <Typography sx={{
+              fontSize: { xs: 16, md: 18 }, lineHeight: 1.7, mb: 4,
+              color: useLightHero ? "#475569" : "rgba(255,255,255,.85)", maxWidth: 480,
+            }}>
+              {heroSubtitle}
+            </Typography>
+
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              {authed ? (
+                <Button component={Link} to="/events" variant="contained" size="large"
+                  sx={{ bgcolor: ORANGE, "&:hover": { bgcolor: "#CC4422" }, boxShadow: "none", borderRadius: 2, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                  Explore Events
+                </Button>
+              ) : (
+                <>
+                  <Button onClick={openSignup} variant="contained" size="large"
+                    sx={{ bgcolor: useLightHero ? NAVY : ORANGE, "&:hover": { bgcolor: useLightHero ? "#2C3E5A" : "#CC4422" }, boxShadow: "none", borderRadius: 2, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                    Get started
+                  </Button>
+                  <Button onClick={openLogin} variant="outlined" size="large"
+                    sx={{ borderColor: useLightHero ? "#CBD5E1" : "rgba(255,255,255,.5)", color: useLightHero ? NAVY : "#FFFFFF", "&:hover": { borderColor: useLightHero ? NAVY : "#FFFFFF", bgcolor: useLightHero ? "rgba(15,32,64,.04)" : "rgba(255,255,255,.1)" }, borderRadius: 2, px: 4, py: 1.5, fontWeight: 600, fontSize: 15, textTransform: "none" }}>
+                    Log in
+                  </Button>
+                </>
+              )}
+            </Box>
+          </Box>
         </Container>
-      </section>
+      </Box>
 
-      {/* Search */}
-      <Container maxWidth="lg" disableGutters className="-mt-6 md:-mt-8 relative z-20 px-4 md:px-6">
-        <Paper
-          elevation={0}
-          className="relative rounded-xl bg-white/90 backdrop-blur border border-teal-500/20 shadow-lg"
-        >
-          <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-teal-600" />
-          <InputBase
-            type="search"
-            placeholder={searchPlaceholder}
-            className="w-full pl-12 pr-4 py-3 sm:py-4 rounded-xl bg-transparent outline-none text-neutral-800 placeholder-neutral-500 text-sm sm:text-base"
-            fullWidth
-            inputProps={{ "aria-label": "search events" }}
-          />
-        </Paper>
-      </Container>
-
-      {/* Featured Events */}
-      <section id="events" className="py-12 md:py-24">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <h2 className="text-3xl font-bold text-center">{featuredTitle}</h2>
-
-          {/* ⬇️ Tailwind grid ensures 1 / 2 / 3 columns */}
-          <div className="mt-8 md:mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 xl:gap-8">
-            {featuredEvents.map((card, idx) => (
-              <div key={`featured-${idx}`} className="h-full">
-                <FeaturedCard
-                  image={card?.image_url || card?.image || ""}
-                  title={card?.title || ""}
-                  desc={card?.desc || ""}
-                  linkUrl={card?.link_url || ""}
-                />
-              </div>
+      {/* FEATURES */}
+      <Box component="section" sx={{ py: { xs: 8, md: 10 }, bgcolor: "#F8FAFC" }}>
+        <Container maxWidth="lg">
+          <Box sx={{ textAlign: "center", mb: 6 }}>
+            <Typography sx={{ color: TEAL, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 12, display: "block", mb: 1 }}>
+              WHY JOIN
+            </Typography>
+            <Typography variant="h2" sx={{ fontSize: { xs: 28, md: 38 }, fontWeight: 800, color: NAVY, mb: 1.5 }}>
+              Built for M&A professionals
+            </Typography>
+            <Typography variant="body1" sx={{ color: "#64748B", maxWidth: 520, mx: "auto", lineHeight: 1.7 }}>
+              Everything you need to grow your dealmaking network and career — in one place.
+            </Typography>
+          </Box>
+          <Grid container spacing={3}>
+            {[
+              { icon: EventNoteIcon, iconColor: "#E8532F", title: "Events & Webinars", desc: "Attend conferences, workshops, and live webinars tailored for M&A professionals worldwide." },
+              { icon: GroupIcon, iconColor: TEAL, title: "Professional Community", desc: "Connect with dealmakers, advisors, and executives across the full M&A spectrum." },
+              { icon: LibraryIcon, iconColor: "#8B5CF6", title: "E-Library & Resources", desc: "Access curated research, templates, and thought leadership from industry experts." },
+              { icon: TrendingIcon, iconColor: "#F59E0B", title: "Courses & Training", desc: "Earn designations and upskill with structured M&A training programs." },
+              { icon: VerifiedIcon, iconColor: "#10B981", title: "Verified Profiles", desc: "Build credibility with identity verification and professional badges." },
+              { icon: GroupsIcon, iconColor: "#EC4899", title: "Private Groups", desc: "Join invite-only groups, alumni networks, and deal communities." },
+            ].map(f => (
+              <Grid item xs={12} sm={6} md={4} key={f.title}>
+                <FeatureCard {...f} />
+              </Grid>
             ))}
-          </div>
+          </Grid>
         </Container>
-      </section>
+      </Box>
 
-      {/* Community Highlights */}
-      <section id="community" className="py-12 md:py-24">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <h2 className="text-3xl font-bold text-center">{communityTitle}</h2>
-
-          {/* ⬇️ 1 / 2 / 3 columns like the reference desktop */}
-          <div className="mt-8 md:mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 xl:gap-8">
-            {communityCards.map((card, idx) => (
-              <div key={`community-${idx}`} className="h-full">
-                <MiniCard
-                  image={card?.image_url || card?.image || ""}
-                  title={card?.title || ""}
-                  desc={card?.desc || ""}
-                  linkUrl={card?.link_url || ""}
-                />
-              </div>
+      {/* EVENTS */}
+      <Box component="section" sx={{ py: { xs: 8, md: 10 }, bgcolor: "#FFFFFF" }}>
+        <Container maxWidth="lg">
+          <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", mb: 5, flexWrap: "wrap", gap: 2 }}>
+            <Box>
+              <Typography sx={{ color: TEAL, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 12, mb: 0.5 }}>EVENTS</Typography>
+              <Typography variant="h2" sx={{ fontSize: { xs: 26, md: 34 }, fontWeight: 800, color: NAVY }}>Upcoming Events</Typography>
+              <Typography variant="body2" sx={{ color: "#64748B", mt: 0.5 }}>Conferences, webinars, workshops and networking for M&A professionals worldwide.</Typography>
+            </Box>
+            <Button component={Link} to="/events" variant="outlined"
+              sx={{ borderColor: "#CBD5E1", color: NAVY, borderRadius: 2, px: 3, fontWeight: 600, textTransform: "none", "&:hover": { borderColor: NAVY, bgcolor: "rgba(15,32,64,.04)" } }}>
+              See all events
+            </Button>
+          </Box>
+          <Grid container spacing={3}>
+            {featuredEvents.slice(0, 3).map((ev, i) => (
+              <Grid item xs={12} sm={6} md={4} key={i}>
+                <EventCard title={ev.title} desc={ev.desc} image={ev.image || ev.image_url || ""} linkUrl={ev.link_url || ev.url || ""} />
+              </Grid>
             ))}
-          </div>
+          </Grid>
         </Container>
-      </section>
+      </Box>
 
-
-      {/* Newsletter */}
-      <section className="py-12 md:py-24">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold">
-            {newsletterTitle}
-          </h2>
-          <p className="mt-3 md:mt-4 text-base md:text-lg max-w-2xl mx-auto text-neutral-600">
-            {newsletterSubtitle}
-          </p>
-
-          <form onSubmit={(e) => e.preventDefault()} className="mt-6 md:mt-8 max-w-lg mx-auto">
-            <Paper elevation={0} className="flex flex-col sm:flex-row rounded-xl border border-neutral-200 overflow-hidden">
-              <InputBase
-                type="email"
-                required
-                placeholder={newsletterEmailPlaceholder}
-                className="flex-1 px-4 py-3 outline-none"
-                inputProps={{ "aria-label": "email" }}
-              />
-              <Button
-                type="submit"
-                disableElevation
-                className="btn-glow px-6 py-3 rounded-none bg-teal-500 text-white font-semibold hover:bg-teal-700 w-full sm:w-auto"
-              >
-                {newsletterButtonLabel}
+      {/* CTA BANNER */}
+      {!authed && (
+        <Box component="section" sx={{
+          py: { xs: 8, md: 10 },
+          background: `linear-gradient(120deg, ${NAVY} 0%, #1E3A5F 100%)`,
+          textAlign: "center",
+        }}>
+          <Container maxWidth="md">
+            <Typography variant="h2" sx={{ fontSize: { xs: 28, md: 40 }, fontWeight: 800, color: "#FFFFFF", mb: 2 }}>
+              Ready to join the M&A network?
+            </Typography>
+            <Typography sx={{ color: "rgba(255,255,255,.75)", fontSize: 17, mb: 5, lineHeight: 1.7 }}>
+              Thousands of dealmakers, advisors, and executives already call IMAA Connect home.
+            </Typography>
+            <Box sx={{ display: "flex", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
+              <Button onClick={openSignup} variant="contained" size="large"
+                sx={{ bgcolor: ORANGE, "&:hover": { bgcolor: "#CC4422" }, boxShadow: "none", borderRadius: 2, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                Create free account
               </Button>
-            </Paper>
-          </form>
-        </Container>
-      </section>
+              <Button onClick={openLogin} variant="outlined" size="large"
+                sx={{ borderColor: "rgba(255,255,255,.4)", color: "#FFFFFF", "&:hover": { borderColor: "#FFFFFF", bgcolor: "rgba(255,255,255,.08)" }, borderRadius: 2, px: 5, py: 1.5, fontWeight: 600, fontSize: 15, textTransform: "none" }}>
+                Sign in
+              </Button>
+            </Box>
+          </Container>
+        </Box>
+      )}
 
-      {/* anchors */}
-      <div id="resources" className="scroll-mt-24" />
-      <div id="about" className="scroll-mt-24" />
-
-    </>
+      <AuthModal open={modalOpen} onClose={() => setModalOpen(false)} initialMode={modalMode} key={modalMode} />
+    </Box>
   );
-};
-
-export default HomePage;
+}

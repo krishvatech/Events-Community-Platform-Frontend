@@ -43,6 +43,7 @@ export function cognitoConfirmSignUp({ username, code }) {
 function cognitoAuthenticateSingle({ usernameOrEmail, password }) {
   return new Promise((resolve, reject) => {
     const user = new CognitoUser({ Username: usernameOrEmail, Pool: pool });
+
     const authDetails = new AuthenticationDetails({
       Username: usernameOrEmail,
       Password: password,

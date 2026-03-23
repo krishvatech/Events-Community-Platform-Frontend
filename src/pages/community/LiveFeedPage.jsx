@@ -487,20 +487,12 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
             const groupDisplayName = String(g.name || "").trim().split(/\s+/)[0] || g.name || "";
             return (
             <Grid key={g.id} item xs={12} sm={6} md={3}>
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: 1,
-                  borderRadius: 2,
-                  borderColor: BORDER,
-                  textAlign: "center",
-                }}
-              >
+              <Paper variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
                 <Box
                   sx={{
                     width: 64,
                     height: 64,
-                    borderRadius: "50%",
+                    borderRadius: 1.5,
                     overflow: "hidden",
                     mb: 1,
                     bgcolor: "grey.100",

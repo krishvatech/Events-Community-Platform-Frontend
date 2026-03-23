@@ -1,4 +1,4 @@
-﻿// src/components/layout/AdminLayout.jsx
+// src/components/layout/AdminLayout.jsx
 import * as React from "react";
 import { Box, Container } from "@mui/material";
 import { Outlet, useNavigate } from "react-router-dom";

@@ -22,6 +22,7 @@ import {
     Divider,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LockIcon from "@mui/icons-material/Lock";
 import UndoIcon from "@mui/icons-material/Undo";
@@ -70,6 +71,7 @@ export default function BannedParticipantsDialog({ open, onClose, eventId }) {
     }, [open, eventId]);
 
     const handleUnban = async (userId, userName) => {
+        if (!confirm("Unban this user? They will be allowed to rejoin."));
         setActionBusy(true);
         setUnbanningId(userId);
         try {

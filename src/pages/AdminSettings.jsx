@@ -3260,7 +3260,7 @@ export default function AdminSettings() {
                                       size="small"
                                       onClick={() => window.open(cert.credential_url, "_blank")}
                                     >
-                                      <LinkIcon fontSize="small" />
+                                      <AttachFileIcon fontSize="small" />
                                     </IconButton>
                                   </Tooltip>
                                 ) : null}
@@ -3363,7 +3363,7 @@ export default function AdminSettings() {
                                       size="small"
                                       onClick={() => window.open(m.membership_url, "_blank")}
                                     >
-                                      <LinkIcon fontSize="small" />
+                                      <AttachFileIcon fontSize="small" />
                                     </IconButton>
                                   </Tooltip>
                                 ) : null}
@@ -3690,7 +3690,7 @@ export default function AdminSettings() {
                                       size="small"
                                       onClick={() => window.open(t.credential_url, "_blank")}
                                     >
-                                      <LinkIcon fontSize="small" />
+                                      <AttachFileIcon fontSize="small" />
                                     </IconButton>
                                   </Tooltip>
                                 ) : null}

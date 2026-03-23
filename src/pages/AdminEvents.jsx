@@ -63,22 +63,6 @@ import SessionDialog from "../components/SessionDialog";
 import SessionList from "../components/SessionList";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
 import { normalizeTimezoneName } from "../utils/timezoneUtils";
-import {
-  getToken,
-  toAbs,
-  getBrowserTimezone,
-  TIMEZONE_OPTIONS,
-  computeEndFromStart,
-  toUTCISO,
-  iso,
-  getDefaultSchedule,
-  roundToHour,
-  COUNTRY_OPTIONS,
-  getSelectedCountry,
-  slugifyLocal,
-  API_ROOT,
-  API_ORIGIN
-} from "../utils/eventUtils";
 import EditEventForm from "../components/EditEventForm";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 
@@ -89,20 +73,103 @@ dayjs.extend(timezone);
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
-// Helpers imported from eventUtils
+const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 
 
-// getToken imported from eventUtils
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
+const EVENTS_URL = `${API_BASE}/events/`;
+const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
+// API_BASE may be like http://127.0.0.1:8000/api
+// const API_BASE = RAW_BASE.replace(/\/+$/, "");
+// Origin without the /api suffix
+const API_ORIGIN = API_BASE.replace(/\/api$/, "");
+
+// Small helpers reused from MyEventsPage
+const urlJoin = (base, path) => {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+};
+
+isoCountries.registerLocale(enLocale);
+
+// 🇮🇳 flag from "IN"
+const flagEmoji = (code) =>
+  code
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt()));
+
+const COUNTRY_OPTIONS = Object.entries(
+  isoCountries.getNames("en", { select: "official" })
+).map(([code, label]) => ({ code, label, emoji: flagEmoji(code) }));
+
+// Same logic as HomePage – but we pass `{ location }`
+const getSelectedCountry = ({ location }) => {
+  if (!location) return null;
+
+  // if you ever store code directly
+  const byCode = COUNTRY_OPTIONS.find((opt) => opt.code === location);
+  if (byCode) return byCode;
+
+  // match by name (what you use now)
+  return (
+    COUNTRY_OPTIONS.find(
+      (opt) =>
+        (opt.label || "").toLowerCase() === String(location).toLowerCase()
+    ) || null
+  );
+};
+
+const FALLBACK_TIMEZONES = [
+  "Asia/Kolkata",
+  "UTC",
+  "Asia/Dubai",
+  "Europe/London",
+  "America/New_York",
+];
+
+const getBrowserTimezone = () => {
+  if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+  }
+  return "Asia/Kolkata";
+};
+
+const getTimezoneOptions = () => {
+  if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
+    return Intl.supportedValuesOf("timeZone");
+  }
+  return FALLBACK_TIMEZONES;
+};
+
+const TIMEZONE_OPTIONS = getTimezoneOptions();
+
+const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
+
+const toAbs = (u) => {
+  if (!u) return u;
+  // already absolute?
+  if (/^https?:\/\//i.test(u)) return u;
+  // ensure leading slash then join to origin
+  const p = u.startsWith("/") ? u : `/${u}`;
+  return `${API_ORIGIN}${p}`;
+};
+
+const getToken = () =>
+  localStorage.getItem("access_token") ||
+  localStorage.getItem("access") ||
+  localStorage.getItem("access_token") ||
+  "";
 
 // --- Helpers ---
 const fmtDateRange = (s, e) => {
   try {
-    const start = dayjs(s);
-    const end = dayjs(e);
-    const sameDay = start.isSame(end, 'day');
-    const left = start.format("MMM D, YYYY h:mm A");
-    const right = end.format("h:mm A");
-    return sameDay ? `${left} – ${right}` : `${left} → ${end.format("MMM D, YYYY h:mm A")}`;
+    const start = new Date(s);
+    const end = new Date(e);
+    const sameDay = start.toDateString() === end.toDateString();
+    const left = start.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    const right = end.toLocaleTimeString(undefined, { timeStyle: "short" });
+    return sameDay ? `${left} – ${right}` : `${left} → ${end.toLocaleString()}`;
   } catch {
     return "";
   }
@@ -181,8 +248,40 @@ const formats = [
   { value: "in_person", label: "In person" },
   { value: "hybrid", label: "Hybrid" },
 ];
-// Schedule helpers imported from eventUtils
+const slugify = (s) =>
+  (s || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+const toUTCISO = (date, time, tz) => {
+  if (!date || !time || !tz) return null;
+  const dt = dayjs.tz(`${date}T${time}:00`, tz);
+  return dt.isValid() ? dt.toDate().toISOString() : null;
+};
 
+// --- Schedule defaults: always hour-aligned (HH:00) and default duration 2 hours ---
+const roundToHour = (d = dayjs()) => dayjs(d).minute(0).second(0).millisecond(0);
+
+const getDefaultSchedule = (durationHours = 2) => {
+  const start = roundToHour(dayjs());
+  const end = start.add(durationHours, "hour");
+  return {
+    startDate: start.format("YYYY-MM-DD"),
+    endDate: end.format("YYYY-MM-DD"),
+    startTime: start.format("HH:mm"),
+    endTime: end.format("HH:mm"),
+  };
+};
+
+const computeEndFromStart = (startDate, startTime, durationHours = 2) => {
+  const start = dayjs(`${startDate}T${startTime}:00`);
+  if (!start.isValid()) {
+    return { endDate: startDate, endTime: startTime };
+  }
+  const end = start.add(durationHours, "hour");
+  return { endDate: end.format("YYYY-MM-DD"), endTime: end.format("HH:mm") };
+};
 
 
 function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
@@ -293,6 +392,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   // const setStartTime = debugSetStartTime;
 
   // Helpers imported from eventUtils
+  const slugifyLocal = (s) =>
+    (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);
 
   // ✅ Default schedule on open: current hour (HH:00) → +2 hours
   React.useEffect(() => {

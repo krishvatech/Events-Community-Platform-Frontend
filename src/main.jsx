@@ -65,16 +65,14 @@ import { HelmetProvider } from 'react-helmet-async';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <HelmetProvider>
-      <StyledEngineProvider injectFirst>
-        <ThemeProvider theme={theme}>
-          {/* Keep Tailwind look exactly the same; CssBaseline only normalizes defaults */}
-          <CssBaseline />
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </ThemeProvider>
-      </StyledEngineProvider>
-    </HelmetProvider>
+    <StyledEngineProvider injectFirst>
+      <ThemeProvider theme={theme}>
+        {/* Keep Tailwind look exactly the same; CssBaseline only normalizes defaults */}
+        <CssBaseline />
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ThemeProvider>
+    </StyledEngineProvider>
   </React.StrictMode>
 );

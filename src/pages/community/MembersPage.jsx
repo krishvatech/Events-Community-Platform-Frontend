@@ -481,6 +481,14 @@ const countryColor = (name) => {
   return PALETTE[h % PALETTE.length];
 };
 
+/* ── accent colour derived from member name (consistent palette) ── */
+function memberAccentColor(name) {
+  const colors = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#3B5998"];
+  let h = 0;
+  for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return colors[h % colors.length];
+}
+
 /* -------------------------- Member card (left) -------------------------- */
 function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFriend, onCancelFriend, onAcceptFriend, onDeclineFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
   const isMobile = useMediaQuery("(max-width:600px)");
@@ -556,175 +564,222 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
   const flag = flagEmojiFromISO2(iso2);
   const country = displayCountry(u);
 
+  // v3 style derived values
+  const accent = memberAccentColor(name);
+  const degree = status === "friends" ? 1 : status === "pending_outgoing" ? 2 : 3;
+  const degreeColors = { 1: "#0A9396", 2: "#E8532F", 3: "#1B2A4A" };
+  const degreeLabels = { 1: "1st", 2: "2nd", 3: "3rd" };
+  const isOnline = !!(u?.is_online || u?.profile?.is_online);
+  const rawSkills = u?.profile?.skills || u?.skills || u?.profile?.expertise || [];
+  const skillsArr = Array.isArray(rawSkills)
+    ? rawSkills
+    : typeof rawSkills === "string"
+    ? rawSkills.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+  const industry = (u?.profile?.industry || u?.industry || "").trim();
+
   return (
-    <Card
-      variant="outlined"
+    <Box
       sx={{
-        width: "100% !important",
-        maxWidth: "100% !important",
-        m: 0,
-        borderRadius: 3,
-        borderColor: BORDER,
-        px: 1.5,
-        py: 1.25,
+        borderRadius: "14px",
+        border: `1px solid ${BORDER}`,
+        background: "#fff",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        transition: "box-shadow .18s, border-color .18s",
+        boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+        width: "100%",
         "&:hover": {
-          boxShadow: "0 6px 24px rgba(0,0,0,0.06)",
-          borderColor: "#cbd5e1",
+          boxShadow: "0 8px 28px rgba(0,0,0,.09)",
+          borderColor: accent + "55",
         },
       }}
     >
-      <Stack direction="row" spacing={1.5} alignItems="center">
-        <Avatar
-          src={u?.avatar_url || ""}
-          alt={name}
-          sx={{ width: 44, height: 44, cursor: "pointer", bgcolor: "#e2e8f0", color: "#334155", fontWeight: 700 }}
-          onClick={() => onOpenProfile?.(u)}
-        >
-          {!(u?.avatar_url) ? (name || "?").slice(0, 1).toUpperCase() : null}
-        </Avatar>
+      {/* Top accent stripe */}
+      <Box sx={{ height: 4, bgcolor: accent, flexShrink: 0 }} />
 
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography
-              variant="subtitle2"
-              sx={{ fontWeight: 700, cursor: "pointer" }}
-              onClick={() => onOpenProfile?.(u)}
-              noWrap
+      {/* Card body — click opens profile */}
+      <Box
+        onClick={() => onOpenProfile?.(u)}
+        sx={{ p: "16px 18px 12px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", cursor: "pointer" }}
+      >
+        {/* Row 1: Avatar (left) + degree / industry (right) */}
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          {/* Avatar with colour ring */}
+          <Box sx={{ position: "relative", flexShrink: 0 }}>
+            <Avatar
+              src={u?.avatar_url || ""}
+              alt={name}
+              sx={{
+                width: 50, height: 50, borderRadius: "13px",
+                background: `linear-gradient(145deg, ${accent}20, ${accent}08)`,
+                border: `2px solid ${accent}25`,
+                color: accent, fontWeight: 800, fontSize: 18,
+              }}
             >
-              {name}
-            </Typography>
-
+              {!(u?.avatar_url) ? (name || "?").slice(0, 1).toUpperCase() : null}
+            </Avatar>
             {isVerified && (
-              <Tooltip title="Verified Member">
-                <VerifiedIcon
-                  sx={{ fontSize: 20, color: "#22d3ee", flexShrink: 0 }}
-                />
-              </Tooltip>
+              <Box sx={{
+                position: "absolute", top: -3, right: -3,
+                width: 16, height: 16, borderRadius: "50%",
+                bgcolor: "#0A9396", border: "1.5px solid #fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                  <polyline points="20 6 9 17 4 12" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Box>
             )}
+          </Box>
 
-            {isDirectoryHidden && (
-              <Tooltip title="User enabled Privacy">
-                <VisibilityOffRoundedIcon
-                  sx={{ fontSize: 20, color: "text.secondary", flexShrink: 0 }}
-                />
-              </Tooltip>
+          {/* Degree badge + industry / connected pill */}
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+            {!isSelf && (
+              <Box sx={{
+                fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
+                bgcolor: degreeColors[degree] + "15", color: degreeColors[degree],
+                letterSpacing: 0.3, lineHeight: 1,
+              }}>
+                {degreeLabels[degree]}
+              </Box>
             )}
-
-            {!!country && (
-              <Chip
-                size="small"
-                variant="outlined"
-                label={`${flag ? flag + " " : ""}${country}`}
-                sx={{ height: 22 }}
-              />
-            )}
-          </Stack>
-
-          {/* Email - always rendered to maintain consistent height */}
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            noWrap
-            sx={{ visibility: showEmailLine ? "visible" : "hidden", height: "1.25rem" }}
-          >
-            {emailDisplay || "placeholder@email.com"}
-          </Typography>
-
+            {status === "friends" ? (
+              <Box sx={{
+                fontSize: 10, fontWeight: 700, px: "10px", py: "3px", borderRadius: "20px",
+                bgcolor: "#0A939614", color: "#0A9396",
+              }}>
+                ✓ Connected
+              </Box>
+            ) : industry ? (
+              <Box sx={{
+                fontSize: 10, fontWeight: 600, px: "10px", py: "3px", borderRadius: "20px",
+                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
+                maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {industry}
+              </Box>
+            ) : null}
+          </Box>
         </Box>
 
-        {!isSelf && (
-          <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>
-            {status === "friends" ? (
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Tooltip title="Open profile">
-                  <IconButton size="small" onClick={() => onOpenProfile?.(u)}>
-                    <OpenInNewOutlinedIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+        {/* Name + title + company */}
+        <Box>
+          <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+            {name}
+          </Typography>
+          {(rawTitle || rawCompany) && (
+            <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+              {rawTitle}
+              {rawTitle && rawCompany
+                ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {rawCompany}</Box>
+                : rawCompany
+                ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}>{rawCompany}</Box>
+                : null}
+            </Typography>
+          )}
+        </Box>
+
+        {/* Location + online indicator */}
+        {country && (
+          <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+            {flag && <span>{flag}</span>}
+            {country}
+            {isOnline && (
+              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "3px", color: "#22C55E", fontWeight: 700, ml: "4px" }}>
+                <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#22C55E", display: "inline-block" }} />
+                Online
+              </Box>
+            )}
+          </Typography>
+        )}
+
+        {/* Skills / expertise chips */}
+        {skillsArr.length > 0 && (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+            {skillsArr.slice(0, 3).map((skill, i) => (
+              <Box key={i} sx={{
+                fontSize: 10, fontWeight: 600, px: "9px", py: "3px", borderRadius: "14px",
+                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
+              }}>
+                {skill}
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* Email line (visibility-aware) */}
+        {showEmailLine && (
+          <Typography sx={{ fontSize: 10.5, color: "#aaa" }} noWrap>
+            {emailDisplay}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Action footer */}
+      {!isSelf && (
+        <Box
+          sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {status === "friends" ? (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => onOpenProfile?.(u)}
+              sx={{
+                textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px",
+                px: 1.5, py: "5px", borderColor: "#0A939630", color: "#0A9396",
+                bgcolor: "#0A939608", "&:hover": { bgcolor: "#0A939615", borderColor: "#0A939660" },
+              }}
+            >
+              Message
+            </Button>
+          ) : status === "pending_outgoing" ? (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled
+              sx={{ textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px", px: 1.5, py: "5px" }}
+            >
+              ✓ Request Sent
+            </Button>
+          ) : (
+            <Tooltip title={blockByVerified ? "Verified members only" : ""}>
+              <span>
                 <Button
                   size="small"
-                  variant="outlined"
-                  color="error"
-                  sx={{ textTransform: "none", borderRadius: 2 }}
-                  onClick={(e) => { e.stopPropagation(); onRemoveFriend?.(u); }}
+                  variant="contained"
+                  disabled={blockByVerified}
+                  onClick={() => onAddFriend?.(u)}
+                  sx={{
+                    textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px",
+                    px: 1.5, py: "5px", bgcolor: accent, boxShadow: "none",
+                    "&:hover": { bgcolor: accent, filter: "brightness(0.9)", boxShadow: "none" },
+                    "&:disabled": { bgcolor: "#ccc", color: "#fff" },
+                  }}
                 >
-                  Remove Contact
+                  Connect
                 </Button>
-              </Stack>
-            ) : status === "pending_outgoing" ? (
-              <Stack direction="row" spacing={1}>
-                {onCancelFriend ? (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    sx={{ textTransform: "none", borderRadius: 2 }}
-                    onClick={(e) => { e.stopPropagation(); onCancelFriend?.(u); }}
-                  >
-                    Cancel
-                  </Button>
-                ) : (
-                  <Tooltip title="Request sent">
-                    <IconButton size="small" disabled>
-                      <CheckCircleRoundedIcon fontSize="small" color="success" />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Stack>
-            ) : status === "pending_incoming" ? (
-              <Stack direction="column" alignItems="flex-end" spacing={0.5}>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                  Your received a request to Connect
-                </Typography>
-                <Stack direction="row" spacing={1}>
-                  {onAcceptFriend && onDeclineFriend ? (
-                    <>
-                      <Button size="small" variant="contained" color="success" onClick={(e) => { e.stopPropagation(); onAcceptFriend?.(u); }} sx={{ textTransform: "none", borderRadius: 2, minWidth: isMobile ? 'auto' : undefined, px: isMobile ? 1 : undefined }}>
-                        Accept
-                      </Button>
-                      <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onDeclineFriend?.(u); }} sx={{ textTransform: "none", borderRadius: 2, minWidth: isMobile ? 'auto' : undefined, px: isMobile ? 1 : undefined }}>
-                        Decline
-                      </Button>
-                    </>
-                  ) : (
-                    <Button size="small" variant="outlined" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-                      Pending your approval
-                    </Button>
-                  )}
-                </Stack>
-              </Stack>
-            ) : isMobile ? (
-              <Tooltip title={blockByVerified ? "Verified members only" : "Request Contact"}>
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={() => onAddFriend?.(u)}
-                    disabled={blockByVerified}
-                  >
-                    <PersonAddAlt1RoundedIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            ) : (
-              <Tooltip title={blockByVerified ? "Verified members only" : ""}>
-                <span>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    sx={{ textTransform: "none", borderRadius: 2 }}
-                    startIcon={<PersonAddAlt1RoundedIcon />}
-                    onClick={() => onAddFriend?.(u)}
-                    disabled={blockByVerified}
-                  >
-                    {blockByVerified ? "Verified Required" : "Request Contact"}
-                  </Button>
-                </span>
-              </Tooltip>
-            )}
-          </Stack>
-        )}
-      </Stack>
-    </Card>
+              </span>
+            </Tooltip>
+          )}
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => onOpenProfile?.(u)}
+            sx={{
+              textTransform: "none", fontSize: 11, fontWeight: 600, borderRadius: "8px",
+              px: 1.5, py: "5px", borderColor: "#1B2A4A12", color: "#1B2A4A88",
+              "&:hover": { borderColor: accent + "40", color: accent },
+            }}
+          >
+            Profile
+          </Button>
+        </Box>
+      )}
+    </Box>
   );
 }
 
@@ -1540,6 +1595,12 @@ export default function MembersPage() {
     const id = m?.id;
     if (!id) return;
 
+    // If the user clicks their own profile card, go to "My Profile" (Edit) page
+    if (me?.id && String(me.id) === String(id)) {
+      navigate("/account/profile");
+      return;
+    }
+
     navigate(`/community/rich-profile/${id}`, { state: { user: m } });
   };
 
@@ -1580,41 +1641,69 @@ export default function MembersPage() {
               height: "100%",
             }}
           >
-            {/* Header Paper */}
-            <Paper
-              sx={{
-                p: 1.5,
-                mb: 1.5,
-                border: `1px solid ${BORDER}`,
-                borderRadius: 3,
-              }}
-            >
-              <Stack spacing={1.25}>
-                {/* Title row */}
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                >
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    {tabValue === 0 ? "All Members" : "My Contacts"} (
-                    {filtered.length})
-                  </Typography>
-
+            {/* v3 Header */}
+            <Box sx={{ mb: 2 }}>
+              {/* Page title */}
+              <Box sx={{ mb: 1.5 }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#0A9396", textTransform: "uppercase", letterSpacing: "0.12em", mb: "4px" }}>
+                  MEMBER DIRECTORY
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: "#1B2A4A", lineHeight: 1.2, mb: "4px" }}>
+                      Explore Members
+                    </Typography>
+                    <Typography sx={{ fontSize: 12.5, color: "#aaa" }}>
+                      Connect with M&A professionals across the globe.
+                    </Typography>
+                  </Box>
                   {isCompact && (
                     <Tooltip title="View map">
-                      <IconButton
-                        size="small"
-                        onClick={() => setMapOverlayOpen(true)}
-                        sx={{ flexShrink: 0 }}
-                      >
+                      <IconButton size="small" onClick={() => setMapOverlayOpen(true)} sx={{ flexShrink: 0, mt: "4px" }}>
                         <MapRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   )}
-                </Stack>
+                </Box>
+              </Box>
 
-                {/* Search bar - full width */}
+              {/* Tab pills */}
+              <Box sx={{ display: "flex", gap: "4px", mb: 1.5, pb: 1.5, borderBottom: "1px solid #EEECEA" }}>
+                {[
+                  { label: "All Members", count: users.length },
+                  { label: "My Contacts", count: Object.values(friendStatusByUser).filter((s) => s === "friends").length },
+                ].map((tab, i) => (
+                  <Box
+                    key={i}
+                    onClick={() => { setTabValue(i); setPage(1); }}
+                    sx={{
+                      px: 2, py: "6px", borderRadius: "100px", cursor: "pointer",
+                      fontSize: 13, fontWeight: tabValue === i ? 700 : 500,
+                      color: tabValue === i ? "#1B2A4A" : "#888",
+                      bgcolor: tabValue === i ? "#fff" : "transparent",
+                      border: tabValue === i ? "1.5px solid #EEECEA" : "1.5px solid transparent",
+                      boxShadow: tabValue === i ? "0 1px 4px rgba(0,0,0,.06)" : "none",
+                      display: "flex", alignItems: "center", gap: "6px",
+                      transition: "all .15s",
+                    }}
+                  >
+                    {tab.label}
+                    {tab.count > 0 && (
+                      <Box component="span" sx={{
+                        fontSize: 11, fontWeight: 700,
+                        bgcolor: tabValue === i ? "#0A9396" : "#e5e7eb",
+                        color: tabValue === i ? "#fff" : "#666",
+                        px: "7px", py: "1px", borderRadius: "100px",
+                      }}>
+                        {tab.count}
+                      </Box>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+
+              <Stack spacing={1.25}>
+                {/* Search bar */}
                 <TextField
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
@@ -1627,6 +1716,7 @@ export default function MembersPage() {
                         <SearchIcon fontSize="small" />
                       </InputAdornment>
                     ),
+                    sx: { borderRadius: "10px", fontSize: 13 },
                   }}
                 />
 
@@ -1800,7 +1890,7 @@ export default function MembersPage() {
                   <Tab label="My Contacts" />
                 </Tabs>
               </Stack>
-            </Paper>
+            </Box>
 
             {/* 🔄 Loading state with skeletons */}
             {loading && (
@@ -1820,29 +1910,32 @@ export default function MembersPage() {
                   }}
                 >
                   {Array.from({ length: ROWS_PER_PAGE }).map((_, idx) => (
-                    <Paper
+                    <Box
                       key={idx}
-                      sx={{
-                        borderRadius: 3,
-                        border: `1px solid ${BORDER}`,
-                        p: 1.5,
-                      }}
+                      sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, bgcolor: "#fff", overflow: "hidden" }}
                     >
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Skeleton variant="circular" width={44} height={44} />
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Skeleton width="40%" height={20} />
-                          <Skeleton width="60%" height={16} sx={{ mt: 0.5 }} />
-                          <Skeleton width="55%" height={16} sx={{ mt: 0.5 }} />
+                      <Skeleton variant="rectangular" width="100%" height={4} sx={{ bgcolor: "#e8f7f7" }} />
+                      <Box sx={{ p: "16px 18px 12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <Skeleton variant="rectangular" width={50} height={50} sx={{ borderRadius: "13px" }} />
+                          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                            <Skeleton width={28} height={14} />
+                            <Skeleton width={80} height={20} sx={{ borderRadius: "20px" }} />
+                          </Box>
                         </Box>
-                        <Skeleton
-                          variant="rectangular"
-                          width={120}
-                          height={32}
-                          sx={{ borderRadius: 2 }}
-                        />
-                      </Stack>
-                    </Paper>
+                        <Skeleton width="55%" height={20} />
+                        <Skeleton width="75%" height={16} />
+                        <Skeleton width="35%" height={14} />
+                        <Box sx={{ display: "flex", gap: "4px" }}>
+                          <Skeleton width={60} height={22} sx={{ borderRadius: "14px" }} />
+                          <Skeleton width={70} height={22} sx={{ borderRadius: "14px" }} />
+                        </Box>
+                      </Box>
+                      <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", gap: "8px" }}>
+                        <Skeleton width={80} height={30} sx={{ borderRadius: "8px" }} />
+                        <Skeleton width={70} height={30} sx={{ borderRadius: "8px" }} />
+                      </Box>
+                    </Box>
                   ))}
                 </Stack>
 
@@ -1877,16 +1970,8 @@ export default function MembersPage() {
             {!loading && !error && (
               <>
                 <Stack
-                  spacing={1.25}
-                  alignItems="stretch"
-                  sx={{
-                    flex: 1,
-                    width: "100%",
-                    "& > *": {
-                      width: "100% !important",
-                      maxWidth: "100% !important",
-                    },
-                  }}
+                  spacing={1.5}
+                  sx={{ flex: 1, width: "100%" }}
                 >
                   {current.map((u) => (
                     <MemberCard
@@ -1906,21 +1991,13 @@ export default function MembersPage() {
                   ))}
 
                   {filtered.length === 0 && (
-                    <Paper
-                      sx={{
-                        p: 4,
-                        borderRadius: 3,
-                        textAlign: "center",
-                        border: `1px solid ${BORDER}`,
-                      }}
-                    >
-                      <Typography>
-                        {tabValue === 1 &&
-                          Object.keys(friendStatusByUser).length === 0
-                          ? "No My Contacts found."
+                    <Box sx={{ textAlign: "center", py: 5 }}>
+                      <Typography sx={{ fontSize: 14, color: "#aaa" }}>
+                        {tabValue === 1 && Object.keys(friendStatusByUser).length === 0
+                          ? "No contacts yet. Start connecting with members!"
                           : "No members match your search."}
                       </Typography>
-                    </Paper>
+                    </Box>
                   )}
                 </Stack>
 

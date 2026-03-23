@@ -586,12 +586,23 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
   );
 }
 
-/* ---------- Single group card ---------- */
+/* ---------- Single group card — v3 design ---------- */
+const GROUP_ACCENT_COLORS = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#3B5998"];
+function hashColor(name) {
+  let h = 0;
+  for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return GROUP_ACCENT_COLORS[h % GROUP_ACCENT_COLORS.length];
+}
+
 function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
+  const [hov, setHov] = React.useState(false);
   const isPrivate = (g.visibility || "").toLowerCase() === "private";
   const members = g.member_count ?? g.members_count ?? g.members?.length ?? 0;
+  const posts = g.post_count ?? g.posts_count ?? 0;
+  const activity = g.weekly_activity ?? g.activity_count ?? null;
   const role = roleLabel(g);
   const memberStatus = membershipLabel(g);
+  const accent = g.color || hashColor(g.name);
 
   const visibility = (g.visibility || "").toLowerCase();
   const jp = (g.join_policy || "").toLowerCase();
@@ -613,277 +624,235 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
           : "Join";
 
   return (
-    <Card
-      variant="outlined"
+    <Box
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
       sx={{
-        width: "100%",
-        borderRadius: 3,
+        borderRadius: "14px",
+        border: `1px solid ${hov ? accent + "55" : BORDER}`,
+        background: "#fff",
         overflow: "hidden",
-        borderColor: BORDER,
-        height: 280,
-        display: "flex", // Keep flex layout
+        display: "flex",
         flexDirection: "column",
+        transition: "box-shadow .2s, border-color .2s",
+        boxShadow: hov ? "0 6px 24px rgba(0,0,0,.09)" : "0 1px 4px rgba(0,0,0,.05)",
+        cursor: "pointer",
+        position: "relative",
       }}
     >
+      {/* Top accent stripe */}
+      <Box sx={{ height: 4, bgcolor: accent, flexShrink: 0 }} />
+
+      {/* Cover image / color bar */}
       <Box
         onClick={() => onOpen?.(g)}
         sx={{
           width: "100%",
-          height: 130,
-          bgcolor: "#f8fafc",
-          borderBottom: `1px solid ${BORDER}`,
-          backgroundImage:
-            g.cover_image || g.cover
-              ? `url(${toAbsolute(g.cover_image || g.cover)})`
-              : "none",
+          height: g.cover_image || g.cover ? 100 : 0,
+          backgroundImage: g.cover_image || g.cover ? `url(${toAbsolute(g.cover_image || g.cover)})` : "none",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          cursor: "pointer",
-          position: "relative", // Needed for alignment
+          position: "relative",
         }}
       >
         {/* Logo overlay */}
         {g.logo && (
-          <Box
-            sx={{
-              position: "absolute",
-              bottom: -24,
-              left: 16,
-              width: 48,
-              height: 48,
-              borderRadius: "50%",
-              overflow: "hidden",
-              border: "3px solid white",
-              backgroundColor: "white",
-              zIndex: 2,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
-            }}
-          >
-            <img
-              src={bust(g.logo, g._cache || g.updated_at)}
-              alt="logo"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
+          <Box sx={{
+            position: "absolute", bottom: -20, left: 14,
+            width: 44, height: 44, borderRadius: "50%",
+            overflow: "hidden", border: "3px solid white", bgcolor: "white",
+            zIndex: 2, boxShadow: "0 2px 8px rgba(0,0,0,.15)"
+          }}>
+            <img src={bust(g.logo, g._cache || g.updated_at)} alt="logo"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </Box>
         )}
       </Box>
 
-      <CardContent
-        sx={{ flexGrow: 1, pb: 1, cursor: "pointer", pt: g.logo ? 4 : 2 }} // Added pt padding if logo exists
-        onClick={() => onOpen?.(g)}
-      >
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 1 }}
-        >
-          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexWrap: "wrap" }}>
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                {isPrivate ? "Private" : "Public"}
-              </Typography>
-              {isApproval && (
-                <Tooltip title="Approval needed for membership - Request to join">
-                  <LockRounded sx={{ fontSize: 14, color: "#f97316" }} />
-                </Tooltip>
-              )}
-            </Stack>
-            {memberStatus && (
-              <Chip
-                size="small"
-                label={memberStatus}
-                sx={{
-                  height: 20,
-                  fontSize: 11,
-                  bgcolor: memberStatus === "Pending" ? "#fffbeb" : "#ecfdf3",
-                  color: memberStatus === "Pending" ? "#b45309" : "#166534",
-                }}
-              />
+      {/* Body */}
+      <Box sx={{ p: "16px 18px 14px", flexGrow: 1, display: "flex", flexDirection: "column", gap: "6px", mt: g.logo && (g.cover_image || g.cover) ? 3 : 0 }}>
+        {/* Category breadcrumb + status badges row */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px", mb: "2px" }}>
+          {category ? (
+            <Typography sx={{ fontSize: 10, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              {category}{subcategory ? ` · ${subcategory}` : ""}
+            </Typography>
+          ) : (
+            <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              {isPrivate ? "PRIVATE" : "GROUP"}
+            </Typography>
+          )}
+          <Box sx={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            {joined && (
+              <Box sx={{ fontSize: 10, fontWeight: 700, color: "#0A9396", bgcolor: "#E8F7F7", px: "7px", py: "2px", borderRadius: "100px" }}>
+                ✓ Joined
+              </Box>
+            )}
+            {pending && (
+              <Box sx={{ fontSize: 10, fontWeight: 700, color: "#b45309", bgcolor: "#fffbeb", px: "7px", py: "2px", borderRadius: "100px" }}>
+                Pending
+              </Box>
+            )}
+            {isApproval && !joined && !pending && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                <LockRounded sx={{ fontSize: 11, color: "#f97316" }} />
+                <Typography sx={{ fontSize: 10, color: "#f97316" }}>Approval required</Typography>
+              </Box>
             )}
             {role && (
-              <Chip
-                size="small"
-                label={role}
-                sx={{
-                  height: 20,
-                  fontSize: 11,
-                  bgcolor: "#eef2ff",
-                  color: "#4338ca",
-                }}
-              />
+              <Box sx={{ fontSize: 10, fontWeight: 700, color: "#4338ca", bgcolor: "#eef2ff", px: "7px", py: "2px", borderRadius: "100px" }}>
+                {role}
+              </Box>
             )}
-          </Stack>
-          <Typography variant="caption" color="text.secondary">
-            {members} Member{members !== 1 ? "s" : ""}
-          </Typography>
-        </Stack>
+          </Box>
+        </Box>
 
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-          {g.name}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" noWrap>
-          {g.category || g.topic || g.description || g.name}
-        </Typography>
+        {/* Title */}
+        <Box onClick={() => onOpen?.(g)}>
+          <Typography sx={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.08em", mb: "2px" }}>
+            GROUP
+          </Typography>
+          <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#1B2A4A", lineHeight: 1.25, mb: "4px" }}>
+            {g.name}
+          </Typography>
+          {g.owner_name || g.created_by_name ? (
+            <Typography sx={{ fontSize: 11, color: "#888" }}>
+              by {g.owner_name || g.created_by_name}
+            </Typography>
+          ) : null}
+        </Box>
+
+        {/* Description */}
+        {desc && (
+          <Typography sx={{ fontSize: 12, color: "#666", lineHeight: 1.55,
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {desc}
+          </Typography>
+        )}
+
+        {/* Stats */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: "12px", mt: "4px" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <Typography sx={{ fontSize: 11, color: "#888" }}>{members}</Typography>
+          </Box>
+          {posts > 0 && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <Typography sx={{ fontSize: 11, color: "#888" }}>{posts}</Typography>
+            </Box>
+          )}
+          {activity != null && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              <Typography sx={{ fontSize: 11, color: "#888" }}>{activity}/wk</Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Tags */}
         {g.parent_group && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+          <Typography sx={{ fontSize: 11, color: "#888" }}>
             Subgroup of <b>{g.parent_group.name}</b>
           </Typography>
         )}
-      </CardContent>
+      </Box>
 
-      <CardActions sx={{ pt: 0, pb: 1, px: 1 }}>
-        <Stack direction="row" spacing={1} sx={{ width: "100%", alignItems: "center" }}>
-          {!hideJoin && (
-            <Button
-              size="small"
-              color="primary"
-              variant={joined ? "outlined" : "contained"}
-              onClick={() => onJoin?.(g)}
-              sx={{ ...JOIN_BTN_SX, flex: 1 }}
-              disabled={pending || joined || isInviteOnly}
-              title={ctaText}
-            >
-              {ctaText}
-            </Button>
-          )}
-          <Button
-            size="small"
-            variant="outlined"
-            sx={{ flex: 1 }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onOpen?.(g);
+      {/* CTA footer */}
+      <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
+        {!hideJoin && (
+          <Box
+            onClick={() => !pending && !joined && onJoin?.(g)}
+            sx={{
+              fontSize: 12, fontWeight: 700,
+              color: joined ? "#888" : accent,
+              cursor: (pending || joined) ? "default" : "pointer",
+              display: "flex", alignItems: "center", gap: "4px",
+              opacity: pending ? 0.6 : 1,
+              "&:hover": { textDecoration: (pending || joined) ? "none" : "underline" }
             }}
           >
-            Details
-          </Button>
-          {canEdit && (
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onEdit?.(g);
-              }}
-              sx={{ color: "#10b8a6" }}
-              title="Edit Group"
-            >
-              <EditNoteRoundedIcon />
-            </IconButton>
-          )}
-        </Stack>
-      </CardActions>
-    </Card>
+            {ctaLabel} {!joined && !pending && "→"}
+          </Box>
+        )}
+        {canEdit && (
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit?.(g); }}
+            sx={{ ml: "auto", color: "#aaa", "&:hover": { color: accent } }} title="Edit Group">
+            <EditNoteRoundedIcon fontSize="small" />
+          </IconButton>
+        )}
+        {(hideJoin || joined) && (
+          <Box
+            onClick={() => onOpen?.(g)}
+            sx={{ fontSize: 12, fontWeight: 700, color: accent, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "4px",
+              "&:hover": { textDecoration: "underline" } }}
+          >
+            {joined ? "Open Group →" : "View Details →"}
+          </Box>
+        )}
+      </Box>
+    </Box>
   );
 }
 
 function GroupGridCardSkeleton() {
   return (
-    <Card
-      variant="outlined"
-      sx={{
-        width: "100%",
-        borderRadius: 3,
-        overflow: "hidden",
-        borderColor: BORDER,
-        height: 280,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/* Cover skeleton */}
-      <Box
-        sx={{
-          width: "100%",
-          height: 130,
-          bgcolor: "#f8fafc",
-          borderBottom: `1px solid ${BORDER}`,
-        }}
-      >
-        <Skeleton variant="rectangular" width="100%" height="100%" />
+    <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <Skeleton variant="rectangular" width="100%" height={4} sx={{ bgcolor: "#e8f7f7" }} />
+      <Box sx={{ p: "16px 18px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+          <Skeleton variant="text" width={80} height={14} />
+          <Skeleton variant="text" width={50} height={14} />
+        </Box>
+        <Skeleton variant="text" width="20%" height={12} />
+        <Skeleton variant="text" width="70%" height={22} />
+        <Skeleton variant="text" width="40%" height={14} />
+        <Skeleton variant="text" width="95%" height={14} />
+        <Skeleton variant="text" width="80%" height={14} />
+        <Box sx={{ display: "flex", gap: "12px" }}>
+          <Skeleton variant="text" width={40} height={14} />
+          <Skeleton variant="text" width={30} height={14} />
+        </Box>
       </Box>
-
-      {/* Content skeleton */}
-      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 1 }}
-        >
-          <Skeleton variant="text" width={80} height={16} />
-          <Skeleton variant="text" width={60} height={16} />
-        </Stack>
-
-        <Skeleton variant="text" width="70%" height={24} />
-        <Skeleton variant="text" width="90%" height={18} />
-      </CardContent>
-
-      {/* Buttons skeleton */}
-      <CardActions sx={{ pt: 0, pb: 1, px: 1 }}>
-        <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
-          <Skeleton variant="rectangular" width="50%" height={32} sx={{ borderRadius: 2 }} />
-          <Skeleton variant="rectangular" width="50%" height={32} sx={{ borderRadius: 2 }} />
-        </Stack>
-      </CardActions>
-    </Card>
+      <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "12px" }}>
+        <Skeleton variant="text" width={90} height={16} />
+      </Box>
+    </Box>
   );
 }
 
 /* ---------- Header with title + overlapping avatars ---------- */
-function TopicHeader({ title, previews = [], extraCount = 0 }) {
+function TopicHeader({ title, groupCount, myGroupCount }) {
+  const navigate = useNavigate();
+  const canCreate = isAdminUser();
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 2,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 3,
-        mb: 2,
-      }}
-    >
-      <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          {title}
-        </Typography>
-
-        <Stack direction="row" alignItems="center" sx={{ gap: 1 }}>
-          <Stack direction="row" sx={{ "& > *": { border: "2px solid #fff" } }}>
-            {previews.slice(0, 3).map((p, i) => (
-              <Avatar
-                key={p.id || i}
-                src={p.avatarUrl}
-                alt={p.name}
-                sx={{
-                  width: 36,
-                  height: 36,
-                  ml: i === 0 ? 0 : -1.2,
-                }}
-              >
-                {(p.name || "U").slice(0, 1)}
-              </Avatar>
-            ))}
-          </Stack>
-          {extraCount > 0 && (
-            <Box
-              sx={{
-                ml: -1,
-                px: 1,
-                py: 0.25,
-                fontSize: 12,
-                borderRadius: 999,
-                border: `1px solid ${BORDER}`,
-                bgcolor: "#fff",
-              }}
-            >
-              +{extraCount}
-            </Box>
-          )}
-        </Stack>
-      </Stack>
-    </Paper>
+    <Box sx={{ textAlign: "center", mb: 3, pt: 1 }}>
+      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0A9396", textTransform: "uppercase", letterSpacing: "0.12em", mb: "6px" }}>
+        COMMUNITY
+      </Typography>
+      <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: "8px", lineHeight: 1.2 }}>
+        Explore Groups
+      </Typography>
+      <Typography sx={{ fontSize: 14, color: "#888", mb: canCreate ? 2 : 0 }}>
+        Join groups organized by region, industry, practice area, and topic.
+      </Typography>
+      {canCreate && (
+        <Box sx={{ mt: 1 }}>
+          <Button
+            variant="contained"
+            onClick={() => navigate("/group/create")}
+            sx={{
+              textTransform: "none", fontWeight: 700, fontSize: 13,
+              bgcolor: "#0A9396", "&:hover": { bgcolor: "#077B7E" },
+              borderRadius: "10px", px: 3,
+            }}
+          >
+            + Create Group
+          </Button>
+        </Box>
+      )}
+    </Box>
   );
 }
 
@@ -1283,12 +1252,12 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   };
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
+    <Box sx={{ width: "100%", py: { xs: 2, md: 3 }, bgcolor: "#FAF9F7", minHeight: "100vh" }}>
       <Box
         sx={{
           display: "flex",
           gap: 3,
-          px: { xs: 0, sm: 2, md: 2.5, lg: 3 },
+          px: { xs: 2, sm: 2, md: 2.5, lg: 3 },
           maxWidth: { xs: "100%", lg: "1200px" },
           mx: "auto",
         }}
@@ -1296,123 +1265,79 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
         {/* LEFT: Main content */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <TopicHeader
-            title={headerTitle}
-            previews={[]}
-            extraCount={0}
+            groupCount={allGroupsCombined.length}
+            myGroupCount={myGroups.length}
           />
 
           {/* TABS + FILTER BAR */}
-          <Paper
-            elevation={0}
+          <Box
             sx={{
-              p: 2,
-              border: `1px solid ${BORDER}`,
-              borderRadius: 3,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 2,
               mb: 2,
+              pb: 2,
+              borderBottom: "1px solid #EEECEA",
             }}
           >
-            <Stack spacing={2}>
-              <Tabs
-                value={tabIndex}
-                onChange={(_e, v) => setTabIndex(v)}
-                variant="standard"
-                textColor="primary"
-                indicatorColor="primary"
-                sx={{ borderBottom: 1, borderColor: "divider" }}
-              >
-                <Tab label="All Groups" />
-                <Tab label="My Groups" />
-              </Tabs>
-
-              <Stack
-                direction={{ xs: "column", md: "row" }}
-                spacing={1.5}
-                alignItems={{ xs: "stretch", md: "center" }}
-              >
-                <Box sx={{ flex: 1 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    placeholder={
-                      tabIndex === 0 ? "Search all groups..." : "Search my groups..."
-                    }
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon fontSize="small" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
+            <Box sx={{ display: "flex", gap: "4px" }}>
+              {[
+                { label: "All Groups", count: allGroupsCombined.length },
+                { label: "My Groups", count: myGroups.length },
+              ].map((tab, i) => (
+                <Box
+                  key={i}
+                  onClick={() => setTabIndex(i)}
+                  sx={{
+                    px: 2, py: "6px", borderRadius: "100px", cursor: "pointer",
+                    fontSize: 13, fontWeight: tabIndex === i ? 700 : 500,
+                    color: tabIndex === i ? "#1B2A4A" : "#888",
+                    bgcolor: tabIndex === i ? "#fff" : "transparent",
+                    border: tabIndex === i ? "1.5px solid #EEECEA" : "1.5px solid transparent",
+                    boxShadow: tabIndex === i ? "0 1px 4px rgba(0,0,0,.06)" : "none",
+                    display: "flex", alignItems: "center", gap: "6px",
+                    transition: "all .15s",
+                  }}
+                >
+                  {tab.label}
+                  {tab.count > 0 && (
+                    <Box component="span" sx={{
+                      fontSize: 11, fontWeight: 700,
+                      bgcolor: tabIndex === i ? "#0A9396" : "#e5e7eb",
+                      color: tabIndex === i ? "#fff" : "#666",
+                      px: "7px", py: "1px", borderRadius: "100px",
+                    }}>
+                      {tab.count}
+                    </Box>
+                  )}
                 </Box>
-              </Stack>
+              ))}
+            </Box>
+            <TextField
+              size="small"
+              placeholder={tabIndex === 0 ? "Search groups…" : "Search my groups…"}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: "#aaa" }} />
+                  </InputAdornment>
+                ),
+                sx: { borderRadius: "10px", fontSize: 13, bgcolor: "#fff" }
+              }}
+              sx={{ width: 240 }}
+            />
+          </Box>
 
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1}
-              >
-                <Autocomplete
-                  multiple
-                  fullWidth
-                  size="small"
-                  options={globalOptions.regions}
-                  value={selectedRegions}
-                  onChange={(_, newValue) => setSelectedRegions(newValue)}
-                  filterSelectedOptions
-                  disableCloseOnSelect
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Region"
-                      placeholder={selectedRegions.length ? "" : "All regions"}
-                    />
-                  )}
-                  sx={{ flex: 1 }}
-                />
-                <Autocomplete
-                  multiple
-                  fullWidth
-                  size="small"
-                  options={Object.keys(JOIN_POLICY_LABELS)}
-                  value={selectedJoinPolicies}
-                  onChange={(_, newValue) => setSelectedJoinPolicies(newValue)}
-                  filterSelectedOptions
-                  disableCloseOnSelect
-                  getOptionLabel={(opt) => JOIN_POLICY_LABELS[opt] || opt}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Join policy"
-                      placeholder={selectedJoinPolicies.length ? "" : "All policies"}
-                    />
-                  )}
-                  sx={{ flex: 1 }}
-                />
-
-                <Autocomplete
-                  multiple
-                  fullWidth
-                  size="small"
-                  options={Object.keys(VISIBILITY_LABELS)}
-                  value={selectedVisibilities}
-                  onChange={(_, newValue) => setSelectedVisibilities(newValue)}
-                  filterSelectedOptions
-                  disableCloseOnSelect
-                  getOptionLabel={(opt) => VISIBILITY_LABELS[opt] || opt}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Visibility"
-                      placeholder={selectedVisibilities.length ? "" : "All visibility"}
-                    />
-                  )}
-                  sx={{ flex: 1 }}
-                />
-              </Stack>
-            </Stack>
-          </Paper>
+          {/* Showing count */}
+          {!loading && (
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
+              {tabIndex === 0 ? "ALL GROUPS" : "MY GROUPS"} {filtered.length}
+            </Typography>
+          )}
 
           {/* Loading / error */}
           {!loading && error && tabIndex === 0 && (
@@ -1486,13 +1411,11 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
               })}
             </Box>
           ) : (
-            <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-              <Typography variant="body2" color="text.secondary">
-                {tabIndex === 0
-                  ? "No groups found."
-                  : "You haven't joined any groups yet."}
+            <Box sx={{ textAlign: "center", py: 8, color: "#aaa" }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+                {tabIndex === 0 ? "No groups found." : "You haven't joined any groups yet."}
               </Typography>
-            </Paper>
+            </Box>
           )}
 
           {/* Pagination */}

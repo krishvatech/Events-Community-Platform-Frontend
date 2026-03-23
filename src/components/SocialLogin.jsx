@@ -1,7 +1,7 @@
 import React from 'react';
 import { FaGoogle, FaLinkedinIn } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-import { Box, Typography, Button } from '@mui/material';
+import { Box, Divider, Typography, Button } from '@mui/material';
 import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
@@ -154,7 +154,6 @@ const SocialLogin = () => {
         >
           LinkedIn
         </Button>
-
       </Box>
     </Box>
   );

@@ -1,4 +1,4 @@
-// src/components/Header.jsx
+﻿// src/components/Header.jsx
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -291,7 +291,16 @@ const Header = () => {
           navigate(`/signin?next=${encodeURIComponent(to)}`);
         }
       }}
-      className="px-1 py-2 text-base text-gray-500 hover:text-teal-400 transition-colors whitespace-nowrap"
+      style={{
+        fontSize: 15,
+        fontWeight: 500,
+        color: "#374151",
+        textDecoration: "none",
+        padding: "4px 0",
+        transition: "color .15s",
+      }}
+      onMouseEnter={e => (e.target.style.color = "#0F2040")}
+      onMouseLeave={e => (e.target.style.color = "#374151")}
     >
       {children}
     </Link>
@@ -302,132 +311,100 @@ const Header = () => {
       position="fixed"
       elevation={0}
       sx={{
-        bgcolor: "background.paper",
-        borderBottom: "1px solid rgba(27,187,179,0.10)",
+        bgcolor: "#ffffff",
+        borderBottom: "1px solid #E2E8F0",
         zIndex: (t) => t.zIndex.drawer + 2,
-        backdropFilter: "none",
       }}
     >
       <Toolbar
         disableGutters
-        sx={{ minHeight: { xs: 56, md: 64 } }}
-        className="h-14 md:h-16"
+        sx={{ minHeight: { xs: 56, md: 64 }, px: { xs: 2, md: 0 } }}
       >
-        <Box className="mx-auto max-w-7xl w-full px-3 sm:px-4 lg:px-6 flex items-center">
-          {/* Left: Brand */}
-          <Box component={Link} to="/" className="flex items-center gap-2 flex-1">
-            <svg
-              className="text-primary"
-              style={{
-                color:
-                  "rgb(27 187 179 / var(--tw-text-opacity, 1))",
-              }}
-              fill="none"
-              height="32"
-              viewBox="0 0 48 48"
-              width="32"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z"
-                fill="currentColor"
-              />
+        <Box sx={{ mx: "auto", maxWidth: 1200, width: "100%", px: { xs: 2, md: 4 }, display: "flex", alignItems: "center", gap: 4 }}>
+
+          {/* Left: IMAA Brand logo */}
+          <Box component={Link} to="/" sx={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 1.5, flexShrink: 0 }}>
+            {/* IMAA logo SVG mark */}
+            <svg width="36" height="36" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="30" fontFamily="Georgia, serif" fontWeight="700" fontSize="30" fill="#0F2040">imaa</text>
             </svg>
-            <span className="text-xl font-bold tracking-tight text-neutral-800">
-              IMAA Connect
-            </span>
+            <Box sx={{ display: { xs: "none", sm: "flex" }, flexDirection: "column", lineHeight: 1.1 }}>
+              <span style={{ fontSize: 11, color: "#64748B", letterSpacing: "0.01em", maxWidth: 180, lineHeight: 1.3 }}>
+                Institute for Mergers,<br />Acquisitions &amp; Alliances
+              </span>
+            </Box>
           </Box>
 
-          {/* Center: Nav */}
+          {/* Center spacer on mobile */}
+          <Box sx={{ flex: 1 }} />
+
+          {/* Center: Nav links (desktop) */}
           <Box
             component="nav"
-            className="hidden lg:flex flex-1 items-center justify-center"
+            sx={{ display: { xs: "none", lg: "flex" }, alignItems: "center", gap: 4 }}
           >
-            <div className="flex items-center gap-6 md:gap-8">
-              <NavLink to="/events">Events</NavLink>
-              <NavLink to="/community" requireAuth>Community</NavLink>
-              <NavLink to={resourcesHref} requireAuth>Resources</NavLink>
-              <NavLink to="/about">About Us</NavLink>
-            </div>
+            <NavLink to="/events">Events</NavLink>
+            <NavLink to="/community" requireAuth>Community</NavLink>
+            <NavLink to={resourcesHref} requireAuth>Resources</NavLink>
+            <NavLink to="/about">About Us</NavLink>
           </Box>
 
-          {/* Right: Actions */}
-          <Box className="hidden lg:flex flex-1 items-center justify-end gap-2.5">
-            {authed ? (
-              <Box className="flex items-center gap-3">
-                {/* Cart (hidden for admins) */}
-                {!owner && (
-                  <>
-                    <Tooltip title="Cart">
-                      <IconButton
-                        component={Link}
-                        to={staff ? "/admin/carts" : "/account/cart"}
-                        size="large"
-                        sx={{ color: "text.primary" }}
-                      >
-                        <Badge
-                          badgeContent={cartCount}
-                          color="error"
-                          overlap="circular"
-                          invisible={!cartCount}
-                          max={99}
-                        >
-                          <ShoppingCartOutlinedIcon />
-                        </Badge>
-                      </IconButton>
-                    </Tooltip>
-                    <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
-                  </>
-                )}
+          {/* Right spacer */}
+          <Box sx={{ flex: 1 }} />
 
-                {/* My Account */}
+          {/* Right: Auth actions (desktop) */}
+          <Box sx={{ display: { xs: "none", lg: "flex" }, alignItems: "center", gap: 1.5, flexShrink: 0 }}>
+            {authed ? (
+              <>
+                {!owner && (
+                  <Tooltip title="Cart">
+                    <IconButton component={Link} to={staff ? "/admin/carts" : "/account/cart"} size="medium">
+                      <Badge badgeContent={cartCount} color="error" invisible={!cartCount} max={99}>
+                        <ShoppingCartOutlinedIcon fontSize="small" />
+                      </Badge>
+                    </IconButton>
+                  </Tooltip>
+                )}
                 <Button
                   component={Link}
                   to={accountHref}
-                  sx={{ textTransform: "none" }}
-                  className="px-0 text-base font-semibold text-teal-600 hover:text-teal-700"
+                  variant="text"
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, color: "#0F2040", "&:hover": { color: "#E85C2A", bgcolor: "transparent" } }}
                 >
                   My Account
                 </Button>
-
-                <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
-
-                {/* Logout */}
                 <Button
                   onClick={signOut}
-                  className="btn-glow h-9 px-5 rounded-xl text-base font-semibold bg-teal-500 text-white hover:bg-teal-600 hover:-translate-y-0.5"
-                  disableElevation
-                  sx={{ textTransform: "none" }}
+                  variant="outlined"
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: 6, borderColor: "#0F2040", color: "#0F2040", px: 2.5, "&:hover": { bgcolor: "#0F2040", color: "#fff" } }}
                 >
-                  Logout
+                  Log out
                 </Button>
-              </Box>
+              </>
             ) : (
               <>
                 <Button
                   component={Link}
-                  to={`/signin?next=${next}`}
-                  className="btn-glow h-9 px-5 rounded-xl text-base font-semibold bg-teal-100 text-teal-500 border border-teal-100 hover:bg-teal-200 hover:text-teal-700 hover:-translate-y-0.5"
+                  to="/signin"
                   variant="text"
-                  sx={{ textTransform: "none" }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 500, color: "#374151", borderRadius: 6, px: 2, "&:hover": { color: "#0F2040", bgcolor: "rgba(15,32,64,.04)" } }}
                 >
-                  Login
+                  Log in
                 </Button>
                 <Button
                   component={Link}
                   to="/signup"
-                  className="btn-glow h-9 px-5 rounded-xl text-base font-semibold bg-teal-500 text-white hover:bg-teal-700 hover:-translate-y-0.5"
-                  disableElevation
-                  sx={{ textTransform: "none" }}
+                  variant="contained"
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: 6, px: 2.5, bgcolor: "#0F2040", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
                 >
-                  Join Now
+                  Sign up
                 </Button>
               </>
             )}
           </Box>
 
           {/* Mobile burger */}
-          <Box className="lg:hidden">
+          <Box sx={{ display: { xs: "flex", lg: "none" } }}>
             <IconButton onClick={openDrawer} aria-label="Open menu">
               <MenuRoundedIcon />
             </IconButton>
@@ -437,76 +414,58 @@ const Header = () => {
 
       {/* Mobile Drawer */}
       <Drawer anchor="right" open={mobileOpen} onClose={closeDrawer}>
-        <Box sx={{ width: 300 }} role="presentation" onClick={closeDrawer}>
-          <Box className="flex items-center justify-between px-3 py-3">
-            <span className="font-semibold">Menu</span>
+        <Box sx={{ width: 280 }} role="presentation">
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5 }}>
+            <span style={{ fontWeight: 700, fontSize: 16, color: "#0F2040" }}>Menu</span>
             <IconButton onClick={closeDrawer} aria-label="Close">
               <CloseRoundedIcon />
             </IconButton>
           </Box>
           <Divider />
-
-          <List>
+          <List onClick={closeDrawer}>
             <ListItemButton component={Link} to="/events">
-              <ListItemText primary="Events" />
+              <ListItemText primary="Events" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
             <ListItemButton component={Link} to="/community" onClick={(e) => {
-              if (!authed) {
-                e.preventDefault();
-                navigate(`/signin?next=${encodeURIComponent("/community")}`);
-              }
+              if (!authed) { e.preventDefault(); navigate(`/signin?next=${encodeURIComponent("/community")}`); }
             }}>
-              <ListItemText primary="Community" />
+              <ListItemText primary="Community" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
-
             <ListItemButton component={Link} to={resourcesHref} onClick={(e) => {
-              if (!authed) {
-                e.preventDefault();
-                navigate(`/signin?next=${encodeURIComponent(resourcesHref)}`);
-              }
+              if (!authed) { e.preventDefault(); navigate(`/signin?next=${encodeURIComponent(resourcesHref)}`); }
             }}>
-              <ListItemText primary="Resources" />
+              <ListItemText primary="Resources" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
             <ListItemButton component={Link} to="/about">
-              <ListItemText primary="About Us" />
+              <ListItemText primary="About Us" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
           </List>
-
           <Divider />
-
           {authed ? (
-            <List>
+            <List onClick={closeDrawer}>
               {!owner && (
-                <ListItemButton
-                  component={Link}
-                  to={staff ? "/admin/carts" : "/account/cart"}
-                >
-                  <ListItemIcon>
-                    <ShoppingCartOutlinedIcon />
-                  </ListItemIcon>
+                <ListItemButton component={Link} to={staff ? "/admin/carts" : "/account/cart"}>
+                  <ListItemIcon><ShoppingCartOutlinedIcon /></ListItemIcon>
                   <ListItemText primary="Cart" />
                 </ListItemButton>
               )}
               <ListItemButton component={Link} to={accountHref}>
-                <ListItemIcon>
-                  <AccountCircleOutlinedIcon />
-                </ListItemIcon>
+                <ListItemIcon><AccountCircleOutlinedIcon /></ListItemIcon>
                 <ListItemText primary="My Account" />
               </ListItemButton>
               <ListItemButton onClick={signOut}>
-                <ListItemIcon>
-                  <LogoutRoundedIcon />
-                </ListItemIcon>
-                <ListItemText primary="Logout" />
+                <ListItemIcon><LogoutRoundedIcon /></ListItemIcon>
+                <ListItemText primary="Log out" />
               </ListItemButton>
             </List>
           ) : (
-            <List>
+            <List onClick={closeDrawer}>
               <ListItemButton component={Link} to="/signin">
-                <ListItemIcon>
-                  <LoginRoundedIcon />
-                </ListItemIcon>
-                <ListItemText primary="Sign In" />
+                <ListItemIcon><LoginRoundedIcon /></ListItemIcon>
+                <ListItemText primary="Log in" />
+              </ListItemButton>
+              <ListItemButton component={Link} to="/signup">
+                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 600, color: "#0F2040" }} />
               </ListItemButton>
             </List>
           )}

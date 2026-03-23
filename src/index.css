@@ -1,15 +1,28 @@
+/* Import IMAA brand tokens — must precede all other statements */
+@import './styles/brand.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Custom global styles */
 body {
-  @apply bg-gray-50;
-  
+  font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--surface-muted);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer base {
-  html { font-family: theme('fontFamily.sans'); }
+  html { font-family: 'DM Sans', 'Helvetica Neue', sans-serif; }
+  h1, h2, h3, h4, h5, h6 { color: var(--text-primary); font-family: 'DM Sans', 'Helvetica Neue', sans-serif; }
+  a { color: inherit; }
+}
+
+/* MUI override for DM Sans */
+.MuiTypography-root, .MuiButton-root, .MuiInputBase-root, .MuiMenuItem-root {
+  font-family: 'DM Sans', 'Helvetica Neue', sans-serif !important;
 }
 
 html, body, #root {

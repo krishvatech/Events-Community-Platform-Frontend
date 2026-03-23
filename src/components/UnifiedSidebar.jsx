@@ -45,16 +45,20 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
+import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { isOwnerUser, isStaffUser, canEditProfilesUser } from "../utils/adminRole";
 import { apiClient, createWagtailSession, getSaleorDashboardUrl } from "../utils/api";
 import { clearAuth } from "../utils/authStorage";
 
-const TEAL = "#14b8b1";
-const TEXT = "#334155";
-const HOVER_BG = "#e6f7f6";
+const ORANGE = "#E8532F";
+const TEXT = "#2C3E5A";
+const HOVER_BG = "rgba(232,83,47,0.07)";
 const CARD_BG = "#ffffff";
-const CARD_BORDER = "#e5e7eb";
+const CARD_BORDER = "#F0EEEB";
 
 // --- Helpers for badges ---
 async function countFromPaginated(url) {
@@ -168,10 +172,22 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
 
     // --- Navigation Config ---
     const discoverItems = [
-        { label: "Explore Events", to: "/events", icon: EventNoteRoundedIcon },
+        { label: "Dashboard", to: "/community?view=home", icon: HomeRoundedIcon },
+        { label: "Upcoming Events", to: "/events", icon: EventNoteRoundedIcon },
+        { label: "Live Feed", to: "/community?view=live", icon: LiveTvRoundedIcon },
+        { label: "Discussion Forum", to: "/community?view=feed", icon: ForumRoundedIcon },
         { label: "Explore Groups", to: "/community?view=feed", icon: GroupsRoundedIcon },
-        { label: "Live Feed Page", to: "/community?view=live", icon: LiveTvRoundedIcon },
         { label: "Explore Members", to: "/community?view=members", icon: Diversity3RoundedIcon },
+    ];
+
+    const trainingsItems = [
+        { label: "My Courses & Trainings", to: "/account/courses", icon: SchoolRoundedIcon },
+        { label: "My Certificates", to: "/account/certificates", icon: EmojiEventsRoundedIcon },
+    ];
+
+    const resourcesItems = [
+        { label: "E-Library", to: "/account/resources", icon: LibraryBooksRoundedIcon },
+        { label: "My Recordings", to: "/account/recordings", icon: OndemandVideoRoundedIcon },
     ];
 
     let manageItems = [];
@@ -200,36 +216,34 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     } else if (isStaffOnly) {
         // Staff User
         manageItems = [
-            { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon }, // "Community/MyPostPage.jsx" per prompt
+            { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
+            { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
+            { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
+            { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
+            { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
             { label: "My Resources", to: "/admin/resources", icon: LibraryBooksRoundedIcon },
             { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },
-            { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
-            { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
-            { label: "My Cart & Orders", to: "/admin/carts", icon: ShoppingCartRoundedIcon }, // "AdminCarts.jsx"
-            { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
-            { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" }, // Staff uses Community Notifications per prompt ("Community/NotificationsPage.jsx")
-            { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
         adminItems = userCanEditProfiles
-            ? [{ label: "Staff", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }]
+            ? [
+                { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
+                { label: "Staff", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }
+            ]
             : [];
-        // Prompt says "My Posts - Community/MyPostPage.jsx" for Staff.
-        // Prompt says "My Events - AdminEvents.jsx" for Staff.
-        // Prompt says "Notifications - Community/NotificationsPage.jsx" for Staff.
     } else {
         // Normal User
         manageItems = [
-            { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
-            { label: "My Groups", to: "/community/mygroups", icon: GroupsRoundedIcon },
-            { label: "My Events", to: "/account/events", icon: EventNoteRoundedIcon },
-            { label: "My Resources", to: "/account/resources", icon: LibraryBooksRoundedIcon },
-            { label: "My Recordings", to: "/account/recordings", icon: OndemandVideoRoundedIcon },
-            { label: "My Cart & Orders", to: "/account/cart", icon: ShoppingCartRoundedIcon },
             { label: "Messages", to: "/community?view=messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
+            { label: "My Events", to: "/account/events", icon: EventNoteRoundedIcon },
+            { label: "My Groups", to: "/community/mygroups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
+            { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
+            { label: "My Orders", to: "/account/cart", icon: ShoppingCartRoundedIcon },
+            { label: "My Resources", to: "/account/resources", icon: LibraryBooksRoundedIcon },
+            { label: "My Recordings", to: "/account/recordings", icon: OndemandVideoRoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
     }
@@ -367,7 +381,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const renderList = (items, title) => (
         <Box sx={{ mb: 2 }}>
             {title && (
-                <Typography variant="overline" sx={{ px: 2, color: "text.secondary", fontWeight: 700 }}>
+                <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: "block", color: "#C0BAB4", fontWeight: 800, fontSize: 10, letterSpacing: "0.1em" }}>
                     {title}
                 </Typography>
             )}
@@ -438,14 +452,14 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                 px: 1.5,
                                 mx: 1,
                                 mb: 0.5,
-                                color: selected ? TEAL : TEXT,
-                                bgcolor: selected ? "rgba(20,184,177,0.08)" : "transparent",
+                                color: selected ? ORANGE : TEXT,
+                                bgcolor: selected ? HOVER_BG : "transparent",
                                 "&:hover": { bgcolor: HOVER_BG },
-                                "&.Mui-selected": { bgcolor: "rgba(20,184,177,0.08)" },
+                                "&.Mui-selected": { bgcolor: HOVER_BG },
                                 "&.Mui-selected:hover": { bgcolor: HOVER_BG },
                             }}
                         >
-                            <ListItemIcon sx={{ minWidth: 36, color: selected ? TEAL : "#6b7280" }}>
+                            <ListItemIcon sx={{ minWidth: 36, color: selected ? ORANGE : "#6b7280" }}>
                                 {item.badge ? (
                                     <Badge color="error" badgeContent={item.badge === "notifications" ? notifCount : messageCount} invisible={!(item.badge === "notifications" ? notifCount : messageCount)}>
                                         <item.icon fontSize="small" />
@@ -533,53 +547,59 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const showCart = cartCount > 0 && !isSuperUser; // Owners typically don't shop
 
     const SidebarContent = (
-        <Box
-            sx={{
-                height: "100%",
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
-                bgcolor: "#ffffff",
-                borderRight: `1px solid ${CARD_BORDER}`
-            }}
-        >
+        <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "#ffffff", borderRight: `1px solid ${CARD_BORDER}` }}>
             {/* Brand area */}
-            <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1 }}>
-                {/* Simple Logo */}
-                <svg className="text-teal-500" style={{ color: "#14b8b1" }} fill="none" height="28" viewBox="0 0 48 48" width="28">
-                    <path d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" />
-                </svg>
-                <Typography variant="h6" fontWeight="700" color="text.primary">IMAA Connect</Typography>
+            <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", gap: 1.5, borderBottom: `1px solid ${CARD_BORDER}` }}>
+                <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#1B2A4A", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="#0A9396" strokeWidth="1.5" />
+                        <ellipse cx="12" cy="12" rx="4" ry="10" stroke="#E8532F" strokeWidth="1.5" />
+                        <line x1="2" y1="12" x2="22" y2="12" stroke="#0A9396" strokeWidth="1.5" />
+                    </svg>
+                </Box>
+                <Box>
+                    <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#1B2A4A", lineHeight: 1.2, letterSpacing: "-0.01em" }}>IMAA</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: 10, color: "#0A9396", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>CONNECT</Typography>
+                </Box>
             </Box>
 
-            <Box
-                ref={menuScrollRef}
-                sx={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflowY: "auto",
-                    py: 1,
-                    scrollbarWidth: "thin",
-                    scrollbarColor: "#a8ddda #dff1ef",
-                    "&::-webkit-scrollbar": {
-                        width: 8
-                    },
-                    "&::-webkit-scrollbar-track": {
-                        backgroundColor: "#dff1ef",
-                        borderRadius: 999
-                    },
-                    "&::-webkit-scrollbar-thumb": {
-                        backgroundColor: "#a8ddda",
-                        borderRadius: 999
-                    },
-                    "&::-webkit-scrollbar-thumb:hover": {
-                        backgroundColor: "#97d4d1"
-                    }
-                }}
-            >
-                {renderList(discoverItems, "Discover")}
-                {renderList(manageItems, "Manage")}
-                {adminItems.length > 0 && renderList(adminItems, "Admin")}
+            <Box sx={{
+                flex: 1,
+                overflowY: "auto",
+                py: 1,
+                // Hide scrollbar
+                "&::-webkit-scrollbar": { display: "none" },
+                scrollbarWidth: "none",
+                msOverflowStyle: "none"
+            }}>
+                {renderList(discoverItems, "EVENTS & COMMUNITY")}
+                {isNormalUser && renderList(trainingsItems, "TRAININGS & COURSES")}
+                {isNormalUser && renderList(resourcesItems, "RESOURCES")}
+                {renderList(manageItems, isNormalUser ? "PERSONAL" : "MY CONTENT")}
+                {adminItems.length > 0 && renderList(adminItems, "PLATFORM")}
+            </Box>
+
+            <Box sx={{ px: 1, pt: 0.5, pb: 0.5 }}>
+                <ListItemButton
+                    onClick={() => navigate("/account/settings")}
+                    sx={{ borderRadius: 2, px: 1.5, mx: 1, mb: 0.25, color: TEXT, "&:hover": { bgcolor: HOVER_BG } }}
+                >
+                    <ListItemIcon sx={{ minWidth: 36, color: "#6b7280" }}>
+                        <SettingsRoundedIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Settings" primaryTypographyProps={{ variant: "body2", fontWeight: 500 }} />
+                </ListItemButton>
+                <Box
+                    component="a"
+                    href="https://imaa-institute.org"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.5, py: 0.75, color: "#C0BAB4", fontSize: 11.5, textDecoration: "none", fontWeight: 500,
+                        "&:hover": { color: ORANGE } }}
+                >
+                    <OpenInNewIcon sx={{ fontSize: 13 }} />
+                    Back to imaa-institute.org
+                </Box>
             </Box>
 
             <Divider />
@@ -754,15 +774,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             onClose={onMobileClose}
             ModalProps={{ keepMounted: true }}
             sx={{
-                "& .MuiDrawer-paper": {
-                    boxSizing: "border-box",
-                    width: 280,
-                    height: "100dvh",
-                    maxHeight: "100dvh",
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "column"
-                }
+                "& .MuiDrawer-paper": { boxSizing: "border-box", width: 280 }
             }}
         >
             {SidebarContent}
@@ -772,18 +784,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             variant="permanent"
             sx={{
                 display: { xs: "none", md: "block" },
-                "& .MuiDrawer-paper": {
-                    boxSizing: "border-box",
-                    width: 280,
-                    position: "fixed",
-                    top: 0,
-                    bottom: 0,
-                    height: "100dvh",
-                    maxHeight: "100dvh",
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "column"
-                }
+                "& .MuiDrawer-paper": { boxSizing: "border-box", width: 280, position: "fixed", height: "100vh" }
             }}
             open
         >

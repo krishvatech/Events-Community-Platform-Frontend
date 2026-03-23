@@ -31,6 +31,8 @@ const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
   .toString()
   .replace(/\/+$/, "");
 const API = RAW_API.endsWith("/api") ? RAW_API : `${RAW_API}/api`;
+const S3_BUCKET_URL =
+  "https://events-agora-recordings.s3.eu-central-1.amazonaws.com";
 
 const getTokenHeader = () => {
   const t =
