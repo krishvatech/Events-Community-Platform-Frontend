@@ -395,7 +395,7 @@ const Header = () => {
                   component={Link}
                   to="/signup"
                   variant="contained"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: 6, px: 2.5, bgcolor: "#0F2040", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: 6, px: 2.5, bgcolor: "#0F2040", color: "#ffffff", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
                 >
                   Sign up
                 </Button>
