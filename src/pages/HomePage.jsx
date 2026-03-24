@@ -10,7 +10,6 @@ import {
   Typography,
   Grid,
   Card,
-  CardContent,
 } from "@mui/material";
 import {
   EventNote as EventNoteIcon,
@@ -72,28 +71,6 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
   </Card>
 );
 
-const EventCard = ({ image, title, desc, linkUrl }) => (
-  <Card elevation={0} component={linkUrl ? "a" : "div"} href={linkUrl || undefined}
-    sx={{
-      border: "1px solid #E2E8F0", borderRadius: 3, overflow: "hidden",
-      height: "100%", display: "flex", flexDirection: "column",
-      textDecoration: "none", transition: "box-shadow .2s, transform .2s",
-      "&:hover": { boxShadow: "0 8px 24px rgba(0,0,0,.08)", transform: "translateY(-4px)" },
-    }}
-  >
-    {image && (
-      <Box sx={{ height: 180, overflow: "hidden", flexShrink: 0 }}>
-        <img src={image} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy"
-          onError={(e) => { e.target.style.display = "none"; }} />
-      </Box>
-    )}
-    <CardContent sx={{ flex: 1, p: 2.5 }}>
-      <Typography sx={{ fontWeight: 600, fontSize: 15, color: NAVY, mb: 0.5 }}>{title}</Typography>
-      <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.6 }}>{desc}</Typography>
-    </CardContent>
-  </Card>
-);
-
 export default function HomePage() {
   const [searchParams] = useSearchParams();
   const authed = isAuthed();
@@ -118,14 +95,6 @@ export default function HomePage() {
     "IMAA Connect brings together M&A professionals worldwide — events, community, resources and more.";
   const heroImage = page?.hero_image_url || "";
   const useLightHero = !heroImage;
-
-  const featuredEvents = (Array.isArray(page?.featured_events) && page.featured_events.length)
-    ? page.featured_events
-    : [
-        { title: "The Annual M&A Summit", desc: "Industry leaders gather to discuss the latest M&A trends and strategies.", image: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=600&q=80" },
-        { title: "Networking Mixer for Dealmakers", desc: "Connect with professionals in a relaxed informal setting.", image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&q=80" },
-        { title: "Advanced Valuation Techniques", desc: "Hands-on workshop led by experienced valuation experts.", image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&q=80" },
-      ];
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#FFFFFF" }}>
@@ -213,32 +182,8 @@ export default function HomePage() {
               { icon: VerifiedIcon, iconColor: "#10B981", title: "Verified Profiles", desc: "Build credibility with identity verification and professional badges." },
               { icon: GroupsIcon, iconColor: "#EC4899", title: "Private Groups", desc: "Join invite-only groups, alumni networks, and deal communities." },
             ].map(f => (
-              <Grid item xs={12} sm={6} md={4} key={f.title}>
+              <Grid item xs={12} sm={6} key={f.title}>
                 <FeatureCard {...f} />
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
-      </Box>
-
-      {/* EVENTS */}
-      <Box component="section" sx={{ py: { xs: 8, md: 10 }, bgcolor: "#FFFFFF" }}>
-        <Container maxWidth="lg">
-          <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", mb: 5, flexWrap: "wrap", gap: 2 }}>
-            <Box>
-              <Typography sx={{ color: TEAL, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 12, mb: 0.5 }}>EVENTS</Typography>
-              <Typography variant="h2" sx={{ fontSize: { xs: 26, md: 34 }, fontWeight: 800, color: NAVY }}>Upcoming Events</Typography>
-              <Typography variant="body2" sx={{ color: "#64748B", mt: 0.5 }}>Conferences, webinars, workshops and networking for M&A professionals worldwide.</Typography>
-            </Box>
-            <Button component={Link} to="/events" variant="outlined"
-              sx={{ borderColor: "#CBD5E1", color: NAVY, borderRadius: 2, px: 3, fontWeight: 600, textTransform: "none", "&:hover": { borderColor: NAVY, bgcolor: "rgba(15,32,64,.04)" } }}>
-              See all events
-            </Button>
-          </Box>
-          <Grid container spacing={3}>
-            {featuredEvents.slice(0, 3).map((ev, i) => (
-              <Grid item xs={12} sm={6} md={4} key={i}>
-                <EventCard title={ev.title} desc={ev.desc} image={ev.image || ev.image_url || ""} linkUrl={ev.link_url || ev.url || ""} />
               </Grid>
             ))}
           </Grid>
