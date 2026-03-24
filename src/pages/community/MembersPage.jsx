@@ -724,24 +724,39 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
           onClick={(e) => e.stopPropagation()}
         >
           {status === "friends" ? (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => onOpenProfile?.(u)}
-              sx={{
-                textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px",
-                px: 1.5, py: "5px", borderColor: "#0A939630", color: "#0A9396",
-                bgcolor: "#0A939608", "&:hover": { bgcolor: "#0A939615", borderColor: "#0A939660" },
-              }}
-            >
-              Message
-            </Button>
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => onOpenProfile?.(u)}
+                sx={{
+                  textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px",
+                  px: 1.5, py: "5px", borderColor: "#0A939630", color: "#0A9396",
+                  bgcolor: "#0A939608", "&:hover": { bgcolor: "#0A939615", borderColor: "#0A939660" },
+                  flex: 1,
+                }}
+              >
+                Message
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                onClick={() => onRemoveFriend?.(u)}
+                sx={{
+                  textTransform: "none", fontSize: 11, fontWeight: 600, borderRadius: "8px",
+                  px: 1.5, py: "5px",
+                }}
+              >
+                Remove
+              </Button>
+            </>
           ) : status === "pending_outgoing" ? (
             <Button
               size="small"
               variant="outlined"
               disabled
-              sx={{ textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px", px: 1.5, py: "5px" }}
+              sx={{ textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px", px: 1.5, py: "5px", flex: 1 }}
             >
               ✓ Request Sent
             </Button>
@@ -758,6 +773,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                     px: 1.5, py: "5px", bgcolor: accent, boxShadow: "none",
                     "&:hover": { bgcolor: accent, filter: "brightness(0.9)", boxShadow: "none" },
                     "&:disabled": { bgcolor: "#ccc", color: "#fff" },
+                    flex: 1,
                   }}
                 >
                   Connect
