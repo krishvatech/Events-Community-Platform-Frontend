@@ -28,7 +28,8 @@ import {
     Dialog,
     DialogTitle,
     DialogContent,
-    DialogActions
+    DialogActions,
+    Card
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -248,6 +249,20 @@ const userDisplayName = (u) => {
     );
 };
 
+function flagEmojiFromISO2(code) {
+    if (!code || code.length !== 2) return "";
+    const cc = code.toUpperCase();
+    const pts = [...cc].map((c) => 127397 + c.charCodeAt(0));
+    try { return String.fromCodePoint(...pts); } catch { return ""; }
+}
+
+function memberAccentColor(name) {
+    const colors = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#3B5998"];
+    let h = 0;
+    for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+    return colors[h % colors.length];
+}
+
 /* -------------------------- Map Component -------------------------- */
 function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOpenProfile }) {
     const hasMarkers = markers && markers.length > 0;
@@ -363,64 +378,212 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
     const industry = getIndustryFromUser(u);
 
     const isMe = currentUserId && String(u.id) === String(currentUserId);
-    const isFriend = friendStatus === "friends";
+    const status = (friendStatus || "").toLowerCase();
+    const isFriend = status === "friends";
+
+    const rawKycStatus = (u?.profile?.kyc_status || u?.kyc_status || "").toString().toLowerCase();
+    const isVerified = rawKycStatus === "approved" || rawKycStatus === "verified";
+
+    const iso2 = resolveCountryCode(u);
+    const flag = flagEmojiFromISO2(iso2);
+    const isOnline = !!(u?.is_online || u?.profile?.is_online);
+
+    const rawSkills = u?.profile?.skills || u?.skills || u?.profile?.expertise || [];
+    const skillsArr = Array.isArray(rawSkills)
+        ? rawSkills
+        : typeof rawSkills === "string"
+        ? rawSkills.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+
+    const accent = memberAccentColor(name);
+    const degree = status === "friends" ? 1 : status === "pending_outgoing" ? 2 : 3;
+    const degreeColors = { 1: "#0A9396", 2: "#E8532F", 3: "#1B2A4A" };
+    const degreeLabels = { 1: "1st", 2: "2nd", 3: "3rd" };
 
     return (
-        <Paper
-            onClick={() => onOpenProfile(u)}
+        <Box
             sx={{
-                p: 1.5,
-                borderRadius: 3,
+                borderRadius: "14px",
                 border: `1px solid ${BORDER}`,
-                cursor: "pointer",
-                transition: "transform 0.2s, box-shadow 0.2s",
-                "&:hover": { transform: "translateY(-2px)", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" },
+                background: "#fff",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                transition: "box-shadow .18s, border-color .18s",
+                boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+                width: "100%",
+                "&:hover": {
+                    boxShadow: "0 8px 28px rgba(0,0,0,.09)",
+                    borderColor: accent + "55",
+                },
             }}
         >
-            <Stack direction="row" spacing={1.5} alignItems="center">
-                <Avatar src={u.profile?.user_image_url || u.user_image_url || u.avatar_url || u.avatar || u.user_image} sx={{ width: 44, height: 44 }}>
-                    {name[0]?.toUpperCase()}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, noWrap: true }}>{name}</Typography>
-                        {u.profile?.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />}
-                    </Stack>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {title}{company && ` at ${company}`}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {industry}{country && ` • ${country}`}
-                    </Typography>
+            {/* Top accent stripe */}
+            <Box sx={{ height: 4, bgcolor: accent, flexShrink: 0 }} />
+
+            {/* Card body — click opens profile */}
+            <Box
+                onClick={() => onOpenProfile?.(u)}
+                sx={{ p: "16px 18px 12px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", cursor: "pointer" }}
+            >
+                {/* Row 1: Avatar (left) + degree / industry (right) */}
+                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                    {/* Avatar with color ring */}
+                    <Box sx={{ position: "relative", flexShrink: 0 }}>
+                        <Avatar
+                            src={u?.profile?.user_image_url || u?.user_image_url || u?.avatar_url || u?.avatar || u?.user_image || ""}
+                            alt={name}
+                            sx={{
+                                width: 50, height: 50, borderRadius: "13px",
+                                background: `linear-gradient(145deg, ${accent}20, ${accent}08)`,
+                                border: `2px solid ${accent}25`,
+                                color: accent, fontWeight: 800, fontSize: 18,
+                            }}
+                        >
+                            {!(u?.profile?.user_image_url || u?.user_image_url || u?.avatar_url || u?.avatar || u?.user_image) ? (name || "?").slice(0, 1).toUpperCase() : null}
+                        </Avatar>
+                        {isVerified && (
+                            <Box sx={{
+                                position: "absolute", top: -3, right: -3,
+                                width: 16, height: 16, borderRadius: "50%",
+                                bgcolor: "#0A9396", border: "1.5px solid #fff",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                                    <polyline points="20 6 9 17 4 12" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </Box>
+                        )}
+                    </Box>
+
+                    {/* Degree badge + industry / connected pill */}
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                        {!isMe && (
+                            <Box sx={{
+                                fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
+                                bgcolor: degreeColors[degree] + "15", color: degreeColors[degree],
+                                letterSpacing: 0.3, lineHeight: 1,
+                            }}>
+                                {degreeLabels[degree]}
+                            </Box>
+                        )}
+                        {status === "friends" ? (
+                            <Box sx={{
+                                fontSize: 10, fontWeight: 700, px: "10px", py: "3px", borderRadius: "20px",
+                                bgcolor: "#0A939614", color: "#0A9396",
+                            }}>
+                                ✓ Connected
+                            </Box>
+                        ) : industry ? (
+                            <Box sx={{
+                                fontSize: 10, fontWeight: 600, px: "10px", py: "3px", borderRadius: "20px",
+                                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
+                                maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}>
+                                {industry}
+                            </Box>
+                        ) : null}
+                    </Box>
                 </Box>
 
-                {!isMe && !isFriend && (
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={(e) => { e.stopPropagation(); onAddFriend(u.id); }}
-                        startIcon={<PersonAddAlt1RoundedIcon fontSize="small" />}
-                        sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
-                    >
-                        Add
-                    </Button>
+                {/* Name + title + company */}
+                <Box>
+                    <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+                        {name}
+                    </Typography>
+                    {(title || company) && (
+                        <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+                            {title}
+                            {title && company
+                                ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {company}</Box>
+                                : company
+                                ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}>{company}</Box>
+                                : null}
+                        </Typography>
+                    )}
+                </Box>
+
+                {/* Location + online indicator */}
+                {country && (
+                    <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                        {flag && <span>{flag}</span>}
+                        {country}
+                        {isOnline && (
+                            <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "3px", color: "#22C55E", fontWeight: 700, ml: "4px" }}>
+                                <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#22C55E", display: "inline-block" }} />
+                                Online
+                            </Box>
+                        )}
+                    </Typography>
                 )}
-                {isFriend && (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                        <Chip label="Contact" size="small" color="success" variant="outlined" sx={{ fontWeight: 600 }} />
+
+                {/* Skills / expertise chips */}
+                {skillsArr.length > 0 && (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                        {skillsArr.slice(0, 3).map((skill, i) => (
+                            <Box key={i} sx={{
+                                fontSize: 10, fontWeight: 600, px: "9px", py: "3px", borderRadius: "14px",
+                                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
+                            }}>
+                                {skill}
+                            </Box>
+                        ))}
+                    </Box>
+                )}
+            </Box>
+
+            {/* Action footer */}
+            {!isMe && (
+                <Box
+                    sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {status === "friends" ? (
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => onOpenProfile?.(u)}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                        >
+                            Message
+                        </Button>
+                    ) : status === "pending_outgoing" ? (
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            onClick={() => {}}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                            disabled
+                        >
+                            Request Sent
+                        </Button>
+                    ) : (
+                        <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => onAddFriend(u.id)}
+                            startIcon={<PersonAddAlt1RoundedIcon fontSize="small" />}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                        >
+                            Add Contact
+                        </Button>
+                    )}
+
+                    {status === "friends" && (
                         <Button
                             size="small"
                             variant="outlined"
                             color="error"
-                            onClick={(e) => { e.stopPropagation(); onRemoveFriend(u.id); }}
+                            onClick={() => onRemoveFriend(u.id)}
                             sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
                         >
-                            Remove Contact
+                            Remove
                         </Button>
-                    </Stack>
-                )}
-            </Stack>
-        </Paper>
+                    )}
+                </Box>
+            )}
+        </Box>
     );
 };
 
@@ -435,86 +598,218 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
     const country = getCountryFromUser(u);
     const industry = getIndustryFromUser(u);
 
+    const rawKycStatus = (u?.profile?.kyc_status || u?.kyc_status || "").toString().toLowerCase();
+    const isVerified = rawKycStatus === "approved" || rawKycStatus === "verified";
+
+    const iso2 = resolveCountryCode(u);
+    const flag = flagEmojiFromISO2(iso2);
+
+    const accent = memberAccentColor(name);
+
     return (
-        <Paper
-            onClick={() => onOpenProfile(u)}
+        <Box
             sx={{
-                p: 1.5,
-                borderRadius: 3,
+                borderRadius: "14px",
                 border: `1px solid ${BORDER}`,
-                cursor: "pointer",
-                transition: "transform 0.2s, box-shadow 0.2s",
-                "&:hover": { transform: "translateY(-2px)", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" },
+                background: "#fff",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                transition: "box-shadow .18s, border-color .18s",
+                boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+                width: "100%",
+                "&:hover": {
+                    boxShadow: "0 8px 28px rgba(0,0,0,.09)",
+                    borderColor: accent + "55",
+                },
             }}
         >
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-                <Avatar src={u.profile?.user_image_url || u.user_image_url || u.avatar_url || u.avatar || u.user_image} sx={{ width: 44, height: 44 }}>
-                    {name[0]?.toUpperCase()}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, noWrap: true }}>{name}</Typography>
-                        {u.profile?.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />}
-                    </Stack>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {title}{company && ` at ${company}`}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {industry}{country && ` • ${country}`}
-                    </Typography>
+            {/* Top accent stripe */}
+            <Box sx={{ height: 4, bgcolor: type === "received" ? "#E8532F" : "#1B2A4A", flexShrink: 0 }} />
+
+            {/* Card body — click opens profile */}
+            <Box
+                onClick={() => onOpenProfile?.(u)}
+                sx={{ p: "16px 18px 12px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", cursor: "pointer" }}
+            >
+                {/* Row 1: Avatar (left) + status badge (right) */}
+                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                    {/* Avatar with color ring */}
+                    <Box sx={{ position: "relative", flexShrink: 0 }}>
+                        <Avatar
+                            src={u?.profile?.user_image_url || u?.user_image_url || u?.avatar_url || u?.avatar || u?.user_image || ""}
+                            alt={name}
+                            sx={{
+                                width: 50, height: 50, borderRadius: "13px",
+                                background: `linear-gradient(145deg, ${accent}20, ${accent}08)`,
+                                border: `2px solid ${accent}25`,
+                                color: accent, fontWeight: 800, fontSize: 18,
+                            }}
+                        >
+                            {!(u?.profile?.user_image_url || u?.user_image_url || u?.avatar_url || u?.avatar || u?.user_image) ? (name || "?").slice(0, 1).toUpperCase() : null}
+                        </Avatar>
+                        {isVerified && (
+                            <Box sx={{
+                                position: "absolute", top: -3, right: -3,
+                                width: 16, height: 16, borderRadius: "50%",
+                                bgcolor: "#0A9396", border: "1.5px solid #fff",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                                    <polyline points="20 6 9 17 4 12" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </Box>
+                        )}
+                    </Box>
+
+                    {/* Status badge */}
+                    <Box sx={{
+                        fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
+                        bgcolor: type === "received" ? "#E8532F15" : "#1B2A4A08",
+                        color: type === "received" ? "#E8532F" : "#1B2A4A99",
+                        letterSpacing: 0.3, lineHeight: 1,
+                    }}>
+                        {type === "received" ? "Pending" : "Waiting"}
+                    </Box>
                 </Box>
-                <Stack direction="row" spacing={1} sx={{ mt: { xs: 1, sm: 0 }, ml: { xs: 0, sm: "auto" } }}>
-                    {type === "sent" ? (
-                        <>
-                            <Chip size="small" icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label="Pending" sx={{ bgcolor: "#F5F5F5", color: "#616161", mr: 1 }} />
-                            <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onCancel(req.id); }} startIcon={<HighlightOffIcon />}>Cancel request</Button>
-                        </>
-                    ) : (
-                        <Stack direction="column" alignItems="flex-end" spacing={0.5}>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                                Your received a request to Connect
-                            </Typography>
-                            <Stack direction="row" spacing={1}>
-                                <Button size="small" variant="contained" onClick={(e) => { e.stopPropagation(); onAccept(req.id); }} startIcon={<CheckCircleOutlineIcon />}>Accept</Button>
-                                <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onDecline(req.id); }} startIcon={<HighlightOffIcon />}>Decline</Button>
-                            </Stack>
-                        </Stack>
+
+                {/* Name + title + company */}
+                <Box>
+                    <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+                        {name}
+                    </Typography>
+                    {(title || company) && (
+                        <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+                            {title}
+                            {title && company
+                                ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {company}</Box>
+                                : company
+                                ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}>{company}</Box>
+                                : null}
+                        </Typography>
                     )}
-                </Stack>
-            </Stack>
-        </Paper>
+                </Box>
+
+                {/* Location + industry */}
+                {(country || industry) && (
+                    <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                        {industry && <span>{industry}</span>}
+                        {industry && country && <span>•</span>}
+                        {flag && <span>{flag}</span>}
+                        {country}
+                    </Typography>
+                )}
+
+                {type === "received" && (
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, mt: "4px" }}>
+                        Wants to connect with you
+                    </Typography>
+                )}
+            </Box>
+
+            {/* Action footer */}
+            <Box
+                sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                {type === "sent" ? (
+                    <>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            disabled
+                            startIcon={<HourglassBottomRoundedIcon />}
+                        >
+                            Pending
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => onCancel(req.id)}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            startIcon={<HighlightOffIcon />}
+                        >
+                            Cancel
+                        </Button>
+                    </>
+                ) : (
+                    <>
+                        <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => onAccept(req.id)}
+                            sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            startIcon={<CheckCircleOutlineIcon />}
+                        >
+                            Accept
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => onDecline(req.id)}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            startIcon={<HighlightOffIcon />}
+                        >
+                            Decline
+                        </Button>
+                    </>
+                )}
+            </Box>
+        </Box>
     );
 };
 
 const MemberCardSkeleton = () => (
-    <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 3, border: `1px solid ${BORDER}` }}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-            <Skeleton variant="circular" width={44} height={44} />
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Skeleton variant="text" width="40%" height={24} />
-                <Skeleton variant="text" width="60%" height={16} />
-                <Skeleton variant="text" width="50%" height={16} />
+    <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ height: 4, bgcolor: "#e2e8f0" }} />
+        <Stack sx={{ p: "16px 18px 12px", gap: "8px" }} spacing={0}>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Skeleton variant="rounded" width={50} height={50} sx={{ borderRadius: "13px" }} />
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                    <Skeleton variant="text" width={60} height={16} />
+                    <Skeleton variant="text" width={80} height={16} />
+                </Box>
             </Box>
-            <Skeleton variant="rounded" width={60} height={30} sx={{ borderRadius: 2 }} />
+            <Box>
+                <Skeleton variant="text" width="50%" height={20} />
+                <Skeleton variant="text" width="70%" height={14} />
+            </Box>
+            <Skeleton variant="text" width="40%" height={14} />
+            <Box sx={{ display: "flex", gap: "4px" }}>
+                <Skeleton variant="text" width={60} height={20} />
+                <Skeleton variant="text" width={60} height={20} />
+            </Box>
         </Stack>
-    </Paper>
+        <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px" }}>
+            <Skeleton variant="rounded" width="100%" height={32} />
+        </Box>
+    </Box>
 );
 
 const RequestCardSkeleton = () => (
-    <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 3, border: `1px solid ${BORDER}` }}>
-        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-            <Skeleton variant="circular" width={44} height={44} />
-            <Box sx={{ flex: 1, minWidth: 200 }}>
-                <Skeleton variant="text" width="40%" height={24} />
-                <Skeleton variant="text" width="60%" height={16} />
-                <Skeleton variant="text" width="50%" height={16} />
+    <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ height: 4, bgcolor: "#e2e8f0" }} />
+        <Stack sx={{ p: "16px 18px 12px", gap: "8px" }} spacing={0}>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Skeleton variant="rounded" width={50} height={50} sx={{ borderRadius: "13px" }} />
+                <Skeleton variant="text" width={60} height={16} />
             </Box>
-            <Stack direction="row" spacing={1} sx={{ mt: { xs: 1, sm: 0 }, ml: { xs: 0, sm: "auto" } }}>
-                <Skeleton variant="rounded" width={80} height={30} sx={{ borderRadius: 2 }} />
-                <Skeleton variant="rounded" width={80} height={30} sx={{ borderRadius: 2 }} />
-            </Stack>
+            <Box>
+                <Skeleton variant="text" width="50%" height={20} />
+                <Skeleton variant="text" width="70%" height={14} />
+            </Box>
+            <Skeleton variant="text" width="40%" height={14} />
+            <Skeleton variant="text" width="60%" height={14} />
         </Stack>
-    </Paper>
+        <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", gap: "8px" }}>
+            <Skeleton variant="rounded" width="100%" height={32} />
+            <Skeleton variant="rounded" width={80} height={32} />
+        </Box>
+    </Box>
 );
 
 /* ------------------------------ Page Component ------------------------------ */
