@@ -3156,6 +3156,18 @@ export default function AdminUserProfileEditPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+        {/* Back Button */}
+        <Box sx={{ mb: 2 }}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => navigate("/admin/users")}
+            sx={{ textTransform: "none", borderRadius: 1 }}
+          >
+            ← Back to Staff Users
+          </Button>
+        </Box>
+
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">
             {mode === "preview" && (
@@ -3277,13 +3289,6 @@ export default function AdminUserProfileEditPage() {
                       gap: 1,
                     }}
                   >
-                    <Button
-                      size="small"
-                      onClick={() => navigate("/admin/staff")}
-                      sx={{ alignSelf: "flex-start", px: 0, minWidth: 0, textTransform: "none" }}
-                    >
-                      ← Back to Staff
-                    </Button>
                     <Stack
                       direction={{ xs: "column", sm: "row" }}
                       spacing={1}
