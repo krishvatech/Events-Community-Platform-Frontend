@@ -287,6 +287,7 @@ function toCard(ev) {
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
     attendees: Math.max(0, visibleRegisteredCount),
     price: ev.price,
+    price_label: ev.price_label,
     is_free: ev.is_free || false,
     status: ev.status,
     is_live: ev.is_live,
