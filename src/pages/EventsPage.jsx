@@ -776,32 +776,30 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
             // Single-day events
             return (
-              <div>
-                <div className="flex items-center gap-6">
-                  <span className="inline-flex items-center gap-2">
-                    <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                    {dayjs(ev.start).format("MMMM D, YYYY")}
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                    <span>
-                      {/* Primary: Organizer Time + Location (for single-day) */}
-                      <span className="block font-medium text-neutral-900">
-                        {orgDateStr} {orgTimeRangeKey}
-                        {organizerTimezone && (
-                          <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
-                        )}
-                      </span>
-
-                      {/* Secondary: Your Time */}
-                      {showYourTime && (
-                        <span className="block mt-1.5 text-xs text-neutral-600">
-                          <span className="font-semibold text-teal-700">Your Time:</span>{" "}
-                          {localDateStr} {localTimeRangeKey}
-                          <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
-                        </span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                  <span className="font-medium text-neutral-900">{dayjs(ev.start).format("MMMM D, YYYY")}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <AccessTimeIcon fontSize="small" className="text-teal-700 mt-0.5" />
+                  <span>
+                    {/* Primary: Organizer Time + Location (for single-day) */}
+                    <span className="block font-medium text-neutral-900">
+                      {orgTimeRangeKey}
+                      {organizerTimezone && (
+                        <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
                       )}
                     </span>
+
+                    {/* Secondary: Your Time */}
+                    {showYourTime && (
+                      <span className="block mt-1.5 text-xs text-neutral-600">
+                        <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                        {localTimeRangeKey}
+                        <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
