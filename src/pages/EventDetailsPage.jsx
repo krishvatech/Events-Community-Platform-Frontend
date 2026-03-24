@@ -945,6 +945,10 @@ export default function EventDetailsPage() {
                           const staff = isStaffUser();
                           const canView = canViewParticipants(event, owner, staff);
 
+                          // Check if participant count should be displayed - hide entire section if OFF
+                          const showParticipantCount = event.show_registered_participant_count !== false;
+                          if (!showParticipantCount) return null;
+
                           const label = visibleRegisteredCount > 0
                             ? `${visibleRegisteredCount} people registered`
                             : "No registrations yet";

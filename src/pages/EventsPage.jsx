@@ -299,6 +299,7 @@ function toCard(ev) {
     timezone: ev.timezone,
     is_multi_day: ev.is_multi_day || false,  // ✅ NEW: Multi-day event flag
     sessions: Array.isArray(ev.sessions) ? ev.sessions.map(normalizeSession) : [], // ✅ NEW: Event sessions array
+    show_registered_participant_count: ev.show_registered_participant_count,
   };
 }
 
@@ -717,6 +718,13 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     localStorage.getItem("access_token");
                   const isGuest = localStorage.getItem("is_guest") === "true";
                   const canOpenParticipants = canView && Boolean(token) && !isGuest;
+
+                  // Check if participant count should be displayed
+                  const showParticipantCount = ev.show_registered_participant_count !== false;
+                  console.log('Event:', ev.slug, 'showParticipantCount:', showParticipantCount, 'field value:', ev.show_registered_participant_count);
+
+                  // Hide entire section if toggle is OFF
+                  if (!showParticipantCount) return null;
 
                   const label = ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet";
 
@@ -1191,7 +1199,11 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                   const isGuest = localStorage.getItem("is_guest") === "true";
                   const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
-                  const label = ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet";
+                  // Check if participant count should be displayed
+                  const showParticipantCount = ev.show_registered_participant_count !== false;
+                  const label = showParticipantCount
+                    ? (ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet")
+                    : "Registrations";
 
                   if (canOpenParticipants) {
                     return (
