@@ -11,8 +11,8 @@ import {
   Language as GlobeIcon,
   EventNote as EventNoteIcon,
   PeopleAlt as PeopleIcon,
-  School as SchoolIcon,
-  LibraryBooks as LibraryIcon,
+  // School as SchoolIcon,
+  // LibraryBooks as LibraryIcon,
   Shield as ShieldIcon,
   ChevronRight as ChevronIcon,
 } from "@mui/icons-material";
@@ -387,10 +387,10 @@ function GroupRow({ g }) {
 // ── USP Strip ─────────────────────────────────────────────────────────────────
 const USP_ITEMS = [
   { value: "4,000+", label: "Members", Icon: PeopleIcon, color: O },
-  { value: "30+", label: "Countries", Icon: GlobeIcon, color: T },
-  { value: "500+", label: "Events / Year", Icon: EventNoteIcon, color: P },
-  { value: "50+", label: "Courses & Certs", Icon: SchoolIcon, color: G },
-  { value: "10K+", label: "Resources", Icon: LibraryIcon, color: "#6EC1E4" },
+  { value: "100+", label: "Countries", Icon: GlobeIcon, color: T },
+  // { value: "500+", label: "Events / Year", Icon: EventNoteIcon, color: P },
+  // { value: "50+", label: "Courses & Certs", Icon: SchoolIcon, color: G },
+  // { value: "10K+", label: "Resources", Icon: LibraryIcon, color: "#6EC1E4" },
 ];
 
 function USPStrip() {
@@ -529,7 +529,7 @@ export default function DashboardPage() {
                 <p style={{ fontSize: 14, color: "#666", margin: "8px 0 0", lineHeight: 1.7, fontFamily: FONT }}>
                   You are part of a global network of{" "}
                   <strong style={{ color: O }}>4,000+ M&A professionals</strong> across{" "}
-                  <strong style={{ color: T }}>30+ countries</strong>.
+                  <strong style={{ color: T }}>100+ countries</strong>.
                   {kycApproved && <> ✅ Your identity is verified.</>}
                   {" "}Explore events, connect with peers, and grow your career.
                 </p>
