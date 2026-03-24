@@ -269,7 +269,7 @@ function FeaturedHero({ event }) {
             </div>
           )}
           <span style={{ display: "inline-block", background: accent, color: "#fff", padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 700, width: "fit-content", fontFamily: FONT }}>
-            Register Now →
+            {event?.registration_type === 'apply' ? 'Apply Now →' : 'Register Now →'}
           </span>
         </div>
         <div style={{ height: 300, overflow: "hidden" }}>

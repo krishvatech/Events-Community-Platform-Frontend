@@ -20,6 +20,7 @@ import {
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
+import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
@@ -295,6 +296,10 @@ export default function EventDetailsPage() {
   // Guest Join Modal
   const [guestModalOpen, setGuestModalOpen] = useState(false);
 
+  // Apply Modal
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [myApplication, setMyApplication] = useState(null);
+
   // Participant Preview
   const [previewParticipants, setPreviewParticipants] = useState([]);
   const [previewParticipantsForbidden, setPreviewParticipantsForbidden] = useState(false);
@@ -486,6 +491,140 @@ export default function EventDetailsPage() {
     })();
     return () => { cancelled = true; };
   }, [event?.id, token]);
+
+  // Fetch application status for events with apply registration type
+  useEffect(() => {
+    if (!event?.id) return;
+    if (event.registration_type !== 'apply') {
+      setMyApplication(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        // For unauthenticated users, check localStorage for cached email
+        let url = `${API_BASE}/events/${event.id}/apply/`;
+        if (!token) {
+          const cached = localStorage.getItem("application_cache");
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (parsed.email) {
+                url += `?email=${encodeURIComponent(parsed.email)}`;
+              }
+            } catch (err) {
+              console.error("Failed to parse application_cache:", err);
+            }
+          }
+        }
+
+        const res = await fetch(url, {
+          headers,
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          setMyApplication(data);
+        }
+      } catch { }
+    })();
+    return () => { cancelled = true; };
+  }, [event?.id, event?.registration_type, token]);
+
+  // When application is approved, refresh registration status
+  useEffect(() => {
+    if (myApplication?.status !== 'approved' || !event?.id || !token) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (cancelled) return;
+        if (mineRes.ok) {
+          const data = await mineRes.json();
+          const results = Array.isArray(data) ? data : (data.results || []);
+          const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
+          setRegistration(mineForEvent || null);
+        }
+      } catch { }
+    })();
+    return () => { cancelled = true; };
+  }, [myApplication?.status, event?.id, token]);
+
+  // For authenticated users, submit application directly without dialog
+  const handleApplyDirect = async () => {
+    if (!event?.id || !token) return;
+
+    try {
+      // First, fetch user profile to get their name and email
+      const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!profileRes.ok) {
+        toast.error("Unable to fetch your profile. Please try again.");
+        return;
+      }
+
+      const profile = await profileRes.json();
+      console.log("Profile fetched:", profile);
+
+      // Check if profile has required data
+      const missingFields = [];
+      if (!profile.first_name) missingFields.push("First Name");
+      if (!profile.last_name) missingFields.push("Last Name");
+      if (!profile.email) missingFields.push("Email");
+      if (!profile.job_title) missingFields.push("Job Title");
+      if (!profile.company) missingFields.push("Company");
+
+      if (missingFields.length > 0) {
+        toast.error(`Please complete your profile: ${missingFields.join(", ")}`);
+        return;
+      }
+
+      const applicationData = {
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        job_title: profile.job_title,
+        company_name: profile.company,
+        linkedin_url: "",
+      };
+      console.log("Submitting application with data:", applicationData);
+
+      // Submit application with user's profile data
+      const res = await fetch(`${API_BASE}/events/${event.id}/apply/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(applicationData),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMyApplication(data);
+        toast.success("Application submitted successfully!");
+      } else if (res.status === 409) {
+        toast.error("You have already applied to this event.");
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("Application submission error:", errData);
+        toast.error(errData.detail || JSON.stringify(errData) || "Failed to submit application. Please try again.");
+      }
+    } catch (err) {
+      toast.error("Error submitting application: " + err.message);
+    }
+  };
 
   const handleRegister = async () => {
     if (!event?.id) return;
@@ -1120,6 +1259,74 @@ export default function EventDetailsPage() {
                           >
                             {multiDayJoinLabel}
                           </Button>
+                        ) : event.registration_type === 'apply' && !canJoinEventNow && !isPast ? (
+                          // --- APPLY FLOW ---
+                          <>
+                            {!myApplication || myApplication.status === 'none'
+                              ? (
+                                <Button
+                                  onClick={() => {
+                                    // For authenticated users, submit directly
+                                    if (token) {
+                                      handleApplyDirect();
+                                    } else {
+                                      // For guests, open modal
+                                      setApplyModalOpen(true);
+                                    }
+                                  }}
+                                  variant="contained"
+                                  sx={{
+                                    textTransform: "none",
+                                    backgroundColor: "#10b8a6",
+                                    "&:hover": { backgroundColor: "#0ea5a4" },
+                                  }}
+                                  className="rounded-xl"
+                                >
+                                  Apply Now
+                                </Button>
+                              )
+                              : myApplication.status === 'approved'
+                              ? (
+                                // After approval, check if registered
+                                registration
+                                  ? (
+                                    <Chip
+                                      label="Registered"
+                                      color="success"
+                                      variant="outlined"
+                                      sx={{ py: 2.5 }}
+                                    />
+                                  )
+                                  : (
+                                    <Chip
+                                      label="Approved - Refresh to Register"
+                                      color="success"
+                                      variant="outlined"
+                                      sx={{ py: 2.5 }}
+                                    />
+                                  )
+                              )
+                              : myApplication.status === 'pending'
+                              ? (
+                                <Chip
+                                  label="Application Pending"
+                                  color="warning"
+                                  variant="outlined"
+                                  sx={{ py: 2.5 }}
+                                />
+                              )
+                              : myApplication.status === 'declined'
+                              ? (
+                                <Chip
+                                  label="Application Declined"
+                                  color="error"
+                                  variant="outlined"
+                                  sx={{ py: 2.5 }}
+                                />
+                              )
+                              : null
+                            }
+                          </>
                         ) : !canJoinEventNow && !isPast ? (
                           <Button
                             onClick={handleRegister}
@@ -1315,12 +1522,22 @@ export default function EventDetailsPage() {
 
       {/* Guest Join Modal */}
       {event && (
-        <GuestJoinModal
-          open={guestModalOpen}
-          onClose={() => setGuestModalOpen(false)}
-          event={event}
-          livePath={livePath}
-        />
+        <>
+          <GuestJoinModal
+            open={guestModalOpen}
+            onClose={() => setGuestModalOpen(false)}
+            event={event}
+            livePath={livePath}
+          />
+
+          <ApplyNowModal
+            open={applyModalOpen}
+            onClose={() => setApplyModalOpen(false)}
+            event={event}
+            token={token}
+            onSuccess={(app) => setMyApplication(app)}
+          />
+        </>
       )}
     </div>
   );

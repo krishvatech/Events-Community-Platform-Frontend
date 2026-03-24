@@ -297,6 +297,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
   const [isFree, setIsFree] = React.useState(true);
+  const [registrationType, setRegistrationType] = React.useState("open");
   const [maxParticipants, setMaxParticipants] = React.useState(""); // New state
 
   const today = dayjs().format("YYYY-MM-DD");
@@ -592,6 +593,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("format", format);
     fd.append("price", String(isFree ? 0 : (price ?? 0)));
     fd.append("is_free", String(isFree));
+    fd.append("registration_type", registrationType);
     if (maxParticipants) {
       fd.append("max_participants", String(maxParticipants));
     } else {
@@ -905,6 +907,22 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 </MenuItem>
               ))}
             </TextField>
+
+            <Box sx={{ mt: 3, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Registration Type
+              </Typography>
+              <TextField
+                select
+                fullWidth
+                value={registrationType}
+                onChange={(e) => setRegistrationType(e.target.value)}
+                helperText="Open: Users register instantly. Apply: Users submit applications for host approval."
+              >
+                <MenuItem value="open">Open Registration</MenuItem>
+                <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
+              </TextField>
+            </Box>
           </Paper>
 
           {/* Replay Options - Only for Virtual/Hybrid */}

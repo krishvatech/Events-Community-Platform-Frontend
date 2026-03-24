@@ -77,7 +77,7 @@ import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
 // ---- API helpers ----
-const RAW = import.meta.env.VITE_API_BASE_URL || "";
+const RAW = import.meta.env.VITE_API_ROOT_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 const API_ORIGIN = API_ROOT.replace(/\/api$/, "");
@@ -178,6 +178,15 @@ const canJoinEarly = (ev, minutes = 15) => {
 // ---- Tabs / pagination ----
 const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
+
+// Helper to get dynamic tab labels based on event registration type
+const getTabLabels = (event, isOwner) => {
+  if (!isOwner) return STAFF_EVENT_TAB_LABELS;
+  if (event?.registration_type === 'apply') {
+    return ["Overview", "Applications", "Registered Members", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+  }
+  return EVENT_TAB_LABELS;
+};
 const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
 
@@ -193,6 +202,9 @@ export default function EventManagePage() {
   const [event, setEvent] = useState(initialEvent);
   const [eventLoading, setEventLoading] = useState(!initialEvent);
   const [eventError, setEventError] = useState("");
+
+  // Get auth token
+  const token = getToken();
 
   // New: Current Viewer State for Timezone
   const [currentUser, setCurrentUser] = useState(null);
@@ -446,7 +458,7 @@ export default function EventManagePage() {
 
   const [myReg, setMyReg] = useState(null); // New state for my registration
   const resources = event?.resources || [];
-  const tabLabels = isOwner ? EVENT_TAB_LABELS : STAFF_EVENT_TAB_LABELS;
+  const tabLabels = getTabLabels(event, isOwner);
 
   // ---- load event ----
   useEffect(() => {
@@ -468,18 +480,44 @@ export default function EventManagePage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
 
-        const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+        const url = `${API_ROOT}/events/${eventId}/`;
+        console.log("🔄 Fetching event from:", url);
+        const res = await fetch(url, {
           headers,
           signal: controller.signal,
         });
 
-        const json = await res.json().catch(() => null);
+        console.log("📡 Event API response status:", res.status);
+
+        // Try to get response text first to see what we're getting
+        const text = await res.text();
+        console.log("📝 Response text:", text.substring(0, 200)); // First 200 chars
+
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (e) {
+          console.error("❌ Failed to parse JSON:", e.message);
+          json = null;
+        }
+
+        console.log("📦 Event API response data:", json);
+
         if (!res.ok) {
           throw new Error(json?.detail || `HTTP ${res.status}`);
+        }
+        if (!json) {
+          throw new Error(`Empty or invalid response from API. Got: "${text.substring(0, 100)}"`);
         }
         setEvent(json);
       } catch (e) {
         if (e.name === "AbortError") return;
+        console.error("❌ Event fetch failed:", {
+          eventId,
+          error: e?.message,
+          status: e?.status,
+          url: `${API_ROOT}/events/${eventId}/`
+        });
         setEventError(e?.message || "Unable to load event");
       } finally {
         setEventLoading(false);
@@ -2262,6 +2300,228 @@ export default function EventManagePage() {
             </Button>
           </Stack>
         </Stack>
+      </Paper>
+    );
+  };
+
+  // Applications Management Tab (for events with apply registration type)
+  const [applications, setApplications] = React.useState([]);
+  const [appLoading, setAppLoading] = React.useState(false);
+  const [appFilter, setAppFilter] = React.useState('all');
+  const [appSearch, setAppSearch] = React.useState('');
+  const [declineDialogOpen, setDeclineDialogOpen] = React.useState(false);
+  const [selectedApp, setSelectedApp] = React.useState(null);
+  const [declineMessage, setDeclineMessage] = React.useState('');
+
+  React.useEffect(() => {
+    if (event?.registration_type !== 'apply' || !event?.id) return;
+    const fetchApps = async () => {
+      setAppLoading(true);
+      try {
+        const url = `${API_ROOT}/events/${event.id}/applications/?status=${appFilter === 'all' ? '' : appFilter}&search=${appSearch}`;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setApplications(Array.isArray(data) ? data : data.results || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch applications:', err);
+      } finally {
+        setAppLoading(false);
+      }
+    };
+    fetchApps();
+  }, [event?.id, event?.registration_type, appFilter, appSearch, token]);
+
+  const handleApproveApp = async (appId) => {
+    try {
+      const res = await fetch(`${API_ROOT}/events/${event.id}/applications/${appId}/approve/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        toast.success('Application approved');
+        setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: 'approved' } : a));
+      }
+    } catch (err) {
+      toast.error('Failed to approve application');
+    }
+  };
+
+  const handleDeclineApp = async () => {
+    try {
+      const res = await fetch(`${API_ROOT}/events/${event.id}/applications/${selectedApp.id}/decline/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ rejection_message: declineMessage })
+      });
+      if (res.ok) {
+        toast.success('Application declined');
+        setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, status: 'declined' } : a));
+        setDeclineDialogOpen(false);
+        setSelectedApp(null);
+        setDeclineMessage('');
+      }
+    } catch (err) {
+      toast.error('Failed to decline application');
+    }
+  };
+
+  const renderApplications = () => {
+    if (!isOwner || event?.registration_type !== 'apply') {
+      return (
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Applications</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>Only available for events with application-based registration.</Typography>
+        </Paper>
+      );
+    }
+
+    const filteredApps = applications.filter(app =>
+      appFilter === 'all' || app.status === appFilter
+    );
+
+    return (
+      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+              APPLICATIONS ({filteredApps.length})
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Review and manage event applications.
+            </Typography>
+          </Box>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              size="small"
+              placeholder="Search by name or email..."
+              value={appSearch}
+              onChange={(e) => setAppSearch(e.target.value)}
+              sx={{ flex: 1 }}
+            />
+            <Select value={appFilter} onChange={(e) => setAppFilter(e.target.value)} size="small" sx={{ minWidth: 150 }}>
+              <MenuItem value="all">All Applications</MenuItem>
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="approved">Approved</MenuItem>
+              <MenuItem value="declined">Declined</MenuItem>
+            </Select>
+          </Stack>
+
+          {appLoading ? (
+            <CircularProgress />
+          ) : filteredApps.length === 0 ? (
+            <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>No applications found.</Typography>
+          ) : (
+            <Box sx={{ overflowX: 'auto' }}>
+              <Table sx={{ minWidth: 650, '& thead th': { fontWeight: 600, backgroundColor: '#f5f5f5' } }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Job Title</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Applied At</TableCell>
+                    <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredApps.map(app => (
+                    <TableRow key={app.id} sx={{ '&:hover': { backgroundColor: '#fafafa' } }}>
+                      <TableCell>{app.applicant_name}</TableCell>
+                      <TableCell>{app.email}</TableCell>
+                      <TableCell>{app.job_title}</TableCell>
+                      <TableCell>{app.company_name}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                          size="small"
+                          color={app.status === 'approved' ? 'success' : app.status === 'declined' ? 'error' : 'warning'}
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>{new Date(app.applied_at).toLocaleDateString()}</TableCell>
+                      <TableCell sx={{ textAlign: 'center' }}>
+                        {app.status === 'pending' && (
+                          <Stack direction="row" spacing={1} justifyContent="center">
+                            <Button
+                              size="small"
+                              variant="contained"
+                              sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}
+                              onClick={() => handleApproveApp(app.id)}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              sx={{ bgcolor: '#f44336', '&:hover': { bgcolor: '#da190b' } }}
+                              onClick={() => { setSelectedApp(app); setDeclineDialogOpen(true); }}
+                            >
+                              Decline
+                            </Button>
+                          </Stack>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          )}
+        </Stack>
+
+        <Dialog open={declineDialogOpen} onClose={() => setDeclineDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>Decline Application</DialogTitle>
+          <DialogContent>
+            {selectedApp && (
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                Declining application from <strong>{selectedApp.applicant_name}</strong> ({selectedApp.email})
+              </Typography>
+            )}
+            <TextField
+              fullWidth
+              multiline
+              rows={5}
+              label="Rejection Message (Optional)"
+              value={declineMessage}
+              onChange={(e) => setDeclineMessage(e.target.value)}
+              placeholder="Tell the applicant why their application was declined (this message will be sent to them)..."
+              sx={{ mt: 1 }}
+              variant="outlined"
+            />
+            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1, display: 'block' }}>
+              If no message is provided, a default rejection message will be sent.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button
+              onClick={() => {
+                setDeclineDialogOpen(false);
+                setDeclineMessage('');
+                setSelectedApp(null);
+              }}
+              variant="outlined"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: '#f44336', '&:hover': { bgcolor: '#da190b' } }}
+              onClick={() => {
+                handleDeclineApp();
+                setDeclineMessage('');
+              }}
+            >
+              Send & Decline
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     );
   };
@@ -4243,14 +4503,30 @@ export default function EventManagePage() {
               {isOwner ? (
                 <>
                   {tab === 0 && renderOverview()}
-                  {tab === 1 && renderMembers()}
-                  {tab === 2 && renderSessions()}
-                  {tab === 3 && renderResources()}
-                  {tab === 4 && renderSpeedNetworking()}
-                  {tab === 5 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                  {tab === 6 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                  {tab === 7 && renderLoungeSettings()}
-                  {tab === 8 && renderEdit()}
+                  {event?.registration_type === 'apply' ? (
+                    <>
+                      {tab === 1 && renderApplications()}
+                      {tab === 2 && renderMembers()}
+                      {tab === 3 && renderSessions()}
+                      {tab === 4 && renderResources()}
+                      {tab === 5 && renderSpeedNetworking()}
+                      {tab === 6 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                      {tab === 7 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                      {tab === 8 && renderLoungeSettings()}
+                      {tab === 9 && renderEdit()}
+                    </>
+                  ) : (
+                    <>
+                      {tab === 1 && renderMembers()}
+                      {tab === 2 && renderSessions()}
+                      {tab === 3 && renderResources()}
+                      {tab === 4 && renderSpeedNetworking()}
+                      {tab === 5 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                      {tab === 6 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                      {tab === 7 && renderLoungeSettings()}
+                      {tab === 8 && renderEdit()}
+                    </>
+                  )}
                 </>
               ) : (
                 <>

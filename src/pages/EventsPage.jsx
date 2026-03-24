@@ -9,6 +9,7 @@ import { Link, useNavigate } from "react-router-dom";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
+import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import {
   Box,
   Avatar,
@@ -284,6 +285,7 @@ function toCard(ev) {
     status: ev.status,
     is_live: ev.is_live,
     event_format: ev.event_format || ev.format, // virtual, hybrid, in_person
+    registration_type: ev.registration_type || 'open', // ✅ NEW: 'open' or 'apply'
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
     waiting_room_enabled: ev.waiting_room_enabled,
     waiting_room_grace_period_minutes: ev.waiting_room_grace_period_minutes,
@@ -416,6 +418,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const [expandSessions, setExpandSessions] = React.useState(false);
   const [expandedSessionDescriptions, setExpandedSessionDescriptions] = React.useState({});
 
+  // Apply modal state
+  const [applyModalOpen, setApplyModalOpen] = React.useState(false);
+  const [myApplication, setMyApplication] = React.useState(null);
+  const [applyAsGuestOnly, setApplyAsGuestOnly] = React.useState(false);
+
   // Timezone logic
   const organizerTimezone = normalizeTimezoneName(ev.timezone);
   const timeFormat = "h:mm A";
@@ -442,6 +449,109 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   // Authenticated regular user (not guest) - guests can still rejoin
   const isAuthenticatedUser = Boolean(token) && !isGuest;
   const isFreeEvent = Boolean(ev.is_free) || Number(ev.price) === 0;
+
+  // Fetch application status for apply-type events
+  React.useEffect(() => {
+    if (ev?.registration_type !== 'apply' || !ev?.id) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        // For unauthenticated users, check localStorage for cached email
+        let url = `${API_BASE}/events/${ev.id}/apply/`;
+        if (!token) {
+          const cached = localStorage.getItem("application_cache");
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (parsed.email) {
+                url += `?email=${encodeURIComponent(parsed.email)}`;
+              }
+            } catch (err) {
+              console.error("Failed to parse application_cache:", err);
+            }
+          }
+        }
+
+        const res = await fetch(url, {
+          headers,
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          setMyApplication(data);
+        }
+      } catch { }
+    })();
+    return () => { cancelled = true; };
+  }, [ev?.id, ev?.registration_type, token]);
+
+  // For authenticated users, submit application directly without dialog
+  const handleApplyCardDirect = async () => {
+    if (!token || !ev?.id) return;
+
+    try {
+      // First, fetch user profile to get their name and email
+      const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!profileRes.ok) {
+        toast.error("Unable to fetch your profile. Please try again.");
+        return;
+      }
+
+      const profile = await profileRes.json();
+
+      // Check if profile has required data
+      const missingFields = [];
+      if (!profile.first_name) missingFields.push("First Name");
+      if (!profile.last_name) missingFields.push("Last Name");
+      if (!profile.email) missingFields.push("Email");
+      if (!profile.job_title) missingFields.push("Job Title");
+      if (!profile.company) missingFields.push("Company");
+
+      if (missingFields.length > 0) {
+        toast.error(`Please complete your profile: ${missingFields.join(", ")}`);
+        return;
+      }
+
+      // Submit application with user's profile data
+      const res = await fetch(`${API_BASE}/events/${ev.id}/apply/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          email: profile.email,
+          job_title: profile.job_title,
+          company_name: profile.company,
+          linkedin_url: "",
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMyApplication(data);
+        toast.success("Application submitted successfully!");
+      } else if (res.status === 409) {
+        toast.error("You have already applied to this event.");
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.detail || "Failed to submit application. Please try again.");
+      }
+    } catch (err) {
+      toast.error("Error submitting application: " + err.message);
+    }
+  };
 
   const handleRegisterCard = async () => {
     if (!token) {
@@ -927,30 +1037,120 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Button
-                variant="contained"
-                size="medium"
-                color="primary"
-                onClick={handleRegisterCard}
-                className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-              >
-                Register Now
-              </Button>
-              {!isAuthenticatedUser && isFreeEvent && (
-                <Button
-                  variant="outlined"
-                  size="medium"
-                  color="primary"
-                  onClick={() => onGuestJoinRequested(ev)}
-                  className="normal-case rounded-full px-4"
-                >
-                  {isGuest ? "Continue as Guest" : "Join as Guest"}
-                </Button>
+              {ev.registration_type === 'apply' ? (
+                // APPLY FLOW
+                <>
+                  {!myApplication || myApplication.status === 'none'
+                    ? (
+                      <Button
+                        variant="contained"
+                        size="medium"
+                        color="primary"
+                        onClick={() => {
+                          if (token) {
+                            // For authenticated users, submit directly
+                            handleApplyCardDirect();
+                          } else {
+                            // For guests, open modal
+                            setApplyAsGuestOnly(false);
+                            setApplyModalOpen(true);
+                          }
+                        }}
+                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                      >
+                        Apply Now
+                      </Button>
+                    )
+                    : myApplication.status === 'approved'
+                    ? (
+                      // After approval, check if registered
+                      myRegistrations?.[ev.id]
+                        ? (
+                          <Chip
+                            label="Registered"
+                            color="success"
+                            variant="outlined"
+                          />
+                        )
+                        : (
+                          <Chip
+                            label="Approved"
+                            color="success"
+                            variant="outlined"
+                          />
+                        )
+                    )
+                    : myApplication.status === 'pending'
+                    ? (
+                      <Chip
+                        label="Application Pending"
+                        color="warning"
+                        variant="outlined"
+                      />
+                    )
+                    : myApplication.status === 'declined'
+                    ? (
+                      <Chip
+                        label="Application Declined"
+                        color="error"
+                        variant="outlined"
+                      />
+                    )
+                    : null
+                  }
+                  {!isAuthenticatedUser && isFreeEvent && (
+                    <Button
+                      variant="outlined"
+                      size="medium"
+                      color="primary"
+                      onClick={() => {
+                        setApplyAsGuestOnly(true);
+                        setApplyModalOpen(true);
+                      }}
+                      className="normal-case rounded-full px-4"
+                    >
+                      {isGuest ? "Continue Applying as Guest" : "Apply as Guest"}
+                    </Button>
+                  )}
+                </>
+              ) : (
+                // REGISTER FLOW
+                <>
+                  <Button
+                    variant="contained"
+                    size="medium"
+                    color="primary"
+                    onClick={handleRegisterCard}
+                    className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                  >
+                    Register Now
+                  </Button>
+                  {!isAuthenticatedUser && isFreeEvent && (
+                    <Button
+                      variant="outlined"
+                      size="medium"
+                      color="primary"
+                      onClick={() => onGuestJoinRequested(ev)}
+                      className="normal-case rounded-full px-4"
+                    >
+                      {isGuest ? "Continue as Guest" : "Join as Guest"}
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           )
         )}
       </div>
+
+      <ApplyNowModal
+        open={applyModalOpen}
+        onClose={() => setApplyModalOpen(false)}
+        event={ev}
+        token={token}
+        onSuccess={(app) => setMyApplication(app)}
+        guestOnly={applyAsGuestOnly}
+      />
     </MUICard>
   );
 }
@@ -1013,6 +1213,52 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   // Authenticated regular user (not guest) - guests can still rejoin
   const isAuthenticatedUser = Boolean(token) && !isGuest;
   const isFreeEvent = Boolean(ev.is_free) || Number(ev.price) === 0;
+
+  // Apply modal state
+  const [applyModalOpen, setApplyModalOpen] = React.useState(false);
+  const [myApplication, setMyApplication] = React.useState(null);
+  const [applyAsGuestOnly, setApplyAsGuestOnly] = React.useState(false);
+
+  // Fetch application status for apply-type events
+  React.useEffect(() => {
+    if (ev?.registration_type !== 'apply' || !ev?.id) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        // For unauthenticated users, check localStorage for cached email
+        let url = `${API_BASE}/events/${ev.id}/apply/`;
+        if (!token) {
+          const cached = localStorage.getItem("application_cache");
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (parsed.email) {
+                url += `?email=${encodeURIComponent(parsed.email)}`;
+              }
+            } catch (err) {
+              console.error("Failed to parse application_cache:", err);
+            }
+          }
+        }
+
+        const res = await fetch(url, {
+          headers,
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          setMyApplication(data);
+        }
+      } catch { }
+    })();
+    return () => { cancelled = true; };
+  }, [ev?.id, ev?.registration_type, token]);
 
   const handleRegisterRow = async () => {
     if (!token) {
@@ -1323,6 +1569,51 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                       </Button>
                     )}
                   </div>
+                ) : ev.registration_type === 'apply' ? (
+                  <div className="flex items-center gap-2">
+                    {!myApplication || myApplication.status === 'none' ? (
+                      <Button
+                        variant="contained"
+                        size="medium"
+                        color="primary"
+                        onClick={() => {
+                          if (token) {
+                            // For authenticated users, submit directly
+                            handleApplyCardDirect();
+                          } else {
+                            // For guests, open modal
+                            setApplyAsGuestOnly(false);
+                            setApplyModalOpen(true);
+                          }
+                        }}
+                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                      >
+                        Apply Now
+                      </Button>
+                    ) : myApplication.status === 'approved' ? (
+                      myRegistrations?.[ev.id]
+                        ? <Chip label="Registered" color="success" variant="outlined" />
+                        : <Chip label="Approved" color="success" variant="outlined" />
+                    ) : myApplication.status === 'pending' ? (
+                      <Chip label="Application Pending" color="warning" variant="outlined" />
+                    ) : myApplication.status === 'declined' ? (
+                      <Chip label="Application Declined" color="error" variant="outlined" />
+                    ) : null}
+                    {!isAuthenticatedUser && isFreeEvent && (
+                      <Button
+                        variant="outlined"
+                        size="medium"
+                        color="primary"
+                        onClick={() => {
+                          setApplyAsGuestOnly(true);
+                          setApplyModalOpen(true);
+                        }}
+                        className="normal-case rounded-full px-4"
+                      >
+                        {isGuest ? "Continue Applying as Guest" : "Apply as Guest"}
+                      </Button>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex items-center gap-2">
                     <Button
@@ -1353,6 +1644,15 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
           </div>
         </CardContent>
       </div>
+
+      <ApplyNowModal
+        open={applyModalOpen}
+        onClose={() => setApplyModalOpen(false)}
+        event={ev}
+        token={token}
+        onSuccess={(app) => setMyApplication(app)}
+        guestOnly={applyAsGuestOnly}
+      />
     </MUICard>
   );
 }

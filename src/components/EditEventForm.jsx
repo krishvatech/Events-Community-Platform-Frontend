@@ -84,6 +84,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         typeof event?.price === "number" ? event.price : Number(event?.price || 0)
     );
     const [isFree, setIsFree] = useState(event?.is_free || false);
+    const [registrationType, setRegistrationType] = useState(event?.registration_type || "open");
     const [maxParticipants, setMaxParticipants] = useState(event?.max_participants || "");
     const [loungeTableCapacity, setLoungeTableCapacity] = useState(event?.lounge_table_capacity || 4);
 
@@ -535,6 +536,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("format", format);
         fd.append("price", String(isFree ? 0 : (price ?? 0)));
         fd.append("is_free", String(isFree));
+        fd.append("registration_type", registrationType);
         if (maxParticipants) {
             fd.append("max_participants", String(maxParticipants));
         } else {
@@ -869,6 +871,22 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                         helperText="Default is 4"
                         sx={{ mt: 0.5, mb: 2 }}
                     />
+
+                    <Box sx={{ mt: 3, mb: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                            Registration Type
+                        </Typography>
+                        <TextField
+                            select
+                            fullWidth
+                            value={registrationType}
+                            onChange={(e) => setRegistrationType(e.target.value)}
+                            helperText="Open: Users register instantly. Apply: Users submit applications for host approval."
+                        >
+                            <MenuItem value="open">Open Registration</MenuItem>
+                            <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
+                        </TextField>
+                    </Box>
 
                 </Grid>
 
