@@ -7,7 +7,7 @@ import {
     CircularProgress, Pagination, Avatar, Skeleton,
     Dialog, DialogTitle, DialogContent, DialogActions,
     FormControlLabel, Checkbox, FormControl, FormLabel,
-    Alert, Snackbar
+    Alert, Snackbar, Tabs, Tab
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import VerifiedIcon from "@mui/icons-material/Verified";
@@ -211,6 +211,9 @@ export default function AdminStaffPage() {
     const [toggleBusyId, setToggleBusyId] = React.useState(null);
     const [snack, setSnack] = React.useState({ open: false, message: "", severity: "warning" });
 
+    // Filter State - "all" | "superuser" | "staff" | "normal"
+    const [userTypeFilter, setUserTypeFilter] = React.useState("all");
+
     // Delete Dialog State
     const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
     const [userToDelete, setUserToDelete] = React.useState(null);
@@ -355,7 +358,7 @@ export default function AdminStaffPage() {
 
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="h5" className="font-extrabold">
-                                {owner ? "Staff Management" : "User Profile Access"}
+                                {owner ? "Users Management" : "User Profile Access"}
                             </Typography>
                             <Typography className="text-slate-500">
                                 {owner
@@ -400,8 +403,19 @@ export default function AdminStaffPage() {
                                 </InputAdornment>
                             ),
                         }}
-                        sx={{ mb: 2, width: { xs: "100%", md: "100%", lg: 360 } }}
+                        sx={{ mb: 2, width: { xs: "100%", md: 360 } }}
                     />
+
+                    <Tabs
+                        value={userTypeFilter}
+                        onChange={(e, newValue) => setUserTypeFilter(newValue)}
+                        sx={{ mb: 2, borderBottom: `1px solid #e5e7eb` }}
+                    >
+                        <Tab label="All Users" value="all" />
+                        <Tab label="Superuser" value="superuser" />
+                        <Tab label="Staff" value="staff" />
+                        <Tab label="Normal User" value="normal" />
+                    </Tabs>
 
                     <TableContainer component={Paper} variant="outlined">
                         <Table>
@@ -430,7 +444,17 @@ export default function AdminStaffPage() {
                                     ))
                                 ) : (
                                     paginatedRows
-                                        .filter((u) => owner || (!u.is_staff && !u.is_superuser))
+                                        .filter((u) => {
+                                            // First filter: owner can see all, non-owners see only normal users
+                                            if (!owner && (u.is_staff || u.is_superuser)) return false;
+
+                                            // Second filter: apply user type filter
+                                            if (userTypeFilter === "all") return true;
+                                            if (userTypeFilter === "superuser") return u.is_superuser;
+                                            if (userTypeFilter === "staff") return u.is_staff && !u.is_superuser;
+                                            if (userTypeFilter === "normal") return !u.is_staff && !u.is_superuser;
+                                            return false;
+                                        })
                                         .map((u) => (
                                         <TableRow key={u.id} hover>
 

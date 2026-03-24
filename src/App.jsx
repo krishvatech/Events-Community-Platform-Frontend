@@ -228,7 +228,7 @@ const AppShell = () => {
             <Route path="recordings/:id" element={<AdminRecordingDetailsPage />} />
             <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
             <Route path="carts" element={<AdminCarts />} />
-            <Route path="staff" element={<AdminStaffPage />} />
+            <Route path="users" element={<AdminStaffPage />} />
             <Route path="users/:userId/edit-profile" element={<AdminUserProfileEditPage />} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />

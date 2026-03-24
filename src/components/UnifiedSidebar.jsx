@@ -209,7 +209,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         adminItems = [
             { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
             { label: "Identity Verification", to: "/admin/name-requests", icon: BadgeRoundedIcon },
-            { label: "Staff", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon },
+            { label: "Users", to: "/admin/users", icon: AdminPanelSettingsRoundedIcon },
             { label: "Saleor Dashboard", action: "saleor", icon: ShoppingCartRoundedIcon },
             { label: "CMS", action: "cms", icon: ArticleRoundedIcon },
         ];
@@ -229,7 +229,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         adminItems = userCanEditProfiles
             ? [
                 { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
-                { label: "Staff", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }
+                { label: "Users", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }
             ]
             : [];
     } else {
