@@ -139,15 +139,34 @@ export default function HomePage() {
 
       {/* HERO */}
       <Box component="section" sx={{
-        position: "relative", minHeight: { xs: 480, md: 580 }, overflow: "hidden",
+        position: "relative", minHeight: { xs: 520, md: 620 }, overflow: "hidden",
         display: "flex", alignItems: "center",
         background: heroImage
           ? `linear-gradient(rgba(15,32,64,.55),rgba(15,32,64,.65)), url(${heroImage}) center/cover no-repeat`
           : "linear-gradient(120deg, #E0F2FE 0%, #ECFDF5 55%, #F8FAFC 100%)",
       }}>
         {useLightHero && <ChevronPattern />}
-        <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1, py: { xs: 8, md: 10 } }}>
-          <Box sx={{ maxWidth: { xs: "100%", md: "52%" } }}>
+        <Container
+          maxWidth="lg"
+          sx={{
+            position: "relative",
+            zIndex: 1,
+            py: { xs: 8, md: 10 },
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <Box
+            sx={{
+              width: "100%",
+              maxWidth: { xs: "100%", md: 760 },
+              textAlign: "center",
+              mx: "auto",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             <Box sx={{
               display: "inline-flex", alignItems: "center", gap: 1,
               bgcolor: useLightHero ? TEAL + "1A" : "rgba(255,255,255,.15)",
@@ -167,14 +186,29 @@ export default function HomePage() {
               {heroTitle}
             </Typography>
 
-            <Typography sx={{
-              fontSize: { xs: 16, md: 18 }, lineHeight: 1.7, mb: 4,
-              color: useLightHero ? "#475569" : "rgba(255,255,255,.85)", maxWidth: 480,
-            }}>
+            <Typography
+              sx={{
+                fontSize: { xs: 16, md: 18 },
+                lineHeight: 1.7,
+                mb: 4,
+                color: useLightHero ? "#475569" : "rgba(255,255,255,.85)",
+                maxWidth: 720,
+                mx: "auto",
+                textAlign: "center",
+              }}
+            >
               {heroSubtitle}
             </Typography>
 
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexWrap: "wrap",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
               {authed ? (
                 <Button component={Link} to="/events" variant="contained" size="large"
                   sx={{ bgcolor: ORANGE, "&:hover": { bgcolor: "#CC4422" }, boxShadow: "none", borderRadius: 2, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
