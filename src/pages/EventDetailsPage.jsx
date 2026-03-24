@@ -156,6 +156,12 @@ function priceStr(p) {
   }
 }
 
+function displayPrice(event) {
+  if (event.is_free) return "Free";
+  if (event.price_label) return event.price_label;
+  return priceStr(event.price);
+}
+
 function getSessionDescription(session) {
   if (!session || typeof session !== "object") return "";
   return (
@@ -1198,7 +1204,7 @@ export default function EventDetailsPage() {
                     <Box className="p-5">
                       <Typography variant="h6" className="font-extrabold">Attend</Typography>
                       <Typography variant="h5" className="font-bold text-teal-600 mt-1 mb-2">
-                        {event.is_free ? "Free" : priceStr(event.price)}
+                        {displayPrice(event)}
                       </Typography>
                       <div className="mt-3 flex flex-col gap-2">
                         {/* Replay Info Badge */}

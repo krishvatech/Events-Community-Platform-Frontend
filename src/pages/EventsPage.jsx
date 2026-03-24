@@ -89,6 +89,12 @@ function priceStr(p) {
   }
 }
 
+function displayPrice(ev) {
+  if (ev.is_free) return <span className="text-teal-600">Free to Join</span>;
+  if (ev.price_label) return ev.price_label;
+  return priceStr(ev.price);
+}
+
 function authHeaders() {
   const t =
     localStorage.getItem("access_token") ||
@@ -946,10 +952,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         <div className="text-base font-semibold text-neutral-900">
           {ev.isRegistered ? (
             <span className="text-teal-600">You are registered for this event.</span>
-          ) : ev.is_free ? (
-            <span className="text-teal-600">Free to Join</span>
           ) : (
-            priceStr(ev.price)
+            displayPrice(ev)
           )}
         </div>
 
@@ -1480,10 +1484,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               <div className="mt-3 text-base font-semibold text-neutral-900">
                 {ev.isRegistered ? (
                   <span className="text-teal-600">You are registered for this event.</span>
-                ) : ev.is_free ? (
-                  <span className="text-teal-600">Free to Join</span>
                 ) : (
-                  priceStr(ev.price)
+                  displayPrice(ev)
                 )}
               </div>
             </div>

@@ -84,6 +84,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         typeof event?.price === "number" ? event.price : Number(event?.price || 0)
     );
     const [isFree, setIsFree] = useState(event?.is_free || false);
+    const [priceLabel, setPriceLabel] = useState(event?.price_label || "");
     const [registrationType, setRegistrationType] = useState(event?.registration_type || "open");
     const [maxParticipants, setMaxParticipants] = useState(event?.max_participants || "");
     const [loungeTableCapacity, setLoungeTableCapacity] = useState(event?.lounge_table_capacity || 4);
@@ -456,12 +457,13 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         if (!description.trim()) e.description = "Description is required";
         const priceValue = Number(price);
         if (!isFree) {
-            if (price === "" || price === null || typeof price === "undefined") {
-                e.price = "Price is required (or mark as free)";
-            } else if (!Number.isFinite(priceValue)) {
-                e.price = "Price must be a valid number";
-            } else if (priceValue < 1) {
-                e.price = "Price must be >= 1";
+            // Price is now optional — only validate format if a value is provided
+            if (price !== "" && price !== null && typeof price !== "undefined") {
+                if (!Number.isFinite(priceValue)) {
+                    e.price = "Price must be a valid number";
+                } else if (priceValue < 0) {
+                    e.price = "Price cannot be negative";
+                }
             }
         }
 
@@ -535,6 +537,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("category", category);
         fd.append("format", format);
         fd.append("price", String(isFree ? 0 : (price ?? 0)));
+        fd.append("price_label", priceLabel.trim());
         fd.append("is_free", String(isFree));
         fd.append("registration_type", registrationType);
         if (maxParticipants) {
@@ -840,21 +843,53 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                         {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
                     </TextField>
 
-                    <Box sx={{ mt: 3, mb: 1 }}>
+                    <Box sx={{ mt: 3, mb: 3 }}>
                         <FormControlLabel
                             control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
                             label="Free Event (all users can register)"
+                            sx={{ mb: 2 }}
                         />
-                    </Box>
 
-                    <TextField
-                        label="Price ($)" type="number" fullWidth
-                        value={price} onChange={(e) => setPrice(e.target.value)}
-                        inputProps={{ min: 0, step: "0.01" }}
-                        error={!!errors.price} helperText={errors.price}
-                        disabled={isFree}
-                        sx={{ mt: 0.5, mb: 2 }}
-                    />
+                        {/* Pricing Section - Only show when NOT free */}
+                        {!isFree && (
+                            <Box sx={{
+                                p: 2.5,
+                                border: "1px solid #e0e0e0",
+                                borderRadius: 2,
+                                bgcolor: "#fafafa",
+                                mt: 2
+                            }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: "#333" }}>
+                                    Pricing Options
+                                </Typography>
+
+                                <Grid container spacing={2}>
+                                    {/* Price Field */}
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            label="Price" type="number" fullWidth
+                                            value={price || ""} onChange={(e) => setPrice(e.target.value === "" ? "" : e.target.value)}
+                                            inputProps={{ min: 0, step: "0.01" }}
+                                            error={!!errors.price}
+                                            helperText={errors.price}
+                                            size="small"
+                                        />
+                                    </Grid>
+
+                                    {/* Price Label Field */}
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            label="Price Label" fullWidth
+                                            placeholder='e.g. "By application only"'
+                                            value={priceLabel} onChange={(e) => setPriceLabel(e.target.value)}
+                                            inputProps={{ maxLength: 100 }}
+                                            size="small"
+                                        />
+                                    </Grid>
+                                </Grid>
+                            </Box>
+                        )}
+                    </Box>
 
                     <TextField
                         label="Max Participants" type="number" fullWidth

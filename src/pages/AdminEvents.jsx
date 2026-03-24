@@ -297,6 +297,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
   const [isFree, setIsFree] = React.useState(true);
+  const [priceLabel, setPriceLabel] = React.useState("");
   const [registrationType, setRegistrationType] = React.useState("open");
   const [maxParticipants, setMaxParticipants] = React.useState(""); // New state
 
@@ -432,6 +433,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setFormat("virtual");
     setPrice(0);
     setIsFree(true);
+    setPriceLabel("");
     setMaxParticipants(""); // Reset max participants
 
     setIsMultiDay(false);
@@ -490,12 +492,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (!description.trim()) e.description = "Required";
     const priceValue = Number(price);
     if (!isFree) {
-      if (price === "" || price === null || typeof price === "undefined") {
-        e.price = "Price is required (or mark as free)";
-      } else if (!Number.isFinite(priceValue)) {
-        e.price = "Price must be a valid number";
-      } else if (priceValue < 1) {
-        e.price = "Price must be >= 1";
+      // Price is now optional — only validate format if a value is provided
+      if (price !== "" && price !== null && typeof price !== "undefined") {
+        if (!Number.isFinite(priceValue)) {
+          e.price = "Price must be a valid number";
+        } else if (priceValue < 0) {
+          e.price = "Price cannot be negative";
+        }
       }
     }
 
@@ -592,6 +595,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("category", category);
     fd.append("format", format);
     fd.append("price", String(isFree ? 0 : (price ?? 0)));
+    fd.append("price_label", priceLabel.trim());
     fd.append("is_free", String(isFree));
     fd.append("registration_type", registrationType);
     if (maxParticipants) {
@@ -1083,32 +1087,65 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </TextField>
           </Box>
 
-          {/* Row 2: Free Event & Price */}
+          {/* Row 2: Free Event & Pricing */}
+          <Box sx={{ mb: 3 }}>
+            <FormControlLabel
+              control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+              label="Free Event"
+              sx={{ mb: 2 }}
+            />
+
+            {/* Pricing Section - Only show when NOT free */}
+            {!isFree && (
+              <Box sx={{
+                p: 2.5,
+                border: "1px solid #e0e0e0",
+                borderRadius: 2,
+                bgcolor: "#fafafa",
+                mb: 3
+              }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: "#333" }}>
+                  Pricing Options
+                </Typography>
+
+                <Grid container spacing={2}>
+                  {/* Price Field */}
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Price"
+                      placeholder="e.g., 500"
+                      InputLabelProps={{ shrink: true }}
+                      type="number"
+                      value={price || ""}
+                      onChange={(e) => setPrice(e.target.value === "" ? "" : e.target.value)}
+                      inputProps={{ min: 0, step: "0.01" }}
+                      fullWidth
+                      error={!!errors.price}
+                      helperText={errors.price}
+                      size="small"
+                    />
+                  </Grid>
+
+                  {/* Price Label Field */}
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Price Label"
+                      placeholder='e.g., "By application only"'
+                      InputLabelProps={{ shrink: true }}
+                      value={priceLabel}
+                      onChange={(e) => setPriceLabel(e.target.value)}
+                      inputProps={{ maxLength: 100 }}
+                      fullWidth
+                      size="small"
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+          </Box>
+
+          {/* Row 3: Max Participants */}
           <Grid container spacing={3} sx={{ mb: 3 }}>
-            {/* Free Event Checkbox */}
-            <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
-              <FormControlLabel
-                control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
-                label="Free Event"
-                sx={{ width: "100%", m: 0 }}
-              />
-            </Grid>
-            {/* Price Field */}
-            <Grid item xs={12} sm={4}>
-              <TextField
-                label="Price ($)"
-                placeholder="0.00"
-                InputLabelProps={{ shrink: true }}
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                inputProps={{ min: 0, step: "0.01" }}
-                fullWidth
-                error={!!errors.price}
-                helperText={errors.price}
-                disabled={isFree}
-              />
-            </Grid>
             {/* Max Participants Field */}
             <Grid item xs={12} sm={4}>
               <TextField

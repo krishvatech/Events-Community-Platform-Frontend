@@ -1471,14 +1471,16 @@ export default function EventManagePage() {
                   )}
                 </Stack>
 
-                {event.price !== null && event.price !== undefined && (
+                {(event.price_label || (event.price !== null && event.price !== undefined)) && (
                   <Typography
                     variant="body2"
                     sx={{ fontWeight: 700, color: "text.primary" }}
                   >
-                    {Number(event.price) > 0
-                      ? `$${Number(event.price).toFixed(2)}`
-                      : "Free"}
+                    {event.price_label
+                      ? event.price_label
+                      : Number(event.price) > 0
+                        ? `$${Number(event.price).toFixed(2)}`
+                        : "Free"}
                   </Typography>
                 )}
               </Stack>
