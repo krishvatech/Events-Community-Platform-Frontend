@@ -270,6 +270,9 @@ export const bulkSetStaff = (ids, is_staff) =>
 export const createAdminUser = (data) =>
   apiClient.post(`${ADMIN_USERS_BASE}/`, data).then((r) => r.data);
 
+export const createAdminUserWithPassword = (data) =>
+  apiClient.post(`${ADMIN_USERS_BASE}/create-with-password/`, data).then((r) => r.data);
+
 export const updateAdminUser = (id, data) =>
   apiClient.patch(`${ADMIN_USERS_BASE}/${id}/`, data).then((r) => r.data);
 

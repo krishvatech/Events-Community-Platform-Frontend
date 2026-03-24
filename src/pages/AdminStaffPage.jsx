@@ -20,11 +20,11 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
-import { listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, updateAdminUser, deleteAdminUser } from "../utils/api";
+import { listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deleteAdminUser } from "../utils/api";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
-// Simple Dialog for Creating/Editing Users/staff
+// Simple Dialog for Creating/Editing Users/staff (Invitation only)
 function UserDialog({ open, onClose, mode, initialData, onSave, loading }) {
     const [formData, setFormData] = React.useState({
         email: "",
@@ -163,6 +163,165 @@ function UserDialog({ open, onClose, mode, initialData, onSave, loading }) {
     );
 }
 
+// Dialog for Manual User Creation with Admin-Set Password
+function ManualUserDialog({ open, onClose, onSave, loading }) {
+    const [formData, setFormData] = React.useState({
+        email: "",
+        first_name: "",
+        last_name: "",
+        password: "",
+        confirm_password: "",
+        is_staff: false,
+        is_superuser: false
+    });
+    const [error, setError] = React.useState(null);
+
+    React.useEffect(() => {
+        if (open) {
+            setError(null);
+            setFormData({
+                email: "",
+                first_name: "",
+                last_name: "",
+                password: "",
+                confirm_password: "",
+                is_staff: false,
+                is_superuser: false
+            });
+        }
+    }, [open]);
+
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+
+        setFormData(prev => {
+            const updates = { [name]: type === "checkbox" ? checked : value };
+
+            // Logic: If checking "Superuser", automatically check "Staff"
+            if (name === "is_superuser" && checked) {
+                updates.is_staff = true;
+            }
+            // Logic: If unchecking "Staff", automatically uncheck "Superuser"
+            if (name === "is_staff" && !checked) {
+                updates.is_superuser = false;
+            }
+
+            return { ...prev, ...updates };
+        });
+    };
+
+    const handleSubmit = () => {
+        if (!formData.email || !formData.first_name || !formData.last_name) {
+            setError("Email, First Name, and Last Name are required.");
+            return;
+        }
+        if (!formData.password || formData.password.length < 8) {
+            setError("Password must be at least 8 characters.");
+            return;
+        }
+        if (formData.password !== formData.confirm_password) {
+            setError("Passwords do not match.");
+            return;
+        }
+
+        // Call onSave with password included
+        const submitData = {
+            email: formData.email,
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            password: formData.password,
+            is_staff: formData.is_staff,
+            is_superuser: formData.is_superuser
+        };
+        onSave(submitData, setError);
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>Create User with Password</DialogTitle>
+            <DialogContent dividers>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                <Stack spacing={2}>
+                    <TextField
+                        label="Email Address"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                    />
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                        <TextField
+                            label="First Name"
+                            name="first_name"
+                            value={formData.first_name}
+                            onChange={handleChange}
+                            fullWidth
+                            required
+                        />
+                        <TextField
+                            label="Last Name"
+                            name="last_name"
+                            value={formData.last_name}
+                            onChange={handleChange}
+                            fullWidth
+                            required
+                        />
+                    </Stack>
+
+                    <TextField
+                        label="Password"
+                        name="password"
+                        type="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                        helperText="Minimum 8 characters"
+                    />
+                    <TextField
+                        label="Confirm Password"
+                        name="confirm_password"
+                        type="password"
+                        value={formData.confirm_password}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                    />
+
+                    <FormControl component="fieldset" variant="standard" sx={{ mt: 2 }}>
+                        <FormLabel component="legend">Roles & Status</FormLabel>
+                        <Typography variant="caption" sx={{ color: "primary.main", fontWeight: 600, mb: 1.5, display: "block" }}>
+                            {formData.is_superuser ? "👨‍💻 Platform Admin (Superuser)" : formData.is_staff ? "👨‍💼 Staff Member" : "👤 Normal User"}
+                        </Typography>
+                        <Stack direction="row" spacing={2} flexWrap="wrap">
+                            <FormControlLabel
+                                control={
+                                    <Switch checked={formData.is_staff} onChange={handleChange} name="is_staff" />
+                                }
+                                label="Staff"
+                            />
+                            <FormControlLabel
+                                control={
+                                    <Checkbox checked={formData.is_superuser} onChange={handleChange} name="is_superuser" color="secondary" />
+                                }
+                                label="Superuser (Platform Admin)"
+                            />
+                        </Stack>
+                    </FormControl>
+                </Stack>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose} disabled={loading}>Cancel</Button>
+                <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+                    {loading ? <CircularProgress size={24} /> : "Create User"}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
 
 export default function AdminStaffPage() {
 
@@ -207,6 +366,7 @@ export default function AdminStaffPage() {
     const [dialogOpen, setDialogOpen] = React.useState(false);
     const [dialogMode, setDialogMode] = React.useState("create"); // 'create' | 'edit'
     const [editingUser, setEditingUser] = React.useState(null);
+    const [manualCreateDialogOpen, setManualCreateDialogOpen] = React.useState(false);
     const [actionLoading, setActionLoading] = React.useState(false);
     const [toggleBusyId, setToggleBusyId] = React.useState(null);
     const [snack, setSnack] = React.useState({ open: false, message: "", severity: "warning" });
@@ -239,6 +399,14 @@ export default function AdminStaffPage() {
         setDialogOpen(true);
     };
 
+    const handleOpenManualCreate = () => {
+        setManualCreateDialogOpen(true);
+    };
+
+    const handleCloseManualCreate = () => {
+        setManualCreateDialogOpen(false);
+    };
+
     const handleOpenEdit = (user) => {
         setDialogMode("edit");
         setEditingUser(user);
@@ -263,6 +431,26 @@ export default function AdminStaffPage() {
         } catch (err) {
             console.error("Failed to save user", err);
             const msg = err.response?.data?.detail || err.response?.data?.email?.[0] || "Failed to save user.";
+            setError(msg);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleSaveManualUser = async (data, setError) => {
+        setActionLoading(true);
+        try {
+            await createAdminUserWithPassword(data);
+            await fetchData();
+            handleCloseManualCreate();
+            setSnack({
+                open: true,
+                severity: "success",
+                message: `User ${data.email} created successfully!`,
+            });
+        } catch (err) {
+            console.error("Failed to create user", err);
+            const msg = err.response?.data?.detail || err.response?.data?.email?.[0] || "Failed to create user.";
             setError(msg);
         } finally {
             setActionLoading(false);
@@ -378,15 +566,26 @@ export default function AdminStaffPage() {
                             }}
                         >
                             {owner && (
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    startIcon={<AddIcon />}
-                                    onClick={handleOpenCreate}
-                                    sx={{ borderRadius: 8, textTransform: "none" }}
-                                >
-                                    Invite User
-                                </Button>
+                                <>
+                                    <Button
+                                        variant="outlined"
+                                        color="primary"
+                                        startIcon={<AddIcon />}
+                                        onClick={handleOpenManualCreate}
+                                        sx={{ borderRadius: 8, textTransform: "none" }}
+                                    >
+                                        Create User
+                                    </Button>
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<AddIcon />}
+                                        onClick={handleOpenCreate}
+                                        sx={{ borderRadius: 8, textTransform: "none" }}
+                                    >
+                                        Invite User
+                                    </Button>
+                                </>
                             )}
                         </Box>
                     </Box>
@@ -599,6 +798,14 @@ export default function AdminStaffPage() {
                         mode={dialogMode}
                         initialData={editingUser}
                         onSave={handleSaveUser}
+                        loading={actionLoading}
+                    />
+
+                    {/* Manual User Creation Dialog */}
+                    <ManualUserDialog
+                        open={manualCreateDialogOpen}
+                        onClose={handleCloseManualCreate}
+                        onSave={handleSaveManualUser}
                         loading={actionLoading}
                     />
 
