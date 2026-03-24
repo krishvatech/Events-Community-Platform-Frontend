@@ -39,6 +39,8 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
   const [error, setError] = useState("");
   const [showAuthOptions, setShowAuthOptions] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [guestToken, setGuestToken] = useState(null); // Guest JWT from application response
+  const [canJoinNow, setCanJoinNow] = useState(false); // Whether to show "Join Now" button
 
   // Pre-fill form for authenticated users on modal open
   useEffect(() => {
@@ -179,6 +181,17 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
       };
       localStorage.setItem("application_cache", JSON.stringify(cacheData));
 
+      // If guest JWT token is provided, store it in localStorage
+      if (data.guest_token && data.guest_id) {
+        localStorage.setItem("guest_token", data.guest_token);
+        localStorage.setItem("guest_id", data.guest_id.toString());
+        console.log("[ApplyNowModal] ✅ Guest JWT stored in localStorage");
+        console.log("[ApplyNowModal] guest_token:", data.guest_token.substring(0, 30) + "...");
+        console.log("[ApplyNowModal] guest_id:", data.guest_id);
+        setGuestToken(data.guest_token);
+        setCanJoinNow(true); // Show "Join Now" button
+      }
+
       // Show success state
       setSubmitSuccess(true);
 
@@ -187,11 +200,12 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
         onSuccess(data);
       }
 
-      // Close modal after 3 seconds
+      // Close modal after 3 seconds (or 5 if they can join now)
+      const closeDelay = canJoinNow ? 5000 : 3000;
       setTimeout(() => {
         setSubmitSuccess(false);
         handleModalClose();
-      }, 3000);
+      }, closeDelay);
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
       console.error("Application submit error:", err);
@@ -204,6 +218,8 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
     setError("");
     setSubmitSuccess(false);
     setShowAuthOptions(false);
+    setGuestToken(null);
+    setCanJoinNow(false);
     setForm({
       first_name: "",
       last_name: "",
@@ -234,12 +250,20 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
             <Box sx={{ display: "flex", justifyContent: "center" }}>
               <CheckCircleOutlineIcon sx={{ fontSize: 60, color: "success.main" }} />
             </Box>
-            <Typography variant="h6">Application Submitted!</Typography>
-            <Typography variant="body2" color="textSecondary">
-              We'll notify you at <strong>{form.email.toLowerCase()}</strong> once a decision is made.
-            </Typography>
-            <Typography variant="caption" color="textSecondary">
-              Closing in a few seconds...
+            <Typography variant="h6">Application Submitted! ✅</Typography>
+
+            {canJoinNow ? (
+              <Typography variant="body2" color="textSecondary">
+                Your application has been received. You'll receive a confirmation email at <strong>{form.email.toLowerCase()}</strong>.
+              </Typography>
+            ) : (
+              <Typography variant="body2" color="textSecondary">
+                We'll notify you at <strong>{form.email.toLowerCase()}</strong> once a decision is made.
+              </Typography>
+            )}
+
+            <Typography variant="caption" color="textSecondary" sx={{ mt: 2 }}>
+              {canJoinNow ? "This window will close in a few seconds..." : "Closing in a few seconds..."}
             </Typography>
           </Stack>
         ) : (

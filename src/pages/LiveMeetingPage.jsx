@@ -189,12 +189,22 @@ const SPOTLIGHT_INVITE_WARNING_SECONDS = 5;
 const SUPPORT_TAB_INDEX = 4;
 
 function getToken() {
-  return (
-    localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
-    ""
-  );
+  // Prioritize guest_token if available (for approved applications joining as guests)
+  const guestToken = localStorage.getItem("guest_token");
+  const accessToken = localStorage.getItem("access_token") || localStorage.getItem("access");
+
+  if (guestToken) {
+    console.log("[getToken] Returning guest_token");
+    return guestToken;
+  }
+
+  if (accessToken) {
+    console.log("[getToken] Returning access_token (no guest_token found)");
+  } else {
+    console.log("[getToken] No token found!");
+  }
+
+  return accessToken || "";
 }
 
 function authHeader() {
@@ -2800,6 +2810,33 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     isRecordingPausedRef.current = isRecordingPaused;
   }, [isRecordingPaused]);
+
+  // 🔍 DIAGNOSTICS: Log initial state on component mount
+  useEffect(() => {
+    console.log("========== LIVEMEETING DIAGNOSTICS ==========");
+    console.log("[Init] Component mounted");
+    console.log("[Init] Slug:", slug);
+    console.log("[Init] Event from state:", eventFromState);
+
+    // Check localStorage
+    const accessToken = localStorage.getItem("access_token");
+    const guestToken = localStorage.getItem("guest_token");
+    const guestId = localStorage.getItem("guest_id");
+    const user = localStorage.getItem("user");
+
+    console.log("[Init] === LocalStorage ===");
+    console.log("[Init] access_token:", accessToken ? "✅ " + accessToken.substring(0, 30) + "..." : "❌ Missing");
+    console.log("[Init] guest_token:", guestToken ? "✅ " + guestToken.substring(0, 30) + "..." : "❌ Missing");
+    console.log("[Init] guest_id:", guestId);
+    console.log("[Init] user:", user ? JSON.parse(user) : "❌ Missing");
+    console.log("[Init] === State Variables ===");
+    console.log("[Init] eventId:", eventId);
+    console.log("[Init] role:", role);
+    console.log("[Init] joinMainRequested:", joinMainRequested);
+    console.log("[Init] loadingJoin:", loadingJoin);
+    console.log("[Init] authToken:", authToken ? "✅ " + authToken.substring(0, 30) + "..." : "❌ Missing");
+    console.log("==========================================");
+  }, []);
 
   const primaryHostUserId = useMemo(
     () => String(eventData?.created_by_id || ""),
@@ -6155,6 +6192,33 @@ export default function NewLiveMeeting() {
     setIsRecordingPaused(Boolean(eventData.recording_paused_at));
   }, [eventData]);
 
+  // ✅ Auto-join for guests coming from approved application email (magic link)
+  useEffect(() => {
+    console.log("[AutoJoin] Effect running... eventId:", eventId, "joinMainRequested:", joinMainRequested);
+
+    if (!eventId) {
+      console.log("[AutoJoin] Skipping: no eventId yet");
+      return;
+    }
+
+    const guestToken = localStorage.getItem("guest_token");
+    const guestId = localStorage.getItem("guest_id");
+    const guestAttendee = localStorage.getItem("guest_attendee");
+
+    console.log("[AutoJoin] Checking for guest session...");
+    console.log("[AutoJoin] guestToken:", guestToken ? "FOUND" : "MISSING");
+    console.log("[AutoJoin] guestId:", guestId);
+    console.log("[AutoJoin] guestAttendee:", guestAttendee ? "FOUND" : "MISSING");
+
+    if (guestToken && !joinMainRequested) {
+      console.log("[AutoJoin] DETECTED GUEST TOKEN! Auto-triggering join...");
+      setJoinMainRequested(true);
+    } else if (!guestToken) {
+      console.log("[AutoJoin] No guest token found, normal user flow");
+    } else if (joinMainRequested) {
+      console.log("[AutoJoin] Join already requested, skipping");
+    }
+  }, [eventId, joinMainRequested]);
 
   // ---------- Join Dyte via your backend ----------
   useEffect(() => {
@@ -6223,24 +6287,41 @@ export default function NewLiveMeeting() {
       tokenFetchAbortControllerRef.current = abortController;
 
       try {
-        console.log("[LiveMeeting] Fetching initial Dyte token for role:", role);
+        const authHeaders = authHeader();
+        console.log("[DyteJoin] Fetching Dyte token...");
+        console.log("[DyteJoin] EventID:", eventId);
+        console.log("[DyteJoin] Role:", role);
+        console.log("[DyteJoin] Auth header:", authHeaders);
+        console.log("[DyteJoin] Token type:", authHeaders.Authorization ? authHeaders.Authorization.split(' ')[1]?.substring(0, 30) + "..." : "None");
+
         const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({ role }),
           signal: abortController.signal, // ✅ Add abort signal
         });
 
+        console.log("[DyteJoin] Response status:", res.status);
+
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
+          console.error("[DyteJoin] Join failed! Status:", res.status);
+          console.error("[DyteJoin] Error data:", errData);
+
           if (errData.error === "banned" || res.status === 403) {
+            console.log("[DyteJoin] User is banned");
             setIsBanned(true);
             setLoadingJoin(false);
             return; // Stop execution
           }
           throw new Error(errData.detail || "Failed to join live meeting.");
         }
+
         const data = await res.json();
+        console.log("[DyteJoin] Join successful! Response:", data);
+        console.log("[DyteJoin] AuthToken received:", data.authToken ? "Yes" : "No");
+        console.log("[DyteJoin] IsGuest:", data.isGuest);
+        console.log("[DyteJoin] Role:", data.role);
 
         if (data?.waiting) {
           setWaitingRoomActive(true);
@@ -6261,12 +6342,16 @@ export default function NewLiveMeeting() {
           return;
         }
 
-        console.log("[LiveMeeting] Received initial Dyte token");
+        console.log("[DyteJoin] Setting Dyte auth token...");
         setWaitingRoomActive(false);
         setAuthToken(data.authToken);
         mainAuthTokenRef.current = data.authToken;
+        console.log("[DyteJoin] Auth token set!");
+
         if (data.role) {
-          setRole(normalizeRole(data.role));
+          const normalizedRole = normalizeRole(data.role);
+          console.log("[DyteJoin] Setting role:", data.role, "->", normalizedRole);
+          setRole(normalizedRole);
         }
       } catch (e) {
         // ✅ Don't log abort errors - they're expected when switching rooms or on lounge close
@@ -9570,6 +9655,8 @@ export default function NewLiveMeeting() {
           localStorage.removeItem("guest_email");
           localStorage.removeItem("guest_name");
           localStorage.removeItem("guest_id");
+          localStorage.removeItem("guest_token"); // ✅ NEW: Clear guest JWT token on session end
+          localStorage.removeItem("guest_attendee"); // ✅ NEW: Clear guest attendee data
           // Dispatch auth change event to notify app of session change
           window.dispatchEvent(new Event("auth:changed"));
         }

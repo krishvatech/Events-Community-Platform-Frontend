@@ -543,7 +543,49 @@ export default function EventDetailsPage() {
     return () => { cancelled = true; };
   }, [event?.id, event?.registration_type, token]);
 
-  // When application is approved, refresh registration status
+  // When application is approved, generate guest JWT if not already in localStorage
+  useEffect(() => {
+    if (myApplication?.status !== 'approved' || !event?.id) return;
+
+    const guestToken = localStorage.getItem("guest_token");
+    // Only generate if no guest token exists
+    if (guestToken) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        console.log("[EventDetails] Approved application detected without guest token, generating...");
+        // Call guest-join to create/update GuestAttendee and get JWT
+        const guestRes = await fetch(`${API_BASE}/events/${event.id}/guest-join/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            first_name: myApplication.first_name || "",
+            last_name: myApplication.last_name || "",
+            email: myApplication.email,
+            job_title: myApplication.job_title || "",
+            company_name: myApplication.company_name || "",
+          }),
+        });
+
+        if (cancelled) return;
+
+        if (guestRes.ok) {
+          const guestData = await guestRes.json();
+          // Store guest JWT token
+          localStorage.setItem("guest_token", guestData.token);
+          localStorage.setItem("guest_id", guestData.guest_id.toString());
+          console.log("[EventDetails] ✅ Guest JWT token stored");
+          console.log("[EventDetails] guest_id:", guestData.guest_id);
+        }
+      } catch (e) {
+        console.warn("[EventDetails] Failed to generate guest JWT:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [myApplication?.status, myApplication?.email, event?.id]);
+
+  // When application is approved, refresh registration status (for authenticated users)
   useEffect(() => {
     if (myApplication?.status !== 'approved' || !event?.id || !token) return;
 
@@ -1292,26 +1334,47 @@ export default function EventDetailsPage() {
                                 </Button>
                               )
                               : myApplication.status === 'approved'
-                              ? (
-                                // After approval, check if registered
-                                registration
-                                  ? (
+                              ? (() => {
+                                // After approval, check if user can join with guest token or is registered
+                                const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
+                                if (guestToken) {
+                                  // Guest has JWT token - can join immediately
+                                  return (
+                                    <Button
+                                      onClick={() => navigate(`/live/${event.slug || event.id}?id=${event.id}&role=audience`)}
+                                      variant="contained"
+                                      sx={{
+                                        textTransform: "none",
+                                        backgroundColor: "#10b8a6",
+                                        "&:hover": { backgroundColor: "#0ea5a4" },
+                                      }}
+                                      className="rounded-xl"
+                                    >
+                                      Join Live
+                                    </Button>
+                                  );
+                                } else if (registration) {
+                                  // Registered user
+                                  return (
                                     <Chip
                                       label="Registered"
                                       color="success"
                                       variant="outlined"
                                       sx={{ py: 2.5 }}
                                     />
-                                  )
-                                  : (
+                                  );
+                                } else {
+                                  // Not registered yet
+                                  return (
                                     <Chip
                                       label="Approved - Refresh to Register"
                                       color="success"
                                       variant="outlined"
                                       sx={{ py: 2.5 }}
                                     />
-                                  )
-                              )
+                                  );
+                                }
+                              })()
                               : myApplication.status === 'pending'
                               ? (
                                 <Chip

@@ -12,9 +12,12 @@ const decodeJwtPayload = (token) => {
 };
 
 const RequireAuth = ({ children }) => {
-  const token = localStorage.getItem("access_token");
+  const accessToken = localStorage.getItem("access_token");
+  const guestToken = localStorage.getItem("guest_token");
+  const token = accessToken || guestToken;
+
   const claims = decodeJwtPayload(token);
-  const isGuest = localStorage.getItem("is_guest") === "true" || claims?.token_type === "guest";
+  const isGuest = localStorage.getItem("is_guest") === "true" || claims?.token_type === "guest" || !!guestToken;
   const location = useLocation();
 
   const isLiveRoute = location.pathname.startsWith("/live/");

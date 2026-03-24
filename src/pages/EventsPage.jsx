@@ -777,30 +777,32 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
             // Single-day events
             return (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                  <span className="font-medium text-neutral-900">{dayjs(ev.start).format("MMMM D, YYYY")}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <AccessTimeIcon fontSize="small" className="text-teal-700 mt-0.5" />
-                  <span>
-                    {/* Primary: Organizer Time + Location (for single-day) */}
-                    <span className="block font-medium text-neutral-900">
-                      {orgTimeRangeKey}
-                      {organizerTimezone && (
-                        <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+              <div>
+                <div className="flex items-center gap-6">
+                  <span className="inline-flex items-center gap-2">
+                    <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                    {dayjs(ev.start).format("MMMM D, YYYY")}
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
+                    <span>
+                      {/* Primary: Organizer Time + Location (for single-day) */}
+                      <span className="block font-medium text-neutral-900">
+                        {orgDateStr} {orgTimeRangeKey}
+                        {organizerTimezone && (
+                          <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                        )}
+                      </span>
+
+                      {/* Secondary: Your Time */}
+                      {showYourTime && (
+                        <span className="block mt-1.5 text-xs text-neutral-600">
+                          <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                          {localDateStr} {localTimeRangeKey}
+                          <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
+                        </span>
                       )}
                     </span>
-
-                    {/* Secondary: Your Time */}
-                    {showYourTime && (
-                      <span className="block mt-1.5 text-xs text-neutral-600">
-                        <span className="font-semibold text-teal-700">Your Time:</span>{" "}
-                        {localTimeRangeKey}
-                        <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
-                      </span>
-                    )}
                   </span>
                 </div>
               </div>
@@ -1054,9 +1056,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                             // For authenticated users, submit directly
                             handleApplyCardDirect();
                           } else {
-                            // For guests, open modal
-                            setApplyAsGuestOnly(false);
-                            setApplyModalOpen(true);
+                            // For unauthenticated users, redirect to sign in
+                            navigate(`/signin?next=${encodeURIComponent(window.location.pathname)}`);
                           }
                         }}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
@@ -1065,24 +1066,46 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       </Button>
                     )
                     : myApplication.status === 'approved'
-                    ? (
-                      // After approval, check if registered
-                      myRegistrations?.[ev.id]
-                        ? (
+                    ? (() => {
+                      // After approval, check if user can join with guest token or is registered
+                      const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
+                      if (guestToken) {
+                        // Guest has JWT token - can join immediately
+                        return (
+                          <Button
+                            onClick={() => navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`)}
+                            variant="contained"
+                            size="medium"
+                            sx={{
+                              textTransform: "none",
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
+                            }}
+                            className="rounded-full"
+                          >
+                            Join Live
+                          </Button>
+                        );
+                      } else if (myRegistrations?.[ev.id]) {
+                        // User is registered
+                        return (
                           <Chip
                             label="Registered"
                             color="success"
                             variant="outlined"
                           />
-                        )
-                        : (
+                        );
+                      } else {
+                        // Approved but no guest token or registration
+                        return (
                           <Chip
                             label="Approved"
                             color="success"
                             variant="outlined"
                           />
-                        )
-                    )
+                        );
+                      }
+                    })()
                     : myApplication.status === 'pending'
                     ? (
                       <Chip
@@ -1101,7 +1124,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     )
                     : null
                   }
-                  {!isAuthenticatedUser && isFreeEvent && (
+                  {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.status !== 'approved') && (
                     <Button
                       variant="outlined"
                       size="medium"
@@ -1582,25 +1605,43 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             // For authenticated users, submit directly
                             handleApplyCardDirect();
                           } else {
-                            // For guests, open modal
-                            setApplyAsGuestOnly(false);
-                            setApplyModalOpen(true);
+                            // For unauthenticated users, redirect to sign in
+                            navigate(`/signin?next=${encodeURIComponent(window.location.pathname)}`);
                           }
                         }}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                       >
                         Apply Now
                       </Button>
-                    ) : myApplication.status === 'approved' ? (
-                      myRegistrations?.[ev.id]
-                        ? <Chip label="Registered" color="success" variant="outlined" />
-                        : <Chip label="Approved" color="success" variant="outlined" />
-                    ) : myApplication.status === 'pending' ? (
+                    ) : myApplication.status === 'approved' ? (() => {
+                      const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
+                      if (guestToken) {
+                        return (
+                          <Button
+                            onClick={() => navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`)}
+                            variant="contained"
+                            size="medium"
+                            sx={{
+                              textTransform: "none",
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
+                            }}
+                            className="rounded-full"
+                          >
+                            Join Live
+                          </Button>
+                        );
+                      } else if (myRegistrations?.[ev.id]) {
+                        return <Chip label="Registered" color="success" variant="outlined" />;
+                      } else {
+                        return <Chip label="Approved" color="success" variant="outlined" />;
+                      }
+                    })() : myApplication.status === 'pending' ? (
                       <Chip label="Application Pending" color="warning" variant="outlined" />
                     ) : myApplication.status === 'declined' ? (
                       <Chip label="Application Declined" color="error" variant="outlined" />
                     ) : null}
-                    {!isAuthenticatedUser && isFreeEvent && (
+                    {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.status !== 'approved') && (
                       <Button
                         variant="outlined"
                         size="medium"
