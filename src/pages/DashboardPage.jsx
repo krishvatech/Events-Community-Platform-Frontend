@@ -235,7 +235,7 @@ function VerifyBanner({ onDismiss }) {
 // ── Featured Event Hero ───────────────────────────────────────────────────────
 function FeaturedHero({ event }) {
   const accent = getAccent(event?.event_type);
-  const imgSrc = event?.image_url || event?.image || FALLBACK_IMGS[0];
+  const imgSrc = event?.cover_image || event?.image_url || event?.image || FALLBACK_IMGS[0];
   const dateStr = event?.start_date
     ? new Date(event.start_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     : "";
@@ -294,7 +294,7 @@ function FeaturedHero({ event }) {
 // ── Event Card (grid) ─────────────────────────────────────────────────────────
 function DashEventCard({ event, index }) {
   const accent = getAccent(event?.event_type);
-  const imgSrc = event?.image_url || event?.image || FALLBACK_IMGS[index % FALLBACK_IMGS.length];
+  const imgSrc = event?.cover_image || event?.image_url || event?.image || FALLBACK_IMGS[index % FALLBACK_IMGS.length];
   const dateStr = event?.start_date
     ? new Date(event.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
@@ -457,7 +457,7 @@ export default function DashboardPage() {
     let active = true;
     Promise.all([
       apiClient.get("/users/me/").then(r => r.data).catch(() => null),
-      apiClient.get("/events/?ordering=start_date&page_size=4").then(r => {
+      apiClient.get("/events/?bucket=upcoming&ordering=start_date&page_size=4").then(r => {
         const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
       }).catch(() => []),
       apiClient.get("/content/posts/?page_size=3").then(r => {
