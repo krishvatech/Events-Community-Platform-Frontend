@@ -13,21 +13,33 @@ const SocialLogin = () => {
   const handleGoogle = async () => {
     try {
       const AUTH_PROVIDER = import.meta.env.VITE_AUTH_PROVIDER;
+      console.log("🔴 Google button clicked! AUTH_PROVIDER:", AUTH_PROVIDER);
+      console.log("🔴 Cognito config available:", { COGNITO_DOMAIN, COGNITO_CLIENT_ID });
 
       // If Cognito config is present, use Cognito Hosted UI Google
       if (AUTH_PROVIDER === "cognito" && COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
+        console.log("✅ Using Cognito OAuth flow");
         const state = randomString(16);
         const verifier = randomString(48);
         const challenge = await pkceChallengeFromVerifier(verifier);
 
+        console.log("🔐 Google OAuth Flow:", { state, verifier, challenge, redirectUri: COGNITO_REDIRECT_URI });
+
+        // Store in sessionStorage
         sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
+        console.log("✅ Stored verifier in sessionStorage:", { key: `pkce_verifier_${state}`, value: verifier?.substring(0, 20) + "..." });
+
         // ✅ store where user should land after login
         const intended =
           new URLSearchParams(window.location.search).get("next") ||
           window.location.pathname ||
-          "/community";
+          "/account/events";
 
         sessionStorage.setItem(`post_login_redirect_${state}`, intended);
+        console.log("✅ Stored redirect in sessionStorage:", { key: `post_login_redirect_${state}`, value: intended });
+
+        // DEBUG: Log all sessionStorage keys
+        console.log("📦 All sessionStorage keys:", Object.keys(sessionStorage).filter(k => k.includes('pkce') || k.includes('redirect')));
 
         const params = new URLSearchParams({
           response_type: "code",
@@ -40,11 +52,14 @@ const SocialLogin = () => {
           identity_provider: "Google",
         });
 
-        window.location.href = `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
+        const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
+        console.log("📍 Redirecting to Cognito:", authUrl);
+        window.location.href = authUrl;
         return;
       }
 
       // fallback (your existing backend social login)
+      console.log("⚠️ Using FALLBACK backend OAuth flow (not Cognito)");
       const res = await fetch(`${API_BASE}/auth/google/url/`, {
         method: "GET",
         credentials: "include",
@@ -52,6 +67,7 @@ const SocialLogin = () => {
       if (!res.ok) throw new Error("Failed to start Google login");
       const data = await res.json();
       if (!data.authorization_url) throw new Error("No authorization_url from backend");
+      console.log("📍 Redirecting to backend auth URL:", data.authorization_url);
       window.location.href = data.authorization_url;
     } catch (err) {
       console.error(err);
