@@ -794,64 +794,65 @@ export default function EventDetailsPage() {
               {/* Only show when activeTab === 0 (or when no tabs exist) */}
               {((!showSpeedNetworkingTab && !showSessionsTab) || activeTab === 0) && (
                 <Box>
-                  {/* EVENT HEADER CARD */}
+                  {/* EVENT HEADER CARD - NEW LAYOUT */}
                   <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
-                    {(event.cover_image || event.preview_image) ? (
-                      <Box
-                        component="img"
-                        src={toAbs(event.cover_image || event.preview_image)}
-                        alt={event.title}
-                        loading="lazy"
-                        sx={{
-                          width: "100%",
-                          height: { xs: 160, sm: 200, md: 240 },
-                          objectFit: "cover",
-                          display: "block",
-                        }}
-                      />
-                    ) : (
-                      <Box
-                        sx={{
-                          width: "100%",
-                          height: { xs: 160, sm: 200, md: 240 },
-                          bgcolor: "grey.200",
-                        }}
-                      />
-                    )}
-                    <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
+                    {/* Top section: Image + Details in a grid */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '350px 1fr' }, gap: { xs: 0, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 } }}>
+                      {/* LEFT: Event Image */}
+                      <Box>
+                        {(event.cover_image || event.preview_image) ? (
+                          <Box
+                            component="img"
+                            src={toAbs(event.cover_image || event.preview_image)}
+                            alt={event.title}
+                            loading="lazy"
+                            sx={{
+                              width: "100%",
+                              aspectRatio: "1",
+                              objectFit: "cover",
+                              display: "block",
+                              borderRadius: 2,
+                            }}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              width: "100%",
+                              aspectRatio: "1",
+                              bgcolor: "grey.200",
+                              borderRadius: 2,
+                            }}
+                          />
+                        )}
+                      </Box>
+
+                      {/* RIGHT: Event Details */}
                       <Stack spacing={2}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
                           <Chip
                             size="small"
                             label={chip.label}
                             className={`${chip.className} font-medium`}
                           />
                           {event?.category ? (
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
                               {event.category}
                             </Typography>
                           ) : null}
                         </Stack>
-                        {event?.title ? (
-                          <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
-                            {event.title}
-                          </Typography>
-                        ) : null}
 
-                        {/* Date & Time Display */}
+                        {/* Date & Time Display - Matches Events Page Format */}
                         {(event.start_time || event.end_time) && (
-                          <>
-                            {/* For multi-day events with sessions, show only the next upcoming session */}
+                          <Box>
                             {event.is_multi_day && event.sessions && event.sessions.length > 0 ? (
-                              <Box sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                                  <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                              <Stack spacing={1.5} sx={{ fontSize: '0.875rem' }}>
+                                <Stack direction="row" spacing={1} alignItems="flex-start">
+                                  <CalendarMonthIcon fontSize="small" sx={{ color: 'teal', mt: 0.25 }} />
                                   <Typography variant="body2" fontWeight={500}>
                                     Next Session:
                                   </Typography>
-                                </Box>
+                                </Stack>
                                 {(() => {
-                                  // Find the next upcoming session
                                   const now = new Date();
                                   const nextSession = event.sessions?.find(s => {
                                     const endTime = new Date(s.end_time);
@@ -860,13 +861,12 @@ export default function EventDetailsPage() {
 
                                   if (!nextSession) {
                                     return (
-                                      <Typography variant="body2" sx={{ fontSize: '0.875rem', ml: 3.5, color: 'text.secondary' }}>
+                                      <Typography variant="body2" sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
                                         All sessions completed
                                       </Typography>
                                     );
                                   }
 
-                                  // Format session times with timezone handling
                                   const sessionTimeRange = formatSessionTimeRange(
                                     nextSession.start_time,
                                     nextSession.end_time,
@@ -874,22 +874,18 @@ export default function EventDetailsPage() {
                                   );
 
                                   return (
-                                    <>
-                                      {/* Primary: Organizer Time */}
-                                      <Typography variant="body2" sx={{ fontSize: '0.875rem', ml: 3.5, fontWeight: 500 }}>
+                                    <Box sx={{ ml: 3.5 }}>
+                                      <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
                                         {sessionTimeRange.primary}
                                       </Typography>
-
-                                      {/* Secondary: Your Time */}
                                       {sessionTimeRange.secondary && (
                                         <Typography
                                           variant="caption"
                                           sx={{
                                             display: 'block',
-                                            ml: 3.5,
                                             mt: 0.5,
                                             fontSize: '0.8rem',
-                                            color: '#4b5563'
+                                            color: 'text.secondary'
                                           }}
                                         >
                                           <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span>{" "}
@@ -899,34 +895,40 @@ export default function EventDetailsPage() {
                                           </span>
                                         </Typography>
                                       )}
-                                    </>
+                                    </Box>
                                   );
                                 })()}
-                              </Box>
+                              </Stack>
                             ) : (
-                              /* For single-day events, show overall event time */
-                              <Stack direction="row" spacing={3} alignItems="center" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 2, sm: 6 }} sx={{ fontSize: '0.875rem' }}>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                  <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                                  <CalendarMonthIcon fontSize="small" sx={{ color: 'teal' }} />
                                   <Typography variant="body2">
-                                    {dayjs(event.start_time).format("MMMM D, YYYY")}
+                                    {dayjs(event.start_time).format("MMM D, YYYY")}
                                   </Typography>
                                 </Stack>
                                 {event.end_time && (
-                                  <Stack direction="row" spacing={1} alignItems="center">
-                                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                                    <Typography variant="body2">
-                                      {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")}
-                                    </Typography>
+                                  <Stack direction="row" spacing={1} alignItems="flex-start">
+                                    <AccessTimeIcon fontSize="small" sx={{ color: 'teal', mt: 0.25 }} />
+                                    <Box>
+                                      <Typography variant="body2" fontWeight={500} sx={{ color: 'text.primary' }}>
+                                        {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")} <span style={{ color: '#9ca3af' }}>({event.timezone || 'UTC'})</span>
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
+                                        <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span> {dayjs(event.start_time).tz(dayjs.tz.guess()).format("h:mm A")} – {dayjs(event.end_time).tz(dayjs.tz.guess()).format("h:mm A")} <span style={{ color: '#9ca3af' }}>({dayjs.tz.guess()})</span>
+                                      </Typography>
+                                    </Box>
                                   </Stack>
                                 )}
                               </Stack>
                             )}
-                          </>
+                          </Box>
                         )}
+
+                        {/* Location */}
                         {event?.location ? (
-                          <Stack direction="row" spacing={0.75} alignItems="center">
-                            <span role="img" aria-label="location">📍</span>
+                          <Stack direction="row" spacing={0.75} alignItems="flex-start">
+                            <span role="img" aria-label="location" style={{ marginTop: '2px' }}>📍</span>
                             <Typography variant="body2" color="text.secondary">
                               {event.location}
                             </Typography>
@@ -934,7 +936,6 @@ export default function EventDetailsPage() {
                         ) : null}
 
                         {/* Participant Count */}
-                        {/* Participant Count & Preview */}
                         {(() => {
                           const visibleRegisteredCount = Number(
                             event.public_registered_count ?? event.registrations_count ?? event.attending_count
@@ -953,7 +954,6 @@ export default function EventDetailsPage() {
                               <Box
                                 onClick={visibleRegisteredCount > 0 ? handleShowParticipants : undefined}
                                 sx={{
-                                  mt: 1,
                                   p: 1.5,
                                   border: '1px solid',
                                   borderColor: 'grey.200',
@@ -1011,7 +1011,6 @@ export default function EventDetailsPage() {
                               </Box>
                             );
                           } else {
-                            // Hidden view logic (just count, no click)
                             return (
                               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default', opacity: 0.7 }}>
                                 <GroupsIcon fontSize="small" className="text-teal-700" />
@@ -1022,18 +1021,31 @@ export default function EventDetailsPage() {
                             );
                           }
                         })()}
-                        <Typography variant="h6" fontWeight={800}>
-                          About this event
-                        </Typography>
-                        {desc?.trim() ? (
-                          <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                            {desc}
+                      </Stack>
+                    </Box>
+
+                    {/* Bottom section: Title + Description */}
+                    <Box sx={{ borderTop: '1px solid', borderColor: 'divider', p: { xs: 2.5, sm: 3, md: 4 }, pt: { xs: 2.5, sm: 3, md: 3 } }}>
+                      <Stack spacing={2}>
+                        {event?.title ? (
+                          <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
+                            {event.title}
                           </Typography>
-                        ) : (
-                          <Typography variant="body1" color="text.secondary">
-                            Event details will be announced soon.
+                        ) : null}
+                        <Box>
+                          <Typography variant="h6" fontWeight={800} sx={{ mb: 1 }}>
+                            About this event
                           </Typography>
-                        )}
+                          {desc?.trim() ? (
+                            <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                              {desc}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body1" color="text.secondary">
+                              Event details will be announced soon.
+                            </Typography>
+                          )}
+                        </Box>
                       </Stack>
                     </Box>
                   </Paper>
