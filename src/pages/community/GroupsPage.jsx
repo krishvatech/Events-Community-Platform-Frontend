@@ -641,6 +641,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
         boxShadow: hov ? "0 6px 24px rgba(0,0,0,.09)" : "0 1px 4px rgba(0,0,0,.05)",
         cursor: "pointer",
         position: "relative",
+        height: "100%",
       }}
     >
       {/* Top accent stripe */}
@@ -649,15 +650,20 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
       {/* Cover image / color bar */}
       <Box
         onClick={() => onOpen?.(g)}
-        sx={{
-          width: "100%",
-          height: g.cover_image || g.cover ? 100 : 0,
-          backgroundImage: g.cover_image || g.cover ? `url(${toAbsolute(g.cover_image || g.cover)})` : "none",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          position: "relative",
-        }}
+        sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}
       >
+        {g.cover_image || g.cover ? (
+          <img
+            key={g._cache || g.updated_at}
+            src={bust(g.cover_image || g.cover, g._cache || g.updated_at)}
+            alt={g.name}
+            loading="lazy"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
+        )}
+
         {/* Logo overlay */}
         {g.logo && (
           <Box sx={{
@@ -673,7 +679,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
       </Box>
 
       {/* Body */}
-      <Box sx={{ p: "16px 18px 14px", flexGrow: 1, display: "flex", flexDirection: "column", gap: "6px", mt: g.logo && (g.cover_image || g.cover) ? 3 : 0 }}>
+      <Box sx={{ p: "16px 18px 14px", flexGrow: 1, display: "flex", flexDirection: "column", gap: "6px", mt: g.logo ? 3 : 0 }}>
         {/* Category breadcrumb + status badges row */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px", mb: "2px" }}>
           {category ? (
@@ -763,6 +769,12 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
 
       {/* CTA footer */}
       <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
+        {canEdit && (
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit?.(g); }}
+            sx={{ color: "#aaa", "&:hover": { color: accent } }} title="Edit Group">
+            <EditNoteRoundedIcon fontSize="small" />
+          </IconButton>
+        )}
         {!hideJoin && (
           <Box
             onClick={() => !pending && !joined && onJoin?.(g)}
@@ -778,17 +790,12 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
             {ctaText} {!joined && !pending && "→"}
           </Box>
         )}
-        {canEdit && (
-          <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit?.(g); }}
-            sx={{ ml: "auto", color: "#aaa", "&:hover": { color: accent } }} title="Edit Group">
-            <EditNoteRoundedIcon fontSize="small" />
-          </IconButton>
-        )}
         {(hideJoin || joined) && (
           <Box
             onClick={() => onOpen?.(g)}
             sx={{ fontSize: 12, fontWeight: 700, color: accent, cursor: "pointer",
               display: "flex", alignItems: "center", gap: "4px",
+              ml: "auto",
               "&:hover": { textDecoration: "underline" } }}
           >
             {joined ? "Open Group →" : "View Details →"}
@@ -1360,6 +1367,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   sm: "repeat(2, minmax(0, 1fr))",
                   md: "repeat(3, minmax(0, 1fr))",
                 },
+                autoRows: "1fr",
                 gap: 2,
               }}
             >
@@ -1378,6 +1386,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   sm: "repeat(2, minmax(0, 1fr))",
                   md: "repeat(3, minmax(0, 1fr))",
                 },
+                autoRows: "1fr",
                 gap: 2,
               }}
             >
