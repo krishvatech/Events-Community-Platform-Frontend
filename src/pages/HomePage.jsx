@@ -8,7 +8,6 @@ import {
   Container,
   Button,
   Typography,
-  Grid,
   Card,
 } from "@mui/material";
 import {
@@ -57,18 +56,57 @@ const ChevronPattern = () => (
 );
 
 const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
-  <Card elevation={0} sx={{
-    border: "1px solid #E2E8F0", borderRadius: 3, p: 3, height: "100%",
-    transition: "box-shadow .2s, transform .2s",
-    "&:hover": { boxShadow: "0 8px 24px rgba(0,0,0,.08)", transform: "translateY(-4px)" },
-  }}>
-    <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: iconColor + "1A",
-      display: "flex", alignItems: "center", justifyContent: "center", mb: 2 }}>
-      <Icon sx={{ color: iconColor, fontSize: 24 }} />
+  <Box
+    sx={{
+      width: "100%",
+      minHeight: { xs: 160, md: 152 },
+      bgcolor: "#FFFFFF",
+      border: "1px solid #D9E2EC",
+      borderRadius: "28px",
+      px: { xs: 3, md: 3.5 },
+      py: { xs: 3, md: 3.25 },
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "flex-start",
+    }}
+  >
+    <Box
+      sx={{
+        width: 40,
+        height: 40,
+        borderRadius: "50%",
+        bgcolor: `${iconColor}14`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        mb: 2.5,
+      }}
+    >
+      <Icon sx={{ color: iconColor, fontSize: 20 }} />
     </Box>
-    <Typography sx={{ fontWeight: 700, fontSize: 15, color: NAVY, mb: 1 }}>{title}</Typography>
-    <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.7 }}>{desc}</Typography>
-  </Card>
+
+    <Typography
+      sx={{
+        fontWeight: 700,
+        fontSize: "15px",
+        lineHeight: 1.35,
+        color: NAVY,
+        mb: 1.25,
+      }}
+    >
+      {title}
+    </Typography>
+
+    <Typography
+      sx={{
+        fontSize: "14px",
+        lineHeight: 1.7,
+        color: "#6B7A90",
+      }}
+    >
+      {desc}
+    </Typography>
+  </Box>
 );
 
 export default function HomePage() {
@@ -160,33 +198,104 @@ export default function HomePage() {
       </Box>
 
       {/* FEATURES */}
-      <Box component="section" sx={{ py: { xs: 8, md: 10 }, bgcolor: "#F8FAFC" }}>
+      <Box
+        component="section"
+        sx={{
+          py: { xs: 8, md: 10 },
+          bgcolor: "#F5F8FC",
+        }}
+      >
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", mb: 6 }}>
-            <Typography sx={{ color: TEAL, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: 12, display: "block", mb: 1 }}>
+          <Box sx={{ textAlign: "center", mb: { xs: 5, md: 6.5 } }}>
+            <Typography
+              sx={{
+                color: TEAL,
+                fontWeight: 700,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                fontSize: 12,
+                mb: 1.5,
+              }}
+            >
               WHY JOIN
             </Typography>
-            <Typography variant="h2" sx={{ fontSize: { xs: 28, md: 38 }, fontWeight: 800, color: NAVY, mb: 1.5 }}>
+
+            <Typography
+              variant="h2"
+              sx={{
+                fontSize: { xs: 30, md: 52 },
+                fontWeight: 800,
+                lineHeight: 1.15,
+                color: NAVY,
+                mb: 1.5,
+                letterSpacing: "-0.02em",
+              }}
+            >
               Built for M&A professionals
             </Typography>
-            <Typography variant="body1" sx={{ color: "#64748B", maxWidth: 520, mx: "auto", lineHeight: 1.7 }}>
-              Everything you need to grow your dealmaking network and career — in one place.
+
+            <Typography
+              sx={{
+                color: "#6B7A90",
+                maxWidth: 560,
+                mx: "auto",
+                fontSize: { xs: 15, md: 16 },
+                lineHeight: 1.8,
+              }}
+            >
+              Everything you need to grow your dealmaking network and career — in
+              one place.
             </Typography>
           </Box>
-          <Grid container spacing={3}>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+              gap: 3,
+            }}
+          >
             {[
-              { icon: EventNoteIcon, iconColor: "#E8532F", title: "Events & Webinars", desc: "Attend conferences, workshops, and live webinars tailored for M&A professionals worldwide." },
-              { icon: GroupIcon, iconColor: TEAL, title: "Professional Community", desc: "Connect with dealmakers, advisors, and executives across the full M&A spectrum." },
-              { icon: LibraryIcon, iconColor: "#8B5CF6", title: "E-Library & Resources", desc: "Access curated research, templates, and thought leadership from industry experts." },
-              { icon: TrendingIcon, iconColor: "#F59E0B", title: "Courses & Training", desc: "Earn designations and upskill with structured M&A training programs." },
-              { icon: VerifiedIcon, iconColor: "#10B981", title: "Verified Profiles", desc: "Build credibility with identity verification and professional badges." },
-              { icon: GroupsIcon, iconColor: "#EC4899", title: "Private Groups", desc: "Join invite-only groups, alumni networks, and deal communities." },
-            ].map(f => (
-              <Grid item xs={12} sm={6} key={f.title}>
-                <FeatureCard {...f} />
-              </Grid>
+              {
+                icon: EventNoteIcon,
+                iconColor: "#F0643B",
+                title: "Events & Webinars",
+                desc: "Attend conferences, workshops, and live webinars tailored for M&A professionals worldwide.",
+              },
+              {
+                icon: GroupIcon,
+                iconColor: "#159AA5",
+                title: "Professional Community",
+                desc: "Connect with dealmakers, advisors, and executives across the full M&A spectrum.",
+              },
+              {
+                icon: LibraryIcon,
+                iconColor: "#8B5CF6",
+                title: "E-Library & Resources",
+                desc: "Access curated research, templates, and thought leadership from industry experts.",
+              },
+              {
+                icon: TrendingIcon,
+                iconColor: "#E8A11A",
+                title: "Courses & Training",
+                desc: "Earn designations and upskill with structured M&A training programs.",
+              },
+              {
+                icon: VerifiedIcon,
+                iconColor: "#18B67A",
+                title: "Verified Profiles",
+                desc: "Build credibility with identity verification and professional badges.",
+              },
+              {
+                icon: GroupsIcon,
+                iconColor: "#EC4899",
+                title: "Private Groups",
+                desc: "Join invite-only groups, alumni networks, and deal communities.",
+              },
+            ].map((f) => (
+              <FeatureCard key={f.title} {...f} />
             ))}
-          </Grid>
+          </Box>
         </Container>
       </Box>
 
