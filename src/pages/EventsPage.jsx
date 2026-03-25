@@ -778,13 +778,13 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             // Single-day events
             return (
               <div>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-col gap-4">
                   <span className="inline-flex items-center gap-2">
                     <CalendarMonthIcon fontSize="small" className="text-teal-700" />
                     {dayjs(ev.start).format("MMMM D, YYYY")}
                   </span>
-                  <span className="inline-flex items-center gap-2">
-                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
+                  <span className="flex items-start gap-2">
+                    <AccessTimeIcon fontSize="small" className="text-teal-700 mt-0.5 flex-shrink-0" />
                     <span>
                       {/* Primary: Organizer Time + Location (for single-day) */}
                       <span className="block font-medium text-neutral-900">
@@ -1421,8 +1421,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                 </span>
 
                 {ev.end && (
-                  <span className="inline-flex items-center gap-2">
-                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
+                  <span className="flex items-start gap-2">
+                    <AccessTimeIcon fontSize="small" className="text-teal-700 mt-0.5 flex-shrink-0" />
                     <span>
                       {/* Primary: Organizer Time + Location */}
                       <span className="block font-medium text-neutral-900">
