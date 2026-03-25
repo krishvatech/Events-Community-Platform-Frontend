@@ -181,6 +181,58 @@ function normalizeSession(session = {}) {
   };
 }
 
+function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
+  if (!participants.length) return null;
+
+  return (
+    <Box className="mt-4 rounded-xl border border-teal-100 bg-teal-50/70 p-3">
+      <Box className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-700">
+        Featured Participants
+      </Box>
+      <Box className="mt-2 space-y-2">
+        {participants.map((person, index) => {
+          const row = (
+            <Box className="flex items-center gap-3 rounded-lg bg-white/80 px-2.5 py-2">
+              <Avatar
+                src={person.avatar_url || ""}
+                alt={person.display_name}
+                sx={{ width: 34, height: 34, fontSize: "0.9rem" }}
+              >
+                {(person.display_name?.[0] || "P").toUpperCase()}
+              </Avatar>
+              <Box className="min-w-0 flex-1">
+                <Box className="truncate text-sm font-semibold text-neutral-900">
+                  {person.display_name}
+                </Box>
+              </Box>
+              <Chip
+                label={person.role_label || "Participant"}
+                size="small"
+                color={person.role === "host" ? "primary" : person.role === "speaker" ? "success" : "secondary"}
+                sx={{ height: 22, fontSize: "0.7rem" }}
+              />
+            </Box>
+          );
+
+          return person.is_profile_clickable && person.profile_url ? (
+            <Link key={`${person.user_id || person.display_name}-${index}`} to={person.profile_url} className="block no-underline">
+              {row}
+            </Link>
+          ) : (
+            <Box key={`${person.user_id || person.display_name}-${index}`}>
+              {row}
+            </Box>
+          );
+        })}
+      </Box>
+      {total > participants.length && (
+        <Box className="mt-2 text-xs font-medium text-teal-700">
+          +{total - participants.length} more
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 function EventDetailsSkeleton() {
   return (
@@ -1212,6 +1264,16 @@ export default function EventDetailsPage() {
                             );
                           }
                         })()}
+
+                        {/* Featured Participants */}
+                        {event?.featured_participants && event.featured_participants.length > 0 && (
+                          <Box sx={{ mt: 2 }}>
+                            <FeaturedParticipantsStrip
+                              participants={event.featured_participants}
+                              total={event.featured_participants_total || event.featured_participants.length}
+                            />
+                          </Box>
+                        )}
                       </Stack>
                     </Box>
 
