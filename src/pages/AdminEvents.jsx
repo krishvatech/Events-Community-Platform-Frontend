@@ -161,6 +161,126 @@ const getToken = () =>
   localStorage.getItem("access_token") ||
   "";
 
+const tokenHeader = () => {
+  const t =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access") ||
+    localStorage.getItem("jwt");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
+// City Autocomplete Component - fetches from backend DB
+function CityAutocompleteOpenMeteo({ label = "City", value, onSelect, error, helperText }) {
+  const [open, setOpen] = React.useState(false);
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+
+  React.useEffect(() => {
+    const q = (inputValue || "").trim();
+    if (q.length < 2) {
+      setOptions(value ? [value] : []);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    const run = async () => {
+      setLoading(true);
+      try {
+        const url = `${API_BASE}/auth/cities/search/?q=${encodeURIComponent(q)}&limit=10`;
+        const r = await fetch(url, {
+          signal: controller.signal,
+          headers: tokenHeader(),
+        });
+        if (!r.ok) return;
+
+        const data = await r.json();
+        const results = (data?.results || [])
+          .map((x) => ({
+            name: x.name || "",
+            admin1: x.is_other ? "Other / Not listed" : "",
+            country: x.country_name || "",
+            country_code: x.country_code || "",
+            latitude: x.lat,
+            longitude: x.lng,
+            label: x.label,
+            timezone: x.timezone || "",
+          }))
+          .filter((x) => x.name && x.country);
+
+        if (active) setOptions(results);
+      } catch (e) {
+        if (e?.name !== "AbortError") console.error("City search failed", e);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const t = setTimeout(run, 350);
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [inputValue, value]);
+
+  return (
+    <Autocomplete
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      options={options}
+      loading={loading}
+      value={value || null}
+      inputValue={inputValue}
+      onInputChange={(_, v) => setInputValue(v)}
+      isOptionEqualToValue={(o, v) =>
+        o?.name === v?.name &&
+        o?.country === v?.country &&
+        o?.admin1 === v?.admin1
+      }
+      getOptionLabel={(o) => o?.name || ""}
+      onChange={(_, newValue) => {
+        onSelect?.(newValue || null);
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={label}
+          fullWidth
+          placeholder="Type city name..."
+          error={error}
+          helperText={helperText}
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress size={18} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+      renderOption={(props, option) => (
+        <li {...props}>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {option.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {option.country}
+            </Typography>
+          </Box>
+        </li>
+      )}
+    />
+  );
+}
+
 // --- Helpers ---
 const fmtDateRange = (s, e) => {
   try {
@@ -488,7 +608,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (!slug.trim()) e.slug = "Required";
     else if (slugStatus.checking) e.slug = "Checking slug availability. Please wait.";
     else if (slugStatus.available === false) e.slug = "This slug is already taken.";
-    if (["in_person", "hybrid"].includes(format) && !location.trim()) e.location = "Required";
+    if (["in_person", "hybrid"].includes(format) && !location) e.location = "Required";
     if (!description.trim()) e.description = "Required";
     const priceValue = Number(price);
     if (!isFree) {
@@ -591,7 +711,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("title", title.trim());
     fd.append("slug", slug.trim());
     fd.append("description", description);
-    fd.append("location", location.trim());
+    // Build location string: for city objects, use "City, Country"; for strings, use as-is
+    const locationStr = typeof location === "object" && location
+      ? `${location.name}, ${location.country}`.trim()
+      : (location || "").trim();
+    fd.append("location", locationStr);
     fd.append("category", category);
     fd.append("format", format);
     fd.append("price", String(isFree ? 0 : (price ?? 0)));
@@ -899,6 +1023,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 const next = e.target.value;
                 setFormat(next);
                 if (next === "virtual") {
+                  setLocation("Germany");
+                  setErrors((prev) => ({ ...prev, location: "" }));
+                } else {
+                  setLocation(null);
                   setErrors((prev) => ({ ...prev, location: "" }));
                 }
               }}
@@ -1052,18 +1180,15 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 )}
               />
             ) : (
-              <TextField
+              <CityAutocompleteOpenMeteo
                 label="Location *"
-                placeholder="Enter location (City, Country)"
-                InputLabelProps={{ shrink: true }}
-                value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value);
+                value={location && typeof location === "object" ? location : null}
+                onSelect={(city) => {
+                  setLocation(city);
                   setErrors((prev) => ({ ...prev, location: "" }));
                 }}
-                fullWidth
                 error={!!errors.location}
-                helperText={errors.location || "City & country, or full address"}
+                helperText={errors.location}
               />
             )}
           </Box>
