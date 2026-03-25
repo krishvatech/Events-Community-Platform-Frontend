@@ -1567,27 +1567,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   const v = e.target.checked;
                   setIsMultiDay(v);
                   if (v) {
-                    // If switching to Multi-Day, set Start Time to 10 minutes ahead of current time in selected timezone
-                    // and End Time to 11:59 PM (end of the final day)
-                    try {
-                      const currentTimeInTz = dayjs().tz(timezone || 'UTC');
-                      const startTimeInTz = currentTimeInTz.add(10, 'minutes').second(0).millisecond(0);
-                      const startTimeStr = startTimeInTz.format("HH:mm");
-                      setStartTime(startTimeStr);
-                      setEndTime("23:59");
-                      console.log("🕐 Multi-Day toggle ON: Set Start Time to current time + 10 minutes", {
-                        timezone,
-                        currentTime: currentTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
-                        startTime: startTimeStr,
-                        startTimeFullISO: startTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
-                      });
-                    } catch (error) {
-                      console.error("❌ Error calculating start time:", error);
-                      // Fallback to current local time if timezone calculation fails
-                      const currentTime = dayjs().add(10, 'minutes').second(0).millisecond(0);
-                      setStartTime(currentTime.format("HH:mm"));
-                      setEndTime("23:59");
-                    }
+                    // If switching to Multi-Day: Set Start Time to 00:00 and End Time to 23:59
+                    setSingleDayStartTime(startTime);
+                    setSingleDayEndTime(endTime);
+                    setStartTime("00:00");
+                    setEndTime("23:59");
+                    console.log("🕐 Multi-Day toggle ON: Set times to 00:00 - 23:59");
                   } else {
                     // If switching to Single Day, restore original single-day times and force end date to equal start date
                     setStartTime(singleDayStartTime);
@@ -1610,8 +1595,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     if (!isMultiDay) {
                       // Single day: force end date same as start
                       setEndDate(v);
+                    } else {
+                      // Multi-day: auto-set start time to 00:00
+                      setStartTime("00:00");
+                      console.log("🕐 Auto-set Start Time to 00:00 for multi-day event");
                     }
-                    // Removed auto-calculation for multi-day to let user set times manually
                   }}
                   format="DD/MM/YYYY"
                   slotProps={{
@@ -1633,6 +1621,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       const v = newValue ? newValue.format("YYYY-MM-DD") : "";
                       console.log("📅 End Date Changed:", { previousEndDate: endDate, newEndDate: v });
                       setEndDate(v);
+                      // Auto-set end time to 23:59 for multi-day events
+                      if (isMultiDay) {
+                        setEndTime("23:59");
+                        console.log("🕐 Auto-set End Time to 23:59 for multi-day event");
+                      }
                     }}
                     format="DD/MM/YYYY"
                     slotProps={{
@@ -2104,7 +2097,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               : null
           }
           eventStartTime={actualEventStartTime || toUTCISO(startDate, startTime, timezone)}
-          eventEndTime={actualEventEndTime || toUTCISO(endDate, endTime, timezone)}
+          eventEndTime={actualEventEndTime || toUTCISO(isMultiDay ? endDate : startDate, endTime, timezone)}
           timezone={timezone}
         />
       </Dialog>
