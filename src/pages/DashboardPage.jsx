@@ -302,12 +302,12 @@ function DashEventCard({ event, index }) {
   return (
     <a href={href} style={{ textDecoration: "none" }}>
       <div
-        style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${BORDER}`, background: "#fff", cursor: "pointer", position: "relative", transition: "box-shadow .2s" }}
+        style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${BORDER}`, background: "#fff", cursor: "pointer", position: "relative", transition: "box-shadow .2s", display: "flex", flexDirection: "column", height: 280 }}
         onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,.09)"; e.currentTarget.style.borderColor = accent + "50"; }}
         onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = BORDER; }}
       >
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, zIndex: 2 }} />
-        <div style={{ height: 152, overflow: "hidden" }}>
+        <div style={{ height: 152, overflow: "hidden", flexShrink: 0 }}>
           <img src={imgSrc} alt={event?.title || "Event"}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
             onError={(e) => {
@@ -321,7 +321,7 @@ function DashEventCard({ event, index }) {
             }}
           />
         </div>
-        <div style={{ padding: "14px 16px 18px", fontFamily: FONT }}>
+        <div style={{ padding: "14px 16px 18px", fontFamily: FONT, flex: 1, display: "flex", flexDirection: "column" }}>
           {(dateStr || event?.event_type) && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
               {dateStr && <span style={{ fontSize: 11, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: 0.5 }}>{dateStr}</span>}
@@ -331,7 +331,9 @@ function DashEventCard({ event, index }) {
           <h3 style={{ fontSize: 13, fontWeight: 700, color: N, margin: "0 0 4px", lineHeight: 1.4, fontFamily: FONT, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {event?.title}
           </h3>
-          {event?.location && <div style={{ fontSize: 11, color: "#AAA", marginTop: 4 }}>📍 {event.location}</div>}
+          <div style={{ marginTop: "auto" }}>
+            {event?.location && <div style={{ fontSize: 11, color: "#AAA", marginTop: 4 }}>📍 {event.location}</div>}
+          </div>
         </div>
       </div>
     </a>
