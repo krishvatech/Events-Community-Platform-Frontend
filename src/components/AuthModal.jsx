@@ -379,7 +379,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 fullWidth
                 variant="contained"
                 disabled={loading}
-                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
+                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", color: "#FFFFFF", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
               >
                 {loading ? <CircularProgress size={20} color="inherit" /> : "Log in"}
               </Button>
@@ -446,7 +446,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 fullWidth
                 variant="contained"
                 disabled={loading}
-                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
+                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", color: "#FFFFFF", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
               >
                 {loading ? <CircularProgress size={20} color="inherit" /> : "Create account"}
               </Button>
@@ -470,7 +470,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 fullWidth
                 variant="contained"
                 disabled={loading}
-                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
+                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", color: "#FFFFFF", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
               >
                 {loading ? <CircularProgress size={20} color="inherit" /> : "Verify & continue"}
               </Button>
