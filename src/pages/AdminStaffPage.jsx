@@ -358,9 +358,10 @@ export default function AdminStaffPage() {
 
     const [selected, setSelected] = React.useState(new Set());
 
-    // Pagination state
+    // Pagination & Filtering
+    const PAGE_SIZE = 10;
     const [page, setPage] = React.useState(1);
-    const rowsPerPage = 10;
+    const [totalCount, setTotalCount] = React.useState(0);
 
     // Dialog State
     const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -381,15 +382,26 @@ export default function AdminStaffPage() {
     const fetchData = React.useCallback(async () => {
         setLoading(true);
         try {
-            const params = { search: q, ordering: "-date_joined", page_size: 100 };
+            const params = {
+                search: q,
+                ordering: "-date_joined",
+                limit: PAGE_SIZE,
+                offset: (page - 1) * PAGE_SIZE
+            };
             if (communityId) params.community_id = communityId;
+            if (userTypeFilter !== "all") params.user_type_filter = userTypeFilter;
             const data = await listAdminUsers(params);
             setRows(data.results ?? data);
-            setPage(1);          // reset to first page on new data
+            setTotalCount(data.count ?? 0);
         } finally {
             setLoading(false);
         }
-    }, [q, communityId]);
+    }, [q, communityId, page, userTypeFilter]);
+
+    // Reset page on search or filter change
+    React.useEffect(() => {
+        setPage(1);
+    }, [q, userTypeFilter]);
 
     React.useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -515,10 +527,9 @@ export default function AdminStaffPage() {
     };
 
 
-    // slice rows for current page
-    const totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
-    const startIndex = (page - 1) * rowsPerPage;
-    const paginatedRows = rows.slice(startIndex, startIndex + rowsPerPage);
+    // Calculate total pages from server count
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+    const paginatedRows = rows;
 
     return (
         <Container maxWidth="lg" disableGutters sx={{ py: 3 }}>
@@ -642,19 +653,7 @@ export default function AdminStaffPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    paginatedRows
-                                        .filter((u) => {
-                                            // First filter: owner can see all, non-owners see only normal users
-                                            if (!owner && (u.is_staff || u.is_superuser)) return false;
-
-                                            // Second filter: apply user type filter
-                                            if (userTypeFilter === "all") return true;
-                                            if (userTypeFilter === "superuser") return u.is_superuser;
-                                            if (userTypeFilter === "staff") return u.is_staff && !u.is_superuser;
-                                            if (userTypeFilter === "normal") return !u.is_staff && !u.is_superuser;
-                                            return false;
-                                        })
-                                        .map((u) => (
+                                    paginatedRows.map((u) => (
                                         <TableRow key={u.id} hover>
 
                                             {/* User */}
@@ -779,7 +778,7 @@ export default function AdminStaffPage() {
                     </TableContainer>
 
                     {/* Pagination control */}
-                    {rows.length > rowsPerPage && (
+                    {totalCount > PAGE_SIZE && (
                         <Box mt={2} display="flex" justifyContent="flex-end">
                             <Pagination
                                 count={totalPages}
