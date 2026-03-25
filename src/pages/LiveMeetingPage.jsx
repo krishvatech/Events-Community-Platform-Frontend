@@ -2797,6 +2797,7 @@ export default function NewLiveMeeting() {
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [supportRequests, setSupportRequests] = useState([]);
   const [attendeeSupportFeedback, setAttendeeSupportFeedback] = useState({ kind: "idle", reason: "" });
+  const [resettingPermissions, setResettingPermissions] = useState(false);
   const currentUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
 
   useEffect(() => {
@@ -7752,6 +7753,52 @@ export default function NewLiveMeeting() {
     return "No active request";
   }, [assistanceCooldownRemaining, attendeeSupportFeedback.kind, waitingRoomActive]);
 
+  const resetBrowserPermissions = useCallback(async () => {
+    setResettingPermissions(true);
+    try {
+      const permissions = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      // Request camera permission
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        permissions.push("camera");
+        successCount++;
+      } catch (err) {
+        failureCount++;
+        console.log("Camera permission request:", err.name);
+      }
+
+      // Request microphone permission
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        permissions.push("microphone");
+        successCount++;
+      } catch (err) {
+        failureCount++;
+        console.log("Microphone permission request:", err.name);
+      }
+
+      // Show feedback based on results
+      if (successCount === 2) {
+        showSnackbar("✓ Camera and microphone permissions granted!", "success");
+      } else if (successCount === 1) {
+        showSnackbar(`✓ ${permissions[0] === "camera" ? "Camera" : "Microphone"} permission granted!`, "success");
+      } else if (failureCount === 2) {
+        showSnackbar(
+          "Permission requests closed. If you denied access, please check your browser settings to allow camera/microphone.",
+          "info"
+        );
+      }
+    } catch (err) {
+      console.error("Error resetting permissions:", err);
+      showSnackbar("Unable to request permissions. Please check your browser settings.", "error");
+    } finally {
+      setResettingPermissions(false);
+    }
+  }, [showSnackbar]);
+
   const requestMainRoomAssistance = useCallback(() => {
     if (isHost || isBreakout) return;
     if (assistanceCooldownRemaining > 0) {
@@ -7776,6 +7823,8 @@ export default function NewLiveMeeting() {
             else setRightOpen(true);
           }
         : requestMainRoomAssistance,
+    onResetPermissions: resetBrowserPermissions,
+    resettingPermissions,
     requestDisabled: assistanceCooldownRemaining > 0,
     requestLabel:
       assistanceCooldownRemaining > 0
@@ -7808,6 +7857,8 @@ export default function NewLiveMeeting() {
     getAttendeeSupportInfoText,
     isMdUp,
     requestMainRoomAssistance,
+    resetBrowserPermissions,
+    resettingPermissions,
   ]);
 
   // ✅ Handle assignment from notification history
@@ -19591,6 +19642,38 @@ export default function NewLiveMeeting() {
                   </Typography>
                 </>
               )}
+            </Box>
+
+            {/* Browser Permissions Reset */}
+            <Box sx={{ p: 1.5, bgcolor: "rgba(125,211,252,0.08)", border: "1px solid rgba(125,211,252,0.25)", borderRadius: 2 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, display: "flex", alignItems: "center", gap: 1, color: "rgba(255,255,255,0.95)" }}>
+                🔐 Browser Permissions
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.75)", mb: 1.5, lineHeight: 1.5 }}>
+                If you accidentally denied camera or microphone access, you can request permissions again here.
+              </Typography>
+              <Button
+                onClick={resetBrowserPermissions}
+                disabled={resettingPermissions}
+                variant="outlined"
+                size="small"
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderColor: "rgba(125,211,252,0.40)",
+                  color: "#dbeafe",
+                  "&:hover": {
+                    borderColor: "rgba(125,211,252,0.60)",
+                    bgcolor: "rgba(125,211,252,0.10)",
+                  },
+                  "&.Mui-disabled": {
+                    borderColor: "rgba(125,211,252,0.15)",
+                    color: "rgba(255,255,255,0.45)",
+                  },
+                }}
+              >
+                {resettingPermissions ? "Requesting Permissions..." : "Reset Browser Permissions"}
+              </Button>
             </Box>
 
             {/* Info */}

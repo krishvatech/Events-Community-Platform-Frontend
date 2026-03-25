@@ -48,12 +48,14 @@ export function AttendeeSupportDialog({
   open,
   onClose,
   onRequestAssistance,
+  onResetPermissions = null,
   requestDisabled = false,
   requestLabel = "Request Assistance",
   statusText = "No active request",
   helperText = "Need help? Notify the host team and we'll get to you shortly.",
   infoSeverity = "info",
   infoText = "",
+  resettingPermissions = false,
 }) {
   const derivedStatus =
     statusText === "No active request"
@@ -144,6 +146,48 @@ export function AttendeeSupportDialog({
             >
               {infoText}
             </Alert>
+          </Paper>
+        ) : null}
+
+        {onResetPermissions ? (
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              mb: 1.5,
+              borderRadius: 3,
+              bgcolor: "rgba(255,255,255,0.04)",
+              borderColor: "rgba(125,211,252,0.20)",
+            }}
+          >
+            <Typography sx={{ fontWeight: 800, fontSize: 13, mb: 1, color: "rgba(255,255,255,0.92)" }}>
+              Browser Permissions
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.72)", mb: 1.5, lineHeight: 1.45 }}>
+              If you denied camera or microphone access, you can reset permissions to try again.
+            </Typography>
+            <Button
+              onClick={onResetPermissions}
+              disabled={resettingPermissions}
+              size="small"
+              variant="outlined"
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                borderColor: "rgba(125,211,252,0.30)",
+                color: "#dbeafe",
+                "&:hover": {
+                  borderColor: "rgba(125,211,252,0.50)",
+                  bgcolor: "rgba(125,211,252,0.08)",
+                },
+                "&.Mui-disabled": {
+                  borderColor: "rgba(125,211,252,0.15)",
+                  color: "rgba(255,255,255,0.45)",
+                },
+              }}
+            >
+              {resettingPermissions ? "Requesting Permissions..." : "Reset Browser Permissions"}
+            </Button>
           </Paper>
         ) : null}
 
