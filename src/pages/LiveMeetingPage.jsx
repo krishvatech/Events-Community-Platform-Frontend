@@ -108,6 +108,7 @@ import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import SupportAgentIcon from "@mui/icons-material/SupportAgent";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
@@ -137,6 +138,8 @@ import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodU
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
 import GuestBanner from "../components/GuestBanner.jsx";
+import ClearMediaCacheDialog from "../components/ClearMediaCacheDialog.jsx";
+import { useClearMediaCache } from "../hooks/useClearMediaCache.js";
 import GuestRegistrationModal from "../components/GuestRegistrationModal.jsx";
 import GuestRestrictionOverlay from "../components/GuestRestrictionOverlay.jsx";
 import GuestNetworkingModal from "../components/GuestNetworkingModal.jsx";
@@ -2594,6 +2597,16 @@ export default function NewLiveMeeting() {
       return;
     }
     setSupportDialogOpen(true);
+  };
+
+  // ✅ Clear Media Cache Hook
+  const clearMediaCacheState = useClearMediaCache((result) => {
+    console.log("Media device cache cleared:", result);
+  });
+
+  const handleClearMediaCache = () => {
+    handleCloseMoreMenu();
+    clearMediaCacheState.handleOpenConfirmDialog();
   };
   // -------------------------------------
   const [micOn, setMicOn] = useState(true);
@@ -20871,6 +20884,39 @@ export default function NewLiveMeeting() {
           </DialogActions>
         </Dialog>
 
+        {/* ✅ Clear Media Cache Dialog */}
+        <ClearMediaCacheDialog
+          open={clearMediaCacheState.confirmDialogOpen}
+          onConfirm={clearMediaCacheState.handleConfirmClear}
+          onCancel={clearMediaCacheState.handleCloseConfirmDialog}
+          isClearing={clearMediaCacheState.isClearing}
+          showDetails={clearMediaCacheState.showDetails}
+          onToggleDetails={clearMediaCacheState.setShowDetails}
+          limitations={clearMediaCacheState.getLimitations()}
+        />
+
+        {/* ✅ Clear Media Cache Snackbar */}
+        <Snackbar
+          open={clearMediaCacheState.snackbarOpen}
+          autoHideDuration={6000}
+          onClose={clearMediaCacheState.handleCloseSnackbar}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        >
+          <Alert
+            onClose={clearMediaCacheState.handleCloseSnackbar}
+            severity={clearMediaCacheState.snackbarSeverity}
+            sx={{
+              width: "100%",
+              color: "#1a202c",
+              "& .MuiAlert-message": {
+                color: "#1a202c",
+              },
+            }}
+          >
+            {clearMediaCacheState.snackbarMessage}
+          </Alert>
+        </Snackbar>
+
         {/* ✅ Small countdown timer at top - for both host and participants */}
         {loungeCountingDown && loungeCountdownValue > 0 && (
           <Box
@@ -21021,6 +21067,15 @@ export default function NewLiveMeeting() {
               <SupportAgentIcon fontSize="small" />
             </ListItemIcon>
             Help & Support
+          </MenuItem>
+
+          {/* ✅ Clear Media Cache - Available to All */}
+          <Divider />
+          <MenuItem onClick={handleClearMediaCache}>
+            <ListItemIcon>
+              <DeleteSweepIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Clear Mic & Camera Cache</ListItemText>
           </MenuItem>
         </Menu>
 
