@@ -16099,8 +16099,8 @@ export default function NewLiveMeeting() {
                                         </Tooltip>
                                       )}
 
-                                      {/* Host actions for other hosts (Bring to Main Stage / Clear / Kick / Ban) - Hidden for guest users */}
-                                      {isHost && !isSelfMember(m) && !/^guest[_:-]/i.test(String(m._raw?.customParticipantId || m.id)) && (
+                                      {/* Host actions for other hosts (Bring to Main Stage / Clear / Kick / Ban) */}
+                                      {isHost && !isSelfMember(m) && (
                                         <IconButton
                                           size="small"
                                           disabled={isOnBreak}
@@ -16514,8 +16514,8 @@ export default function NewLiveMeeting() {
                                         </Tooltip>
                                       )}
 
-                                      {/* KICK/BAN MENU for Host - Hidden for guest users */}
-                                      {isHost && !isSelfMember(m) && !/^guest[_:-]/i.test(String(m._raw?.customParticipantId || m.id)) && (
+                                      {/* KICK/BAN MENU for Host */}
+                                      {isHost && !isSelfMember(m) && (
                                         <IconButton
                                           size="small"
                                           disabled={isOnBreak}
@@ -16849,8 +16849,8 @@ export default function NewLiveMeeting() {
                                       </Tooltip>
                                     )}
 
-                                    {/* KICK/BAN MENU for Host - Hidden for guest users */}
-                                    {isHost && !isSelfMember(m) && !/^guest[_:-]/i.test(String(m._raw?.customParticipantId || m.id)) && (
+                                    {/* KICK/BAN MENU for Host */}
+                                    {isHost && !isSelfMember(m) && (
                                       <IconButton
                                         size="small"
                                         disabled={Boolean(m.isVirtual) || isOnBreak}
