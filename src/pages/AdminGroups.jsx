@@ -1048,11 +1048,13 @@ export default function AdminGroups() {
           let arr = Array.isArray(data) ? data : [];
 
           if (owner && myId) {
-            // Owner: only groups I created
+            // Owner: show groups I created OR groups I joined
             arr = arr.filter((g) => {
               const creator =
                 g.created_by?.id ?? g.created_by_id ?? g.owner_id ?? null;
-              return creator != null && String(creator) === String(myId);
+              const isCreator = creator != null && String(creator) === String(myId);
+              const isMember = !!g.current_user_role;
+              return isCreator || isMember;
             });
           }
 
