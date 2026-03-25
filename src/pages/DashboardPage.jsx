@@ -21,8 +21,8 @@ import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 const O = "#E8532F";
 const N = "#1B2A4A";
 const T = "#0A9396";
-const P = "#7B2D8E";
-const G = "#D4920B";
+// const P = "#7B2D8E"; // COMMENTED OUT - used only in commented Community section
+// const G = "#D4920B"; // COMMENTED OUT - used only in commented Community section
 const BG = "#FAF9F7";
 const BORDER = "#EEECEA";
 const FONT = "'DM Sans', 'Helvetica Neue', sans-serif";
@@ -338,7 +338,8 @@ function DashEventCard({ event, index }) {
   );
 }
 
-// ── Discussion Row ────────────────────────────────────────────────────────────
+// ── Discussion Row ──────────────────────────────────────────────────────────── [COMMENTED OUT - will restore with community section]
+/*
 function DiscRow({ d, index }) {
   const accents = [P, O, T, G];
   const accent = accents[index % accents.length];
@@ -361,8 +362,10 @@ function DiscRow({ d, index }) {
     </div>
   );
 }
+*/
 
-// ── Group Row ─────────────────────────────────────────────────────────────────
+// ── Group Row ─────────────────────────────────────────────────────────────────  [COMMENTED OUT - will restore with community section]
+/*
 function GroupRow({ g }) {
   return (
     <a href={`/community/groups/${g.id}/`} style={{ textDecoration: "none" }}>
@@ -383,6 +386,7 @@ function GroupRow({ g }) {
     </a>
   );
 }
+*/
 
 // ── USP Strip ─────────────────────────────────────────────────────────────────
 const USP_ITEMS = [
@@ -444,8 +448,8 @@ function FooterCTA({ isMember }) {
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
-  const [discussions, setDiscussions] = useState([]);
-  const [groups, setGroups] = useState([]);
+  // const [discussions, setDiscussions] = useState([]); // COMMENTED OUT - will restore when community section is re-enabled
+  // const [groups, setGroups] = useState([]); // COMMENTED OUT - will restore when community section is re-enabled
   const [loading, setLoading] = useState(true);
   const [notifCount, setNotifCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
@@ -470,8 +474,8 @@ export default function DashboardPage() {
       if (!active) return;
       setUser(userData);
       setEvents(eventsData.slice(0, 4));
-      setDiscussions(postsData.length ? postsData.slice(0, 3) : STATIC_DISCUSSIONS);
-      setGroups(groupsData.length ? groupsData.slice(0, 3) : STATIC_GROUPS);
+      // setDiscussions(postsData.length ? postsData.slice(0, 3) : STATIC_DISCUSSIONS); // COMMENTED OUT
+      // setGroups(groupsData.length ? groupsData.slice(0, 3) : STATIC_GROUPS); // COMMENTED OUT
       setLoading(false);
     });
 
@@ -586,7 +590,7 @@ export default function DashboardPage() {
         </div>
       </FadeIn>
 
-      {/* Community Section */}
+      {/* Community Section - COMMENTED OUT FOR NOW - will add back in future
       <FadeIn delay={300}>
         <div style={{ background: "#fff", borderTop: `1px solid ${BORDER}`, padding: "48px 40px" }}>
           <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 300px", gap: 48 }}>
@@ -613,6 +617,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </FadeIn>
+      */}
 
       {/* USP Strip */}
       <FadeIn delay={400}><USPStrip /></FadeIn>
