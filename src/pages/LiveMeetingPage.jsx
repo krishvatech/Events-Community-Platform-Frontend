@@ -85,6 +85,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import FileCopyIcon from "@mui/icons-material/FileCopy";
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
@@ -13078,6 +13079,7 @@ export default function NewLiveMeeting() {
   const [chatEditSaving, setChatEditSaving] = useState(false);
   const [chatDeleteOpen, setChatDeleteOpen] = useState(false);
   const [chatDeleteTarget, setChatDeleteTarget] = useState(null);
+  const [copiedMessageId, setCopiedMessageId] = useState(null);
 
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [qnaUnreadCount, setQnaUnreadCount] = useState(0);
@@ -13854,6 +13856,18 @@ export default function NewLiveMeeting() {
       await fetchChatMessages(cid);
     },
     [activeChatConversationId, fetchChatMessages]
+  );
+
+  const copyChatMessage = useCallback(
+    (messageId, messageBody) => {
+      if (!messageBody) return;
+      navigator.clipboard.writeText(messageBody).then(() => {
+        setCopiedMessageId(messageId);
+        setTimeout(() => setCopiedMessageId(null), 2000);
+        showSnackbar("Message copied to clipboard", "success");
+      });
+    },
+    []
   );
 
   useEffect(() => {
@@ -15332,6 +15346,18 @@ export default function NewLiveMeeting() {
                                 {formatChatTime(m.created_at)}
                               </Typography>
                               <Stack direction="row" spacing={0.5} alignItems="center">
+                                <Tooltip title={copiedMessageId === m.id ? "Copied!" : "Copy message"}>
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Copy message"
+                                    onClick={() => copyChatMessage(m.id, m.body)}
+                                    sx={{
+                                      color: copiedMessageId === m.id ? "#22c55e" : "inherit",
+                                    }}
+                                  >
+                                    <FileCopyIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
                                 {isHost && m.is_flagged && (
                                   <IconButton
                                     size="small"
