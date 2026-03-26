@@ -5039,19 +5039,57 @@ export default function NewLiveMeeting() {
     showSnackbar(`Invitation sent to ${payload.name}. They have 15 seconds to accept.`, "info");
   };
 
-  const handleClearSpotlight = () => {
+  const handleClearSpotlight = async () => {
     handleCloseParticipantMenu();
     if (!isHost) return;
 
+    const clearedSpotlight = spotlightTarget;
+    const presentationToClear =
+      (clearedSpotlight && matchesStageTarget(presentationTarget, clearedSpotlight) && presentationTarget) ||
+      (clearedSpotlight && matchesStageTarget(approvedMainStageScreenShare, clearedSpotlight) && approvedMainStageScreenShare) ||
+      null;
+
     setSpotlightTarget(null);
     setPendingSpotlightInvite(null);
-    const payload = { byHostId: dyteMeeting?.self?.id || null, ts: Date.now() };
+
+    const payload = {
+      participantId: clearedSpotlight?.participantId || null,
+      participantUserKey: clearedSpotlight?.participantUserKey || null,
+      name: clearedSpotlight?.name || "Participant",
+      byHostId: dyteMeeting?.self?.id || null,
+      ts: Date.now(),
+    };
+
+    if (presentationToClear) {
+      await revokeMainStageScreenShare(presentationToClear);
+      setApprovedMainStageScreenShare(null);
+      setPresentationTarget(null);
+      setIncomingMainStageScreenShareRequest(null);
+    }
+
     try {
       dyteMeeting?.participants?.broadcastMessage?.("spotlight-clear", payload);
+      if (presentationToClear) {
+        dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+          requestId: `ssr-revoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          status: "revoked",
+          participantId: presentationToClear?.participantId || null,
+          participantUserKey: presentationToClear?.participantUserKey || null,
+          name: presentationToClear?.name || payload.name,
+          byHostId: dyteMeeting?.self?.id || null,
+          ts: Date.now(),
+        });
+        dyteMeeting?.participants?.broadcastMessage?.("presentation-clear", {
+          participantId: presentationToClear?.participantId || null,
+          participantUserKey: presentationToClear?.participantUserKey || null,
+          name: presentationToClear?.name || payload.name,
+          byHostId: dyteMeeting?.self?.id || null,
+          ts: Date.now(),
+        });
+      }
     } catch (e) {
-      console.warn("[Spotlight] Failed to broadcast spotlight-clear:", e);
+      console.warn("[Spotlight] Failed to clear spotlight state:", e);
     }
-    showSnackbar("Returned to normal layout", "info");
   };
 
   const handleRespondSpotlightInvite = useCallback(
