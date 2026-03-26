@@ -66,6 +66,14 @@ function resolveAvatar(user) {
   return raw.startsWith("/") ? `${base}${raw}` : `${base}/${raw}`;
 }
 
+function getEventLocation(event) {
+  // For virtual and hybrid events, show "Virtual live" instead of physical location
+  if (event?.format === "virtual" || event?.format === "hybrid") {
+    return "Virtual live";
+  }
+  return event?.location || "";
+}
+
 
 // ── FadeIn Animation ─────────────────────────────────────────────────────────
 function FadeIn({ children, delay = 0 }) {
@@ -239,6 +247,7 @@ function FeaturedHero({ event }) {
   const dateStr = event?.start_date
     ? new Date(event.start_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     : "";
+  const eventLocation = getEventLocation(event);
   const href = `/events/${event?.id || event?.slug || ""}`;
   return (
     <a href={href} style={{ textDecoration: "none", display: "block", marginBottom: 24 }}>
@@ -262,10 +271,10 @@ function FeaturedHero({ event }) {
           <p style={{ fontSize: 13, color: "#666", lineHeight: 1.65, margin: "0 0 16px", fontFamily: FONT }}>
             {event?.description || event?.desc || event?.short_description || "Join fellow M&A professionals at this premier industry event."}
           </p>
-          {(dateStr || event?.location) && (
+          {(dateStr || eventLocation) && (
             <div style={{ fontSize: 12, color: "#888", marginBottom: 20, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: FONT }}>
               <EventNoteIcon sx={{ fontSize: 14, color: "#C0BAB4" }} />
-              {dateStr}{event?.location && <> · {event.location}</>}
+              {dateStr}{eventLocation && <> · {eventLocation}</>}
             </div>
           )}
           <span style={{ display: "inline-block", background: accent, color: "#fff", padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 700, width: "fit-content", fontFamily: FONT }}>
@@ -298,6 +307,7 @@ function DashEventCard({ event, index }) {
   const dateStr = event?.start_date
     ? new Date(event.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
+  const eventLocation = getEventLocation(event);
   const href = `/events/${event?.id || event?.slug || ""}`;
   return (
     <a href={href} style={{ textDecoration: "none" }}>
@@ -332,7 +342,7 @@ function DashEventCard({ event, index }) {
             {event?.title}
           </h3>
           <div style={{ marginTop: "auto" }}>
-            {event?.location && <div style={{ fontSize: 11, color: "#AAA", marginTop: 4 }}>📍 {event.location}</div>}
+            {eventLocation && <div style={{ fontSize: 11, color: "#AAA", marginTop: 4 }}>📍 {eventLocation}</div>}
           </div>
         </div>
       </div>
