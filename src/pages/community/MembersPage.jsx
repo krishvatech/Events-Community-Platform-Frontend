@@ -1611,12 +1611,6 @@ export default function MembersPage() {
     const id = m?.id;
     if (!id) return;
 
-    // If the user clicks their own profile card, go to "My Profile" (Edit) page
-    if (me?.id && String(me.id) === String(id)) {
-      navigate("/account/profile");
-      return;
-    }
-
     navigate(`/community/rich-profile/${id}`, { state: { user: m } });
   };
 
