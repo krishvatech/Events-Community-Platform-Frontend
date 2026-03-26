@@ -65,6 +65,9 @@ export default function GuestRegistrationModal({ open, onClose }) {
     localStorage.removeItem("guest_id");
     localStorage.removeItem("guest_email");
     localStorage.removeItem("guest_name");
+    localStorage.removeItem("guest_session_cache");
+    localStorage.removeItem("guest_job_title");
+    localStorage.removeItem("guest_company");
 
     try {
       window.dispatchEvent(new Event("auth:changed"));
@@ -151,7 +154,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
 
         const guestToken = localStorage.getItem("access_token");
         if (guestToken) {
-          await fetch(`${API_BASE}/auth/guest-register/link/`, {
+          const linkResponse = await fetch(`${API_BASE}/auth/guest-register/link/`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -159,6 +162,17 @@ export default function GuestRegistrationModal({ open, onClose }) {
             },
             body: JSON.stringify({ email: form.email.trim().toLowerCase() }),
           });
+
+          // Capture profile data from link response
+          if (linkResponse.ok) {
+            const linkData = await linkResponse.json();
+            const profile = linkData?.profile || {};
+
+            // Persist profile fields locally so UI updates immediately after rejoin
+            if (profile.job_title) localStorage.setItem("user_job_title", profile.job_title);
+            if (profile.company) localStorage.setItem("user_company", profile.company);
+            if (profile.full_name) localStorage.setItem("user_name", profile.full_name);
+          }
         }
 
         localStorage.setItem("guest_email", form.email.trim().toLowerCase());
