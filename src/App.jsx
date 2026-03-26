@@ -55,6 +55,7 @@ import MagicLinkPage from "./pages/MagicLinkPage.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import CmsBridge from "./pages/CmsBridge.jsx";
 import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
+import VirtualSpeakersPage from "./pages/VirtualSpeakersPage.jsx";
 import { CircularProgress } from "@mui/material";
 
 
@@ -233,6 +234,7 @@ const AppShell = () => {
             <Route path="carts" element={<AdminCarts />} />
             <Route path="users" element={<AdminStaffPage />} />
             <Route path="users/:userId/edit-profile" element={<AdminUserProfileEditPage />} />
+            <Route path="virtual-speakers" element={<VirtualSpeakersPage />} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />

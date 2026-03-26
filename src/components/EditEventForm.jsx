@@ -328,19 +328,23 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 p.participantType ||
                 (p.user_id || p.userId || p.user ? "staff" : "guest");
             const participantTypeNormalized = String(participantTypeRaw || "guest").toLowerCase();
-            const isNonStaffUser = p?.is_staff === false || p?.user?.is_staff === false;
-            const participantType =
-                participantTypeNormalized === "guest"
-                    ? "guest"
-                    : isNonStaffUser
-                        ? "user"
-                        : "staff";
+
+            let participantType = "guest";
+            if (participantTypeNormalized === "virtual" || p.virtual_speaker_id || p.virtualSpeakerId) {
+                participantType = "virtual";
+            } else if (participantTypeNormalized === "guest") {
+                participantType = "guest";
+            } else {
+                const isNonStaffUser = p?.is_staff === false || p?.user?.is_staff === false;
+                participantType = isNonStaffUser ? "user" : "staff";
+            }
+
             const firstName = p.first_name || p.firstName || p.user?.first_name || "";
             const lastName = p.last_name || p.lastName || p.user?.last_name || "";
             const fullName = p.name || p.guestName || `${firstName} ${lastName}`.trim();
             const role = String(p.role || "speaker").toLowerCase();
 
-            normalizedParticipants.push({
+            const normalized = {
                 id: p.id,
                 participantType,
                 role,
@@ -353,7 +357,21 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 bio: p.bio || p.bio_text || "",
                 imageUrl: p.profile_image_url || p.imageUrl || p.user?.profile?.image || "",
                 displayOrder: Number(p.display_order ?? p.displayOrder ?? 0),
-            });
+            };
+
+            // Add virtual speaker specific fields
+            if (participantType === "virtual") {
+                normalized.virtualSpeakerId = p.virtual_speaker_id || p.virtualSpeakerId || null;
+                // If we have a full virtual_speaker object, extract data
+                if (p.virtual_speaker) {
+                    normalized.name = p.virtual_speaker.name || fullName;
+                    normalized.imageUrl = p.virtual_speaker.profile_image_url || normalized.imageUrl;
+                } else {
+                    normalized.name = fullName;
+                }
+            }
+
+            normalizedParticipants.push(normalized);
         };
 
         if (Array.isArray(eventPayload?.participants)) {
@@ -743,16 +761,29 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
 
         // Always send participants so backend can replace existing list (including clearing with []).
-        const participantsData = participants.map((p, idx) => ({
-            type: p.participantType === "guest" ? "guest" : "staff",
-            user_id: p.participantType !== "guest" ? p.userId : undefined,
-            role: p.role,
-            name: p.participantType === "guest" ? p.guestName : undefined,
-            email: p.participantType === "guest" ? p.guestEmail : undefined,
-            bio: p.bio || "",
-            display_order: idx,
-            client_index: idx,
-        }));
+        const participantsData = participants.map((p, idx) => {
+            const data = {
+                type: p.participantType,
+                role: p.role,
+                display_order: idx,
+                client_index: idx,
+            };
+
+            if (p.participantType === "guest") {
+                data.name = p.guestName;
+                data.email = p.guestEmail;
+                data.bio = p.bio || "";
+            } else if (p.participantType === "virtual") {
+                data.virtual_speaker_id = p.virtualSpeakerId;
+                data.bio = p.bio || "";
+            } else {
+                // staff or user
+                data.user_id = p.userId;
+                data.bio = p.bio || "";
+            }
+
+            return data;
+        });
 
         // Backend expects JSON string for nested array
         fd.append("participants", JSON.stringify(participantsData));

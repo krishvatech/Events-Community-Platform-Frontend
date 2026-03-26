@@ -47,6 +47,7 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
+import MicRoundedIcon from "@mui/icons-material/MicRounded";
 // import ForumRoundedIcon from "@mui/icons-material/ForumRounded"; // TODO: Re-enable when Discussion Forum is ready
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
@@ -198,6 +199,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         manageItems = [
             { label: "My Posts", to: "/admin/posts", icon: ArticleRoundedIcon },
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
+            { label: "Virtual Speakers", to: "/admin/virtual-speakers", icon: MicRoundedIcon },
             { label: "My Resources", to: "/admin/resources", icon: LibraryBooksRoundedIcon },
             { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
@@ -219,6 +221,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
+            { label: "Virtual Speakers", to: "/admin/virtual-speakers", icon: MicRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },

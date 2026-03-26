@@ -24,6 +24,7 @@ import { toast } from "react-toastify";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import { listAdminUsers } from "../utils/api";
+import { listVirtualSpeakers } from "../services/virtualSpeakerService";
 
 const ParticipantForm = ({
   open,
@@ -44,12 +45,17 @@ const ParticipantForm = ({
   const [bio, setBio] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [selectedVirtualSpeaker, setSelectedVirtualSpeaker] = useState(null);
+  const [virtualSpeakerSearch, setVirtualSpeakerSearch] = useState("");
+  const [virtualSpeakerOptions, setVirtualSpeakerOptions] = useState([]);
+  const [loadingVirtualSpeakers, setLoadingVirtualSpeakers] = useState(false);
 
   // UI state
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const isAccountParticipant = participantType === "staff" || participantType === "user";
+  const isVirtualSpeaker = participantType === "virtual";
   const participantSelectLabel =
     participantType === "staff" ? "Select Staff Member *" : "Select Normal User *";
 
@@ -75,6 +81,12 @@ const ParticipantForm = ({
               `${initialData.firstName || ""} ${initialData.lastName || ""}`.trim(),
           });
           setUserSearch("");
+        } else if (initialData.participantType === "virtual") {
+          setSelectedVirtualSpeaker({
+            id: initialData.virtualSpeakerId,
+            name: initialData.name,
+          });
+          setVirtualSpeakerSearch("");
         } else {
           setGuestName(initialData.guestName || "");
           setGuestEmail(initialData.guestEmail || "");
@@ -123,6 +135,37 @@ const ParticipantForm = ({
     return () => clearTimeout(timer);
   }, [userSearch, participantType, isAccountParticipant]);
 
+  // Load virtual speakers on component mount and when searching
+  useEffect(() => {
+    if (!isVirtualSpeaker) {
+      setVirtualSpeakerOptions([]);
+      return;
+    }
+
+    if (!virtualSpeakerSearch.trim() && virtualSpeakerOptions.length === 0) {
+      // Load initial list
+      const loadInitialSpeakers = async () => {
+        setLoadingVirtualSpeakers(true);
+        try {
+          const response = await listVirtualSpeakers(1); // Use community ID from context if available
+          const speakers = Array.isArray(response) ? response : response.results || [];
+          setVirtualSpeakerOptions(speakers);
+        } catch (error) {
+          console.error("Failed to load virtual speakers:", error);
+        } finally {
+          setLoadingVirtualSpeakers(false);
+        }
+      };
+      loadInitialSpeakers();
+    } else if (virtualSpeakerSearch.trim()) {
+      // Filter existing speakers
+      const filtered = virtualSpeakerOptions.filter((s) =>
+        s.name.toLowerCase().includes(virtualSpeakerSearch.toLowerCase())
+      );
+      setVirtualSpeakerOptions(filtered);
+    }
+  }, [isVirtualSpeaker, virtualSpeakerSearch]);
+
   const resetForm = () => {
     setParticipantType("staff");
     setRole("speaker");
@@ -134,6 +177,10 @@ const ParticipantForm = ({
     setBio("");
     setImageFile(null);
     setImagePreview("");
+    setSelectedVirtualSpeaker(null);
+    setVirtualSpeakerSearch("");
+    setVirtualSpeakerOptions([]);
+    setLoadingVirtualSpeakers(false);
     setErrors({});
   };
 
@@ -146,6 +193,10 @@ const ParticipantForm = ({
           participantType === "staff"
             ? "Please select a staff member"
             : "Please select a normal user";
+      }
+    } else if (isVirtualSpeaker) {
+      if (!selectedVirtualSpeaker?.id) {
+        newErrors.speaker = "Please select a virtual speaker";
       }
     } else {
       if (!guestName.trim()) {
@@ -169,6 +220,8 @@ const ParticipantForm = ({
         return p.userId === selectedUser?.id && p.role === role;
       } else if (participantType === "guest" && p.participantType === "guest") {
         return p.guestEmail === guestEmail && p.role === role;
+      } else if (participantType === "virtual" && p.participantType === "virtual") {
+        return p.virtualSpeakerId === selectedVirtualSpeaker?.id && p.role === role;
       }
       return false;
     });
@@ -212,6 +265,10 @@ const ParticipantForm = ({
           selectedUser?.profile?.avatar_url ||
           selectedUser?.profile?.image_url ||
           "";
+      } else if (isVirtualSpeaker) {
+        participantData.virtualSpeakerId = selectedVirtualSpeaker.id;
+        participantData.name = selectedVirtualSpeaker.name;
+        participantData.imageUrl = selectedVirtualSpeaker.profile_image_url || "";
       } else {
         participantData.guestName = guestName.trim();
         participantData.guestEmail = guestEmail.trim();
@@ -283,7 +340,9 @@ const ParticipantForm = ({
               setGuestEmail("");
               setImageFile(null);
               setImagePreview("");
-              setErrors((prev) => ({ ...prev, user: "", name: "", email: "" }));
+              setSelectedVirtualSpeaker(null);
+              setVirtualSpeakerSearch("");
+              setErrors((prev) => ({ ...prev, user: "", name: "", email: "", speaker: "" }));
             }}
           >
             <FormControlLabel
@@ -292,6 +351,7 @@ const ParticipantForm = ({
               label="Staff Member"
             />
             <FormControlLabel value="user" control={<Radio />} label="Normal User" />
+            <FormControlLabel value="virtual" control={<Radio />} label="Virtual Speaker" />
             <FormControlLabel value="guest" control={<Radio />} label="Guest" />
           </RadioGroup>
         </FormControl>
@@ -351,6 +411,69 @@ const ParticipantForm = ({
                   ),
                 }}
               />
+            )}
+          />
+        )}
+
+        {/* Virtual Speaker Selection */}
+        {isVirtualSpeaker && (
+          <Autocomplete
+            freeSolo={false}
+            options={virtualSpeakerOptions}
+            loading={loadingVirtualSpeakers}
+            value={selectedVirtualSpeaker}
+            getOptionLabel={(option) => {
+              if (typeof option === "string") return option;
+              return option?.name || "";
+            }}
+            filterOptions={(x) => x} // Disable client-side filtering
+            inputValue={virtualSpeakerSearch}
+            onInputChange={(event, newInputValue) => {
+              setVirtualSpeakerSearch(newInputValue);
+              if (!newInputValue) setSelectedVirtualSpeaker(null);
+            }}
+            onChange={(event, newValue) => {
+              setSelectedVirtualSpeaker(newValue && typeof newValue === "object" ? newValue : null);
+              if (newValue && typeof newValue === "object") {
+                setErrors((prev) => ({ ...prev, speaker: "" }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Select Virtual Speaker *"
+                placeholder="Search by name"
+                error={!!errors.speaker}
+                helperText={errors.speaker}
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {loadingVirtualSpeakers ? (
+                        <CircularProgress color="inherit" size={20} />
+                      ) : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            renderOption={(props, option) => (
+              <Box {...props} component="li">
+                <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
+                  {option.profile_image_url && (
+                    <Avatar src={option.profile_image_url} sx={{ width: 32, height: 32 }} />
+                  )}
+                  <Box>
+                    <Typography variant="body2">{option.name}</Typography>
+                    {option.job_title && (
+                      <Typography variant="caption" color="textSecondary">
+                        {option.job_title}
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
+              </Box>
             )}
           />
         )}

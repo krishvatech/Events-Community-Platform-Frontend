@@ -792,16 +792,29 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
     // Add participants if any
     if (participants.length > 0) {
-      const participantsData = participants.map((p, idx) => ({
-        type: p.participantType === "guest" ? "guest" : "staff",
-        user_id: p.participantType !== "guest" ? p.userId : undefined,
-        role: p.role,
-        name: p.participantType === "guest" ? p.guestName : undefined,
-        email: p.participantType === "guest" ? p.guestEmail : undefined,
-        bio: p.bio || "",
-        display_order: idx,
-        client_index: idx,
-      }));
+      const participantsData = participants.map((p, idx) => {
+        const data = {
+          type: p.participantType,
+          role: p.role,
+          display_order: idx,
+          client_index: idx,
+        };
+
+        if (p.participantType === "guest") {
+          data.name = p.guestName;
+          data.email = p.guestEmail;
+          data.bio = p.bio || "";
+        } else if (p.participantType === "virtual") {
+          data.virtual_speaker_id = p.virtualSpeakerId;
+          data.bio = p.bio || "";
+        } else {
+          // staff or user
+          data.user_id = p.userId;
+          data.bio = p.bio || "";
+        }
+
+        return data;
+      });
 
       console.log("Sending participants data:", participantsData); // Debug log
 

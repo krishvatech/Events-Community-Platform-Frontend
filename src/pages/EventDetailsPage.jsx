@@ -205,12 +205,23 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
                   {person.display_name}
                 </Box>
               </Box>
-              <Chip
-                label={person.role_label || "Participant"}
-                size="small"
-                color={person.role === "host" ? "primary" : person.role === "speaker" ? "success" : "secondary"}
-                sx={{ height: 22, fontSize: "0.7rem" }}
-              />
+              <Box className="flex gap-1">
+                <Chip
+                  label={person.role_label || "Participant"}
+                  size="small"
+                  color={person.role === "host" ? "primary" : person.role === "speaker" ? "success" : "secondary"}
+                  sx={{ height: 22, fontSize: "0.7rem" }}
+                />
+                {person.participant_type && (
+                  <Chip
+                    label={person.participant_type_label || person.participant_type}
+                    size="small"
+                    variant="outlined"
+                    color={person.participant_type === "virtual" ? "info" : "default"}
+                    sx={{ height: 22, fontSize: "0.7rem" }}
+                  />
+                )}
+              </Box>
             </Box>
           );
 
