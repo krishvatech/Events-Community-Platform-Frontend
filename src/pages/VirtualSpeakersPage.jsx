@@ -14,8 +14,6 @@ import {
   DialogContent,
   DialogActions,
   Chip,
-  useTheme,
-  useMediaQuery,
   Table,
   TableBody,
   TableCell,
@@ -38,9 +36,6 @@ import VirtualSpeakerForm from '../components/VirtualSpeakerForm';
 import ConvertVirtualSpeakerModal from '../components/ConvertVirtualSpeakerModal';
 
 const VirtualSpeakersPage = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
   // Get community ID from URL or context
   const urlParams = new URLSearchParams(window.location.search);
   const communityId = parseInt(urlParams.get('community_id')) || 1;
@@ -54,6 +49,13 @@ const VirtualSpeakersPage = () => {
   const [convertingSpeaker, setConvertingSpeaker] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [speakerToDelete, setSpeakerToDelete] = useState(null);
+
+  // Get current user
+  const [user, setUser] = useState(null);
+  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    setUser(userData);
+  }, []);
 
   // Load speakers
   const loadSpeakers = useCallback(async () => {
@@ -158,18 +160,20 @@ const VirtualSpeakersPage = () => {
         <Box
           sx={{
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mb: 3,
-            flexDirection: isMobile ? 'column' : 'row',
+            flexWrap: 'wrap',
+            alignItems: { xs: 'flex-start', sm: 'center' },
             gap: 2,
+            mb: 3,
           }}
         >
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 600 }}>
+          <Avatar sx={{ bgcolor: '#0ea5a4' }}>
+            {(user?.first_name || 'A')[0].toUpperCase()}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
               Virtual Speakers
             </Typography>
-            <Typography variant="body2" color="textSecondary">
+            <Typography sx={{ color: '#64748b' }}>
               Create and manage reusable speaker profiles
             </Typography>
           </Box>
@@ -177,6 +181,12 @@ const VirtualSpeakersPage = () => {
             variant="contained"
             startIcon={<AddRoundedIcon />}
             onClick={handleCreateNew}
+            sx={{
+              width: { xs: '100%', sm: 'auto' },
+              textTransform: 'none',
+              backgroundColor: '#10b8a6',
+              '&:hover': { backgroundColor: '#0ea5a4' },
+            }}
           >
             Create Speaker
           </Button>
