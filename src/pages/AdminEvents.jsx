@@ -516,6 +516,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   // Helpers imported from eventUtils
   const slugifyLocal = (s) =>
     (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const sanitizeSlugInput = (s) =>
+    (s || "").toLowerCase().replace(/\//g, "-").replace(/\s+/g, "-").replace(/^-+|-+$/g, "");
   const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);
 
   // ✅ Default schedule on open: current hour (HH:00) → +2 hours
@@ -1010,7 +1012,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               InputLabelProps={{ shrink: true }}
               value={slug}
               onChange={(e) => {
-                setSlug(slugifyLocal(e.target.value));
+                setSlug(sanitizeSlugInput(e.target.value));
                 setErrors((prev) => ({ ...prev, slug: "" }));
               }}
               fullWidth
@@ -1023,7 +1025,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     ? "Slug is available."
                     : slugStatus.available === false
                       ? "This slug is already taken."
-                      : "Use lowercase letters, numbers, and hyphens.")
+                      : "Lowercase, numbers, special chars (@$&#) allowed. No forward slashes.")
               }
               sx={{ mb: 2 }}
             />
@@ -2895,7 +2897,7 @@ function EventsPage() {
     if (!ev?.id) return;
     setHostingId(ev.id);
     try {
-      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=publisher`;
+      const livePath = `/live/${encodeURIComponent(ev.slug || ev.id)}?id=${ev.id}&role=publisher`;
       navigate(livePath);
     } catch (e) {
       setErrMsg(e?.message || "Unable to start live meeting.");
@@ -2914,7 +2916,7 @@ function EventsPage() {
       // Determine role: if the user's registration marks them as host, join as publisher
       const myReg = myRegistrations?.[ev.id];
       const joinRole = myReg?.is_host ? "publisher" : "audience";
-      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${joinRole}`;
+      const livePath = `/live/${encodeURIComponent(ev.slug || ev.id)}?id=${ev.id}&role=${joinRole}`;
       navigate(livePath, {
         state: {
           event: ev,

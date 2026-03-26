@@ -740,7 +740,7 @@ export default function EventDetailsPage() {
   const handleRegister = async () => {
     if (!event?.id) return;
     if (!token) {
-      navigate(`/signin?next=/events/${slug}`);
+      navigate(`/signin?next=/events/${encodeURIComponent(slug)}`);
       return;
     }
 
@@ -959,7 +959,7 @@ export default function EventDetailsPage() {
         : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
   const isHost = Boolean(registration?.is_host);
-  const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
+  const livePath = `/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
   const isPostEventLounge = isPostEventLoungeOpen(event);
   const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
   const isLive = status === "live" && event.status !== "ended";
@@ -1414,7 +1414,7 @@ export default function EventDetailsPage() {
                                   // Guest has JWT token - can join immediately
                                   return (
                                     <Button
-                                      onClick={() => navigate(`/live/${event.slug || event.id}?id=${event.id}&role=audience`)}
+                                      onClick={() => navigate(`/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=audience`)}
                                       variant="contained"
                                       sx={{
                                         textTransform: "none",

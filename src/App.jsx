@@ -91,7 +91,7 @@ function EventIdRedirect() {
       })
       .then(event => {
         if (event.slug) {
-          navigate(`/events/${event.slug}`, { replace: true });
+          navigate(`/events/${encodeURIComponent(event.slug)}`, { replace: true });
         } else {
           navigate('/events', { replace: true });
         }

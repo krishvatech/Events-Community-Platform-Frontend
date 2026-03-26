@@ -49,7 +49,8 @@ import {
     API_ROOT,
     COUNTRY_OPTIONS,
     getSelectedCountry,
-    slugifyLocal
+    slugifyLocal,
+    sanitizeSlugInput
 } from "../utils/eventUtils";
 
 dayjs.extend(utc);
@@ -863,13 +864,13 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 placeholder="enter-event-slug"
                 value={slug}
                 onChange={(e) => {
-                    setSlug(slugifyLocal(e.target.value));
+                    setSlug(sanitizeSlugInput(e.target.value));
                     setErrors((prev) => ({ ...prev, slug: "" }));
                 }}
                 fullWidth
                 className="mb-3"
                 error={!!errors.slug}
-                helperText={errors.slug || "Use lowercase letters, numbers, and hyphens."}
+                helperText={errors.slug || "Lowercase letters, numbers, special chars (@$&) allowed. No forward slashes."}
             />
 
             <TextField

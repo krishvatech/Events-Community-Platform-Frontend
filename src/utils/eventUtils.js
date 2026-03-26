@@ -130,3 +130,11 @@ export const slugifyLocal = (s) =>
         .trim()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
+
+export const sanitizeSlugInput = (s) =>
+    (s || "")
+        .toLowerCase()
+        .replace(/\//g, "-")     // forward slash can never appear in URL paths
+        .replace(/\s+/g, "-")    // spaces → hyphens
+        .replace(/^-+|-+$/g, ""); // trim leading/trailing hyphens
+// Allows: @, #, $, &, ?, !, (, ), *, +, ;, :, ~, ' and other special chars
