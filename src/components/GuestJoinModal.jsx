@@ -21,11 +21,13 @@ const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path
 /**
  * GuestJoinModal
  * Allows unauthenticated users to join an event as guests.
- * Collects minimal info: name, email, job title
- * Issues a guest JWT token for session access.
+ * Two-step flow:
+ * 1. Collect name, email, job title → send OTP
+ * 2. Verify OTP → receive guest JWT token
  */
 export default function GuestJoinModal({ open, onClose, event, livePath }) {
   const navigate = useNavigate();
+  const [step, setStep] = useState("form"); // "form" or "otp"
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -33,9 +35,11 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
     job_title: "",
     company_name: "",
   });
+  const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isReturningGuest, setIsReturningGuest] = useState(false);
+  const [otpSentEmail, setOtpSentEmail] = useState("");
 
   // Detect and pre-fill form for returning guest on modal open
   useEffect(() => {
@@ -124,6 +128,7 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
 
     setLoading(true);
     try {
+      // Step 1: Send OTP to email
       const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/guest-join/`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,11 +154,67 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
           setError("You already have an account for this event. Please sign in.");
           return;
         }
-        throw new Error(data.error || data.message || text || `Failed to join as guest (${res.status})`);
+        throw new Error(data.error || data.message || text || `Failed to send verification code (${res.status})`);
+      }
+
+      if (!data?.otp_required) {
+        throw new Error("OTP was not requested by server.");
+      }
+
+      // Successfully sent OTP - move to verification step
+      setOtpSentEmail(form.email.trim().toLowerCase());
+      setStep("otp");
+      setOtpCode("");
+      console.debug("[GuestJoinModal] OTP sent to:", form.email);
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+      console.error("Guest join error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    setError("");
+    if (!otpCode.trim()) {
+      setError("Please enter the verification code");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Step 2: Verify OTP and get JWT
+      const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/guest-verify-otp/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: otpSentEmail,
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          otp_code: otpCode.trim(),
+          job_title: form.job_title.trim(),
+          company: form.company_name.trim(),
+        }),
+      });
+
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        if (data.error === "account_exists") {
+          setError("You already have an account for this event. Please sign in.");
+          return;
+        }
+        throw new Error(data.error || data.message || text || `Failed to verify code (${res.status})`);
       }
 
       if (!data?.token) {
-        throw new Error("Guest join succeeded but no token was returned.");
+        throw new Error("OTP verification succeeded but no token was returned.");
       }
 
       // Store guest session in localStorage
@@ -162,30 +223,15 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
       localStorage.setItem("guest_email", data.email);
       localStorage.setItem("guest_name", data.name);
       localStorage.setItem("guest_id", String(data.guest_id));
-      // Store company and job_title from API response (ensures sync with backend)
       localStorage.setItem("guest_company", data.company || form.company_name.trim());
       localStorage.setItem("guest_job_title", data.job_title || form.job_title.trim());
-
-      // ✅ DEBUG: Log stored values
-      console.debug("[GuestJoinModal] API Response:", {
-        company: data.company,
-        job_title: data.job_title,
-      });
-      console.debug("[GuestJoinModal] Form values:", {
-        company_name: form.company_name.trim(),
-        job_title: form.job_title.trim(),
-      });
-      console.debug("[GuestJoinModal] Stored in localStorage:", {
-        guest_company: localStorage.getItem("guest_company"),
-        guest_job_title: localStorage.getItem("guest_job_title"),
-      });
 
       // Store persistent guest session cache (survives token expiry)
       const cacheData = {
         event_id: event.id,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
-        email: form.email.trim().toLowerCase(),
+        email: otpSentEmail,
         job_title: form.job_title.trim(),
         company_name: form.company_name.trim(),
       };
@@ -199,10 +245,56 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
       navigate(livePath, { state: { event } });
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
-      console.error("Guest join error:", err);
+      console.error("OTP verification error:", err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResendOTP = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/guest-resend-otp/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: otpSentEmail,
+          first_name: form.first_name.trim(),
+        }),
+      });
+
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        // 429 = rate limited
+        if (res.status === 429 && data.seconds_remaining) {
+          throw new Error(`Please wait ${data.seconds_remaining} seconds before requesting another code`);
+        }
+        throw new Error(data.error || data.message || `Failed to resend code (${res.status})`);
+      }
+
+      setOtpCode("");
+      console.debug("[GuestJoinModal] OTP resent to:", otpSentEmail);
+    } catch (err) {
+      setError(err.message || "Failed to resend code. Please try again.");
+      console.error("Resend OTP error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToForm = () => {
+    setStep("form");
+    setOtpCode("");
+    setError("");
+    setOtpSentEmail("");
   };
 
   const handleClearGuestSession = () => {
@@ -215,6 +307,9 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
   const handleModalClose = () => {
     setIsReturningGuest(false);
     setError("");
+    setStep("form");
+    setOtpCode("");
+    setOtpSentEmail("");
     onClose();
   };
 
@@ -230,7 +325,9 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
 
   return (
     <Dialog open={open} onClose={handleModalClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Join Event as Guest</DialogTitle>
+      <DialogTitle>
+        {step === "form" ? "Join Event as Guest" : "Verify Your Email"}
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           {error && (
@@ -239,124 +336,193 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
             </Alert>
           )}
 
-          {isReturningGuest && (
-            <Alert severity="info" sx={{ py: 0.5 }}>
-              Welcome back! Your details have been pre-filled.
-            </Alert>
-          )}
+          {step === "form" ? (
+            <>
+              {isReturningGuest && (
+                <Alert severity="info" sx={{ py: 0.5 }}>
+                  Welcome back! Your details have been pre-filled.
+                </Alert>
+              )}
 
-          <Typography variant="body2" color="textSecondary">
-            {isReturningGuest
-              ? "Continue your event experience or update your details."
-              : "Experience the event first, then register to save your connections."}
-          </Typography>
+              <Typography variant="body2" color="textSecondary">
+                {isReturningGuest
+                  ? "Continue your event experience or update your details."
+                  : "Experience the event first, then register to save your connections."}
+              </Typography>
 
-          <Stack direction="row" spacing={1}>
-            <TextField
-              label="First Name"
-              required
-              fullWidth
-              size="small"
-              value={form.first_name}
-              onChange={handleInputChange("first_name")}
-              disabled={loading}
-            />
-            <TextField
-              label="Last Name"
-              required
-              fullWidth
-              size="small"
-              value={form.last_name}
-              onChange={handleInputChange("last_name")}
-              disabled={loading}
-            />
-          </Stack>
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  label="First Name"
+                  required
+                  fullWidth
+                  size="small"
+                  value={form.first_name}
+                  onChange={handleInputChange("first_name")}
+                  disabled={loading}
+                />
+                <TextField
+                  label="Last Name"
+                  required
+                  fullWidth
+                  size="small"
+                  value={form.last_name}
+                  onChange={handleInputChange("last_name")}
+                  disabled={loading}
+                />
+              </Stack>
 
-          <TextField
-            label="Email"
-            type="email"
-            required
-            fullWidth
-            size="small"
-            value={form.email}
-            onChange={handleInputChange("email")}
-            disabled={loading}
-          />
+              <TextField
+                label="Email"
+                type="email"
+                required
+                fullWidth
+                size="small"
+                value={form.email}
+                onChange={handleInputChange("email")}
+                disabled={loading}
+              />
 
-          <TextField
-            label="Current Role / Job Title"
-            fullWidth
-            size="small"
-            placeholder="e.g., Software Engineer"
-            value={form.job_title}
-            onChange={handleInputChange("job_title")}
-            disabled={loading}
-          />
+              <TextField
+                label="Current Role / Job Title"
+                fullWidth
+                size="small"
+                placeholder="e.g., Software Engineer"
+                value={form.job_title}
+                onChange={handleInputChange("job_title")}
+                disabled={loading}
+              />
 
-          <TextField
-            label="Company Name"
-            fullWidth
-            size="small"
-            placeholder="e.g., Acme Corporation"
-            value={form.company_name}
-            onChange={handleInputChange("company_name")}
-            disabled={loading}
-          />
+              <TextField
+                label="Company Name"
+                fullWidth
+                size="small"
+                placeholder="e.g., Acme Corporation"
+                value={form.company_name}
+                onChange={handleInputChange("company_name")}
+                disabled={loading}
+              />
 
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={handleGuestJoin}
-            disabled={loading || !form.first_name || !form.last_name || !form.email}
-            sx={{ py: 1 }}
-          >
-            {loading ? (
-              <CircularProgress size={20} color="inherit" />
-            ) : isReturningGuest ? (
-              "Continue as Guest"
-            ) : (
-              "Join as Guest"
-            )}
-          </Button>
-
-          {isReturningGuest && (
-            <Typography variant="caption" align="center" sx={{ display: "block", mt: -1 }}>
-              Not you?{" "}
-              <Box
-                component="span"
-                onClick={handleClearGuestSession}
-                sx={{
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                  color: "primary.main",
-                  "&:hover": { fontWeight: 500 },
-                }}
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={handleGuestJoin}
+                disabled={loading || !form.first_name || !form.last_name || !form.email}
+                sx={{ py: 1 }}
               >
-                Clear and start fresh
-              </Box>
-            </Typography>
+                {loading ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : isReturningGuest ? (
+                  "Continue as Guest"
+                ) : (
+                  "Send Verification Code"
+                )}
+              </Button>
+
+              {isReturningGuest && (
+                <Typography variant="caption" align="center" sx={{ display: "block", mt: -1 }}>
+                  Not you?{" "}
+                  <Box
+                    component="span"
+                    onClick={handleClearGuestSession}
+                    sx={{
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      color: "primary.main",
+                      "&:hover": { fontWeight: 500 },
+                    }}
+                  >
+                    Clear and start fresh
+                  </Box>
+                </Typography>
+              )}
+
+              <Divider sx={{ my: 1 }}>or</Divider>
+
+              <Stack direction="row" spacing={1}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={handleSignInClick}
+                  disabled={loading}
+                >
+                  Sign In
+                </Button>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={handleSignUpClick}
+                  disabled={loading}
+                >
+                  Create Account
+                </Button>
+              </Stack>
+            </>
+          ) : (
+            <>
+              <Typography variant="body2" color="textSecondary">
+                A verification code has been sent to <strong>{otpSentEmail}</strong>.
+                Please enter it below to confirm your email.
+              </Typography>
+
+              <TextField
+                label="Verification Code"
+                placeholder="Enter 6-digit code"
+                inputProps={{ maxLength: 6, style: { textAlign: "center", letterSpacing: "0.25em", fontSize: "1.5em" } }}
+                fullWidth
+                size="small"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                disabled={loading}
+                autoFocus
+              />
+
+              <Typography variant="caption" color="textSecondary">
+                This code expires in 10 minutes.
+              </Typography>
+
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={handleVerifyOTP}
+                disabled={loading || otpCode.length !== 6}
+                sx={{ py: 1 }}
+              >
+                {loading ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  "Verify Code"
+                )}
+              </Button>
+
+              <Typography variant="caption" align="center" sx={{ display: "block" }}>
+                Didn't receive the code?{" "}
+                <Box
+                  component="span"
+                  onClick={handleResendOTP}
+                  sx={{
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    color: "primary.main",
+                    "&:hover": { fontWeight: 500 },
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  Resend Code
+                </Box>
+              </Typography>
+
+              <Button
+                variant="text"
+                fullWidth
+                onClick={handleBackToForm}
+                disabled={loading}
+                size="small"
+              >
+                ← Back to Form
+              </Button>
+            </>
           )}
-
-          <Divider sx={{ my: 1 }}>or</Divider>
-
-          <Stack direction="row" spacing={1}>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={handleSignInClick}
-              disabled={loading}
-            >
-              Sign In
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={handleSignUpClick}
-              disabled={loading}
-            >
-              Create Account
-            </Button>
-          </Stack>
         </Stack>
       </DialogContent>
     </Dialog>
