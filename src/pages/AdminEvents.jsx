@@ -796,7 +796,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (participants.length > 0) {
       const participantsData = participants.map((p, idx) => {
         const data = {
-          type: p.participantType,
+          type: p.participantType === "user" ? "staff" : p.participantType,
           role: p.role,
           display_order: idx,
           client_index: idx,

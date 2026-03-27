@@ -764,7 +764,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         // Always send participants so backend can replace existing list (including clearing with []).
         const participantsData = participants.map((p, idx) => {
             const data = {
-                type: p.participantType,
+                type: p.participantType === "user" ? "staff" : p.participantType,
                 role: p.role,
                 display_order: idx,
                 client_index: idx,
