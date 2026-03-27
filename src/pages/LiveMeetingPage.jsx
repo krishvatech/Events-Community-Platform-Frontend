@@ -7302,12 +7302,26 @@ export default function NewLiveMeeting() {
           // Handle broadcast messages (kick/ban)
           const payload = msg.data;
           if (payload.type === "kicked") {
+            // Clear guest session if this is a guest user
+            if (localStorage.getItem("is_guest") === "true") {
+              ["guest_token", "guest_id", "is_guest", "guest_email", "guest_name", "guest_attendee", "access_token"].forEach(k => localStorage.removeItem(k));
+              window.dispatchEvent(new Event("auth:changed"));
+            }
             // alert("You have been kicked from the meeting by the host."); // Removed intrusive alert
             showSnackbar("You have been kicked from the meeting by the host.", "error");
             navigate(`/community/${currentCommunitySlug}/events/${eventId}`);
           } else if (payload.type === "banned") {
+            // Clear guest session if this is a guest user
+            if (localStorage.getItem("is_guest") === "true") {
+              ["guest_token", "guest_id", "is_guest", "guest_email", "guest_name", "guest_attendee", "access_token"].forEach(k => localStorage.removeItem(k));
+              window.dispatchEvent(new Event("auth:changed"));
+            }
             setIsBanned(true);
             if (dyteMeeting) dyteMeeting.leaveRoom();
+          } else if (payload.type === "participant_kicked" || payload.type === "participant_banned") {
+            // Refresh participant list when someone is kicked/banned
+            console.log(`[MainSocket] Participant ${payload.type}:`, payload.kicked_user_id || payload.banned_user_id);
+            setParticipantsTick((v) => v + 1);  // Triggers participant list re-fetch
           }
         } else if (msg.type === "meeting_started") {
           // ✅ NEW: Handle meeting start notification from backend
