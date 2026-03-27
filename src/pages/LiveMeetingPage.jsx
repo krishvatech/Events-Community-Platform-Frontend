@@ -143,6 +143,7 @@ import { useClearMediaCache } from "../hooks/useClearMediaCache.js";
 import GuestRegistrationModal from "../components/GuestRegistrationModal.jsx";
 import GuestRestrictionOverlay from "../components/GuestRestrictionOverlay.jsx";
 import GuestNetworkingModal from "../components/GuestNetworkingModal.jsx";
+import GuestNetworkingWaitingScreen from "../components/GuestNetworkingWaitingScreen.jsx";
 import {
   VIRTUAL_BG_FEATURE_ENABLED,
   VIRTUAL_BG_PRESETS,
@@ -2501,6 +2502,13 @@ export default function NewLiveMeeting() {
   const [showNetworkingPrompt, setShowNetworkingPrompt] = useState(false); // Show/hide modal
   const [networkingSessionId, setNetworkingSessionId] = useState(null); // Current session ID
   const [showGuestNetworkingModal, setShowGuestNetworkingModal] = useState(false); // Guest networking restriction modal
+  const [guestSkippedNetworking, setGuestSkippedNetworking] = useState(false); // Guest chose "Maybe Later" — show waiting screen
+  const guestSkippedNetworkingRef = useRef(false); // ✅ For use in async WebSocket handler
+
+  // ✅ Sync guestSkippedNetworking state with ref for use in async handlers
+  useEffect(() => {
+    guestSkippedNetworkingRef.current = guestSkippedNetworking;
+  }, [guestSkippedNetworking]);
 
   const [lastMessage, setLastMessage] = useState(null);
   const [isPostEventLounge, setIsPostEventLounge] = useState(false); // ✅ Track post-event lounge mode
@@ -7415,6 +7423,13 @@ export default function NewLiveMeeting() {
           // Always execute state cleanup when message arrives
           setShowNetworkingPrompt(false);
           setShowGuestNetworkingModal(false);
+
+          // ✅ NEW: Reset guest networking waiting room state
+          if (guestSkippedNetworkingRef.current) {
+            setGuestSkippedNetworking(false);
+            showSnackbar("Networking session has ended. You can now rejoin the main meeting.", "success");
+          }
+
           setNetworkingSessionId(null);
           setShowSpeedNetworking(false);
           setLoungeOpen(false);
@@ -17435,7 +17450,17 @@ export default function NewLiveMeeting() {
     );
   }
 
-
+  // ✅ NEW: Show guest networking waiting screen if guest chose "Maybe Later"
+  if (guestSkippedNetworking && networkingSessionId && isGuest && !isBreakout) {
+    return (
+      <GuestNetworkingWaitingScreen
+        onSignUp={() => {
+          setGuestSkippedNetworking(false);
+          setGuestRegModalOpen(true);
+        }}
+      />
+    );
+  }
 
   if (waitingRoomActive && !isBreakout) {
     return (
@@ -17828,7 +17853,10 @@ export default function NewLiveMeeting() {
         {/* Guest Networking Restriction Modal */}
         <GuestNetworkingModal
           open={showGuestNetworkingModal}
-          onClose={() => setShowGuestNetworkingModal(false)}
+          onClose={() => {
+            setShowGuestNetworkingModal(false);
+            setGuestSkippedNetworking(true);
+          }}
           onSignUp={() => {
             setShowGuestNetworkingModal(false);
             setGuestRegModalOpen(true);
