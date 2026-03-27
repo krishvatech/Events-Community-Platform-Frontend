@@ -77,7 +77,7 @@ import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
 // ---- API helpers ----
-const RAW = import.meta.env.VITE_API_ROOT_URL || "";
+const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 const API_ORIGIN = API_ROOT.replace(/\/api$/, "");
