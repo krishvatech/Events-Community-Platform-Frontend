@@ -106,6 +106,25 @@ function FadeIn({ children, delay = 0 }) {
 // ── Internal Topbar ───────────────────────────────────────────────────────────
 function DashTopbar({ notifCount, messageCount, isAdmin }) {
   const navigate = useNavigate();
+  const isOwner = isOwnerUser();
+  const isStaff = isStaffUser();
+
+  const handleMessagesClick = () => {
+    if (isOwner || isStaff) {
+      navigate("/admin/messages");
+    } else {
+      navigate("/community?view=messages");
+    }
+  };
+
+  const handleNotificationsClick = () => {
+    if (isOwner) {
+      navigate("/admin/notifications");
+    } else {
+      navigate("/community?view=notify");
+    }
+  };
+
   return (
     <div style={{
       height: 50, background: "#fff", borderBottom: `1px solid ${BORDER}`,
@@ -130,7 +149,7 @@ function DashTopbar({ notifCount, messageCount, isAdmin }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
         <button
-          onClick={() => navigate("/community?view=messages")}
+          onClick={handleMessagesClick}
           style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <Badge badgeContent={messageCount || 0} color="error" sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, padding: "0 3px" } }}>
@@ -138,7 +157,7 @@ function DashTopbar({ notifCount, messageCount, isAdmin }) {
           </Badge>
         </button>
         <button
-          onClick={() => navigate("/community?view=notify")}
+          onClick={handleNotificationsClick}
           style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <Badge badgeContent={notifCount || 0} color="error" sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, padding: "0 3px" } }}>
@@ -165,12 +184,45 @@ function DashTopbar({ notifCount, messageCount, isAdmin }) {
   );
 }
 
+// ── Format missing sections into readable text ────────────────────────────────
+function formatMissingSections(missing) {
+  if (!missing || missing.length === 0) return "Add to your profile to stand out to M&A peers.";
+
+  const sectionLabels = {
+    bio: "bio",
+    skills: "skills",
+    experience: "experience",
+    education: "education",
+    certifications: "certifications",
+    memberships: "memberships",
+    email: "email",
+    phone: "phone numbers",
+    social_links: "social links",
+    websites: "websites",
+  };
+
+  const labels = missing.map(s => sectionLabels[s] || s).filter(Boolean);
+
+  if (labels.length === 0) return "Add to your profile to stand out to M&A peers.";
+  if (labels.length === 1) {
+    return `Add your ${labels[0]} to stand out to M&A peers.`;
+  } else if (labels.length === 2) {
+    return `Add your ${labels[0]} and ${labels[1]} to stand out to M&A peers.`;
+  } else {
+    const lastLabel = labels.pop();
+    return `Add your ${labels.join(", ")}, and ${lastLabel} to stand out to M&A peers.`;
+  }
+}
+
 // ── Profile Completion Banner ─────────────────────────────────────────────────
-function ProfileBanner({ completion, onDismiss }) {
+function ProfileBanner({ completion, onDismiss, profile }) {
   const r = 22;
   const circ = 2 * Math.PI * r;
   const filled = circ * (completion / 100);
   const gap = circ - filled;
+  const missing = profile?.missing_sections || [];
+  const helperText = formatMissingSections(missing);
+
   return (
     <div style={{
       margin: "0 40px 14px",
@@ -191,7 +243,7 @@ function ProfileBanner({ completion, onDismiss }) {
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: N, marginBottom: 2, fontFamily: FONT }}>Complete your profile</div>
         <div style={{ fontSize: 12, color: "#777", lineHeight: 1.5, fontFamily: FONT }}>
-          Add your experience, photo, and bio to stand out to M&A peers.
+          {helperText}
         </div>
       </div>
       <a href="/account/profile"
@@ -559,7 +611,7 @@ export default function DashboardPage() {
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         {showProfileBanner && !loading && profileCompletion < 100 && (
           <FadeIn delay={80}>
-            <ProfileBanner completion={profileCompletion || 40} onDismiss={() => setShowProfileBanner(false)} />
+            <ProfileBanner completion={profileCompletion || 40} onDismiss={() => setShowProfileBanner(false)} profile={user?.profile} />
           </FadeIn>
         )}
         {showVerifyBanner && !loading && !kycApproved && (

@@ -48,7 +48,6 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import RichProfile from "./community/RichProfile";
-import EmailAliasManagement from "../components/EmailAliasManagement";
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -3940,10 +3939,6 @@ export default function ProfilePage() {
                           ) : null}
                         </Stack>
                       </SectionCard>
-
-                      <Box sx={{ mt: 2 }}>
-                        <EmailAliasManagement accessToken={localStorage.getItem("access_token")} />
-                      </Box>
 
                       <SectionCard
                         sx={{ mt: 2 }}
