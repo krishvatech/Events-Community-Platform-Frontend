@@ -87,6 +87,20 @@ export default function MainRoomPeek({
 
             const loungeKeySet = new Set(loungeParticipantKeys || []);
 
+            // ✅ PRIORITY 0: Always prioritize host first (host should always be visible in main room peek)
+            const host = allParticipants.find(p =>
+                p.presetName?.toLowerCase().includes('host') ||
+                p.presetName?.toLowerCase().includes('admin') ||
+                p.presetName?.toLowerCase().includes('webinar_presenter') ||
+                p.presetName?.toLowerCase().includes('publisher')
+            );
+
+            if (host) {
+                console.log('[MainRoomPeek] Using host:', host.name);
+                setPrimaryParticipant(host);
+                return;
+            }
+
             // ✅ PRIORITY 1: Use pinned participant if available and in main room
             if (pinnedParticipantId) {
                 console.log('[MainRoomPeek] Looking for pinned participant:', pinnedParticipantId);
@@ -126,21 +140,6 @@ export default function MainRoomPeek({
                     setPrimaryParticipant(activeSpeaker);
                     return;
                 }
-            }
-
-            // ✅ PRIORITY 4: Find the host/admin (only if not in lounge)
-            const host = allParticipants.find(p =>
-                !loungeKeySet.has(getParticipantUserKey(p)) &&
-                (p.presetName?.toLowerCase().includes('host') ||
-                    p.presetName?.toLowerCase().includes('admin') ||
-                    p.presetName?.toLowerCase().includes('webinar_presenter') ||
-                    p.presetName?.toLowerCase().includes('publisher'))
-            );
-
-            if (host) {
-                console.log('[MainRoomPeek] Using host:', host.name);
-                setPrimaryParticipant(host);
-                return;
             }
 
             // ✅ PRIORITY 5: Fallback to first participant with video enabled (not in lounge)
