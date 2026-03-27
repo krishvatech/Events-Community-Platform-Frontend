@@ -48,6 +48,7 @@ import AdminCarts from "./pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
 import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
 import { useParams, useNavigate } from "react-router-dom";
+import { RequireSuperAdmin, RequireStaffOrAdmin } from "./components/RoleBasedRoute.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
 import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
@@ -223,8 +224,8 @@ const AppShell = () => {
             <Route path="messages" element={<AdminMessagesPage />} />
             <Route path="notifications" element={<AdminNotificationsPage />} />
             <Route path="settings" element={<AdminSettings />} />
-            <Route path="moderation" element={<AdminModerationPage />} />
-            <Route path="moderation/profiles" element={<AdminProfileModerationPage />} />
+            <Route path="moderation" element={<RequireStaffOrAdmin><AdminModerationPage /></RequireStaffOrAdmin>} />
+            <Route path="moderation/profiles" element={<RequireStaffOrAdmin><AdminProfileModerationPage /></RequireStaffOrAdmin>} />
             <Route path="name-requests" element={<AdminNameRequestsPage />} />
             <Route path="/admin/events/:eventId" element={<EventManagePage />} />
             {/* keep your recordings behavior same as before */}
@@ -234,7 +235,7 @@ const AppShell = () => {
             <Route path="carts" element={<AdminCarts />} />
             <Route path="users" element={<AdminStaffPage />} />
             <Route path="users/:userId/edit-profile" element={<AdminUserProfileEditPage />} />
-            <Route path="virtual-speakers" element={<VirtualSpeakersPage />} />
+            <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />

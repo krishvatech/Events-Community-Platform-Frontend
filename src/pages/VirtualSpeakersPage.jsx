@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -27,6 +28,7 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import PersonAddRoundedIcon from '@mui/icons-material/PersonAddRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { toast } from 'react-toastify';
+import { isOwnerUser } from '../utils/adminRole';
 import {
   listVirtualSpeakers,
   deleteVirtualSpeaker,
@@ -36,6 +38,15 @@ import VirtualSpeakerForm from '../components/VirtualSpeakerForm';
 import ConvertVirtualSpeakerModal from '../components/ConvertVirtualSpeakerModal';
 
 const VirtualSpeakersPage = () => {
+  const navigate = useNavigate();
+
+  // Role-based access control: Super Admin only
+  useEffect(() => {
+    if (!isOwnerUser()) {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
+
   // Get community ID from URL or context
   const urlParams = new URLSearchParams(window.location.search);
   const communityId = parseInt(urlParams.get('community_id')) || 1;

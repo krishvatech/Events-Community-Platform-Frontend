@@ -1,5 +1,6 @@
 // src/pages/AdminModerationPage.jsx
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -22,6 +23,7 @@ import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 
+import { isAdminUser } from "../utils/adminRole";
 import AdminProfileModerationPage from "./AdminProfileModerationPage";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
@@ -65,6 +67,15 @@ function buildPatch(item, text, title) {
 }
 
 export default function AdminModerationPage() {
+  const navigate = useNavigate();
+
+  // Role-based access control: Staff and Super Admin only
+  React.useEffect(() => {
+    if (!isAdminUser()) {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
+
   // Top-level tab: 0 = Content, 1 = Profiles
   const [viewMode, setViewMode] = React.useState(0);
 

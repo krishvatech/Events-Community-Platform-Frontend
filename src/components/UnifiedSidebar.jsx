@@ -221,7 +221,6 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
-            { label: "Virtual Speakers", to: "/admin/virtual-speakers", icon: MicRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
@@ -229,12 +228,10 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
-        adminItems = userCanEditProfiles
-            ? [
-                { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
-                { label: "Users", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }
-            ]
-            : [];
+        adminItems = [
+            { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
+            ...(userCanEditProfiles ? [{ label: "Users", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }] : [])
+        ];
     } else {
         // Normal User
         manageItems = [
