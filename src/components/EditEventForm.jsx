@@ -1041,7 +1041,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 fullWidth
                 className="mb-3"
                 error={!!errors.slug}
-                helperText={errors.slug || "Lowercase letters, numbers, special chars (@$&) allowed. No forward slashes."}
+                helperText={errors.slug || "Lowercase letters, numbers, underscores, special chars (@$&) allowed. No forward slashes."}
             />
 
             <TextField

@@ -517,9 +517,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
   // Helpers imported from eventUtils
   const slugifyLocal = (s) =>
-    (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    (s || "").toLowerCase().trim().replace(/[^a-z0-9_]+/g, "-").replace(/^-+|-+$/g, "");
   const sanitizeSlugInput = (s) =>
-    (s || "").toLowerCase().replace(/\//g, "-").replace(/\s+/g, "-").replace(/^-+|-+$/g, "");
+    (s || "").toLowerCase().replace(/\//g, "-").replace(/\s+/g, "-").replace(/^-+/g, "");
   const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);
 
   // ✅ Default schedule on open: current hour (HH:00) → +2 hours
@@ -1101,7 +1101,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     ? "Slug is available."
                     : slugStatus.available === false
                       ? "This slug is already taken."
-                      : "Lowercase, numbers, special chars (@$&#) allowed. No forward slashes.")
+                      : "Lowercase, numbers, underscores, special chars (@$&#) allowed. No forward slashes.")
               }
               sx={{ mb: 2 }}
             />
