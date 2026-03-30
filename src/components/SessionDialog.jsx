@@ -15,10 +15,11 @@ import { LocalizationProvider, TimePicker, DatePicker } from "@mui/x-date-picker
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
+import tzPlugin from "dayjs/plugin/timezone";
+import { validateSessionTimes } from "../utils/dateTimeValidator";
 
 dayjs.extend(utc);
-dayjs.extend(timezone);
+dayjs.extend(tzPlugin);
 
 const SESSION_TYPES = [
   { value: "main", label: "Main Session" },
@@ -62,6 +63,9 @@ function SessionDialog({
   eventStartTime = null,
   eventEndTime = null,
   timezone = "UTC",
+  eventStartDate = null, // Add event start/end dates for session validation
+  eventEndDate = null,
+  isMultiDay = false,
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -133,52 +137,73 @@ function SessionDialog({
 
     // Guard against invalid Dayjs values before combining date + time
     if (!startTime || !startTime.isValid()) {
-      e.startTime = "Invalid time (use 1–12 in AM/PM).";
+      e.startTime = "Invalid time.";
     }
     if (!endTime || !endTime.isValid()) {
-      e.endTime = "Invalid time (use 1–12 in AM/PM).";
+      e.endTime = "Invalid time.";
     }
 
-    if (!e.startTime && !e.endTime) {
-      const start = startDate.hour(startTime.hour()).minute(startTime.minute());
-      const end = endDate.hour(endTime.hour()).minute(endTime.minute());
+    if (!e.startTime && !e.endTime && startDate && endDate) {
+      // Extract date and time strings for validation
+      const sessionStartDateStr = startDate.format("YYYY-MM-DD");
+      const sessionStartTimeStr = startTime.format("HH:mm");
+      const sessionEndDateStr = endDate.format("YYYY-MM-DD");
+      const sessionEndTimeStr = endTime.format("HH:mm");
 
-      // Validate session end is after start
-      if (!end.isAfter(start)) {
-        e.endTime = "End time must be after start time";
+      // Derive event dates from eventStartTime/eventEndTime if available
+      let eventStartDateStr = eventStartDate;
+      let eventEndDateStr = eventEndDate;
+
+      if (!eventStartDateStr && eventStartTime) {
+        eventStartDateStr = dayjs(eventStartTime).tz(timezone).format("YYYY-MM-DD");
+      }
+      if (!eventEndDateStr && eventEndTime) {
+        eventEndDateStr = dayjs(eventEndTime).tz(timezone).format("YYYY-MM-DD");
       }
 
-      // Validate session times are within event times
-      if (eventStartTime && eventEndTime) {
-        const eventStart = dayjs(eventStartTime);
-        const eventEnd = dayjs(eventEndTime);
+      // Timezone-aware session validation
+      if (eventStartDateStr && eventEndDateStr) {
+        const validation = validateSessionTimes(
+          sessionStartDateStr,
+          sessionStartTimeStr,
+          sessionEndDateStr,
+          sessionEndTimeStr,
+          eventStartDateStr,
+          eventEndDateStr,
+          timezone,
+          initialData, // pass existing session for PATCH bypass logic
+          isMultiDay
+        );
 
-        if (start.isBefore(eventStart)) {
-          e.startTime = `Session cannot start before event (${eventStart.format("MMM DD, HH:mm")})`;
+        if (!validation.valid) {
+          Object.assign(e, validation.errors);
+          if (validation.errors.sessionStartTime && !e.startTime) {
+            e.startTime = validation.errors.sessionStartTime;
+          }
+          if (validation.errors.sessionEndTime && !e.endTime) {
+            e.endTime = validation.errors.sessionEndTime;
+          }
+        }
+      }
+
+      // Fallback boundary checks (for cases where timezone-aware validation doesn't apply)
+      if (!isMultiDay && eventStartTime && eventEndTime && !e.sessionStartTime && !e.sessionEndTime) {
+        const startLocal = dayjs.tz(`${sessionStartDateStr}T${sessionStartTimeStr}:00`, timezone);
+        const endLocal = dayjs.tz(`${sessionEndDateStr}T${sessionEndTimeStr}:00`, timezone);
+        const eventStartLocal = dayjs(eventStartTime).tz(timezone);
+        const eventEndLocal = dayjs(eventEndTime).tz(timezone);
+
+        if (startLocal.isBefore(eventStartLocal)) {
+          e.startTime = `Session cannot start before event (${eventStartLocal.format("MMM DD, HH:mm")})`;
         }
 
-        let cutoffTime = eventEnd;
-        // If event ends at midnight (00:00), treat it as inclusive of that day
-        if (eventEnd.hour() === 0 && eventEnd.minute() === 0) {
-          cutoffTime = eventEnd.add(1, "day");
+        let cutoffTime = eventEndLocal;
+        if (eventEndLocal.hour() === 0 && eventEndLocal.minute() === 0) {
+          cutoffTime = eventEndLocal.add(1, "day");
         }
 
-        if (end.isAfter(cutoffTime)) {
-          e.endTime = `Session cannot end after event (${eventEnd.format("MMM DD, HH:mm")})`;
-        }
-
-        const eventStartDate = eventStart.startOf("day");
-        const eventEndDate = eventEnd.startOf("day");
-        const sessionStartDate = start.startOf("day");
-        const sessionEndDate = end.startOf("day");
-
-        if (
-          sessionStartDate.isBefore(eventStartDate) ||
-          sessionEndDate.isAfter(eventEndDate)
-        ) {
-          e.startTime = `Session dates must be within event dates (${eventStart.format(
-            "MMM DD"
-          )} - ${eventEnd.format("MMM DD")})`;
+        if (endLocal.isAfter(cutoffTime)) {
+          e.endTime = `Session cannot end after event (${eventEndLocal.format("MMM DD, HH:mm")})`;
         }
       }
     }
@@ -215,6 +240,7 @@ function SessionDialog({
       _startTime: startTime.format("HH:mm"),
       _endDate: endDate.format("YYYY-MM-DD"),
       _endTime: endTime.format("HH:mm"),
+      _localId: initialData?._localId,
     };
 
     try {
@@ -275,7 +301,13 @@ function SessionDialog({
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <DatePicker
                   value={startDate}
-                  onChange={(date) => setStartDate(date || dayjs())}
+                  onChange={(date) => {
+                    const next = date || dayjs();
+                    setStartDate(next);
+                    if (endDate && endDate.isBefore(next, "day")) {
+                      setEndDate(next);
+                    }
+                  }}
                   format="DD/MM/YYYY"
                   slotProps={{ textField: { size: "small", fullWidth: true, error: !!errors.startTime } }}
                 />
@@ -326,7 +358,14 @@ function SessionDialog({
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <DatePicker
                   value={endDate}
-                  onChange={(date) => setEndDate(date || dayjs())}
+                  onChange={(date) => {
+                    const next = date || dayjs();
+                    if (startDate && next.isBefore(startDate, "day")) {
+                      setEndDate(startDate);
+                    } else {
+                      setEndDate(next);
+                    }
+                  }}
                   format="DD/MM/YYYY"
                   slotProps={{ textField: { size: "small", fullWidth: true } }}
                 />

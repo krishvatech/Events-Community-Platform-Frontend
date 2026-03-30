@@ -429,8 +429,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [startTime, setStartTime] = React.useState(defaultSchedule.startTime);
   const [endTime, setEndTime] = React.useState(defaultSchedule.endTime);
   // Store single-day times to restore when toggling back
-  const [singleDayStartTime] = React.useState(defaultSchedule.startTime);
-  const [singleDayEndTime] = React.useState(defaultSchedule.endTime);
+  const [singleDayStartTime, setSingleDayStartTime] = React.useState(defaultSchedule.startTime);
+  const [singleDayEndTime, setSingleDayEndTime] = React.useState(defaultSchedule.endTime);
   const [timezone, setTimezone] = React.useState(getBrowserTimezone());
 
   const timezoneOptions = React.useMemo(() => {
@@ -496,6 +496,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [sessions, setSessions] = React.useState([]);
   const [sessionDialogOpen, setSessionDialogOpen] = React.useState(false);
   const [editingSessionIndex, setEditingSessionIndex] = React.useState(null);
+  const [dateRangeDialogOpen, setDateRangeDialogOpen] = React.useState(false);
+  const [outOfRangeSessions, setOutOfRangeSessions] = React.useState([]);
   const [actualEventStartTime, setActualEventStartTime] = React.useState(null);
   const [actualEventEndTime, setActualEventEndTime] = React.useState(null);
 
@@ -541,6 +543,80 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       formEndTime: endTime,
     });
   }, [sessions]);
+
+  const findOutOfRangeSessions = React.useCallback((candidateStartDate, candidateEndDate) => {
+    if (!sessions.length || !candidateStartDate || !candidateEndDate) return [];
+    const tz = normalizeTimezoneName(timezone || getBrowserTimezone());
+    return sessions.filter((s) => {
+      const sessStartDate =
+        s._startDate ||
+        (s.startTime ? dayjs(s.startTime).tz(tz).format("YYYY-MM-DD") : "");
+      const sessEndDate =
+        s._endDate ||
+        (s.endTime ? dayjs(s.endTime).tz(tz).format("YYYY-MM-DD") : "");
+      if (!sessStartDate || !sessEndDate) return false;
+      return sessStartDate < candidateStartDate || sessEndDate > candidateEndDate;
+    });
+  }, [sessions, timezone]);
+
+  const handleStartDateChange = React.useCallback((newValue) => {
+    const v = newValue ? newValue.format("YYYY-MM-DD") : "";
+    const candidateStart = v;
+    let candidateEnd = isMultiDay ? endDate : v;
+    if (candidateEnd && candidateStart && candidateEnd < candidateStart) {
+      candidateEnd = candidateStart;
+    }
+    const outside = findOutOfRangeSessions(candidateStart, candidateEnd);
+    if (outside.length > 0) {
+      setOutOfRangeSessions(outside);
+      setDateRangeDialogOpen(true);
+      return;
+    }
+    console.log("📅 Start Date Changed:", { previousStartDate: startDate, newStartDate: v, isMultiDay });
+    setStartDate(v);
+    if (!isMultiDay) {
+      setEndDate(v);
+    } else {
+      if (endDate && v && endDate < v) {
+        setEndDate(v);
+        setEndTime("23:59");
+        console.log("🕐 Auto-set End Date/Time to match Start Date for multi-day event");
+      }
+      setStartTime("00:00");
+      console.log("🕐 Auto-set Start Time to 00:00 for multi-day event");
+    }
+  }, [endDate, findOutOfRangeSessions, isMultiDay, startDate]);
+
+  const handleEndDateChange = React.useCallback((newValue) => {
+    const v = newValue ? newValue.format("YYYY-MM-DD") : "";
+    const candidateStart = startDate;
+    const candidateEnd = v;
+    const outside = findOutOfRangeSessions(candidateStart, candidateEnd);
+    if (outside.length > 0) {
+      setOutOfRangeSessions(outside);
+      setDateRangeDialogOpen(true);
+      return;
+    }
+    console.log("📅 End Date Changed:", { previousEndDate: endDate, newEndDate: v });
+    setEndDate(v);
+    if (isMultiDay) {
+      setEndTime("23:59");
+      console.log("🕐 Auto-set End Time to 23:59 for multi-day event");
+    }
+  }, [endDate, findOutOfRangeSessions, isMultiDay, startDate]);
+
+  const formatSessionDateRange = React.useCallback((session) => {
+    const tz = normalizeTimezoneName(timezone || getBrowserTimezone());
+    const start =
+      session?._startDate ||
+      (session?.startTime ? dayjs(session.startTime).tz(tz).format("YYYY-MM-DD") : "");
+    const end =
+      session?._endDate ||
+      (session?.endTime ? dayjs(session.endTime).tz(tz).format("YYYY-MM-DD") : "");
+    if (!start && !end) return "Unknown date";
+    if (start && end) return `${start} → ${end}`;
+    return start || end;
+  }, [timezone]);
 
   // 🔹 NEW: reset all fields back to defaults after successful create
   const resetForm = () => {
@@ -1603,19 +1679,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <DatePicker
                   label={isMultiDay ? "Start Date" : "Date"}
                   value={startDateValue}
-                  onChange={(newValue) => {
-                    const v = newValue ? newValue.format("YYYY-MM-DD") : "";
-                    console.log("📅 Start Date Changed:", { previousStartDate: startDate, newStartDate: v, isMultiDay });
-                    setStartDate(v);
-                    if (!isMultiDay) {
-                      // Single day: force end date same as start
-                      setEndDate(v);
-                    } else {
-                      // Multi-day: auto-set start time to 00:00
-                      setStartTime("00:00");
-                      console.log("🕐 Auto-set Start Time to 00:00 for multi-day event");
-                    }
-                  }}
+                  onChange={handleStartDateChange}
                   format="DD/MM/YYYY"
                   slotProps={{
                     textField: {
@@ -1632,16 +1696,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   <DatePicker
                     label="End Date"
                     value={endDateValue}
-                    onChange={(newValue) => {
-                      const v = newValue ? newValue.format("YYYY-MM-DD") : "";
-                      console.log("📅 End Date Changed:", { previousEndDate: endDate, newEndDate: v });
-                      setEndDate(v);
-                      // Auto-set end time to 23:59 for multi-day events
-                      if (isMultiDay) {
-                        setEndTime("23:59");
-                        console.log("🕐 Auto-set End Time to 23:59 for multi-day event");
-                      }
-                    }}
+                    onChange={handleEndDateChange}
                     format="DD/MM/YYYY"
                     slotProps={{
                       textField: {
@@ -2114,7 +2169,42 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           eventStartTime={actualEventStartTime || toUTCISO(startDate, startTime, timezone)}
           eventEndTime={actualEventEndTime || toUTCISO(isMultiDay ? endDate : startDate, endTime, timezone)}
           timezone={timezone}
+          eventStartDate={startDate}
+          eventEndDate={isMultiDay ? endDate : startDate}
+          isMultiDay={isMultiDay}
         />
+
+        {/* Sessions outside date range dialog */}
+        <Dialog
+          open={dateRangeDialogOpen}
+          onClose={() => setDateRangeDialogOpen(false)}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle className="font-bold">Sessions Outside Date Range</DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              Some sessions fall outside the new event date range. Please delete or reschedule them before changing
+              the event dates.
+            </Typography>
+            {outOfRangeSessions.length > 0 && (
+              <Box component="ul" sx={{ pl: 2, mb: 0 }}>
+                {outOfRangeSessions.map((s, idx) => (
+                  <li key={`${s.title || "session"}-${idx}`}>
+                    <Typography variant="body2">
+                      {(s.title || `Session ${idx + 1}`)} ({formatSessionDateRange(s)})
+                    </Typography>
+                  </li>
+                ))}
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button variant="contained" onClick={() => setDateRangeDialogOpen(false)}>
+              OK
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Dialog>
     </LocalizationProvider>
   );
@@ -2295,12 +2385,12 @@ function AdminEventCard({
         <div className="text-sm text-slate-500">
           {(() => {
             // DEBUG: Log event data
-            console.log(`[AdminEventCard Debug] Event "${ev.title}":`, {
-              is_multi_day: ev.is_multi_day,
-              sessions_present: !!ev.sessions,
-              sessions_count: ev.sessions?.length || 0,
-              timezone: organizerTimezone,
-            });
+            // console.log(`[AdminEventCard Debug] Event "${ev.title}":`, {
+            //   is_multi_day: ev.is_multi_day,
+            //   sessions_present: !!ev.sessions,
+            //   sessions_count: ev.sessions?.length || 0,
+            //   timezone: organizerTimezone,
+            // });
 
             // For multi-day events with sessions, show only the next upcoming session
             if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {

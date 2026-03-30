@@ -15,6 +15,11 @@ import {
     Switch,
     IconButton,
     InputAdornment,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    DialogContentText,
 } from "@mui/material";
 import Grid from "@mui/material/Grid"; // v5
 import Autocomplete from "@mui/material/Autocomplete";
@@ -52,6 +57,10 @@ import {
     slugifyLocal,
     sanitizeSlugInput
 } from "../utils/eventUtils";
+import {
+    validateNonMultidayEvent,
+    validateMultidayEvent,
+} from "../utils/dateTimeValidator";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -248,17 +257,14 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [loungeTableCapacity, setLoungeTableCapacity] = useState(event?.lounge_table_capacity || 4);
 
 
-    const [isMultiDay, setIsMultiDay] = useState(() => {
-        if (!initialStart || !initialEnd) return false;
-        return initialStart.format("YYYY-MM-DD") !== initialEnd.format("YYYY-MM-DD");
-    });
+    const [isMultiDay, setIsMultiDay] = useState(() => Boolean(event?.is_multi_day));
     const [startDate, setStartDate] = useState(initialStart.format("YYYY-MM-DD"));
     const [endDate, setEndDate] = useState(initialEnd.format("YYYY-MM-DD"));
     const [startTime, setStartTime] = useState(initialStart.format("HH:mm"));
     const [endTime, setEndTime] = useState(initialEnd.format("HH:mm"));
     // Store single-day times to restore when toggling back
-    const [singleDayStartTime] = useState(initialStart.format("HH:mm"));
-    const [singleDayEndTime] = useState(initialEnd.format("HH:mm"));
+    const [singleDayStartTime, setSingleDayStartTime] = useState(initialStart.format("HH:mm"));
+    const [singleDayEndTime, setSingleDayEndTime] = useState(initialEnd.format("HH:mm"));
 
     const [timezone, setTimezone] = useState(initialTimezone);
     const timezoneOptions = useMemo(() => {
@@ -312,6 +318,37 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
     const [editingSessionIndex, setEditingSessionIndex] = useState(null);
     const [sessionSubmitting, setSessionSubmitting] = useState(false);
+    const [savedSchedule, setSavedSchedule] = useState(() => ({
+        startISO: event?.start_time ? dayjs(event.start_time).toISOString() : null,
+        endISO: event?.end_time ? dayjs(event.end_time).toISOString() : null,
+        timezone: event?.timezone || getBrowserTimezone(),
+        isMultiDay: Boolean(event?.is_multi_day),
+    }));
+
+    useEffect(() => {
+        if (!event?.id) return;
+        setSavedSchedule({
+            startISO: event?.start_time ? dayjs(event.start_time).toISOString() : null,
+            endISO: event?.end_time ? dayjs(event.end_time).toISOString() : null,
+            timezone: event?.timezone || getBrowserTimezone(),
+            isMultiDay: Boolean(event?.is_multi_day),
+        });
+    }, [event?.end_time, event?.id, event?.is_multi_day, event?.start_time, event?.timezone]);
+
+    const isScheduleDirty = useMemo(() => {
+        if (!event?.id) return false;
+        const currentStartISO = toUTCISO(startDate, startTime, timezone);
+        const currentEndISO = toUTCISO(isMultiDay ? endDate : startDate, endTime, timezone);
+        return (
+            savedSchedule.timezone !== timezone ||
+            savedSchedule.isMultiDay !== Boolean(isMultiDay) ||
+            savedSchedule.startISO !== currentStartISO ||
+            savedSchedule.endISO !== currentEndISO
+        );
+    }, [endDate, endTime, event?.id, isMultiDay, savedSchedule, startDate, startTime, timezone]);
+
+    // Confirmation dialog for multi-day to single-day conversion
+    const [showSingleDayConversionDialog, setShowSingleDayConversionDialog] = useState(false);
 
     const [replayAvailable, setReplayAvailable] = React.useState(false);
     const [replayDuration, setReplayDuration] = React.useState("");
@@ -408,6 +445,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             endTime: endISO,
             sessionDate: session.sessionDate || session.session_date || dateFromStart,
             displayOrder: Number(session.displayOrder ?? session.display_order ?? 0),
+            _pending: Boolean(session._pending),
+            _localId: session._localId || session.localId || null,
         };
     }, []);
 
@@ -435,7 +474,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         const start = event?.start_time ? dayjs(event.start_time).tz(tz) : dayjs();
         const end = event?.end_time ? dayjs(event.end_time).tz(tz) : start.add(2, "hour");
         setTimezone(tz);
-        setIsMultiDay(start.format("YYYY-MM-DD") !== end.format("YYYY-MM-DD"));
+        setIsMultiDay(Boolean(event?.is_multi_day));
         setStartDate(start.format("YYYY-MM-DD"));
         setEndDate(end.format("YYYY-MM-DD"));
         setStartTime(start.format("HH:mm"));
@@ -540,6 +579,36 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         try {
             const isEditing = editingSessionIndex !== null;
             const editingSession = isEditing ? sessions[editingSessionIndex] : null;
+            const displayOrder = isEditing
+                ? Number(editingSession?.displayOrder ?? editingSessionIndex ?? 0)
+                : sessions.length;
+
+            if (isScheduleDirty) {
+                const localId =
+                    sessionData._localId ||
+                    editingSession?._localId ||
+                    `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                const pendingSession = normalizeSession({
+                    ...sessionData,
+                    id: editingSession?.id,
+                    displayOrder,
+                    _pending: true,
+                    _localId: localId,
+                });
+                setSessions((prev) => {
+                    if (isEditing) {
+                        return prev.map((item, idx) => (idx === editingSessionIndex ? pendingSession : item));
+                    }
+                    return [...prev, pendingSession];
+                });
+                setToast({
+                    open: true,
+                    type: "info",
+                    msg: "Session will be saved when you click Save.",
+                });
+                return;
+            }
+
             const payload = {
                 title: sessionData.title,
                 description: sessionData.description || "",
@@ -547,9 +616,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 start_time: sessionData.startTime,
                 end_time: sessionData.endTime,
                 session_date: dayjs(sessionData.startTime).format("YYYY-MM-DD"),
-                display_order: isEditing
-                    ? Number(editingSession?.displayOrder ?? editingSessionIndex ?? 0)
-                    : sessions.length,
+                display_order: displayOrder,
             };
 
             const url = isEditing
@@ -588,6 +655,73 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             setSessionsError(err?.message || "Unable to save session");
             setToast({ open: true, type: "error", msg: err?.message || "Unable to save session" });
             throw err;
+        } finally {
+            setSessionSubmitting(false);
+        }
+    };
+
+    const flushPendingSessions = async () => {
+        if (!event?.id) return true;
+        const pending = sessions.filter((s) => s._pending);
+        if (pending.length === 0) return true;
+
+        setSessionSubmitting(true);
+        setSessionsError("");
+        try {
+            for (const pendingSession of pending) {
+                const isEditing = Boolean(pendingSession.id);
+                const payload = {
+                    title: pendingSession.title,
+                    description: pendingSession.description || "",
+                    session_type: pendingSession.sessionType || "main",
+                    start_time: pendingSession.startTime,
+                    end_time: pendingSession.endTime,
+                    session_date: pendingSession.startTime
+                        ? dayjs(pendingSession.startTime).format("YYYY-MM-DD")
+                        : null,
+                    display_order: Number(pendingSession.displayOrder ?? 0),
+                };
+
+                const url = isEditing
+                    ? `${API_ROOT}/events/${event.id}/sessions/${pendingSession.id}/`
+                    : `${API_ROOT}/events/${event.id}/sessions/`;
+                const method = isEditing ? "PATCH" : "POST";
+
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const msg =
+                        json?.detail ||
+                        Object.entries(json)
+                            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+                            .join(" | ") ||
+                        `HTTP ${res.status}`;
+                    throw new Error(msg);
+                }
+
+                const savedSession = normalizeSession(json);
+                setSessions((prev) =>
+                    prev.map((item) => {
+                        if (pendingSession.id && item.id === pendingSession.id) return savedSession;
+                        if (!pendingSession.id && pendingSession._localId && item._localId === pendingSession._localId) {
+                            return savedSession;
+                        }
+                        return item;
+                    })
+                );
+            }
+            return true;
+        } catch (err) {
+            setSessionsError(err?.message || "Unable to save sessions");
+            setToast({ open: true, type: "error", msg: err?.message || "Unable to save sessions" });
+            return false;
         } finally {
             setSessionSubmitting(false);
         }
@@ -651,19 +785,40 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
         // Validate time fields before comparing — never call dayjs.tz on invalid strings
         if (!isValidHHmm(startTime)) {
-            e.startTime = "Invalid start time (use 1–12 in AM/PM).";
+            e.startTime = "Invalid start time format.";
         }
         if (!isValidHHmm(endTime)) {
-            e.endTime = "Invalid end time (use 1–12 in AM/PM).";
+            e.endTime = "Invalid end time format.";
         }
 
-        if (!e.startTime && !e.endTime && startDate && endDate) {
-            // Both times are valid — safe to use toUTCISO for comparison
-            const sISO = toUTCISO(startDate, startTime, timezone);
-            const edISO = toUTCISO(isMultiDay ? endDate : startDate, endTime, timezone);
-            if (sISO && edISO && !dayjs(edISO).isAfter(dayjs(sISO))) {
-                e.endTime = "End must be after start";
-                e.endDate = "End must be after start";
+        // Timezone-aware validation for event times
+        if (!e.startTime && !e.endTime && startDate && startTime && endDate && endTime) {
+            if (isMultiDay) {
+                // Multiday event: start_date >= today, end_date >= start_date
+                const validation = validateMultidayEvent(
+                    startDate,
+                    startTime,
+                    endDate,
+                    endTime,
+                    timezone,
+                    event
+                );
+                if (!validation.valid) {
+                    Object.assign(e, validation.errors);
+                }
+            } else {
+                // Non-multiday event: start_date today or future, today requires +30min buffer
+                const validation = validateNonMultidayEvent(
+                    startDate,
+                    startTime,
+                    startDate, // for non-multiday, end date is same as start date
+                    endTime,
+                    timezone,
+                    event
+                );
+                if (!validation.valid) {
+                    Object.assign(e, validation.errors);
+                }
             }
         }
         setErrors(e);
@@ -733,6 +888,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         }
         fd.append("lounge_table_capacity", String(loungeTableCapacity || 4));
         fd.append("timezone", timezone);
+        fd.append("is_multi_day", String(isMultiDay));
         fd.append("start_time", combineToISO(startDate, startTime));
         fd.append("end_time", combineToISO(isMultiDay ? endDate : startDate, endTime));
 
@@ -816,7 +972,22 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 throw new Error(msg);
             }
             onUpdated?.(json);
-            setToast({ open: true, type: "success", msg: "Event updated" });
+            setSavedSchedule({
+                startISO: json?.start_time ? dayjs(json.start_time).toISOString() : toUTCISO(startDate, startTime, timezone),
+                endISO: json?.end_time ? dayjs(json.end_time).toISOString() : toUTCISO(isMultiDay ? endDate : startDate, endTime, timezone),
+                timezone: json?.timezone || timezone,
+                isMultiDay: Boolean(json?.is_multi_day ?? isMultiDay),
+            });
+
+            const pendingCount = sessions.filter((s) => s._pending).length;
+            const sessionsSaved = await flushPendingSessions();
+            if (pendingCount > 0 && sessionsSaved) {
+                setToast({ open: true, type: "success", msg: "Event updated and sessions saved" });
+            } else if (pendingCount > 0 && !sessionsSaved) {
+                setToast({ open: true, type: "error", msg: "Event updated but some sessions failed to save." });
+            } else {
+                setToast({ open: true, type: "success", msg: "Event updated" });
+            }
             // onCancel?.(); // Don't close by default, let parent decide
         } catch (e) {
             setToast({ open: true, type: "error", msg: String(e?.message || e) });
@@ -1319,8 +1490,13 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 {/* Dates */}
                 <Grid item xs={12}>
                     <FormControlLabel
-                        control={<Switch checked={isMultiDay} onChange={(e) => {
+                        control={<Switch checked={isMultiDay} disabled={sessionsLoading} onChange={(e) => {
                             const v = e.target.checked;
+                            if (!v && sessions.length > 0) {
+                                // Cannot convert to single-day when sessions exist — show dialog
+                                setShowSingleDayConversionDialog(true);
+                                return; // Don't change toggle
+                            }
                             setIsMultiDay(v);
                             if (v) {
                                 // If switching to Multi-Day: Set Start Time to 00:00 and End Time to 23:59
@@ -1350,6 +1526,11 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                             if (!isMultiDay) {
                                 setEndDate(v);
                             } else {
+                                if (endDate && v && endDate < v) {
+                                    setEndDate(v);
+                                    setEndTime("23:59");
+                                    console.log("🕐 Auto-set End Date/Time to match Start Date for multi-day event (Edit)");
+                                }
                                 // Multi-day: auto-set start time to 00:00
                                 setStartTime("00:00");
                                 console.log("🕐 Auto-set Start Time to 00:00 for multi-day event (Edit)");
@@ -1646,8 +1827,25 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 eventStartTime={toUTCISO(startDate, startTime, timezone)}
                 eventEndTime={toUTCISO(endDate, endTime, timezone)}
                 timezone={timezone}
+                eventStartDate={startDate}
+                eventEndDate={endDate}
+                isMultiDay={isMultiDay}
             />
 
+            {/* Multi-day to Single-day Conversion Confirmation Dialog */}
+            <Dialog open={showSingleDayConversionDialog} onClose={() => setShowSingleDayConversionDialog(false)}>
+                <DialogTitle>Cannot Convert to Single-Day</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        To convert this event into a single-day event, you must first delete all existing sessions.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowSingleDayConversionDialog(false)} variant="contained">
+                        OK
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Snackbar
                 open={toast.open}

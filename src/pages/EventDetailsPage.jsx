@@ -1094,60 +1094,15 @@ export default function EventDetailsPage() {
                         {/* Date & Time Display - Matches Events Page Format */}
                         {(event.start_time || event.end_time) && (
                           <Box>
-                            {event.is_multi_day && event.sessions && event.sessions.length > 0 ? (
-                              <Stack spacing={1.5} sx={{ fontSize: '0.875rem' }}>
-                                <Stack direction="row" spacing={1} alignItems="flex-start">
-                                  <CalendarMonthIcon fontSize="small" sx={{ color: 'teal', mt: 0.25 }} />
-                                  <Typography variant="body2" fontWeight={500}>
-                                    Next Session:
-                                  </Typography>
-                                </Stack>
-                                {(() => {
-                                  const now = new Date();
-                                  const nextSession = event.sessions?.find(s => {
-                                    const endTime = new Date(s.end_time);
-                                    return endTime > now;
-                                  });
-
-                                  if (!nextSession) {
-                                    return (
-                                      <Typography variant="body2" sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
-                                        All sessions completed
-                                      </Typography>
-                                    );
-                                  }
-
-                                  const sessionTimeRange = formatSessionTimeRange(
-                                    nextSession.start_time,
-                                    nextSession.end_time,
-                                    event.timezone
-                                  );
-
-                                  return (
-                                    <Box sx={{ ml: 3.5 }}>
-                                      <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                                        {sessionTimeRange.primary}
-                                      </Typography>
-                                      {sessionTimeRange.secondary && (
-                                        <Typography
-                                          variant="caption"
-                                          sx={{
-                                            display: 'block',
-                                            mt: 0.5,
-                                            fontSize: '0.8rem',
-                                            color: 'text.secondary'
-                                          }}
-                                        >
-                                          <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span>{" "}
-                                          {sessionTimeRange.secondary.label.replace('Your Time: ', '')}
-                                          <span style={{ color: '#9ca3af', marginLeft: '4px' }}>
-                                            ({sessionTimeRange.secondary.timezone})
-                                          </span>
-                                        </Typography>
-                                      )}
-                                    </Box>
-                                  );
-                                })()}
+                            {event.is_multi_day ? (
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ fontSize: '0.875rem' }}>
+                                <CalendarMonthIcon fontSize="small" sx={{ color: 'teal' }} />
+                                <Typography variant="body2" fontWeight={500}>
+                                  {dayjs(event.start_time).format("MMM D, YYYY")}
+                                  {event.end_time && event.end_time !== event.start_time
+                                    ? ` – ${dayjs(event.end_time).format("MMM D, YYYY")}`
+                                    : ""}
+                                </Typography>
                               </Stack>
                             ) : (
                               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 2, sm: 6 }} sx={{ fontSize: '0.875rem' }}>

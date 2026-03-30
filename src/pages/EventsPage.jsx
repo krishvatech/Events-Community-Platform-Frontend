@@ -740,35 +740,15 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     </span>
                   </div>
 
-                  {/* Next upcoming session */}
+                  {/* Date range (no time for multi-day events) */}
                   <div className="flex items-center gap-2">
-                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                    {nextSession ? (
-                      (() => {
-                        const sessionTimeRange = formatSessionTimeRange(
-                          nextSession.start_time,
-                          nextSession.end_time,
-                          ev.timezone
-                        );
-                        return (
-                          <div className="text-xs">
-                            <span className="font-medium text-neutral-900">
-                              {sessionTimeRange.primary}
-                              {organizerTimezone && (
-                                <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
-                              )}
-                            </span>
-                            {sessionTimeRange.secondary && (
-                              <span className="block text-neutral-600 mt-0.5">
-                                <span className="font-semibold text-teal-700">Your Time:</span> {sessionTimeRange.secondary.label.replace('Your Time: ', '')} <span className="text-neutral-400">({sessionTimeRange.secondary.timezone})</span>
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <span className="text-xs text-neutral-600">All sessions completed</span>
-                    )}
+                    <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                    <span className="text-xs font-medium text-neutral-900">
+                      {ev.start ? dayjs(ev.start).format("MMM D, YYYY") : ""}
+                      {ev.end && ev.start !== ev.end
+                        ? ` – ${dayjs(ev.end).format("MMM D, YYYY")}`
+                        : ""}
+                    </span>
                   </div>
 
                 </div>
@@ -870,7 +850,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             }
           })()}
 
-          {ev.is_multi_day && ev.sessions?.length > 1 && (
+          {ev.is_multi_day && ev.sessions?.length >= 1 && (
             <div className="pt-2 border-t border-neutral-100">
               <button
                 type="button"
@@ -883,7 +863,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                 <span className="inline-block h-2 w-2 rounded-full bg-teal-600" aria-hidden="true" />
                 {expandSessions
                   ? "Hide Full Session Schedule"
-                  : `Read More: View All ${ev.sessions.length} Sessions`}
+                  : ev.sessions.length === 1
+                    ? "Read More: View All Sessions"
+                    : `Read More: View All ${ev.sessions.length} Sessions`}
               </button>
 
               {expandSessions && (

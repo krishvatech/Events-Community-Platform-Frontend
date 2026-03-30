@@ -56,7 +56,7 @@ import timezone from "dayjs/plugin/timezone";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-function fmtDateRange(startISO, endISO, organizerTimezone) {
+function fmtDateRange(startISO, endISO, organizerTimezone, isMultiDayFromBackend) {
   try {
     const dateFormat = "MMM D, YYYY";
     const timeFormat = "h:mm A";
@@ -69,14 +69,27 @@ function fmtDateRange(startISO, endISO, organizerTimezone) {
     const orgEndObj = (endISO && normalizedOrganizerTimezone)
       ? dayjs(endISO).tz(normalizedOrganizerTimezone)
       : dayjs(endISO);
-    const orgDateStr = orgStartObj.format(dateFormat);
-    const orgTimeRangeKey = `${orgStartObj.format(timeFormat)} – ${orgEndObj.format(timeFormat)}`;
+
+    // Use is_multi_day from backend, fallback to date comparison
+    const isMultiDay = isMultiDayFromBackend || (orgStartObj.format("YYYY-MM-DD") !== orgEndObj.format("YYYY-MM-DD"));
+
+    // For multi-day events, show date range without times. For single-day, show date with times.
+    const orgDateStr = isMultiDay
+      ? `${orgStartObj.format(dateFormat)} – ${orgEndObj.format(dateFormat)}`
+      : orgStartObj.format(dateFormat);
+    const orgTimeRangeKey = isMultiDay
+      ? ""
+      : `${orgStartObj.format(timeFormat)} – ${orgEndObj.format(timeFormat)}`;
 
     // User's local timezone
     const localStartObj = dayjs(startISO).local();
     const localEndObj = dayjs(endISO).local();
-    const localDateStr = localStartObj.format(dateFormat);
-    const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
+    const localDateStr = isMultiDay
+      ? `${localStartObj.format(dateFormat)} – ${localEndObj.format(dateFormat)}`
+      : localStartObj.format(dateFormat);
+    const localTimeRangeKey = isMultiDay
+      ? ""
+      : `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
 
     // Check if times differ
     const userTimezoneName = getBrowserTimezone();
@@ -361,7 +374,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             }
 
             // For single-day events, show overall event time
-            const dateRange = fmtDateRange(ev.start_time, ev.end_time, ev.timezone);
+            const dateRange = fmtDateRange(ev.start_time, ev.end_time, ev.timezone, ev.is_multi_day);
             return (
               <>
                 {/* Primary: Organizer Time + Location */}
