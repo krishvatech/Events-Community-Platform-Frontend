@@ -101,6 +101,10 @@ function getEventLocation(event) {
   if (format === "virtual" || format === "hybrid") {
     return "Virtual live";
   }
+  // Use location_city + location_country if available (new format), fall back to location string
+  if (event?.location_city || event?.location_country) {
+    return [event?.location_city, event?.location_country].filter(Boolean).join(", ");
+  }
   return event?.location || "";
 }
 

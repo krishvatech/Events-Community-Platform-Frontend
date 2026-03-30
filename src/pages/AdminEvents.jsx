@@ -200,6 +200,7 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect, error, hel
         const data = await r.json();
         const results = (data?.results || [])
           .map((x) => ({
+            geoname_id: x.geoname_id, // unique identifier
             name: x.name || "",
             admin1: x.is_other ? "Other / Not listed" : "",
             country: x.country_name || "",
@@ -238,9 +239,10 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect, error, hel
       inputValue={inputValue}
       onInputChange={(_, v) => setInputValue(v)}
       isOptionEqualToValue={(o, v) =>
-        o?.name === v?.name &&
-        o?.country === v?.country &&
-        o?.admin1 === v?.admin1
+        (o?.geoname_id && v?.geoname_id && o.geoname_id === v.geoname_id) ||
+        (o?.name === v?.name &&
+          o?.country === v?.country &&
+          o?.admin1 === v?.admin1)
       }
       getOptionLabel={(o) => o?.name || ""}
       onChange={(_, newValue) => {
@@ -266,7 +268,7 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect, error, hel
         />
       )}
       renderOption={(props, option) => (
-        <li {...props}>
+        <li {...props} key={option.geoname_id || `${option.name}-${option.country}`}>
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {option.name}
@@ -413,6 +415,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [slugStatus, setSlugStatus] = React.useState({ checking: false, available: null });
   const [description, setDescription] = React.useState("");
   const [location, setLocation] = React.useState("Germany");
+  const [locationCity, setLocationCity] = React.useState(null); // city object from autocomplete
+  const [locationCountry, setLocationCountry] = React.useState(""); // country string
+  const [venueName, setVenueName] = React.useState("");
+  const [venueAddress, setVenueAddress] = React.useState("");
   const [category, setCategory] = React.useState("Workshop");
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
@@ -686,7 +692,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (!slug.trim()) e.slug = "Required";
     else if (slugStatus.checking) e.slug = "Checking slug availability. Please wait.";
     else if (slugStatus.available === false) e.slug = "This slug is already taken.";
-    if (["in_person", "hybrid"].includes(format) && !location) e.location = "Required";
+    // For in-person/hybrid, check locationCity; for virtual, check location
+    if (format === "virtual" && !location) {
+      e.location = "Required";
+    } else if (["in_person", "hybrid"].includes(format) && !locationCity) {
+      e.location = "Required";
+    }
     if (!description.trim()) e.description = "Required";
     const priceValue = Number(price);
     if (!isFree) {
@@ -789,11 +800,26 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("title", title.trim());
     fd.append("slug", slug.trim());
     fd.append("description", description);
-    // Build location string: for city objects, use "City, Country"; for strings, use as-is
-    const locationStr = typeof location === "object" && location
-      ? `${location.name}, ${location.country}`.trim()
-      : (location || "").trim();
-    fd.append("location", locationStr);
+
+    // Build location string and send separate fields
+    if (format === "virtual") {
+      // Virtual: send country as location string
+      fd.append("location", (location || "").trim());
+      fd.append("location_city", "");
+      fd.append("location_country", (location || "").trim());
+    } else {
+      // In-person/hybrid: send city, country separately and build location string
+      const cityName = (locationCity?.name || "").trim();
+      const countryName = (locationCountry || "").trim();
+      const locationStr = [cityName, countryName].filter(Boolean).join(", ");
+
+      fd.append("location", locationStr);
+      fd.append("location_city", cityName);
+      fd.append("location_country", countryName);
+      fd.append("venue_name", (venueName || "").trim());
+      fd.append("venue_address", (venueAddress || "").trim());
+    }
+
     fd.append("category", category);
     fd.append("format", format);
     fd.append("price", String(isFree ? 0 : (price ?? 0)));
@@ -1115,6 +1141,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 setFormat(next);
                 if (next === "virtual") {
                   setLocation("Germany");
+                  setLocationCity(null);
+                  setLocationCountry("");
+                  setVenueName("");
+                  setVenueAddress("");
                   setErrors((prev) => ({ ...prev, location: "" }));
                 } else {
                   setLocation(null);
@@ -1227,9 +1257,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Paper>
           )}
 
-          {/* Country Field */}
+          {/* Location Field */}
           <Box sx={{ mb: 2 }}>
             {format === "virtual" ? (
+              // Virtual: Country only
               <Autocomplete
                 fullWidth
                 options={COUNTRY_OPTIONS}
@@ -1271,16 +1302,90 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 )}
               />
             ) : (
-              <CityAutocompleteOpenMeteo
-                label="Location *"
-                value={location && typeof location === "object" ? location : null}
-                onSelect={(city) => {
-                  setLocation(city);
-                  setErrors((prev) => ({ ...prev, location: "" }));
-                }}
-                error={!!errors.location}
-                helperText={errors.location}
-              />
+              // In-person/Hybrid: City and Country separate
+              <>
+                <CityAutocompleteOpenMeteo
+                  label="Location *"
+                  value={locationCity}
+                  onSelect={(city) => {
+                    setLocationCity(city);
+                    // Auto-populate country from city selection
+                    if (city?.country) {
+                      setLocationCountry(city.country);
+                    }
+                    setErrors((prev) => ({ ...prev, location: "" }));
+                  }}
+                  error={!!errors.location}
+                  helperText={errors.location}
+                />
+
+                {/* Country field - can be manually edited */}
+                <Box sx={{ mt: 2 }}>
+                  <Autocomplete
+                    fullWidth
+                    options={COUNTRY_OPTIONS}
+                    autoHighlight
+                    value={COUNTRY_OPTIONS.find((opt) => opt.label === locationCountry) || null}
+                    getOptionLabel={(opt) => opt?.label ?? ""}
+                    isOptionEqualToValue={(o, v) => o.code === v.code}
+                    onChange={(_, newVal) => {
+                      setLocationCountry(newVal ? newVal.label : "");
+                    }}
+                    ListboxProps={{
+                      style: {
+                        maxHeight: 36 * 7,
+                        overflowY: "auto",
+                        paddingTop: 0,
+                        paddingBottom: 0,
+                      },
+                    }}
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.code}>
+                        <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                        {option.label}
+                      </li>
+                    )}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Country"
+                        placeholder="Select country"
+                        fullWidth
+                        inputProps={{
+                          ...params.inputProps,
+                          autoComplete: "new-password",
+                        }}
+                      />
+                    )}
+                  />
+                </Box>
+
+                {/* Venue Name - Optional */}
+                <Box sx={{ mt: 2 }}>
+                  <TextField
+                    fullWidth
+                    label="Venue Name (Optional)"
+                    placeholder="e.g., Marriott Hotel, Tech Hub Office"
+                    value={venueName}
+                    onChange={(e) => setVenueName(e.target.value)}
+                    helperText="Hotel name, office building, or venue name"
+                  />
+                </Box>
+
+                {/* Venue Address - Optional and private */}
+                <Box sx={{ mt: 2 }}>
+                  <TextField
+                    fullWidth
+                    label="Exact Address (Optional)"
+                    placeholder="e.g., 123 Main St, Suite 100"
+                    value={venueAddress}
+                    onChange={(e) => setVenueAddress(e.target.value)}
+                    multiline
+                    rows={2}
+                    helperText="🔒 Only visible to registered/accepted members"
+                  />
+                </Box>
+              </>
             )}
           </Box>
 

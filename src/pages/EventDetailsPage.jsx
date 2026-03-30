@@ -57,6 +57,10 @@ function getEventLocation(event) {
   if (format === "virtual" || format === "hybrid") {
     return "Virtual live";
   }
+  // Use location_city + location_country if available (new format), fall back to location string
+  if (event?.location_city || event?.location_country) {
+    return [event?.location_city, event?.location_country].filter(Boolean).join(", ");
+  }
   return event?.location || "";
 }
 
@@ -1150,6 +1154,30 @@ export default function EventDetailsPage() {
                               </Typography>
                             </Stack>
                           ) : null;
+                        })()}
+
+                        {/* Venue Details - Only shown to registered/accepted members */}
+                        {(() => {
+                          if (!event?.venue_name && !event?.venue_address) {
+                            return null; // No venue details to show
+                          }
+                          return (
+                            <Stack direction="row" spacing={0.75} alignItems="flex-start">
+                              <span role="img" aria-label="venue" style={{ marginTop: '2px' }}>🏢</span>
+                              <Box>
+                                {event?.venue_name && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    {event.venue_name}
+                                  </Typography>
+                                )}
+                                {event?.venue_address && (
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                    {event.venue_address}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Stack>
+                          );
                         })()}
 
                         {/* Participant Count */}
