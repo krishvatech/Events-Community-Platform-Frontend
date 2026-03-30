@@ -51,6 +51,15 @@ const toAbs = (u) => {
 };
 const EARLY_JOIN_MINUTES = 15;
 
+// Get location display text, handling virtual/hybrid events
+function getEventLocation(event) {
+  const format = event?.event_format || event?.format;
+  if (format === "virtual" || format === "hybrid") {
+    return "Virtual live";
+  }
+  return event?.location || "";
+}
+
 function bumpCartCount(qty = 1) {
   const prev = Number(localStorage.getItem("cart_count") || "0");
   const next = prev + qty;
@@ -1131,14 +1140,17 @@ export default function EventDetailsPage() {
                         )}
 
                         {/* Location */}
-                        {event?.location ? (
-                          <Stack direction="row" spacing={0.75} alignItems="flex-start">
-                            <span role="img" aria-label="location" style={{ marginTop: '2px' }}>📍</span>
-                            <Typography variant="body2" color="text.secondary">
-                              {event.location}
-                            </Typography>
-                          </Stack>
-                        ) : null}
+                        {(() => {
+                          const locDisplay = getEventLocation(event);
+                          return locDisplay ? (
+                            <Stack direction="row" spacing={0.75} alignItems="flex-start">
+                              <span role="img" aria-label="location" style={{ marginTop: '2px' }}>📍</span>
+                              <Typography variant="body2" color="text.secondary">
+                                {locDisplay}
+                              </Typography>
+                            </Stack>
+                          ) : null;
+                        })()}
 
                         {/* Participant Count */}
                         {(() => {

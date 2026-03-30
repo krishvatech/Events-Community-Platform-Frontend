@@ -95,6 +95,15 @@ function displayPrice(ev) {
   return priceStr(ev.price);
 }
 
+// Get location display text, handling virtual/hybrid events
+function getEventLocation(event) {
+  const format = event?.event_format || event?.format;
+  if (format === "virtual" || format === "hybrid") {
+    return "Virtual live";
+  }
+  return event?.location || "";
+}
+
 function authHeaders() {
   const t =
     localStorage.getItem("access_token") ||
@@ -727,7 +736,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   {/* Location */}
                   <div className="flex items-center gap-2">
                     <span role="img" aria-label="location">📍</span>
-                    <span className="font-medium text-neutral-900">{ev.location || "Virtual"}</span>
+                    <span className="font-medium text-neutral-900">{getEventLocation(ev)}</span>
                   </div>
 
                   {/* Session count and total duration badges */}
@@ -789,12 +798,15 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             );
           })()}
 
-          {ev.location && (
-            <div className="flex items-center gap-2">
-              <PlaceIcon fontSize="small" className="text-teal-700" />
-              <span className="truncate">{ev.location}</span>
-            </div>
-          )}
+          {(() => {
+            const locDisplay = getEventLocation(ev);
+            return locDisplay && (
+              <div className="flex items-center gap-2">
+                <PlaceIcon fontSize="small" className="text-teal-700" />
+                <span className="truncate">{locDisplay}</span>
+              </div>
+            );
+          })()}
 
           {Number.isFinite(ev.attendees) && (() => {
             const owner = isOwnerUser();
@@ -1426,12 +1438,15 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                   </span>
                 )}
 
-                {ev.location && (
-                  <span className="inline-flex items-center gap-2">
-                    <PlaceIcon fontSize="small" className="text-teal-700" />
-                    {ev.location}
-                  </span>
-                )}
+                {(() => {
+                  const locDisplay = getEventLocation(ev);
+                  return locDisplay && (
+                    <span className="inline-flex items-center gap-2">
+                      <PlaceIcon fontSize="small" className="text-teal-700" />
+                      {locDisplay}
+                    </span>
+                  );
+                })()}
 
                 {Number.isFinite(ev.attendees) && (() => {
                   const owner = isOwnerUser(); // Function is imported globally in the file
