@@ -120,6 +120,26 @@ export function cognitoConfirmForgotPassword({ usernameOrEmail, code, newPasswor
   });
 }
 
+// ✅ Change Password: re-authenticate then change password for logged-in user
+export function cognitoChangePassword({ usernameOrEmail, currentPassword, newPassword }) {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: usernameOrEmail, Pool: pool });
+    const authDetails = new AuthenticationDetails({
+      Username: usernameOrEmail,
+      Password: currentPassword,
+    });
+    user.authenticateUser(authDetails, {
+      onSuccess: () => {
+        user.changePassword(currentPassword, newPassword, (err, result) => {
+          if (err) return reject(err);
+          resolve(result);
+        });
+      },
+      onFailure: (err) => reject(err),
+    });
+  });
+}
+
 // ✅ Refresh Session: use Refresh Token to get new Access/Id tokens
 export function cognitoRefreshSession({ username, refreshToken }) {
   return new Promise((resolve, reject) => {

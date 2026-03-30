@@ -96,9 +96,13 @@ export default function MainRoomPeek({
             );
 
             if (host) {
-                console.log('[MainRoomPeek] Using host:', host.name);
-                setPrimaryParticipant(host);
-                return;
+                const hostKey = getParticipantUserKey(host);
+                if (!hostKey || !loungeKeySet.has(hostKey)) {
+                    console.log('[MainRoomPeek] Using host:', host.name);
+                    setPrimaryParticipant(host);
+                    return;
+                }
+                console.log('[MainRoomPeek] Host is not in main room, falling back');
             }
 
             // ✅ PRIORITY 1: Use pinned participant if available and in main room

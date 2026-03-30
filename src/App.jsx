@@ -25,6 +25,7 @@ import LiveMeetingPage from "./pages/LiveMeetingPage.jsx";
 import Footer from "./components/Footer.jsx";
 import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
 import ProfilePage from "./pages/ProfilePage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
 import ResourceDetailsPage from "./pages/ResourceDetailsPage.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
@@ -257,6 +258,7 @@ const AppShell = () => {
           <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
           <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
+          <Route path="/account/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
 
           {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
           <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />

@@ -500,9 +500,10 @@ function getBackendUserId(participant) {
 // ✅ PHASE 1: Match Dyte participant to backend user in lounge tables
 function findUserIdForDyteParticipant(dyteParticipantId, loungeTables, participantIdMapRef) {
   if (!dyteParticipantId || !loungeTables) return null;
+  const key = String(dyteParticipantId);
 
   // Check cache first
-  const cached = participantIdMapRef.current?.get(dyteParticipantId);
+  const cached = participantIdMapRef.current?.get(key);
   if (cached) return cached;
 
   // Search lounge tables
@@ -516,13 +517,23 @@ function findUserIdForDyteParticipant(dyteParticipantId, loungeTables, participa
     if (participant) {
       const userId = String(participant.user_id || participant.userId);
       if (participantIdMapRef.current) {
-        participantIdMapRef.current.set(dyteParticipantId, userId);
+        participantIdMapRef.current.set(key, userId);
       }
       return userId;
     }
   }
 
   return null;
+}
+
+function normalizeRoomType(rawValue) {
+  const raw = String(rawValue || "").toLowerCase();
+  if (!raw) return "";
+  if (raw.includes("breakout")) return "breakout";
+  if (raw.includes("lounge")) return "lounge";
+  if (raw.includes("waiting")) return "waiting";
+  if (raw.includes("main")) return "main";
+  return raw;
 }
 
 
@@ -2824,6 +2835,19 @@ export default function NewLiveMeeting() {
 
   const lastParticipantSyncRef = useRef(0);
   // Track last sync timestamp for validation
+
+  const getParticipantRoomInfo = useCallback(
+    (participantOrId) => {
+      const id =
+        typeof participantOrId === "string" || typeof participantOrId === "number"
+          ? participantOrId
+          : participantOrId?.id;
+      if (id === null || id === undefined) return null;
+      const key = String(id);
+      return participantRoomMap.get(key) || participantRoomMap.get(id) || null;
+    },
+    [participantRoomMap]
+  );
 
   const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
   const [mainRoomSupportStatus, setMainRoomSupportStatus] = useState(null);
@@ -5850,8 +5874,9 @@ export default function NewLiveMeeting() {
       if (joinedParticipants.length === 0) return;
 
       const isParticipantInLoungeOrBreakout = (participant) => {
-        const roomInfo = participantRoomMap.get(participant?.id);
-        if (roomInfo?.type === "lounge" || roomInfo?.type === "breakout") return true;
+        const roomInfo = getParticipantRoomInfo(participant);
+        const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || "");
+        if (roomType === "lounge" || roomType === "breakout") return true;
 
         const participantUserId = getBackendUserId(participant);
         if (!participantUserId) return false;
@@ -5901,7 +5926,7 @@ export default function NewLiveMeeting() {
         }
       }
     },
-    [dyteMeeting, getJoinedParticipants, isHost, loungeTables, participantRoomMap]
+    [dyteMeeting, getJoinedParticipants, isHost, loungeTables, getParticipantRoomInfo]
   );
 
   const forceMuteParticipant = useCallback(
@@ -7093,20 +7118,20 @@ export default function NewLiveMeeting() {
 
             // Cache the user_id → dyte_participant_id mapping
             if (user_id && dyte_participant_id) {
-              participantIdMapRef.current.set(dyte_participant_id, user_id);
+              participantIdMapRef.current.set(String(dyte_participant_id), String(user_id));
             }
 
             if (action === "left" || !current_room) {
               // User left the meeting or a room
-              if (dyte_participant_id && newRoomMap.has(dyte_participant_id)) {
-                newRoomMap.delete(dyte_participant_id);
+              if (dyte_participant_id && newRoomMap.has(String(dyte_participant_id))) {
+                newRoomMap.delete(String(dyte_participant_id));
                 mapChanged = true;
                 console.log(`[MainSocket] Participant ${user_id} left room`);
               }
             } else {
               // User joined or switched rooms
               if (dyte_participant_id) {
-                newRoomMap.set(dyte_participant_id, {
+                newRoomMap.set(String(dyte_participant_id), {
                   type: current_room.type || "main",
                   roomId: current_room.room_id || null,
                   roomName: current_room.room_name || "Main Room",
@@ -7176,11 +7201,11 @@ export default function NewLiveMeeting() {
             const { dyte_participant_id, user_id, current_room } = p;
 
             if (user_id && dyte_participant_id) {
-              participantIdMapRef.current.set(dyte_participant_id, user_id);
+              participantIdMapRef.current.set(String(dyte_participant_id), String(user_id));
             }
 
             if (dyte_participant_id && current_room) {
-              newRoomMap.set(dyte_participant_id, {
+              newRoomMap.set(String(dyte_participant_id), {
                 type: current_room.type || "main",
                 roomId: current_room.room_id || null,
                 roomName: current_room.room_name || "Main Room",
@@ -9535,9 +9560,9 @@ export default function NewLiveMeeting() {
 
     const userIdsOutsideLounge = new Set();
     for (const [dyteParticipantId, roomInfo] of participantRoomMap.entries()) {
-      const userId = participantIdMapRef.current?.get(dyteParticipantId);
+      const userId = participantIdMapRef.current?.get(String(dyteParticipantId));
       if (!userId) continue;
-      const roomType = String(roomInfo?.type || "").toLowerCase();
+      const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || "");
       if (roomType && roomType !== "lounge") {
         userIdsOutsideLounge.add(String(userId));
       }
@@ -10928,11 +10953,12 @@ export default function NewLiveMeeting() {
     if (!isHost || !dyteMeeting?.participants?.joined || !dyteMeeting?.self) return;
     const handleParticipantJoined = async (participant) => {
       if (participant.id === dyteMeeting.self?.id) return;
-      const roomInfo = participantRoomMap.get(participant?.id);
+      const roomInfo = getParticipantRoomInfo(participant);
       const participantUserId = getBackendUserId(participant);
+      const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || "");
       const isInLoungeOrBreakout =
-        roomInfo?.type === "lounge" ||
-        roomInfo?.type === "breakout" ||
+        roomType === "lounge" ||
+        roomType === "breakout" ||
         loungeTables.some((table) => {
           if (!table?.participants || !participantUserId) return false;
           const participantsList = Array.isArray(table.participants)
@@ -11023,7 +11049,7 @@ export default function NewLiveMeeting() {
     isHost,
     isOnBreak,
     loungeTables,
-    participantRoomMap,
+    getParticipantRoomInfo,
     spotlightTarget,
   ]);
 
@@ -11617,6 +11643,66 @@ export default function NewLiveMeeting() {
     });
   }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity, moodMap]);
 
+  const roomTypeByUserId = useMemo(() => {
+    const map = new Map();
+    for (const [dyteParticipantId, roomInfo] of participantRoomMap.entries()) {
+      const userId = participantIdMapRef.current?.get(String(dyteParticipantId));
+      if (!userId) continue;
+      const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || roomInfo?.roomName || "");
+      if (roomType) map.set(String(userId), roomType);
+    }
+    return map;
+  }, [participantRoomMap]);
+
+  const getParticipantRoomType = useCallback(
+    (participant) => {
+      if (!participant) return "main";
+      const directRoom = getParticipantRoomInfo(participant);
+      const directType = normalizeRoomType(directRoom?.type || directRoom?.roomCategory || directRoom?.roomName || "");
+      if (directType) return directType;
+
+      const backendUserId = getBackendUserId(participant?._raw || participant);
+      if (backendUserId) {
+        const fromUserId = roomTypeByUserId.get(String(backendUserId));
+        if (fromUserId) return fromUserId;
+      }
+
+      if (participant?.isOccupyingLounge) return "lounge";
+      return "main";
+    },
+    [getParticipantRoomInfo, roomTypeByUserId]
+  );
+
+  const isParticipantInMainRoom = useCallback(
+    (participant) => getParticipantRoomType(participant) === "main",
+    [getParticipantRoomType]
+  );
+
+  const nonMainParticipantKeysForPeek = useMemo(() => {
+    const keys = new Set();
+
+    for (const [dyteParticipantId, roomInfo] of participantRoomMap.entries()) {
+      const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || roomInfo?.roomName || "");
+      if (!roomType || roomType === "main") continue;
+      const userId = participantIdMapRef.current?.get(String(dyteParticipantId));
+      if (userId) keys.add(`id:${String(userId)}`);
+    }
+
+    for (const table of loungeTables || []) {
+      const participantsList = Array.isArray(table?.participants)
+        ? table.participants
+        : Object.values(table?.participants || {});
+      for (const tableParticipant of participantsList) {
+        const userId = tableParticipant?.user_id || tableParticipant?.userId;
+        if (userId !== undefined && userId !== null && String(userId)) {
+          keys.add(`id:${String(userId)}`);
+        }
+      }
+    }
+
+    return Array.from(keys);
+  }, [participantRoomMap, loungeTables]);
+
   const hostVirtualAudienceMembers = useMemo(() => {
     if (!isHost || isBreakout || !Array.isArray(onlineUsers) || onlineUsers.length === 0) return [];
 
@@ -11712,7 +11798,7 @@ export default function NewLiveMeeting() {
 
     const nextValue = participants.some((participant) => {
       if (!participant?.id) return false;
-      if (participant?.isOccupyingLounge) return false;
+      if (!isParticipantInMainRoom(participant)) return false;
       const inCurrentMainRoom =
         Boolean(participant?.inMeeting) ||
         Boolean(dyteMeeting?.self?.id && participant.id === dyteMeeting.self.id);
@@ -11720,7 +11806,7 @@ export default function NewLiveMeeting() {
     });
 
     setHasLiveSupportPresenceInMainRoom(nextValue);
-  }, [isBreakout, participants, dyteMeeting?.self?.id]);
+  }, [isBreakout, participants, dyteMeeting?.self?.id, isParticipantInMainRoom]);
 
   // ✅ Phase 3: Sync loungeTables with participantRoomMap
   useEffect(() => {
@@ -11744,12 +11830,12 @@ export default function NewLiveMeeting() {
 
           // Find the corresponding Dyte participant
           const dyteParticipant = participants.find(p => {
-            const pUserId = getBackendUserId(p) || participantIdMapRef.current?.get(p.id);
+            const pUserId = getBackendUserId(p) || participantIdMapRef.current?.get(String(p.id));
             return pUserId && String(pUserId) === userId;
           });
 
           if (dyteParticipant && dyteParticipant.id) {
-            newRoomMap.set(dyteParticipant.id, {
+            newRoomMap.set(String(dyteParticipant.id), {
               type: roomType,
               roomId: String(table.id),
               roomName: roomName,
@@ -11758,7 +11844,7 @@ export default function NewLiveMeeting() {
             });
 
             // Update cache
-            participantIdMapRef.current.set(dyteParticipant.id, userId);
+            participantIdMapRef.current.set(String(dyteParticipant.id), userId);
           }
         }
       }
@@ -11782,7 +11868,7 @@ export default function NewLiveMeeting() {
       if (pUserId && !loungeUserIds.has(String(pUserId))) {
         // ✅ Always update to Main Room if not in any lounge (catches participants leaving lounges)
         if (p.inMeeting) {
-          newRoomMap.set(p.id, {
+          newRoomMap.set(String(p.id), {
             type: "main",
             roomId: null,
             roomName: "Main Room",
@@ -12310,7 +12396,7 @@ export default function NewLiveMeeting() {
           presenter = dyteMeeting.self;
         }
       }
-      if (presenter && !(suppressHostPresenceInMainRoom && isLikelyHostParticipant(presenter))) {
+      if (presenter && isParticipantInMainRoom(presenter) && !(suppressHostPresenceInMainRoom && isLikelyHostParticipant(presenter))) {
         return presenter?._raw || presenter;
       }
     }
@@ -12341,7 +12427,7 @@ export default function NewLiveMeeting() {
         }
       }
 
-      if (spotlighted && !(suppressHostPresenceInMainRoom && isLikelyHostParticipant(spotlighted))) {
+      if (spotlighted && isParticipantInMainRoom(spotlighted) && !(suppressHostPresenceInMainRoom && isLikelyHostParticipant(spotlighted))) {
         return spotlighted?._raw || spotlighted;
       }
     }
@@ -12359,15 +12445,14 @@ export default function NewLiveMeeting() {
         getJoinedParticipants().find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
         participants.find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
         (dyteMeeting?.self && getParticipantUserKey(dyteMeeting.self) === primaryHostKey ? dyteMeeting.self : null);
-      // Prefer current Dyte room presence over lounge metadata (location flags can be stale during transitions).
-      const creatorInCurrentRoom = participantInCurrentDyteRoom(creatorHost);
-      if (creatorHost && (creatorInCurrentRoom || !creatorHost.isOccupyingLounge)) {
+      const creatorInMainRoom = creatorHost ? isParticipantInMainRoom(creatorHost) : false;
+      if (creatorHost && creatorInMainRoom) {
         if (suppressHostPresenceInMainRoom && isLikelyHostParticipant(creatorHost)) {
           return null;
         }
         console.log("[LatestPinnedHost] ✅ Pinning creator host from main room:", creatorHost.name);
         return creatorHost?._raw || creatorHost;
-      } else if (creatorHost && creatorHost.isOccupyingLounge) {
+      } else if (creatorHost && !creatorInMainRoom) {
         console.log("[LatestPinnedHost] ❌ Creator host is in breakout room, not pinning in main view:", creatorHost.name);
         // Fall through to find other participants
       }
@@ -12377,16 +12462,17 @@ export default function NewLiveMeeting() {
     // In breakout/lounge, always pin self if host is present
     if (isPrimaryBroadcastHost && dyteMeeting?.self) {
       const selfParticipant = participants.find(x => x.id === dyteMeeting.self.id);
+      const selfInMainRoom = selfParticipant ? isParticipantInMainRoom(selfParticipant) : false;
 
       // ✅ NEW RULE: If host is in lounge, ALWAYS show the host (not other participants)
       // This ensures both host and audience see the host when they're present
-      if (selfParticipant?.isOccupyingLounge && isBreakout) {
+      if (!selfInMainRoom && isBreakout) {
         console.log("[LoungePinning] Host in lounge: showing self (the host) in pinned area");
         return selfParticipant;
       }
 
       // If host is in lounge and we're in main view, find another participant to pin instead
-      if (selfParticipant?.isOccupyingLounge && !isBreakout) {
+      if (!selfInMainRoom && !isBreakout) {
         console.log("[LoungePinning] Host is in lounge, looking for alternative participant from main room...", {
           selfId: selfParticipant.id,
           selfName: selfParticipant.name
@@ -12397,7 +12483,7 @@ export default function NewLiveMeeting() {
         const mainAreaParticipants = participants.filter(
           x =>
             x.id !== dyteMeeting.self.id &&  // Exclude self (host in lounge)
-            !x.isOccupyingLounge &&           // Only show main area participants
+            isParticipantInMainRoom(x) &&     // Only show main area participants
             x.id                              // Must have valid ID
         );
         console.log("[LoungePinning] Main area participants available:", mainAreaParticipants.map(p => ({
@@ -12501,8 +12587,7 @@ export default function NewLiveMeeting() {
             inMeeting: hostParticipant.inMeeting,
             preset: hostParticipant.presetName
           });
-          const hostInCurrentRoom = participantInCurrentDyteRoom(hostParticipant);
-          if (hostInCurrentRoom || !hostParticipant.isOccupyingLounge) {
+          if (isParticipantInMainRoom(hostParticipant)) {
             console.log("[LatestPinnedHost] ✅ PINNING: Found host in main room, using as pinned host:", hostParticipant.name);
             p = hostParticipant;
           } else {
@@ -12548,36 +12633,25 @@ export default function NewLiveMeeting() {
         }
       }
 
-      if (pinnedHostParticipant?.isOccupyingLounge && !isBreakout) {
-        console.log("[LoungePinning-Audience] Pinned host IS in lounge, finding other lounge members...");
+      if (pinnedHostParticipant && !isBreakout && !isParticipantInMainRoom(pinnedHostParticipant)) {
+        console.log("[LoungePinning-Audience] Pinned host is not in main room, finding main room participant...");
 
-        // ✅ When pinned host is in a lounge, show OTHER members in the SAME lounge, not main room participants
-        const loungeMembers = participants.filter(
+        const mainRoomParticipants = participants.filter(
           x =>
-            x.isOccupyingLounge && // Must be in a lounge
-            x.id !== p.id && // Not the pinned host
-            x.id !== dyteMeeting?.self?.id && // Not self (the viewer)
-            x.inMeeting &&
-            x.id
+            x.id &&
+            isParticipantInMainRoom(x) &&
+            x.id !== p.id &&
+            x.id !== dyteMeeting?.self?.id &&
+            (!suppressHostPresenceInMainRoom || !isLikelyHostParticipant(x))
         );
 
-        console.log("[LoungePinning] Lounge members found:", loungeMembers.map(x => ({
-          id: x.id,
-          name: x.name
-        })));
-
-        if (loungeMembers.length > 0) {
-          console.log("[LoungePinning] Audience: Pinning lounge member:", loungeMembers[0].name);
-          p = loungeMembers[0];
+        if (mainRoomParticipants.length > 0) {
+          console.log("[LoungePinning-Audience] Pinning main room participant:", mainRoomParticipants[0].name);
+          p = mainRoomParticipants[0];
         } else {
-          console.log("[LoungePinning] Audience: No other members in lounge, showing welcome screen");
+          console.log("[LoungePinning-Audience] No main room participants available, showing welcome screen");
           return null;
         }
-      } else {
-        console.log("[LoungePinning-Audience] Pinned host is NOT in lounge or not found:", {
-          pinnedHostFound: !!pinnedHostParticipant,
-          pinnedHostInLounge: pinnedHostParticipant?.isOccupyingLounge
-        });
       }
     }
 
@@ -12630,14 +12704,14 @@ export default function NewLiveMeeting() {
     // ✅ CRITICAL FIX: When viewing main room (!isBreakout), only show main room participants
     // If all participants are in lounges, show null (no participant in main stage)
     if (!isBreakout && p) {
-      const pinnedIsInLounge = p.isOccupyingLounge && !participantInCurrentDyteRoom(p);
-      if (pinnedIsInLounge) {
-        console.log("[MainRoomFilter] Pinned participant is in lounge, not showing in main room view");
+      const pinnedIsInMainRoom = isParticipantInMainRoom(p);
+      if (!pinnedIsInMainRoom) {
+        console.log("[MainRoomFilter] Pinned participant is not in main room, not showing in main room view");
         // Try to find a main room participant
         const mainRoomParticipants = participants.filter(
           (x) =>
             x.id &&
-            !x.isOccupyingLounge &&
+            isParticipantInMainRoom(x) &&
             x.id !== dyteMeeting?.self?.id &&
             (!suppressHostPresenceInMainRoom || !isLikelyHostParticipant(x))
         );
@@ -12747,6 +12821,7 @@ export default function NewLiveMeeting() {
     currentLoungeUserIds,
     presentationTarget,
     isMainRoomSupportMissing,
+    isParticipantInMainRoom,
   ]);
 
   // Pinned “host” view data
@@ -14629,7 +14704,8 @@ export default function NewLiveMeeting() {
       // If attendee is still in pre-event lounge waiting list, keep them only in PRE-EVENT LOUNGE section.
       if (isHost && eventData?.lounge_enabled_waiting_room && preEventLoungeUserIds.size > 0) {
         const backendUserId = String(getBackendUserId(p?._raw || p) || getBackendUserId(p) || "");
-        const roomType = String(participantRoomMap.get(p?.id)?.type || "").toLowerCase();
+        const roomInfo = getParticipantRoomInfo(p);
+        const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || "");
         // Hide from regular member groups only when user is still actually in lounge.
         // This avoids temporary "missing from all lists" after admit when lounge polling is stale.
         if (backendUserId && preEventLoungeUserIds.has(backendUserId) && roomType === "lounge") {
@@ -14691,7 +14767,7 @@ export default function NewLiveMeeting() {
     if (isHost && !isBreakout) {
       const hostWithLocation = host.map(p => ({
         ...p,
-        _roomLocation: participantRoomMap.get(p.id) || {
+        _roomLocation: getParticipantRoomInfo(p) || {
           type: "main",
           roomId: null,
           roomName: "Main Room"
@@ -14699,7 +14775,7 @@ export default function NewLiveMeeting() {
       }));
       const speakersWithLocation = speakers.map(p => ({
         ...p,
-        _roomLocation: participantRoomMap.get(p.id) || {
+        _roomLocation: getParticipantRoomInfo(p) || {
           type: "main",
           roomId: null,
           roomName: "Main Room"
@@ -14707,7 +14783,7 @@ export default function NewLiveMeeting() {
       }));
       const audienceWithLocation = audience.map(p => ({
         ...p,
-        _roomLocation: participantRoomMap.get(p.id) || {
+        _roomLocation: getParticipantRoomInfo(p) || {
           type: "main",
           roomId: null,
           roomName: "Main Room"
@@ -14736,6 +14812,7 @@ export default function NewLiveMeeting() {
     primaryHostUserId,
     isMainRoomSupportMissing,
     participantRoomMap,  // ✅ PHASE 4: Added dependency
+    getParticipantRoomInfo,
     assignedRoleByIdentity,  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
     hostVirtualAudienceMembers
   ]);
@@ -14755,7 +14832,7 @@ export default function NewLiveMeeting() {
     // Filter participants based on room type
     const filterByRoomType = (participants) => {
       return participants.filter(p => {
-        const roomType = p._roomLocation?.type || "main";
+        const roomType = normalizeRoomType(p._roomLocation?.type || "main");
         if (participantRoomFilter === "main") return roomType === "main";
         if (participantRoomFilter === "breakout") return roomType === "breakout";
         if (participantRoomFilter === "lounge") return roomType === "lounge";
@@ -14976,11 +15053,23 @@ export default function NewLiveMeeting() {
     return participants.filter((p) => {
       if (!p.inMeeting) return false;
       if (isPinnedParticipant(p)) return false;
-      if (!isBreakout && p.isOccupyingLounge) return false;
+      if (!isParticipantInMainRoom(p)) return false;
       if (suppressHostPresenceInMainRoom && isLikelyHostParticipant(p)) return false;
       return true;
     });
-  }, [participants, isBreakout, latestPinnedHost, dyteMeeting?.self?.id, currentLoungeUserIds, isHost, isMainRoomSupportMissing, pinnedHost?.id, hostIdHint, primaryHostUserId]);
+  }, [
+    participants,
+    isBreakout,
+    latestPinnedHost,
+    dyteMeeting?.self?.id,
+    currentLoungeUserIds,
+    isHost,
+    isMainRoomSupportMissing,
+    pinnedHost?.id,
+    hostIdHint,
+    primaryHostUserId,
+    isParticipantInMainRoom,
+  ]);
 
   // Strip should be only others (no host duplicate)
   const stageStrip = stageOthers;
@@ -20519,10 +20608,7 @@ export default function NewLiveMeeting() {
               onHeaderPointerDown={handleMainRoomPeekDragStart}
               isDragging={isDraggingMainRoomPeek}
               pinnedParticipantId={pinnedRaw?.id}
-              loungeParticipantKeys={participants
-                .filter((p) => p.isOccupyingLounge)
-                .map((p) => getParticipantUserKey(p?._raw || p))
-                .filter(Boolean)}
+              loungeParticipantKeys={nonMainParticipantKeysForPeek}
             />
           </Box>
         )}
