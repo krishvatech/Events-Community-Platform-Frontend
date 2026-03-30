@@ -1056,7 +1056,7 @@ export default function EventDetailsPage() {
                   {/* EVENT HEADER CARD - NEW LAYOUT */}
                   <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
                     {/* Top section: Image + Details in a grid */}
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 } }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 }, alignItems: 'start' }}>
                       {/* LEFT: Event Image */}
                       <Box>
                         {(event.cover_image || event.preview_image) ? (
