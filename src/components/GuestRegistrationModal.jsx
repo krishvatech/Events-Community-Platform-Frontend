@@ -26,7 +26,7 @@ import {
  * Collects basic account fields and password.
  * Triggers Cognito account creation and email verification.
  */
-export default function GuestRegistrationModal({ open, onClose }) {
+export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
   const guestEmail = localStorage.getItem("guest_email") || "";
   const guestName = localStorage.getItem("guest_name") || "";
   const nameParts = guestName.trim().split(/\s+/).filter(Boolean);
@@ -47,6 +47,14 @@ export default function GuestRegistrationModal({ open, onClose }) {
   const [pendingUsername, setPendingUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const onClose = () => {
+    setStage("signup");
+    setVerifyCode("");
+    setPendingUsername("");
+    setError("");
+    onCloseProp();
+  };
 
   const switchToRegisteredSessionAndRejoin = (session) => {
     const idToken = session?.idToken || "";
@@ -309,91 +317,95 @@ export default function GuestRegistrationModal({ open, onClose }) {
               : "Create an account to save your connections and access recordings."}
           </Typography>
 
-          <TextField
-            label="First Name"
-            required
-            fullWidth
-            size="small"
-            value={form.first_name}
-            onChange={handleInputChange("first_name")}
-            disabled={loading || stage === "confirm"}
-            sx={textFieldSx}
-          />
-          <TextField
-            label="Last Name"
-            required
-            fullWidth
-            size="small"
-            value={form.last_name}
-            onChange={handleInputChange("last_name")}
-            disabled={loading || stage === "confirm"}
-            sx={textFieldSx}
-          />
-          <TextField
-            label="Email"
-            required
-            type="email"
-            fullWidth
-            size="small"
-            value={form.email}
-            onChange={handleInputChange("email")}
-            disabled={loading || stage === "confirm"}
-            sx={textFieldSx}
-          />
+          {stage === "signup" && (
+            <>
+              <TextField
+                label="First Name"
+                required
+                fullWidth
+                size="small"
+                value={form.first_name}
+                onChange={handleInputChange("first_name")}
+                disabled={loading}
+                sx={textFieldSx}
+              />
+              <TextField
+                label="Last Name"
+                required
+                fullWidth
+                size="small"
+                value={form.last_name}
+                onChange={handleInputChange("last_name")}
+                disabled={loading}
+                sx={textFieldSx}
+              />
+              <TextField
+                label="Email"
+                required
+                type="email"
+                fullWidth
+                size="small"
+                value={form.email}
+                onChange={handleInputChange("email")}
+                disabled={loading}
+                sx={textFieldSx}
+              />
 
-          {/* Password field */}
-          <TextField
-            label="Password"
-            type={showPassword ? "text" : "password"}
-            required
-            fullWidth
-            size="small"
-            value={form.password}
-            onChange={handleInputChange("password")}
-            disabled={loading || stage === "confirm"}
-            sx={textFieldSx}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowPassword(!showPassword)}
-                    edge="end"
-                    size="small"
-                    sx={{ color: "rgba(255,255,255,0.6)" }}
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
+              {/* Password field */}
+              <TextField
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                required
+                fullWidth
+                size="small"
+                value={form.password}
+                onChange={handleInputChange("password")}
+                disabled={loading}
+                sx={textFieldSx}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        size="small"
+                        sx={{ color: "rgba(255,255,255,0.6)" }}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
 
-          {/* Confirm password field */}
-          <TextField
-            label="Confirm Password"
-            type={showConfirm ? "text" : "password"}
-            required
-            fullWidth
-            size="small"
-            value={form.confirm_password}
-            onChange={handleInputChange("confirm_password")}
-            disabled={loading || stage === "confirm"}
-            sx={textFieldSx}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    edge="end"
-                    size="small"
-                    sx={{ color: "rgba(255,255,255,0.6)" }}
-                  >
-                    {showConfirm ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
+              {/* Confirm password field */}
+              <TextField
+                label="Confirm Password"
+                type={showConfirm ? "text" : "password"}
+                required
+                fullWidth
+                size="small"
+                value={form.confirm_password}
+                onChange={handleInputChange("confirm_password")}
+                disabled={loading}
+                sx={textFieldSx}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowConfirm(!showConfirm)}
+                        edge="end"
+                        size="small"
+                        sx={{ color: "rgba(255,255,255,0.6)" }}
+                      >
+                        {showConfirm ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </>
+          )}
 
           {stage === "confirm" && (
             <TextField
@@ -417,7 +429,7 @@ export default function GuestRegistrationModal({ open, onClose }) {
               !form.first_name.trim() ||
               !form.last_name.trim() ||
               !form.email.trim() ||
-              !form.password ||
+              !form.password || 
               !form.confirm_password
             }
             sx={{ py: 1, color: "#ffffff", fontWeight: 600 }}

@@ -2470,7 +2470,8 @@ export default function NewLiveMeeting() {
   }, [tab]);
 
   // Desktop right panel toggle
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  // Guest users (unregistered) start with the sidebar closed to avoid an aggressive UI experience
+  const [rightPanelOpen, setRightPanelOpen] = useState(!isGuest);
   const [loungeOpen, setLoungeOpen] = useState(false);
   const [showSpeedNetworking, setShowSpeedNetworking] = useState(false);
   const [speedNetworkingMainIsolation, setSpeedNetworkingMainIsolation] = useState(false);
@@ -2555,10 +2556,22 @@ export default function NewLiveMeeting() {
   const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
   const isQnaActive = isPanelOpen && tab === 1;
 
-  // When switching to desktop, keep panel open by default
+  // When switching to desktop, keep panel open by default (but not for unregistered guests)
   useEffect(() => {
-    if (isMdUp) setRightPanelOpen(true);
+    if (isMdUp && !isGuest) setRightPanelOpen(true);
   }, [isMdUp]);
+
+  // Once a guest registers or logs in, open the sidebar
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      const stillGuest = localStorage.getItem("is_guest") === "true";
+      if (!stillGuest) {
+        setRightPanelOpen(true);
+      }
+    };
+    window.addEventListener("auth:changed", handleAuthChanged);
+    return () => window.removeEventListener("auth:changed", handleAuthChanged);
+  }, []);
 
   const toggleRightPanel = (targetTab = 0) => {
     let nextTab = targetTab;
