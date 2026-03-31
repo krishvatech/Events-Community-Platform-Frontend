@@ -33,7 +33,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import { formatSessionTimeRange } from "../utils/timezoneUtils";
+import { normalizeTimezoneName, getBrowserTimezone } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { toast } from "react-toastify";
 
@@ -1133,9 +1133,11 @@ export default function EventDetailsPage() {
                                       <Typography variant="body2" fontWeight={500} sx={{ color: 'text.primary' }}>
                                         {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")} <span style={{ color: '#9ca3af' }}>({event.timezone || 'UTC'})</span>
                                       </Typography>
-                                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
-                                        <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span> {dayjs(event.start_time).tz(dayjs.tz.guess()).format("h:mm A")} – {dayjs(event.end_time).tz(dayjs.tz.guess()).format("h:mm A")} <span style={{ color: '#9ca3af' }}>({dayjs.tz.guess()})</span>
-                                      </Typography>
+                                      {((event?.event_format === 'virtual' || event?.event_format === 'hybrid') || (event?.format === 'virtual' || event?.format === 'hybrid')) && (
+                                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
+                                          <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span> {dayjs(event.start_time).tz(dayjs.tz.guess()).format("h:mm A")} – {dayjs(event.end_time).tz(dayjs.tz.guess()).format("h:mm A")} <span style={{ color: '#9ca3af' }}>({dayjs.tz.guess()})</span>
+                                        </Typography>
+                                      )}
                                     </Box>
                                   </Stack>
                                 )}
@@ -1593,11 +1595,21 @@ export default function EventDetailsPage() {
                                     {dayjs(session.start_time).format("MMM D, YYYY")}
                                   </Typography>
                                 </Stack>
-                                <Stack direction="row" spacing={0.5} alignItems="center">
-                                  <AccessTimeIcon fontSize="small" sx={{ color: 'teal.700' }} />
-                                  <Typography variant="body2">
-                                    {dayjs(session.start_time).format("h:mm A")} – {dayjs(session.end_time).format("h:mm A")}
-                                  </Typography>
+                                <Stack direction="column" spacing={0.5}>
+                                  <Stack direction="row" spacing={0.5} alignItems="center">
+                                    <AccessTimeIcon fontSize="small" sx={{ color: 'teal.700' }} />
+                                    <Typography variant="body2">
+                                      {dayjs(session.start_time).format("h:mm A")} – {dayjs(session.end_time).format("h:mm A")}
+                                      {event.timezone && (
+                                        <span style={{ color: '#9ca3af' }}>({normalizeTimezoneName(event.timezone)})</span>
+                                      )}
+                                    </Typography>
+                                  </Stack>
+                                  {((event?.event_format === 'virtual' || event?.event_format === 'hybrid') || (event?.format === 'virtual' || event?.format === 'hybrid')) && (
+                                    <Typography variant="caption" sx={{ color: 'teal.700', fontWeight: 600, ml: 3.5 }}>
+                                      Your Time: {dayjs(session.start_time).tz(getBrowserTimezone()).format("h:mm A")} – {dayjs(session.end_time).tz(getBrowserTimezone()).format("h:mm A")} ({getBrowserTimezone()})
+                                    </Typography>
+                                  )}
                                 </Stack>
                               </Stack>
 

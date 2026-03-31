@@ -460,7 +460,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
   const userTimezoneName = getBrowserTimezone();
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
-  const showYourTime = ev.event_format === 'virtual' && organizerTimezone && timesDiffer;
+  const showYourTime = (ev.event_format === 'virtual' || ev.event_format === 'hybrid') && organizerTimezone && timesDiffer;
   const token =
     localStorage.getItem("access_token") ||
     localStorage.getItem("access_token") ||
@@ -757,9 +757,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   <div className="flex items-center gap-2">
                     <CalendarMonthIcon fontSize="small" className="text-teal-700" />
                     <span className="text-xs font-medium text-neutral-900">
-                      {ev.start ? dayjs(ev.start).format("MMM D, YYYY") : ""}
+                      {ev.start ? orgStartObj.format("MMM D, YYYY") : ""}
                       {ev.end && ev.start !== ev.end
-                        ? ` – ${dayjs(ev.end).format("MMM D, YYYY")}`
+                        ? ` – ${orgEndObj.format("MMM D, YYYY")}`
                         : ""}
                     </span>
                   </div>
@@ -774,7 +774,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                 <div className="flex flex-col gap-4">
                   <span className="inline-flex items-center gap-2">
                     <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                    {dayjs(ev.start).format("MMMM D, YYYY")}
+                    {orgStartObj.format("MMMM D, YYYY")}
                   </span>
                   <span className="flex items-start gap-2">
                     <AccessTimeIcon fontSize="small" className="text-teal-700 mt-0.5 flex-shrink-0" />
@@ -902,10 +902,17 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         <div className="font-medium text-neutral-900">{session.title || `Session ${idx + 1}`}</div>
                         <div className="text-neutral-500 mt-0.5">
                           <span className="inline-block bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded text-xs mr-1.5">{sessionType}</span>
-                          <span>
-                            {sessionTimeRange.primary}
-                            {organizerTimezone && (
-                              <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                          <span className="flex flex-col gap-0.5">
+                            <span>
+                              {sessionTimeRange.primary}
+                              {organizerTimezone && (
+                                <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
+                              )}
+                            </span>
+                            {(ev.event_format === 'virtual' || ev.event_format === 'hybrid') && sessionTimeRange.secondary && (
+                              <span className="text-xs text-neutral-600">
+                                <span className="font-semibold text-teal-700">Your Time:</span> {sessionTimeRange.secondary.label.replace('Your Time: ', '')}
+                              </span>
                             )}
                           </span>
                           <span className="ml-1">•</span>
@@ -1228,7 +1235,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
 
   const userTimezoneName = getBrowserTimezone();
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
-  const showYourTime = ev.event_format === 'virtual' && organizerTimezone && timesDiffer;
+  const showYourTime = (ev.event_format === 'virtual' || ev.event_format === 'hybrid') && organizerTimezone && timesDiffer;
   const token =
     localStorage.getItem("access_token") ||
     localStorage.getItem("access_token") ||
