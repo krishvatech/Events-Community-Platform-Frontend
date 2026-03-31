@@ -1,6 +1,6 @@
 // src/pages/CoursesPage.jsx
-// Moodle LMS course integration page.
-// Shows the user's enrolled courses (synced from Moodle) and a full course catalogue.
+// IMAA LMS course integration page.
+// Shows the user's enrolled courses (synced via Edwiser Bridge) and a full course catalogue.
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -302,7 +302,7 @@ function MyCoursesTab() {
         <Typography variant="body2" color="text.secondary">
           {enrollments.length === 0 ? "No courses found" : `${enrollments.length} course${enrollments.length !== 1 ? "s" : ""} enrolled`}
         </Typography>
-        <Tooltip title="Sync from Moodle LMS">
+        <Tooltip title="Sync from IMAA LMS">
           <span>
             <Button
               size="small"
@@ -327,7 +327,7 @@ function MyCoursesTab() {
             No courses enrolled yet
           </Typography>
           <Typography variant="body2" color="text.disabled">
-            Your Moodle LMS courses will appear here once enrolled.
+            Your IMAA courses will appear here once enrolled.
           </Typography>
         </Box>
       ) : (
@@ -510,7 +510,7 @@ export default function CoursesPage() {
           My Courses & Trainings
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Your IMAA courses synced from the Moodle LMS. Click "Continue in LMS" to open a course.
+          Your IMAA courses synced via Edwiser Bridge. Click "Continue in LMS" to open a course.
         </Typography>
       </Box>
 
