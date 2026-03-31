@@ -2468,7 +2468,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
   // Fetch visitors when visitors tab is opened (tab === 2)
   useEffect(() => {
-    if (!isMe || !viewerIsStaff || tab !== 2) {
+    if ((!isMe || !viewerIsStaff) && !(viewAsPublic && isAdminUser()) || tab !== 2) {
       return;
     }
 
@@ -3685,7 +3685,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                   >
                     <Tab label="Posts" />
                     <Tab label="About" />
-                    {isMe && viewerIsStaff && <Tab label="Visitors" />}
+                    {(isMe && viewerIsStaff || (viewAsPublic && isAdminUser())) && <Tab label="Visitors" />}
                   </Tabs>
                   <Divider />
                   {tab === 0 && (
@@ -4339,7 +4339,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                       </Stack>
                     </CardContent>
                   )}
-                  {isMe && viewerIsStaff && tab === 2 && (
+                  {(isMe && viewerIsStaff || (viewAsPublic && isAdminUser())) && tab === 2 && (
                     <CardContent>
                       {visitorsLoading ? (
                         <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
