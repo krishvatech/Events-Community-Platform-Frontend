@@ -349,6 +349,7 @@ export default function EventDetailsPage() {
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     "";
+  const isGuest = localStorage.getItem("is_guest") === "true";
   const location = useLocation();
   const preload = location.state?.event || null;
   const fallbackId = preload?.id || null;
@@ -1465,18 +1466,35 @@ export default function EventDetailsPage() {
                             }
                           </>
                         ) : !canJoinEventNow && !isPast ? (
-                          <Button
-                            onClick={handleRegister}
-                            variant="contained"
-                            sx={{
-                              textTransform: "none",
-                              backgroundColor: "#10b8a6",
-                              "&:hover": { backgroundColor: "#0ea5a4" },
-                            }}
-                            className="rounded-xl"
-                          >
-                            Register Now
-                          </Button>
+                          <>
+                            <Button
+                              onClick={handleRegister}
+                              variant="contained"
+                              sx={{
+                                textTransform: "none",
+                                backgroundColor: "#10b8a6",
+                                "&:hover": { backgroundColor: "#0ea5a4" },
+                              }}
+                              className="rounded-xl"
+                            >
+                              Register Now
+                            </Button>
+                            {(!token || isGuest) && (
+                              <Button
+                                onClick={() => setGuestModalOpen(true)}
+                                variant="outlined"
+                                sx={{
+                                  textTransform: "none",
+                                  borderColor: "#10b8a6",
+                                  color: "#10b8a6",
+                                  "&:hover": { borderColor: "#0ea5a4", backgroundColor: "rgba(16,184,166,0.04)" },
+                                }}
+                                className="rounded-xl"
+                              >
+                                {isGuest ? "Continue as Guest" : "Join as Guest"}
+                              </Button>
+                            )}
+                          </>
                         ) : canWatch ? (
                           <Button
                             component="a"
