@@ -56,6 +56,7 @@ import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
 import MagicLinkPage from "./pages/MagicLinkPage.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import CmsBridge from "./pages/CmsBridge.jsx";
+import CoursesPage from "./pages/CoursesPage.jsx";
 import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
 import VirtualSpeakersPage from "./pages/VirtualSpeakersPage.jsx";
 import { CircularProgress } from "@mui/material";
@@ -255,6 +256,7 @@ const AppShell = () => {
           {/* LIVE meeting page — no header/footer */}
           <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
 
+          <Route path="/account/courses" element={<RequireAuth><CoursesPage /></RequireAuth>} />
           <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
           <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
