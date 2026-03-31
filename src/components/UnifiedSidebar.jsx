@@ -578,7 +578,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             </Box>
 
             <Box sx={{ px: 1, pt: 0.5, pb: 0.5 }}>
-                <ListItemButton
+                {/* TODO: Re-enable Settings when ready */}
+                {/* <ListItemButton
                     onClick={() => navigate("/account/settings")}
                     sx={{ borderRadius: 2, px: 1.5, mx: 1, mb: 0.25, color: TEXT, "&:hover": { bgcolor: HOVER_BG } }}
                 >
@@ -586,7 +587,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                         <SettingsRoundedIcon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText primary="Settings" primaryTypographyProps={{ variant: "body2", fontWeight: 500 }} />
-                </ListItemButton>
+                </ListItemButton> */}
                 <Box
                     component="a"
                     href="https://imaa-institute.org"

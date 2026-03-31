@@ -4,7 +4,8 @@ import {
   useTheme, useMediaQuery
 } from '@mui/material';
 
-import { CustomDashboardIcon, CustomEventIcon,CustomCommunityIcon,CustomResourcesIcon,CustomSettingsIcon} from '../components/CustomIcons';
+import { CustomDashboardIcon, CustomEventIcon,CustomCommunityIcon,CustomResourcesIcon} from '../components/CustomIcons';
+// TODO: Re-enable when Settings is added back: import { CustomSettingsIcon } from '../components/CustomIcons';
 
 const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
   const muiTheme = useTheme();
@@ -15,7 +16,8 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
   { text: 'My Events', icon: <CustomEventIcon />, active: false },
   { text: 'Community', icon: <CustomCommunityIcon />, active: false },
   { text: 'Resources', icon: <CustomResourcesIcon />, active: false },
-  { text: 'Settings', icon: <CustomSettingsIcon />, active: false },
+  // TODO: Re-enable Settings when ready
+  // { text: 'Settings', icon: <CustomSettingsIcon />, active: false },
 ];
 
   const drawer = (
