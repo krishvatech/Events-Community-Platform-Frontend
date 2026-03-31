@@ -1366,7 +1366,7 @@ export default function EventDetailsPage() {
                           >
                             {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false, registration))}
                           </Button>
-                        ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" ? (
+                        ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" && (event.registration_type !== 'apply' || (myApplication && myApplication.status === 'approved')) ? (
                           <Button
                             disabled
                             variant="contained"
