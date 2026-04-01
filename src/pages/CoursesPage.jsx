@@ -3,6 +3,7 @@
 // Shows the user's enrolled courses (synced via Edwiser Bridge) and a full course catalogue.
 
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -83,6 +84,7 @@ function decodeEntities(str) {
 
 function CourseCard({ course, enrollment = null }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const navigate = useNavigate();
 
   const progress = enrollment?.progress ?? null;
   const completed = enrollment?.completed ?? false;
@@ -90,6 +92,8 @@ function CourseCard({ course, enrollment = null }) {
   const name = decodeEntities(enrollment?.full_name || course?.full_name || "");
   const category = decodeEntities(enrollment?.category_name || course?.category_name || null);
   const courseUrl = enrollment?.course_url || course?.course_url || "#";
+  // For enrolled courses, navigate to in-platform player; for catalogue, open in LMS
+  const playerPath = enrollment?.course_id ? `/account/courses/${enrollment.course_id}` : null;
 
   return (
     <Card
@@ -206,23 +210,40 @@ function CourseCard({ course, enrollment = null }) {
         <Box sx={{ flexGrow: 1 }} />
 
         {/* Launch button */}
-        <Button
-          variant={enrollment ? "contained" : "outlined"}
-          size="small"
-          endIcon={<OpenInNewRoundedIcon fontSize="small" />}
-          href={courseUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          sx={{
-            textTransform: "none",
-            borderRadius: 1.5,
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-          fullWidth
-        >
-          {completed ? "Review" : enrollment ? "Continue" : "Open in LMS"}
-        </Button>
+        {playerPath ? (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => navigate(playerPath)}
+            sx={{
+              textTransform: "none",
+              borderRadius: 1.5,
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+            fullWidth
+          >
+            {completed ? "Review" : "Continue"}
+          </Button>
+        ) : (
+          <Button
+            variant="outlined"
+            size="small"
+            endIcon={<OpenInNewRoundedIcon fontSize="small" />}
+            href={courseUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              textTransform: "none",
+              borderRadius: 1.5,
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+            fullWidth
+          >
+            Open in LMS
+          </Button>
+        )}
       </Box>
     </Card>
   );
@@ -510,7 +531,7 @@ export default function CoursesPage() {
           My Courses & Trainings
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Your IMAA courses synced via Edwiser Bridge. Click "Continue in LMS" to open a course.
+          Your IMAA courses synced via Edwiser Bridge. Click "Continue" to open a course in the platform.
         </Typography>
       </Box>
 
