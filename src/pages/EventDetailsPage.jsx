@@ -1112,10 +1112,17 @@ export default function EventDetailsPage() {
                               <Stack direction="row" spacing={1} alignItems="center" sx={{ fontSize: '0.875rem' }}>
                                 <CalendarMonthIcon fontSize="small" sx={{ color: 'teal' }} />
                                 <Typography variant="body2" fontWeight={500}>
-                                  {dayjs(event.start_time).format("MMM D, YYYY")}
-                                  {event.end_time && event.end_time !== event.start_time
-                                    ? ` – ${dayjs(event.end_time).format("MMM D, YYYY")}`
-                                    : ""}
+                                  {(() => {
+                                    const organizerTimezone = normalizeTimezoneName(event.timezone);
+                                    const startDate = organizerTimezone ? dayjs(event.start_time).tz(organizerTimezone).format("MMM D, YYYY") : dayjs(event.start_time).format("MMM D, YYYY");
+                                    const endDate = organizerTimezone ? dayjs(event.end_time).tz(organizerTimezone).format("MMM D, YYYY") : dayjs(event.end_time).format("MMM D, YYYY");
+                                    return (
+                                      <>
+                                        {startDate}
+                                        {event.end_time && event.end_time !== event.start_time ? ` – ${endDate}` : ""}
+                                      </>
+                                    );
+                                  })()}
                                 </Typography>
                               </Stack>
                             ) : (
@@ -1123,21 +1130,38 @@ export default function EventDetailsPage() {
                                 <Stack direction="row" spacing={1} alignItems="center">
                                   <CalendarMonthIcon fontSize="small" sx={{ color: 'teal' }} />
                                   <Typography variant="body2">
-                                    {dayjs(event.start_time).format("MMM D, YYYY")}
+                                    {(() => {
+                                      const organizerTimezone = normalizeTimezoneName(event.timezone);
+                                      return organizerTimezone ? dayjs(event.start_time).tz(organizerTimezone).format("MMM D, YYYY") : dayjs(event.start_time).format("MMM D, YYYY");
+                                    })()}
                                   </Typography>
                                 </Stack>
                                 {event.end_time && (
                                   <Stack direction="row" spacing={1} alignItems="flex-start">
                                     <AccessTimeIcon fontSize="small" sx={{ color: 'teal', mt: 0.25 }} />
                                     <Box>
-                                      <Typography variant="body2" fontWeight={500} sx={{ color: 'text.primary' }}>
-                                        {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")} <span style={{ color: '#9ca3af' }}>({event.timezone || 'UTC'})</span>
-                                      </Typography>
-                                      {((event?.event_format === 'virtual' || event?.event_format === 'hybrid') || (event?.format === 'virtual' || event?.format === 'hybrid')) && (
-                                        <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
-                                          <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span> {dayjs(event.start_time).tz(dayjs.tz.guess()).format("h:mm A")} – {dayjs(event.end_time).tz(dayjs.tz.guess()).format("h:mm A")} <span style={{ color: '#9ca3af' }}>({dayjs.tz.guess()})</span>
-                                        </Typography>
-                                      )}
+                                      {(() => {
+                                        const organizerTimezone = normalizeTimezoneName(event.timezone);
+                                        const orgStartTime = organizerTimezone ? dayjs(event.start_time).tz(organizerTimezone).format("h:mm A") : dayjs(event.start_time).format("h:mm A");
+                                        const orgEndTime = organizerTimezone ? dayjs(event.end_time).tz(organizerTimezone).format("h:mm A") : dayjs(event.end_time).format("h:mm A");
+                                        const localStartTime = dayjs(event.start_time).tz(dayjs.tz.guess()).format("h:mm A");
+                                        const localEndTime = dayjs(event.end_time).tz(dayjs.tz.guess()).format("h:mm A");
+                                        const isVirtualOrHybrid = (event?.event_format === 'virtual' || event?.event_format === 'hybrid') || (event?.format === 'virtual' || event?.format === 'hybrid');
+                                        const timesDiffer = (orgStartTime !== localStartTime || orgEndTime !== localEndTime);
+
+                                        return (
+                                          <>
+                                            <Typography variant="body2" fontWeight={500} sx={{ color: 'text.primary' }}>
+                                              {orgStartTime} – {orgEndTime} <span style={{ color: '#9ca3af' }}>({event.timezone || 'UTC'})</span>
+                                            </Typography>
+                                            {isVirtualOrHybrid && timesDiffer && (
+                                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
+                                                <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span> {localStartTime} – {localEndTime} <span style={{ color: '#9ca3af' }}>({dayjs.tz.guess()})</span>
+                                              </Typography>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
                                     </Box>
                                   </Stack>
                                 )}
