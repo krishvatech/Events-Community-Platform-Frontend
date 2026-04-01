@@ -12,10 +12,12 @@ import {
   Stack,
   Box,
   Tooltip,
+  Typography,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import dayjs from "dayjs";
+import { formatSessionTimeRange } from "../utils/timezoneUtils";
 
 const SESSION_TYPE_COLORS = {
   main: "#10b8a6",
@@ -31,7 +33,7 @@ const SESSION_TYPE_LABELS = {
   networking: "Networking",
 };
 
-function SessionList({ sessions, onEdit, onDelete }) {
+function SessionList({ sessions, onEdit, onDelete, timezone }) {
   if (!sessions || sessions.length === 0) {
     return (
       <Box
@@ -53,6 +55,14 @@ function SessionList({ sessions, onEdit, onDelete }) {
     return date.isValid() ? date.format("MMM DD, YYYY • h:mm A") : "—";
   };
 
+  const formatSessionDisplay = (startTime, endTime) => {
+    const formatted = formatSessionTimeRange(startTime, endTime, timezone);
+    return {
+      primary: formatted.primary,
+      secondary: formatted.secondary,
+    };
+  };
+
   return (
     <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e5e7eb" }}>
       <Table size="small">
@@ -60,8 +70,18 @@ function SessionList({ sessions, onEdit, onDelete }) {
           <TableRow>
             <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Start</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>End</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>
+              <Box>
+                <Typography variant="subtitle2">Start</Typography>
+                <Typography variant="caption" sx={{ color: "#6b7280" }}>Event • User</Typography>
+              </Box>
+            </TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>
+              <Box>
+                <Typography variant="subtitle2">End</Typography>
+                <Typography variant="caption" sx={{ color: "#6b7280" }}>Event • User</Typography>
+              </Box>
+            </TableCell>
             <TableCell align="right" sx={{ fontWeight: 600 }}>Actions</TableCell>
           </TableRow>
         </TableHead>
@@ -88,10 +108,38 @@ function SessionList({ sessions, onEdit, onDelete }) {
                 />
               </TableCell>
               <TableCell sx={{ fontSize: "0.875rem" }}>
-                {formatDateTime(session.startTime)}
+                {(() => {
+                  const formatted = formatSessionDisplay(session.startTime, session.endTime);
+                  return (
+                    <Stack spacing={0.5}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {formatted.primary}
+                      </Typography>
+                      {formatted.secondary && (
+                        <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                          {formatted.secondary.label}
+                        </Typography>
+                      )}
+                    </Stack>
+                  );
+                })()}
               </TableCell>
               <TableCell sx={{ fontSize: "0.875rem" }}>
-                {formatDateTime(session.endTime)}
+                {(() => {
+                  const formatted = formatSessionDisplay(session.startTime, session.endTime);
+                  return (
+                    <Stack spacing={0.5}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {formatted.primary}
+                      </Typography>
+                      {formatted.secondary && (
+                        <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                          {formatted.secondary.label}
+                        </Typography>
+                      )}
+                    </Stack>
+                  );
+                })()}
               </TableCell>
               <TableCell align="right">
                 <Stack direction="row" spacing={0.5} justifyContent="flex-end">

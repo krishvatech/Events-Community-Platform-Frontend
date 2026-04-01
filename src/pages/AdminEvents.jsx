@@ -1896,19 +1896,38 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 </>
               )}
               <Grid item xs={12} md={4}>
-                <Autocomplete
-                  fullWidth
-                  options={timezoneOptions}
-                  value={timezone}
-                  onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Event Timezone"
-                      helperText="Times are saved in this timezone."
-                    />
+                <Stack spacing={1}>
+                  <Autocomplete
+                    fullWidth
+                    options={timezoneOptions}
+                    value={timezone}
+                    onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Event Timezone"
+                        helperText="Times are saved in this timezone."
+                      />
+                    )}
+                  />
+                  {isMultiDay && (
+                    <Box
+                      sx={{
+                        p: 1.5,
+                        backgroundColor: "#f3f4f6",
+                        borderRadius: 1,
+                        border: "1px solid #e5e7eb"
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: "#6b7280" }}>
+                        User Time: {getBrowserTimezone()}
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: "block", color: "#9ca3af", mt: 0.5 }}>
+                        Sessions will also display in your local timezone
+                      </Typography>
+                    </Box>
                   )}
-                />
+                </Stack>
               </Grid>
             </Grid>
           </Paper>
@@ -1944,6 +1963,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <Box mb={2}>
                   <SessionList
                     sessions={sessions}
+                    timezone={timezone}
                     onEdit={(session, idx) => {
                       setEditingSessionIndex(idx);
                       setSessionDialogOpen(true);

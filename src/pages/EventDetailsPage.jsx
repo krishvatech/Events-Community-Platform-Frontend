@@ -1616,21 +1616,21 @@ export default function EventDetailsPage() {
                                 <Stack direction="row" spacing={0.5} alignItems="center">
                                   <CalendarMonthIcon fontSize="small" sx={{ color: 'teal.700' }} />
                                   <Typography variant="body2">
-                                    {dayjs(session.start_time).format("MMM D, YYYY")}
+                                    {event.timezone ? dayjs(session.start_time).tz(normalizeTimezoneName(event.timezone)).format("MMM D, YYYY") : dayjs(session.start_time).format("MMM D, YYYY")}
                                   </Typography>
                                 </Stack>
                                 <Stack direction="column" spacing={0.5}>
                                   <Stack direction="row" spacing={0.5} alignItems="center">
                                     <AccessTimeIcon fontSize="small" sx={{ color: 'teal.700' }} />
                                     <Typography variant="body2">
-                                      {dayjs(session.start_time).format("h:mm A")} – {dayjs(session.end_time).format("h:mm A")}
+                                      {event.timezone ? dayjs(session.start_time).tz(normalizeTimezoneName(event.timezone)).format("h:mm A") : dayjs(session.start_time).format("h:mm A")} – {event.timezone ? dayjs(session.end_time).tz(normalizeTimezoneName(event.timezone)).format("h:mm A") : dayjs(session.end_time).format("h:mm A")}
                                       {event.timezone && (
                                         <span style={{ color: '#9ca3af' }}>({normalizeTimezoneName(event.timezone)})</span>
                                       )}
                                     </Typography>
                                   </Stack>
                                   {((event?.event_format === 'virtual' || event?.event_format === 'hybrid') || (event?.format === 'virtual' || event?.format === 'hybrid')) && (
-                                    <Typography variant="caption" sx={{ color: 'teal.700', fontWeight: 600, ml: 3.5 }}>
+                                    <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500, ml: 3.5 }}>
                                       Your Time: {dayjs(session.start_time).tz(getBrowserTimezone()).format("h:mm A")} – {dayjs(session.end_time).tz(getBrowserTimezone()).format("h:mm A")} ({getBrowserTimezone()})
                                     </Typography>
                                   )}

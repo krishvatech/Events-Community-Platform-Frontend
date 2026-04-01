@@ -17,6 +17,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import tzPlugin from "dayjs/plugin/timezone";
 import { validateSessionTimes } from "../utils/dateTimeValidator";
+import { formatSessionTimeRange } from "../utils/timezoneUtils";
 
 dayjs.extend(utc);
 dayjs.extend(tzPlugin);
@@ -102,12 +103,14 @@ function SessionDialog({
       setSessionType(initialData.sessionType || "main");
 
       if (initialData.startTime) {
-        const sd = dayjs(initialData.startTime);
+        // Convert ISO time to event's timezone
+        const sd = timezone ? dayjs(initialData.startTime).tz(timezone) : dayjs(initialData.startTime);
         setStartDate(sd);
         setStartTime(sd);
       }
       if (initialData.endTime) {
-        const ed = dayjs(initialData.endTime);
+        // Convert ISO time to event's timezone
+        const ed = timezone ? dayjs(initialData.endTime).tz(timezone) : dayjs(initialData.endTime);
         setEndDate(ed);
         setEndTime(ed);
       }
@@ -116,10 +119,13 @@ function SessionDialog({
       let defaultStart = dayjs();
 
       if (eventStartTime) {
-        defaultStart = dayjs(eventStartTime);
+        // Convert event start time to event's timezone
+        defaultStart = timezone ? dayjs(eventStartTime).tz(timezone) : dayjs(eventStartTime);
       } else {
-        // Fallback: 9:00 AM today
-        defaultStart = dayjs().hour(9).minute(0).second(0);
+        // Fallback: 9:00 AM today in event's timezone
+        defaultStart = timezone
+          ? dayjs().tz(timezone).hour(9).minute(0).second(0)
+          : dayjs().hour(9).minute(0).second(0);
       }
 
       const defaultEnd = defaultStart.add(1, "hour");
@@ -129,7 +135,7 @@ function SessionDialog({
       setEndDate(defaultEnd);
       setEndTime(defaultEnd);
     }
-  }, [open, initialData, eventStartTime]);
+  }, [open, initialData, eventStartTime, timezone]);
 
   const validate = () => {
     const e = {};
@@ -294,9 +300,14 @@ function SessionDialog({
           </TextField>
 
           <Box>
-            <Typography variant="body2" className="font-semibold mb-2">
-              Start Date &amp; Time
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+              <Typography variant="body2" className="font-semibold">
+                Start Date &amp; Time
+              </Typography>
+              <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                {timezone}
+              </Typography>
+            </Box>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <DatePicker
@@ -351,9 +362,14 @@ function SessionDialog({
           </Box>
 
           <Box>
-            <Typography variant="body2" className="font-semibold mb-2">
-              End Date &amp; Time
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+              <Typography variant="body2" className="font-semibold">
+                End Date &amp; Time
+              </Typography>
+              <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                {timezone}
+              </Typography>
+            </Box>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <DatePicker
@@ -398,6 +414,39 @@ function SessionDialog({
                 </Typography>
               )}
             </LocalizationProvider>
+          </Box>
+
+          {/* Timezone Conversion Display */}
+          <Box
+            sx={{
+              p: 1.5,
+              backgroundColor: "#f3f4f6",
+              borderRadius: 1,
+              border: "1px solid #e5e7eb"
+            }}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 600, color: "#6b7280", display: "block", mb: 0.5 }}>
+              Event Timezone: {timezone}
+            </Typography>
+            {(() => {
+              // Create ISO strings from current start/end times for display
+              const start = startDate.hour(startTime.hour()).minute(startTime.minute());
+              const end = endDate.hour(endTime.hour()).minute(endTime.minute());
+              const startISO = toUTCISO(start, timezone);
+              const endISO = toUTCISO(end, timezone);
+
+              if (startISO && endISO) {
+                const formatted = formatSessionTimeRange(startISO, endISO, timezone);
+                return formatted.secondary ? (
+                  <>
+                    <Typography variant="caption" sx={{ color: "#9ca3af" }}>
+                      {formatted.secondary.label}
+                    </Typography>
+                  </>
+                ) : null;
+              }
+              return null;
+            })()}
           </Box>
         </Stack>
       </DialogContent>
