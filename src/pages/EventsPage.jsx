@@ -1061,8 +1061,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                             // For authenticated users, submit directly
                             handleApplyCardDirect();
                           } else {
-                            // For unauthenticated users, redirect to sign in
-                            navigate(`/signin?next=${encodeURIComponent(window.location.pathname)}`);
+                            // For guests, open modal
+                            setApplyModalOpen(true);
                           }
                         }}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
@@ -1613,8 +1613,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             // For authenticated users, submit directly
                             handleApplyCardDirect();
                           } else {
-                            // For unauthenticated users, redirect to sign in
-                            navigate(`/signin?next=${encodeURIComponent(window.location.pathname)}`);
+                            // For guests, open modal
+                            setApplyModalOpen(true);
                           }
                         }}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
