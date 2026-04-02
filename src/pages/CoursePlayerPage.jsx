@@ -680,7 +680,7 @@ export function ModuleDetailPanel({ courseId, module, onClose }) {
 }
 
 // ── Single module card (full content) ─────────────────────────────────────────
-function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform }) {
+function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPreview = false, onSelectModule }) {
   const { modtype, name, is_video, is_pdf, content_url, content_mimetype, module_url, visible, completed, completion } = module;
   const color = moduleColor(modtype, content_mimetype);
   const [marking, setMarking] = useState(false);
@@ -716,52 +716,76 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform }) {
     >
       {/* ── Video ── */}
       {modtype === "resource" && is_video && content_url && (
-        <Box sx={{ bgcolor: "#000", lineHeight: 0 }}>
-          <video
-            controls
-            style={{ width: "100%", maxHeight: 480, display: "block", objectFit: "contain", backgroundColor: "#000" }}
-          >
-            <source src={content_url} type={content_mimetype || "video/mp4"} />
-          </video>
-        </Box>
+        <>
+          {showPreview ? (
+            <Box sx={{ bgcolor: "#000", lineHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Box sx={{ width: "100%", maxWidth: "100%", aspectRatio: "16 / 9" }}>
+                <video
+                  controls
+                  style={{ width: "100%", height: "100%", display: "block", objectFit: "contain", backgroundColor: "#000" }}
+                >
+                  <source src={content_url} type={content_mimetype || "video/mp4"} />
+                </video>
+              </Box>
+            </Box>
+          ) : (
+            <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
+              <OndemandVideoRoundedIcon sx={{ fontSize: 40, color: "#1bbbb3" }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
+              </Box>
+            </Box>
+          )}
+        </>
       )}
 
       {/* ── PDF (full viewer modal) ── */}
       {modtype === "resource" && is_pdf && content_url && (
-        <Box sx={{ bgcolor: "#ffffff", borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column", height: "800px" }}>
-          {/* Header with title and controls */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 3, py: 2, borderBottom: "1px solid #e5e7eb", bgcolor: "#f9fafb", flexShrink: 0 }}>
-            <PictureAsPdfRoundedIcon sx={{ fontSize: 28, color: "#ef4444", flexShrink: 0 }} />
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600 }}>
-                {decodeEntities(name)}
-              </Typography>
-            </Box>
-            <Button
-              size="small"
-              variant="contained"
-              endIcon={<OpenInNewRoundedIcon fontSize="small" />}
-              href={content_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{ bgcolor: "#ef4444", "&:hover": { bgcolor: "#dc2626" }, textTransform: "none", fontSize: 12, flexShrink: 0 }}
-            >
-              View Full
-            </Button>
-          </Box>
+        <>
+          {showPreview ? (
+            <Box sx={{ bgcolor: "#ffffff", borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column", height: "800px" }}>
+              {/* Header with title and controls */}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 3, py: 2, borderBottom: "1px solid #e5e7eb", bgcolor: "#f9fafb", flexShrink: 0 }}>
+                <PictureAsPdfRoundedIcon sx={{ fontSize: 28, color: "#ef4444", flexShrink: 0 }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600 }}>
+                    {decodeEntities(name)}
+                  </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  variant="contained"
+                  endIcon={<OpenInNewRoundedIcon fontSize="small" />}
+                  href={content_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{ bgcolor: "#ef4444", "&:hover": { bgcolor: "#dc2626" }, textTransform: "none", fontSize: 12, flexShrink: 0 }}
+                >
+                  View Full
+                </Button>
+              </Box>
 
-          {/* PDF Viewer Container */}
-          <Box sx={{ flex: 1, display: "flex", overflow: "hidden", bgcolor: "#f3f4f6" }}>
-            {/* Embedded PDF with controls */}
-            <Box sx={{ flex: 1, bgcolor: "#fff", position: "relative" }}>
-              <embed
-                src={`${content_url}#toolbar=1&navpanes=0&scrollbar=1`}
-                type="application/pdf"
-                style={{ width: "100%", height: "100%", border: "none" }}
-              />
+              {/* PDF Viewer Container */}
+              <Box sx={{ flex: 1, display: "flex", overflow: "hidden", bgcolor: "#f3f4f6" }}>
+                {/* Embedded PDF with controls */}
+                <Box sx={{ flex: 1, bgcolor: "#fff", position: "relative" }}>
+                  <embed
+                    src={`${content_url}#toolbar=1&navpanes=0&scrollbar=1`}
+                    type="application/pdf"
+                    style={{ width: "100%", height: "100%", border: "none" }}
+                  />
+                </Box>
+              </Box>
             </Box>
-          </Box>
-        </Box>
+          ) : (
+            <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
+              <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: "#ef4444" }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
+              </Box>
+            </Box>
+          )}
+        </>
       )}
 
       {/* ── External URL ── */}
@@ -779,9 +803,8 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform }) {
       {modtype === "quiz" && (
         <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
           <QuizRoundedIcon sx={{ fontSize: 40, color: "#8b5cf6" }} />
-          <Box>
-            <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
-            {openBtn("Start Quiz", "#8b5cf6")}
+          <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onSelectModule?.(module)}>
+            <Typography variant="body2" sx={{ color: "#3b82f6", fontWeight: 600, mb: 0.5, "&:hover": { textDecoration: "underline" } }}>{decodeEntities(name)}</Typography>
           </Box>
         </Box>
       )}
@@ -790,9 +813,8 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform }) {
       {modtype === "assign" && (
         <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
           <AssignmentRoundedIcon sx={{ fontSize: 40, color: "#ec4899" }} />
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
-            {openBtn("Open Assignment", "#ec4899")}
+          <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onSelectModule?.(module)}>
+            <Typography variant="body2" sx={{ color: "#3b82f6", fontWeight: 600, mb: 0.5, "&:hover": { textDecoration: "underline" } }}>{decodeEntities(name)}</Typography>
           </Box>
         </Box>
       )}
@@ -908,7 +930,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform }) {
 }
 
 // ── Section view (all sections or single module view) ──────────────────────────
-function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs, onMarkDone, onOpenInPlatform, loading }) {
+function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs, onMarkDone, onOpenInPlatform, loading, expandedSections, onToggleSection }) {
   if (loading) {
     return (
       <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -977,6 +999,7 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
             moduleRef={moduleRefs.current[activeModule.moodle_module_id]}
             onMarkDone={onMarkDone}
             onOpenInPlatform={onOpenInPlatform}
+            showPreview={true}
           />
         </Box>
       );
@@ -988,55 +1011,85 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
     <Box sx={{ p: 3, maxWidth: 860, mx: "auto" }}>
       {sections.map((section) => {
         const mods = (section.modules || []);
+        const isExpanded = expandedSections[section.id] === true; // All sections collapsed by default
         return (
           <Box
             key={section.id}
             ref={(el) => { if (el) sectionRefs.current[section.id] = el; }}
             data-section-id={section.id}
-            sx={{ mb: 4 }}
+            sx={{ mb: 3, borderRadius: 1, border: "1px solid #e5e7eb", bgcolor: "#ffffff", overflow: "hidden" }}
           >
-            {/* Section heading */}
-            <Typography
-              variant="h6"
-              fontWeight={700}
-              sx={{ color: "#111827", mb: 2, pb: 1.5, borderBottom: "1px solid #e5e7eb" }}
+            {/* Section heading with expand/collapse */}
+            <Box
+              onClick={() => onToggleSection(section.id)}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1.5,
+                px: 3,
+                py: 2,
+                borderBottom: "1px solid #e5e7eb",
+                cursor: "pointer",
+                transition: "background-color 0.2s ease",
+                "&:hover": { bgcolor: "#f9fafb" },
+              }}
             >
-              {decodeEntities(section.name) || `Section ${section.position + 1}`}
-            </Typography>
-
-            {/* Section summary HTML (instructor info, welcome text, schedule, etc.) */}
-            {section.summary?.trim() && (
-              <Box
+              <ExpandMoreRoundedIcon
                 sx={{
-                  mb: 2.5,
-                  p: 2,
-                  bgcolor: "#ffffff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 2,
-                  fontSize: 14,
-                  color: "#374151",
-                  lineHeight: 1.7,
-                  "& img": { maxWidth: "100%", height: "auto", borderRadius: 1 },
-                  "& p": { margin: "0 0 8px 0" },
-                  "& strong": { color: "#111827" },
+                  fontSize: 24,
+                  color: "#6b7280",
+                  transition: "transform 0.2s ease",
+                  transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)",
                 }}
-                dangerouslySetInnerHTML={{ __html: section.summary }}
               />
-            )}
+              <Typography
+                variant="h6"
+                fontWeight={700}
+                sx={{ color: "#111827", flex: 1 }}
+              >
+                {decodeEntities(section.name) || `Section ${section.position + 1}`}
+              </Typography>
+            </Box>
 
-            {mods.length === 0 ? null : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                {mods.map((mod) => (
-                  <ModuleCard
-                    key={mod.id}
-                    module={mod}
-                    moduleRef={moduleRefs.current[mod.moodle_module_id]}
-                    onMarkDone={onMarkDone}
-                    onOpenInPlatform={onOpenInPlatform}
+            {/* Section content (summary + modules) */}
+            <Collapse in={isExpanded} timeout="auto">
+              <Box sx={{ px: 3, py: 2 }}>
+                {/* Section summary HTML (instructor info, welcome text, schedule, etc.) */}
+                {section.summary?.trim() && (
+                  <Box
+                    sx={{
+                      mb: 2.5,
+                      p: 2,
+                      bgcolor: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 2,
+                      fontSize: 14,
+                      color: "#374151",
+                      lineHeight: 1.7,
+                      "& img": { maxWidth: "100%", height: "auto", borderRadius: 1 },
+                      "& p": { margin: "0 0 8px 0" },
+                      "& strong": { color: "#111827" },
+                    }}
+                    dangerouslySetInnerHTML={{ __html: section.summary }}
                   />
-                ))}
+                )}
+
+                {mods.length === 0 ? null : (
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {mods.map((mod) => (
+                      <ModuleCard
+                        key={mod.id}
+                        module={mod}
+                        moduleRef={moduleRefs.current[mod.moodle_module_id]}
+                        onMarkDone={onMarkDone}
+                        onOpenInPlatform={onOpenInPlatform}
+                        onSelectModule={() => onSelectModule?.(section, mod)}
+                      />
+                    ))}
+                  </Box>
+                )}
               </Box>
-            )}
+            </Collapse>
           </Box>
         );
       })}
@@ -1060,7 +1113,7 @@ export default function CoursePlayerPage() {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [snack, setSnack] = useState(null);
-  const [launchModal, setLaunchModal] = useState({ open: false, module: null });
+  const [expandedSections, setExpandedSections] = useState({});
 
   const mainRef = useRef(null);
   const sectionRefs = useRef({});
@@ -1101,10 +1154,6 @@ export default function CoursePlayerPage() {
           (s) => s.modules?.length > 0 || s.summary?.trim()
         );
         setSections(secs);
-        // Set first section as active
-        if (secs.length > 0) {
-          setActiveSectionId(secs[0].id);
-        }
       } catch {
         if (!cancelled) setSnack("Could not load course content.");
       } finally {
@@ -1141,8 +1190,13 @@ export default function CoursePlayerPage() {
   useEffect(() => {
     if (!mainRef.current || sections.length === 0) return;
 
+    let hasScrolled = false;
+
     const observer = new IntersectionObserver(
       (entries) => {
+        // Only update on user scroll, not on initial load
+        if (!hasScrolled) return;
+
         // Find the section that is most visible
         const visible = entries.filter((e) => e.isIntersecting);
         if (visible.length > 0) {
@@ -1166,7 +1220,17 @@ export default function CoursePlayerPage() {
       if (el) observer.observe(el);
     });
 
-    return () => observer.disconnect();
+    // Track when user scrolls
+    const handleScroll = () => {
+      hasScrolled = true;
+      mainRef.current?.removeEventListener('scroll', handleScroll);
+    };
+    mainRef.current?.addEventListener('scroll', handleScroll);
+
+    return () => {
+      observer.disconnect();
+      mainRef.current?.removeEventListener('scroll', handleScroll);
+    };
   }, [sections]);
 
   // ── Select section → scroll to it ──────────────────────────────────────────
@@ -1182,7 +1246,7 @@ export default function CoursePlayerPage() {
     }
   }, []);
 
-  // ── Select module → show focused view ───────────────────────────────────────
+  // ── Select module → show inline detail view ──────────────────────────────────
   const handleSelectModule = useCallback((section, module) => {
     setActiveSectionId(section.id);
     setActiveModule(module);
@@ -1213,6 +1277,14 @@ export default function CoursePlayerPage() {
       setSnack("Could not mark as done — please try in the LMS.");
     }
   }, [courseId]);
+
+  // ── Toggle section expand/collapse ──────────────────────────────────────────
+  const handleToggleSection = useCallback((sectionId) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }));
+  }, []);
 
   // ── Loading / error states ──────────────────────────────────────────────────
   if (loading) {
@@ -1283,28 +1355,22 @@ export default function CoursePlayerPage() {
           />
         </Box>
 
-        {/* Main content area - show all sections or assignment modal */}
+        {/* Main content area - show all sections or inline detail view */}
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {launchModal.open ? (
-            <ModuleLaunchModal
+          <Box ref={mainRef} sx={{ flex: 1, overflowY: "auto", bgcolor: "#f3f4f6" }}>
+            <SectionView
               courseId={courseId}
-              module={launchModal.module}
-              onClose={() => setLaunchModal({ open: false, module: null })}
+              sections={sections}
+              sectionRefs={sectionRefs}
+              activeModule={activeModule}
+              moduleRefs={moduleRefs}
+              onMarkDone={handleMarkDone}
+              onOpenInPlatform={handleOpenInPlatform}
+              loading={contentLoading}
+              expandedSections={expandedSections}
+              onToggleSection={handleToggleSection}
             />
-          ) : (
-            <Box ref={mainRef} sx={{ flex: 1, overflowY: "auto", bgcolor: "#f3f4f6" }}>
-              <SectionView
-                courseId={courseId}
-                sections={sections}
-                sectionRefs={sectionRefs}
-                activeModule={activeModule}
-                moduleRefs={moduleRefs}
-                onMarkDone={handleMarkDone}
-                onOpenInPlatform={handleOpenInPlatform}
-                loading={contentLoading}
-              />
-            </Box>
-          )}
+          </Box>
         </Box>
       </Box>
 
@@ -1315,6 +1381,7 @@ export default function CoursePlayerPage() {
         message={snack}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       />
+
     </Box>
   );
 }
