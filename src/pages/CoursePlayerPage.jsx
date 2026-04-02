@@ -718,7 +718,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
       {modtype === "resource" && is_video && content_url && (
         <>
           {showPreview ? (
-            <Box sx={{ bgcolor: "#000", lineHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#000", lineHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
               <Box sx={{ width: "100%", maxWidth: "100%", aspectRatio: "16 / 9" }}>
                 <video
                   controls
@@ -729,7 +729,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
               </Box>
             </Box>
           ) : (
-            <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
+            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb", cursor: "pointer", "&:hover": { bgcolor: "#f3f4f6" }, transition: "background-color 0.2s ease" }}>
               <OndemandVideoRoundedIcon sx={{ fontSize: 40, color: "#1bbbb3" }} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
@@ -743,7 +743,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
       {modtype === "resource" && is_pdf && content_url && (
         <>
           {showPreview ? (
-            <Box sx={{ bgcolor: "#ffffff", borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column", height: "800px" }}>
+            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#ffffff", borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column", height: "800px", cursor: "pointer" }}>
               {/* Header with title and controls */}
               <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 3, py: 2, borderBottom: "1px solid #e5e7eb", bgcolor: "#f9fafb", flexShrink: 0 }}>
                 <PictureAsPdfRoundedIcon sx={{ fontSize: 28, color: "#ef4444", flexShrink: 0 }} />
@@ -760,6 +760,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
                   target="_blank"
                   rel="noopener noreferrer"
                   sx={{ bgcolor: "#ef4444", "&:hover": { bgcolor: "#dc2626" }, textTransform: "none", fontSize: 12, flexShrink: 0 }}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   View Full
                 </Button>
@@ -778,7 +779,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
               </Box>
             </Box>
           ) : (
-            <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
+            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb", cursor: "pointer", "&:hover": { bgcolor: "#f3f4f6" }, transition: "background-color 0.2s ease" }}>
               <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: "#ef4444" }} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
@@ -930,7 +931,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
 }
 
 // ── Section view (all sections or single module view) ──────────────────────────
-function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs, onMarkDone, onOpenInPlatform, loading, expandedSections, onToggleSection }) {
+function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs, onMarkDone, onOpenInPlatform, loading, expandedSections, onToggleSection, onSelectModule }) {
   if (loading) {
     return (
       <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1369,6 +1370,7 @@ export default function CoursePlayerPage() {
               loading={contentLoading}
               expandedSections={expandedSections}
               onToggleSection={handleToggleSection}
+              onSelectModule={handleSelectModule}
             />
           </Box>
         </Box>
