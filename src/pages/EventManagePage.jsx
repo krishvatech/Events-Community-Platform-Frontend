@@ -176,14 +176,14 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Guest Audit", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
 const getTabLabels = (event, isOwner) => {
   if (!isOwner) return STAFF_EVENT_TAB_LABELS;
   if (event?.registration_type === 'apply') {
-    return ["Overview", "Applications", "Registered Members", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+    return ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
   }
   return EVENT_TAB_LABELS;
 };
@@ -253,6 +253,11 @@ export default function EventManagePage() {
   const [registrations, setRegistrations] = useState([]);
   const [registrationsLoading, setRegistrationsLoading] = useState(false);
   const [registrationsError, setRegistrationsError] = useState("");
+  const [guestAuditRows, setGuestAuditRows] = useState([]);
+  const [guestAuditLoading, setGuestAuditLoading] = useState(false);
+  const [guestAuditError, setGuestAuditError] = useState("");
+  const [guestAuditSearch, setGuestAuditSearch] = useState("");
+  const [guestAuditSort, setGuestAuditSort] = useState("latest");
 
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -459,6 +464,8 @@ export default function EventManagePage() {
   const [myReg, setMyReg] = useState(null); // New state for my registration
   const resources = event?.resources || [];
   const tabLabels = getTabLabels(event, isOwner);
+  const guestAuditTabIndex = tabLabels.indexOf("Guest Audit");
+  const speedNetworkingTabIndex = tabLabels.indexOf("Speed Networking");
 
   // ---- load event ----
   useEffect(() => {
@@ -602,6 +609,42 @@ export default function EventManagePage() {
     return () => controller.abort();
   }, [eventId, isOwner, regsRefresh]);
 
+  useEffect(() => {
+    if (!eventId || !isOwner || guestAuditTabIndex === -1 || tab !== guestAuditTabIndex) return;
+
+    const token = getToken();
+    if (!token) return;
+
+    const controller = new AbortController();
+
+    const loadGuestAudit = async () => {
+      setGuestAuditLoading(true);
+      setGuestAuditError("");
+      try {
+        const res = await fetch(`${API_ROOT}/events/${eventId}/guest-audit/`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(json?.detail || `HTTP ${res.status}`);
+        }
+        setGuestAuditRows(Array.isArray(json?.guests) ? json.guests : []);
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        setGuestAuditError(e?.message || "Unable to load guest audit");
+      } finally {
+        setGuestAuditLoading(false);
+      }
+    };
+
+    loadGuestAudit();
+    return () => controller.abort();
+  }, [eventId, isOwner, tab, guestAuditTabIndex]);
+
   // ---- load sessions (owner only, for multi-day events) ----
   useEffect(() => {
     if (!eventId || !isOwner) return;
@@ -724,7 +767,7 @@ export default function EventManagePage() {
 
   // Fetch speed networking sessions when tab 4 is selected
   useEffect(() => {
-    if (tab !== 4 || !eventId || !isOwner) return;
+    if (speedNetworkingTabIndex === -1 || tab !== speedNetworkingTabIndex || !eventId || !isOwner) return;
 
     const fetchSpeedNetworkingSessions = async () => {
       setSpeedNetworkingLoading(true);
@@ -755,7 +798,7 @@ export default function EventManagePage() {
     };
 
     fetchSpeedNetworkingSessions();
-  }, [tab, eventId, isOwner]);
+  }, [tab, eventId, isOwner, speedNetworkingTabIndex]);
 
   // Initialize form when editing
   useEffect(() => {
@@ -1323,6 +1366,41 @@ export default function EventManagePage() {
     (memberPage - 1) * MEMBERS_PER_PAGE,
     memberPage * MEMBERS_PER_PAGE
   );
+
+  const filteredGuestAuditRows = useMemo(() => {
+    let rows = guestAuditRows.slice();
+
+    if (guestAuditSearch.trim()) {
+      const q = guestAuditSearch.trim().toLowerCase();
+      rows = rows.filter((row) => {
+        const haystack = [
+          row.name,
+          row.guest_email,
+          row.registered_email,
+          row.company,
+          row.job_title,
+          row.changed_fields?.join(" "),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+
+    rows.sort((a, b) => {
+      const aLatest = a.changes?.[0]?.changed_at || a.converted_at || a.joined_live_at || a.created_at || "";
+      const bLatest = b.changes?.[0]?.changed_at || b.converted_at || b.joined_live_at || b.created_at || "";
+      const aTime = aLatest ? new Date(aLatest).getTime() : 0;
+      const bTime = bLatest ? new Date(bLatest).getTime() : 0;
+
+      if (guestAuditSort === "oldest") return aTime - bTime;
+      if (guestAuditSort === "most_changes") return (b.change_count || 0) - (a.change_count || 0);
+      return bTime - aTime;
+    });
+
+    return rows;
+  }, [guestAuditRows, guestAuditSearch, guestAuditSort]);
 
   // ---- resources filtering / paging ----
   useEffect(() => {
@@ -2845,6 +2923,184 @@ export default function EventManagePage() {
               />
             </Stack>
           </>
+        )}
+      </Paper>
+    );
+  };
+
+  const renderGuestAudit = () => {
+    const viewerTz = currentUser?.profile?.timezone || dayjs.tz.guess();
+    const fmtAuditDate = (value) =>
+      value ? dayjs.utc(value).tz(viewerTz).format("M/D/YYYY, h:mm:ss A z") : "—";
+
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+          p: { xs: 2, sm: 3 },
+          bgcolor: "background.paper",
+        }}
+      >
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", md: "center" }}
+          spacing={1.5}
+          sx={{ mb: 2 }}
+        >
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.25 }}>
+              GUEST AUDIT
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Track which guests joined this event and what profile details they changed.
+            </Typography>
+          </Box>
+          <Chip
+            size="small"
+            label={`${filteredGuestAuditRows.length} guests`}
+            sx={{ bgcolor: "grey.100", color: "text.secondary" }}
+          />
+        </Stack>
+
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search guest, guest email, registered email, company..."
+            value={guestAuditSearch}
+            onChange={(e) => setGuestAuditSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <Select
+              value={guestAuditSort}
+              onChange={(e) => setGuestAuditSort(e.target.value)}
+              IconComponent={ArrowDropDownRoundedIcon}
+            >
+              <MenuItem value="latest">Latest activity</MenuItem>
+              <MenuItem value="oldest">Oldest activity</MenuItem>
+              <MenuItem value="most_changes">Most changes</MenuItem>
+            </Select>
+          </FormControl>
+        </Stack>
+
+        {guestAuditLoading ? (
+          <Box sx={{ py: 4, textAlign: "center" }}>
+            <CircularProgress size={22} />
+          </Box>
+        ) : guestAuditError ? (
+          <Alert severity="error">{guestAuditError}</Alert>
+        ) : filteredGuestAuditRows.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary", py: 2 }}>
+            No guest audit records found for this event.
+          </Typography>
+        ) : (
+          <TableContainer
+            sx={{
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              overflow: "hidden",
+            }}
+          >
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: "grey.50", "& th": { fontSize: 13, color: "text.secondary" } }}>
+                  <TableCell>Guest</TableCell>
+                  <TableCell>Guest Email</TableCell>
+                  <TableCell>Registered Account</TableCell>
+                  <TableCell>Company / Role</TableCell>
+                  <TableCell>Joined</TableCell>
+                  <TableCell>Converted</TableCell>
+                  <TableCell>Changes</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredGuestAuditRows.map((row) => (
+                  <TableRow key={row.guest_id} hover>
+                    <TableCell sx={{ minWidth: 180 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {row.name || "Guest"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        Guest ID: {row.guest_id}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 180 }}>
+                      <Typography variant="body2">{row.guest_email || "—"}</Typography>
+                      <Stack direction="row" spacing={0.75} sx={{ mt: 0.75, flexWrap: "wrap" }}>
+                        {row.email_verified && <Chip size="small" label="OTP Verified" color="success" variant="outlined" />}
+                        {row.joined_live && <Chip size="small" label="Joined Live" color="primary" variant="outlined" />}
+                      </Stack>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 190 }}>
+                      {row.converted_user ? (
+                        <>
+                          <Typography variant="body2">{row.converted_user.name || row.registered_email}</Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                            {row.registered_email || "—"}
+                          </Typography>
+                          {row.email_changed_on_signup && (
+                            <Chip size="small" label="Email changed on signup" color="warning" variant="outlined" sx={{ mt: 0.75 }} />
+                          )}
+                        </>
+                      ) : (
+                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                          Not converted
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 180 }}>
+                      <Typography variant="body2">{row.company || "—"}</Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {row.job_title || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 155 }}>
+                      <Typography variant="body2">{fmtAuditDate(row.joined_live_at || row.created_at)}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 155 }}>
+                      <Typography variant="body2">{fmtAuditDate(row.converted_at)}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 300 }}>
+                      {row.changes?.length ? (
+                        <Stack spacing={0.75}>
+                          {row.changes.map((change) => (
+                            <Box key={change.id} sx={{ p: 1, borderRadius: 1.5, bgcolor: "grey.50", border: "1px solid", borderColor: "divider" }}>
+                              <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
+                                <Chip size="small" label={change.field_label} variant="outlined" />
+                                <Chip size="small" label={change.source_label} variant="outlined" />
+                              </Stack>
+                              <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
+                                {change.old_value || "—"} → {change.new_value || "—"}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                                {fmtAuditDate(change.changed_at)}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                          No profile changes recorded.
+                        </Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
       </Paper>
     );
@@ -4509,6 +4765,19 @@ export default function EventManagePage() {
                     <>
                       {tab === 1 && renderApplications()}
                       {tab === 2 && renderMembers()}
+                      {tab === 3 && renderGuestAudit()}
+                      {tab === 4 && renderSessions()}
+                      {tab === 5 && renderResources()}
+                      {tab === 6 && renderSpeedNetworking()}
+                      {tab === 7 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                      {tab === 8 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                      {tab === 9 && renderLoungeSettings()}
+                      {tab === 10 && renderEdit()}
+                    </>
+                  ) : (
+                    <>
+                      {tab === 1 && renderMembers()}
+                      {tab === 2 && renderGuestAudit()}
                       {tab === 3 && renderSessions()}
                       {tab === 4 && renderResources()}
                       {tab === 5 && renderSpeedNetworking()}
@@ -4516,17 +4785,6 @@ export default function EventManagePage() {
                       {tab === 7 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                       {tab === 8 && renderLoungeSettings()}
                       {tab === 9 && renderEdit()}
-                    </>
-                  ) : (
-                    <>
-                      {tab === 1 && renderMembers()}
-                      {tab === 2 && renderSessions()}
-                      {tab === 3 && renderResources()}
-                      {tab === 4 && renderSpeedNetworking()}
-                      {tab === 5 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                      {tab === 6 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                      {tab === 7 && renderLoungeSettings()}
-                      {tab === 8 && renderEdit()}
                     </>
                   )}
                 </>

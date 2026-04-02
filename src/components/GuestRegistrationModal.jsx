@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -11,6 +11,8 @@ import {
   Alert,
   InputAdornment,
   IconButton,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { API_BASE } from "../utils/api";
@@ -27,19 +29,25 @@ import {
  * Triggers Cognito account creation and email verification.
  */
 export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
-  const guestEmail = localStorage.getItem("guest_email") || "";
-  const guestName = localStorage.getItem("guest_name") || "";
-  const nameParts = guestName.trim().split(/\s+/).filter(Boolean);
-  const defaultFirstName = nameParts[0] || "";
-  const defaultLastName = nameParts.slice(1).join(" ");
+  const buildInitialForm = () => {
+    const guestEmail = localStorage.getItem("guest_email") || "";
+    const guestName = localStorage.getItem("guest_name") || "";
+    const guestCompany = localStorage.getItem("guest_company") || "";
+    const guestJobTitle = localStorage.getItem("guest_job_title") || "";
+    const nameParts = guestName.trim().split(/\s+/).filter(Boolean);
 
-  const [form, setForm] = useState({
-    first_name: defaultFirstName,
-    last_name: defaultLastName,
-    email: guestEmail,
-    password: "",
-    confirm_password: "",
-  });
+    return {
+      first_name: nameParts[0] || "",
+      last_name: nameParts.slice(1).join(" "),
+      email: guestEmail,
+      company: guestCompany,
+      job_title: guestJobTitle,
+      password: "",
+      confirm_password: "",
+    };
+  };
+
+  const [form, setForm] = useState(buildInitialForm);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [stage, setStage] = useState("signup"); // signup | confirm | done
@@ -47,12 +55,38 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
   const [pendingUsername, setPendingUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [originalGuestEmail, setOriginalGuestEmail] = useState(
+    () => (localStorage.getItem("guest_email") || "").trim().toLowerCase()
+  );
+  const [allowDifferentEmail, setAllowDifferentEmail] = useState(false);
+
+  const normalizedSignupEmail = useMemo(
+    () => form.email.trim().toLowerCase(),
+    [form.email]
+  );
+  const hasDifferentSignupEmail = Boolean(
+    normalizedSignupEmail &&
+    originalGuestEmail &&
+    normalizedSignupEmail !== originalGuestEmail
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(buildInitialForm());
+    setOriginalGuestEmail((localStorage.getItem("guest_email") || "").trim().toLowerCase());
+    setAllowDifferentEmail(false);
+    setStage("signup");
+    setVerifyCode("");
+    setPendingUsername("");
+    setError("");
+  }, [open]);
 
   const onClose = () => {
     setStage("signup");
     setVerifyCode("");
     setPendingUsername("");
     setError("");
+    setAllowDifferentEmail(false);
     onCloseProp();
   };
 
@@ -110,6 +144,15 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
       setError("Email is required");
       return false;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email.trim())) {
+      setError("Please enter a valid email address");
+      return false;
+    }
+    if (hasDifferentSignupEmail && !allowDifferentEmail) {
+      setError("Please confirm that you want to sign up with a different email address.");
+      return false;
+    }
     if (!form.password.trim()) {
       setError("Password is required");
       return false;
@@ -145,7 +188,7 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
         });
 
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        await fetch(`${API_BASE}/auth/cognito/bootstrap/`, {
+        const bootstrapResponse = await fetch(`${API_BASE}/auth/cognito/bootstrap/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -156,9 +199,21 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
             email: form.email.trim().toLowerCase(),
             firstName: form.first_name.trim(),
             lastName: form.last_name.trim(),
+            company: form.company.trim(),
+            job_title: form.job_title.trim(),
             timezone: tz,
           }),
         });
+
+        if (!bootstrapResponse.ok) {
+          let bootstrapData = {};
+          try {
+            bootstrapData = await bootstrapResponse.json();
+          } catch {
+            bootstrapData = {};
+          }
+          throw new Error(bootstrapData?.detail || "We could not save your account profile.");
+        }
 
         const guestToken = localStorage.getItem("access_token");
         if (guestToken) {
@@ -168,24 +223,42 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
               "Content-Type": "application/json",
               Authorization: `Bearer ${guestToken}`,
             },
-            body: JSON.stringify({ email: form.email.trim().toLowerCase() }),
+            body: JSON.stringify({
+              email: form.email.trim().toLowerCase(),
+              guest_email: originalGuestEmail,
+              first_name: form.first_name.trim(),
+              last_name: form.last_name.trim(),
+              company: form.company.trim(),
+              job_title: form.job_title.trim(),
+              email_changed: hasDifferentSignupEmail,
+              preserve_guest_email_history: !hasDifferentSignupEmail || allowDifferentEmail,
+            }),
           });
 
-          // Capture profile data from link response
-          if (linkResponse.ok) {
-            const linkData = await linkResponse.json();
-            const profile = linkData?.profile || {};
-
-            // Persist profile fields locally so UI updates immediately after rejoin
-            if (profile.job_title) localStorage.setItem("user_job_title", profile.job_title);
-            if (profile.company) localStorage.setItem("user_company", profile.company);
-            if (profile.full_name) localStorage.setItem("user_name", profile.full_name);
+          if (!linkResponse.ok) {
+            let linkData = {};
+            try {
+              linkData = await linkResponse.json();
+            } catch {
+              linkData = {};
+            }
+            throw new Error(
+              linkData?.error ||
+              linkData?.message ||
+              "We could not link your guest session to the new account."
+            );
           }
+
+          // Capture profile data from link response
+          const linkData = await linkResponse.json();
+          const profile = linkData?.profile || {};
+
+          // Persist profile fields locally so UI updates immediately after rejoin
+          if (profile.job_title) localStorage.setItem("user_job_title", profile.job_title);
+          if (profile.company) localStorage.setItem("user_company", profile.company);
+          if (profile.full_name) localStorage.setItem("user_name", profile.full_name);
         }
 
-        localStorage.setItem("guest_email", form.email.trim().toLowerCase());
-        const displayName = `${form.first_name.trim()} ${form.last_name.trim()}`.trim();
-        if (displayName) localStorage.setItem("guest_name", displayName);
         switchToRegisteredSessionAndRejoin(session);
       } catch (err) {
         const msg =
@@ -350,6 +423,47 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
                 disabled={loading}
                 sx={textFieldSx}
               />
+              <TextField
+                label="Company"
+                fullWidth
+                size="small"
+                value={form.company}
+                onChange={handleInputChange("company")}
+                disabled={loading}
+                sx={textFieldSx}
+              />
+              <TextField
+                label="Role / Job Title"
+                fullWidth
+                size="small"
+                value={form.job_title}
+                onChange={handleInputChange("job_title")}
+                disabled={loading}
+                sx={textFieldSx}
+              />
+              {hasDifferentSignupEmail && (
+                <>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={allowDifferentEmail}
+                        onChange={(e) => setAllowDifferentEmail(e.target.checked)}
+                        disabled={loading}
+                        sx={{ color: "rgba(255,255,255,0.7)" }}
+                      />
+                    }
+                    label={(
+                      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.82)" }}>
+                        Sign me up with this different email and keep my original join email linked for attendance history.
+                      </Typography>
+                    )}
+                    sx={{ alignItems: "flex-start", m: 0 }}
+                  />
+                  <Alert severity="info" sx={{ backgroundColor: "rgba(25, 103, 210, 0.1)", color: "#64B5F6" }}>
+                    Joined as <strong>{originalGuestEmail}</strong>, signing up as <strong>{normalizedSignupEmail}</strong>.
+                  </Alert>
+                </>
+              )}
 
               {/* Password field */}
               <TextField
@@ -408,16 +522,23 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
           )}
 
           {stage === "confirm" && (
-            <TextField
-              label="Verification Code"
-              placeholder="Enter code from email"
-              fullWidth
-              size="small"
-              value={verifyCode}
-              onChange={(e) => setVerifyCode(e.target.value.replace(/\s/g, ""))}
-              disabled={loading}
-              sx={textFieldSx}
-            />
+            <>
+              {hasDifferentSignupEmail && (
+                <Alert severity="info" sx={{ backgroundColor: "rgba(25, 103, 210, 0.1)", color: "#64B5F6" }}>
+                  We will link your guest attendance from {originalGuestEmail} to your new account {normalizedSignupEmail}.
+                </Alert>
+              )}
+              <TextField
+                label="Verification Code"
+                placeholder="Enter code from email"
+                fullWidth
+                size="small"
+                value={verifyCode}
+                onChange={(e) => setVerifyCode(e.target.value.replace(/\s/g, ""))}
+                disabled={loading}
+                sx={textFieldSx}
+              />
+            </>
           )}
 
           <Button
