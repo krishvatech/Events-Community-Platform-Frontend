@@ -387,6 +387,10 @@ export default function EventDetailsPage() {
   const [previewParticipants, setPreviewParticipants] = useState([]);
   const [previewParticipantsForbidden, setPreviewParticipantsForbidden] = useState(false);
 
+  const handleImageLoad = useCallback((e) => {
+    const img = e.currentTarget;
+  }, []);
+
   const refreshEventFromServer = useCallback(async () => {
     if (!event?.id) return;
     try {
@@ -1063,19 +1067,30 @@ export default function EventDetailsPage() {
                     {/* Top section: Image + Details in a grid */}
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 }, alignItems: 'start' }}>
                       {/* LEFT: Event Image */}
-                      <Box>
+                      <Box
+                        sx={{
+                          backgroundColor: "#e5e7eb",
+                          padding: 2,
+                          borderRadius: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: "400px",
+                        }}
+                      >
                         {(event.cover_image || event.preview_image) ? (
                           <Box
                             component="img"
                             src={toAbs(event.cover_image || event.preview_image)}
                             alt={event.title}
                             loading="lazy"
+                            onLoad={handleImageLoad}
                             sx={{
                               width: "100%",
-                              aspectRatio: "16/9",
+                              maxHeight: "450px",
                               objectFit: "contain",
                               display: "block",
-                              borderRadius: 2,
+                              borderRadius: 1,
                             }}
                           />
                         ) : (
