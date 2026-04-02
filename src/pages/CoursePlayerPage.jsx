@@ -1008,7 +1008,7 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
 
   // Show all sections (scroll spy view)
   return (
-    <Box sx={{ p: 3, maxWidth: 860, mx: "auto" }}>
+    <Box sx={{ p: 3, width: "100%" }}>
       {sections.map((section) => {
         const mods = (section.modules || []);
         const isExpanded = expandedSections[section.id] === true; // All sections collapsed by default
