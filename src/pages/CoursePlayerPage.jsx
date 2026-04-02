@@ -333,8 +333,8 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
   const fmtDate = (ts) => ts ? new Date(ts * 1000).toLocaleDateString(undefined, { dateStyle: "medium" }) : null;
 
   return (
-    <Box sx={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", flexDirection: "column", bgcolor: "#f9fafb" }}>
-      {/* Top bar */}
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "#f9fafb" }}>
+      {/* Header bar */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1, bgcolor: "#ffffff", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
         <Box sx={{ width: 32, height: 32, borderRadius: 1.5, bgcolor: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <ModuleIcon modtype={modtype} mimetype={content_mimetype} sx={{ fontSize: 18, color }} />
@@ -475,6 +475,11 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
       </Box>
     </Box>
   );
+}
+
+// ── Simplified export for display in split layout ──
+export function ModuleDetailPanel({ courseId, module, onClose }) {
+  return <ModuleLaunchModal courseId={courseId} module={module} onClose={onClose} />;
 }
 
 // ── Single module card (full content) ─────────────────────────────────────────
@@ -1001,16 +1006,26 @@ export default function CoursePlayerPage() {
           />
         </Box>
 
-        {/* Main scrollable section view */}
-        <Box ref={mainRef} sx={{ flex: 1, overflowY: "auto", bgcolor: "#f3f4f6" }}>
-          <SectionView
-            section={activeSection}
-            activeModule={activeModule}
-            moduleRefs={moduleRefs}
-            onMarkDone={handleMarkDone}
-            onOpenInPlatform={handleOpenInPlatform}
-            loading={contentLoading}
-          />
+        {/* Main content area - show assignment modal or section view */}
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {launchModal.open ? (
+            <ModuleLaunchModal
+              courseId={courseId}
+              module={launchModal.module}
+              onClose={() => setLaunchModal({ open: false, module: null })}
+            />
+          ) : (
+            <Box ref={mainRef} sx={{ flex: 1, overflowY: "auto", bgcolor: "#f3f4f6" }}>
+              <SectionView
+                section={activeSection}
+                activeModule={activeModule}
+                moduleRefs={moduleRefs}
+                onMarkDone={handleMarkDone}
+                onOpenInPlatform={handleOpenInPlatform}
+                loading={contentLoading}
+              />
+            </Box>
+          )}
         </Box>
       </Box>
 
@@ -1021,15 +1036,6 @@ export default function CoursePlayerPage() {
         message={snack}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       />
-
-      {/* Full-screen in-platform module detail viewer */}
-      {launchModal.open && (
-        <ModuleLaunchModal
-          courseId={courseId}
-          module={launchModal.module}
-          onClose={() => setLaunchModal({ open: false, module: null })}
-        />
-      )}
     </Box>
   );
 }
