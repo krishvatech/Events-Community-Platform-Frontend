@@ -177,7 +177,7 @@ function PlayerTopBar({ course, progress, completed, refreshing, onRefresh }) {
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
-function CourseSidebar({ sections, activeSectionId, activeModuleId, onSelectSection, onSelectModule, loading }) {
+function CourseSidebar({ sections, activeSectionId, activeModule, onSelectSection, onSelectModule, loading }) {
   const [openSections, setOpenSections] = useState({});
 
   // Auto-open the active section
@@ -210,7 +210,7 @@ function CourseSidebar({ sections, activeSectionId, activeModuleId, onSelectSect
 
         return (
           <Box key={section.id}>
-            {/* Section header */}
+            {/* Section header - click to scroll to section */}
             <Box
               onClick={() => { onSelectSection(section); toggle(section.id); }}
               sx={{
@@ -220,9 +220,10 @@ function CourseSidebar({ sections, activeSectionId, activeModuleId, onSelectSect
                 px: 2,
                 py: 1,
                 cursor: "pointer",
-                bgcolor: isActive && !activeModuleId ? "#1bbbb318" : "transparent",
-                borderLeft: isActive && !activeModuleId ? "3px solid #1bbbb3" : "3px solid transparent",
-                "&:hover": { bgcolor: isActive && !activeModuleId ? "#1bbbb318" : "#f3f4f6" },
+                bgcolor: isActive ? "#1bbbb318" : "transparent",
+                borderLeft: isActive ? "3px solid #1bbbb3" : "3px solid transparent",
+                "&:hover": { bgcolor: isActive ? "#1bbbb318" : "#f3f4f6" },
+                transition: "all 0.2s ease",
               }}
             >
               {isOpen
@@ -252,14 +253,14 @@ function CourseSidebar({ sections, activeSectionId, activeModuleId, onSelectSect
               </Box>
             </Box>
 
-            {/* Module list */}
+            {/* Module list - expandable */}
             <Collapse in={isOpen}>
               {mods.map((mod) => {
-                const isModActive = mod.moodle_module_id === activeModuleId;
+                const isModuleActive = activeModule?.moodle_module_id === mod.moodle_module_id;
                 return (
                   <Box
                     key={mod.id}
-                    onClick={() => { onSelectModule(section, mod); }}
+                    onClick={() => onSelectModule(section, mod)}
                     sx={{
                       display: "flex",
                       alignItems: "center",
@@ -268,9 +269,10 @@ function CourseSidebar({ sections, activeSectionId, activeModuleId, onSelectSect
                       pr: 2,
                       py: 0.75,
                       cursor: "pointer",
-                      bgcolor: isModActive ? "#1bbbb318" : "transparent",
-                      borderLeft: isModActive ? "3px solid #1bbbb3" : "3px solid transparent",
-                      "&:hover": { bgcolor: isModActive ? "#1bbbb318" : "#f3f4f6" },
+                      bgcolor: isModuleActive ? "#1bbbb318" : "transparent",
+                      borderLeft: isModuleActive ? "3px solid #1bbbb3" : "3px solid transparent",
+                      "&:hover": { bgcolor: "#f3f4f6" },
+                      transition: "all 0.2s ease",
                     }}
                   >
                     <Box sx={{ color: mod.completed ? "#34d399" : moduleColor(mod.modtype, mod.content_mimetype), flexShrink: 0 }}>
@@ -281,9 +283,9 @@ function CourseSidebar({ sections, activeSectionId, activeModuleId, onSelectSect
                     <Typography
                       variant="body2"
                       sx={{
-                        color: isModActive ? "#1bbbb3" : mod.completed ? "#9ca3af" : "#374151",
+                        color: isModuleActive ? "#1bbbb3" : mod.completed ? "#9ca3af" : "#374151",
                         fontSize: 12,
-                        fontWeight: isModActive ? 600 : 400,
+                        fontWeight: isModuleActive ? 600 : 400,
                         flex: 1,
                         minWidth: 0,
                         overflow: "hidden",
@@ -299,6 +301,7 @@ function CourseSidebar({ sections, activeSectionId, activeModuleId, onSelectSect
                 );
               })}
             </Collapse>
+
             <Divider sx={{ borderColor: "#e5e7eb", my: 0.5 }} />
           </Box>
         );
@@ -477,6 +480,200 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
   );
 }
 
+// ── Module details inline (for assignments/quizzes) ────────────────────────────
+function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [marking, setMarking] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(module?.completed || false);
+
+  useEffect(() => {
+    if (!module) return;
+    let cancelled = false;
+    setLoading(true);
+    setDetail(null);
+    setError(false);
+    apiFetch(`/courses/${courseId}/modules/${module.moodle_module_id}/detail/`)
+      .then((d) => { if (!cancelled) { setDetail(d); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [courseId, module]);
+
+  const handleMarkAsDone = async () => {
+    setMarking(true);
+    try {
+      await onMarkDone?.(module);
+      setIsCompleted(true);
+    } finally {
+      setMarking(false);
+    }
+  };
+
+  const fmtDate = (ts) => ts ? new Date(ts * 1000).toLocaleDateString(undefined, { dateStyle: "medium" }) : null;
+  const { module_url, modtype, completion } = module;
+
+  if (loading) {
+    return <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress sx={{ color: "#1bbbb3" }} /></Box>;
+  }
+
+  if (error || !detail) {
+    return (
+      <Box sx={{ p: 3, textAlign: "center" }}>
+        <Typography sx={{ color: "#6b7280", mb: 2 }}>Could not load content.</Typography>
+        {module_url && (
+          <Button variant="outlined" endIcon={<OpenInNewRoundedIcon />} href={module_url} target="_blank" rel="noopener noreferrer">
+            Open in LMS
+          </Button>
+        )}
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ p: 3, maxWidth: "100%" }}>
+      {/* Assignment */}
+      {modtype === "assign" && (
+        <>
+          {/* Meta row with Mark as done button */}
+          {(detail.allowsubmissionsfromdate > 0 || detail.duedate > 0 || detail.nosubmissions === 1 || completion === 1) && (
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center", mb: 2.5 }}>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                {detail.allowsubmissionsfromdate > 0 && (
+                  <Chip label={`Opens: ${fmtDate(detail.allowsubmissionsfromdate)}`} size="small" sx={{ bgcolor: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0" }} />
+                )}
+                {detail.duedate > 0 && (
+                  <Chip label={`Due: ${fmtDate(detail.duedate)}`} size="small" sx={{ bgcolor: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }} />
+                )}
+                {detail.nosubmissions === 1 && (
+                  <Chip label="No submission required" size="small" sx={{ bgcolor: "#f0f9ff", color: "#0369a1", border: "1px solid #bae6fd" }} />
+                )}
+              </Box>
+
+              {/* Mark as done button on the right */}
+              <Box sx={{ ml: "auto" }}>
+                {completion === 1 && (
+                  isCompleted ? (
+                    <Chip
+                      icon={<DoneRoundedIcon sx={{ fontSize: 14 }} />}
+                      label="Done"
+                      size="small"
+                      sx={{ bgcolor: "#34d39922", color: "#34d399", border: "1px solid #34d39944", height: 26, fontSize: 11 }}
+                    />
+                  ) : (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={marking}
+                      onClick={handleMarkAsDone}
+                      sx={{
+                        textTransform: "none",
+                        fontSize: 12,
+                        color: "#9ca3af",
+                        borderColor: "#e5e7eb",
+                        whiteSpace: "nowrap",
+                        "&:hover": { borderColor: "#1bbbb3", color: "#1bbbb3" },
+                      }}
+                    >
+                      {marking ? <CircularProgress size={12} /> : "Mark as done"}
+                    </Button>
+                  )
+                )}
+              </Box>
+            </Box>
+          )}
+
+          {/* Intro HTML */}
+          {detail.intro && (
+            <Box
+              sx={{
+                bgcolor: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 2, p: 3,
+                fontSize: 14, color: "#374151", lineHeight: 1.8,
+                "& img": { maxWidth: "100%", height: "auto", borderRadius: 1, my: 1 },
+                "& p": { margin: "0 0 10px 0" },
+                "& ol, & ul": { pl: 3, mb: 1 },
+                "& a": { color: "#1bbbb3" },
+                mb: 3,
+              }}
+              dangerouslySetInnerHTML={{ __html: detail.intro }}
+            />
+          )}
+
+          {/* Submit button */}
+          {module_url && (
+            <Button
+              variant="contained"
+              endIcon={<OpenInNewRoundedIcon />}
+              href={module_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ bgcolor: "#ec4899", "&:hover": { bgcolor: "#db2777" }, textTransform: "none" }}
+            >
+              Submit Assignment in LMS
+            </Button>
+          )}
+        </>
+      )}
+
+      {/* Quiz */}
+      {modtype === "quiz" && (
+        <>
+          {(detail.timelimit > 0 || detail.timeopen > 0 || detail.timeclose > 0 || completion === 1) && (
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center", mb: 2.5 }}>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                {detail.timelimit > 0 && <Chip label={`Time limit: ${Math.round(detail.timelimit / 60)} min`} size="small" sx={{ bgcolor: "#faf5ff", color: "#7c3aed", border: "1px solid #e9d5ff" }} />}
+                {detail.timeopen > 0 && <Chip label={`Opens: ${fmtDate(detail.timeopen)}`} size="small" sx={{ bgcolor: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0" }} />}
+                {detail.timeclose > 0 && <Chip label={`Closes: ${fmtDate(detail.timeclose)}`} size="small" sx={{ bgcolor: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }} />}
+              </Box>
+
+              {/* Mark as done button on the right */}
+              <Box sx={{ ml: "auto" }}>
+                {completion === 1 && (
+                  isCompleted ? (
+                    <Chip
+                      icon={<DoneRoundedIcon sx={{ fontSize: 14 }} />}
+                      label="Done"
+                      size="small"
+                      sx={{ bgcolor: "#34d39922", color: "#34d399", border: "1px solid #34d39944", height: 26, fontSize: 11 }}
+                    />
+                  ) : (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={marking}
+                      onClick={handleMarkAsDone}
+                      sx={{
+                        textTransform: "none",
+                        fontSize: 12,
+                        color: "#9ca3af",
+                        borderColor: "#e5e7eb",
+                        whiteSpace: "nowrap",
+                        "&:hover": { borderColor: "#1bbbb3", color: "#1bbbb3" },
+                      }}
+                    >
+                      {marking ? <CircularProgress size={12} /> : "Mark as done"}
+                    </Button>
+                  )
+                )}
+              </Box>
+            </Box>
+          )}
+          {detail.intro && (
+            <Box sx={{ bgcolor: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 2, p: 3, fontSize: 14, color: "#374151", lineHeight: 1.8, "& img": { maxWidth: "100%" }, "& p": { margin: "0 0 10px 0" }, mb: 3 }}
+              dangerouslySetInnerHTML={{ __html: detail.intro }}
+            />
+          )}
+          {module_url && (
+            <Button variant="contained" endIcon={<OpenInNewRoundedIcon />} href={module_url} target="_blank" rel="noopener noreferrer" sx={{ bgcolor: "#8b5cf6", "&:hover": { bgcolor: "#7c3aed" }, textTransform: "none" }}>
+              Start Quiz in LMS
+            </Button>
+          )}
+        </>
+      )}
+    </Box>
+  );
+}
+
 // ── Simplified export for display in split layout ──
 export function ModuleDetailPanel({ courseId, module, onClose }) {
   return <ModuleLaunchModal courseId={courseId} module={module} onClose={onClose} />;
@@ -529,14 +726,17 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform }) {
         </Box>
       )}
 
-      {/* ── PDF (download link — browser PDF embed often breaks in flex layouts) ── */}
+      {/* ── PDF (full viewer modal) ── */}
       {modtype === "resource" && is_pdf && content_url && (
-        <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
-          <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: "#ef4444" }} />
-          <Box>
-            <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>
-              {decodeEntities(name)}
-            </Typography>
+        <Box sx={{ bgcolor: "#ffffff", borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column", height: "800px" }}>
+          {/* Header with title and controls */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 3, py: 2, borderBottom: "1px solid #e5e7eb", bgcolor: "#f9fafb", flexShrink: 0 }}>
+            <PictureAsPdfRoundedIcon sx={{ fontSize: 28, color: "#ef4444", flexShrink: 0 }} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600 }}>
+                {decodeEntities(name)}
+              </Typography>
+            </Box>
             <Button
               size="small"
               variant="contained"
@@ -544,10 +744,22 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform }) {
               href={content_url}
               target="_blank"
               rel="noopener noreferrer"
-              sx={{ bgcolor: "#ef4444", "&:hover": { bgcolor: "#dc2626" }, textTransform: "none", fontSize: 12 }}
+              sx={{ bgcolor: "#ef4444", "&:hover": { bgcolor: "#dc2626" }, textTransform: "none", fontSize: 12, flexShrink: 0 }}
             >
-              Open PDF
+              View Full
             </Button>
+          </Box>
+
+          {/* PDF Viewer Container */}
+          <Box sx={{ flex: 1, display: "flex", overflow: "hidden", bgcolor: "#f3f4f6" }}>
+            {/* Embedded PDF with controls */}
+            <Box sx={{ flex: 1, bgcolor: "#fff", position: "relative" }}>
+              <embed
+                src={`${content_url}#toolbar=1&navpanes=0&scrollbar=1`}
+                type="application/pdf"
+                style={{ width: "100%", height: "100%", border: "none" }}
+              />
+            </Box>
           </Box>
         </Box>
       )}
@@ -695,8 +907,8 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform }) {
   );
 }
 
-// ── Section view (main scrollable area) ──────────────────────────────────────
-function SectionView({ section, activeModule, moduleRefs, onMarkDone, onOpenInPlatform, loading }) {
+// ── Section view (all sections or single module view) ──────────────────────────
+function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs, onMarkDone, onOpenInPlatform, loading }) {
   if (loading) {
     return (
       <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -712,78 +924,122 @@ function SectionView({ section, activeModule, moduleRefs, onMarkDone, onOpenInPl
     );
   }
 
-  if (!section) {
+  if (!sections || sections.length === 0) {
     return (
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
         <SchoolRoundedIcon sx={{ fontSize: 64, color: "#d1d5db" }} />
-        <Typography sx={{ color: "#6b7280" }}>Select a section to begin</Typography>
+        <Typography sx={{ color: "#6b7280" }}>No course content available</Typography>
       </Box>
     );
   }
 
-  // Single-module focused view (when a specific module is clicked in the sidebar)
+  // If a module is selected, show focused view of just that module
   if (activeModule) {
-    return (
-      <Box sx={{ p: 3, maxWidth: 860, mx: "auto" }}>
-        {/* Breadcrumb */}
-        <Typography variant="caption" sx={{ color: "#6b7280", mb: 2, display: "block" }}>
-          {decodeEntities(section.name)} › {decodeEntities(activeModule.name)}
-        </Typography>
-        <ModuleCard
-          module={activeModule}
-          moduleRef={moduleRefs.current[activeModule.moodle_module_id]}
-          onMarkDone={onMarkDone}
-          onOpenInPlatform={onOpenInPlatform}
-        />
-      </Box>
-    );
-  }
+    const section = sections.find((s) => (s.modules || []).some((m) => m.moodle_module_id === activeModule.moodle_module_id));
+    if (section) {
+      // For interactive modules (assign, quiz), show inline details instead of card
+      if (["assign", "quiz"].includes(activeModule.modtype)) {
+        return (
+          <Box sx={{ p: 3, width: "100%" }}>
+            {/* Breadcrumb */}
+            <Typography variant="caption" sx={{ color: "#6b7280", mb: 3, display: "block" }}>
+              {decodeEntities(section.name)} › {decodeEntities(activeModule.name)}
+            </Typography>
 
-  // All-modules view (when a section header is clicked)
-  const mods = (section.modules || []);
+            {/* Module details container */}
+            <Box sx={{ bgcolor: "#ffffff", borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+              {/* Header with icon and title */}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 3, py: 2, borderBottom: "1px solid #e5e7eb" }}>
+                <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: `${moduleColor(activeModule.modtype, activeModule.content_mimetype)}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <ModuleIcon modtype={activeModule.modtype} mimetype={activeModule.content_mimetype} sx={{ fontSize: 20, color: moduleColor(activeModule.modtype, activeModule.content_mimetype) }} />
+                </Box>
+                <Typography variant="h6" fontWeight={700} sx={{ color: "#111827", flex: 1 }}>
+                  {decodeEntities(activeModule.name)}
+                </Typography>
+              </Box>
 
-  return (
-    <Box sx={{ p: 3 }}>
-      {/* Section heading */}
-      <Typography
-        variant="h6"
-        fontWeight={700}
-        sx={{ color: "#111827", mb: 2, pb: 1.5, borderBottom: "1px solid #e5e7eb" }}
-      >
-        {decodeEntities(section.name) || `Section ${section.position + 1}`}
-      </Typography>
+              {/* Loading state - fetch details */}
+              <ModuleDetailContent courseId={courseId} module={activeModule} onMarkDone={onMarkDone} onOpenInPlatform={onOpenInPlatform} />
+            </Box>
+          </Box>
+        );
+      }
 
-      {/* Section summary HTML (instructor info, welcome text, schedule, etc.) */}
-      {section.summary?.trim() && (
-        <Box
-          sx={{
-            mb: 2.5,
-            p: 2,
-            bgcolor: "#ffffff",
-            border: "1px solid #e5e7eb",
-            borderRadius: 2,
-            fontSize: 14,
-            color: "#374151",
-            lineHeight: 1.7,
-            "& img": { maxWidth: "100%", height: "auto", borderRadius: 1 },
-            "& p": { margin: "0 0 8px 0" },
-            "& strong": { color: "#111827" },
-          }}
-          dangerouslySetInnerHTML={{ __html: section.summary }}
-        />
-      )}
-
-      {mods.length === 0 ? null : (
-        mods.map((mod) => (
+      // For other modules, show card view
+      return (
+        <Box sx={{ p: 3, width: "100%" }}>
+          {/* Breadcrumb */}
+          <Typography variant="caption" sx={{ color: "#6b7280", mb: 2, display: "block" }}>
+            {decodeEntities(section.name)} › {decodeEntities(activeModule.name)}
+          </Typography>
           <ModuleCard
-            key={mod.id}
-            module={mod}
-            moduleRef={moduleRefs.current[mod.moodle_module_id]}
+            module={activeModule}
+            moduleRef={moduleRefs.current[activeModule.moodle_module_id]}
             onMarkDone={onMarkDone}
             onOpenInPlatform={onOpenInPlatform}
           />
-        ))
-      )}
+        </Box>
+      );
+    }
+  }
+
+  // Show all sections (scroll spy view)
+  return (
+    <Box sx={{ p: 3, maxWidth: 860, mx: "auto" }}>
+      {sections.map((section) => {
+        const mods = (section.modules || []);
+        return (
+          <Box
+            key={section.id}
+            ref={(el) => { if (el) sectionRefs.current[section.id] = el; }}
+            data-section-id={section.id}
+            sx={{ mb: 4 }}
+          >
+            {/* Section heading */}
+            <Typography
+              variant="h6"
+              fontWeight={700}
+              sx={{ color: "#111827", mb: 2, pb: 1.5, borderBottom: "1px solid #e5e7eb" }}
+            >
+              {decodeEntities(section.name) || `Section ${section.position + 1}`}
+            </Typography>
+
+            {/* Section summary HTML (instructor info, welcome text, schedule, etc.) */}
+            {section.summary?.trim() && (
+              <Box
+                sx={{
+                  mb: 2.5,
+                  p: 2,
+                  bgcolor: "#ffffff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 2,
+                  fontSize: 14,
+                  color: "#374151",
+                  lineHeight: 1.7,
+                  "& img": { maxWidth: "100%", height: "auto", borderRadius: 1 },
+                  "& p": { margin: "0 0 8px 0" },
+                  "& strong": { color: "#111827" },
+                }}
+                dangerouslySetInnerHTML={{ __html: section.summary }}
+              />
+            )}
+
+            {mods.length === 0 ? null : (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {mods.map((mod) => (
+                  <ModuleCard
+                    key={mod.id}
+                    module={mod}
+                    moduleRef={moduleRefs.current[mod.moodle_module_id]}
+                    onMarkDone={onMarkDone}
+                    onOpenInPlatform={onOpenInPlatform}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+        );
+      })}
     </Box>
   );
 }
@@ -797,7 +1053,7 @@ export default function CoursePlayerPage() {
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [sections, setSections] = useState([]);
-  const [activeSection, setActiveSection] = useState(null);
+  const [activeSectionId, setActiveSectionId] = useState(null);
   const [activeModule, setActiveModule] = useState(null);
   const [loading, setLoading] = useState(true);
   const [contentLoading, setContentLoading] = useState(true);
@@ -807,6 +1063,7 @@ export default function CoursePlayerPage() {
   const [launchModal, setLaunchModal] = useState({ open: false, module: null });
 
   const mainRef = useRef(null);
+  const sectionRefs = useRef({});
   const moduleRefs = useRef({});
 
   // ── Load course detail ──────────────────────────────────────────────────────
@@ -844,16 +1101,9 @@ export default function CoursePlayerPage() {
           (s) => s.modules?.length > 0 || s.summary?.trim()
         );
         setSections(secs);
-        // Auto-select first section with a video/pdf/url module
-        const firstWithContent = secs.find((s) =>
-          (s.modules || []).some((m) => m.is_video || m.is_pdf || m.modtype === "url")
-        ) || secs[0];
-        if (firstWithContent) {
-          setActiveSection(firstWithContent);
-          const firstMod = (firstWithContent.modules || []).find(
-            (m) => m.is_video || m.is_pdf || m.modtype === "url"
-          ) || firstWithContent.modules?.[0];
-          if (firstMod) setActiveModule(firstMod);
+        // Set first section as active
+        if (secs.length > 0) {
+          setActiveSectionId(secs[0].id);
         }
       } catch {
         if (!cancelled) setSnack("Could not load course content.");
@@ -887,17 +1137,55 @@ export default function CoursePlayerPage() {
     return () => clearInterval(timer);
   }, [loading, refreshProgress]);
 
-  // ── Select section header → show all modules, clear active module ──────────
+  // ── Scroll spy effect ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mainRef.current || sections.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find the section that is most visible
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length > 0) {
+          const mostVisible = visible.reduce((prev, current) =>
+            current.intersectionRatio > prev.intersectionRatio ? current : prev
+          );
+
+          // Extract section ID from data attribute
+          const sectionId = mostVisible.target.getAttribute("data-section-id");
+          if (sectionId) {
+            setActiveSectionId(parseInt(sectionId, 10));
+          }
+        }
+      },
+      { threshold: 0.3, root: mainRef.current }
+    );
+
+    // Observe all section headers
+    sections.forEach((section) => {
+      const el = sectionRefs.current[section.id];
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [sections]);
+
+  // ── Select section → scroll to it ──────────────────────────────────────────
   const handleSelectSection = useCallback((section) => {
-    setActiveSection(section);
+    setActiveSectionId(section.id);
     setActiveModule(null);
-    setTimeout(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, 50);
+    const sectionEl = sectionRefs.current[section.id];
+    if (sectionEl && mainRef.current) {
+      setTimeout(() => {
+        const offset = sectionEl.offsetTop;
+        mainRef.current.scrollTo({ top: offset - 20, behavior: "smooth" });
+      }, 50);
+    }
   }, []);
 
-  // ── Select specific module → show single focused view ───────────────────────
-  const handleSelectModule = useCallback((section, mod) => {
-    setActiveSection(section);
-    setActiveModule(mod);
+  // ── Select module → show focused view ───────────────────────────────────────
+  const handleSelectModule = useCallback((section, module) => {
+    setActiveSectionId(section.id);
+    setActiveModule(module);
     setTimeout(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, 50);
   }, []);
 
@@ -920,22 +1208,11 @@ export default function CoursePlayerPage() {
           ),
         }))
       );
-      if (activeSection) {
-        setActiveSection((prev) => ({
-          ...prev,
-          modules: (prev.modules || []).map((m) =>
-            m.moodle_module_id === module.moodle_module_id ? { ...m, completed: true } : m
-          ),
-        }));
-      }
-      if (activeModule?.moodle_module_id === module.moodle_module_id) {
-        setActiveModule((prev) => ({ ...prev, completed: true }));
-      }
       setSnack("Marked as done!");
     } catch {
       setSnack("Could not mark as done — please try in the LMS.");
     }
-  }, [courseId, activeSection]);
+  }, [courseId]);
 
   // ── Loading / error states ──────────────────────────────────────────────────
   if (loading) {
@@ -998,15 +1275,15 @@ export default function CoursePlayerPage() {
           </Box>
           <CourseSidebar
             sections={sections}
-            activeSectionId={activeSection?.id}
-            activeModuleId={activeModule?.moodle_module_id}
+            activeSectionId={activeSectionId}
+            activeModule={activeModule}
             onSelectSection={handleSelectSection}
             onSelectModule={handleSelectModule}
             loading={contentLoading}
           />
         </Box>
 
-        {/* Main content area - show assignment modal or section view */}
+        {/* Main content area - show all sections or assignment modal */}
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {launchModal.open ? (
             <ModuleLaunchModal
@@ -1017,7 +1294,9 @@ export default function CoursePlayerPage() {
           ) : (
             <Box ref={mainRef} sx={{ flex: 1, overflowY: "auto", bgcolor: "#f3f4f6" }}>
               <SectionView
-                section={activeSection}
+                courseId={courseId}
+                sections={sections}
+                sectionRefs={sectionRefs}
                 activeModule={activeModule}
                 moduleRefs={moduleRefs}
                 onMarkDone={handleMarkDone}
