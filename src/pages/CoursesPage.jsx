@@ -14,7 +14,6 @@ import {
   CircularProgress,
   Container,
   Divider,
-  Grid,
   InputAdornment,
   LinearProgress,
   MenuItem,
@@ -38,7 +37,7 @@ import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 9;
 
 function authHeaders() {
   const token = localStorage.getItem("access_token");
@@ -305,14 +304,23 @@ function MyCoursesTab() {
 
   if (loading) {
     return (
-      <Box sx={{ flexGrow: 1 }}>
-        <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }} sx={{ mt: 0 }}>
-          {[1, 2, 3].map((i) => (
-            <Grid item xs={4} sm={4} md={4} key={i}>
-              <CourseCardSkeleton />
-            </Grid>
-          ))}
-        </Grid>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(3, minmax(0, 1fr))",
+          },
+          autoRows: "1fr",
+          gap: 2,
+        }}
+      >
+        {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+          <Box key={i}>
+            <CourseCardSkeleton />
+          </Box>
+        ))}
       </Box>
     );
   }
@@ -353,14 +361,23 @@ function MyCoursesTab() {
         </Box>
       ) : (
         <>
-          <Box sx={{ flexGrow: 1 }}>
-            <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
-              {enrollments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((enrollment) => (
-                <Grid item xs={4} sm={4} md={4} key={enrollment.id}>
-                  <CourseCard enrollment={enrollment} />
-                </Grid>
-              ))}
-            </Grid>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                md: "repeat(3, minmax(0, 1fr))",
+              },
+              autoRows: "1fr",
+              gap: 2,
+            }}
+          >
+            {enrollments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((enrollment) => (
+              <Box key={enrollment.id}>
+                <CourseCard enrollment={enrollment} />
+              </Box>
+            ))}
           </Box>
           {Math.ceil(enrollments.length / PAGE_SIZE) > 1 && (
             <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
@@ -429,14 +446,23 @@ function CourseCatalogueTab() {
 
   if (loading) {
     return (
-      <Box sx={{ flexGrow: 1 }}>
-        <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }} sx={{ mt: 0 }}>
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Grid item xs={4} sm={4} md={4} key={i}>
-              <CourseCardSkeleton />
-            </Grid>
-          ))}
-        </Grid>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+            md: "repeat(3, minmax(0, 1fr))",
+          },
+          autoRows: "1fr",
+          gap: 2,
+        }}
+      >
+        {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+          <Box key={i}>
+            <CourseCardSkeleton />
+          </Box>
+        ))}
       </Box>
     );
   }
@@ -492,14 +518,23 @@ function CourseCatalogueTab() {
         </Box>
       ) : (
         <>
-          <Box sx={{ flexGrow: 1 }}>
-            <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
-              {filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((course) => (
-                <Grid item xs={4} sm={4} md={4} key={course.id}>
-                  <CourseCard course={course} />
-                </Grid>
-              ))}
-            </Grid>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                md: "repeat(3, minmax(0, 1fr))",
+              },
+              autoRows: "1fr",
+              gap: 2,
+            }}
+          >
+            {filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((course) => (
+              <Box key={course.id}>
+                <CourseCard course={course} />
+              </Box>
+            ))}
           </Box>
           {Math.ceil(filtered.length / PAGE_SIZE) > 1 && (
             <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
