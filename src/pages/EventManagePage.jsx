@@ -1584,6 +1584,68 @@ export default function EventManagePage() {
                 </Typography>
               )}
 
+              {/* Share Link */}
+              {event.slug && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    bgcolor: "rgba(59, 130, 246, 0.05)",
+                    border: "1px solid",
+                    borderColor: "primary.light",
+                    borderRadius: 2,
+                    p: 2,
+                    mb: 2.5,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      fontWeight: 600,
+                      color: "text.secondary",
+                      mb: 0.75,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    Landing Page URL
+                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={`${window.location.origin}/${event.slug}`}
+                      InputProps={{
+                        readOnly: true,
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LinkRoundedIcon sx={{ fontSize: 18 }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          bgcolor: "background.paper",
+                        },
+                      }}
+                    />
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}/${event.slug}`
+                        );
+                        toast.success("Link copied to clipboard!");
+                      }}
+                      sx={{ whiteSpace: "nowrap" }}
+                    >
+                      Copy
+                    </Button>
+                  </Stack>
+                </Paper>
+              )}
+
               {/* date / time / location */}
               <Stack spacing={0.75} sx={{ mb: 2.5 }}>
                 <Stack direction="row" spacing={1.2} alignItems="center">

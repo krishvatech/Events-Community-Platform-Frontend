@@ -132,7 +132,6 @@ function Hero({ onApplyClick, eventData = {} }) {
     const endDateInTZ = getDateInTimezone(endDate, eventTimezone);
 
     const startDay = startDateInTZ.day;
-    const endDay = endDateInTZ.day;
     const month = monthNames[startDateInTZ.month - 1];
     const year = startDateInTZ.year;
 
@@ -151,21 +150,94 @@ function Hero({ onApplyClick, eventData = {} }) {
     };
     const formatLabel = formatMap[data.format] || data.format || 'Onsite';
 
-    // Build location string
-    const locationStr = data.is_multi_day
-      ? `Onsite · ${data.location_city || data.location || ''}`
-      : `${formatLabel} · ${data.location_city || data.location || ''}`;
+    // Get user's timezone
+    const getUserTimezone = () => {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch (e) {
+        return 'User Time';
+      }
+    };
+
+    // Build location string without timezone (timezone shown in time)
+    const buildLocationString = () => {
+      const baseLocation = data.location_city || data.location || '';
+
+      // For virtual events, show "Virtual live"
+      if (data.format === 'virtual') {
+        return 'Virtual live';
+      }
+
+      if (data.is_multi_day) {
+        return `Onsite · ${baseLocation}`;
+      } else {
+        return `${formatLabel} · ${baseLocation}`;
+      }
+    };
+
+    const locationStr = buildLocationString();
+    const userTZ = getUserTimezone();
+    const userTimezone = '';
 
     // Calculate days if multi-day (in event timezone)
     const numDays = data.is_multi_day
       ? Math.abs(endDateInTZ.day - startDateInTZ.day) + 1
       : 1;
-    const daysText = numDays > 1 ? `${numDays} Days` : '1 Day';
+
+    // Format date display - for single day events show full date, for multi-day show date range
+    const isSingleDay = numDays === 1;
+
+    // Add time/timezone information based on event type
+    let eventTimeStr = '';
+    let userTimeStr = '';
+
+    if (data.start_time) {
+      const formatTimeInTimezone = (isoString, timezone) => {
+        try {
+          const date = new Date(isoString);
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezone || 'UTC',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          });
+          return formatter.format(date);
+        } catch (e) {
+          return '';
+        }
+      };
+
+      if (isSingleDay) {
+        // Single-day: show actual times
+        const eventStartTime = formatTimeInTimezone(data.start_time, eventTimezone);
+        const userStartTime = formatTimeInTimezone(data.start_time, userTZ);
+        const isSameTimezone = eventTimezone === userTZ;
+
+        if (eventStartTime) eventTimeStr = `${eventStartTime} (${eventTimezone})`;
+        if (userStartTime && !isSameTimezone) userTimeStr = `${userStartTime} (${userTZ})`;
+      } else {
+        // Multi-day: show timezone labels only
+        eventTimeStr = `Event's timezone: (${eventTimezone})`;
+        userTimeStr = `User's timezone: (${userTZ})`;
+      }
+    }
+    const startDateStr = isSingleDay
+      ? `${month} ${startDay}, ${year}`
+      : `${month} ${startDay}`;
+    const endDateStr = isSingleDay
+      ? ''
+      : `${endDateInTZ.day}`;
+    const yearDisplay = isSingleDay ? '' : year;
+
+    // For multi-day events, show days count only
+    const formatDisplay = numDays > 1 ? `${numDays} Days` : formatLabel;
 
     // Get cover image URL (handle both relative and absolute URLs)
     let coverImageUrl = data.cover_image || heroImg;
     if (coverImageUrl && !coverImageUrl.startsWith('http')) {
-      coverImageUrl = `http://localhost:8000${coverImageUrl}`;
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      const apiOrigin = apiBase.replace(/\/api\/?$/, '');
+      coverImageUrl = `${apiOrigin}${coverImageUrl}`;
     }
 
     return {
@@ -174,11 +246,14 @@ function Hero({ onApplyClick, eventData = {} }) {
       description: data.description || '',
       venue_name: data.venue_name || 'Venue',
       venue_location: `${data.location_city || ''}${data.location_country ? ', ' + data.location_country : ''}`.trim(),
-      start_date: `${month} ${startDay}`,
-      end_date: endDay,
-      year,
-      format: daysText,
+      start_date: startDateStr,
+      end_date: endDateStr,
+      year: yearDisplay,
+      format: formatDisplay,
       location: locationStr,
+      userTimezone,
+      eventTimeStr,
+      userTimeStr,
       badge_text: badgeText,
       organizer_name: "IMAA INSTITUTE",
       organizer_abbreviation: "IM",
@@ -195,8 +270,11 @@ function Hero({ onApplyClick, eventData = {} }) {
     start_date = "Sep 14",
     end_date = "17",
     year = "2026",
-    format = "4 Days",
+    format = "Onsite",
     location = "Onsite, Oxford",
+    userTimezone = "User Time",
+    eventTimeStr = "",
+    userTimeStr = "",
     badge_text = "By Invitation & Application Only",
     organizer_name = "IMAA INSTITUTE",
     organizer_abbreviation = "IM",
@@ -406,44 +484,127 @@ function Hero({ onApplyClick, eventData = {} }) {
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, ...a(0.7) }}>
-            <div style={{ height: 200, borderRadius: 4, position: "relative", overflow: "hidden" }}>
-              <img
-                src={hero_image}
-                alt={venue_name}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  objectPosition: "center 40%",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "linear-gradient(to top, rgba(40,77,97,0.88) 0%, rgba(40,77,97,0.3) 55%, transparent 100%)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
-                  padding: 20,
-                  zIndex: 1,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                  {Ic.mapPin(C.lightBlue)}
+            {hero_image && eventData.format !== 'virtual' && (
+              <div style={{ height: 200, borderRadius: 4, position: "relative", overflow: "hidden" }}>
+                <img
+                  src={hero_image}
+                  alt={venue_name}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center 40%",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(to top, rgba(40,77,97,0.88) 0%, rgba(40,77,97,0.3) 55%, transparent 100%)",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-end",
+                    padding: 20,
+                    zIndex: 1,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    {Ic.mapPin(C.lightBlue)}
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: "0.14em",
+                        textTransform: "uppercase",
+                        color: C.lightBlue,
+                        fontFamily: F.body,
+                      }}
+                    >
+                      Venue
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 700, color: C.white, lineHeight: 1.2 }}>
+                    {venue_name}
+                  </div>
+                  <div style={{ fontFamily: F.body, fontSize: 13, color: C.lightBlue, marginTop: 2 }}>
+                    {venue_location}
+                  </div>
+                </div>
+              </div>
+            )}
+            {hero_image && eventData.format === 'virtual' && (
+              <div style={{ height: 200, borderRadius: 4, position: "relative", overflow: "hidden" }}>
+                <img
+                  src={hero_image}
+                  alt="Event banner"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(to top, rgba(40,77,97,0.88) 0%, rgba(40,77,97,0.3) 55%, transparent 100%)",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-end",
+                    padding: 20,
+                    zIndex: 1,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    {Ic.users(C.lightBlue)}
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: "0.14em",
+                        textTransform: "uppercase",
+                        color: C.lightBlue,
+                        fontFamily: F.body,
+                      }}
+                    >
+                      Venue
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 700, color: C.white, lineHeight: 1.2 }}>
+                    {venue_name}
+                  </div>
+                  <div style={{ fontFamily: F.body, fontSize: 13, color: C.lightBlue, marginTop: 2 }}>
+                    Virtual live
+                  </div>
+                </div>
+              </div>
+            )}
+            {!hero_image && eventData.format === 'virtual' && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  {Ic.users(C.lightBlue)}
                   <span
                     style={{
                       fontSize: 9,
                       fontWeight: 700,
-                      letterSpacing: "0.14em",
+                      letterSpacing: "0.1em",
                       textTransform: "uppercase",
                       color: C.lightBlue,
                       fontFamily: F.body,
@@ -452,14 +613,11 @@ function Hero({ onApplyClick, eventData = {} }) {
                     Venue
                   </span>
                 </div>
-                <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 700, color: C.white, lineHeight: 1.2 }}>
-                  {venue_name}
-                </div>
-                <div style={{ fontFamily: F.body, fontSize: 13, color: C.lightBlue, marginTop: 2 }}>
-                  {venue_location}
+                <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 700, color: C.white }}>
+                  Virtual live
                 </div>
               </div>
-            </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div
                 style={{
@@ -485,11 +643,13 @@ function Hero({ onApplyClick, eventData = {} }) {
                   </span>
                 </div>
                 <div style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.white }}>
-                  {start_date} - {end_date}
+                  {end_date ? `${start_date} - ${end_date}` : start_date}
                 </div>
-                <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
-                  {year}
-                </div>
+                {year && (
+                  <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
+                    {year}
+                  </div>
+                )}
               </div>
               <div
                 style={{
@@ -520,6 +680,20 @@ function Hero({ onApplyClick, eventData = {} }) {
                 <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
                   {location}
                 </div>
+                {eventTimeStr && (
+                  <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
+                    {eventTimeStr}
+                  </div>
+                )}
+                {userTimeStr ? (
+                  <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
+                    {userTimeStr}
+                  </div>
+                ) : userTimezone ? (
+                  <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: eventTimeStr ? 2 : 4 }}>
+                    {userTimezone}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -988,6 +1162,15 @@ function Programme({ eventData = {} }) {
     }
   };
 
+  // Helper function to get user's timezone
+  const getUserTimezone = () => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (e) {
+      return 'User Time';
+    }
+  };
+
   // Transform API sessions into day cards
   const transformSessions = (sessions, isMultiDay, timezone, startTime, endTime) => {
     if (!isMultiDay || !sessions || !Array.isArray(sessions)) return [];
@@ -1031,12 +1214,17 @@ function Programme({ eventData = {} }) {
         const dayName = dayNames[date.getDay()];
         const dateStr = `${monthNames[date.getMonth()]} ${date.getDate()}`;
 
+        // Show event timezone in parentheses and user timezone
+        const timezoneLabel = timezone ? `(${timezone})` : '';
+        const userTZ = getUserTimezone();
+
         return {
           day: dayName,
           date: dateStr,
           color: colors[idx % colors.length],
           sessions: day.sessions.map((s) => ({
-            time: `${formatTimeInTimezone(s.start_time, timezone)} – ${formatTimeInTimezone(s.end_time, timezone)}`,
+            time: `${formatTimeInTimezone(s.start_time, timezone)} – ${formatTimeInTimezone(s.end_time, timezone)} ${timezoneLabel}`,
+            userTime: `${formatTimeInTimezone(s.start_time, userTZ)} – ${formatTimeInTimezone(s.end_time, userTZ)} (${userTZ})`,
             label: s.session_type === "main" ? s.title : "Sessions",
           })),
           evening: day.title,
@@ -1076,7 +1264,10 @@ function Programme({ eventData = {} }) {
                 <div style={{ fontSize: 11, color: C.cool60, fontFamily: F.body, letterSpacing: "0.05em", textTransform: "uppercase" }}>{d.date}</div>
               </div>
               {d.sessions.map((s, j) => (
-                <div key={j} style={{ marginBottom: 12, fontSize: 12, color: C.cool60, fontFamily: F.body }}>{s.time} <strong>{s.label}</strong></div>
+                <div key={j} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, color: C.cool60, fontFamily: F.body }}>{s.time}</div>
+                  <div style={{ fontSize: 11, color: C.cool60, fontFamily: F.body, marginTop: 2 }}>{s.userTime}</div>
+                </div>
               ))}
               {d.evening && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.cool20}`, fontSize: 13, fontWeight: 600, color: C.deepBlue, fontFamily: F.display, fontStyle: "italic" }}>{d.evening}</div>
@@ -1204,7 +1395,10 @@ function About() {
 }
 
 // 10. CTA & APPLY
-function FinalCTA({ onApplyClick }) {
+function FinalCTA({ onApplyClick, eventData = {} }) {
+  const eventTitle = eventData.title || 'The Oxford M&A Symposium 2026';
+  const eventName = eventTitle.replace(' 2026', '').replace(/\d{4}$/, '').trim();
+
   return (
     <section id="apply" style={{ background: `linear-gradient(135deg, ${C.deepBlue}, ${C.midBlue})`, padding: "80px 0" }}>
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 40px", textAlign: "center" }}>
@@ -1220,7 +1414,7 @@ function FinalCTA({ onApplyClick }) {
               fontStyle: "italic",
             }}
           >
-            The Oxford M&A Symposium
+            {eventName}
           </div>
           <div
             style={{
@@ -1499,7 +1693,7 @@ export default function OxfordSymposium2026() {
       <OxfordExperience />
       <Programme eventData={eventData} />
       <About />
-      <FinalCTA onApplyClick={() => setApplyOpen(true)} />
+      <FinalCTA onApplyClick={() => setApplyOpen(true)} eventData={eventData} />
       <Footer />
       <ApplyDialog open={applyOpen} onClose={() => setApplyOpen(false)} />
     </div>
