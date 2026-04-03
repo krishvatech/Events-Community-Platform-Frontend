@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Dialog, DialogTitle, DialogContent, TextField, Button, CircularProgress, Alert } from "@mui/material";
 import heroImg from "../assets/oxford/Oxford_Jesus-College.png";
 import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
@@ -96,7 +97,112 @@ function FadeIn({ children, delay = 0 }) {
 
 
 // 1. HERO
-function Hero({ onApplyClick }) {
+function Hero({ onApplyClick, eventData = {} }) {
+  // Format event data from API response
+  const formatEventData = (data) => {
+    if (!data || !data.start_time) return null;
+
+    const startDate = new Date(data.start_time);
+    const endDate = new Date(data.end_time || data.start_time);
+    const eventTimezone = data.timezone || 'UTC';
+
+    // Helper function to format date in event's timezone
+    const getDateInTimezone = (date, timezone) => {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const parts = formatter.formatToParts(date);
+      const result = {};
+      parts.forEach(({ type, value }) => {
+        result[type] = value;
+      });
+      return {
+        day: parseInt(result.day),
+        month: parseInt(result.month),
+        year: parseInt(result.year),
+      };
+    };
+
+    // Format dates in event's timezone
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const startDateInTZ = getDateInTimezone(startDate, eventTimezone);
+    const endDateInTZ = getDateInTimezone(endDate, eventTimezone);
+
+    const startDay = startDateInTZ.day;
+    const endDay = endDateInTZ.day;
+    const month = monthNames[startDateInTZ.month - 1];
+    const year = startDateInTZ.year;
+
+    // Get registration type badge
+    const registrationTypeBadges = {
+      'open': 'Open Registration',
+      'apply': 'By Invitation & Application Only',
+    };
+    const badgeText = registrationTypeBadges[data.registration_type] || 'By Invitation & Application Only';
+
+    // Format format string (e.g., "hybrid" -> "4 Days Hybrid")
+    const formatMap = {
+      'in_person': 'Onsite',
+      'virtual': 'Virtual',
+      'hybrid': 'Hybrid',
+    };
+    const formatLabel = formatMap[data.format] || data.format || 'Onsite';
+
+    // Build location string
+    const locationStr = data.is_multi_day
+      ? `Onsite · ${data.location_city || data.location || ''}`
+      : `${formatLabel} · ${data.location_city || data.location || ''}`;
+
+    // Calculate days if multi-day (in event timezone)
+    const numDays = data.is_multi_day
+      ? Math.abs(endDateInTZ.day - startDateInTZ.day) + 1
+      : 1;
+    const daysText = numDays > 1 ? `${numDays} Days` : '1 Day';
+
+    // Get cover image URL (handle both relative and absolute URLs)
+    let coverImageUrl = data.cover_image || heroImg;
+    if (coverImageUrl && !coverImageUrl.startsWith('http')) {
+      coverImageUrl = `http://localhost:8000${coverImageUrl}`;
+    }
+
+    return {
+      title: data.title,
+      subtitle: data.description?.split('\n')[0] || 'Event',
+      description: data.description || '',
+      venue_name: data.venue_name || 'Venue',
+      venue_location: `${data.location_city || ''}${data.location_country ? ', ' + data.location_country : ''}`.trim(),
+      start_date: `${month} ${startDay}`,
+      end_date: endDay,
+      year,
+      format: daysText,
+      location: locationStr,
+      badge_text: badgeText,
+      organizer_name: "IMAA INSTITUTE",
+      organizer_abbreviation: "IM",
+      hero_image: coverImageUrl,
+    };
+  };
+
+  const {
+    title = "The Oxford M&A Symposium 2026",
+    subtitle = "Sustainable Value Creation in Times of Uncertainty",
+    description = "Four days of rigorous dialogue among senior dealmakers, sovereign wealth principals, and strategic leaders - at the heart of Oxford.",
+    venue_name = "Jesus College",
+    venue_location = "Oxford University",
+    start_date = "Sep 14",
+    end_date = "17",
+    year = "2026",
+    format = "4 Days",
+    location = "Onsite, Oxford",
+    badge_text = "By Invitation & Application Only",
+    organizer_name = "IMAA INSTITUTE",
+    organizer_abbreviation = "IM",
+    hero_image = heroImg,
+  } = formatEventData(eventData) || {};
+
   const [ld, sLd] = useState(false);
   useEffect(() => {
     setTimeout(() => sLd(true), 300);
@@ -140,7 +246,7 @@ function Hero({ onApplyClick }) {
             }}
           >
             <span style={{ color: C.white, fontSize: 10, fontWeight: 700, fontFamily: F.body }}>
-              IM
+              {organizer_abbreviation}
             </span>
           </div>
           <span
@@ -152,7 +258,7 @@ function Hero({ onApplyClick }) {
               letterSpacing: "0.06em",
             }}
           >
-            IMAA INSTITUTE
+            {organizer_name}
           </span>
         </div>
         <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
@@ -217,7 +323,7 @@ function Hero({ onApplyClick }) {
                   fontFamily: F.body,
                 }}
               >
-                By Invitation & Application Only
+                {badge_text}
               </span>
             </div>
             <h1
@@ -231,7 +337,7 @@ function Hero({ onApplyClick }) {
                 ...a(0.5),
               }}
             >
-              The Oxford M&A Symposium 2026
+              {title}
             </h1>
             <p
               style={{
@@ -244,9 +350,7 @@ function Hero({ onApplyClick }) {
                 ...a(0.6),
               }}
             >
-              Sustainable Value Creation
-              <br />
-              in Times of Uncertainty
+              {subtitle}
             </p>
             <p
               style={{
@@ -257,10 +361,14 @@ function Hero({ onApplyClick }) {
                 margin: "0 0 32px",
                 maxWidth: 460,
                 ...a(0.7),
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
-              Four days of rigorous dialogue among senior dealmakers, sovereign wealth principals,
-              and strategic leaders - at the heart of Oxford.
+              {description}
             </p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", ...a(0.85) }}>
               <button
@@ -300,8 +408,8 @@ function Hero({ onApplyClick }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 12, ...a(0.7) }}>
             <div style={{ height: 200, borderRadius: 4, position: "relative", overflow: "hidden" }}>
               <img
-                src={heroImg}
-                alt="Jesus College Oxford"
+                src={hero_image}
+                alt={venue_name}
                 style={{
                   position: "absolute",
                   inset: 0,
@@ -345,10 +453,10 @@ function Hero({ onApplyClick }) {
                   </span>
                 </div>
                 <div style={{ fontFamily: F.display, fontSize: 22, fontWeight: 700, color: C.white, lineHeight: 1.2 }}>
-                  Jesus College
+                  {venue_name}
                 </div>
                 <div style={{ fontFamily: F.body, fontSize: 13, color: C.lightBlue, marginTop: 2 }}>
-                  Oxford University
+                  {venue_location}
                 </div>
               </div>
             </div>
@@ -377,10 +485,10 @@ function Hero({ onApplyClick }) {
                   </span>
                 </div>
                 <div style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.white }}>
-                  Sep 14 - 17
+                  {start_date} - {end_date}
                 </div>
                 <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
-                  2026
+                  {year}
                 </div>
               </div>
               <div
@@ -407,10 +515,10 @@ function Hero({ onApplyClick }) {
                   </span>
                 </div>
                 <div style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.white }}>
-                  4 Days
+                  {format}
                 </div>
                 <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
-                  Onsite · Oxford
+                  {location}
                 </div>
               </div>
             </div>
@@ -445,47 +553,44 @@ function PositioningStatement() {
   );
 }
 
-// 3. SPEAKERS
-function Speakers() {
+// 3. SPEAKERS & HOSTS
+function Speakers({ eventData = {} }) {
   const [offset, setOffset] = useState(0);
   const [activeBio, setActiveBio] = useState(null);
-  const speakers = [
-    {
-      name: "Prof. Emanuele Colonnelli",
-      role: "Joseph L. Gidwitz Professor of Finance & Entrepreneurship",
-      org: "University of Chicago Booth",
-      initials: "EC",
-      bio: "Research at the intersection of finance, development, and political economy. Focus on venture capital and private equity in emerging markets, corporate governance, and impact investing.",
-    },
-    {
-      name: "Yong Woon Park",
-      role: "",
-      org: "A2Mind Co., Korea",
-      initials: "YP",
-      bio: "Background in autonomous systems and defence robotics at A2Mind Co., Korea.",
-    },
-    {
-      name: "Christian Juel",
-      role: "Managing Director, Head of ESG & Impact",
-      org: "Aptimus Capital Partners",
-      initials: "CJ",
-      bio: "Heads the impact offering and investment team at Aptimus Capital Partners. Over 18 years of financial market experience.",
-    },
-    {
-      name: "Dr. Tom Ludescher",
-      role: "Chairman & Co-Founder",
-      org: "Shrimpl · SGProtein",
-      initials: "TL",
-      bio: "Chairman and Co-Founder advancing aquaculture and plant-based protein innovation in Southeast Asia.",
-    },
-    {
-      name: "Dr. Simson Wu",
-      role: "CEO & Co-Founder",
-      org: "OXGRIN · Amonova",
-      initials: "SW",
-      bio: "Inventor and co-founder of OXGRIN, a University of Oxford spin-off pioneering zero-emission hydrogen production.",
-    },
-  ];
+
+  // Transform API featured_participants data to component format
+  const transformParticipants = (apiParticipants) => {
+    if (!apiParticipants || !Array.isArray(apiParticipants)) return [];
+
+    return apiParticipants.map((participant) => {
+      // Generate initials from display_name
+      const initials = participant.display_name
+        ?.split(' ')
+        .slice(0, 2)
+        .map((word) => word[0])
+        .join('')
+        .toUpperCase() || '?';
+
+      // Extract professional info (job_title from profile or bio text)
+      const professionalInfo = participant.professional_info?.split('\n')[0] || participant.participant_type_label || '';
+
+      return {
+        name: participant.display_name || 'Participant',
+        role: participant.role_label || '', // Role label (Speaker, Host, Moderator, etc.)
+        org: professionalInfo, // Professional info / experience from job_title or bio
+        initials,
+        bio: participant.professional_info || '', // Full info for bio panel
+        image: participant.avatar_url,
+      };
+    });
+  };
+
+  const speakers = transformParticipants(eventData.featured_participants);
+
+  // Hide section if no speakers
+  if (!speakers || speakers.length === 0) {
+    return null;
+  }
 
   const visible = 3;
   const maxOffset = speakers.length - visible;
@@ -508,7 +613,7 @@ function Speakers() {
                 marginBottom: 8,
               }}
             >
-              Speakers & Panellists
+              Speakers & Hosts
             </div>
             <h3
               style={{
@@ -866,21 +971,103 @@ function MoreThanSessions() {
 }
 
 // 7. PROGRAMME SCHEDULE
-function Programme() {
-  const days = [
-    { day: "Monday", date: "Sep 14", color: C.coral, sessions: [{ time: "1 pm – 5 pm", label: "Sessions" }], evening: "Welcome Reception & Dinner" },
-    { day: "Tuesday", date: "Sep 15", color: C.brightBlue, sessions: [{ time: "9 am – 12 pm", label: "Sessions" }, { time: "1 pm – 5 pm", label: "Sessions" }], evening: "BBQ Dinner" },
-    { day: "Wednesday", date: "Sep 16", color: C.green, sessions: [{ time: "9 am – 12 pm", label: "Sessions" }, { time: "1 pm – 5 pm", label: "Sessions" }], evening: "Punting & Dinner" },
-    { day: "Thursday", date: "Sep 17", color: C.oxfordGold, sessions: [{ time: "9 am – 12 pm", label: "Sessions" }, { time: "1 pm – 5 pm", label: "Sessions" }], evening: "College Dinner" },
-  ];
+function Programme({ eventData = {} }) {
+  // Helper function to format time in event's timezone
+  const formatTimeInTimezone = (isoString, timezone) => {
+    try {
+      const date = new Date(isoString);
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone || "UTC",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      return formatter.format(date);
+    } catch (e) {
+      return "TBD";
+    }
+  };
+
+  // Transform API sessions into day cards
+  const transformSessions = (sessions, isMultiDay, timezone, startTime, endTime) => {
+    if (!isMultiDay || !sessions || !Array.isArray(sessions)) return [];
+
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const colors = [C.coral, C.brightBlue, C.green, C.oxfordGold];
+
+    // Get event date range
+    const eventStartDate = startTime ? new Date(startTime).toISOString().split('T')[0] : null;
+    const eventEndDate = endTime ? new Date(endTime).toISOString().split('T')[0] : null;
+
+    // Group sessions by date, only include those within event date range
+    const groupedByDate = {};
+    sessions.forEach((session) => {
+      const sessionDate = session.session_date;
+
+      // Filter: only include sessions within the event's date range
+      if (eventStartDate && eventEndDate) {
+        if (sessionDate < eventStartDate || sessionDate > eventEndDate) {
+          return; // Skip sessions outside event date range
+        }
+      }
+
+      const key = sessionDate;
+      if (!groupedByDate[key]) {
+        groupedByDate[key] = { date: key, sessions: [], title: null };
+      }
+      groupedByDate[key].sessions.push(session);
+      // Use session title as evening activity
+      if (session.session_type === "main" && !groupedByDate[key].title) {
+        groupedByDate[key].title = session.title;
+      }
+    });
+
+    // Convert to array and format
+    return Object.values(groupedByDate)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map((day, idx) => {
+        const date = new Date(day.date);
+        const dayName = dayNames[date.getDay()];
+        const dateStr = `${monthNames[date.getMonth()]} ${date.getDate()}`;
+
+        return {
+          day: dayName,
+          date: dateStr,
+          color: colors[idx % colors.length],
+          sessions: day.sessions.map((s) => ({
+            time: `${formatTimeInTimezone(s.start_time, timezone)} – ${formatTimeInTimezone(s.end_time, timezone)}`,
+            label: s.session_type === "main" ? s.title : "Sessions",
+          })),
+          evening: day.title,
+        };
+      });
+  };
+
+  const days = transformSessions(eventData.sessions, eventData.is_multi_day, eventData.timezone, eventData.start_time, eventData.end_time);
+
+  // Hide section if not multi-day or no sessions
+  if (!eventData.is_multi_day || days.length === 0) {
+    return null;
+  }
+
+  // Calculate optimal grid columns based on number of days
+  const getGridColumns = (dayCount) => {
+    if (dayCount <= 4) return dayCount; // 1-4 days: use actual count
+    if (dayCount === 5) return 3; // 5 days: 3 + 2 layout
+    if (dayCount <= 8) return 4; // 6-8 days: 4 + 2/3/4 layout
+    return 5; // 9+ days: 5 columns
+  };
+
+  const gridCols = getGridColumns(days.length);
 
   return (
     <Section bg={C.white} style={{ padding: "64px 0" }} id="programme">
       <FadeIn>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.oxfordGold, fontFamily: F.body, marginBottom: 8 }}>At A Glance</div>
-        <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>Four days, one trajectory.</h3>
+        <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>{days.length} days, one trajectory.</h3>
       </FadeIn>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginTop: 32 }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 20, marginTop: 32 }}>
         {days.map((d, i) => (
           <FadeIn key={i} delay={i * 0.1}>
             <div style={{ padding: "24px", border: `1px solid ${C.cool20}`, borderTop: `4px solid ${d.color}`, borderRadius: 4, background: C.white }}>
@@ -1255,7 +1442,37 @@ function ApplyDialog({ open, onClose }) {
 
 // MAIN COMPONENT
 export default function OxfordSymposium2026() {
+  const { slug } = useParams();
   const [applyOpen, setApplyOpen] = useState(false);
+  const [eventData, setEventData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchEventData = async () => {
+      try {
+        setLoading(true);
+        // Fetch event by slug from the API
+        // Using Vite's import.meta.env for environment variables
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+        const response = await fetch(`${apiUrl}/events/by-slug/${slug}/`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch event data: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setEventData(data);
+      } catch (err) {
+        console.error("Error fetching event:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (slug) {
+      fetchEventData();
+    }
+  }, [slug]);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -1264,15 +1481,23 @@ export default function OxfordSymposium2026() {
     document.head.appendChild(link);
   }, []);
 
+  if (loading) {
+    return <div style={{ padding: "100px 40px", textAlign: "center" }}>Loading event...</div>;
+  }
+
+  if (error) {
+    return <div style={{ padding: "100px 40px", textAlign: "center", color: "red" }}>Error: {error}</div>;
+  }
+
   return (
     <div style={{ fontFamily: F.body, WebkitFontSmoothing: "antialiased" }}>
-      <Hero onApplyClick={() => setApplyOpen(true)} />
+      <Hero onApplyClick={() => setApplyOpen(true)} eventData={eventData} />
       <PositioningStatement />
-      <Speakers />
+      <Speakers eventData={eventData} />
       <Themes />
       <MoreThanSessions />
       <OxfordExperience />
-      <Programme />
+      <Programme eventData={eventData} />
       <About />
       <FinalCTA onApplyClick={() => setApplyOpen(true)} />
       <Footer />

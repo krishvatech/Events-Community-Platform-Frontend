@@ -156,9 +156,11 @@ const AppShell = () => {
     location.pathname === "/reset-password" ||
     location.pathname === "/auth/magic-link" ||
     location.pathname === "/cognito/callback" ||
-    location.pathname === "/oxford-m-and-a-symposium-2026" ||
+    location.pathname === "/the-oxford-m-a-symposium-2026" ||
     location.pathname === "/live" ||
-    location.pathname.startsWith("/live/");
+    location.pathname.startsWith("/live/") ||
+    // Hide chrome for event landing pages (dynamic slug routes)
+    (location.pathname.match(/^\/[a-z0-9-]+$/) && !location.pathname.startsWith("/admin") && !location.pathname.startsWith("/account"));
 
   const showSidebar = authed && !hideChrome;
   const showHeader = !authed && !hideChrome;
@@ -208,7 +210,6 @@ const AppShell = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
-          <Route path="/oxford-m-and-a-symposium-2026" element={<OxfordSymposium2026 />} />
           <Route path="/cms" element={<RequireAuth><CmsBridge /></RequireAuth>} />
           <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
           <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
@@ -273,8 +274,12 @@ const AppShell = () => {
           {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
           <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
           <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
           <Route path="/kyc/callback" element={<KYCCallbackPage />} />
+
+          {/* Event landing pages - dynamic slug route (must be near end, before catch-all) */}
+          <Route path="/:slug" element={<OxfordSymposium2026 />} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Box>
 
