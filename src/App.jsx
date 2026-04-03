@@ -60,6 +60,7 @@ import CoursesPage from "./pages/CoursesPage.jsx";
 import CoursePlayerPage from "./pages/CoursePlayerPage.jsx";
 import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
 import VirtualSpeakersPage from "./pages/VirtualSpeakersPage.jsx";
+import OxfordSymposium2026 from "./pages/OxfordSymposium2026.jsx";
 import { CircularProgress } from "@mui/material";
 
 
@@ -155,6 +156,7 @@ const AppShell = () => {
     location.pathname === "/reset-password" ||
     location.pathname === "/auth/magic-link" ||
     location.pathname === "/cognito/callback" ||
+    location.pathname === "/oxford-m-and-a-symposium-2026" ||
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/");
 
@@ -206,6 +208,7 @@ const AppShell = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/oxford-m-and-a-symposium-2026" element={<OxfordSymposium2026 />} />
           <Route path="/cms" element={<RequireAuth><CmsBridge /></RequireAuth>} />
           <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
           <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
