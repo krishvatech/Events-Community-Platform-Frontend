@@ -148,7 +148,7 @@ const AppShell = () => {
   }, [location.pathname]);
 
 
-  // Hide header & footer on auth pages and live meeting routes
+  // Hide header & footer on auth pages, live meeting routes, and public branded event pages
   const hideChrome =
     location.pathname === "/signin" ||
     location.pathname === "/signup" ||
@@ -156,11 +156,9 @@ const AppShell = () => {
     location.pathname === "/reset-password" ||
     location.pathname === "/auth/magic-link" ||
     location.pathname === "/cognito/callback" ||
-    location.pathname === "/the-oxford-m-a-symposium-2026" ||
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/") ||
-    // Hide chrome for event landing pages (dynamic slug routes)
-    (location.pathname.match(/^\/[a-z0-9-]+$/) && !location.pathname.startsWith("/admin") && !location.pathname.startsWith("/account"));
+    location.pathname.startsWith("/public/");
 
   const showSidebar = authed && !hideChrome;
   const showHeader = !authed && !hideChrome;
@@ -246,6 +244,7 @@ const AppShell = () => {
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />
+          <Route path="/public/:slug" element={<OxfordSymposium2026 />} />
           <Route path="/events/:slug" element={<EventDetailsPage />} />
           <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />
@@ -274,12 +273,8 @@ const AppShell = () => {
           {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
           <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
           <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
-          <Route path="/kyc/callback" element={<KYCCallbackPage />} />
-
-          {/* Event landing pages - dynamic slug route (must be near end, before catch-all) */}
-          <Route path="/:slug" element={<OxfordSymposium2026 />} />
-
           <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/kyc/callback" element={<KYCCallbackPage />} />
         </Routes>
       </Box>
 

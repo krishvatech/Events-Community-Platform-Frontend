@@ -1614,7 +1614,7 @@ export default function EventManagePage() {
                     <TextField
                       fullWidth
                       size="small"
-                      value={`${window.location.origin}/${event.slug}`}
+                      value={`${window.location.origin}/public/${event.slug}`}
                       InputProps={{
                         readOnly: true,
                         startAdornment: (
@@ -1634,7 +1634,7 @@ export default function EventManagePage() {
                       size="small"
                       onClick={() => {
                         navigator.clipboard.writeText(
-                          `${window.location.origin}/${event.slug}`
+                          `${window.location.origin}/public/${event.slug}`
                         );
                         toast.success("Link copied to clipboard!");
                       }}

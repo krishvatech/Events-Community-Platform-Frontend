@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { Dialog, DialogTitle, DialogContent, TextField, Button, CircularProgress, Alert } from "@mui/material";
+import { useParams, useNavigate } from "react-router-dom";
+import { Button, Alert } from "@mui/material";
+import ApplyNowModal from "../components/ApplyNowModal";
+import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import heroImg from "../assets/oxford/Oxford_Jesus-College.png";
 import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
 import puntingImg from "../assets/oxford/Oxford_Punting.png";
@@ -95,9 +97,69 @@ function FadeIn({ children, delay = 0 }) {
   );
 }
 
+// Helper: Status display for application (shows badge or Join button)
+function ApplyStatusDisplay({ status, eventData, onJoinClick, style, buttonSize = 'small' }) {
+  if (!status || status === 'none') return null;
+
+  const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
+
+  // After approval - show Join Live button if guest_token exists
+  if (status === 'approved') {
+    if (guestToken && eventData?.slug) {
+      // User can join immediately with guest token
+      return (
+        <button
+          onClick={onJoinClick}
+          style={{
+            fontSize: buttonSize === 'small' ? 13 : 14,
+            fontWeight: 700,
+            color: C.white,
+            background: '#22c55e',
+            padding: buttonSize === 'small' ? '6px 16px' : '12px 24px',
+            border: 'none',
+            borderRadius: 3,
+            cursor: 'pointer',
+            fontFamily: "'Roboto', Arial, sans-serif",
+            ...style
+          }}
+        >
+          Join Live
+        </button>
+      );
+    } else {
+      // Approved but waiting for guest token or event data
+      return (
+        <span style={{
+          fontSize: buttonSize === 'small' ? 13 : 14, fontWeight: 700, color: '#22c55e',
+          border: '1px solid #22c55e', borderRadius: 3,
+          padding: buttonSize === 'small' ? '6px 16px' : '12px 24px',
+          fontFamily: "'Roboto', Arial, sans-serif",
+          ...style
+        }}>Approved ✓</span>
+      );
+    }
+  }
+
+  // Other statuses - just show badge
+  const map = {
+    pending: { label: 'Application Pending', color: '#F97316' },
+    declined: { label: 'Application Declined', color: '#ef4444' },
+  };
+  const cfg = map[status];
+  if (!cfg) return null;
+  return (
+    <span style={{
+      fontSize: buttonSize === 'small' ? 13 : 14, fontWeight: 700, color: cfg.color,
+      border: `1px solid ${cfg.color}`, borderRadius: 3,
+      padding: buttonSize === 'small' ? '6px 16px' : '12px 24px',
+      fontFamily: "'Roboto', Arial, sans-serif",
+      ...style
+    }}>{cfg.label}</span>
+  );
+}
 
 // 1. HERO
-function Hero({ onApplyClick, eventData = {} }) {
+function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
   // Format event data from API response
   const formatEventData = (data) => {
     if (!data || !data.start_time) return null;
@@ -360,22 +422,26 @@ function Hero({ onApplyClick, eventData = {} }) {
               {i}
             </a>
           ))}
-          <button
-            onClick={onApplyClick}
-            style={{
-              fontSize: 12,
-              color: C.white,
-              fontWeight: 700,
-              background: C.coral,
-              padding: "6px 16px",
-              border: "none",
-              borderRadius: 3,
-              cursor: "pointer",
-              fontFamily: F.body,
-            }}
-          >
-            Register Interest
-          </button>
+          {!myApplication || myApplication.status === 'none' ? (
+            <button
+              onClick={onApplyClick}
+              style={{
+                fontSize: 12,
+                color: C.white,
+                fontWeight: 700,
+                background: C.coral,
+                padding: "6px 16px",
+                border: "none",
+                borderRadius: 3,
+                cursor: "pointer",
+                fontFamily: F.body,
+              }}
+            >
+              Register Interest
+            </button>
+          ) : (
+            <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="small" />
+          )}
         </div>
       </div>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "52px 40px 72px" }}>
@@ -448,23 +514,27 @@ function Hero({ onApplyClick, eventData = {} }) {
             >
               {description}
             </p>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", ...a(0.85) }}>
-              <button
-                onClick={onApplyClick}
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: C.deepBlue,
-                  background: C.white,
-                  padding: "14px 36px",
-                  border: "none",
-                  borderRadius: 3,
-                  cursor: "pointer",
-                  fontFamily: F.body,
-                }}
-              >
-                Register Interest
-              </button>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", ...a(0.85) }}>
+              {!myApplication || myApplication.status === 'none' ? (
+                <button
+                  onClick={onApplyClick}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: C.deepBlue,
+                    background: C.white,
+                    padding: "14px 36px",
+                    border: "none",
+                    borderRadius: 3,
+                    cursor: "pointer",
+                    fontFamily: F.body,
+                  }}
+                >
+                  Register Interest
+                </button>
+              ) : (
+                <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="large" />
+              )}
               <button
                 onClick={() => handleSmoothScroll("themes")}
                 style={{
@@ -1395,7 +1465,7 @@ function About() {
 }
 
 // 10. CTA & APPLY
-function FinalCTA({ onApplyClick, eventData = {} }) {
+function FinalCTA({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
   const eventTitle = eventData.title || 'The Oxford M&A Symposium 2026';
   const eventName = eventTitle.replace(' 2026', '').replace(/\d{4}$/, '').trim();
 
@@ -1441,22 +1511,26 @@ function FinalCTA({ onApplyClick, eventData = {} }) {
             <br />
             Places are allocated to ensure the calibre of exchange that defines the Symposium.
           </p>
-          <button
-            onClick={onApplyClick}
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: C.white,
-              background: C.coral,
-              padding: "14px 44px",
-              border: "none",
-              borderRadius: 3,
-              cursor: "pointer",
-              fontFamily: F.body,
-            }}
-          >
-            Apply
-          </button>
+          {!myApplication || myApplication.status === 'none' ? (
+            <button
+              onClick={onApplyClick}
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: C.white,
+                background: C.coral,
+                padding: "14px 44px",
+                border: "none",
+                borderRadius: 3,
+                cursor: "pointer",
+                fontFamily: F.body,
+              }}
+            >
+              Apply
+            </button>
+          ) : (
+            <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="large" />
+          )}
           <div style={{ marginTop: 16 }}>
             <span style={{ fontFamily: F.body, fontSize: 12, color: C.lightBlue, opacity: 0.5 }}>
               A participation fee applies. Details are shared upon successful application.
@@ -1497,150 +1571,29 @@ function Footer() {
   );
 }
 
-// 12. APPLY DIALOG
-function ApplyDialog({ open, onClose }) {
-  const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    company_name: "",
-    job_title: "",
-    linkedin_url: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      // First, try to find the Oxford event by slug, then fallback to ID
-      const eventIdOrSlug = "oxford-m-a-symposium-2026"; // Will be updated with actual event ID
-      const response = await fetch(`/api/events/${eventIdOrSlug}/apply/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || "Application submission failed");
-      }
-
-      setSuccess(true);
-      setTimeout(() => {
-        setFormData({ first_name: "", last_name: "", email: "", company_name: "", job_title: "", linkedin_url: "" });
-        setSuccess(false);
-        onClose();
-      }, 2000);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontFamily: F.display, fontWeight: 700, color: C.deepBlue, fontSize: 24 }}>
-        Register Your Interest
-      </DialogTitle>
-      <DialogContent>
-        {success ? (
-          <Alert severity="success" sx={{ mt: 2 }}>
-            Thank you! Your application has been received. We will be in touch shortly.
-          </Alert>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
-            <TextField
-              label="First Name"
-              name="first_name"
-              value={formData.first_name}
-              onChange={handleChange}
-              fullWidth
-              required
-              size="small"
-            />
-            <TextField
-              label="Last Name"
-              name="last_name"
-              value={formData.last_name}
-              onChange={handleChange}
-              fullWidth
-              required
-              size="small"
-            />
-            <TextField
-              label="Email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              fullWidth
-              required
-              size="small"
-            />
-            <TextField
-              label="Company/Organisation"
-              name="company_name"
-              value={formData.company_name}
-              onChange={handleChange}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="Role/Title"
-              name="job_title"
-              value={formData.job_title}
-              onChange={handleChange}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="LinkedIn Profile (Optional)"
-              name="linkedin_url"
-              type="url"
-              value={formData.linkedin_url}
-              onChange={handleChange}
-              fullWidth
-              size="small"
-            />
-            {error && <Alert severity="error">{error}</Alert>}
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={loading}
-              sx={{
-                background: C.coral,
-                color: C.white,
-                fontFamily: F.body,
-                fontWeight: 700,
-                mt: 2,
-              }}
-            >
-              {loading ? <CircularProgress size={20} /> : "Submit Application"}
-            </Button>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // MAIN COMPONENT
 export default function OxfordSymposium2026() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [applyOpen, setApplyOpen] = useState(false);
   const [eventData, setEventData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Apply workflow state
+  const token = localStorage.getItem("access_token") || localStorage.getItem("access");
+  const isGuest = localStorage.getItem("is_guest") === "true";
+  const [myApplication, setMyApplication] = useState(null);
+  const [applyAsGuestOnly, setApplyAsGuestOnly] = useState(false);
+
+  // Guest join modal state
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
+  const [guestJoinEvent, setGuestJoinEvent] = useState(null);
+
+  const handleGuestJoinRequested = (eventData) => {
+    setGuestJoinEvent(eventData);
+    setGuestModalOpen(true);
+  };
 
   useEffect(() => {
     const fetchEventData = async () => {
@@ -1668,6 +1621,45 @@ export default function OxfordSymposium2026() {
     }
   }, [slug]);
 
+  // Fetch application status for apply-type events
+  useEffect(() => {
+    if (!eventData?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+        const headers = { "Content-Type": "application/json" };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        let url = `${apiUrl}/events/${eventData.id}/apply/`;
+        if (!token) {
+          const cached = localStorage.getItem("application_cache");
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Number(parsed.event_id) === Number(eventData.id) && parsed.email) {
+                url += `?email=${encodeURIComponent(parsed.email)}`;
+              }
+            } catch (err) {
+              console.error("Failed to parse application_cache:", err);
+            }
+          }
+        }
+
+        const res = await fetch(url, { headers });
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setMyApplication(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch application status:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [eventData?.id, token]);
+
   useEffect(() => {
     const link = document.createElement("link");
     link.href = "https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900;1,400&family=Roboto+Slab:wght@300;400;500;600;700&display=swap";
@@ -1683,9 +1675,65 @@ export default function OxfordSymposium2026() {
     return <div style={{ padding: "100px 40px", textAlign: "center", color: "red" }}>Error: {error}</div>;
   }
 
+  const handleApplyClick = () => {
+    // Prevent guest users from applying
+    if (isGuest) {
+      return;
+    }
+
+    // For guest users on free events
+    if (!token) {
+      const isFreeEvent = !eventData?.price || Number(eventData?.price) === 0;
+
+      // Open registration + free = show guest join modal
+      if (eventData?.registration_type === 'open' && isFreeEvent) {
+        handleGuestJoinRequested(eventData);
+        return;
+      }
+
+      // Apply registration + free = show apply modal as guest
+      if (eventData?.registration_type === 'apply' && isFreeEvent) {
+        setApplyAsGuestOnly(true);
+        setApplyOpen(true);
+        return;
+      }
+    }
+
+    // Default: show apply modal for authenticated users or paid events
+    setApplyAsGuestOnly(false);
+    setApplyOpen(true);
+  };
+
+  const handleJoinClick = () => {
+    if (eventData?.slug) {
+      navigate(`/live/${eventData.slug}?id=${eventData.id}&role=audience`);
+    } else if (eventData?.id) {
+      navigate(`/live/${eventData.id}?id=${eventData.id}&role=audience`);
+    }
+  };
+
+  const handleApplicationSuccess = (app) => {
+    setMyApplication(app);
+
+    // Only auto-join if guest application was APPROVED (not pending)
+    if (app.guest_token && app.guest_id && applyAsGuestOnly && app.status === "approved") {
+      // Store guest session
+      localStorage.setItem("guest_token", app.guest_token);
+      localStorage.setItem("guest_id", String(app.guest_id));
+      localStorage.setItem("is_guest", "true");
+
+      // Navigate to meeting
+      if (eventData?.slug) {
+        navigate(`/live/${eventData.slug}?id=${eventData.id}&role=audience`);
+      } else if (eventData?.id) {
+        navigate(`/live/${eventData.id}?id=${eventData.id}&role=audience`);
+      }
+    }
+  };
+
   return (
     <div style={{ fontFamily: F.body, WebkitFontSmoothing: "antialiased" }}>
-      <Hero onApplyClick={() => setApplyOpen(true)} eventData={eventData} />
+      <Hero onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
       <PositioningStatement />
       <Speakers eventData={eventData} />
       <Themes />
@@ -1693,9 +1741,27 @@ export default function OxfordSymposium2026() {
       <OxfordExperience />
       <Programme eventData={eventData} />
       <About />
-      <FinalCTA onApplyClick={() => setApplyOpen(true)} eventData={eventData} />
+      <FinalCTA onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
       <Footer />
-      <ApplyDialog open={applyOpen} onClose={() => setApplyOpen(false)} />
+      <ApplyNowModal
+        open={applyOpen}
+        onClose={() => setApplyOpen(false)}
+        event={eventData}
+        token={token}
+        onSuccess={handleApplicationSuccess}
+        guestOnly={applyAsGuestOnly}
+      />
+      {guestJoinEvent && (
+        <GuestJoinModal
+          open={guestModalOpen}
+          onClose={() => {
+            setGuestModalOpen(false);
+            setGuestJoinEvent(null);
+          }}
+          event={guestJoinEvent}
+          livePath={`/live/${guestJoinEvent.slug || guestJoinEvent.id}?id=${guestJoinEvent.id}&role=audience`}
+        />
+      )}
     </div>
   );
 }
