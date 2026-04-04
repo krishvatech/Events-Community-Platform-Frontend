@@ -4,11 +4,11 @@ import { Button, Alert } from "@mui/material";
 import ApplyNowModal from "../components/ApplyNowModal";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import heroImg from "../assets/oxford/Oxford_Jesus-College.png";
+import receptionImg from "../assets/oxford/Oxford_Reception.png";
 import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
 import puntingImg from "../assets/oxford/Oxford_Punting.png";
 import bbqImg from "../assets/oxford/Oxford_BBQ_2.png";
-import jesuCollegeLogo from "../assets/oxford/Jesus_College_Crest_Logo.png";
-import imaaLogo from "../assets/oxford/IMAA_Logo.svg";
+import jesuCollegeLogo from "../../../Jesus-College_Logos/Jesus Horisontal - new shield 2023.png";
 import bancorLogo from "../assets/oxford/Bancor_Logo.jpeg";
 
 // Design System
@@ -64,12 +64,31 @@ const Ic = {
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   ),
+  bulb: (color) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5">
+      <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    </svg>
+  ),
+  award: (color) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5">
+      <circle cx="12" cy="8" r="7" />
+      <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+    </svg>
+  ),
+  usersLarge: (color) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
 };
 
 // Helper Components
-function Section({ bg, children, style }) {
+function Section({ bg, children, style, id }) {
   return (
-    <section style={{ background: bg, ...style }}>
+    <section id={id} style={{ background: bg, ...style }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 40px" }}>
         {children}
       </div>
@@ -212,15 +231,6 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
     };
     const formatLabel = formatMap[data.format] || data.format || 'Onsite';
 
-    // Get user's timezone
-    const getUserTimezone = () => {
-      try {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone;
-      } catch (e) {
-        return 'User Time';
-      }
-    };
-
     // Build location string without timezone (timezone shown in time)
     const buildLocationString = () => {
       const baseLocation = data.location_city || data.location || '';
@@ -238,8 +248,6 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
     };
 
     const locationStr = buildLocationString();
-    const userTZ = getUserTimezone();
-    const userTimezone = '';
 
     // Calculate days if multi-day (in event timezone)
     const numDays = data.is_multi_day
@@ -248,41 +256,6 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
 
     // Format date display - for single day events show full date, for multi-day show date range
     const isSingleDay = numDays === 1;
-
-    // Add time/timezone information based on event type
-    let eventTimeStr = '';
-    let userTimeStr = '';
-
-    if (data.start_time) {
-      const formatTimeInTimezone = (isoString, timezone) => {
-        try {
-          const date = new Date(isoString);
-          const formatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: timezone || 'UTC',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          });
-          return formatter.format(date);
-        } catch (e) {
-          return '';
-        }
-      };
-
-      if (isSingleDay) {
-        // Single-day: show actual times
-        const eventStartTime = formatTimeInTimezone(data.start_time, eventTimezone);
-        const userStartTime = formatTimeInTimezone(data.start_time, userTZ);
-        const isSameTimezone = eventTimezone === userTZ;
-
-        if (eventStartTime) eventTimeStr = `${eventStartTime} (${eventTimezone})`;
-        if (userStartTime && !isSameTimezone) userTimeStr = `${userStartTime} (${userTZ})`;
-      } else {
-        // Multi-day: show timezone labels only
-        eventTimeStr = `Event's timezone: (${eventTimezone})`;
-        userTimeStr = `User's timezone: (${userTZ})`;
-      }
-    }
     const startDateStr = isSingleDay
       ? `${month} ${startDay}, ${year}`
       : `${month} ${startDay}`;
@@ -313,9 +286,6 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
       year: yearDisplay,
       format: formatDisplay,
       location: locationStr,
-      userTimezone,
-      eventTimeStr,
-      userTimeStr,
       badge_text: badgeText,
       organizer_name: "IMAA INSTITUTE",
       organizer_abbreviation: "IM",
@@ -334,9 +304,6 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
     year = "2026",
     format = "Onsite",
     location = "Onsite, Oxford",
-    userTimezone = "User Time",
-    eventTimeStr = "",
-    userTimeStr = "",
     badge_text = "By Invitation & Application Only",
     organizer_name = "IMAA INSTITUTE",
     organizer_abbreviation = "IM",
@@ -750,20 +717,6 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
                 <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
                   {location}
                 </div>
-                {eventTimeStr && (
-                  <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
-                    {eventTimeStr}
-                  </div>
-                )}
-                {userTimeStr ? (
-                  <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: 2 }}>
-                    {userTimeStr}
-                  </div>
-                ) : userTimezone ? (
-                  <div style={{ fontSize: 12, color: C.lightBlue, fontFamily: F.body, marginTop: eventTimeStr ? 2 : 4 }}>
-                    {userTimezone}
-                  </div>
-                ) : null}
               </div>
             </div>
           </div>
@@ -776,7 +729,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
 // 2. POSITIONING
 function PositioningStatement() {
   return (
-    <Section bg={C.cool10} style={{ padding: "64px 0" }}>
+    <Section bg={C.cool10} style={{ padding: "64px 0" }} id="positioning">
       <FadeIn>
         <p
           style={{
@@ -842,22 +795,37 @@ function Speakers({ eventData = {} }) {
   const canNext = offset < maxOffset;
 
   return (
-    <Section bg={C.white} style={{ padding: "64px 0" }}>
+    <Section bg={C.white} style={{ padding: "64px 0" }} id="speakers">
       <FadeIn>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 12 }}>
           <div>
             <div
               style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: C.oxfordGold,
-                fontFamily: F.body,
-                marginBottom: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 12,
               }}
             >
-              Speakers & Hosts
+              <div
+                style={{
+                  width: 40,
+                  height: 2,
+                  background: C.brightBlue,
+                }}
+              />
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: C.brightBlue,
+                  fontFamily: F.body,
+                }}
+              >
+                Speakers & Panellists
+              </div>
             </div>
             <h3
               style={{
@@ -1050,24 +1018,135 @@ function Speakers({ eventData = {} }) {
   );
 }
 
+// ThemeToggle Component
+function ThemeToggle({ num, title, desc, isOpen, onToggle, isFirst }) {
+  return (
+    <div
+      style={{
+        borderTop: isFirst ? `1px solid ${C.cool20}` : "none",
+        borderBottom: `1px solid ${C.cool20}`,
+      }}
+    >
+      <button
+        onClick={onToggle}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "56px 1fr 28px",
+          gap: 20,
+          alignItems: "center",
+          padding: "22px 0",
+          width: "100%",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 4,
+            background: isOpen ? C.deepBlue : C.cool10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "background 0.3s",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: isOpen ? C.white : C.deepBlue,
+              fontFamily: F.display,
+              transition: "color 0.3s",
+            }}
+          >
+            {num}
+          </span>
+        </div>
+        <div
+          style={{
+            fontFamily: F.display,
+            fontSize: 20,
+            fontWeight: 700,
+            color: C.deepBlue,
+            lineHeight: 1.3,
+          }}
+        >
+          {title}
+        </div>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={isOpen ? C.coral : C.cool50}
+          strokeWidth="2"
+          style={{
+            transition: "transform 0.3s, stroke 0.3s",
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <div
+        style={{
+          maxHeight: isOpen ? 200 : 0,
+          overflow: "hidden",
+          transition: "max-height 0.4s cubic-bezier(0.22,1,0.36,1), opacity 0.3s",
+          opacity: isOpen ? 1 : 0,
+        }}
+      >
+        <div style={{ paddingLeft: 76, paddingBottom: 24 }}>
+          <p
+            style={{
+              fontFamily: F.body,
+              fontSize: 14,
+              color: C.cool60,
+              lineHeight: 1.7,
+              margin: 0,
+              maxWidth: 640,
+            }}
+          >
+            {desc}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 4. THEMES
 function Themes() {
   const [openTheme, setOpenTheme] = useState(0);
   const themes = [
     {
-      num: "01",
-      title: "Sustainable Value Creation",
-      desc: "Navigating dealmaking in a world of environmental responsibility.",
+      num: "I",
+      title: "The New Energy Order Rewired",
+      desc: "Global energy markets face their greatest stress test in a generation: oil prices swinging, strategic reserves being tapped into, AI-driven demand soaring - the rules of energy investment are being rewritten.",
     },
     {
-      num: "02",
-      title: "Geopolitical Risk & Opportunity",
-      desc: "How global tensions reshape M&A strategy and capital allocation.",
+      num: "II",
+      title: "Defence Capital Paving the Way to a New Security Architecture",
+      desc: "Defence spending is surging, venture capital is flooding into the sector, boundaries between civilian and defence industries are blurring - raising the fundamental question about who builds, who funds, and who leads.",
     },
     {
-      num: "03",
-      title: "Technology & Disruption",
-      desc: "Building defensible positions in rapidly evolving sectors.",
+      num: "III",
+      title: "AI and the Race for Digital Sovereignty",
+      desc: "A handful of companies are deploying vast amounts of capital into AI, regulatory frameworks are diverging, and governments are asserting control over data. The race for technological dominance is no longer just corporate - it is sovereign.",
+    },
+    {
+      num: "IV",
+      title: "The New Frontiers of Impact Investment",
+      desc: "Post-conflict reconstruction, food security under stress, water scarcity accelerating - this will be the defining moment for the next generation of impact investment. Can private capital move from the sidelines to the centre of the pitch?",
+    },
+    {
+      num: "V",
+      title: "Supply Chains Unchained",
+      desc: "For decades, the invisible hand fuelled the steady growth of globalisation. Now visible hands are dismantling it - through protective tariffs, export controls, and the race for critical resources. What is a global supply chain worth when the chain itself is the risk?",
     },
   ];
 
@@ -1076,16 +1155,31 @@ function Themes() {
       <FadeIn>
         <div
           style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: C.oxfordGold,
-            fontFamily: F.body,
-            marginBottom: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
           }}
         >
-          Key Topics
+          <div
+            style={{
+              width: 40,
+              height: 2,
+              background: C.brightBlue,
+            }}
+          />
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: C.brightBlue,
+              fontFamily: F.body,
+            }}
+          >
+            What We Will Explore
+          </div>
         </div>
         <h3
           style={{
@@ -1093,78 +1187,34 @@ function Themes() {
             fontWeight: 700,
             color: C.deepBlue,
             fontFamily: F.display,
-            margin: "0 0 32px",
+            margin: "0 0 12px",
             lineHeight: 1.25,
           }}
         >
-          Four days. Three focused themes.
+          The Questions That Matter
         </h3>
+        <p
+          style={{
+            fontFamily: F.body,
+            fontSize: 16,
+            color: C.cool60,
+            lineHeight: 1.75,
+            margin: "0 0 32px",
+            maxWidth: 680,
+          }}
+        >
+          The Symposium is built around the strategic tensions that currently define how capital is deployed, how deals are shaped and structured, and how value is redefined.
+        </p>
       </FadeIn>
       {themes.map((t, i) => (
-        <div key={i} style={{ borderTop: i === 0 ? `1px solid ${C.cool20}` : "none", borderBottom: `1px solid ${C.cool20}` }}>
-          <button
-            onClick={() => setOpenTheme(openTheme === i ? -1 : i)}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "56px 1fr 28px",
-              gap: 20,
-              alignItems: "center",
-              padding: "22px 0",
-              width: "100%",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: C.oxfordGold,
-                fontFamily: F.display,
-              }}
-            >
-              {t.num}
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: C.deepBlue,
-                  fontFamily: F.display,
-                  marginBottom: 4,
-                }}
-              >
-                {t.title}
-              </div>
-              {openTheme === i && (
-                <p
-                  style={{
-                    fontSize: 14,
-                    color: C.cool60,
-                    lineHeight: 1.6,
-                    margin: 0,
-                    fontFamily: F.body,
-                  }}
-                >
-                  {t.desc}
-                </p>
-              )}
-            </div>
-            <div
-              style={{
-                fontSize: 18,
-                fontWeight: 300,
-                color: openTheme === i ? C.brightBlue : C.cool30,
-                transition: "color 0.3s",
-              }}
-            >
-              {openTheme === i ? "−" : "+"}
-            </div>
-          </button>
-        </div>
+        <FadeIn key={i} delay={i * 0.06}>
+          <ThemeToggle
+            {...t}
+            isOpen={openTheme === i}
+            onToggle={() => setOpenTheme(openTheme === i ? -1 : i)}
+            isFirst={i === 0}
+          />
+        </FadeIn>
       ))}
     </Section>
   );
@@ -1173,43 +1223,123 @@ function Themes() {
 // 5. OXFORD EXPERIENCE
 // 6. MORE THAN SESSIONS
 function MoreThanSessions() {
-  const [activeTab, setActiveTab] = useState(0);
-  const tabs = [
+  const [sel, setSel] = useState(0);
+  const items = [
     {
-      label: "Meet the Innovators",
-      description: "Selected start-ups and researchers presenting their research and investment opportunities. These are not polished pitches, but substantive work-in-progress.",
+      icon: Ic.bulb,
+      title: "Meet the Innovators",
+      desc: "Selected start-ups and researchers presenting their research and investment opportunities. These are not polished pitches, but substantive work-in-progress. Gain early visibility into emerging opportunities you would not encounter through conventional deal flow, and presenters receive the calibre of feedback that no accelerator can offer.",
     },
     {
-      label: "Professional Development",
-      description: "Curated sessions designed to develop leadership skills and strategic thinking for senior dealmakers and investors.",
+      icon: Ic.award,
+      title: "Professional Development",
+      desc: "Focused executive sessions by IMAA for those who wish to deepen their insights in M&A governance, leadership, and standards. Sessions are case-anchored and practitioner-led. Those who wish to continue may pursue a recognised professional credential by IMAA. Building knowledge and insights beyond the Symposium.",
     },
     {
-      label: "Connections That Last",
-      description: "Structured networking opportunities and peer exchange designed to build lasting professional relationships.",
+      icon: Ic.usersLarge,
+      title: "Connections That Last",
+      desc: "Beyond the sessions, breaks, and evening events, a dedicated space is available for bilateral conversations and for spontaneous exchange. The Symposium is designed so that the right people find each other - by architecture, not by accident.",
     },
   ];
+  const item = items[sel];
 
   return (
-    <Section bg={C.white} style={{ padding: "64px 0" }}>
+    <Section bg={C.cool10} style={{ padding: "64px 0" }} id="more-than-sessions">
       <FadeIn>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.oxfordGold, fontFamily: F.body, marginBottom: 8 }}>Beyond the Programme</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 2,
+              background: C.brightBlue,
+            }}
+          />
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: C.brightBlue,
+              fontFamily: F.body,
+            }}
+          >
+            Beyond the Programme
+          </div>
+        </div>
         <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>More Than Sessions</h3>
         <p style={{ fontSize: 15, color: C.cool60, lineHeight: 1.7, marginBottom: 32, maxWidth: 640, fontFamily: F.body }}>Designed so that the right people find each other — not by accident, but by architecture.</p>
       </FadeIn>
-      <div style={{ display: "flex", gap: 16, marginBottom: 32, borderBottom: `1px solid ${C.cool20}` }}>
-        {tabs.map((tab, i) => (
-          <button key={i} onClick={() => setActiveTab(i)} style={{ padding: "16px 0", fontSize: 14, fontWeight: 500, color: activeTab === i ? C.deepBlue : C.cool60, background: "none", border: "none", borderBottom: activeTab === i ? `3px solid ${C.brightBlue}` : "none", cursor: "pointer", fontFamily: F.body, transition: "all 0.3s" }}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-      <div style={{ padding: "32px", background: C.cool10, borderRadius: 4, borderLeft: `4px solid ${C.brightBlue}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 4, background: C.brightBlue, display: "flex", alignItems: "center", justifyContent: "center" }}>✨</div>
-          <h4 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.deepBlue, fontFamily: F.display }}>{tabs[activeTab].label}</h4>
+      <FadeIn delay={0.1}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
+          {items.map((it, i) => (
+            <button
+              key={i}
+              onClick={() => setSel(i)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "14px 18px",
+                background: sel === i ? C.deepBlue : C.white,
+                border: `1px solid ${sel === i ? C.deepBlue : C.cool20}`,
+                borderRadius: 4,
+                cursor: "pointer",
+                transition: "all 0.3s",
+              }}
+            >
+              {it.icon(sel === i ? C.white : C.cool50)}
+              <span
+                style={{
+                  fontFamily: F.body,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: sel === i ? C.white : C.deepBlue,
+                  transition: "color 0.3s",
+                }}
+              >
+                {it.title}
+              </span>
+            </button>
+          ))}
         </div>
-        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.cool60, fontFamily: F.body }}>{tabs[activeTab].description}</p>
-      </div>
+      </FadeIn>
+      <FadeIn delay={0.15}>
+        <div
+          style={{
+            padding: "28px 28px",
+            background: C.white,
+            border: `1px solid ${C.cool20}`,
+            borderRadius: 4,
+            borderLeft: `3px solid ${C.brightBlue}`,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 4,
+                background: `${C.brightBlue}10`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {item.icon(C.brightBlue)}
+            </div>
+            <div style={{ fontFamily: F.display, fontSize: 20, fontWeight: 700, color: C.deepBlue }}>{item.title}</div>
+          </div>
+          <p style={{ fontFamily: F.body, fontSize: 14, color: C.cool60, lineHeight: 1.7, margin: 0, maxWidth: 640 }}>{item.desc}</p>
+        </div>
+      </FadeIn>
     </Section>
   );
 }
@@ -1229,15 +1359,6 @@ function Programme({ eventData = {} }) {
       return formatter.format(date);
     } catch (e) {
       return "TBD";
-    }
-  };
-
-  // Helper function to get user's timezone
-  const getUserTimezone = () => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch (e) {
-      return 'User Time';
     }
   };
 
@@ -1284,17 +1405,12 @@ function Programme({ eventData = {} }) {
         const dayName = dayNames[date.getDay()];
         const dateStr = `${monthNames[date.getMonth()]} ${date.getDate()}`;
 
-        // Show event timezone in parentheses and user timezone
-        const timezoneLabel = timezone ? `(${timezone})` : '';
-        const userTZ = getUserTimezone();
-
         return {
           day: dayName,
           date: dateStr,
           color: colors[idx % colors.length],
           sessions: day.sessions.map((s) => ({
-            time: `${formatTimeInTimezone(s.start_time, timezone)} – ${formatTimeInTimezone(s.end_time, timezone)} ${timezoneLabel}`,
-            userTime: `${formatTimeInTimezone(s.start_time, userTZ)} – ${formatTimeInTimezone(s.end_time, userTZ)} (${userTZ})`,
+            time: `${formatTimeInTimezone(s.start_time, timezone)} – ${formatTimeInTimezone(s.end_time, timezone)}`,
             label: s.session_type === "main" ? s.title : "Sessions",
           })),
           evening: day.title,
@@ -1322,7 +1438,34 @@ function Programme({ eventData = {} }) {
   return (
     <Section bg={C.white} style={{ padding: "64px 0" }} id="programme">
       <FadeIn>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.oxfordGold, fontFamily: F.body, marginBottom: 8 }}>At A Glance</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 2,
+              background: C.brightBlue,
+            }}
+          />
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: C.brightBlue,
+              fontFamily: F.body,
+            }}
+          >
+            At A Glance
+          </div>
+        </div>
         <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>{days.length} days, one trajectory.</h3>
       </FadeIn>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 20, marginTop: 32 }}>
@@ -1336,7 +1479,6 @@ function Programme({ eventData = {} }) {
               {d.sessions.map((s, j) => (
                 <div key={j} style={{ marginBottom: 12 }}>
                   <div style={{ fontSize: 12, color: C.cool60, fontFamily: F.body }}>{s.time}</div>
-                  <div style={{ fontSize: 11, color: C.cool60, fontFamily: F.body, marginTop: 2 }}>{s.userTime}</div>
                 </div>
               ))}
               {d.evening && (
@@ -1350,85 +1492,182 @@ function Programme({ eventData = {} }) {
   );
 }
 
+// 8. OXFORD EXPERIENCE - EVENING CARD COMPONENT
+function EveningCard({ ev, img }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        borderRadius: 6,
+        overflow: "hidden",
+        position: "relative",
+        minHeight: 460,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+        borderLeft: `3px solid ${ev.accent}`,
+        cursor: "default",
+      }}
+    >
+      <img
+        src={img}
+        alt={ev.title}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          transition: "transform 0.6s cubic-bezier(0.22,1,0.36,1)",
+          transform: hovered ? "scale(1.04)" : "scale(1)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: hovered
+            ? "linear-gradient(to top, rgba(20,26,38,0.92) 0%, rgba(20,26,38,0.6) 55%, rgba(20,26,38,0.15) 100%)"
+            : "linear-gradient(to top, rgba(20,26,38,0.85) 0%, rgba(20,26,38,0.2) 35%, transparent 60%)",
+          transition: "background 0.4s ease",
+        }}
+      />
+      <div style={{ position: "relative", padding: "20px 18px", zIndex: 1 }}>
+        <span
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: ev.accent,
+            fontFamily: F.body,
+            marginBottom: 6,
+            display: "block",
+          }}
+        >
+          {ev.day}
+        </span>
+        <div
+          style={{
+            fontFamily: F.display,
+            fontSize: 18,
+            fontWeight: 700,
+            color: C.white,
+            lineHeight: 1.25,
+            marginBottom: hovered ? 8 : 0,
+            transition: "margin 0.3s ease",
+          }}
+        >
+          {ev.title}
+        </div>
+        <div
+          style={{
+            maxHeight: hovered ? 120 : 0,
+            opacity: hovered ? 1 : 0,
+            overflow: "hidden",
+            transition: "max-height 0.4s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: F.body,
+              fontSize: 12,
+              color: C.lightBlue,
+              lineHeight: 1.65,
+              margin: 0,
+            }}
+          >
+            {ev.desc}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 8. OXFORD EXPERIENCE
 function OxfordExperience() {
-  const activities = [
-    { title: "College Dinner", img: dinnerImg },
-    { title: "Punting on the Cherwell", img: puntingImg },
-    { title: "BBQ Reception", img: bbqImg },
+  const evenings = [
+    {
+      day: "Monday",
+      title: "Welcome Reception & Dinner",
+      desc: "A reception and dinner to close the first day. No formalities beyond a brief welcome. Informal, unhurried, and shaped by the inspiration that the first day's sessions have set in motion.",
+      accent: C.coral,
+      img: receptionImg,
+    },
+    {
+      day: "Tuesday",
+      title: "College Dinner",
+      desc: "A black-tie dinner in the Great Hall of Jesus College, conducted in the Oxford tradition. An evening that belongs to the room that is forming around you.",
+      accent: C.oxfordGold,
+      img: dinnerImg,
+    },
+    {
+      day: "Wednesday",
+      title: "Punting & Dinner",
+      desc: "An optional early evening on the Cherwell by punt, followed by a riverside dinner. No prior punting ability required. Quintessentially Oxford.",
+      accent: C.green,
+      img: puntingImg,
+    },
+    {
+      day: "Thursday",
+      title: "BBQ Dinner",
+      desc: "The final evening. By Thursday, the programme ends. The conversations do not.",
+      accent: C.brightBlue,
+      img: bbqImg,
+    },
   ];
 
   return (
-    <Section bg={C.cool10} style={{ padding: "64px 0" }} id="experience">
+    <Section bg={C.white} style={{ padding: "64px 0" }} id="experience">
       <FadeIn>
         <div
           style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: C.oxfordGold,
-            fontFamily: F.body,
-            marginBottom: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
           }}
         >
-          The Oxford Experience
+          <div
+            style={{
+              width: 40,
+              height: 2,
+              background: C.brightBlue,
+            }}
+          />
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: C.brightBlue,
+              fontFamily: F.body,
+            }}
+          >
+            The Oxford Experience
+          </div>
         </div>
         <h3
           style={{
-            fontSize: 36,
+            fontSize: 42,
             fontWeight: 700,
             color: C.deepBlue,
             fontFamily: F.display,
-            margin: "0 0 12px",
+            margin: "0 0 36px",
             lineHeight: 1.25,
           }}
         >
-          More than sessions.
+          Not every important conversation happens in a room.
         </h3>
-        <p
-          style={{
-            fontSize: 15,
-            color: C.cool60,
-            lineHeight: 1.7,
-            marginBottom: 36,
-            maxWidth: 640,
-            fontFamily: F.body,
-          }}
-        >
-          Conversations extend far beyond the seminar room. Evening receptions, formal dinners, and traditional college
-          experiences create space for deeper engagement.
-        </p>
       </FadeIn>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-        {activities.map((a, i) => (
-          <FadeIn key={i} delay={i * 0.1}>
-            <div style={{ height: 280, borderRadius: 4, overflow: "hidden", position: "relative" }}>
-              <img
-                src={a.img}
-                alt={a.title}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "linear-gradient(to top, rgba(40,77,97,0.9) 0%, rgba(40,77,97,0) 50%)",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
-                  padding: 20,
-                }}
-              >
-                <div style={{ fontFamily: F.display, fontSize: 18, fontWeight: 700, color: C.white }}>
-                  {a.title}
-                </div>
-              </div>
-            </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 20 }}>
+        {evenings.map((ev, i) => (
+          <FadeIn key={i} delay={i * 0.08}>
+            <EveningCard ev={ev} img={ev.img} />
           </FadeIn>
         ))}
       </div>
@@ -1439,26 +1678,74 @@ function OxfordExperience() {
 // 9. ABOUT - ORGANISED IN PARTNERSHIP
 function About() {
   return (
-    <Section bg={C.white} style={{ padding: "64px 0" }}>
+    <Section bg={C.white} style={{ padding: "64px 0" }} id="about">
       <FadeIn>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.oxfordGold, fontFamily: F.body, marginBottom: 8 }}>About the Symposium</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 2,
+              background: C.brightBlue,
+            }}
+          />
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: C.brightBlue,
+              fontFamily: F.body,
+            }}
+          >
+            About the Symposium
+          </div>
+        </div>
         <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>Organised in Partnership</h3>
         <p style={{ fontFamily: F.body, fontSize: 15, lineHeight: 1.7, color: C.cool60, margin: "0 0 36px", maxWidth: 700 }}>Organised in partnership by Jesus College at Oxford University with the Institute for Mergers, Acquisitions and Alliances (IMAA) and Bancor International Limited, the Symposium brings together senior dealmakers, sovereign wealth principals, defence and technology leaders, corporate strategists, and leading international academic faculty for four days of rigorous dialogue, case discussions, and high-level peer exchange culminating in a College Dinner.</p>
       </FadeIn>
       <FadeIn delay={0.1}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0, border: `1px solid ${C.cool20}`, borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 60 }}>
           {[
             { name: "Jesus College", sub: "Oxford University", logo: jesuCollegeLogo },
-            { name: "IMAA", sub: "Institute for Mergers, Acquisitions & Alliances", logo: imaaLogo },
-            { name: "Bancor International", sub: "Limited", logo: bancorLogo },
+            { name: "IMAA", sub: "Institute for Mergers, Acquisitions & Alliances", textOnly: true },
+            { name: "Bancor International Limited", sub: "Hong Kong", logo: bancorLogo },
           ].map((p, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 24px", background: C.white, borderRight: i < 2 ? `1px solid ${C.cool20}` : "none", textAlign: "center" }}>
-              <img src={p.logo} alt={p.name} style={{ height: 50, marginBottom: 14, objectFit: "contain" }} />
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+              <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                {p.textOnly ? (
+                  <div style={{ fontFamily: F.display, fontSize: 48, fontWeight: 700, color: C.brightBlue, letterSpacing: "0.05em" }}>IMAA</div>
+                ) : (
+                  <img src={p.logo} alt={p.name} style={{ height: i === 0 ? 90 : 100, objectFit: "contain" }} />
+                )}
+              </div>
               <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.deepBlue, marginBottom: 2 }}>{p.name}</div>
               {p.sub && <div style={{ fontFamily: F.body, fontSize: 11, color: C.cool50, lineHeight: 1.4 }}>{p.sub}</div>}
             </div>
           ))}
         </div>
+        {/* Strategic Partners - Hidden for now */}
+        {/* <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${C.cool20}` }}>
+          <div style={{ textAlign: "center", marginBottom: 18 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.cool50, fontFamily: F.body }}>Strategic Partners</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 36, alignItems: "center", flexWrap: "wrap" }}>
+            {["Partner 1", "Partner 2", "Partner 3", "Partner 4"].map((n, i) => (
+              <div key={i} style={{ opacity: 0.35 }}>
+                <div style={{ width: 100, height: 32, border: `1.5px solid ${C.cool50}`, borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 8, fontWeight: 700, color: C.cool50, fontFamily: F.body, letterSpacing: "0.06em" }}>{n}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div> */}
       </FadeIn>
     </Section>
   );
@@ -1548,7 +1835,7 @@ function Footer() {
   return (
     <footer style={{ background: C.cool100, padding: "48px 0" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 40px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 40, marginBottom: 40, paddingBottom: 40, borderBottom: `1px solid ${C.cool20}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 40, marginBottom: 40, paddingBottom: 40 }}>
           {[{ name: "Jesus College", sub: "Oxford University" }, { name: "IMAA", sub: "Institute for Mergers, Acquisitions & Alliances" }, { name: "Bancor International", sub: "" }].map((p, i) => (
             <div key={i} style={{ textAlign: "center" }}>
               <div style={{ fontFamily: F.display, fontSize: 14, fontWeight: 700, color: C.white, marginBottom: 2 }}>{p.name}</div>
@@ -1556,11 +1843,11 @@ function Footer() {
             </div>
           ))}
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 24, borderTop: `1px solid ${C.cool30}` }}>
           <span style={{ fontSize: 11, color: C.cool60, fontFamily: F.body }}>© 2026 Oxford M&A Symposium</span>
           <div style={{ display: "flex", gap: 20 }}>
             {["Privacy Policy", "Terms", "Imprint"].map((t) => (
-              <span key={t} style={{ fontSize: 11, color: C.cool60, cursor: "pointer", fontFamily: F.body, transition: "color 0.3s", "&:hover": { color: C.white } }}>
+              <span key={t} style={{ fontSize: 11, color: C.cool60, cursor: "pointer", fontFamily: F.body, transition: "color 0.3s" }} onMouseEnter={(e) => e.target.style.color = C.white} onMouseLeave={(e) => e.target.style.color = C.cool60}>
                 {t}
               </span>
             ))}
