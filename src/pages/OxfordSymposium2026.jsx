@@ -37,7 +37,6 @@ const C = {
 const F = {
   body: "'Roboto', Arial, sans-serif",
   display: "'Roboto Slab', Georgia, serif",
-  mono: "'Roboto Mono', monospace",
 };
 
 // Icon Components
@@ -1275,7 +1274,6 @@ function MoreThanSessions() {
           </div>
         </div>
         <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>More Than Sessions</h3>
-        <p style={{ fontSize: 15, color: C.cool60, lineHeight: 1.7, marginBottom: 32, maxWidth: 640, fontFamily: F.body }}>Designed so that the right people find each other — not by accident, but by architecture.</p>
       </FadeIn>
       <FadeIn delay={0.1}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
@@ -1835,15 +1833,7 @@ function Footer() {
   return (
     <footer style={{ background: C.cool100, padding: "48px 0" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 40px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 40, marginBottom: 40, paddingBottom: 40 }}>
-          {[{ name: "Jesus College", sub: "Oxford University" }, { name: "IMAA", sub: "Institute for Mergers, Acquisitions & Alliances" }, { name: "Bancor International", sub: "" }].map((p, i) => (
-            <div key={i} style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: F.display, fontSize: 14, fontWeight: 700, color: C.white, marginBottom: 2 }}>{p.name}</div>
-              {p.sub && <div style={{ fontFamily: F.body, fontSize: 11, color: C.cool60 }}>{p.sub}</div>}
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 24, borderTop: `1px solid ${C.cool30}` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 11, color: C.cool60, fontFamily: F.body }}>© 2026 Oxford M&A Symposium</span>
           <div style={{ display: "flex", gap: 20 }}>
             {["Privacy Policy", "Terms", "Imprint"].map((t) => (
