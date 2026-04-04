@@ -8,7 +8,7 @@ import receptionImg from "../assets/oxford/Oxford_Reception.png";
 import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
 import puntingImg from "../assets/oxford/Oxford_Punting.png";
 import bbqImg from "../assets/oxford/Oxford_BBQ_2.png";
-import jesuCollegeLogo from "../../../Jesus-College_Logos/Jesus Horisontal - new shield 2023.png";
+import jesuCollegeLogo from "../../assets/oxford/Jesus Horisontal - new shield 2023.png";
 import bancorLogo from "../assets/oxford/Bancor_Logo.jpeg";
 
 // Design System
