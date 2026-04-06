@@ -564,6 +564,8 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
     const members = g.member_count ?? g.members_count ?? g.members?.length ?? 0;
     const role = roleLabel(g);
     const memberStatus = membershipLabel(g);
+    const accent = "#0A9396";
+    const desc = g.description || g.topic || g.category || "";
 
     const visibility = (g.visibility || "").toLowerCase();
     const jp = (g.join_policy || "").toLowerCase();
@@ -573,6 +575,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
     const joined =
         (g.membership_status || "").toLowerCase() === "joined" || !!g.is_member;
 
+    const category = g.category || g.topic || "";
     const ctaText = joined
         ? "Joined"
         : pending
@@ -582,169 +585,162 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
                 : "Join";
 
     return (
-        <Card
-            variant="outlined"
-            sx={{
-                width: "100%",
-                borderRadius: 3,
-                overflow: "hidden",
-                borderColor: BORDER,
-                height: 280,
-                display: "flex", // Keep flex layout
-                flexDirection: "column",
-            }}
-        >
+        <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            {/* Top color stripe */}
+            <Box sx={{ width: "100%", height: 4, bgcolor: accent }} />
+
+            {/* Cover image */}
             <Box
                 onClick={() => onOpen?.(g)}
-                sx={{
-                    width: "100%",
-                    height: 130,
-                    bgcolor: "#f8fafc",
-                    borderBottom: `1px solid ${BORDER}`,
-                    backgroundImage:
-                        g.cover_image || g.cover
-                            ? `url(${toAbsolute(g.cover_image || g.cover)})`
-                            : "none",
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                    cursor: "pointer",
-                    position: "relative", // Needed for alignment
-                }}
+                sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}
             >
+                {g.cover_image || g.cover ? (
+                    <img
+                        key={g._cache || g.updated_at}
+                        src={bust(g.cover_image || g.cover, g._cache || g.updated_at)}
+                        alt={g.name}
+                        loading="lazy"
+                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                ) : (
+                    <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
+                )}
+
                 {/* Logo overlay */}
                 {g.logo && (
-                    <Box
-                        sx={{
-                            position: "absolute",
-                            bottom: -24,
-                            left: 16,
-                            width: 48,
-                            height: 48,
-                            borderRadius: "50%",
-                            overflow: "hidden",
-                            border: "3px solid white",
-                            backgroundColor: "white",
-                            zIndex: 2,
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
-                        }}
-                    >
-                        <img
-                            src={bust(g.logo, g._cache || g.updated_at)}
-                            alt="logo"
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        />
+                    <Box sx={{
+                        position: "absolute", bottom: -20, left: 14,
+                        width: 44, height: 44, borderRadius: "50%",
+                        overflow: "hidden", border: "3px solid white", bgcolor: "white",
+                        zIndex: 2, boxShadow: "0 2px 8px rgba(0,0,0,.15)"
+                    }}>
+                        <img src={bust(g.logo, g._cache || g.updated_at)} alt="logo"
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     </Box>
                 )}
             </Box>
 
-            <CardContent
-                sx={{ flexGrow: 1, pb: 1, cursor: "pointer", pt: g.logo ? 4 : 2 }} // Added pt padding if logo exists
-                onClick={() => onOpen?.(g)}
-            >
-                <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
-                    sx={{ mb: 1 }}
-                >
-                    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexWrap: "wrap" }}>
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                            <Typography variant="caption" color="text.secondary">
-                                {isPrivate ? "Private" : "Public"}
-                            </Typography>
-                            {isApproval && (
-                                <Tooltip title="Approval needed for membership - Request to join">
-                                    <LockRounded sx={{ fontSize: 14, color: "#f97316" }} />
-                                </Tooltip>
-                            )}
-                        </Stack>
+            {/* Body */}
+            <Box sx={{ p: "16px 18px 14px", flexGrow: 1, display: "flex", flexDirection: "column", gap: "6px", mt: g.logo ? 3 : 0 }}>
+                {/* Status badges row */}
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px", mb: "2px" }}>
+                    <Typography sx={{ fontSize: 10, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        {isPrivate ? "PRIVATE" : "GROUP"}
+                    </Typography>
+                    <Box sx={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                        {joined && (
+                            <Box sx={{ fontSize: 10, fontWeight: 700, color: accent, bgcolor: "#E8F7F7", px: "7px", py: "2px", borderRadius: "100px" }}>
+                                ✓ Joined
+                            </Box>
+                        )}
+                        {pending && (
+                            <Box sx={{ fontSize: 10, fontWeight: 700, color: "#b45309", bgcolor: "#fffbeb", px: "7px", py: "2px", borderRadius: "100px" }}>
+                                Pending
+                            </Box>
+                        )}
+                        {isApproval && !joined && !pending && (
+                            <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                                <LockRounded sx={{ fontSize: 11, color: "#f97316" }} />
+                                <Typography sx={{ fontSize: 10, color: "#f97316" }}>Approval required</Typography>
+                            </Box>
+                        )}
                         {memberStatus && (
                             <Chip
                                 size="small"
                                 label={memberStatus}
                                 sx={{
                                     height: 20,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     bgcolor: memberStatus === "Pending" ? "#fffbeb" : "#ecfdf3",
                                     color: memberStatus === "Pending" ? "#b45309" : "#166534",
                                 }}
                             />
                         )}
                         {role && (
-                            <Chip
-                                size="small"
-                                label={role}
-                                sx={{
-                                    height: 20,
-                                    fontSize: 11,
-                                    bgcolor: "#eef2ff",
-                                    color: "#4338ca",
-                                }}
-                            />
+                            <Box sx={{ fontSize: 10, fontWeight: 700, color: "#4338ca", bgcolor: "#eef2ff", px: "7px", py: "2px", borderRadius: "100px" }}>
+                                {role}
+                            </Box>
                         )}
-                    </Stack>
-                    <Typography variant="caption" color="text.secondary">
-                        {members} Member{members !== 1 ? "s" : ""}
-                    </Typography>
-                </Stack>
+                        <Chip
+                            size="small"
+                            label={`${members} Member${members !== 1 ? "s" : ""}`}
+                            sx={{
+                                height: 20,
+                                fontSize: 10,
+                                bgcolor: "#f0f9ff",
+                                color: "#0369a1",
+                            }}
+                        />
+                    </Box>
+                </Box>
 
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                    {g.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" noWrap>
-                    {g.category || g.topic || g.description || g.name}
-                </Typography>
+                {/* Title */}
+                <Box onClick={() => onOpen?.(g)}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.08em", mb: "2px" }}>
+                        GROUP
+                    </Typography>
+                    <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#1B2A4A", lineHeight: 1.25, mb: "4px" }}>
+                        {g.name}
+                    </Typography>
+                    {g.owner_name || g.created_by_name ? (
+                        <Typography sx={{ fontSize: 11, color: "#888" }}>
+                            by {g.owner_name || g.created_by_name}
+                        </Typography>
+                    ) : null}
+                </Box>
+
+                {/* Description */}
+                {desc && (
+                    <Typography sx={{ fontSize: 12, color: "#666", lineHeight: 1.55,
+                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {desc}
+                    </Typography>
+                )}
+
+
                 {g.parent_group && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                    <Typography sx={{ fontSize: 11, color: "#888" }}>
                         Subgroup of <b>{g.parent_group.name}</b>
                     </Typography>
                 )}
-            </CardContent>
+            </Box>
 
-            <CardActions sx={{ pt: 0, pb: 1, px: 1 }}>
-                <Stack direction="row" spacing={1} sx={{ width: "100%", alignItems: "center" }}>
-                    {!hideJoin && (
-                        <Button
-                            size="small"
-                            color="primary"
-                            variant={joined ? "outlined" : "contained"}
-                            onClick={() => onJoin?.(g)}
-                            sx={{ ...JOIN_BTN_SX, flex: 1 }}
-                            disabled={pending || joined}
-                            title={ctaText}
-                        >
-                            {ctaText}
-                        </Button>
-                    )}
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        sx={{ flex: 1 }}
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onOpen?.(g);
+            {/* Footer CTA */}
+            <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
+                {canEdit && (
+                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit?.(g); }}
+                        sx={{ color: "#aaa", "&:hover": { color: accent } }} title="Edit Group">
+                        <EditNoteRoundedIcon fontSize="small" />
+                    </IconButton>
+                )}
+                {!hideJoin && (
+                    <Box
+                        onClick={() => !pending && !joined && onJoin?.(g)}
+                        sx={{
+                            fontSize: 12, fontWeight: 700,
+                            color: joined ? "#888" : accent,
+                            cursor: (pending || joined) ? "default" : "pointer",
+                            display: "flex", alignItems: "center", gap: "4px",
+                            opacity: pending ? 0.6 : 1,
+                            "&:hover": { textDecoration: (pending || joined) ? "none" : "underline" }
                         }}
                     >
-                        Details
-                    </Button>
-                    {canEdit && (
-                        <IconButton
-                            size="small"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onEdit?.(g);
-                            }}
-                            sx={{ color: "#10b8a6" }}
-                            title="Edit Group"
-                        >
-                            <EditNoteRoundedIcon />
-                        </IconButton>
-                    )}
-                </Stack>
-            </CardActions>
-        </Card>
+                        {ctaText} {!joined && !pending && "→"}
+                    </Box>
+                )}
+                {(hideJoin || joined) && (
+                    <Box
+                        onClick={() => onOpen?.(g)}
+                        sx={{ fontSize: 12, fontWeight: 700, color: accent, cursor: "pointer",
+                            display: "flex", alignItems: "center", gap: "4px",
+                            ml: "auto",
+                            "&:hover": { textDecoration: "underline" } }}
+                    >
+                        {joined ? "Open Group →" : "View Details →"}
+                    </Box>
+                )}
+            </Box>
+        </Box>
     );
 }
 
@@ -1090,22 +1086,34 @@ export default function MyGroupsPage() {
     };
 
     return (
-        <Box className="p-4 md:p-6 max-w-7xl mx-auto w-full">
-            {/* Header */}
-            <Box className="mb-6">
-                <Box className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                    <div>
-                        <Typography variant="h4" fontWeight={800} className="text-slate-800">
+        <Box sx={{ width: "100%", py: { xs: 2, md: 3 }, bgcolor: "#FAF9F7", minHeight: "100vh" }}>
+            <Box
+                sx={{
+                    display: "flex",
+                    gap: 3,
+                    px: { xs: 2, sm: 2, md: 2.5, lg: 3 },
+                    maxWidth: { xs: "100%", lg: "1200px" },
+                    mx: "auto",
+                }}
+            >
+                {/* Main content */}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    {/* Header */}
+                    <Box sx={{ textAlign: "center", mb: 3, pt: 1 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0A9396", textTransform: "uppercase", letterSpacing: "0.12em", mb: "6px" }}>
+                            COMMUNITY
+                        </Typography>
+                        <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: "8px", lineHeight: 1.2 }}>
                             My Groups
                         </Typography>
-                        <Typography variant="body2" className="text-slate-500 mt-1">
+                        <Typography sx={{ fontSize: 14, color: "#888", mb: 2 }}>
                             Groups you have joined or are managing
                         </Typography>
-                    </div>
-                </Box>
+                    </Box>
 
-                {/* Filters */}
-                <Stack direction="column" spacing={2}>
+                    {/* Filters */}
+                    <Box sx={{ mb: 2 }}>
+                        <Stack direction="column" spacing={2}>
                     <TextField
                         placeholder="Search my groups..."
                         size="small"
@@ -1203,14 +1211,18 @@ export default function MyGroupsPage() {
                         />
                     </Stack>
                 </Stack>
-            </Box>
+                    </Box>
 
-            {/* Profile Card if needed, or maybe just list? GroupsPage had it. */}
-            {/* <CommunityProfileCard /> */}
+                    {/* Showing count */}
+                    {!loading && (
+                        <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
+                            MY GROUPS {data.length}
+                        </Typography>
+                    )}
 
-            {/* Content */}
-            <Box className="min-h-[400px]">
-                {loading ? (
+                    {/* Content */}
+                    <Box sx={{ minHeight: "400px" }}>
+                        {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[...Array(6)].map((_, i) => (
                             <GroupGridCardSkeleton key={i} />
@@ -1231,59 +1243,63 @@ export default function MyGroupsPage() {
                         </Button>
                     </Paper>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {data.map((g) => (
-                            <GroupGridCard
-                                key={g.id}
-                                g={g}
-                                hideJoin={true} // Usually "My Groups" are already joined, so we can hide generic join button or keep it as status
-                                onOpen={(grp) => navigate(`/community/mygroups/${grp.slug || grp.id}`, { state: { backTo: "/community/mygroups", backLabel: "Back to My Groups" } })}
-                                onEdit={(grp) => setEditGroup(grp)}
-                                canEdit={canEditGroup(g)}
-                            />
-                        ))}
-                    </div>
-                )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {data.map((g) => (
+                                    <GroupGridCard
+                                        key={g.id}
+                                        g={g}
+                                        hideJoin={true} // Usually "My Groups" are already joined, so we can hide generic join button or keep it as status
+                                        onOpen={(grp) => navigate(`/community/mygroups/${grp.slug || grp.id}`, { state: { backTo: "/community/mygroups", backLabel: "Back to My Groups" } })}
+                                        onEdit={(grp) => setEditGroup(grp)}
+                                        canEdit={canEditGroup(g)}
+                                    />
+                                ))}
+                            </div>
+                        )}
 
-                {/* Pagination */}
-                {!loading && totalPages > 1 && (
-                    <Box className="flex flex-col items-center gap-2 mt-8">
-                        <Typography variant="caption" className="text-slate-500">
-                            {ITEMS_PER_PAGE} per page
-                        </Typography>
-                        <Pagination
-                            count={totalPages}
-                            page={page}
-                            onChange={(_, p) => setPage(p)}
-                            color="primary"
-                            shape="rounded"
-                        />
+                        {/* Pagination */}
+                        {!loading && totalPages > 1 && (
+                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, mt: 4 }}>
+                                <Typography variant="caption" sx={{ color: "#888" }}>
+                                    {ITEMS_PER_PAGE} per page
+                                </Typography>
+                                <Pagination
+                                    count={totalPages}
+                                    page={page}
+                                    onChange={(_, p) => setPage(p)}
+                                    color="primary"
+                                    size="large"
+                                    showFirstButton
+                                    showLastButton
+                                />
+                            </Box>
+                        )}
                     </Box>
-                )}
+
+                    {/* Dialogs */}
+                    <QuickViewDialog
+                        open={!!quickViewGroup}
+                        group={quickViewGroup}
+                        onClose={() => setQuickViewGroup(null)}
+                        onJoin={handleJoin}
+                        onEdit={(g) => {
+                            setQuickViewGroup(null);
+                            setEditGroup(g);
+                        }}
+                        canEdit={quickViewGroup && canEditGroup(quickViewGroup)}
+                    />
+
+                    <EditGroupDialog
+                        open={!!editGroup}
+                        group={editGroup}
+                        onClose={() => setEditGroup(null)}
+                        onUpdated={(updated) => {
+                            setData((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+                            setEditGroup(null);
+                        }}
+                    />
+                </Box>
             </Box>
-
-            {/* Dialogs */}
-            <QuickViewDialog
-                open={!!quickViewGroup}
-                group={quickViewGroup}
-                onClose={() => setQuickViewGroup(null)}
-                onJoin={handleJoin}
-                onEdit={(g) => {
-                    setQuickViewGroup(null);
-                    setEditGroup(g);
-                }}
-                canEdit={quickViewGroup && canEditGroup(quickViewGroup)}
-            />
-
-            <EditGroupDialog
-                open={!!editGroup}
-                group={editGroup}
-                onClose={() => setEditGroup(null)}
-                onUpdated={(updated) => {
-                    setData((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-                    setEditGroup(null);
-                }}
-            />
         </Box>
     );
 }
