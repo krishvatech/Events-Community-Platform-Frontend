@@ -624,6 +624,45 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     return start || end;
   }, [timezone]);
 
+  const withSequentialSessionOrder = React.useCallback((items) => {
+    return items.map((session, index) => ({
+      ...session,
+      displayOrder: index,
+    }));
+  }, []);
+
+  const moveSession = React.useCallback((fromIndex, toIndex) => {
+    setSessions((prev) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length ||
+        fromIndex === toIndex
+      ) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return withSequentialSessionOrder(next);
+    });
+  }, [withSequentialSessionOrder]);
+
+  const sortSessionsByStartTime = React.useCallback(() => {
+    setSessions((prev) => {
+      if (prev.length < 2) return prev;
+      const sorted = [...prev].sort((a, b) => {
+        const aTime = a?.startTime ? dayjs(a.startTime).valueOf() : Number.MAX_SAFE_INTEGER;
+        const bTime = b?.startTime ? dayjs(b.startTime).valueOf() : Number.MAX_SAFE_INTEGER;
+        if (aTime !== bTime) return aTime - bTime;
+        return (a?.displayOrder ?? 0) - (b?.displayOrder ?? 0);
+      });
+      return withSequentialSessionOrder(sorted);
+    });
+    setToast({ open: true, type: "success", msg: "Sessions sorted by start time" });
+  }, [withSequentialSessionOrder]);
+
   // 🔹 NEW: reset all fields back to defaults after successful create
   const resetForm = () => {
     const sch = getDefaultSchedule(2);
@@ -1964,6 +2003,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   <SessionList
                     sessions={sessions}
                     timezone={timezone}
+                    onMoveUp={(idx) => moveSession(idx, idx - 1)}
+                    onMoveDown={(idx) => moveSession(idx, idx + 1)}
+                    onSortByStartTime={sortSessionsByStartTime}
                     onEdit={(session, idx) => {
                       setEditingSessionIndex(idx);
                       setSessionDialogOpen(true);

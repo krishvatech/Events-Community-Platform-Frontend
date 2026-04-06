@@ -13,10 +13,13 @@ import {
   Box,
   Tooltip,
   Typography,
+  Button,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import dayjs from "dayjs";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ScheduleIcon from "@mui/icons-material/Schedule";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
 
 const SESSION_TYPE_COLORS = {
@@ -33,7 +36,16 @@ const SESSION_TYPE_LABELS = {
   networking: "Networking",
 };
 
-function SessionList({ sessions, onEdit, onDelete, timezone }) {
+function SessionList({
+  sessions,
+  onEdit,
+  onDelete,
+  timezone,
+  onMoveUp,
+  onMoveDown,
+  onSortByStartTime,
+  disableReordering = false,
+}) {
   if (!sessions || sessions.length === 0) {
     return (
       <Box
@@ -50,11 +62,6 @@ function SessionList({ sessions, onEdit, onDelete, timezone }) {
     );
   }
 
-  const formatDateTime = (isoString) => {
-    const date = dayjs(isoString);
-    return date.isValid() ? date.format("MMM DD, YYYY • h:mm A") : "—";
-  };
-
   const formatSessionDisplay = (startTime, endTime) => {
     const formatted = formatSessionTimeRange(startTime, endTime, timezone);
     return {
@@ -65,6 +72,37 @@ function SessionList({ sessions, onEdit, onDelete, timezone }) {
 
   return (
     <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e5e7eb" }}>
+      {(onSortByStartTime || onMoveUp || onMoveDown) && (
+        <Box
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderBottom: "1px solid #e5e7eb",
+            backgroundColor: "#fafafa",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+          }}
+        >
+          <Typography variant="body2" sx={{ color: "#475569" }}>
+            Reorder sessions manually, or sort them by start time.
+          </Typography>
+          {onSortByStartTime && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ScheduleIcon fontSize="small" />}
+              onClick={onSortByStartTime}
+              disabled={disableReordering || sessions.length < 2}
+              sx={{ textTransform: "none" }}
+            >
+              Sort by Start Time
+            </Button>
+          )}
+        </Box>
+      )}
       <Table size="small">
         <TableHead sx={{ backgroundColor: "#f3f4f6" }}>
           <TableRow>
@@ -143,6 +181,34 @@ function SessionList({ sessions, onEdit, onDelete, timezone }) {
               </TableCell>
               <TableCell align="right">
                 <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                  {(onMoveUp || onMoveDown) && (
+                    <>
+                      <Tooltip title="Move up">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => onMoveUp?.(idx)}
+                            disabled={disableReordering || idx === 0}
+                            sx={{ color: "#64748b" }}
+                          >
+                            <ArrowUpwardIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Move down">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => onMoveDown?.(idx)}
+                            disabled={disableReordering || idx === sessions.length - 1}
+                            sx={{ color: "#64748b" }}
+                          >
+                            <ArrowDownwardIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </>
+                  )}
                   <Tooltip title="Edit session">
                     <IconButton
                       size="small"

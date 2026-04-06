@@ -461,6 +461,13 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         };
     }, []);
 
+    const withSequentialSessionOrder = useCallback((items) => {
+        return items.map((session, index) => ({
+            ...session,
+            displayOrder: index,
+        }));
+    }, []);
+
     useEffect(() => {
         // hydrate on open in case `event` changed
         const tz = event?.timezone || getBrowserTimezone();
@@ -568,7 +575,15 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 } else if (json && Array.isArray(json.results)) {
                     data = json.results;
                 }
-                setSessions(data.map(normalizeSession));
+                const normalized = data.map(normalizeSession).sort((a, b) => {
+                    const aOrder = Number(a.displayOrder ?? Number.MAX_SAFE_INTEGER);
+                    const bOrder = Number(b.displayOrder ?? Number.MAX_SAFE_INTEGER);
+                    if (aOrder !== bOrder) return aOrder - bOrder;
+                    const aTime = a.startTime ? dayjs(a.startTime).valueOf() : Number.MAX_SAFE_INTEGER;
+                    const bTime = b.startTime ? dayjs(b.startTime).valueOf() : Number.MAX_SAFE_INTEGER;
+                    return aTime - bTime;
+                });
+                setSessions(withSequentialSessionOrder(normalized));
             } catch (err) {
                 console.error("Error loading sessions:", err);
                 setSessionsError(err?.message || "Unable to load sessions");
@@ -581,7 +596,98 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         return () => {
             cancelled = true;
         };
-    }, [event?.id, token, isMultiDay, normalizeSession]);
+    }, [event?.id, token, isMultiDay, normalizeSession, withSequentialSessionOrder]);
+
+    const persistSessionOrder = useCallback(async (orderedSessions) => {
+        if (!event?.id) return true;
+
+        const persistedSessions = orderedSessions.filter((session) => session?.id && !session?._pending);
+        if (persistedSessions.length === 0) return true;
+
+        setSessionSubmitting(true);
+        setSessionsError("");
+        try {
+            for (const session of persistedSessions) {
+                const res = await fetch(`${API_ROOT}/events/${event.id}/sessions/${session.id}/`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({
+                        display_order: Number(session.displayOrder ?? 0),
+                    }),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const msg =
+                        json?.detail ||
+                        Object.entries(json)
+                            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+                            .join(" | ") ||
+                        `HTTP ${res.status}`;
+                    throw new Error(msg);
+                }
+            }
+            return true;
+        } catch (err) {
+            setSessionsError(err?.message || "Unable to save session order");
+            setToast({ open: true, type: "error", msg: err?.message || "Unable to save session order" });
+            return false;
+        } finally {
+            setSessionSubmitting(false);
+        }
+    }, [event?.id, token]);
+
+    const updateSessionOrder = useCallback(async (nextSessions, successMessage) => {
+        const orderedSessions = withSequentialSessionOrder(nextSessions);
+        const previousSessions = sessions;
+        setSessions(orderedSessions);
+
+        if (isScheduleDirty || orderedSessions.some((session) => session?._pending || !session?.id)) {
+            setToast({
+                open: true,
+                type: "info",
+                msg: "Session order will be saved when you click Save.",
+            });
+            return;
+        }
+
+        const saved = await persistSessionOrder(orderedSessions);
+        if (!saved) {
+            setSessions(previousSessions);
+            return;
+        }
+
+        setToast({ open: true, type: "success", msg: successMessage });
+    }, [isScheduleDirty, persistSessionOrder, sessions, withSequentialSessionOrder]);
+
+    const moveSession = useCallback(async (fromIndex, toIndex) => {
+        if (
+            fromIndex < 0 ||
+            toIndex < 0 ||
+            fromIndex >= sessions.length ||
+            toIndex >= sessions.length ||
+            fromIndex === toIndex
+        ) {
+            return;
+        }
+        const next = [...sessions];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        await updateSessionOrder(next, "Session order updated");
+    }, [sessions, updateSessionOrder]);
+
+    const sortSessionsByStartTime = useCallback(async () => {
+        if (sessions.length < 2) return;
+        const sorted = [...sessions].sort((a, b) => {
+            const aTime = a?.startTime ? dayjs(a.startTime).valueOf() : Number.MAX_SAFE_INTEGER;
+            const bTime = b?.startTime ? dayjs(b.startTime).valueOf() : Number.MAX_SAFE_INTEGER;
+            if (aTime !== bTime) return aTime - bTime;
+            return Number(a?.displayOrder ?? 0) - Number(b?.displayOrder ?? 0);
+        });
+        await updateSessionOrder(sorted, "Sessions sorted by start time");
+    }, [sessions, updateSessionOrder]);
 
     const upsertSession = async (sessionData) => {
         if (!event?.id) return;
@@ -608,9 +714,11 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 });
                 setSessions((prev) => {
                     if (isEditing) {
-                        return prev.map((item, idx) => (idx === editingSessionIndex ? pendingSession : item));
+                        return withSequentialSessionOrder(
+                            prev.map((item, idx) => (idx === editingSessionIndex ? pendingSession : item))
+                        );
                     }
-                    return [...prev, pendingSession];
+                    return withSequentialSessionOrder([...prev, pendingSession]);
                 });
                 setToast({
                     open: true,
@@ -657,9 +765,11 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             const savedSession = normalizeSession(json);
             setSessions((prev) => {
                 if (isEditing) {
-                    return prev.map((item, idx) => (idx === editingSessionIndex ? savedSession : item));
+                    return withSequentialSessionOrder(
+                        prev.map((item, idx) => (idx === editingSessionIndex ? savedSession : item))
+                    );
                 }
-                return [...prev, savedSession];
+                return withSequentialSessionOrder([...prev, savedSession]);
             });
             setToast({ open: true, type: "success", msg: isEditing ? "Session updated" : "Session added" });
         } catch (err) {
@@ -719,13 +829,15 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
                 const savedSession = normalizeSession(json);
                 setSessions((prev) =>
-                    prev.map((item) => {
-                        if (pendingSession.id && item.id === pendingSession.id) return savedSession;
-                        if (!pendingSession.id && pendingSession._localId && item._localId === pendingSession._localId) {
-                            return savedSession;
-                        }
-                        return item;
-                    })
+                    withSequentialSessionOrder(
+                        prev.map((item) => {
+                            if (pendingSession.id && item.id === pendingSession.id) return savedSession;
+                            if (!pendingSession.id && pendingSession._localId && item._localId === pendingSession._localId) {
+                                return savedSession;
+                            }
+                            return item;
+                        })
+                    )
                 );
             }
             return true;
@@ -760,7 +872,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 throw new Error(msg);
             }
 
-            setSessions((prev) => prev.filter((_, idx) => idx !== index));
+            setSessions((prev) => withSequentialSessionOrder(prev.filter((_, idx) => idx !== index)));
             setToast({ open: true, type: "success", msg: "Session deleted" });
         } catch (err) {
             setSessionsError(err?.message || "Unable to delete session");
@@ -1832,6 +1944,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     <SessionList
                                         sessions={sessions}
                                         timezone={timezone}
+                                        onMoveUp={(idx) => moveSession(idx, idx - 1)}
+                                        onMoveDown={(idx) => moveSession(idx, idx + 1)}
+                                        onSortByStartTime={sortSessionsByStartTime}
+                                        disableReordering={sessionSubmitting}
                                         onEdit={(session, idx) => {
                                             setEditingSessionIndex(idx);
                                             setSessionDialogOpen(true);
