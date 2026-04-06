@@ -60,7 +60,7 @@ import CoursesPage from "./pages/CoursesPage.jsx";
 import CoursePlayerPage from "./pages/CoursePlayerPage.jsx";
 import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
 import VirtualSpeakersPage from "./pages/VirtualSpeakersPage.jsx";
-import OxfordSymposium2026 from "./pages/OxfordSymposium2026.jsx";
+import EventLandingPage_Marketing from "./pages/EventLandingPage_Marketing.jsx";
 import { CircularProgress } from "@mui/material";
 
 
@@ -244,7 +244,7 @@ const AppShell = () => {
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />
-          <Route path="/public/:slug" element={<OxfordSymposium2026 />} />
+          <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
           <Route path="/events/:slug" element={<EventDetailsPage />} />
           <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />
