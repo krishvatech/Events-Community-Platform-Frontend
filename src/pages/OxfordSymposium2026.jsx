@@ -8,7 +8,7 @@ import receptionImg from "../assets/oxford/Oxford_Reception.png";
 import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
 import puntingImg from "../assets/oxford/Oxford_Punting.png";
 import bbqImg from "../assets/oxford/Oxford_BBQ_2.png";
-import jesuCollegeLogo from "../assets/oxford/Jesus Horisontal - new shield 2023.png";
+import jesuCollegeLogo from "../assets/oxford/Jesus_College_Crest_Logo.png";
 import bancorLogo from "../assets/oxford/Bancor_Logo.jpeg";
 
 // Design System
@@ -1719,9 +1719,9 @@ function About() {
             <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
               <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                 {p.textOnly ? (
-                  <div style={{ fontFamily: F.display, fontSize: 48, fontWeight: 700, color: C.brightBlue, letterSpacing: "0.05em" }}>IMAA</div>
+                  <div style={{ fontFamily: F.display, fontSize: 48, fontWeight: 700, color: C.deepBlue, letterSpacing: "0.05em" }}>IMAA</div>
                 ) : (
-                  <img src={p.logo} alt={p.name} style={{ height: i === 0 ? 90 : 100, objectFit: "contain" }} />
+                  <img src={p.logo} alt={p.name} style={{ height: i === 0 ? 80 : i === 2 ? 55 : 100, objectFit: "contain" }} />
                 )}
               </div>
               <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.deepBlue, marginBottom: 2 }}>{p.name}</div>
