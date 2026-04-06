@@ -989,34 +989,36 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
     if (isMultiDay && sessions.length > 0) {
       console.log("✅ Condition TRUE - Processing sessions");
-      const sessionsData = sessions.map((s, idx) => {
-        // SessionDialog returns data with both ISO fields (startTime, endTime) and display fields (_startDate, _startTime, _endDate, _endTime)
-        // Use the ISO fields directly since they're already timezone-converted
-        return {
-          title: s.title,
-          description: s.description || "",
-          session_type: s.sessionType || "main",
-          session_date: s._startDate,  // Use display field for session_date
-          start_time: s.startTime,     // Already ISO from SessionDialog
-          end_time: s.endTime,         // Already ISO from SessionDialog
-          display_order: idx,
-          use_parent_meeting: true,
-        };
-      });
 
-      console.log("Sending sessions_input data:", sessionsData);
-      console.log("Sessions being sent:", {
-        count: sessionsData.length,
-        sessions: sessionsData.map(s => ({
-          title: s.title,
-          session_date: s.session_date,
-          start_time: s.start_time,
-          end_time: s.end_time,
-        })),
-      });
-      const sessionsJSON = JSON.stringify(sessionsData);
-      fd.append("sessions_input", sessionsJSON);
-      console.log("📤 sessions_input JSON appended to FormData:", sessionsJSON);
+      // Separate sessions with and without images
+      const sessionsWithoutImages = sessions.filter(s => !s.imageFile);
+      const sessionsWithImages = sessions.filter(s => s.imageFile);
+
+      // Only send sessions without images in sessions_input (JSON format)
+      // Sessions with images will be saved after event creation via separate API calls
+      if (sessionsWithoutImages.length > 0) {
+        const sessionsData = sessionsWithoutImages.map((s, idx) => {
+          return {
+            title: s.title,
+            description: s.description || "",
+            session_type: s.sessionType || "main",
+            session_date: s._startDate,
+            start_time: s.startTime,
+            end_time: s.endTime,
+            display_order: idx,
+            use_parent_meeting: true,
+          };
+        });
+
+        console.log("Sending sessions_input data:", sessionsData);
+        const sessionsJSON = JSON.stringify(sessionsData);
+        fd.append("sessions_input", sessionsJSON);
+        console.log("📤 sessions_input JSON appended to FormData:", sessionsJSON);
+      }
+
+      if (sessionsWithImages.length > 0) {
+        console.log(`⚠️  ${sessionsWithImages.length} session(s) with images will be saved after event creation`);
+      }
     } else {
       console.log("❌ Condition FALSE - Not processing sessions");
     }
@@ -1071,6 +1073,51 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         timezone: json.timezone,
         sessionsCount: json.sessions?.length || 0,
       });
+
+      // Save sessions with images after event creation
+      const sessionsWithImages = sessions.filter(s => s.imageFile);
+      if (sessionsWithImages.length > 0) {
+        console.log(`📸 Saving ${sessionsWithImages.length} session(s) with images...`);
+        try {
+          for (const session of sessionsWithImages) {
+            const formData = new FormData();
+            formData.append("title", session.title);
+            formData.append("description", session.description || "");
+            formData.append("session_type", session.sessionType || "main");
+            formData.append("start_time", session.startTime);
+            formData.append("end_time", session.endTime);
+            formData.append("session_date", session._startDate);
+            formData.append("display_order", sessions.indexOf(session));
+            formData.append("use_parent_meeting", "true");
+            formData.append("session_image", session.imageFile);
+
+            const sessionRes = await fetch(`${API_ROOT}/events/${eventId}/sessions/`, {
+              method: "POST",
+              headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+              body: formData,
+            });
+
+            if (!sessionRes.ok) {
+              const sessionJson = await sessionRes.json().catch(() => ({}));
+              console.error(`Failed to save session "${session.title}" with image:`, sessionJson);
+              setToast({
+                open: true,
+                type: "warning",
+                msg: `Event created but session "${session.title}" image failed to save.`,
+              });
+            } else {
+              console.log(`✅ Session "${session.title}" saved with image`);
+            }
+          }
+        } catch (err) {
+          console.error("Error saving sessions with images:", err);
+          setToast({
+            open: true,
+            type: "warning",
+            msg: "Event created but some session images failed to save.",
+          });
+        }
+      }
 
       onCreated?.(json);
       const msg = isMultiDay && sessions.length > 0

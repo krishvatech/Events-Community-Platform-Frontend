@@ -20,6 +20,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ScheduleIcon from "@mui/icons-material/Schedule";
+import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
 
 const SESSION_TYPE_COLORS = {
@@ -107,6 +108,7 @@ function SessionList({
         <TableHead sx={{ backgroundColor: "#f3f4f6" }}>
           <TableRow>
             <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
+            <TableCell sx={{ fontWeight: 600, textAlign: "center" }}>Image</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>
               <Box>
@@ -131,6 +133,40 @@ function SessionList({
                   <p className="font-medium text-sm">{session.title}</p>
                   {session.description && (
                     <p className="text-xs text-slate-500 line-clamp-1">{session.description}</p>
+                  )}
+                </Box>
+              </TableCell>
+              <TableCell align="center">
+                <Box
+                  sx={{
+                    width: 50,
+                    height: 80,
+                    backgroundColor: "#f3f4f6",
+                    borderRadius: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  {session.session_image ? (
+                    <img
+                      src={session.session_image}
+                      alt={session.title}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                      }}
+                    />
+                  ) : null}
+                  {!session.session_image && (
+                    <ImageRoundedIcon sx={{ fontSize: 24, color: "#9ca3af" }} />
                   )}
                 </Box>
               </TableCell>

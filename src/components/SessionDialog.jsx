@@ -11,6 +11,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import { LocalizationProvider, TimePicker, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
@@ -77,6 +78,20 @@ function SessionDialog({
   const [sessionType, setSessionType] = useState("main");
   const [errors, setErrors] = useState({});
 
+  // Image handling
+  const [sessionImageFile, setSessionImageFile] = useState(null);
+  const [localSessionImagePreview, setLocalSessionImagePreview] = useState("");
+  const [existingSessionImage, setExistingSessionImage] = useState("");
+
+  // Load existing image URL when initialData changes
+  useEffect(() => {
+    if (initialData?.session_image) {
+      setExistingSessionImage(initialData.session_image);
+    } else {
+      setExistingSessionImage("");
+    }
+  }, [initialData?.session_image]);
+
   // Helper to get default event date from eventStartTime
   const getDefaultEventDate = () => {
     if (eventStartTime) {
@@ -96,6 +111,9 @@ function SessionDialog({
       setEndTime(dayjs().add(2, "hours"));
       setSessionType("main");
       setErrors({});
+      setSessionImageFile(null);
+      setLocalSessionImagePreview("");
+      setExistingSessionImage("");
     } else if (initialData) {
       // Load existing session data
       setTitle(initialData.title || "");
@@ -136,6 +154,22 @@ function SessionDialog({
       setEndTime(defaultEnd);
     }
   }, [open, initialData, eventStartTime, timezone]);
+
+  const onPickSessionImage = (file) => {
+    if (file && file.size > 5 * 1024 * 1024) {
+      setErrors((prev) => ({ ...prev, sessionImage: "Session image size must be less than 5MB" }));
+      return;
+    }
+    setSessionImageFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => setLocalSessionImagePreview(String(e.target?.result || ""));
+      reader.readAsDataURL(file);
+    } else {
+      setLocalSessionImagePreview("");
+    }
+    setErrors((prev) => ({ ...prev, sessionImage: "" }));
+  };
 
   const validate = () => {
     const e = {};
@@ -247,6 +281,8 @@ function SessionDialog({
       _endDate: endDate.format("YYYY-MM-DD"),
       _endTime: endTime.format("HH:mm"),
       _localId: initialData?._localId,
+      // Image file (if selected)
+      imageFile: sessionImageFile,
     };
 
     try {
@@ -284,6 +320,90 @@ function SessionDialog({
             rows={2}
             placeholder="Session description or agenda"
           />
+
+          {/* Session Image Upload */}
+          <Box>
+            <Typography variant="body2" className="font-semibold" sx={{ mb: 1.5 }}>
+              Session Image (optional)
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#6b7280", display: "block", mb: 1.5 }}>
+              Portrait orientation recommended. Max 5MB.
+            </Typography>
+
+            {/* Image Preview - Portrait (9:16 aspect ratio) */}
+            <Box
+              sx={{
+                width: "100%",
+                maxWidth: 160,
+                aspectRatio: "9 / 16",
+                border: localSessionImagePreview || existingSessionImage ? "2px solid #d1d5db" : "2px dashed #d1d5db",
+                borderRadius: 1.5,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 1.5,
+                cursor: "pointer",
+                backgroundColor: "#fafafa",
+                transition: "all 0.2s",
+                "&:hover": { borderColor: "#10b8a6", backgroundColor: "#f0fdf9" },
+                overflow: "hidden",
+              }}
+              onClick={() => document.getElementById("session-image-upload")?.click()}
+            >
+              {localSessionImagePreview ? (
+                <img
+                  src={localSessionImagePreview}
+                  alt="session preview"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : existingSessionImage && existingSessionImage.trim() ? (
+                <img
+                  src={existingSessionImage}
+                  alt="session preview"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={(e) => {
+                    console.error("Failed to load session image:", existingSessionImage);
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <Box sx={{ textAlign: "center" }}>
+                  <ImageRoundedIcon sx={{ fontSize: 32, color: "#9ca3af", mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ color: "#6b7280", display: "block" }}>
+                    Click to upload
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* Hidden File Input */}
+            <input
+              id="session-image-upload"
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => onPickSessionImage(e.target.files?.[0])}
+            />
+
+            {/* Error Message */}
+            {errors.sessionImage && (
+              <Typography variant="caption" color="error" display="block">
+                {errors.sessionImage}
+              </Typography>
+            )}
+
+            {/* Clear Button - Show if new image file is selected */}
+            {sessionImageFile && (
+              <Button
+                size="small"
+                variant="outlined"
+                sx={{ mt: 1, color: "#ef4444", borderColor: "#ef4444" }}
+                onClick={() => onPickSessionImage(null)}
+              >
+                Clear Image
+              </Button>
+            )}
+          </Box>
 
           <TextField
             fullWidth

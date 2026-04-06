@@ -456,6 +456,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             endTime: endISO,
             sessionDate: session.sessionDate || session.session_date || dateFromStart,
             displayOrder: Number(session.displayOrder ?? session.display_order ?? 0),
+            session_image: session.session_image || null,
+            imageFile: session.imageFile || null, // Preserve image file when pending
             _pending: Boolean(session._pending),
             _localId: session._localId || session.localId || null,
         };
@@ -728,15 +730,36 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 return;
             }
 
-            const payload = {
-                title: sessionData.title,
-                description: sessionData.description || "",
-                session_type: sessionData.sessionType || "main",
-                start_time: sessionData.startTime,
-                end_time: sessionData.endTime,
-                session_date: dayjs(sessionData.startTime).format("YYYY-MM-DD"),
-                display_order: displayOrder,
-            };
+            // Prepare payload - use FormData if image present, otherwise JSON
+            const hasImage = sessionData.imageFile && sessionData.imageFile instanceof File;
+            let requestBody;
+            let headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+            if (hasImage) {
+                const formData = new FormData();
+                formData.append("title", sessionData.title);
+                formData.append("description", sessionData.description || "");
+                formData.append("session_type", sessionData.sessionType || "main");
+                formData.append("start_time", sessionData.startTime);
+                formData.append("end_time", sessionData.endTime);
+                formData.append("session_date", dayjs(sessionData.startTime).format("YYYY-MM-DD"));
+                formData.append("display_order", displayOrder);
+                formData.append("session_image", sessionData.imageFile);
+                requestBody = formData;
+                // Don't set Content-Type header; browser will set it with boundary
+            } else {
+                const payload = {
+                    title: sessionData.title,
+                    description: sessionData.description || "",
+                    session_type: sessionData.sessionType || "main",
+                    start_time: sessionData.startTime,
+                    end_time: sessionData.endTime,
+                    session_date: dayjs(sessionData.startTime).format("YYYY-MM-DD"),
+                    display_order: displayOrder,
+                };
+                requestBody = JSON.stringify(payload);
+                headers = { "Content-Type": "application/json", ...headers };
+            }
 
             const url = isEditing
                 ? `${API_ROOT}/events/${event.id}/sessions/${editingSession?.id}/`
@@ -745,11 +768,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
             const res = await fetch(url, {
                 method,
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify(payload),
+                headers,
+                body: requestBody,
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) {
@@ -791,17 +811,41 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         try {
             for (const pendingSession of pending) {
                 const isEditing = Boolean(pendingSession.id);
-                const payload = {
-                    title: pendingSession.title,
-                    description: pendingSession.description || "",
-                    session_type: pendingSession.sessionType || "main",
-                    start_time: pendingSession.startTime,
-                    end_time: pendingSession.endTime,
-                    session_date: pendingSession.startTime
+
+                // Prepare payload - use FormData if image present, otherwise JSON
+                const hasImage = pendingSession.imageFile && pendingSession.imageFile instanceof File;
+                let requestBody;
+                let headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+                if (hasImage) {
+                    const formData = new FormData();
+                    formData.append("title", pendingSession.title);
+                    formData.append("description", pendingSession.description || "");
+                    formData.append("session_type", pendingSession.sessionType || "main");
+                    formData.append("start_time", pendingSession.startTime);
+                    formData.append("end_time", pendingSession.endTime);
+                    formData.append("session_date", pendingSession.startTime
                         ? dayjs(pendingSession.startTime).format("YYYY-MM-DD")
-                        : null,
-                    display_order: Number(pendingSession.displayOrder ?? 0),
-                };
+                        : null);
+                    formData.append("display_order", Number(pendingSession.displayOrder ?? 0));
+                    formData.append("session_image", pendingSession.imageFile);
+                    requestBody = formData;
+                    // Don't set Content-Type header; browser will set it with boundary
+                } else {
+                    const payload = {
+                        title: pendingSession.title,
+                        description: pendingSession.description || "",
+                        session_type: pendingSession.sessionType || "main",
+                        start_time: pendingSession.startTime,
+                        end_time: pendingSession.endTime,
+                        session_date: pendingSession.startTime
+                            ? dayjs(pendingSession.startTime).format("YYYY-MM-DD")
+                            : null,
+                        display_order: Number(pendingSession.displayOrder ?? 0),
+                    };
+                    requestBody = JSON.stringify(payload);
+                    headers = { "Content-Type": "application/json", ...headers };
+                }
 
                 const url = isEditing
                     ? `${API_ROOT}/events/${event.id}/sessions/${pendingSession.id}/`
@@ -810,11 +854,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
                 const res = await fetch(url, {
                     method,
-                    headers: {
-                        "Content-Type": "application/json",
-                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
-                    body: JSON.stringify(payload),
+                    headers,
+                    body: requestBody,
                 });
                 const json = await res.json().catch(() => ({}));
                 if (!res.ok) {
