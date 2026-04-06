@@ -1,6 +1,6 @@
 // src/components/GuestOnly.jsx
-import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { getRoleAndRedirectPath, getCognitoGroupsFromTokens } from "../utils/roleRedirect";
 
 const decodeJwtPayload = (token) => {
   try {
@@ -24,7 +24,23 @@ const GuestOnly = ({ children }) => {
   const loc = useLocation();
   if (isAuthed()) {
     const params = new URLSearchParams(loc.search);
-    const next = params.get("next") || "/account/profile";
+    let next = params.get("next");
+
+    if (!next) {
+      // Get role and determine correct redirect based on user type
+      const token = localStorage.getItem("access_token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const cognitoGroups = getCognitoGroupsFromTokens(token);
+
+      const { path } = getRoleAndRedirectPath({
+        cognitoGroups,
+        backendUser: user,
+        defaultPath: "/account/profile",
+      });
+
+      next = path;
+    }
+
     return <Navigate to={next} replace />;
   }
   return children;

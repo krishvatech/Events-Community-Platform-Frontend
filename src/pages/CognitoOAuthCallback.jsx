@@ -265,8 +265,7 @@ const CognitoOAuthCallback = () => {
         });
 
         console.log("🎯 Redirecting to:", path);
-        if (path === "/admin/events") window.location.replace(path);
-        else navigate(path, { replace: true });
+        navigate(path, { replace: true });
       } catch (e) {
         console.error("❌ Cognito callback error:", e);
         toast.error("❌ Could not finish Cognito social login.");

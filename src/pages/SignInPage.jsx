@@ -181,11 +181,7 @@ export default function SignInPage() {
 
       // Redirect
       setTimeout(() => {
-        if (path === "/admin/events") {
-          window.location.replace(path);
-        } else {
-          navigate(path, { replace: true });
-        }
+        navigate(path, { replace: true });
       }, 900);
 
     } catch (err) {
