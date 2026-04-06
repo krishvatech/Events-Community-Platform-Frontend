@@ -1745,37 +1745,92 @@ function EveningCard({ ev, img }) {
 }
 
 // 8. OXFORD EXPERIENCE
-function OxfordExperience() {
-  const evenings = [
-    {
-      day: "Monday",
-      title: "Welcome Reception & Dinner",
-      desc: "A reception and dinner to close the first day. No formalities beyond a brief welcome. Informal, unhurried, and shaped by the inspiration that the first day's sessions have set in motion.",
-      accent: C.coral,
-      img: receptionImg,
-    },
-    {
-      day: "Tuesday",
-      title: "College Dinner",
-      desc: "A black-tie dinner in the Great Hall of Jesus College, conducted in the Oxford tradition. An evening that belongs to the room that is forming around you.",
-      accent: C.oxfordGold,
-      img: dinnerImg,
-    },
-    {
-      day: "Wednesday",
-      title: "Punting & Dinner",
-      desc: "An optional early evening on the Cherwell by punt, followed by a riverside dinner. No prior punting ability required. Quintessentially Oxford.",
-      accent: C.green,
-      img: puntingImg,
-    },
-    {
-      day: "Thursday",
-      title: "BBQ Dinner",
-      desc: "The final evening. By Thursday, the programme ends. The conversations do not.",
-      accent: C.brightBlue,
-      img: bbqImg,
-    },
-  ];
+function OxfordExperience({ eventData = {} }) {
+  // Fallback static images
+  const fallbackImages = [receptionImg, dinnerImg, puntingImg, bbqImg];
+  const colors = [C.coral, C.brightBlue, C.green, C.oxfordGold];
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  // Build evenings dynamically from sessions
+  const buildEveonings = (sessions) => {
+    if (!sessions || !Array.isArray(sessions)) {
+      // No sessions - use fallback static data
+      return [
+        {
+          day: "Monday",
+          title: "Welcome Reception & Dinner",
+          desc: "A reception and dinner to close the first day. No formalities beyond a brief welcome. Informal, unhurried, and shaped by the inspiration that the first day's sessions have set in motion.",
+          accent: C.coral,
+          img: receptionImg,
+        },
+        {
+          day: "Tuesday",
+          title: "College Dinner",
+          desc: "A black-tie dinner in the Great Hall of Jesus College, conducted in the Oxford tradition. An evening that belongs to the room that is forming around you.",
+          accent: C.oxfordGold,
+          img: dinnerImg,
+        },
+        {
+          day: "Wednesday",
+          title: "Punting & Dinner",
+          desc: "An optional early evening on the Cherwell by punt, followed by a riverside dinner. No prior punting ability required. Quintessentially Oxford.",
+          accent: C.green,
+          img: puntingImg,
+        },
+        {
+          day: "Thursday",
+          title: "BBQ Dinner",
+          desc: "The final evening. By Thursday, the programme ends. The conversations do not.",
+          accent: C.brightBlue,
+          img: bbqImg,
+        },
+      ];
+    }
+
+    // Group sessions by date and get unique days
+    const groupedByDate = {};
+    sessions.forEach((session) => {
+      const sessionDate = session.session_date;
+      if (!groupedByDate[sessionDate]) {
+        groupedByDate[sessionDate] = { date: sessionDate, sessions: [] };
+      }
+      groupedByDate[sessionDate].sessions.push(session);
+    });
+
+    // Convert to array and map to evening cards
+    return Object.values(groupedByDate)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map((dayObj, idx) => {
+        const date = new Date(dayObj.date);
+        const dayName = dayNames[date.getDay()];
+
+        // Use first session as evening data
+        const firstSession = dayObj.sessions[0] || {};
+
+        return {
+          day: dayName,
+          title: firstSession.title || `Evening ${idx + 1}`,
+          desc: firstSession.description || `An evening activity for ${dayName}.`,
+          accent: colors[idx % colors.length],
+          img: firstSession.session_image || fallbackImages[idx % fallbackImages.length],
+        };
+      });
+  };
+
+  const evenings = buildEveonings(eventData.sessions);
+
+  // Hide section if not multi-day or no sessions
+  if (!eventData.is_multi_day || evenings.length === 0) {
+    return null;
+  }
+
+  // Determine grid columns based on number of sessions
+  const getGridColumns = (count) => {
+    if (count <= 4) return 4;
+    return 3; // 5+ sessions: 3 columns (3 in first row, 2+ in second row)
+  };
+
+  const gridCols = getGridColumns(evenings.length);
 
   return (
     <Section bg={C.white} style={{ padding: "64px 0" }} id="experience">
@@ -1825,7 +1880,7 @@ function OxfordExperience() {
         id="evenings"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
           gap: 12,
           marginTop: 20,
           overflowX: "auto",
@@ -2187,7 +2242,7 @@ export default function OxfordSymposium2026() {
       <Speakers eventData={eventData} />
       <Themes />
       <MoreThanSessions />
-      <OxfordExperience />
+      <OxfordExperience eventData={eventData} />
       <Programme eventData={eventData} />
       <About />
       <FinalCTA onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
