@@ -934,22 +934,38 @@ function Speakers({ eventData = {} }) {
                 transition: "border-color 0.3s",
               }}
             >
-              <div
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: "50%",
-                  background: `linear-gradient(135deg, ${C.deepBlue}, ${C.midBlue})`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 14,
-                }}
-              >
-                <span style={{ fontFamily: F.body, fontSize: 16, fontWeight: 700, color: C.white }}>
-                  {s.initials}
-                </span>
-              </div>
+              {s.image ? (
+                <img
+                  src={s.image}
+                  alt={s.name}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    marginBottom: 14,
+                    objectFit: "cover",
+                    filter: "grayscale(100%)",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    background: `linear-gradient(135deg, ${C.deepBlue}, ${C.midBlue})`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 14,
+                    filter: "grayscale(100%)",
+                  }}
+                >
+                  <span style={{ fontFamily: F.body, fontSize: 16, fontWeight: 700, color: C.white }}>
+                    {s.initials}
+                  </span>
+                </div>
+              )}
               <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.deepBlue, lineHeight: 1.25, marginBottom: 4 }}>
                 {s.name}
               </div>
@@ -982,21 +998,36 @@ function Speakers({ eventData = {} }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: `linear-gradient(135deg, ${C.deepBlue}, ${C.midBlue})`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span style={{ fontFamily: F.body, fontSize: 12, fontWeight: 700, color: C.white }}>
-                {speakers[activeBio].initials}
-              </span>
-            </div>
+            {speakers[activeBio].image ? (
+              <img
+                src={speakers[activeBio].image}
+                alt={speakers[activeBio].name}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  filter: "grayscale(100%)",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: `linear-gradient(135deg, ${C.deepBlue}, ${C.midBlue})`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  filter: "grayscale(100%)",
+                }}
+              >
+                <span style={{ fontFamily: F.body, fontSize: 12, fontWeight: 700, color: C.white }}>
+                  {speakers[activeBio].initials}
+                </span>
+              </div>
+            )}
             <div>
               <div style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.deepBlue }}>
                 {speakers[activeBio].name}
