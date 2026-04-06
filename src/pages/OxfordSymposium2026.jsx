@@ -10,6 +10,7 @@ import puntingImg from "../assets/oxford/Oxford_Punting.png";
 import bbqImg from "../assets/oxford/Oxford_BBQ_2.png";
 import jesuCollegeLogo from "../assets/oxford/Jesus_College_Crest_Logo.png";
 import bancorLogo from "../assets/oxford/Bancor_Logo.jpeg";
+import "../styles/OxfordSymposium2026.css";
 
 // Design System
 const C = {
@@ -38,6 +39,19 @@ const F = {
   body: "'Roboto', Arial, sans-serif",
   display: "'Roboto Slab', Georgia, serif",
 };
+
+// Mobile responsiveness hook
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" && window.innerWidth < breakpoint
+  );
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [breakpoint]);
+  return isMobile;
+}
 
 // Icon Components
 const Ic = {
@@ -178,6 +192,9 @@ function ApplyStatusDisplay({ status, eventData, onJoinClick, style, buttonSize 
 
 // 1. HERO
 function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
+
   // Format event data from API response
   const formatEventData = (data) => {
     if (!data || !data.start_time) return null;
@@ -337,9 +354,11 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
           borderBottom: `1px solid ${C.midBlue}40`,
           opacity: ld ? 1 : 0,
           transition: "opacity 0.7s ease 0.2s",
+          width: "100%",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {/* Logo - Always Left */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <div
             style={{
               width: 28,
@@ -367,7 +386,86 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
             {organizer_name}
           </span>
         </div>
-        <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
+
+        {/* Spacer - grows to push nav/hamburger right */}
+        <div style={{ flex: 1 }} />
+
+        {/* Desktop Nav */}
+        {!isMobile && (
+          <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
+            {["Themes", "Experience", "Programme"].map((i) => (
+              <a
+                key={i}
+                href={`#${i.toLowerCase()}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSmoothScroll(i.toLowerCase());
+                }}
+                style={{
+                  fontSize: 12,
+                  color: C.lightBlue,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  textDecoration: "none",
+                  fontFamily: F.body,
+                }}
+              >
+                {i}
+              </a>
+            ))}
+            {!myApplication || myApplication.status === 'none' ? (
+              <button
+                onClick={onApplyClick}
+                style={{
+                  fontSize: 12,
+                  color: C.white,
+                  fontWeight: 700,
+                  background: C.coral,
+                  padding: "6px 16px",
+                  border: "none",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontFamily: F.body,
+                }}
+              >
+                Register Interest
+              </button>
+            ) : (
+              <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="small" />
+            )}
+          </div>
+        )}
+
+        {/* Mobile Hamburger Menu - Always Right */}
+        {isMobile && (
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 8,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              minHeight: 32,
+              minWidth: 32,
+              justifyContent: "center",
+              alignItems: "center",
+              flexShrink: 0,
+            }}
+            aria-label="Toggle menu"
+          >
+            <div style={{ width: 24, height: 2.5, background: C.white, borderRadius: 1.5 }} />
+            <div style={{ width: 24, height: 2.5, background: C.white, borderRadius: 1.5 }} />
+            <div style={{ width: 24, height: 2.5, background: C.white, borderRadius: 1.5 }} />
+          </button>
+        )}
+      </div>
+
+      {/* Mobile Menu Dropdown */}
+      {isMobile && mobileMenuOpen && (
+        <div style={{ background: C.midBlue, padding: "12px 20px", borderTop: `1px solid ${C.midBlue}40` }}>
           {["Themes", "Experience", "Programme"].map((i) => (
             <a
               key={i}
@@ -375,41 +473,51 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
               onClick={(e) => {
                 e.preventDefault();
                 handleSmoothScroll(i.toLowerCase());
+                setMobileMenuOpen(false);
               }}
               style={{
-                fontSize: 12,
+                display: "block",
+                fontSize: 14,
                 color: C.lightBlue,
                 fontWeight: 500,
                 cursor: "pointer",
                 textDecoration: "none",
                 fontFamily: F.body,
+                padding: "10px 0",
+                borderBottom: `1px solid ${C.midBlue}40`,
               }}
             >
               {i}
             </a>
           ))}
-          {!myApplication || myApplication.status === 'none' ? (
-            <button
-              onClick={onApplyClick}
-              style={{
-                fontSize: 12,
-                color: C.white,
-                fontWeight: 700,
-                background: C.coral,
-                padding: "6px 16px",
-                border: "none",
-                borderRadius: 3,
-                cursor: "pointer",
-                fontFamily: F.body,
-              }}
-            >
-              Register Interest
-            </button>
-          ) : (
-            <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="small" />
-          )}
+          <div style={{ paddingTop: 12 }}>
+            {!myApplication || myApplication.status === 'none' ? (
+              <button
+                onClick={() => {
+                  onApplyClick();
+                  setMobileMenuOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  fontSize: 14,
+                  color: C.white,
+                  fontWeight: 700,
+                  background: C.coral,
+                  padding: "12px 16px",
+                  border: "none",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontFamily: F.body,
+                }}
+              >
+                Register Interest
+              </button>
+            ) : (
+              <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="small" style={{ width: "100%" }} />
+            )}
+          </div>
         </div>
-      </div>
+      )}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "52px 40px 72px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
           <div>
@@ -753,6 +861,7 @@ function PositioningStatement() {
 function Speakers({ eventData = {} }) {
   const [offset, setOffset] = useState(0);
   const [activeBio, setActiveBio] = useState(null);
+  const isMobile = useIsMobile();
 
   // Transform API featured_participants data to component format
   const transformParticipants = (apiParticipants) => {
@@ -788,7 +897,7 @@ function Speakers({ eventData = {} }) {
     return null;
   }
 
-  const visible = 3;
+  const visible = isMobile ? 1 : 3;
   const maxOffset = speakers.length - visible;
   const canPrev = offset > 0;
   const canNext = offset < maxOffset;
@@ -844,8 +953,8 @@ function Speakers({ eventData = {} }) {
               onClick={() => setOffset(Math.max(0, offset - 1))}
               disabled={!canPrev}
               style={{
-                width: 32,
-                height: 32,
+                width: isMobile ? 44 : 32,
+                height: isMobile ? 44 : 32,
                 borderRadius: 4,
                 border: `1px solid ${canPrev ? C.cool20 : C.cool10}`,
                 background: canPrev ? C.white : C.cool10,
@@ -853,7 +962,9 @@ function Speakers({ eventData = {} }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                transition: "all 0.2s",
               }}
+              aria-label="Previous speaker"
             >
               <svg
                 width="14"
@@ -870,8 +981,8 @@ function Speakers({ eventData = {} }) {
               onClick={() => setOffset(Math.min(maxOffset, offset + 1))}
               disabled={!canNext}
               style={{
-                width: 32,
-                height: 32,
+                width: isMobile ? 44 : 32,
+                height: isMobile ? 44 : 32,
                 borderRadius: 4,
                 border: `1px solid ${canNext ? C.cool20 : C.cool10}`,
                 background: canNext ? C.white : C.cool10,
@@ -879,7 +990,9 @@ function Speakers({ eventData = {} }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                transition: "all 0.2s",
               }}
+              aria-label="Next speaker"
             >
               <svg
                 width="14"
@@ -1254,6 +1367,7 @@ function Themes() {
 // 6. MORE THAN SESSIONS
 function MoreThanSessions() {
   const [sel, setSel] = useState(0);
+  const isMobile = useIsMobile();
   const items = [
     {
       icon: Ic.bulb,
@@ -1307,7 +1421,7 @@ function MoreThanSessions() {
         <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>More Than Sessions</h3>
       </FadeIn>
       <FadeIn delay={0.1}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 10, marginBottom: 12 }}>
           {items.map((it, i) => (
             <button
               key={i}
@@ -1316,13 +1430,15 @@ function MoreThanSessions() {
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                padding: "14px 18px",
+                padding: isMobile ? "16px 14px" : "14px 18px",
                 background: sel === i ? C.deepBlue : C.white,
                 border: `1px solid ${sel === i ? C.deepBlue : C.cool20}`,
                 borderRadius: 4,
                 cursor: "pointer",
                 transition: "all 0.3s",
+                minHeight: isMobile ? 44 : "auto",
               }}
+              aria-label={it.title}
             >
               {it.icon(sel === i ? C.white : C.cool50)}
               <span
@@ -1497,10 +1613,22 @@ function Programme({ eventData = {} }) {
         </div>
         <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>{days.length} days, one trajectory.</h3>
       </FadeIn>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 20, marginTop: 32 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+          gap: 20,
+          marginTop: 32,
+          overflowX: "auto",
+          overflowY: "hidden",
+          scrollBehavior: "smooth",
+          paddingBottom: 12,
+          marginBottom: -12,
+        }}
+      >
         {days.map((d, i) => (
           <FadeIn key={i} delay={i * 0.1}>
-            <div style={{ padding: "24px", border: `1px solid ${C.cool20}`, borderTop: `4px solid ${d.color}`, borderRadius: 4, background: C.white }}>
+            <div style={{ padding: "24px", border: `1px solid ${C.cool20}`, borderTop: `4px solid ${d.color}`, borderRadius: 4, background: C.white, minWidth: "calc(50% - 10px)" }}>
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, marginBottom: 2 }}>{d.day}</div>
                 <div style={{ fontSize: 11, color: C.cool60, fontFamily: F.body, letterSpacing: "0.05em", textTransform: "uppercase" }}>{d.date}</div>
@@ -1693,7 +1821,20 @@ function OxfordExperience() {
           Not every important conversation happens in a room.
         </h3>
       </FadeIn>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 20 }}>
+      <div
+        id="evenings"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 12,
+          marginTop: 20,
+          overflowX: "auto",
+          overflowY: "hidden",
+          scrollBehavior: "smooth",
+          paddingBottom: 12,
+          marginBottom: -12,
+        }}
+      >
         {evenings.map((ev, i) => (
           <FadeIn key={i} delay={i * 0.08}>
             <EveningCard ev={ev} img={ev.img} />
@@ -1741,7 +1882,7 @@ function About() {
         <p style={{ fontFamily: F.body, fontSize: 15, lineHeight: 1.7, color: C.cool60, margin: "0 0 36px", maxWidth: 700 }}>Organised in partnership by Jesus College at Oxford University with the Institute for Mergers, Acquisitions and Alliances (IMAA) and Bancor International Limited, the Symposium brings together senior dealmakers, sovereign wealth principals, defence and technology leaders, corporate strategists, and leading international academic faculty for four days of rigorous dialogue, case discussions, and high-level peer exchange culminating in a College Dinner.</p>
       </FadeIn>
       <FadeIn delay={0.1}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 60 }}>
+        <div id="partners" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 60 }}>
           {[
             { name: "Jesus College", sub: "Oxford University", logo: jesuCollegeLogo },
             { name: "IMAA", sub: "Institute for Mergers, Acquisitions & Alliances", textOnly: true },

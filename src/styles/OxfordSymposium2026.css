@@ -1,0 +1,114 @@
+/* Oxford Symposium 2026 - Mobile Responsive Styles */
+
+/* Tablet and below (768px) */
+@media (max-width: 768px) {
+  /* Hero content (not navbar) */
+  section:first-child > div:nth-child(2) {
+    padding: 32px 20px 48px !important;
+  }
+
+  section:first-child > div:nth-child(2) > div {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+
+  section:first-child h1 {
+    font-size: 28px !important;
+  }
+
+  /* All sections padding */
+  section > div {
+    padding: 0 20px !important;
+  }
+
+  /* Section titles */
+  h2 {
+    font-size: 26px !important;
+  }
+
+  h3 {
+    font-size: 24px !important;
+  }
+
+  /* Speakers carousel */
+  #speakers > div {
+    padding: 0 20px !important;
+  }
+
+  /* More Than Sessions buttons - stack vertically */
+  #experience > div:first-child {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Evening cards - keep 4 columns on tablet */
+  #evenings {
+    gap: 12px !important;
+  }
+
+  #evenings > div {
+    min-height: 320px !important;
+  }
+
+  /* Programme schedule - keep responsive on tablet */
+
+  /* About partners - stack vertically on mobile */
+  #partners {
+    grid-template-columns: 1fr !important;
+    gap: 40px !important;
+  }
+
+  /* CTA section */
+  #apply > div {
+    padding: 0 20px !important;
+  }
+
+  #apply h2,
+  #apply h3 {
+    font-size: 28px !important;
+  }
+
+  /* Footer */
+  footer > div {
+    padding: 0 20px !important;
+  }
+}
+
+/* Mobile phones (640px and below) - 2 column scrollable */
+@media (max-width: 640px) {
+  /* Evening cards - 2 column scrollable */
+  #evenings {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Programme schedule - 2 column scrollable */
+  #programme > div {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Small mobile (480px and below) - single column */
+@media (max-width: 480px) {
+  /* Evening cards - single column */
+  #evenings {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Programme schedule - single column */
+  #programme > div {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Hero title */
+  section:first-child h1 {
+    font-size: 24px !important;
+  }
+
+  /* Section titles */
+  h2 {
+    font-size: 22px !important;
+  }
+
+  h3 {
+    font-size: 20px !important;
+  }
+}
