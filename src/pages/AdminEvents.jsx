@@ -2684,6 +2684,31 @@ function AdminEventCard({
           })()}
         </div>
 
+        {/* Session counts for multi-day events */}
+        {ev.is_multi_day && (
+          <div className="text-xs text-slate-600 space-y-1 my-2">
+            {(ev.main_sessions_count > 0 || ev.breakout_sessions_count > 0 || ev.workshops_count > 0 || ev.networking_count > 0) && (
+              <>
+                {ev.main_sessions_count > 0 && (
+                  <div>📌 {ev.main_sessions_count} Main Session{ev.main_sessions_count !== 1 ? 's' : ''}</div>
+                )}
+                {ev.breakout_sessions_count > 0 && (
+                  <div>🔀 {ev.breakout_sessions_count} Breakout Session{ev.breakout_sessions_count !== 1 ? 's' : ''}</div>
+                )}
+                {ev.workshops_count > 0 && (
+                  <div>🛠️ {ev.workshops_count} Workshop{ev.workshops_count !== 1 ? 's' : ''}</div>
+                )}
+                {ev.networking_count > 0 && (
+                  <div>🤝 {ev.networking_count} Networking Session{ev.networking_count !== 1 ? 's' : ''}</div>
+                )}
+              </>
+            )}
+            {ev.calculated_hours_display && (
+              <div className="font-medium text-slate-700">⏱️ {ev.calculated_hours_display}</div>
+            )}
+          </div>
+        )}
+
         {/* Actions – stop click bubbling so buttons don't trigger card navigation */}
         <Box
           className="mt-auto pt-1 flex gap-2"

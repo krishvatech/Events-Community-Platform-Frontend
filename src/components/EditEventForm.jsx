@@ -297,6 +297,16 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [sessionsLoading, setSessionsLoading] = useState(false);
     const [sessionsError, setSessionsError] = useState("");
 
+    // Hours calculation session types (platform_admin only)
+    const [hoursCalculationSessionTypes, setHoursCalculationSessionTypes] = useState(() => {
+        const defaultTypes = ["main", "breakout", "workshop"];
+        return event?.hours_calculation_session_types || defaultTypes;
+    });
+
+    // Current user info for platform_admin check
+    const [currentUser, setCurrentUser] = useState(null);
+    const [userLoading, setUserLoading] = useState(true);
+
     // image handling - Update Logo / Picture (original branding image)
     const [logoImageFile, setLogoImageFile] = useState(null);
     const [localLogoImagePreview, setLocalLogoImagePreview] = useState("");
@@ -345,6 +355,25 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             isMultiDay: Boolean(event?.is_multi_day),
         });
     }, [event?.end_time, event?.id, event?.is_multi_day, event?.start_time, event?.timezone]);
+
+    // Fetch current user to check if platform_admin
+    useEffect(() => {
+        const fetchUser = async () => {
+            try {
+                const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                const res = await fetch(`${API_ROOT}/users/me/`, { headers });
+                if (res.ok) {
+                    const data = await res.json();
+                    setCurrentUser(data);
+                }
+            } catch (err) {
+                console.error("Failed to fetch current user:", err);
+            } finally {
+                setUserLoading(false);
+            }
+        };
+        fetchUser();
+    }, [token]);
 
     const isScheduleDirty = useMemo(() => {
         if (!event?.id) return false;
@@ -1100,6 +1129,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
         }
         fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
+
+        // Send hours calculation session types (platform_admin only, will be validated on backend)
+        fd.append("hours_calculation_session_types", JSON.stringify(hoursCalculationSessionTypes));
 
         // Always send participants so backend can replace existing list (including clearing with []).
         const participantsData = participants.map((p, idx) => {
@@ -1999,6 +2031,59 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     />
                                 </Box>
                             ) : null}
+                        </Paper>
+                    </Box>
+                )}
+
+                {/* ===== Hours Calculation Settings (Platform Admin Only) ===== */}
+                {isMultiDay && currentUser?.is_superuser && (
+                    <Box sx={{ width: "100%", flexBasis: "100%" }}>
+                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+                            <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                                <Typography variant="h6" className="font-semibold">
+                                    ⏱️ Hours Calculation
+                                </Typography>
+                                <Chip label="Admin Only" size="small" variant="outlined" color="info" />
+                            </Stack>
+
+                            <Typography variant="body2" color="text.secondary" mb={3}>
+                                Select which session types should count toward the total hours displayed on the event card.
+                            </Typography>
+
+                            <Stack direction="column" spacing={1}>
+                                {["main", "breakout", "workshop", "networking"].map((sessionType) => (
+                                    <FormControlLabel
+                                        key={sessionType}
+                                        control={
+                                            <Switch
+                                                checked={hoursCalculationSessionTypes.includes(sessionType)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setHoursCalculationSessionTypes(prev => [...prev, sessionType]);
+                                                    } else {
+                                                        setHoursCalculationSessionTypes(prev => prev.filter(t => t !== sessionType));
+                                                    }
+                                                }}
+                                            />
+                                        }
+                                        label={
+                                            <span>
+                                                {sessionType === "main" && "📌 Main Sessions"}
+                                                {sessionType === "breakout" && "🔀 Breakout Sessions"}
+                                                {sessionType === "workshop" && "🛠️ Workshops"}
+                                                {sessionType === "networking" && "🤝 Networking Sessions"}
+                                            </span>
+                                        }
+                                        sx={{ m: 0 }}
+                                    />
+                                ))}
+                            </Stack>
+
+                            {hoursCalculationSessionTypes.length === 0 && (
+                                <Typography variant="caption" color="error" sx={{ display: "block", mt: 2 }}>
+                                    ⚠️ Select at least one session type for hours calculation
+                                </Typography>
+                            )}
                         </Paper>
                     </Box>
                 )}

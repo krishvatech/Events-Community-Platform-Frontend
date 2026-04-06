@@ -1313,6 +1313,48 @@ export default function EventDetailsPage() {
                           }
                         })()}
 
+                        {/* Session Counts and Hours Breakdown (Multi-day events only) */}
+                        {event?.is_multi_day && (event?.main_sessions_count > 0 || event?.breakout_sessions_count > 0 || event?.workshops_count > 0 || event?.networking_count > 0 || event?.calculated_hours_display) && (
+                          <Stack spacing={1.5} sx={{
+                            p: 1.5,
+                            border: '1px solid',
+                            borderColor: 'grey.200',
+                            borderRadius: 2,
+                            bgcolor: 'grey.50'
+                          }}>
+                            <Typography variant="body2" fontWeight={600} color="text.primary">
+                              Session Breakdown
+                            </Typography>
+                            <Stack spacing={0.75}>
+                              {event?.main_sessions_count > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  📌 {event.main_sessions_count} Main Session{event.main_sessions_count !== 1 ? 's' : ''}
+                                </Typography>
+                              )}
+                              {event?.breakout_sessions_count > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  🔀 {event.breakout_sessions_count} Breakout Session{event.breakout_sessions_count !== 1 ? 's' : ''}
+                                </Typography>
+                              )}
+                              {event?.workshops_count > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  🛠️ {event.workshops_count} Workshop{event.workshops_count !== 1 ? 's' : ''}
+                                </Typography>
+                              )}
+                              {event?.networking_count > 0 && (
+                                <Typography variant="caption" color="text.secondary">
+                                  🤝 {event.networking_count} Networking Session{event.networking_count !== 1 ? 's' : ''}
+                                </Typography>
+                              )}
+                              {event?.calculated_hours_display && (
+                                <Typography variant="body2" fontWeight={600} color="text.primary" sx={{ mt: 1 }}>
+                                  ⏱️ {event.calculated_hours_display}
+                                </Typography>
+                              )}
+                            </Stack>
+                          </Stack>
+                        )}
+
                         {/* Featured Participants */}
                         {event?.featured_participants && event.featured_participants.length > 0 && (
                           <Box sx={{ mt: 2 }}>

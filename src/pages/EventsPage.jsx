@@ -730,8 +730,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
             // For multi-day events with sessions
             if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
-              const totalDurationMinutes = calculateTotalDuration(ev.sessions);
-              const totalDurationStr = formatDuration(totalDurationMinutes);
               const now = new Date();
               const nextSession = ev.sessions.find(s => new Date(s.end_time) > now);
 
@@ -743,14 +741,29 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     <span className="font-medium text-neutral-900">{getEventLocation(ev)}</span>
                   </div>
 
-                  {/* Session count and total duration badges */}
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-teal-50 text-teal-700 rounded-full">
-                      {ev.sessions.length} {ev.sessions.length === 1 ? 'Session' : 'Sessions'}
-                    </span>
-                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
-                      {totalDurationStr} total
-                    </span>
+                  {/* Session type breakdown and calculated hours */}
+                  <div className="text-xs text-slate-600 space-y-1">
+                    {(ev.main_sessions_count > 0 || ev.breakout_sessions_count > 0 || ev.workshops_count > 0 || ev.networking_count > 0) ? (
+                      <>
+                        {ev.main_sessions_count > 0 && (
+                          <div>📌 {ev.main_sessions_count} Main Session{ev.main_sessions_count !== 1 ? 's' : ''}</div>
+                        )}
+                        {ev.breakout_sessions_count > 0 && (
+                          <div>🔀 {ev.breakout_sessions_count} Breakout Session{ev.breakout_sessions_count !== 1 ? 's' : ''}</div>
+                        )}
+                        {ev.workshops_count > 0 && (
+                          <div>🛠️ {ev.workshops_count} Workshop{ev.workshops_count !== 1 ? 's' : ''}</div>
+                        )}
+                        {ev.networking_count > 0 && (
+                          <div>🤝 {ev.networking_count} Networking Session{ev.networking_count !== 1 ? 's' : ''}</div>
+                        )}
+                      </>
+                    ) : (
+                      <div>📌 {ev.sessions.length} Session{ev.sessions.length !== 1 ? 's' : ''}</div>
+                    )}
+                    {ev.calculated_hours_display && (
+                      <div className="font-medium text-slate-700">⏱️ {ev.calculated_hours_display}</div>
+                    )}
                   </div>
 
                   {/* Date range (no time for multi-day events) */}
