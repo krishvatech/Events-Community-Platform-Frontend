@@ -29,7 +29,11 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Card
+    Card,
+    ListItem,
+    ListItemAvatar,
+    List,
+    CircularProgress
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -77,6 +81,11 @@ const normalizeFriendStatus = (s) => {
     if (["pending_incoming", "incoming_pending", "received", "request_received"].includes(v)) return "pending_incoming";
     return "none";
 };
+
+function isVerifiedStatus(raw) {
+    const v = String(raw || "").toLowerCase();
+    return v === "approved" || v === "verified";
+}
 
 const LINKEDIN_COMPANY_SIZES = [
     "1-10",
@@ -822,10 +831,12 @@ export default function MyContacts() {
     const [cityCenters, setCityCenters] = useState({});
     const [showMap, setShowMap] = useState(true);
 
-    const [tabIndex, setTabIndex] = useState(0); // 0 = Contacts, 1 = Sent, 2 = Received
+    const [tabIndex, setTabIndex] = useState(0); // 0 = Contacts, 1 = Sent, 2 = Received, 3 = Visitors
     const [sentRequests, setSentRequests] = useState([]);
     const [receivedRequests, setReceivedRequests] = useState([]);
     const [loadingRequests, setLoadingRequests] = useState(false);
+    const [visitors, setVisitors] = useState([]);
+    const [visitorsLoading, setVisitorsLoading] = useState(false);
 
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1141,6 +1152,35 @@ export default function MyContacts() {
         return () => { alive = false; };
     }, [cityKeyEntries]);
 
+    // Fetch visitors when visitors tab is opened (tab === 3)
+    useEffect(() => {
+        if (tabIndex !== 3) {
+            return;
+        }
+
+        setVisitorsLoading(true);
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE}/users/me/profile-visitors/`, {
+                    headers: { ...tokenHeader(), Accept: "application/json" },
+                    credentials: "include",
+                });
+                if (!res.ok) {
+                    console.error("Failed to fetch visitors:", res.status);
+                    setVisitors([]);
+                } else {
+                    const data = await res.json().catch(() => []);
+                    setVisitors(Array.isArray(data) ? data : []);
+                }
+            } catch (err) {
+                console.error("Error fetching visitors:", err);
+                setVisitors([]);
+            } finally {
+                setVisitorsLoading(false);
+            }
+        })();
+    }, [tabIndex]);
+
     const liveMarkers = useMemo(() => {
         const byCity = {};
         for (const u of filtered) {
@@ -1263,6 +1303,9 @@ export default function MyContacts() {
                                         <Tab label={`My Contacts ${tabIndex === 0 ? `(${filtered.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
                                         <Tab label={`Requests Sent ${tabIndex === 1 && sentRequests.length ? `(${sentRequests.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
                                         <Tab label={`Requests Received ${tabIndex === 2 && receivedRequests.length ? `(${receivedRequests.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
+                                        {viewerIsStaff && (
+                                            <Tab label={`Visitors ${tabIndex === 3 && visitors.length ? `(${visitors.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
+                                        )}
                                     </Tabs>
 
                                     {isCompact && (
@@ -1484,7 +1527,7 @@ export default function MyContacts() {
                                     <>
                                         {sentRequests.length > 0 && (
                                             <Typography variant="body2" color="text.secondary" sx={{ pb: 1, pl: 1, fontWeight: 500 }}>
-                                                “Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted.”
+                                                "Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted."
                                             </Typography>
                                         )}
                                         {sentRequests.map((req) => (
@@ -1502,7 +1545,7 @@ export default function MyContacts() {
                                     <>
                                         {receivedRequests.length > 0 && (
                                             <Typography variant="body2" color="text.secondary" sx={{ pb: 1, pl: 1, fontWeight: 500 }}>
-                                                “Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted.”
+                                                Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted.
                                             </Typography>
                                         )}
                                         {receivedRequests.map((req) => (
@@ -1512,6 +1555,93 @@ export default function MyContacts() {
                                             <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
                                                 No pending requests received.
                                             </Typography>
+                                        )}
+                                    </>
+                                )}
+
+                                {viewerIsStaff && tabIndex === 3 && (
+                                    <>
+                                        {visitorsLoading ? (
+                                            <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                                                <CircularProgress size={32} />
+                                            </Box>
+                                        ) : visitors.length === 0 ? (
+                                            <Box sx={{ textAlign: "center", py: 4 }}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    No profile visitors yet.
+                                                </Typography>
+                                            </Box>
+                                        ) : (
+                                            <List disablePadding>
+                                                {visitors.map((visitor, index) => (
+                                                    <ListItem
+                                                        key={`${visitor.id}-${visitor.viewed_at}-${index}`}
+                                                        disableGutters
+                                                        onClick={() => !visitor.is_anonymous && navigate(`/community/rich-profile/${visitor.id}`)}
+                                                        sx={{
+                                                            py: 1.5,
+                                                            px: 0,
+                                                            borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                                                            "&:last-child": { borderBottom: "none" },
+                                                            cursor: !visitor.is_anonymous ? "pointer" : "default",
+                                                            "&:hover": !visitor.is_anonymous ? {
+                                                                backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                                            } : {},
+                                                            transition: "background-color 0.2s",
+                                                        }}
+                                                    >
+                                                        <ListItemAvatar>
+                                                            <Avatar
+                                                                src={visitor.avatar_url || ""}
+                                                                sx={{ width: 40, height: 40, bgcolor: "primary.main" }}
+                                                            >
+                                                                {visitor.avatar_url ? null : (visitor.full_name || visitor.username || "?").slice(0, 1).toUpperCase()}
+                                                            </Avatar>
+                                                        </ListItemAvatar>
+                                                        <ListItemText
+                                                            primary={
+                                                                <Stack direction="row" alignItems="center" gap={0.5}>
+                                                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                                        {visitor.is_anonymous ? "Someone" : `${visitor.first_name || ""} ${visitor.last_name || ""}`.trim() || visitor.full_name || visitor.username}
+                                                                    </Typography>
+                                                                    {!visitor.is_anonymous && isVerifiedStatus(visitor.kyc_status || visitor.profile?.kyc_status) && (
+                                                                        <Tooltip title="Verified Member">
+                                                                            <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 16 }} />
+                                                                        </Tooltip>
+                                                                    )}
+                                                                </Stack>
+                                                            }
+                                                            secondary={
+                                                                <Stack spacing={0.5}>
+                                                                    {!visitor.is_anonymous && (
+                                                                        <>
+                                                                            {visitor.headline && (
+                                                                                <Typography variant="caption" color="text.secondary">
+                                                                                    {visitor.headline}
+                                                                                </Typography>
+                                                                            )}
+                                                                            {visitor.company && (
+                                                                                <Typography variant="caption" color="text.secondary">
+                                                                                    {visitor.company}
+                                                                                </Typography>
+                                                                            )}
+                                                                        </>
+                                                                    )}
+                                                                    {visitor.country && (
+                                                                        <Typography variant="caption" color="text.secondary">
+                                                                            📍 {visitor.country}
+                                                                        </Typography>
+                                                                    )}
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        {new Date(visitor.viewed_at).toLocaleDateString()} {new Date(visitor.viewed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                                    </Typography>
+                                                                </Stack>
+                                                            }
+                                                            secondaryTypographyProps={{ component: 'div' }}
+                                                        />
+                                                    </ListItem>
+                                                ))}
+                                            </List>
                                         )}
                                     </>
                                 )}
