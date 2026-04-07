@@ -1490,21 +1490,37 @@ export default function EventDetailsPage() {
                                 // After approval, check if user can join with guest token or is registered
                                 const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
                                 if (guestToken) {
-                                  // Guest has JWT token - can join immediately
-                                  return (
-                                    <Button
-                                      onClick={() => navigate(`/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=audience`)}
-                                      variant="contained"
-                                      sx={{
-                                        textTransform: "none",
-                                        backgroundColor: "#10b8a6",
-                                        "&:hover": { backgroundColor: "#0ea5a4" },
-                                      }}
-                                      className="rounded-xl"
-                                    >
-                                      Join Live
-                                    </Button>
-                                  );
+                                  // Guest has JWT token - can join only if event is live
+                                  if (isLive) {
+                                    return (
+                                      <Button
+                                        onClick={() => navigate(`/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=audience`)}
+                                        variant="contained"
+                                        sx={{
+                                          textTransform: "none",
+                                          backgroundColor: "#10b8a6",
+                                          "&:hover": { backgroundColor: "#0ea5a4" },
+                                        }}
+                                        className="rounded-xl"
+                                      >
+                                        Join Live
+                                      </Button>
+                                    );
+                                  } else {
+                                    // Event not live yet
+                                    return (
+                                      <Chip
+                                        label="Waiting for Event to Go Live"
+                                        variant="outlined"
+                                        sx={{
+                                          py: 2.5,
+                                          borderColor: "#10b8a6",
+                                          color: "#10b8a6",
+                                          fontWeight: 500
+                                        }}
+                                      />
+                                    );
+                                  }
                                 } else if (registration) {
                                   // Registered user
                                   return (

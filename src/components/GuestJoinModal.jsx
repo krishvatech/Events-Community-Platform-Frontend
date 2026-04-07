@@ -218,7 +218,7 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
       }
 
       // Store guest session in localStorage
-      localStorage.setItem("access_token", data.token);
+      localStorage.setItem("guest_token", data.token);
       localStorage.setItem("is_guest", "true");
       localStorage.setItem("guest_email", data.email);
       localStorage.setItem("guest_name", data.name);

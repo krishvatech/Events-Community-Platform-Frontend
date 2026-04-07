@@ -1088,22 +1088,37 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       // After approval, check if user can join with guest token or is registered
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
                       if (guestToken) {
-                        // Guest has JWT token - can join immediately
-                        return (
-                          <Button
-                            onClick={() => navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`)}
-                            variant="contained"
-                            size="medium"
-                            sx={{
-                              textTransform: "none",
-                              backgroundColor: "#10b8a6",
-                              "&:hover": { backgroundColor: "#0ea5a4" },
-                            }}
-                            className="rounded-full"
-                          >
-                            Join Live
-                          </Button>
-                        );
+                        // Guest has JWT token - can join only if event is live
+                        if (isLive) {
+                          return (
+                            <Button
+                              onClick={() => navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`)}
+                              variant="contained"
+                              size="medium"
+                              sx={{
+                                textTransform: "none",
+                                backgroundColor: "#10b8a6",
+                                "&:hover": { backgroundColor: "#0ea5a4" },
+                              }}
+                              className="rounded-full"
+                            >
+                              Join Live
+                            </Button>
+                          );
+                        } else {
+                          // Event not live yet, show "Waiting for Event" message
+                          return (
+                            <Chip
+                              label="Waiting for Event to Go Live"
+                              sx={{
+                                borderColor: "#10b8a6",
+                                color: "#10b8a6",
+                                fontWeight: 500
+                              }}
+                              variant="outlined"
+                            />
+                          );
+                        }
                       } else if (myRegistrations?.[ev.id]) {
                         // User is registered
                         return (
@@ -1637,21 +1652,25 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     ) : myApplication.status === 'approved' ? (() => {
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
                       if (guestToken) {
-                        return (
-                          <Button
-                            onClick={() => navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`)}
-                            variant="contained"
-                            size="medium"
-                            sx={{
-                              textTransform: "none",
-                              backgroundColor: "#10b8a6",
-                              "&:hover": { backgroundColor: "#0ea5a4" },
-                            }}
-                            className="rounded-full"
-                          >
-                            Join Live
-                          </Button>
-                        );
+                        if (isLive) {
+                          return (
+                            <Button
+                              onClick={() => navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`)}
+                              variant="contained"
+                              size="medium"
+                              sx={{
+                                textTransform: "none",
+                                backgroundColor: "#10b8a6",
+                                "&:hover": { backgroundColor: "#0ea5a4" },
+                              }}
+                              className="rounded-full"
+                            >
+                              Join Live
+                            </Button>
+                          );
+                        } else {
+                          return <Chip label="Waiting for Event to Go Live" color="warning" variant="outlined" />;
+                        }
                       } else if (myRegistrations?.[ev.id]) {
                         return <Chip label="Registered" color="success" variant="outlined" />;
                       } else {

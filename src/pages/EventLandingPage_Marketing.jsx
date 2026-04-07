@@ -138,26 +138,42 @@ function ApplyStatusDisplay({ status, eventData, onJoinClick, style, buttonSize 
   // After approval - show Join Live button if guest_token exists
   if (status === 'approved') {
     if (guestToken && eventData?.slug) {
-      // User can join immediately with guest token
-      return (
-        <button
-          onClick={onJoinClick}
-          style={{
-            fontSize: buttonSize === 'small' ? 13 : 14,
-            fontWeight: 700,
-            color: C.white,
-            background: '#22c55e',
+      // Check if event is live before showing Join Live button
+      const isLive = eventData?.is_live || eventData?.status === 'live';
+
+      if (isLive) {
+        // User can join immediately with guest token
+        return (
+          <button
+            onClick={onJoinClick}
+            style={{
+              fontSize: buttonSize === 'small' ? 13 : 14,
+              fontWeight: 700,
+              color: C.white,
+              background: '#22c55e',
+              padding: buttonSize === 'small' ? '6px 16px' : '12px 24px',
+              border: 'none',
+              borderRadius: 3,
+              cursor: 'pointer',
+              fontFamily: "'Roboto', Arial, sans-serif",
+              ...style
+            }}
+          >
+            Join Live
+          </button>
+        );
+      } else {
+        // Event not live yet
+        return (
+          <span style={{
+            fontSize: buttonSize === 'small' ? 13 : 14, fontWeight: 700, color: '#F97316',
+            border: '1px solid #F97316', borderRadius: 3,
             padding: buttonSize === 'small' ? '6px 16px' : '12px 24px',
-            border: 'none',
-            borderRadius: 3,
-            cursor: 'pointer',
             fontFamily: "'Roboto', Arial, sans-serif",
             ...style
-          }}
-        >
-          Join Live
-        </button>
-      );
+          }}>Waiting for Event to Go Live</span>
+        );
+      }
     } else {
       // Approved but waiting for guest token or event data
       return (
