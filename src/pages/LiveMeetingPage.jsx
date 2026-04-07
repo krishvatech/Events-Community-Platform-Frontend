@@ -201,6 +201,7 @@ const SPOTLIGHT_INVITE_WARNING_SECONDS = 5;
 const SUPPORT_TAB_INDEX = 4;
 const QNA_HOT_GRAVITY = 1.5;        // time decay exponent for hot score
 const QNA_FLAME_THRESHOLD = 0.5;    // hot score above this → show 🔥 trending
+const QNA_DISPLAY_BROADCAST_TYPE = "qna-display-state";
 
 function getToken() {
   // Prioritize guest_token if available (for approved applications joining as guests)
@@ -233,6 +234,12 @@ function toApiUrl(pathOrUrl) {
     const rel = String(pathOrUrl).replace(/^\/+/, "");
     return `${API_ROOT}/${rel.replace(/^api\/+/, "")}`;
   }
+}
+
+function resolveMediaUrl(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  return toApiUrl(url);
 }
 
 function getMyUserIdFromJwt() {
@@ -10607,6 +10614,26 @@ export default function NewLiveMeeting() {
         setMoodMap((prev) => ({ ...prev, [payload.userKey]: payload?.mood || null }));
       }
 
+      if (type === QNA_DISPLAY_BROADCAST_TYPE) {
+        if (payload?.visible === false || !payload?.question_id) {
+          setDisplayedQuestion(null);
+        } else {
+          setDisplayedQuestion({
+            visible: true,
+            question_id: payload.question_id,
+            content: payload.content || "",
+            asked_by: payload.asked_by || "Audience",
+            user_id: payload.user_id ?? null,
+            user_avatar_url: payload.user_avatar_url || "",
+            is_anonymous: Boolean(payload.is_anonymous),
+            upvote_count: payload.upvote_count ?? 0,
+            created_at: payload.created_at || null,
+            lounge_table_id: payload.lounge_table_id ?? null,
+            is_answered: Boolean(payload.is_answered),
+          });
+        }
+      }
+
       // ✅ Handle guest profile update broadcast
       if (type === "guest_profile_updated" && payload?.participant_id) {
         // Find the participant and update their name
@@ -14507,12 +14534,15 @@ export default function NewLiveMeeting() {
               content: msg.content,
               user_id: msg.user_id,
               user_name: msg.user,
+              user_avatar_url: msg.user_avatar_url || "",
               event_id: msg.event_id,
               upvote_count: msg.upvote_count ?? 0,
               user_upvoted: false,
               upvoters: msg.upvoters ?? [],
               lounge_table_id: msg.lounge_table_id, // Store it
               created_at: msg.created_at,
+              is_anonymous: Boolean(msg.is_anonymous),
+              display_order: msg.display_order ?? 0,
             };
             return [newQ, ...prev];
           });
@@ -14530,6 +14560,9 @@ export default function NewLiveMeeting() {
 
         if (msg.type === "qna.delete") {
           setQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
+          setDisplayedQuestion((prev) => (
+            prev?.question_id === msg.question_id ? null : prev
+          ));
         }
 
         if (msg.type === "qna.visibility_change") {
@@ -14555,6 +14588,7 @@ export default function NewLiveMeeting() {
               content: msg.content,
               user_id: msg.user_id,
               user_name: msg.user_name,
+              user_avatar_url: msg.user_avatar_url || "",
               event_id: msg.event_id,
               upvote_count: msg.upvote_count ?? 0,
               user_upvoted: false,
@@ -14942,6 +14976,153 @@ export default function NewLiveMeeting() {
 
     return { pinned, unpinned };
   }, [questions, isHost, qnaSortMode, qnaHotScore]);
+
+  const [displayedQuestion, setDisplayedQuestion] = useState(null);
+
+  const qnaStageQueue = useMemo(
+    () => [...qaSorted.pinned, ...qaSorted.unpinned].filter((q) => q && !q.is_hidden),
+    [qaSorted]
+  );
+
+  const resolveQuestionDisplayMeta = useCallback((question) => {
+    if (!question) {
+      return {
+        askedBy: "Audience",
+        avatarUrl: "",
+        userId: null,
+        isAnonymous: false,
+      };
+    }
+
+    let qUserId = question.user_id ?? question.user?.id ?? question.user ?? null;
+    if (typeof qUserId === "object" && qUserId) qUserId = qUserId.id ?? null;
+
+    const self = dyteMeeting?.self;
+    const selfCsid = self?.clientSpecificId || self?.customParticipantId || null;
+    const selfUserId = myUserIdRef.current || getMyUserIdFromJwt() || null;
+    const isSelfQuestion =
+      (selfCsid && qUserId != null && String(selfCsid) === String(qUserId)) ||
+      (selfUserId && qUserId != null && String(selfUserId) === String(qUserId));
+
+    const matchedParticipant = participants.find((p) => {
+      const raw = p?._raw || {};
+      const candidateIds = [
+        raw?.customParticipantId,
+        raw?.clientSpecificId,
+        raw?.client_specific_id,
+        raw?.userId,
+        raw?.user_id,
+        p?.userId,
+        p?.id,
+      ].filter((value) => value != null && value !== "");
+      return qUserId != null && candidateIds.some((value) => String(value) === String(qUserId));
+    });
+
+    const askedBy = (question.is_anonymous && !isSelfQuestion)
+      ? "Anonymous"
+      : isSelfQuestion
+        ? (question.is_anonymous ? "You (anonymous)" : "You")
+        : question.user_name ||
+          question.user_display ||
+          question.user ||
+          question.user?.name ||
+          matchedParticipant?.name ||
+          (qUserId ? `User ${qUserId}` : "Audience");
+
+    const avatarUrl = resolveMediaUrl(
+      question.user_avatar_url ||
+      matchedParticipant?.picture ||
+      matchedParticipant?.avatar_url ||
+      matchedParticipant?.user_image_url ||
+      matchedParticipant?.user_image ||
+      matchedParticipant?.avatar ||
+      ""
+    );
+
+    return {
+      askedBy,
+      avatarUrl,
+      userId: qUserId,
+      isAnonymous: Boolean(question.is_anonymous && !isSelfQuestion),
+    };
+  }, [dyteMeeting?.self, participants]);
+
+  const buildDisplayedQuestionPayload = useCallback((question) => {
+    if (!question) return null;
+
+    const meta = resolveQuestionDisplayMeta(question);
+    return {
+      question_id: question.id,
+      content: question.content,
+      asked_by: meta.askedBy,
+      user_id: meta.userId,
+      user_avatar_url: meta.avatarUrl,
+      is_anonymous: meta.isAnonymous,
+      upvote_count: question.upvote_count ?? 0,
+      created_at: question.created_at || null,
+      lounge_table_id: question.lounge_table_id ?? null,
+      is_answered: Boolean(question.is_answered),
+    };
+  }, [resolveQuestionDisplayMeta]);
+
+  const broadcastDisplayedQuestionState = useCallback((payload) => {
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.(QNA_DISPLAY_BROADCAST_TYPE, payload);
+    } catch (e) {
+      console.warn("[Q&A] Failed to broadcast displayed question state:", e);
+    }
+  }, [dyteMeeting]);
+
+  const handleDisplayQuestionOnScreen = useCallback((question, options = {}) => {
+    const payload = buildDisplayedQuestionPayload(question);
+    if (!payload) return;
+
+    const nextState = { ...payload, visible: true };
+    setDisplayedQuestion(nextState);
+    broadcastDisplayedQuestionState(nextState);
+
+    if (!options.silent) {
+      showSnackbar(`Showing question from ${payload.asked_by} on the main screen.`, "success");
+    }
+  }, [broadcastDisplayedQuestionState, buildDisplayedQuestionPayload, showSnackbar]);
+
+  const handleDismissDisplayedQuestion = useCallback((options = {}) => {
+    setDisplayedQuestion(null);
+    broadcastDisplayedQuestionState({ visible: false, question_id: null });
+
+    if (!options.silent) {
+      showSnackbar("Question removed from the main screen.", "info");
+    }
+  }, [broadcastDisplayedQuestionState, showSnackbar]);
+
+  const handleShowNextDisplayedQuestion = useCallback(() => {
+    if (qnaStageQueue.length === 0) {
+      showSnackbar("There are no questions available to display.", "info");
+      return;
+    }
+
+    const currentQuestionId = displayedQuestion?.question_id;
+    const currentIdx = qnaStageQueue.findIndex((q) => q.id === currentQuestionId);
+    const nextQuestion = currentIdx >= 0
+      ? qnaStageQueue[(currentIdx + 1) % qnaStageQueue.length]
+      : qnaStageQueue[0];
+
+    handleDisplayQuestionOnScreen(nextQuestion, { silent: true });
+    showSnackbar(`Now showing the next question from ${resolveQuestionDisplayMeta(nextQuestion).askedBy}.`, "success");
+  }, [displayedQuestion?.question_id, handleDisplayQuestionOnScreen, qnaStageQueue, resolveQuestionDisplayMeta, showSnackbar]);
+
+  useEffect(() => {
+    if (!displayedQuestion?.question_id) return;
+
+    const freshQuestion = questions.find((q) => q.id === displayedQuestion.question_id);
+    if (!freshQuestion) return;
+
+    const freshPayload = buildDisplayedQuestionPayload(freshQuestion);
+    setDisplayedQuestion((prev) => {
+      if (!prev || prev.question_id !== freshPayload?.question_id) return prev;
+      return { ...prev, ...freshPayload, visible: true };
+    });
+  }, [buildDisplayedQuestionPayload, displayedQuestion?.question_id, questions]);
 
   const polls = useMemo(
     () => [
@@ -16294,25 +16475,14 @@ export default function NewLiveMeeting() {
 
                           const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
 
-                          const askedBy = (q.is_anonymous && !isSelfQuestion)
-                            ? "Anonymous"
-                            : isSelfQuestion
-                              ? (q.is_anonymous ? "You (anonymous)" : "You")
-                              : q.user_name ||
-                              q.user_display ||
-                              q.user ||
-                              q.user?.name ||
-                              participants.find((p) => {
-                                const raw = p?._raw || {};
-                                const csid = raw.clientSpecificId ?? raw.client_specific_id;
-                                return csid != null && String(csid) === String(q.user_id);
-                              })?.name ||
-                              (q.user_id ? `User ${q.user_id}` : "Audience");
+                          const questionDisplayMeta = resolveQuestionDisplayMeta(q);
+                          const askedBy = questionDisplayMeta.askedBy;
 
                           const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
 
                           const canManage = isHost || isSelfQuestion;
                           const isEditing = qnaEditingId === q.id;
+                          const isDisplayedOnScreen = displayedQuestion?.question_id === q.id && displayedQuestion?.visible !== false;
 
                           return (
                             <>
@@ -16553,6 +16723,23 @@ export default function NewLiveMeeting() {
                                               </span>
                                             </Tooltip>
                                           </>
+                                        )}
+                                        {isHost && (
+                                          <Tooltip title={isDisplayedOnScreen ? "Question is live on the main screen" : "Show on the main screen"}>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => handleDisplayQuestionOnScreen(q)}
+                                              sx={{
+                                                color: isDisplayedOnScreen ? "#38bdf8" : "rgba(255,255,255,0.45)",
+                                                p: 0.5,
+                                                "&:hover": {
+                                                  color: "#7dd3fc",
+                                                }
+                                              }}
+                                            >
+                                              <AnnouncementIcon sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                          </Tooltip>
                                         )}
                                         <IconButton
                                           size="small"
@@ -19126,6 +19313,135 @@ export default function NewLiveMeeting() {
                         {isStageContentFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
                       </IconButton>
                     </Tooltip>
+                  </Box>
+                )}
+
+                {displayedQuestion?.visible !== false && displayedQuestion?.question_id && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      left: { xs: 12, sm: 20 },
+                      right: { xs: 12, sm: 20 },
+                      bottom: { xs: 12, sm: 20 },
+                      zIndex: 4,
+                      display: "flex",
+                      justifyContent: "center",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <Paper
+                      elevation={10}
+                      sx={{
+                        width: "100%",
+                        maxWidth: 920,
+                        borderRadius: 3,
+                        px: { xs: 1.5, sm: 2 },
+                        py: { xs: 1.25, sm: 1.5 },
+                        background: "linear-gradient(135deg, rgba(2,6,23,0.92) 0%, rgba(15,23,42,0.94) 55%, rgba(8,47,73,0.92) 100%)",
+                        border: "1px solid rgba(125,211,252,0.26)",
+                        boxShadow: "0 24px 80px rgba(0,0,0,0.42)",
+                        backdropFilter: "blur(18px)",
+                        pointerEvents: "auto",
+                      }}
+                    >
+                      <Stack spacing={1.2}>
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1.25}
+                          alignItems={{ xs: "flex-start", sm: "center" }}
+                          justifyContent="space-between"
+                        >
+                          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+                            <Avatar
+                              src={displayedQuestion.user_avatar_url || ""}
+                              sx={{
+                                width: 48,
+                                height: 48,
+                                bgcolor: "rgba(255,255,255,0.12)",
+                                border: "1px solid rgba(255,255,255,0.18)",
+                              }}
+                            >
+                              {initialsFromName(displayedQuestion.asked_by || "Audience")}
+                            </Avatar>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: "wrap" }}>
+                                <Chip
+                                  size="small"
+                                  label="On Screen"
+                                  sx={{
+                                    bgcolor: "rgba(56,189,248,0.16)",
+                                    border: "1px solid rgba(56,189,248,0.34)",
+                                    color: "#7dd3fc",
+                                    fontWeight: 800,
+                                  }}
+                                />
+                                {displayedQuestion.is_answered && (
+                                  <Chip
+                                    size="small"
+                                    label="Answered"
+                                    sx={{
+                                      bgcolor: "rgba(34,197,94,0.14)",
+                                      border: "1px solid rgba(34,197,94,0.32)",
+                                      color: "#4ade80",
+                                      fontWeight: 700,
+                                    }}
+                                  />
+                                )}
+                              </Stack>
+                              <Typography sx={{ mt: 0.75, fontWeight: 800, fontSize: { xs: 14, sm: 16 } }}>
+                                {displayedQuestion.asked_by || "Audience"}
+                              </Typography>
+                              <Typography sx={{ opacity: 0.68, fontSize: 12 }}>
+                                Question from the audience
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          {isHost && (
+                            <Stack direction="row" spacing={1} sx={{ pointerEvents: "auto" }}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleDismissDisplayedQuestion()}
+                                sx={{
+                                  textTransform: "none",
+                                  borderColor: "rgba(255,255,255,0.2)",
+                                  color: "#fff",
+                                }}
+                              >
+                                Dismiss
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                onClick={handleShowNextDisplayedQuestion}
+                                sx={{
+                                  textTransform: "none",
+                                  bgcolor: "#0ea5e9",
+                                  "&:hover": { bgcolor: "#0284c7" },
+                                }}
+                              >
+                                Next
+                              </Button>
+                            </Stack>
+                          )}
+                        </Stack>
+
+                        <Typography
+                          sx={{
+                            fontSize: { xs: 17, sm: 24, md: 28 },
+                            lineHeight: 1.35,
+                            fontWeight: 800,
+                            letterSpacing: "-0.01em",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            textShadow: "0 10px 32px rgba(0,0,0,0.36)",
+                          }}
+                        >
+                          {displayedQuestion.content}
+                        </Typography>
+                      </Stack>
+                    </Paper>
                   </Box>
                 )}
 
