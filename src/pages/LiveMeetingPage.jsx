@@ -76,6 +76,7 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import AnnouncementIcon from "@mui/icons-material/Announcement"; // ✅ NEW for waiting room announcements
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
+import CheckIcon from "@mui/icons-material/Check"; // <--- ADDED for moderation approve button
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded"; // <--- ADDED for KYC verified badge
 import ShuffleIcon from "@mui/icons-material/Shuffle"; // Keep this if used elsewhere
 import Diversity3Icon from "@mui/icons-material/Diversity3"; // New icon for Networking
@@ -6248,6 +6249,9 @@ export default function NewLiveMeeting() {
         if (res.ok) {
           const data = await res.json();
           setEventData(data); // ✅ Store full event data for access to images and timezone
+          if (data?.qna_moderation_enabled !== undefined) {
+            setQnaModerationEnabled(data.qna_moderation_enabled);
+          }
           if (data?.status) setDbStatus(data.status);
           if (data?.title) setEventTitle(data.title);
           if (data?.waiting_room_enabled === false) {
@@ -14340,6 +14344,11 @@ export default function NewLiveMeeting() {
   // Delete confirmation
   const [qnaDeleteId, setQnaDeleteId] = useState(null);
 
+  // Moderation state
+  const [qnaModerationEnabled, setQnaModerationEnabled] = useState(false);
+  const [pendingQuestions, setPendingQuestions] = useState([]);
+  const [focusedPendingIdx, setFocusedPendingIdx] = useState(0);
+
   const loadQuestions = useCallback(async (opts = {}) => {
     if (!eventId) return;
     const { silent = false } = opts;
@@ -14435,6 +14444,28 @@ export default function NewLiveMeeting() {
         }
 
         if (msg.type === "qna.question") {
+          // Handle pending questions (when moderation is enabled)
+          if (msg.moderation_status === "pending") {
+            if (isHostRef.current) {
+              // Host sees pending questions in queue
+              setPendingQuestions((prev) => {
+                if (prev.some((q) => q.id === msg.question_id)) return prev;
+                return [
+                  {
+                    id: msg.question_id,
+                    content: msg.content,
+                    user_name: msg.user,
+                    created_at: msg.created_at,
+                  },
+                  ...prev,
+                ];
+              });
+            }
+            // Attendees don't see pending questions at all
+            return;
+          }
+
+          // Handle approved questions (normal flow)
           const senderId = String(msg.user_id ?? msg.uid ?? "");
           const meId = String(myUserIdRef.current || "");
           // Check if this new question belongs to the current view
@@ -14498,11 +14529,70 @@ export default function NewLiveMeeting() {
           );
         }
 
+        if (msg.type === "qna.approved") {
+          // Remove from pending queue
+          setPendingQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
+          // Add to main questions list
+          setQuestions((prev) => {
+            if (prev.some((q) => q.id === msg.question_id)) return prev;
+            const newQ = {
+              id: msg.question_id,
+              content: msg.content,
+              user_id: msg.user_id,
+              user_name: msg.user_name,
+              event_id: msg.event_id,
+              upvote_count: msg.upvote_count ?? 0,
+              user_upvoted: false,
+              upvoters: [],
+              created_at: msg.created_at,
+            };
+            return [newQ, ...prev];
+          });
+        }
+
+        if (msg.type === "qna.rejected") {
+          // Remove from pending queue (only host cares about this)
+          setPendingQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
+        }
+
       } catch { }
     };
 
     return () => ws.close();
   }, [tab, isPanelOpen, eventId, activeTableId, isGuest]); // Re-connect when activeTableId changes
+
+  // Keyboard shortcuts for moderation panel (A=approve, R=reject, arrows=navigate)
+  useEffect(() => {
+    if (tab !== 1 || !isHost || !qnaModerationEnabled || pendingQuestions.length === 0) return;
+
+    const onKeyDown = (e) => {
+      const target = e.target;
+      // Don't fire when typing in an input/textarea
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+
+      if (e.key === "a" || e.key === "A") {
+        e.preventDefault();
+        const questionId = pendingQuestions[focusedPendingIdx]?.id;
+        if (questionId) approveQuestion(questionId);
+      }
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        const questionId = pendingQuestions[focusedPendingIdx]?.id;
+        if (questionId) rejectQuestion(questionId);
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedPendingIdx((i) => Math.min(i + 1, pendingQuestions.length - 1));
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedPendingIdx((i) => Math.max(i - 1, 0));
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [tab, isHost, qnaModerationEnabled, pendingQuestions, focusedPendingIdx]);
 
   const submitQuestion = async () => {
     const content = newQuestion.trim();
@@ -14591,6 +14681,51 @@ export default function NewLiveMeeting() {
       }
     } catch (e) {
       setQnaError(e.message || "Failed to update vote.");
+    }
+  };
+
+  const approveQuestion = async (questionId) => {
+    setQnaError("");
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${questionId}/approve/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) throw new Error("Failed to approve question");
+      // State updates via WebSocket broadcast (qna.approved)
+    } catch (e) {
+      setQnaError("Failed to approve: " + (e.message || "Unknown error"));
+    }
+  };
+
+  const rejectQuestion = async (questionId, reason = "") => {
+    setQnaError("");
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${questionId}/reject/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) throw new Error("Failed to reject question");
+      // State updates via WebSocket broadcast (qna.rejected)
+    } catch (e) {
+      setQnaError("Failed to reject: " + (e.message || "Unknown error"));
+    }
+  };
+
+  const handleToggleQnaModeration = async () => {
+    const newVal = !qnaModerationEnabled;
+    setQnaModerationEnabled(newVal);
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ qna_moderation_enabled: newVal }),
+      });
+      if (!res.ok) throw new Error("Failed to update moderation setting");
+    } catch (e) {
+      setQnaError("Failed to toggle moderation: " + (e.message || "Unknown error"));
+      setQnaModerationEnabled(!newVal); // Revert on error
     }
   };
 
@@ -15822,6 +15957,98 @@ export default function NewLiveMeeting() {
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
               <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                  {/* Moderation Control (Host Only) */}
+                  {isHost && (
+                    <Box sx={{ px: 2, py: 1, borderBottom: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography variant="caption" color="text.secondary">Pre-approval</Typography>
+                      <Switch
+                        size="small"
+                        checked={qnaModerationEnabled}
+                        onChange={handleToggleQnaModeration}
+                        color="warning"
+                      />
+                      {qnaModerationEnabled && (
+                        <Chip label="Moderation ON" size="small" color="warning" variant="outlined" />
+                      )}
+                    </Box>
+                  )}
+
+                  {/* Pending Review Queue (Host Only) */}
+                  {isHost && qnaModerationEnabled && pendingQuestions.length > 0 && (
+                    <Box sx={{ borderBottom: "1px solid rgba(255,165,0,0.3)", mb: 1 }}>
+                      <Typography variant="caption" sx={{ px: 2, color: "warning.main", display: "block", py: 1 }}>
+                        Pending Review ({pendingQuestions.length}) — A=Approve R=Reject ↑↓=Navigate
+                      </Typography>
+                      {pendingQuestions.map((q, idx) => (
+                        <Paper
+                          key={q.id}
+                          variant="outlined"
+                          onClick={() => setFocusedPendingIdx(idx)}
+                          onTouchStart={(e) => {
+                            e.currentTarget._touchStartX = e.touches[0].clientX;
+                          }}
+                          onTouchEnd={(e) => {
+                            const diff = e.changedTouches[0].clientX - (e.currentTarget._touchStartX || 0);
+                            if (diff > 80) approveQuestion(q.id);      // Swipe right = approve
+                            if (diff < -80) rejectQuestion(q.id);       // Swipe left = reject
+                          }}
+                          sx={{
+                            p: 1,
+                            mx: 1,
+                            mb: 0.5,
+                            bgcolor: "rgba(255,165,0,0.08)",
+                            borderColor: focusedPendingIdx === idx ? "warning.main" : "rgba(255,165,0,0.2)",
+                            borderWidth: focusedPendingIdx === idx ? 2 : 1,
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 1,
+                            "&:hover": {
+                              bgcolor: "rgba(255,165,0,0.12)",
+                              borderColor: "warning.main",
+                            },
+                          }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Chip label="PENDING" size="small" color="warning" variant="filled" sx={{ mb: 0.5 }} />
+                            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                              {q.content}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {q.user_name} • {new Date(q.created_at).toLocaleTimeString()}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
+                            <IconButton
+                              size="small"
+                              color="success"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                approveQuestion(q.id);
+                              }}
+                              title="Approve (A)"
+                            >
+                              <CheckIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                rejectQuestion(q.id);
+                              }}
+                              title="Reject (R)"
+                            >
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Paper>
+                      ))}
+                    </Box>
+                  )}
+
                   {/* Q&A Messages Area */}
                   <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
                     {qnaError && (
@@ -17219,7 +17446,14 @@ export default function NewLiveMeeting() {
             transition: "all 0.2s",
           }}
         >
-          <Badge variant="dot" color="error" invisible={!(qnaUnreadCount > 0 && !isQnaActive)}>
+          <Badge
+            variant="dot"
+            color="error"
+            invisible={!(
+              (qnaUnreadCount > 0 && !isQnaActive) ||
+              (isHost && pendingQuestions.length > 0)
+            )}
+          >
             <QuestionAnswerIcon />
           </Badge>
         </IconButton>
@@ -19137,7 +19371,10 @@ export default function NewLiveMeeting() {
                         variant="dot"
                         color="error"
                         overlap="circular"
-                        invisible={!(qnaUnreadCount > 0 && !isQnaActive)}
+                        invisible={!(
+                          (qnaUnreadCount > 0 && !isQnaActive) ||
+                          (isHost && pendingQuestions.length > 0)
+                        )}
                         anchorOrigin={{ vertical: "top", horizontal: "right" }}
                       >
                         <QuestionAnswerIcon />
