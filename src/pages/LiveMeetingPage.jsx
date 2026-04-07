@@ -87,6 +87,8 @@ import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
+import PushPinIcon from "@mui/icons-material/PushPin"; // <--- ADDED for pinned questions
+import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined"; // <--- ADDED for pin toggle
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import FileCopyIcon from "@mui/icons-material/FileCopy";
 
@@ -14573,6 +14575,27 @@ export default function NewLiveMeeting() {
           );
         }
 
+        if (msg.type === "qna.pinned") {
+          // Update question with pinned status and handle auto-unpin
+          setQuestions((prev) =>
+            prev.map((q) => {
+              if (q.id === msg.question_id)
+                return {
+                  ...q,
+                  is_pinned: msg.is_pinned,
+                  pinned_at: msg.pinned_at,
+                };
+              if (msg.unpinned_question_id && q.id === msg.unpinned_question_id)
+                return {
+                  ...q,
+                  is_pinned: false,
+                  pinned_at: null,
+                };
+              return q;
+            })
+          );
+        }
+
       } catch { }
     };
 
@@ -14762,6 +14785,20 @@ export default function NewLiveMeeting() {
     }
   };
 
+  const handlePinQuestion = async (questionId) => {
+    setQnaError("");
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${questionId}/pin/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) throw new Error("Failed to pin question");
+      // State updates come via qna.pinned WebSocket broadcast
+    } catch (e) {
+      setQnaError("Failed to pin question: " + (e.message || "Unknown error"));
+    }
+  };
+
   const toggleQuestionVisibility = async (questionId) => {
     setQnaError("");
     try {
@@ -14800,14 +14837,21 @@ export default function NewLiveMeeting() {
       arr = arr.filter((q) => !q.is_hidden);
     }
 
-    // Sort: answered questions to bottom, then by upvotes, then by timestamp
-    arr.sort((a, b) => {
-      // Answered questions go to bottom
-      if (a.is_answered !== b.is_answered) return a.is_answered ? 1 : -1;
-      // Then by upvotes first, then by timestamp
-      return (b.upvote_count ?? 0) - (a.upvote_count ?? 0) || (new Date(b.created_at || 0) - new Date(a.created_at || 0));
-    });
-    return arr;
+    // Split into pinned and unpinned
+    const pinned = arr
+      .filter(q => q.is_pinned)
+      .sort((a, b) => new Date(a.pinned_at || 0) - new Date(b.pinned_at || 0));
+
+    const unpinned = arr
+      .filter(q => !q.is_pinned)
+      .sort((a, b) => {
+        // Answered questions go to bottom
+        if (a.is_answered !== b.is_answered) return a.is_answered ? 1 : -1;
+        // Then by upvotes first, then by timestamp
+        return (b.upvote_count ?? 0) - (a.upvote_count ?? 0) || (new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      });
+
+    return { pinned, unpinned };
   }, [questions, isHost]);
 
   const polls = useMemo(
@@ -16100,11 +16144,23 @@ export default function NewLiveMeeting() {
                       <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
                         <CircularProgress size={22} />
                       </Box>
-                    ) : qaSorted.length === 0 ? (
+                    ) : (qaSorted.pinned.length + qaSorted.unpinned.length) === 0 ? (
                       <Typography sx={{ opacity: 0.75 }}>No questions yet. Be the first to ask!</Typography>
                     ) : (
                       <Stack spacing={1.5}>
-                        {qaSorted.map((q) => {
+                        {/* PINNED SECTION HEADER */}
+                        {qaSorted.pinned.length > 0 && (
+                          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 0.5 }}>
+                            <PushPinIcon sx={{ fontSize: 13, color: "#facc15" }} />
+                            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#facc15" }}>
+                              PINNED ({qaSorted.pinned.length}/3)
+                            </Typography>
+                          </Stack>
+                        )}
+
+                        {/* ALL QUESTIONS - PINNED FIRST, THEN UNPINNED */}
+                        {[...qaSorted.pinned, ...qaSorted.unpinned].map((q, idx) => {
+                          const showUnpinnedDivider = idx === qaSorted.pinned.length && qaSorted.pinned.length > 0 && qaSorted.unpinned.length > 0;
                           const voters = q.upvoters ?? [];
                           const votes = q.upvote_count ?? voters.length;
                           const hasVoted = Boolean(q.user_upvoted);
@@ -16141,7 +16197,11 @@ export default function NewLiveMeeting() {
                           const isEditing = qnaEditingId === q.id;
 
                           return (
-                            <Paper
+                            <>
+                              {showUnpinnedDivider && (
+                                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 1 }} />
+                              )}
+                              <Paper
                               key={q.id}
                               variant="outlined"
                               sx={{
@@ -16151,11 +16211,13 @@ export default function NewLiveMeeting() {
                                   : q.is_hidden
                                     ? "rgba(251, 191, 36, 0.08)"
                                     : "rgba(255,255,255,0.03)",
-                                borderColor: q.is_answered
-                                  ? "rgba(34,197,94,0.2)"
-                                  : q.is_hidden
-                                    ? "rgba(251, 191, 36, 0.3)"
-                                    : "rgba(255,255,255,0.08)",
+                                borderColor: q.is_pinned
+                                  ? "rgba(250,204,21,0.5)"
+                                  : q.is_answered
+                                    ? "rgba(34,197,94,0.2)"
+                                    : q.is_hidden
+                                      ? "rgba(251, 191, 36, 0.3)"
+                                      : "rgba(255,255,255,0.08)",
                                 borderRadius: 2,
                                 position: "relative",
                                 opacity: q.is_answered ? 0.75 : 1,
@@ -16329,6 +16391,23 @@ export default function NewLiveMeeting() {
                                           <EditRoundedIcon sx={{ fontSize: 16 }} />
                                         </IconButton>
                                         {isHost && (
+                                          <Tooltip title={q.is_pinned ? "Unpin question" : "Pin question"}>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => handlePinQuestion(q.id)}
+                                              sx={{
+                                                color: q.is_pinned ? "#facc15" : "rgba(255,255,255,0.4)",
+                                                p: 0.5,
+                                                "&:hover": {
+                                                  color: q.is_pinned ? "#facc15" : "rgba(255,255,255,0.9)"
+                                                }
+                                              }}
+                                            >
+                                              {q.is_pinned ? <PushPinIcon sx={{ fontSize: 16 }} /> : <PushPinOutlinedIcon sx={{ fontSize: 16 }} />}
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
+                                        {isHost && (
                                           <Tooltip title={q.is_hidden ? "Unhide Question" : "Hide Question"}>
                                             <IconButton
                                               size="small"
@@ -16392,6 +16471,7 @@ export default function NewLiveMeeting() {
                                 </>
                               )}
                             </Paper>
+                          </>
                           );
                         })}
                       </Stack>
@@ -16444,7 +16524,7 @@ export default function NewLiveMeeting() {
                       }}
                     />
                   </Box>
-                </Box>
+              </Box>
             </TabPanel>
 
             {/* POLLS (Hidden) */}
