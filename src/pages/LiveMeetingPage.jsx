@@ -114,6 +114,8 @@ import SupportAgentIcon from "@mui/icons-material/SupportAgent";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
@@ -197,6 +199,8 @@ const API_ROOT = (
 const SPOTLIGHT_INVITE_TIMEOUT_MS = 15000;
 const SPOTLIGHT_INVITE_WARNING_SECONDS = 5;
 const SUPPORT_TAB_INDEX = 4;
+const QNA_HOT_GRAVITY = 1.5;        // time decay exponent for hot score
+const QNA_FLAME_THRESHOLD = 0.5;    // hot score above this → show 🔥 trending
 
 function getToken() {
   // Prioritize guest_token if available (for approved applications joining as guests)
@@ -14355,6 +14359,8 @@ export default function NewLiveMeeting() {
   const [qnaModerationEnabled, setQnaModerationEnabled] = useState(false);
   const [qnaAnonymousModeEnabled, setQnaAnonymousModeEnabled] = useState(false);
   const [isAnonymousQuestion, setIsAnonymousQuestion] = useState(false);
+  const [qnaSortMode, setQnaSortMode] = useState("hot");
+  const [qnaReordering, setQnaReordering] = useState(false);
   const [pendingQuestions, setPendingQuestions] = useState([]);
   const [focusedPendingIdx, setFocusedPendingIdx] = useState(0);
 
@@ -14791,6 +14797,11 @@ export default function NewLiveMeeting() {
     }
   };
 
+  const qnaHotScore = useCallback((q) => {
+    const ageHours = (Date.now() - new Date(q.created_at).getTime()) / 3_600_000;
+    return (q.upvote_count ?? 0) / Math.pow(ageHours + 2, QNA_HOT_GRAVITY);
+  }, []);
+
   const handleMarkAnswered = async (questionId, requiresFollowup = false) => {
     setQnaError("");
     try {
@@ -14831,6 +14842,35 @@ export default function NewLiveMeeting() {
       // State updates come via qna.anonymized WebSocket broadcast
     } catch (e) {
       setQnaError("Failed to anonymize question: " + (e.message || "Unknown error"));
+    }
+  };
+
+  const handleMoveQuestion = async (questionId, fromIndex, toIndex, sortedList) => {
+    if (toIndex < 0 || toIndex >= sortedList.length || qnaReordering) return;
+    const previousQuestions = [...questions];
+    setQnaReordering(true);
+
+    const next = [...sortedList];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    const updated = next.map((q, i) => ({ ...q, display_order: i }));
+
+    // Optimistic update
+    setQuestions(prev => prev.map(q => updated.find(u => u.id === q.id) ?? q));
+
+    try {
+      for (const q of updated) {
+        await fetch(toApiUrl(`interactions/questions/${q.id}/reorder/`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ display_order: q.display_order }),
+        });
+      }
+    } catch (e) {
+      setQuestions(previousQuestions);
+      setQnaError("Failed to reorder questions.");
+    } finally {
+      setQnaReordering(false);
     }
   };
 
@@ -14877,17 +14917,31 @@ export default function NewLiveMeeting() {
       .filter(q => q.is_pinned)
       .sort((a, b) => new Date(a.pinned_at || 0) - new Date(b.pinned_at || 0));
 
-    const unpinned = arr
-      .filter(q => !q.is_pinned)
-      .sort((a, b) => {
-        // Answered questions go to bottom
+    let unpinned = arr.filter(q => !q.is_pinned);
+
+    // Sort unpinned questions based on sort mode
+    if (qnaSortMode === "newest") {
+      unpinned = unpinned.sort((a, b) => {
         if (a.is_answered !== b.is_answered) return a.is_answered ? 1 : -1;
-        // Then by upvotes first, then by timestamp
-        return (b.upvote_count ?? 0) - (a.upvote_count ?? 0) || (new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
       });
+    } else if (qnaSortMode === "most_voted") {
+      unpinned = unpinned.sort((a, b) => {
+        if (a.is_answered !== b.is_answered) return a.is_answered ? 1 : -1;
+        return (b.upvote_count ?? 0) - (a.upvote_count ?? 0) ||
+               new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
+    } else if (qnaSortMode === "manual") {
+      unpinned = unpinned.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    } else { // "hot" (default)
+      unpinned = unpinned.sort((a, b) => {
+        if (a.is_answered !== b.is_answered) return a.is_answered ? 1 : -1;
+        return qnaHotScore(b) - qnaHotScore(a);
+      });
+    }
 
     return { pinned, unpinned };
-  }, [questions, isHost]);
+  }, [questions, isHost, qnaSortMode, qnaHotScore]);
 
   const polls = useMemo(
     () => [
@@ -16175,6 +16229,33 @@ export default function NewLiveMeeting() {
                       </Typography>
                     )}
 
+                    {/* Sort Tabs */}
+                    <Stack direction="row" spacing={0.5} sx={{ pt: 1, pb: 0.5, flexWrap: "wrap", gap: 0.5 }}>
+                      {[
+                        { key: "hot", label: "🔥 Hot" },
+                        { key: "most_voted", label: "▲ Votes" },
+                        { key: "newest", label: "🕐 New" },
+                        ...(isHost ? [{ key: "manual", label: "⇅ Manual" }] : []),
+                      ].map(({ key, label }) => (
+                        <Chip
+                          key={key}
+                          label={label}
+                          size="small"
+                          clickable
+                          onClick={() => setQnaSortMode(key)}
+                          variant={qnaSortMode === key ? "filled" : "outlined"}
+                          sx={{
+                            fontSize: 11,
+                            height: 22,
+                            bgcolor: qnaSortMode === key ? "rgba(255,255,255,0.15)" : "transparent",
+                            borderColor: "rgba(255,255,255,0.2)",
+                            color: "rgba(255,255,255,0.85)",
+                            cursor: "pointer",
+                          }}
+                        />
+                      ))}
+                    </Stack>
+
                     {qnaLoading ? (
                       <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
                         <CircularProgress size={22} />
@@ -16427,10 +16508,52 @@ export default function NewLiveMeeting() {
                                           variant="outlined"
                                         />
                                       )}
+                                      {qnaSortMode === "hot" && qnaHotScore(q) > QNA_FLAME_THRESHOLD && (
+                                        <Chip
+                                          label="🔥 Trending"
+                                          size="small"
+                                          sx={{
+                                            fontSize: 10,
+                                            height: 18,
+                                            bgcolor: "rgba(251,146,60,0.15)",
+                                            color: "#fb923c",
+                                            borderColor: "rgba(251,146,60,0.3)"
+                                          }}
+                                          variant="outlined"
+                                        />
+                                      )}
                                     </Stack>
 
                                     {canManage && (
                                       <Stack direction="row" spacing={0} justifyContent="flex-end">
+                                        {isHost && qnaSortMode === "manual" && !q.is_pinned && (
+                                          <>
+                                            <Tooltip title="Move up">
+                                              <span>
+                                                <IconButton
+                                                  size="small"
+                                                  disabled={qnaReordering || qaSorted.unpinned.indexOf(q) === 0}
+                                                  onClick={() => handleMoveQuestion(q.id, qaSorted.unpinned.indexOf(q), qaSorted.unpinned.indexOf(q) - 1, qaSorted.unpinned)}
+                                                  sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                                >
+                                                  <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+                                                </IconButton>
+                                              </span>
+                                            </Tooltip>
+                                            <Tooltip title="Move down">
+                                              <span>
+                                                <IconButton
+                                                  size="small"
+                                                  disabled={qnaReordering || qaSorted.unpinned.indexOf(q) === qaSorted.unpinned.length - 1}
+                                                  onClick={() => handleMoveQuestion(q.id, qaSorted.unpinned.indexOf(q), qaSorted.unpinned.indexOf(q) + 1, qaSorted.unpinned)}
+                                                  sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                                >
+                                                  <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+                                                </IconButton>
+                                              </span>
+                                            </Tooltip>
+                                          </>
+                                        )}
                                         <IconButton
                                           size="small"
                                           onClick={() => {
