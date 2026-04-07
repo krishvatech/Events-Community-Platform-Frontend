@@ -77,6 +77,8 @@ import AnnouncementIcon from "@mui/icons-material/Announcement"; // ✅ NEW for 
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 import CheckIcon from "@mui/icons-material/Check"; // <--- ADDED for moderation approve button
+import CheckCircleIcon from "@mui/icons-material/CheckCircle"; // <--- ADDED for answered status
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"; // <--- ADDED for answered toggle
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded"; // <--- ADDED for KYC verified badge
 import ShuffleIcon from "@mui/icons-material/Shuffle"; // Keep this if used elsewhere
 import Diversity3Icon from "@mui/icons-material/Diversity3"; // New icon for Networking
@@ -14555,6 +14557,22 @@ export default function NewLiveMeeting() {
           setPendingQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
         }
 
+        if (msg.type === "qna.answered") {
+          // Update question with answered status
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.id === msg.question_id
+                ? {
+                    ...q,
+                    is_answered: msg.is_answered,
+                    answered_at: msg.answered_at,
+                    requires_followup: msg.requires_followup,
+                  }
+                : q
+            )
+          );
+        }
+
       } catch { }
     };
 
@@ -14729,6 +14747,21 @@ export default function NewLiveMeeting() {
     }
   };
 
+  const handleMarkAnswered = async (questionId, requiresFollowup = false) => {
+    setQnaError("");
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${questionId}/mark_answered/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ requires_followup: requiresFollowup }),
+      });
+      if (!res.ok) throw new Error("Failed to mark question as answered");
+      // State updates come via qna.answered WebSocket broadcast
+    } catch (e) {
+      setQnaError("Failed to mark answered: " + (e.message || "Unknown error"));
+    }
+  };
+
   const toggleQuestionVisibility = async (questionId) => {
     setQnaError("");
     try {
@@ -14758,6 +14791,7 @@ export default function NewLiveMeeting() {
 
   // Sort: highest votes on top, then newest
   // Filter: hide hidden questions for non-hosts
+  // Answered questions go to bottom
   const qaSorted = useMemo(() => {
     let arr = [...questions];
 
@@ -14766,8 +14800,13 @@ export default function NewLiveMeeting() {
       arr = arr.filter((q) => !q.is_hidden);
     }
 
-    // Sort by upvotes first, then by timestamp
-    arr.sort((a, b) => (b.upvote_count ?? 0) - (a.upvote_count ?? 0) || (new Date(b.created_at || 0) - new Date(a.created_at || 0)));
+    // Sort: answered questions to bottom, then by upvotes, then by timestamp
+    arr.sort((a, b) => {
+      // Answered questions go to bottom
+      if (a.is_answered !== b.is_answered) return a.is_answered ? 1 : -1;
+      // Then by upvotes first, then by timestamp
+      return (b.upvote_count ?? 0) - (a.upvote_count ?? 0) || (new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    });
     return arr;
   }, [questions, isHost]);
 
@@ -16107,14 +16146,19 @@ export default function NewLiveMeeting() {
                               variant="outlined"
                               sx={{
                                 p: 1.5,
-                                bgcolor: q.is_hidden
-                                  ? "rgba(251, 191, 36, 0.08)"
-                                  : "rgba(255,255,255,0.03)",
-                                borderColor: q.is_hidden
-                                  ? "rgba(251, 191, 36, 0.3)"
-                                  : "rgba(255,255,255,0.08)",
+                                bgcolor: q.is_answered
+                                  ? "rgba(34,197,94,0.05)"
+                                  : q.is_hidden
+                                    ? "rgba(251, 191, 36, 0.08)"
+                                    : "rgba(255,255,255,0.03)",
+                                borderColor: q.is_answered
+                                  ? "rgba(34,197,94,0.2)"
+                                  : q.is_hidden
+                                    ? "rgba(251, 191, 36, 0.3)"
+                                    : "rgba(255,255,255,0.08)",
                                 borderRadius: 2,
                                 position: "relative",
+                                opacity: q.is_answered ? 0.75 : 1,
                                 ...(q.is_hidden && {
                                   "&::before": {
                                     content: '"HIDDEN"',
@@ -16231,17 +16275,49 @@ export default function NewLiveMeeting() {
                                         </Box>
                                       </Tooltip>
 
+                                      {q.is_answered && (
+                                        <Chip
+                                          size="small"
+                                          icon={<CheckCircleIcon sx={{ fontSize: 14, color: "#22c55e" }} />}
+                                          label="ANSWERED"
+                                          sx={{
+                                            bgcolor: "rgba(34,197,94,0.12)",
+                                            border: "1px solid rgba(34,197,94,0.4)",
+                                            color: "#22c55e",
+                                            fontWeight: 700,
+                                            fontSize: 10,
+                                            height: 20
+                                          }}
+                                        />
+                                      )}
+
                                       <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
                                     </Stack>
                                   </Stack>
 
                                   <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{q.content}</Typography>
 
-                                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
-                                    <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                  <Stack direction="column" spacing={0.75} sx={{ mt: 1 }}>
+                                    <Stack direction="row" spacing={0.5} alignItems="center">
+                                      <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                      {q.requires_followup && (
+                                        <Chip
+                                          label="Follow-up"
+                                          size="small"
+                                          icon={<FlagOutlinedIcon />}
+                                          sx={{
+                                            fontSize: 10,
+                                            height: 18,
+                                            color: "#f97316",
+                                            borderColor: "rgba(249,115,22,0.4)"
+                                          }}
+                                          variant="outlined"
+                                        />
+                                      )}
+                                    </Stack>
 
                                     {canManage && (
-                                      <Stack direction="row" spacing={0}>
+                                      <Stack direction="row" spacing={0} justifyContent="flex-end">
                                         <IconButton
                                           size="small"
                                           onClick={() => {
@@ -16266,6 +16342,40 @@ export default function NewLiveMeeting() {
                                               }}
                                             >
                                               {q.is_hidden ? <VisibilityIcon sx={{ fontSize: 16 }} /> : <VisibilityOffIcon sx={{ fontSize: 16 }} />}
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
+                                        {isHost && (
+                                          <Tooltip title={q.is_answered ? "Mark as unanswered" : "Mark as answered"}>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => handleMarkAnswered(q.id, q.requires_followup)}
+                                              sx={{
+                                                color: q.is_answered ? "#22c55e" : "rgba(255,255,255,0.4)",
+                                                p: 0.5,
+                                                "&:hover": {
+                                                  color: q.is_answered ? "#22c55e" : "rgba(255,255,255,0.9)"
+                                                }
+                                              }}
+                                            >
+                                              {q.is_answered ? <CheckCircleIcon sx={{ fontSize: 16 }} /> : <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />}
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
+                                        {isHost && (
+                                          <Tooltip title={q.requires_followup ? "Remove follow-up flag" : "Flag for follow-up"}>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => handleMarkAnswered(q.id, !q.requires_followup)}
+                                              sx={{
+                                                color: q.requires_followup ? "#f97316" : "rgba(255,255,255,0.4)",
+                                                p: 0.5,
+                                                "&:hover": {
+                                                  color: q.requires_followup ? "#f97316" : "rgba(255,255,255,0.9)"
+                                                }
+                                              }}
+                                            >
+                                              <FlagOutlinedIcon sx={{ fontSize: 16 }} />
                                             </IconButton>
                                           </Tooltip>
                                         )}
