@@ -202,6 +202,7 @@ const SUPPORT_TAB_INDEX = 4;
 const QNA_HOT_GRAVITY = 1.5;        // time decay exponent for hot score
 const QNA_FLAME_THRESHOLD = 0.5;    // hot score above this → show 🔥 trending
 const QNA_DISPLAY_BROADCAST_TYPE = "qna-display-state";
+const URL_REGEX = /(https?:\/\/[^\s<>"')\]]+)/gi;
 
 function getToken() {
   // Prioritize guest_token if available (for approved applications joining as guests)
@@ -240,6 +241,11 @@ function resolveMediaUrl(url) {
   if (!url) return "";
   if (/^https?:\/\//i.test(url)) return url;
   return toApiUrl(url);
+}
+
+function extractUrlsFromText(text = "") {
+  const matches = String(text || "").match(URL_REGEX);
+  return Array.from(new Set((matches || []).map((url) => url.replace(/[),.;!?]+$/, ""))));
 }
 
 function getMyUserIdFromJwt() {
@@ -14388,6 +14394,7 @@ export default function NewLiveMeeting() {
   const [isAnonymousQuestion, setIsAnonymousQuestion] = useState(false);
   const [qnaSortMode, setQnaSortMode] = useState("hot");
   const [qnaReordering, setQnaReordering] = useState(false);
+  const [qnaLinkPreviewCache, setQnaLinkPreviewCache] = useState({});
   const [pendingQuestions, setPendingQuestions] = useState([]);
   const [focusedPendingIdx, setFocusedPendingIdx] = useState(0);
 
@@ -14983,6 +14990,91 @@ export default function NewLiveMeeting() {
     () => [...qaSorted.pinned, ...qaSorted.unpinned].filter((q) => q && !q.is_hidden),
     [qaSorted]
   );
+
+  const qnaQuestionUrls = useMemo(() => {
+    const map = {};
+    questions.forEach((question) => {
+      map[question.id] = extractUrlsFromText(question.content || "");
+    });
+    return map;
+  }, [questions]);
+
+  useEffect(() => {
+    const allUrls = Array.from(
+      new Set(
+        Object.values(qnaQuestionUrls)
+          .flat()
+          .filter(Boolean)
+      )
+    );
+    if (!allUrls.length) return;
+
+    const missingUrls = allUrls.filter((url) => !(url in qnaLinkPreviewCache));
+    if (!missingUrls.length) return;
+
+    let alive = true;
+
+    (async () => {
+      await Promise.all(
+        missingUrls.map(async (url) => {
+          try {
+            const res = await fetch(
+              toApiUrl(`interactions/questions/link-preview/?url=${encodeURIComponent(url)}`),
+              { headers: { Accept: "application/json", ...authHeader() } }
+            );
+
+            if (!alive) return;
+
+            if (!res.ok) {
+              setQnaLinkPreviewCache((prev) => ({ ...prev, [url]: null }));
+              return;
+            }
+
+            const data = await res.json().catch(() => null);
+            setQnaLinkPreviewCache((prev) => ({ ...prev, [url]: data || null }));
+          } catch {
+            if (!alive) return;
+            setQnaLinkPreviewCache((prev) => ({ ...prev, [url]: null }));
+          }
+        })
+      );
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [qnaLinkPreviewCache, qnaQuestionUrls]);
+
+  const renderTextWithDetectedLinks = useCallback((text) => {
+    const raw = String(text || "");
+    const parts = raw.split(URL_REGEX);
+
+    return parts.map((part, index) => {
+      const trimmedUrl = String(part || "").replace(/[),.;!?]+$/, "");
+      if (trimmedUrl && /^https?:\/\//i.test(trimmedUrl)) {
+        return (
+          <Box
+            key={`${trimmedUrl}-${index}`}
+            component="a"
+            href={trimmedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              color: "#7dd3fc",
+              textDecoration: "underline",
+              textUnderlineOffset: "2px",
+              wordBreak: "break-all",
+            }}
+          >
+            {trimmedUrl}
+          </Box>
+        );
+      }
+
+      if (!part) return null;
+      return <React.Fragment key={`text-${index}`}>{part}</React.Fragment>;
+    });
+  }, []);
 
   const resolveQuestionDisplayMeta = useCallback((question) => {
     if (!question) {
@@ -16483,6 +16575,9 @@ export default function NewLiveMeeting() {
                           const canManage = isHost || isSelfQuestion;
                           const isEditing = qnaEditingId === q.id;
                           const isDisplayedOnScreen = displayedQuestion?.question_id === q.id && displayedQuestion?.visible !== false;
+                          const detectedUrls = qnaQuestionUrls[q.id] || [];
+                          const previewUrl = detectedUrls[0] || "";
+                          const preview = previewUrl ? qnaLinkPreviewCache[previewUrl] : null;
 
                           return (
                             <>
@@ -16645,7 +16740,81 @@ export default function NewLiveMeeting() {
                                     </Stack>
                                   </Stack>
 
-                                  <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{q.content}</Typography>
+                                  <Typography
+                                    component="div"
+                                    sx={{
+                                      mt: 0.75,
+                                      fontSize: 13,
+                                      opacity: 0.92,
+                                      whiteSpace: "pre-wrap",
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    {renderTextWithDetectedLinks(q.content)}
+                                  </Typography>
+
+                                  {previewUrl && preview && (
+                                    <Paper
+                                      component="a"
+                                      href={preview.url || previewUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      variant="outlined"
+                                      sx={{
+                                        mt: 1,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        p: 1,
+                                        bgcolor: "rgba(125,211,252,0.06)",
+                                        borderColor: "rgba(125,211,252,0.2)",
+                                        borderRadius: 2,
+                                        textDecoration: "none",
+                                        "&:hover": {
+                                          bgcolor: "rgba(125,211,252,0.1)",
+                                          borderColor: "rgba(125,211,252,0.32)",
+                                        },
+                                      }}
+                                    >
+                                      <Avatar
+                                        src={preview.favicon_url || ""}
+                                        variant="rounded"
+                                        sx={{
+                                          width: 28,
+                                          height: 28,
+                                          bgcolor: "rgba(255,255,255,0.08)",
+                                          borderRadius: 1.2,
+                                        }}
+                                      >
+                                        {(preview.hostname || previewUrl).slice(0, 1).toUpperCase()}
+                                      </Avatar>
+                                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                                        <Typography
+                                          sx={{
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            color: "#e2f3ff",
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                          }}
+                                        >
+                                          {preview.title || preview.hostname || previewUrl}
+                                        </Typography>
+                                        <Typography
+                                          sx={{
+                                            fontSize: 11,
+                                            opacity: 0.68,
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                          }}
+                                        >
+                                          {preview.hostname || previewUrl}
+                                        </Typography>
+                                      </Box>
+                                    </Paper>
+                                  )}
 
                                   <Stack direction="column" spacing={0.75} sx={{ mt: 1 }}>
                                     <Stack direction="row" spacing={0.5} alignItems="center">
