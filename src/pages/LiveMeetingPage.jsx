@@ -6256,6 +6256,9 @@ export default function NewLiveMeeting() {
           if (data?.qna_moderation_enabled !== undefined) {
             setQnaModerationEnabled(data.qna_moderation_enabled);
           }
+          if (data?.qna_anonymous_mode !== undefined) {
+            setQnaAnonymousModeEnabled(data.qna_anonymous_mode);
+          }
           if (data?.status) setDbStatus(data.status);
           if (data?.title) setEventTitle(data.title);
           if (data?.waiting_room_enabled === false) {
@@ -14350,6 +14353,8 @@ export default function NewLiveMeeting() {
 
   // Moderation state
   const [qnaModerationEnabled, setQnaModerationEnabled] = useState(false);
+  const [qnaAnonymousModeEnabled, setQnaAnonymousModeEnabled] = useState(false);
+  const [isAnonymousQuestion, setIsAnonymousQuestion] = useState(false);
   const [pendingQuestions, setPendingQuestions] = useState([]);
   const [focusedPendingIdx, setFocusedPendingIdx] = useState(0);
 
@@ -14596,6 +14601,17 @@ export default function NewLiveMeeting() {
           );
         }
 
+        if (msg.type === "qna.anonymized") {
+          // Update question with anonymous status
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.id === msg.question_id
+                ? { ...q, is_anonymous: msg.is_anonymous }
+                : q
+            )
+          );
+        }
+
       } catch { }
     };
 
@@ -14643,7 +14659,11 @@ export default function NewLiveMeeting() {
     setQnaError("");
 
     try {
-      const payload = { event: eventId, content };
+      const payload = {
+        event: eventId,
+        content,
+        is_anonymous: qnaAnonymousModeEnabled || isAnonymousQuestion,
+      };
       if (activeTableId) {
         payload.lounge_table = activeTableId;
       }
@@ -14655,6 +14675,7 @@ export default function NewLiveMeeting() {
       });
       if (!res.ok) throw new Error("Failed to create question.");
       setNewQuestion("");
+      setIsAnonymousQuestion(false);  // Reset toggle after submit
       await loadQuestions();
     } catch (e) {
       setQnaError(e.message || "Failed to create question.");
@@ -14796,6 +14817,20 @@ export default function NewLiveMeeting() {
       // State updates come via qna.pinned WebSocket broadcast
     } catch (e) {
       setQnaError("Failed to pin question: " + (e.message || "Unknown error"));
+    }
+  };
+
+  const handleAnonymizeQuestion = async (questionId) => {
+    setQnaError("");
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${questionId}/anonymize/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) throw new Error("Failed to anonymize question");
+      // State updates come via qna.anonymized WebSocket broadcast
+    } catch (e) {
+      setQnaError("Failed to anonymize question: " + (e.message || "Unknown error"));
     }
   };
 
@@ -16178,18 +16213,20 @@ export default function NewLiveMeeting() {
 
                           const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
 
-                          const askedBy = isSelfQuestion
-                            ? "You"
-                            : q.user_name ||
-                            q.user_display ||
-                            q.user ||
-                            q.user?.name ||
-                            participants.find((p) => {
-                              const raw = p?._raw || {};
-                              const csid = raw.clientSpecificId ?? raw.client_specific_id;
-                              return csid != null && String(csid) === String(q.user_id);
-                            })?.name ||
-                            (q.user_id ? `User ${q.user_id}` : "Audience");
+                          const askedBy = (q.is_anonymous && !isSelfQuestion)
+                            ? "Anonymous"
+                            : isSelfQuestion
+                              ? (q.is_anonymous ? "You (anonymous)" : "You")
+                              : q.user_name ||
+                              q.user_display ||
+                              q.user ||
+                              q.user?.name ||
+                              participants.find((p) => {
+                                const raw = p?._raw || {};
+                                const csid = raw.clientSpecificId ?? raw.client_specific_id;
+                                return csid != null && String(csid) === String(q.user_id);
+                              })?.name ||
+                              (q.user_id ? `User ${q.user_id}` : "Audience");
 
                           const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
 
@@ -16376,6 +16413,20 @@ export default function NewLiveMeeting() {
                                           variant="outlined"
                                         />
                                       )}
+                                      {q.is_anonymous && (
+                                        <Chip
+                                          label="Anonymous"
+                                          size="small"
+                                          icon={<VisibilityOffIcon />}
+                                          sx={{
+                                            fontSize: 10,
+                                            height: 18,
+                                            color: "rgba(255,255,255,0.6)",
+                                            borderColor: "rgba(255,255,255,0.25)"
+                                          }}
+                                          variant="outlined"
+                                        />
+                                      )}
                                     </Stack>
 
                                     {canManage && (
@@ -16458,6 +16509,23 @@ export default function NewLiveMeeting() {
                                             </IconButton>
                                           </Tooltip>
                                         )}
+                                        {isHost && (
+                                          <Tooltip title={q.is_anonymous ? "De-anonymize question" : "Anonymize question"}>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => handleAnonymizeQuestion(q.id)}
+                                              sx={{
+                                                color: q.is_anonymous ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)",
+                                                p: 0.5,
+                                                "&:hover": {
+                                                  color: q.is_anonymous ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.9)"
+                                                }
+                                              }}
+                                            >
+                                              <VisibilityOffIcon sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
                                         <IconButton
                                           size="small"
                                           onClick={() => handleQnaDelete(q.id)}
@@ -16523,6 +16591,17 @@ export default function NewLiveMeeting() {
                         },
                       }}
                     />
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.75, px: 0.5 }}>
+                      <Switch
+                        size="small"
+                        checked={qnaAnonymousModeEnabled || isAnonymousQuestion}
+                        disabled={qnaAnonymousModeEnabled}
+                        onChange={(e) => setIsAnonymousQuestion(e.target.checked)}
+                      />
+                      <Typography sx={{ fontSize: 11, opacity: 0.7 }}>
+                        {qnaAnonymousModeEnabled ? "Anonymous mode (forced)" : "Post anonymously"}
+                      </Typography>
+                    </Stack>
                   </Box>
               </Box>
             </TabPanel>
