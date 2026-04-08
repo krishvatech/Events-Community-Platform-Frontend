@@ -1964,7 +1964,7 @@ function About() {
                 {p.textOnly ? (
                   <div style={{ fontFamily: F.display, fontSize: 48, fontWeight: 700, color: C.deepBlue, letterSpacing: "0.05em" }}>IMAA</div>
                 ) : (
-                  <img src={p.logo} alt={p.name} style={{ height: i === 0 ? 80 : i === 2 ? 55 : 100, objectFit: "contain" }} />
+                  <img src={p.logo} alt={p.name} style={{ height: i === 0 ? 120 : i === 2 ? 55 : 100, objectFit: "contain" }} />
                 )}
               </div>
               <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.deepBlue, marginBottom: 2 }}>{p.name}</div>
