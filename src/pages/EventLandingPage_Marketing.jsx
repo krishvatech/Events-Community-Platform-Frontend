@@ -908,6 +908,12 @@ function Speakers({ eventData = {} }) {
 
   const speakers = transformParticipants(eventData.featured_participants);
 
+  // Debug: log featured participants
+  useEffect(() => {
+    console.log('Featured participants from API:', eventData.featured_participants);
+    console.log('Transformed speakers:', speakers);
+  }, [eventData.featured_participants, speakers]);
+
   // Hide section if no speakers
   if (!speakers || speakers.length === 0) {
     return null;
