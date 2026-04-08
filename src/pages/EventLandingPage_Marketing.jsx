@@ -879,6 +879,16 @@ function Speakers({ eventData = {} }) {
   const [activeBio, setActiveBio] = useState(null);
   const isMobile = useIsMobile();
 
+  // Truncate text to 5 words max with "..." if longer
+  const truncateToFiveWords = (text) => {
+    if (!text) return '';
+    const words = text.split(' ');
+    if (words.length > 5) {
+      return words.slice(0, 5).join(' ') + '...';
+    }
+    return text;
+  };
+
   // Transform API featured_participants data to component format
   const transformParticipants = (apiParticipants) => {
     if (!apiParticipants || !Array.isArray(apiParticipants)) return [];
@@ -1105,7 +1115,7 @@ function Speakers({ eventData = {} }) {
                 {s.name}
               </div>
               <div style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.cool80, marginBottom: 10 }}>
-                {s.org}
+                {truncateToFiveWords(s.org)}
               </div>
               {(s.bio || s.role) && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -2099,7 +2109,8 @@ export default function OxfordSymposium2026() {
         // Fetch event by slug from the API
         // Using Vite's import.meta.env for environment variables
         const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-        const response = await fetch(`${apiUrl}/events/by-slug/${slug}/`);
+        // featured_all=true: show all speakers/hosts/moderators regardless of visibility settings
+        const response = await fetch(`${apiUrl}/events/by-slug/${slug}/?featured_all=true`);
         if (!response.ok) {
           throw new Error(`Failed to fetch event data: ${response.statusText}`);
         }
