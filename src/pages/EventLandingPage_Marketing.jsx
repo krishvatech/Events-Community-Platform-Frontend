@@ -1506,98 +1506,40 @@ function MoreThanSessions() {
 }
 
 // 7. PROGRAMME SCHEDULE
-function Programme({ eventData = {} }) {
-  // Helper function to format time in event's timezone
-  const formatTimeInTimezone = (isoString, timezone) => {
-    try {
-      const date = new Date(isoString);
-      const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone || "UTC",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-      return formatter.format(date);
-    } catch (e) {
-      return "TBD";
-    }
-  };
-
-  // Transform API sessions into day cards
-  const transformSessions = (sessions, isMultiDay, timezone, startTime, endTime) => {
-    if (!isMultiDay || !sessions || !Array.isArray(sessions)) return [];
-
-    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const colors = [C.coral, C.brightBlue, C.green, C.oxfordGold];
-
-    // Get event date range
-    const eventStartDate = startTime ? new Date(startTime).toISOString().split('T')[0] : null;
-    const eventEndDate = endTime ? new Date(endTime).toISOString().split('T')[0] : null;
-
-    // Group sessions by date, only include those within event date range
-    const groupedByDate = {};
-    sessions.forEach((session) => {
-      const sessionDate = session.session_date;
-
-      // Filter: only include sessions within the event's date range
-      if (eventStartDate && eventEndDate) {
-        if (sessionDate < eventStartDate || sessionDate > eventEndDate) {
-          return; // Skip sessions outside event date range
-        }
-      }
-
-      const key = sessionDate;
-      if (!groupedByDate[key]) {
-        groupedByDate[key] = { date: key, sessions: [], title: null };
-      }
-      groupedByDate[key].sessions.push(session);
-      // Use session title as evening activity
-      if (session.session_type === "main" && !groupedByDate[key].title) {
-        groupedByDate[key].title = session.title;
-      }
-    });
-
-    // Convert to array and format
-    return Object.values(groupedByDate)
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .map((day, idx) => {
-        const date = new Date(day.date);
-        const dayName = dayNames[date.getDay()];
-        const dateStr = `${monthNames[date.getMonth()]} ${date.getDate()}`;
-
-        return {
-          day: dayName,
-          date: dateStr,
-          color: colors[idx % colors.length],
-          sessions: day.sessions.map((s) => ({
-            time: `${formatTimeInTimezone(s.start_time, timezone)} – ${formatTimeInTimezone(s.end_time, timezone)}`,
-            label: s.session_type === "main" ? s.title : "Sessions",
-          })),
-          evening: day.title,
-        };
-      });
-  };
-
-  const days = transformSessions(eventData.sessions, eventData.is_multi_day, eventData.timezone, eventData.start_time, eventData.end_time);
-
-  // Hide section if not multi-day or no sessions
-  if (!eventData.is_multi_day || days.length === 0) {
-    return null;
-  }
-
-  // Calculate optimal grid columns based on number of days
-  const getGridColumns = (dayCount) => {
-    if (dayCount <= 4) return dayCount; // 1-4 days: use actual count
-    if (dayCount === 5) return 3; // 5 days: 3 + 2 layout
-    if (dayCount <= 8) return 4; // 6-8 days: 4 + 2/3/4 layout
-    return 5; // 9+ days: 5 columns
-  };
-
-  const gridCols = getGridColumns(days.length);
+function Programme() {
+  const days = [
+    {
+      day: "Monday",
+      date: "Sep 14",
+      sessions: ["1 pm - 5 pm  Sessions"],
+      evening: "Welcome Reception & Dinner",
+      accent: C.coral,
+    },
+    {
+      day: "Tuesday",
+      date: "Sep 15",
+      sessions: ["9 am - 12 pm  Sessions", "1 pm - 5 pm  Sessions"],
+      evening: "College Dinner",
+      accent: C.oxfordGold,
+    },
+    {
+      day: "Wednesday",
+      date: "Sep 16",
+      sessions: ["9 am - 12 pm  Sessions", "1 pm - 5 pm  Sessions"],
+      evening: "Punting & Dinner",
+      accent: C.green,
+    },
+    {
+      day: "Thursday",
+      date: "Sep 17",
+      sessions: ["9 am - 12 pm  Sessions", "1 pm - 5 pm  Sessions"],
+      evening: "BBQ Dinner",
+      accent: C.brightBlue,
+    },
+  ];
 
   return (
-    <Section bg={C.white} style={{ padding: "64px 0" }} id="programme">
+    <Section bg={C.cool10} style={{ padding: "80px 0" }} id="programme">
       <FadeIn>
         <div
           style={{
@@ -1618,45 +1560,110 @@ function Programme({ eventData = {} }) {
             style={{
               fontSize: 10,
               fontWeight: 700,
-              letterSpacing: "0.08em",
+              letterSpacing: "0.14em",
               textTransform: "uppercase",
               color: C.brightBlue,
               fontFamily: F.body,
             }}
           >
-            At A Glance
+            At a Glance
           </div>
         </div>
-        <h3 style={{ fontSize: 36, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, margin: "0 0 12px", lineHeight: 1.25 }}>{days.length} days, one trajectory.</h3>
+        <h3
+          style={{
+            fontSize: 42,
+            fontWeight: 700,
+            color: C.deepBlue,
+            fontFamily: F.display,
+            margin: "0 0 36px",
+            lineHeight: 1.25,
+          }}
+        >
+          Four days, one trajectory.
+        </h3>
       </FadeIn>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-          gap: 20,
-          marginTop: 32,
-          overflowX: "auto",
-          overflowY: "hidden",
-          scrollBehavior: "smooth",
-          paddingBottom: 12,
-          marginBottom: -12,
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 12,
+          marginTop: 20,
+          alignItems: "stretch",
         }}
       >
         {days.map((d, i) => (
-          <FadeIn key={i} delay={i * 0.1}>
-            <div style={{ padding: "24px", border: `1px solid ${C.cool20}`, borderTop: `4px solid ${d.color}`, borderRadius: 4, background: C.white, minWidth: "calc(50% - 10px)" }}>
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.deepBlue, fontFamily: F.display, marginBottom: 2 }}>{d.day}</div>
-                <div style={{ fontSize: 11, color: C.cool60, fontFamily: F.body, letterSpacing: "0.05em", textTransform: "uppercase" }}>{d.date}</div>
+          <FadeIn key={i} delay={i * 0.08} style={{ height: "100%" }}>
+            <div
+              style={{
+                background: C.white,
+                border: `1px solid ${C.cool20}`,
+                borderRadius: 4,
+                padding: "22px 20px",
+                borderTop: `3px solid ${d.accent}`,
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: F.display,
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: C.deepBlue,
+                }}
+              >
+                {d.day}
               </div>
-              {d.sessions.map((s, j) => (
-                <div key={j} style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: C.cool60, fontFamily: F.body }}>{s.time}</div>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: C.cool50,
+                  fontFamily: F.body,
+                  marginBottom: 16,
+                  paddingBottom: 14,
+                  borderBottom: `1px solid ${C.cool20}`,
+                }}
+              >
+                {d.date}
+              </div>
+              <div style={{ flex: 1 }}>
+                {d.sessions.map((s, j) => (
+                  <div
+                    key={j}
+                    style={{
+                      fontFamily: F.body,
+                      fontSize: 13,
+                      color: C.cool60,
+                      lineHeight: 2,
+                    }}
+                  >
+                    {s}
+                  </div>
+                ))}
+              </div>
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: `1px solid ${C.cool20}`,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: F.display,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: C.deepBlue,
+                    fontStyle: "italic",
+                  }}
+                >
+                  {d.evening}
                 </div>
-              ))}
-              {d.evening && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.cool20}`, fontSize: 13, fontWeight: 600, color: C.deepBlue, fontFamily: F.display, fontStyle: "italic" }}>{d.evening}</div>
-              )}
+              </div>
             </div>
           </FadeIn>
         ))}
@@ -1676,11 +1683,11 @@ function EveningCard({ ev, img }) {
         borderRadius: 6,
         overflow: "hidden",
         position: "relative",
-        minHeight: 460,
+        minHeight: 480,
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",
-        borderLeft: `3px solid ${ev.accent}`,
+        border: `3px solid ${ev.accent}`,
         cursor: "default",
       }}
     >
@@ -1695,6 +1702,7 @@ function EveningCard({ ev, img }) {
           objectFit: "cover",
           transition: "transform 0.6s cubic-bezier(0.22,1,0.36,1)",
           transform: hovered ? "scale(1.04)" : "scale(1)",
+          zIndex: 0,
         }}
       />
       <div
@@ -1705,9 +1713,10 @@ function EveningCard({ ev, img }) {
             ? "linear-gradient(to top, rgba(20,26,38,0.92) 0%, rgba(20,26,38,0.6) 55%, rgba(20,26,38,0.15) 100%)"
             : "linear-gradient(to top, rgba(20,26,38,0.85) 0%, rgba(20,26,38,0.2) 35%, transparent 60%)",
           transition: "background 0.4s ease",
+          zIndex: 1,
         }}
       />
-      <div style={{ position: "relative", padding: "20px 18px", zIndex: 1 }}>
+      <div style={{ position: "relative", padding: "28px 20px", zIndex: 2 }}>
         <span
           style={{
             fontSize: 9,
@@ -1716,7 +1725,7 @@ function EveningCard({ ev, img }) {
             textTransform: "uppercase",
             color: ev.accent,
             fontFamily: F.body,
-            marginBottom: 6,
+            marginBottom: 8,
             display: "block",
           }}
         >
@@ -1725,7 +1734,7 @@ function EveningCard({ ev, img }) {
         <div
           style={{
             fontFamily: F.display,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: 700,
             color: C.white,
             lineHeight: 1.25,
@@ -1761,95 +1770,40 @@ function EveningCard({ ev, img }) {
 }
 
 // 8. OXFORD EXPERIENCE
-function OxfordExperience({ eventData = {} }) {
-  // Fallback static images
-  const fallbackImages = [receptionImg, dinnerImg, puntingImg, bbqImg];
-  const colors = [C.coral, C.brightBlue, C.green, C.oxfordGold];
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-  // Build evenings dynamically from sessions
-  const buildEveonings = (sessions) => {
-    if (!sessions || !Array.isArray(sessions)) {
-      // No sessions - use fallback static data
-      return [
-        {
-          day: "Monday",
-          title: "Welcome Reception & Dinner",
-          desc: "A reception and dinner to close the first day. No formalities beyond a brief welcome. Informal, unhurried, and shaped by the inspiration that the first day's sessions have set in motion.",
-          accent: C.coral,
-          img: receptionImg,
-        },
-        {
-          day: "Tuesday",
-          title: "College Dinner",
-          desc: "A black-tie dinner in the Great Hall of Jesus College, conducted in the Oxford tradition. An evening that belongs to the room that is forming around you.",
-          accent: C.oxfordGold,
-          img: dinnerImg,
-        },
-        {
-          day: "Wednesday",
-          title: "Punting & Dinner",
-          desc: "An optional early evening on the Cherwell by punt, followed by a riverside dinner. No prior punting ability required. Quintessentially Oxford.",
-          accent: C.green,
-          img: puntingImg,
-        },
-        {
-          day: "Thursday",
-          title: "BBQ Dinner",
-          desc: "The final evening. By Thursday, the programme ends. The conversations do not.",
-          accent: C.brightBlue,
-          img: bbqImg,
-        },
-      ];
-    }
-
-    // Group sessions by date and get unique days
-    const groupedByDate = {};
-    sessions.forEach((session) => {
-      const sessionDate = session.session_date;
-      if (!groupedByDate[sessionDate]) {
-        groupedByDate[sessionDate] = { date: sessionDate, sessions: [] };
-      }
-      groupedByDate[sessionDate].sessions.push(session);
-    });
-
-    // Convert to array and map to evening cards
-    return Object.values(groupedByDate)
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .map((dayObj, idx) => {
-        const date = new Date(dayObj.date);
-        const dayName = dayNames[date.getDay()];
-
-        // Use first session as evening data
-        const firstSession = dayObj.sessions[0] || {};
-
-        return {
-          day: dayName,
-          title: firstSession.title || `Evening ${idx + 1}`,
-          desc: firstSession.description || `An evening activity for ${dayName}.`,
-          accent: colors[idx % colors.length],
-          img: firstSession.session_image || fallbackImages[idx % fallbackImages.length],
-        };
-      });
-  };
-
-  const evenings = buildEveonings(eventData.sessions);
-
-  // Hide section if not multi-day or no sessions
-  if (!eventData.is_multi_day || evenings.length === 0) {
-    return null;
-  }
-
-  // Determine grid columns based on number of sessions
-  const getGridColumns = (count) => {
-    if (count <= 4) return 4;
-    return 3; // 5+ sessions: 3 columns (3 in first row, 2+ in second row)
-  };
-
-  const gridCols = getGridColumns(evenings.length);
+function OxfordExperience() {
+  const evenings = [
+    {
+      day: "Monday",
+      title: "Welcome Reception & Dinner",
+      desc: "A reception and dinner to close the first day. No formalities beyond a brief welcome. Informal, unhurried, and shaped by the inspiration that the first day's sessions have set in motion.",
+      accent: C.coral,
+      img: receptionImg,
+    },
+    {
+      day: "Tuesday",
+      title: "College Dinner",
+      desc: "A black-tie dinner in the Great Hall of Jesus College, conducted in the Oxford tradition. An evening that belongs to the room that is forming around you.",
+      accent: C.oxfordGold,
+      img: dinnerImg,
+    },
+    {
+      day: "Wednesday",
+      title: "Punting & Dinner",
+      desc: "An optional early evening on the Cherwell by punt, followed by a riverside dinner. No prior punting ability required. Quintessentially Oxford.",
+      accent: C.green,
+      img: puntingImg,
+    },
+    {
+      day: "Thursday",
+      title: "BBQ Dinner",
+      desc: "The final evening. By Thursday, the programme ends. The conversations do not.",
+      accent: C.brightBlue,
+      img: bbqImg,
+    },
+  ];
 
   return (
-    <Section bg={C.white} style={{ padding: "64px 0" }} id="experience">
+    <Section bg={C.white} style={{ padding: "80px 0" }} id="evenings">
       <FadeIn>
         <div
           style={{
@@ -1870,7 +1824,7 @@ function OxfordExperience({ eventData = {} }) {
             style={{
               fontSize: 10,
               fontWeight: 700,
-              letterSpacing: "0.08em",
+              letterSpacing: "0.14em",
               textTransform: "uppercase",
               color: C.brightBlue,
               fontFamily: F.body,
@@ -1893,17 +1847,11 @@ function OxfordExperience({ eventData = {} }) {
         </h3>
       </FadeIn>
       <div
-        id="evenings"
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+          gridTemplateColumns: "repeat(4, 1fr)",
           gap: 12,
           marginTop: 20,
-          overflowX: "auto",
-          overflowY: "hidden",
-          scrollBehavior: "smooth",
-          paddingBottom: 12,
-          marginBottom: -12,
         }}
       >
         {evenings.map((ev, i) => (
