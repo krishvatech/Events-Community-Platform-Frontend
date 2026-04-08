@@ -1104,18 +1104,41 @@ function Speakers({ eventData = {} }) {
               <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.deepBlue, lineHeight: 1.25, marginBottom: 4 }}>
                 {s.name}
               </div>
-              {s.role && (
-                <div style={{ fontFamily: F.body, fontSize: 12, color: C.cool60, lineHeight: 1.4, marginBottom: 2 }}>
-                  {s.role}
-                </div>
-              )}
-              <div style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.cool80, marginBottom: s.bio ? 10 : 0 }}>
+              <div style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.cool80, marginBottom: 10 }}>
                 {s.org}
               </div>
-              {s.bio && (
-                <span style={{ fontSize: 10, fontWeight: 600, color: C.brightBlue, fontFamily: F.body }}>
-                  {activeBio === i ? "Close" : "View bio"} →
-                </span>
+              {(s.bio || s.role) && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <div>
+                    {s.bio && (
+                      <span style={{ fontSize: 10, fontWeight: 600, color: C.brightBlue, fontFamily: F.body }}>
+                        {activeBio === i ? "Close" : "View bio"} →
+                      </span>
+                    )}
+                  </div>
+                  {s.role && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: C.bgBlue2,
+                        border: `1px solid ${C.cool20}`,
+                        fontFamily: F.body,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: C.deepBlue,
+                        lineHeight: 1,
+                        whiteSpace: "nowrap",
+                        marginLeft: "auto",
+                      }}
+                    >
+                      {s.role}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           ))}
