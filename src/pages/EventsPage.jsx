@@ -358,7 +358,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
   return (
     <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50/70 p-3">
       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-700">
-        Featured Participants
+        Event Line-up
       </div>
       <div className="mt-2 space-y-2">
         {participants.map((person, index) => {

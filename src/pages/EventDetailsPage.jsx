@@ -200,7 +200,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
   return (
     <Box className="mt-4 rounded-xl border border-teal-100 bg-teal-50/70 p-3">
       <Box className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-700">
-        Featured Participants
+        Event Line-up
       </Box>
       <Box className="mt-2 space-y-2">
         {participants.map((person, index) => {
@@ -1355,7 +1355,7 @@ export default function EventDetailsPage() {
                           </Stack>
                         )}
 
-                        {/* Featured Participants */}
+                        {/* Event Line-up */}
                         {event?.featured_participants && event.featured_participants.length > 0 && (
                           <Box sx={{ mt: 2 }}>
                             <FeaturedParticipantsStrip
