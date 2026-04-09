@@ -1546,6 +1546,7 @@ function MoreThanSessions() {
 
 // 7. PROGRAMME SCHEDULE
 function Programme() {
+  const isMobile = useIsMobile();
   const days = [
     {
       day: "Monday",
@@ -1624,7 +1625,7 @@ function Programme() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
           gap: 12,
           marginTop: 20,
           alignItems: "stretch",
@@ -1810,6 +1811,7 @@ function EveningCard({ ev, img }) {
 
 // 8. OXFORD EXPERIENCE
 function OxfordExperience() {
+  const isMobile = useIsMobile();
   const evenings = [
     {
       day: "Monday",
@@ -1888,7 +1890,7 @@ function OxfordExperience() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
           gap: 12,
           marginTop: 20,
         }}
