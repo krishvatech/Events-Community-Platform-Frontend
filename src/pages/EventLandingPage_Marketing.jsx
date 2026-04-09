@@ -1097,18 +1097,15 @@ function Speakers({ eventData = {} }) {
                   style={{
                     width: 52,
                     height: 52,
-                    borderRadius: "50%",
-                    background: `linear-gradient(135deg, ${C.deepBlue}, ${C.midBlue})`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     marginBottom: 14,
-                    filter: "grayscale(100%)",
+                    color: C.cool80,
+                    fontSize: 20,
                   }}
                 >
-                  <span style={{ fontFamily: F.body, fontSize: 16, fontWeight: 700, color: C.white }}>
-                    {s.initials}
-                  </span>
+                  −
                 </div>
               )}
               <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.deepBlue, lineHeight: 1.25, marginBottom: 4 }}>
