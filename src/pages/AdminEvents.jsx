@@ -2455,8 +2455,10 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
 function AdminEventCard({
   ev,
   onHost,
+  onHostRtk,
   isHosting,
   onJoinLive,
+  onJoinLiveRtk,
   isJoining,
   isOwner,
   onEdit,
@@ -2743,6 +2745,32 @@ function AdminEventCard({
                     )}
                   </Button>
 
+                  {/* RTK Join Button */}
+                  <Button
+                    onClick={() => onJoinLiveRtk?.(ev)}
+                    variant="contained"
+                    className="rounded-xl flex-1"
+                    sx={{
+                      textTransform: "none",
+                      backgroundColor: "#0066cc",
+                      "&:hover": { backgroundColor: "#0052a3" },
+                      minWidth: 0,
+                      px: 1,
+                    }}
+                    disabled={isJoining}
+                    title="Join using RealtimeKit"
+                  >
+                    {isJoining ? (
+                      <span className="flex items-center gap-2">
+                        <CircularProgress size={18} />
+                      </span>
+                    ) : (
+                      <Box component="span" sx={{ whiteSpace: "nowrap", fontSize: "0.875rem" }}>
+                        RTK
+                      </Box>
+                    )}
+                  </Button>
+
                   <Button
                     component={Link}
                     to={`/admin/events/${ev.id}`}
@@ -2876,6 +2904,35 @@ function AdminEventCard({
                     </Button>
                   )}
 
+                  {/* RTK Host Button */}
+                  {isHost && (isLive || isWithinEarlyJoinWindow) ? (
+                    <Button
+                      onClick={() => onHostRtk(ev)}
+                      startIcon={<LiveTvRoundedIcon />}
+                      variant="contained"
+                      className="rounded-xl flex-1"
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#0066cc",
+                        "&:hover": { backgroundColor: "#0052a3" },
+                        minWidth: 0,
+                        px: 1,
+                      }}
+                      disabled={isHosting}
+                      title="Host using RealtimeKit"
+                    >
+                      {isHosting ? (
+                        <span className="flex items-center gap-2">
+                          <CircularProgress size={18} />
+                        </span>
+                      ) : (
+                        <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+                          Host RTK
+                        </Box>
+                      )}
+                    </Button>
+                  ) : null}
+
                   {/* Upcoming/Live → View Details (Event Manage) */}
                   <Button
                     component={Link}
@@ -2922,45 +2979,72 @@ function AdminEventCard({
                 </Button>
               ) : canShowActiveJoin ? (
                 // Live OR within 15 min before start → Join
-                <Button
-                  onClick={() => onJoinLive?.(ev)}
-                  variant="contained"
-                  className="rounded-xl"
-                  fullWidth
-                  sx={{
-                    textTransform: "none",
-                    backgroundColor: "#10b8a6",
-                    "&:hover": { backgroundColor: "#0ea5a4" },
-                  }}
-                  disabled={isJoining}
-                >
-                  {isJoining ? (
-                    <span className="flex items-center gap-2">
-                      <CircularProgress size={18} />
-                      <Box
-                        component="span"
-                        sx={{ display: { xs: "none", lg: "inline" } }}
-                      >
-                        Joining…
-                      </Box>
-                    </span>
-                  ) : (
-                    <>
-                      <Box
-                        component="span"
-                        sx={{ display: { xs: "none", lg: "inline" } }}
-                      >
-                        {joinLabel}
-                      </Box>
-                      <Box
-                        component="span"
-                        sx={{ display: { xs: "inline", lg: "none" } }}
-                      >
-                        {joinLabelShort}
-                      </Box>
-                    </>
-                  )}
-                </Button>
+                <>
+                  <Button
+                    onClick={() => onJoinLive?.(ev)}
+                    variant="contained"
+                    className="rounded-xl"
+                    fullWidth
+                    sx={{
+                      textTransform: "none",
+                      backgroundColor: "#10b8a6",
+                      "&:hover": { backgroundColor: "#0ea5a4" },
+                    }}
+                    disabled={isJoining}
+                  >
+                    {isJoining ? (
+                      <span className="flex items-center gap-2">
+                        <CircularProgress size={18} />
+                        <Box
+                          component="span"
+                          sx={{ display: { xs: "none", lg: "inline" } }}
+                        >
+                          Joining…
+                        </Box>
+                      </span>
+                    ) : (
+                      <>
+                        <Box
+                          component="span"
+                          sx={{ display: { xs: "none", lg: "inline" } }}
+                        >
+                          {joinLabel}
+                        </Box>
+                        <Box
+                          component="span"
+                          sx={{ display: { xs: "inline", lg: "none" } }}
+                        >
+                          {joinLabelShort}
+                        </Box>
+                      </>
+                    )}
+                  </Button>
+
+                  {/* RTK Join Button */}
+                  <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+                    <Button
+                      onClick={() => onJoinLiveRtk?.(ev)}
+                      variant="contained"
+                      className="rounded-xl flex-1"
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#0066cc",
+                        "&:hover": { backgroundColor: "#0052a3" },
+                      }}
+                      disabled={isJoining}
+                      size="small"
+                      title="Join using RealtimeKit"
+                    >
+                      {isJoining ? (
+                        <span className="flex items-center gap-1">
+                          <CircularProgress size={16} />
+                        </span>
+                      ) : (
+                        "RTK"
+                      )}
+                    </Button>
+                  </Box>
+                </>
               ) : isPast && ev.recording_url ? (
                 // Ended + recording → Watch Recording
                 <Button
@@ -3261,6 +3345,39 @@ function EventsPage() {
     }
   };
 
+  // RTK versions
+  const onHostRtk = async (ev) => {
+    if (!ev?.id) return;
+    setHostingId(ev.id);
+    try {
+      const rtkPath = `/rtk-live/${encodeURIComponent(ev.slug || ev.id)}?id=${ev.id}&role=publisher`;
+      navigate(rtkPath);
+    } catch (e) {
+      setErrMsg(e?.message || "Unable to start RTK meeting.");
+      setErrOpen(true);
+    } finally {
+      setHostingId(null);
+    }
+  };
+
+  const handleJoinLiveRtk = async (ev) => {
+    if (!ev?.id) return;
+    setJoiningId(ev.id);
+    try {
+      const myReg = myRegistrations?.[ev.id];
+      const joinRole = myReg?.is_host ? "publisher" : "audience";
+      const rtkPath = `/rtk-live/${encodeURIComponent(ev.slug || ev.id)}?id=${ev.id}&role=${joinRole}`;
+      navigate(rtkPath, {
+        state: { event: ev }
+      });
+    } catch (e) {
+      setErrMsg(e?.message || "Unable to join RTK meeting.");
+      setErrOpen(true);
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
   const handleEditEvent = async (ev) => {
     if (!ev?.id) return;
 
@@ -3409,8 +3526,10 @@ function EventsPage() {
                   <AdminEventCard
                     ev={ev}
                     onHost={onHost}
+                    onHostRtk={onHostRtk}
                     isHosting={hostingId === (ev.id ?? null)}
                     onJoinLive={handleJoinLive}
+                    onJoinLiveRtk={handleJoinLiveRtk}
                     isJoining={joiningId === (ev.id ?? null)}
                     isOwner={isOwner}
                     onEdit={handleEditEvent}

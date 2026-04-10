@@ -978,6 +978,7 @@ export default function EventDetailsPage() {
   // Decide the best join URL:
   const isHost = Boolean(registration?.is_host);
   const livePath = `/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
+  const rtkPath = `/rtk-live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
   const isPostEventLounge = isPostEventLoungeOpen(event);
   const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
   const isLive = status === "live" && event.status !== "ended";
@@ -1425,31 +1426,54 @@ export default function EventDetailsPage() {
                             Event Cancelled
                           </Button>
                         ) : canShowActiveJoin && canJoinEventNow ? (
-                          <Button
-                            onClick={() => {
-                              // If not authenticated, show guest modal; otherwise navigate
-                              if (!token) {
-                                setGuestModalOpen(true);
-                              } else {
-                                navigate(livePath, {
-                                  state: {
-                                    event,
-                                    openLounge: shouldOpenLoungeOnEntry,
-                                    preEventLounge: isPreEventLounge,
-                                  },
-                                });
-                              }
-                            }}
-                            sx={{
-                              textTransform: "none",
-                              backgroundColor: "#10b8a6",
-                              "&:hover": { backgroundColor: "#0ea5a4" },
-                            }}
-                            className="rounded-xl"
-                            variant="contained"
-                          >
-                            {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false, registration))}
-                          </Button>
+                          <>
+                            <Button
+                              onClick={() => {
+                                // If not authenticated, show guest modal; otherwise navigate
+                                if (!token) {
+                                  setGuestModalOpen(true);
+                                } else {
+                                  navigate(livePath, {
+                                    state: {
+                                      event,
+                                      openLounge: shouldOpenLoungeOnEntry,
+                                      preEventLounge: isPreEventLounge,
+                                    },
+                                  });
+                                }
+                              }}
+                              sx={{
+                                textTransform: "none",
+                                backgroundColor: "#10b8a6",
+                                "&:hover": { backgroundColor: "#0ea5a4" },
+                              }}
+                              className="rounded-xl"
+                              variant="contained"
+                            >
+                              {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false, registration))}
+                            </Button>
+                            {/* RTK Join Button */}
+                            <Button
+                              onClick={() => {
+                                if (!token) {
+                                  setGuestModalOpen(true);
+                                } else {
+                                  navigate(rtkPath, { state: { event } });
+                                }
+                              }}
+                              sx={{
+                                textTransform: "none",
+                                backgroundColor: "#0066cc",
+                                "&:hover": { backgroundColor: "#0052a3" },
+                              }}
+                              className="rounded-xl"
+                              variant="contained"
+                              title="Join using RealtimeKit"
+                              size="small"
+                            >
+                              RTK
+                            </Button>
+                          </>
                         ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" && (event.registration_type !== 'apply' || (myApplication && myApplication.status === 'approved')) ? (
                           <Button
                             disabled

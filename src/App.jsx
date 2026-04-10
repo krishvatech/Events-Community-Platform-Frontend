@@ -22,6 +22,7 @@ import MyCartPage from "./pages/MyCartPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import LiveMeetingPage from "./pages/LiveMeetingPage.jsx";
+import NewLiveMeetingPage from "./pages/NewLiveMeetingPage.jsx";
 import Footer from "./components/Footer.jsx";
 import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
 import ProfilePage from "./pages/ProfilePage.jsx";
@@ -158,6 +159,7 @@ const AppShell = () => {
     location.pathname === "/cognito/callback" ||
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/") ||
+    location.pathname.startsWith("/rtk-live/") ||
     location.pathname.startsWith("/public/");
 
   const showSidebar = authed && !hideChrome;
@@ -259,6 +261,9 @@ const AppShell = () => {
 
           {/* LIVE meeting page — no header/footer */}
           <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
+
+          {/* RTK meeting page — no header/footer */}
+          <Route path="/rtk-live/:meetingId" element={<RequireAuth><NewLiveMeetingPage /></RequireAuth>} />
 
           <Route path="/account/courses" element={<RequireAuth><CoursesPage /></RequireAuth>} />
           <Route path="/account/courses/:courseId" element={<RequireAuth><CoursePlayerPage /></RequireAuth>} />
