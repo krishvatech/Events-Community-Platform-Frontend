@@ -484,42 +484,80 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
 
   useEffect(() => {
     if (!meeting) return;
-    const joined = meeting.participants?.joined;
-    const listeners = ["participantJoined", "participantLeft", "participantsUpdate", "stageStatusUpdate"];
-    const selfListeners = ["cameraToggled", "mediaUpdate", "videoUpdate", "participantUpdated"];
+    const participants = meeting.participants;
+    const joined = participants?.joined;
+    const active = participants?.active;
+    const participantEventTargets = [participants, joined, active, meeting.stage].filter(Boolean);
+    const participantListeners = [
+      "participantJoined",
+      "participantLeft",
+      "participantsUpdate",
+      "stageStatusUpdate",
+      "videoUpdate",
+      "audioUpdate",
+      "screenShareUpdate",
+      "mediaUpdate",
+    ];
+    const selfListeners = [
+      "cameraToggled",
+      "mediaUpdate",
+      "videoUpdate",
+      "audioUpdate",
+      "participantUpdated",
+      "stageStatusUpdate",
+    ];
+    const peerParticipants = getJoinedParticipants(meeting).filter(
+      (participant) => typeof participant?.on === "function" || typeof participant?.addListener === "function"
+    );
+
+    const addListener = (target, event) => {
+      if (typeof target?.on === "function") {
+        target.on(event, updateParticipantChips);
+      } else if (typeof target?.addListener === "function") {
+        target.addListener(event, updateParticipantChips);
+      }
+    };
+
+    const removeListener = (target, event) => {
+      if (typeof target?.off === "function") {
+        target.off(event, updateParticipantChips);
+      } else if (typeof target?.removeListener === "function") {
+        target.removeListener(event, updateParticipantChips);
+      }
+    };
 
     updateParticipantChips();
 
-    listeners.forEach((event) => {
-      if (typeof joined?.on === "function") {
-        joined.on(event, updateParticipantChips);
-      } else if (typeof joined?.addListener === "function") {
-        joined.addListener(event, updateParticipantChips);
-      }
+    const refreshTimers = [
+      setTimeout(updateParticipantChips, 100),
+      setTimeout(updateParticipantChips, 500),
+      setTimeout(updateParticipantChips, 1500),
+    ];
+    const refreshInterval = setInterval(updateParticipantChips, 1000);
+
+    participantEventTargets.forEach((target) => {
+      participantListeners.forEach((event) => addListener(target, event));
     });
 
     selfListeners.forEach((event) => {
-      if (typeof meeting.self?.on === "function") {
-        meeting.self.on(event, updateParticipantChips);
-      } else if (typeof meeting.self?.addListener === "function") {
-        meeting.self.addListener(event, updateParticipantChips);
-      }
+      addListener(meeting.self, event);
+    });
+
+    peerParticipants.forEach((participant) => {
+      selfListeners.forEach((event) => addListener(participant, event));
     });
 
     return () => {
-      listeners.forEach((event) => {
-        if (typeof joined?.off === "function") {
-          joined.off(event, updateParticipantChips);
-        } else if (typeof joined?.removeListener === "function") {
-          joined.removeListener(event, updateParticipantChips);
-        }
+      refreshTimers.forEach(clearTimeout);
+      clearInterval(refreshInterval);
+      participantEventTargets.forEach((target) => {
+        participantListeners.forEach((event) => removeListener(target, event));
       });
       selfListeners.forEach((event) => {
-        if (typeof meeting.self?.off === "function") {
-          meeting.self.off(event, updateParticipantChips);
-        } else if (typeof meeting.self?.removeListener === "function") {
-          meeting.self.removeListener(event, updateParticipantChips);
-        }
+        removeListener(meeting.self, event);
+      });
+      peerParticipants.forEach((participant) => {
+        selfListeners.forEach((event) => removeListener(participant, event));
       });
     };
   }, [meeting, isHost, profileImageByKey]);
