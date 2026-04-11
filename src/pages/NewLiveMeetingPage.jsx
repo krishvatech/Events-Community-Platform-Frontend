@@ -7,7 +7,6 @@ import {
 import {
   RtkUiProvider,
   RtkGrid,
-  RtkChat,
   RtkParticipants,
   RtkParticipantsAudio,
   RtkDialogManager,
@@ -49,6 +48,8 @@ import {
   Menu,
   Badge,
   Switch,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
 import {
   ArrowBackIosNew as ArrowBackIosNewIcon,
@@ -69,11 +70,15 @@ import {
   PlayCircle as PlayCircleIcon,
   StopCircle as StopCircleIcon,
   DeleteOutline as DeleteOutlineIcon,
+  Send as SendIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 
 const LAYOUT_TOP_OFFSET = 64;
 const RIGHT_PANEL_W = 420;
+const API_ROOT = (
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
+).replace(/\/$/, "");
 
 function toArraySafe(source) {
   if (!source) return [];
@@ -159,7 +164,30 @@ function getToken() {
   );
 }
 
-function JoinedMeetingLayout({ meeting, isHost, panel, setPanel, containerRef }) {
+function authHeader() {
+  const tok = getToken();
+  return tok ? { Authorization: `Bearer ${tok}` } : {};
+}
+
+function toApiUrl(pathOrUrl) {
+  try {
+    return new URL(pathOrUrl).toString();
+  } catch {
+    const rel = String(pathOrUrl).replace(/^\/+/, "");
+    return `${API_ROOT}/${rel.replace(/^api\/+/, "")}`;
+  }
+}
+
+function formatChatTime(ts) {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, containerRef }) {
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -181,6 +209,14 @@ function JoinedMeetingLayout({ meeting, isHost, panel, setPanel, containerRef })
   const [pinnedHostId, setPinnedHostId] = useState(null);
   const [participantChips, setParticipantChips] = useState([]);
   const [participantList, setParticipantList] = useState([]);
+  const [chatConversationId, setChatConversationId] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const [chatInput, setChatInput] = useState("");
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const chatBottomRef = useRef(null);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -427,6 +463,347 @@ function JoinedMeetingLayout({ meeting, isHost, panel, setPanel, containerRef })
     setRightPanelOpen(false);
   };
 
+  const fetchChatMessages = async (conversationId) => {
+    const cid = conversationId || chatConversationId;
+    if (!cid) return;
+
+    const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
+      headers: { Accept: "application/json", ...authHeader() },
+    });
+    const data = await res.json().catch(() => []);
+    if (!res.ok) throw new Error(data?.detail || "Failed to load chat.");
+    setChatMessages(Array.isArray(data) ? data : []);
+  };
+
+  const ensureEventConversation = async () => {
+    if (!eventId) return null;
+    const res = await fetch(toApiUrl("messaging/conversations/ensure-event/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ event: eventId }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.detail || "Failed to open chat.");
+    if (!data?.id) throw new Error("Chat conversation missing.");
+    setChatConversationId(data.id);
+    return data.id;
+  };
+
+  const markChatAllRead = async (conversationId) => {
+    const cid = conversationId || chatConversationId;
+    if (!cid) return;
+
+    try {
+      await fetch(toApiUrl(`messaging/conversations/${cid}/mark-all-read/`), {
+        method: "POST",
+        headers: { ...authHeader() },
+      });
+      setChatUnreadCount(0);
+    } catch { }
+  };
+
+  const fetchChatUnread = async () => {
+    try {
+      const cid = chatConversationId || (await ensureEventConversation());
+      if (!cid) return;
+
+      const res = await fetch(toApiUrl(`messaging/conversations/${cid}/`), {
+        headers: { Accept: "application/json", ...authHeader() },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) setChatUnreadCount(Number(data?.unread_count || 0));
+    } catch { }
+  };
+
+  const loadChatThread = async () => {
+    setChatLoading(true);
+    setChatError("");
+    try {
+      const cid = chatConversationId || (await ensureEventConversation());
+      if (cid) {
+        await fetchChatMessages(cid);
+        await markChatAllRead(cid);
+      }
+    } catch (e) {
+      setChatError(e?.message || "Unable to load chat.");
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    const text = chatInput.trim();
+    if (!text || chatSending) return;
+
+    setChatSending(true);
+    setChatError("");
+    try {
+      const cid = chatConversationId || (await ensureEventConversation());
+      if (!cid) throw new Error("Chat not ready.");
+
+      const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ body: text }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.detail || "Failed to send message.");
+
+      setChatMessages((prev) => [...prev, ...(data ? [data] : [])]);
+      setChatInput("");
+      await markChatAllRead(cid);
+    } catch (e) {
+      setChatError(e?.message || "Failed to send message.");
+    } finally {
+      setChatSending(false);
+    }
+  };
+
+  useEffect(() => {
+    setChatConversationId(null);
+    setChatMessages([]);
+    setChatInput("");
+    setChatError("");
+    setChatUnreadCount(0);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!(rightPanelOpen && tab === 0) || !eventId) return;
+    loadChatThread();
+
+    let alive = true;
+    const timer = setInterval(async () => {
+      if (!alive) return;
+      try {
+        const cid = chatConversationId || (await ensureEventConversation());
+        if (!cid) return;
+        await fetchChatMessages(cid);
+        await markChatAllRead(cid);
+      } catch { }
+    }, 3000);
+
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [rightPanelOpen, tab, eventId, chatConversationId]);
+
+  useEffect(() => {
+    if ((rightPanelOpen && tab === 0) || !eventId) return;
+    fetchChatUnread();
+
+    const timer = setInterval(fetchChatUnread, 5000);
+    return () => clearInterval(timer);
+  }, [rightPanelOpen, tab, eventId, chatConversationId]);
+
+  useEffect(() => {
+    if (!(rightPanelOpen && tab === 0)) return;
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages.length, rightPanelOpen, tab]);
+
+  const PublicChatContent = (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        minHeight: 0,
+        width: "100%",
+        maxWidth: "100%",
+        overflow: "hidden",
+        bgcolor: "rgba(0,0,0,0.12)",
+      }}
+    >
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          width: "100%",
+          maxWidth: "100%",
+          overflowX: "hidden",
+          overflowY: "auto",
+          p: 2,
+          boxSizing: "border-box",
+        }}
+      >
+        {chatError && (
+          <Typography color="error" sx={{ mb: 1, fontSize: 13 }}>
+            {chatError}
+          </Typography>
+        )}
+
+        {chatLoading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+            <CircularProgress size={22} />
+          </Box>
+        ) : chatMessages.length === 0 ? (
+          <Box sx={{ height: "100%", minHeight: 180, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", px: 2 }}>
+            <Typography sx={{ opacity: 0.75, fontSize: 13 }}>No messages yet. Start the conversation!</Typography>
+          </Box>
+        ) : (
+          <Stack spacing={1.25} sx={{ width: "100%", maxWidth: "100%" }}>
+            {chatMessages.map((message) => {
+              const senderName = message.sender_display || message.sender_name || "User";
+              const avatarSrc =
+                message.sender_avatar ||
+                message.sender_image ||
+                message.sender_profile_image ||
+                message.sender?.avatar ||
+                message.sender?.profile_image ||
+                "";
+
+              return (
+                <Paper
+                  key={message.id}
+                  variant="outlined"
+                  sx={{
+                    p: 1.25,
+                    bgcolor: "rgba(255,255,255,0.03)",
+                    borderColor: "rgba(255,255,255,0.08)",
+                    borderRadius: 2,
+                    width: "100%",
+                    maxWidth: "100%",
+                    minWidth: 0,
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    spacing={1}
+                    sx={{ width: "100%", minWidth: 0 }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ flex: 1, minWidth: 0 }}>
+                      <Avatar
+                        src={avatarSrc}
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          fontSize: 12,
+                          bgcolor: "rgba(255,255,255,0.12)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {initialsFromName(senderName).slice(0, 1)}
+                      </Avatar>
+                      <Typography
+                        noWrap
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: 13,
+                          lineHeight: 1.25,
+                          color: "rgba(255,255,255,0.9)",
+                          minWidth: 0,
+                          maxWidth: "100%",
+                        }}
+                      >
+                        {senderName}
+                      </Typography>
+                    </Stack>
+                    <Typography sx={{ fontSize: 12, lineHeight: 1.2, opacity: 0.7, flexShrink: 0 }}>
+                      {formatChatTime(message.created_at)}
+                    </Typography>
+                  </Stack>
+                  <Typography
+                    sx={{
+                      mt: 0.75,
+                      fontSize: 13,
+                      lineHeight: 1.45,
+                      opacity: 0.9,
+                      whiteSpace: "pre-wrap",
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
+                      maxWidth: "100%",
+                    }}
+                  >
+                    {message.body}
+                  </Typography>
+                </Paper>
+              );
+            })}
+          </Stack>
+        )}
+        <Box ref={chatBottomRef} />
+      </Box>
+
+      <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+
+      <Box
+        sx={{
+          p: 2,
+          flexShrink: 0,
+          width: "100%",
+          boxSizing: "border-box",
+          bgcolor: "rgba(0,0,0,0.28)",
+          borderTop: "1px solid rgba(255,255,255,0.10)",
+          position: "sticky",
+          bottom: 0,
+          zIndex: 2,
+        }}
+      >
+        <TextField
+          fullWidth
+          placeholder="Type a message..."
+          size="small"
+          multiline
+          maxRows={4}
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              sendChatMessage();
+            }
+          }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  aria-label="Send message"
+                  onClick={sendChatMessage}
+                  disabled={chatSending || !chatInput.trim()}
+                >
+                  {chatSending ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              bgcolor: "rgba(255,255,255,0.07)",
+              borderRadius: 2,
+              alignItems: "flex-end",
+              pr: 0.5,
+              fontSize: 13,
+              lineHeight: 1.4,
+              minHeight: 42,
+              maxWidth: "100%",
+              overflow: "hidden",
+              "& fieldset": {
+                borderColor: "rgba(255,255,255,0.22)",
+              },
+              "&:hover fieldset": {
+                borderColor: "rgba(255,255,255,0.34)",
+              },
+              "&.Mui-focused fieldset": {
+                borderColor: "#14b8b1",
+              },
+            },
+            "& .MuiInputBase-input": {
+              fontSize: 13,
+              lineHeight: 1.4,
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+            },
+          }}
+        />
+      </Box>
+    </Box>
+  );
+
   const SidebarMainContent = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <Box
@@ -450,7 +827,7 @@ function JoinedMeetingLayout({ meeting, isHost, panel, setPanel, containerRef })
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, p: 0 }}>
         {tab === 0 ? (
-          <RtkChat style={{ width: "100%", height: "100%" }} />
+          PublicChatContent
         ) : tab === 3 ? (
           ParticipantsTabContent
         ) : null}
@@ -492,7 +869,9 @@ function JoinedMeetingLayout({ meeting, isHost, panel, setPanel, containerRef })
             },
           }}
         >
-          <ChatBubbleOutlineIcon />
+          <Badge color="error" badgeContent={chatUnreadCount} max={99}>
+            <ChatBubbleOutlineIcon />
+          </Badge>
         </IconButton>
       </Tooltip>
 
@@ -544,7 +923,7 @@ function JoinedMeetingLayout({ meeting, isHost, panel, setPanel, containerRef })
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, p: 0 }}>
         {tab === 0 ? (
-          <RtkChat style={{ width: "100%", height: "100%" }} />
+          PublicChatContent
         ) : tab === 3 ? (
           ParticipantsTabContent
         ) : null}
@@ -1046,7 +1425,9 @@ function JoinedMeetingLayout({ meeting, isHost, panel, setPanel, containerRef })
                       "&:hover": { bgcolor: tab === 0 && rightPanelOpen ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
                     }}
                   >
-                    <ChatBubbleOutlineIcon />
+                    <Badge color="error" badgeContent={chatUnreadCount} max={99}>
+                      <ChatBubbleOutlineIcon />
+                    </Badge>
                   </IconButton>
                   <Typography
                     sx={{
@@ -1348,6 +1729,7 @@ export default function NewLiveMeetingPage() {
           <JoinedMeetingLayout
             meeting={meeting}
             isHost={isHost}
+            eventId={eventId}
             containerRef={containerRef}
           />
         )}
