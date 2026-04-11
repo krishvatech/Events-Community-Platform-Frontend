@@ -1097,16 +1097,9 @@ function Speakers({ eventData = {} }) {
                   style={{
                     width: 52,
                     height: 52,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                     marginBottom: 14,
-                    color: C.cool80,
-                    fontSize: 20,
                   }}
-                >
-                  −
-                </div>
+                />
               )}
               <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.deepBlue, lineHeight: 1.25, marginBottom: 4 }}>
                 {s.name}
