@@ -6,7 +6,6 @@ import {
 } from "@cloudflare/realtimekit-react";
 import {
   RtkUiProvider,
-  RtkGrid,
   RtkParticipants,
   RtkParticipantsAudio,
   RtkDialogManager,
@@ -178,6 +177,12 @@ function toApiUrl(pathOrUrl) {
   }
 }
 
+function resolveMediaUrl(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  return toApiUrl(url);
+}
+
 function formatChatTime(ts) {
   if (!ts) return "";
   try {
@@ -185,6 +190,205 @@ function formatChatTime(ts) {
   } catch {
     return "";
   }
+}
+
+function getParticipantIdentityKeys(participant) {
+  if (!participant) return [];
+  const raw = participant._raw || participant;
+  const keys = [
+    participant.id,
+    participant.participantId,
+    participant.userId,
+    participant.user_id,
+    participant.customParticipantId,
+    participant.clientSpecificId,
+    raw?.id,
+    raw?.participantId,
+    raw?.userId,
+    raw?.user_id,
+    raw?.customParticipantId,
+    raw?.clientSpecificId,
+    raw?.client_specific_id,
+  ]
+    .filter((value) => value !== null && value !== undefined && value !== "")
+    .map((value) => String(value));
+
+  const name = participantName(participant);
+  if (name) keys.push(`name:${String(name).trim().toLowerCase()}`);
+  return Array.from(new Set(keys));
+}
+
+function getParticipantPicture(participant) {
+  if (!participant) return "";
+  const raw = participant._raw || participant;
+  let parsedMeta = null;
+
+  if (typeof raw?.metadata === "string") {
+    try {
+      parsedMeta = JSON.parse(raw.metadata);
+    } catch {
+      parsedMeta = null;
+    }
+  } else if (raw?.metadata && typeof raw.metadata === "object") {
+    parsedMeta = raw.metadata;
+  }
+
+  const metaProfilePicture =
+    typeof parsedMeta?.profilePicture === "object"
+      ? parsedMeta.profilePicture.displayImage || parsedMeta.profilePicture.url
+      : parsedMeta?.profilePicture;
+
+  return resolveMediaUrl(
+    participant.picture ||
+    participant.avatar ||
+    participant.profilePicture ||
+    participant.image ||
+    participant.photo ||
+    raw?.picture ||
+    raw?.avatar ||
+    raw?.profilePicture ||
+    raw?.profile_picture ||
+    raw?.avatar_url ||
+    raw?.user_image_url ||
+    raw?.user_image ||
+    raw?.image ||
+    raw?.photo ||
+    parsedMeta?.picture ||
+    parsedMeta?.avatar ||
+    parsedMeta?.avatar_url ||
+    parsedMeta?.user_image_url ||
+    parsedMeta?.user_image ||
+    parsedMeta?.image ||
+    parsedMeta?.photo ||
+    metaProfilePicture ||
+    ""
+  );
+}
+
+function cacheProfileImage(next, keys, imageUrl) {
+  const url = resolveMediaUrl(imageUrl);
+  if (!url) return;
+  keys.forEach((key) => {
+    if (key) next[String(key)] = url;
+  });
+}
+
+function ParticipantStageTile({ participant, main = false }) {
+  const videoRef = useRef(null);
+  const raw = participant?.raw || participant?._raw || participant || {};
+  const sourceVideo =
+    raw.videoTrack ||
+    raw.rawVideoTrack ||
+    raw.video ||
+    raw.webcamTrack ||
+    raw.camTrack ||
+    null;
+  const getTrack = (source) => {
+    if (!source) return null;
+    if (source instanceof MediaStreamTrack) return source;
+    if (source instanceof MediaStream) return source.getVideoTracks()[0] || null;
+    if (typeof source.getMediaStreamTrack === "function") return source.getMediaStreamTrack();
+    if (source.track instanceof MediaStreamTrack) return source.track;
+    if (source.mediaStreamTrack instanceof MediaStreamTrack) return source.mediaStreamTrack;
+    return null;
+  };
+  const mediaTrack = getTrack(sourceVideo);
+  const hasVideo = Boolean(
+    (participant?.cam || raw.videoEnabled || raw.webcamOn) &&
+    mediaTrack &&
+    mediaTrack.readyState !== "ended"
+  );
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (hasVideo && mediaTrack) {
+      const stream = new MediaStream([mediaTrack]);
+      video.srcObject = stream;
+      video.play?.().catch(() => { });
+    } else {
+      video.srcObject = null;
+    }
+
+    return () => {
+      video.srcObject = null;
+    };
+  }, [hasVideo, mediaTrack]);
+
+  if (!participant) return null;
+
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        height: "100%",
+        minHeight: main ? 280 : 140,
+        borderRadius: main ? 2 : 1.5,
+        overflow: "hidden",
+        bgcolor: "rgba(255,255,255,0.04)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {hasVideo ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      ) : (
+        <Avatar
+          src={participant.picture || undefined}
+          alt={participant.name}
+          sx={{
+            width: main ? { xs: 112, sm: 140 } : 88,
+            height: main ? { xs: 112, sm: 140 } : 88,
+            fontSize: main ? { xs: 34, sm: 44 } : 28,
+            bgcolor: "#2563eb",
+            border: participant.picture ? "3px solid rgba(37,99,235,0.95)" : "none",
+            boxShadow: "0 18px 60px rgba(0,0,0,0.32)",
+          }}
+        >
+          {initialsFromName(participant.name)}
+        </Avatar>
+      )}
+
+      <Box
+        sx={{
+          position: "absolute",
+          left: 12,
+          bottom: 12,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.75,
+          maxWidth: "calc(100% - 24px)",
+          px: 1,
+          py: 0.5,
+          borderRadius: 1,
+          bgcolor: "rgba(0,0,0,0.52)",
+          color: "#fff",
+        }}
+      >
+        {participant.mic ? (
+          <MicIcon sx={{ fontSize: 16 }} />
+        ) : (
+          <MicOffIcon sx={{ fontSize: 16 }} />
+        )}
+        <Typography noWrap sx={{ fontSize: 13, fontWeight: 700, minWidth: 0 }}>
+          {participant.name}{participant.isSelf ? " (You)" : ""}
+        </Typography>
+      </Box>
+    </Box>
+  );
 }
 
 function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, containerRef }) {
@@ -207,7 +411,6 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
   const handleCloseMoreMenu = () => setMoreMenuAnchor(null);
 
   const [pinnedHostId, setPinnedHostId] = useState(null);
-  const [participantChips, setParticipantChips] = useState([]);
   const [participantList, setParticipantList] = useState([]);
   const [chatConversationId, setChatConversationId] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
@@ -216,7 +419,19 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
   const [chatError, setChatError] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [profileImageByKey, setProfileImageByKey] = useState({});
   const chatBottomRef = useRef(null);
+
+  const lookupProfileImage = (participantOrKeys) => {
+    const keys = Array.isArray(participantOrKeys)
+      ? participantOrKeys
+      : getParticipantIdentityKeys(participantOrKeys);
+    for (const key of keys) {
+      const cached = profileImageByKey[String(key)];
+      if (cached) return cached;
+    }
+    return "";
+  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -240,12 +455,13 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
         id: participant.id || participant.participantId || participant.userId || name,
         name,
         roleLabel,
-        cam: Boolean(participant.cam || participant.videoEnabled || participant.webcamOn),
+        cam: Boolean(participant.cam || participant.videoEnabled || participant.webcamOn || participant.rawVideoTrack || participant.videoTrack),
         mic: Boolean(participant.mic || participant.audioEnabled || participant.micOn),
-        picture: participant.picture || participant.image || participant.avatar || participant._raw?.picture || null,
+        picture: getParticipantPicture(participant) || lookupProfileImage(participant) || null,
         isHost: roleLabel === "Host",
         isSpeaker: roleLabel === "Speaker",
         isSelf: selfId ? String(participant.id || "") === String(selfId) : false,
+        raw: participant,
       };
     };
 
@@ -263,12 +479,6 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
       return aName.localeCompare(bName);
     });
 
-    const chips = sortedParticipants
-      .filter((participant) => participant?.id && participant.id !== hostId)
-      .slice(0, 8)
-      .map(toParticipantItem);
-
-    setParticipantChips(chips);
     setParticipantList(sortedParticipants.map(toParticipantItem));
   };
 
@@ -276,6 +486,7 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
     if (!meeting) return;
     const joined = meeting.participants?.joined;
     const listeners = ["participantJoined", "participantLeft", "participantsUpdate", "stageStatusUpdate"];
+    const selfListeners = ["cameraToggled", "mediaUpdate", "videoUpdate", "participantUpdated"];
 
     updateParticipantChips();
 
@@ -287,6 +498,14 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
       }
     });
 
+    selfListeners.forEach((event) => {
+      if (typeof meeting.self?.on === "function") {
+        meeting.self.on(event, updateParticipantChips);
+      } else if (typeof meeting.self?.addListener === "function") {
+        meeting.self.addListener(event, updateParticipantChips);
+      }
+    });
+
     return () => {
       listeners.forEach((event) => {
         if (typeof joined?.off === "function") {
@@ -295,14 +514,123 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
           joined.removeListener(event, updateParticipantChips);
         }
       });
+      selfListeners.forEach((event) => {
+        if (typeof meeting.self?.off === "function") {
+          meeting.self.off(event, updateParticipantChips);
+        } else if (typeof meeting.self?.removeListener === "function") {
+          meeting.self.removeListener(event, updateParticipantChips);
+        }
+      });
     };
-  }, [meeting, isHost]);
+  }, [meeting, isHost, profileImageByKey]);
 
   const groupedParticipantList = [
     { label: "HOST", items: participantList.filter((participant) => participant.roleLabel === "Host") },
     { label: "SPEAKER", items: participantList.filter((participant) => participant.roleLabel === "Speaker") },
     { label: "AUDIENCE", items: participantList.filter((participant) => participant.roleLabel === "Audience") },
   ];
+
+  useEffect(() => {
+    if (!eventId) return;
+
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/`), {
+          headers: { Accept: "application/json", ...authHeader() },
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !alive) return;
+
+        const groups = data.event_participants || {};
+        const next = {};
+        const ingest = (items = []) => {
+          (Array.isArray(items) ? items : []).forEach((participant) => {
+            const name =
+              participant.full_name ||
+              participant.name ||
+              participant.username ||
+              participant.email ||
+              "";
+            const id =
+              participant.user_id ||
+              participant.userId ||
+              participant.id ||
+              participant.uid ||
+              participant.pk ||
+              "";
+            const picture =
+              participant.avatar_url ||
+              participant.user_image_url ||
+              participant.user_image ||
+              participant.avatar ||
+              participant.profile_image ||
+              participant.picture ||
+              participant.image ||
+              "";
+
+            cacheProfileImage(
+              next,
+              [
+                id,
+                participant.email,
+                participant.username,
+                name ? `name:${String(name).trim().toLowerCase()}` : "",
+              ],
+              picture
+            );
+          });
+        };
+
+        ingest(groups.hosts || groups.host || []);
+        ingest(groups.speakers || groups.speaker || []);
+        ingest(groups.audience || groups.attendees || groups.participants || []);
+
+        if (Object.keys(next).length) {
+          setProfileImageByKey((prev) => ({ ...prev, ...next }));
+        }
+      } catch {
+        // Profile images are a visual enhancement; keep the meeting usable if metadata fails.
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!chatMessages.length) return;
+
+    const next = {};
+    chatMessages.forEach((message) => {
+      const senderId =
+        message.sender_id ??
+        (typeof message.sender === "object" ? message.sender?.id : message.sender) ??
+        message.user_id ??
+        (typeof message.user === "object" ? message.user?.id : message.user) ??
+        "";
+      const senderName = message.sender_display || message.sender_name || message.user_name || "";
+      const imageUrl =
+        message.sender_avatar ||
+        message.sender_image ||
+        message.sender_profile_image ||
+        message.user_avatar_url ||
+        message.sender?.avatar ||
+        message.sender?.profile_image ||
+        "";
+
+      cacheProfileImage(
+        next,
+        [senderId, senderName ? `name:${String(senderName).trim().toLowerCase()}` : ""],
+        imageUrl
+      );
+    });
+
+    if (Object.keys(next).length) {
+      setProfileImageByKey((prev) => ({ ...prev, ...next }));
+    }
+  }, [chatMessages]);
 
   const ParticipantsTabContent = (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -560,6 +888,39 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
   };
 
   useEffect(() => {
+    if (!eventId) return;
+
+    let alive = true;
+    (async () => {
+      try {
+        const ensureRes = await fetch(toApiUrl("messaging/conversations/ensure-event/"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event: eventId }),
+        });
+        const conversation = await ensureRes.json().catch(() => null);
+        if (!ensureRes.ok || !conversation?.id || !alive) return;
+
+        setChatConversationId((prev) => prev || conversation.id);
+
+        const messagesRes = await fetch(toApiUrl(`messaging/conversations/${conversation.id}/messages/`), {
+          headers: { Accept: "application/json", ...authHeader() },
+        });
+        const messages = await messagesRes.json().catch(() => []);
+        if (messagesRes.ok && alive && Array.isArray(messages)) {
+          setChatMessages(messages);
+        }
+      } catch {
+        // Keep this silent: chat opening still handles errors in the visible panel.
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [eventId]);
+
+  useEffect(() => {
     setChatConversationId(null);
     setChatMessages([]);
     setChatInput("");
@@ -644,12 +1005,23 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
           <Stack spacing={1.25} sx={{ width: "100%", maxWidth: "100%" }}>
             {chatMessages.map((message) => {
               const senderName = message.sender_display || message.sender_name || "User";
+              const senderId =
+                message.sender_id ??
+                (typeof message.sender === "object" ? message.sender?.id : message.sender) ??
+                message.user_id ??
+                (typeof message.user === "object" ? message.user?.id : message.user) ??
+                "";
               const avatarSrc =
                 message.sender_avatar ||
                 message.sender_image ||
                 message.sender_profile_image ||
+                message.user_avatar_url ||
                 message.sender?.avatar ||
                 message.sender?.profile_image ||
+                lookupProfileImage([
+                  senderId,
+                  senderName ? `name:${String(senderName).trim().toLowerCase()}` : "",
+                ]) ||
                 "";
 
               return (
@@ -802,6 +1174,15 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
         />
       </Box>
     </Box>
+  );
+
+  const stageMainParticipant =
+    participantList.find((participant) => participant.isHost) ||
+    participantList.find((participant) => participant.isSelf) ||
+    participantList[0] ||
+    null;
+  const stageSideParticipants = participantList.filter(
+    (participant) => !stageMainParticipant || participant.id !== stageMainParticipant.id
   );
 
   const SidebarMainContent = (
@@ -1226,74 +1607,54 @@ function JoinedMeetingLayout({ meeting, isHost, eventId, panel, setPanel, contai
               />
             </Box>
 
-            <Box sx={{ flex: 1, minHeight: 0 }}>
-              <RtkGrid style={{ width: "100%", height: "100%" }} />
-            </Box>
-
-            {participantChips.length > 0 && (
-              <Box
-                sx={{
-                  flexShrink: 0,
-                  display: "flex",
-                  gap: 1,
-                  overflowX: "auto",
-                  flexWrap: "nowrap",
-                  px: 2,
-                  py: 1,
-                  bgcolor: "rgba(0,0,0,0.16)",
-                  borderTop: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                {participantChips.map((participant) => (
-                  <Paper
-                    key={participant.id}
-                    variant="outlined"
-                    sx={{
-                      flex: "0 0 auto",
-                      width: 150,
-                      minWidth: 150,
-                      height: 84,
-                      borderRadius: 2,
-                      borderColor: "rgba(255,255,255,0.10)",
-                      bgcolor: "rgba(255,255,255,0.04)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      px: 1.5,
-                      py: 1,
-                    }}
-                  >
-                    <Avatar
-                      src={participant.picture || undefined}
-                      sx={{ width: 36, height: 36, fontSize: 14, bgcolor: "rgba(255,255,255,0.12)" }}
-                    >
-                      {participant.name
-                        .split(" ")
-                        .map((part) => part[0])
-                        .join("")
-                        .slice(0, 2)}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography noWrap sx={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>
-                        {participant.name}
-                      </Typography>
-                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
-                        {participant.cam ? (
-                          <VideocamIcon sx={{ fontSize: 14, color: "#22c55e" }} />
-                        ) : (
-                          <VideocamOffIcon sx={{ fontSize: 14, color: "#ef4444" }} />
-                        )}
-                        {participant.mic ? (
-                          <MicIcon sx={{ fontSize: 14, color: "#22c55e" }} />
-                        ) : (
-                          <MicOffIcon sx={{ fontSize: 14, color: "#ef4444" }} />
-                        )}
-                      </Stack>
-                    </Box>
-                  </Paper>
-                ))}
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
+                p: 2,
+                pt: 5,
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+                <ParticipantStageTile participant={stageMainParticipant} main />
               </Box>
-            )}
+
+              {stageSideParticipants.length > 0 && (
+                <Box
+                  sx={{
+                    flexShrink: 0,
+                    height: { xs: 116, sm: 132 },
+                    display: "flex",
+                    gap: 1,
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                    pb: 0.5,
+                    px: 0.25,
+                    "&::-webkit-scrollbar": { height: 6 },
+                    "&::-webkit-scrollbar-thumb": {
+                      bgcolor: "rgba(255,255,255,0.18)",
+                      borderRadius: 999,
+                    },
+                  }}
+                >
+                  {stageSideParticipants.map((participant) => (
+                    <Box
+                      key={participant.id}
+                      sx={{
+                        flex: "0 0 auto",
+                        width: { xs: 148, sm: 176 },
+                        height: "100%",
+                      }}
+                    >
+                      <ParticipantStageTile participant={participant} />
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
           </Paper>
 
           {/* Bottom Controls */}
