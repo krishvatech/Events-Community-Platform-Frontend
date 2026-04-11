@@ -164,6 +164,7 @@ const AppShell = () => {
 
   const showSidebar = authed && !hideChrome;
   const showHeader = !authed && !hideChrome;
+  const showKYCNotification = !hideChrome;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -195,7 +196,7 @@ const AppShell = () => {
         </>
       )}
 
-      <KYCNotification />
+      {showKYCNotification && <KYCNotification />}
 
       {/* Main Content Wrapper */}
       <Box
