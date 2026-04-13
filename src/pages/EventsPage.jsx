@@ -703,7 +703,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           </span>
         )}
       </Box>
-
       <CardContent className="p-4 sm:p-5 md:p-6 flex-1 flex flex-col min-h-[260px] sm:min-h-[280px] md:min-h-[300px]">
         <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 leading-snug two-line">
           {ev.title}
@@ -965,7 +964,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
         <div className="mt-auto" />
       </CardContent>
-
       {/* Footer */}
       <div className="flex items-center justify-between border-t p-6">
         <div className="text-base font-semibold text-neutral-900">
@@ -1062,7 +1060,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             <div className="flex items-center gap-2">
               {ev.registration_type === 'apply' ? (
                 // APPLY FLOW
-                <>
+                (<>
                   {!myApplication || myApplication.status === 'none'
                     ? (
                       <Button
@@ -1171,10 +1169,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       {isGuest ? "Continue Applying as Guest" : "Apply as Guest"}
                     </Button>
                   )}
-                </>
+                </>)
               ) : (
                 // REGISTER FLOW
-                <>
+                (<>
                   <Button
                     variant="contained"
                     size="medium"
@@ -1195,13 +1193,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       {isGuest ? "Continue as Guest" : "Join as Guest"}
                     </Button>
                   )}
-                </>
+                </>)
               )}
             </div>
           )
         )}
       </div>
-
       <ApplyNowModal
         open={applyModalOpen}
         onClose={() => setApplyModalOpen(false)}

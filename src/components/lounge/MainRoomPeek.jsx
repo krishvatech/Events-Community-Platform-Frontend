@@ -55,7 +55,7 @@ function getParticipantUserKey(participant) {
 }
 
 export default function MainRoomPeek({
-    mainDyteMeeting,
+    mainRtkMeeting,
     isInBreakout,
     pinnedParticipantId,
     loungeParticipantKeys,
@@ -69,7 +69,7 @@ export default function MainRoomPeek({
     const videoRef = useRef(null);
 
     useEffect(() => {
-        if (mainDyteMeeting) {
+        if (mainRtkMeeting) {
             setMainRoomConnectTimedOut(false);
             return;
         }
@@ -77,13 +77,13 @@ export default function MainRoomPeek({
             setMainRoomConnectTimedOut(true);
         }, 4000);
         return () => clearTimeout(timeout);
-    }, [mainDyteMeeting]);
+    }, [mainRtkMeeting]);
 
     useEffect(() => {
-        if (!mainDyteMeeting?.participants) return;
+        if (!mainRtkMeeting?.participants) return;
 
         const updatePrimaryParticipant = () => {
-            const allParticipants = mainDyteMeeting.participants.joined.toArray();
+            const allParticipants = mainRtkMeeting.participants.joined.toArray();
 
             const loungeKeySet = new Set(loungeParticipantKeys || []);
 
@@ -134,7 +134,7 @@ export default function MainRoomPeek({
             }
 
             // ✅ PRIORITY 3: Try to find the active speaker
-            const activeSpeaker = mainDyteMeeting.participants.activeSpeaker;
+            const activeSpeaker = mainRtkMeeting.participants.activeSpeaker;
             if (activeSpeaker) {
                 const activeKey = getParticipantUserKey(activeSpeaker);
                 if (activeKey && loungeKeySet.has(activeKey)) {
@@ -177,18 +177,18 @@ export default function MainRoomPeek({
         const handleActiveSpeakerChanged = () => updatePrimaryParticipant();
         const handleVideoUpdate = () => updatePrimaryParticipant();
 
-        mainDyteMeeting.participants.joined.on('participantJoined', handleParticipantJoined);
-        mainDyteMeeting.participants.joined.on('participantLeft', handleParticipantLeft);
-        mainDyteMeeting.participants.on('activeSpeakerChanged', handleActiveSpeakerChanged);
-        mainDyteMeeting.participants.joined.on('videoUpdate', handleVideoUpdate);
+        mainRtkMeeting.participants.joined.on('participantJoined', handleParticipantJoined);
+        mainRtkMeeting.participants.joined.on('participantLeft', handleParticipantLeft);
+        mainRtkMeeting.participants.on('activeSpeakerChanged', handleActiveSpeakerChanged);
+        mainRtkMeeting.participants.joined.on('videoUpdate', handleVideoUpdate);
 
         return () => {
-            mainDyteMeeting.participants.joined.removeListener('participantJoined', handleParticipantJoined);
-            mainDyteMeeting.participants.joined.removeListener('participantLeft', handleParticipantLeft);
-            mainDyteMeeting.participants.removeListener('activeSpeakerChanged', handleActiveSpeakerChanged);
-            mainDyteMeeting.participants.joined.removeListener('videoUpdate', handleVideoUpdate);
+            mainRtkMeeting.participants.joined.removeListener('participantJoined', handleParticipantJoined);
+            mainRtkMeeting.participants.joined.removeListener('participantLeft', handleParticipantLeft);
+            mainRtkMeeting.participants.removeListener('activeSpeakerChanged', handleActiveSpeakerChanged);
+            mainRtkMeeting.participants.joined.removeListener('videoUpdate', handleVideoUpdate);
         };
-    }, [mainDyteMeeting, pinnedParticipantId, loungeParticipantKeys]);
+    }, [mainRtkMeeting, pinnedParticipantId, loungeParticipantKeys]);
 
     // Attach video track or screen share to video element
     useEffect(() => {
@@ -344,7 +344,7 @@ export default function MainRoomPeek({
             {!isFolded && (
                 <>
                     <Box sx={{ flex: 1, position: 'relative', bgcolor: '#000', overflow: 'hidden' }}>
-                        {!mainDyteMeeting ? (
+                        {!mainRtkMeeting ? (
                             <Box sx={{
                                 width: '100%',
                                 height: '100%',
@@ -426,7 +426,7 @@ export default function MainRoomPeek({
                     <Box sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
                         <Typography sx={{ color: '#22c55e', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#22c55e' }} />
-                            {!mainDyteMeeting
+                            {!mainRtkMeeting
                                 ? (mainRoomConnectTimedOut ? 'MAIN STAGE' : 'CONNECTING MAIN STAGE')
                                 : (primaryParticipant ? `LIVE: ${primaryParticipant.name || 'Main Stage'}` : 'MAIN STAGE')}
                         </Typography>

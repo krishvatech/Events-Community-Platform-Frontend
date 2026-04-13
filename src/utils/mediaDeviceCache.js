@@ -34,9 +34,9 @@ export const clearMediaDeviceCache = async () => {
       "videoDevice",
       "deviceSettings",
       "mediaDeviceCache",
-      "dyte_selected_device",
-      "dyte_audio_device",
-      "dyte_video_device",
+      "rtk_selected_device",
+      "rtk_audio_device",
+      "rtk_video_device",
       "webrtc_device_cache",
     ];
 
@@ -77,7 +77,7 @@ export const clearMediaDeviceCache = async () => {
           if (
             dbName.includes("media") ||
             dbName.includes("device") ||
-            dbName.includes("dyte")
+            dbName.includes("rtk")
           ) {
             indexedDB.deleteDatabase(dbName);
             result.clearedItems.push(`IndexedDB: ${dbName}`);
@@ -221,7 +221,7 @@ export const verifyCacheCleared = () => {
     if (
       key.toLowerCase().includes("media") ||
       key.toLowerCase().includes("device") ||
-      key.toLowerCase().includes("dyte")
+      key.toLowerCase().includes("rtk")
     ) {
       verification.localStorage.push(key);
     }

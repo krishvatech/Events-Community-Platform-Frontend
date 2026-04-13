@@ -14,7 +14,7 @@ function getToken() {
     return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
 }
 
-const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, dyteMeeting, onParticipantClick, onJoinMain, onOpenSettings }) => {
+const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, rtkMeeting, onParticipantClick, onJoinMain, onOpenSettings }) => {
     const [tables, setTables] = useState([]);
     const [breakoutTables, setBreakoutTables] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -358,21 +358,21 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     console.log("[Lounge] Late joiner assigned:", msg);
                     setIsWaitingForAssignment(false);
 
-                    // ✅ Refresh Dyte participant list to show newly assigned participant
-                    if (dyteMeeting) {
-                        console.log("[Lounge] Refreshing Dyte participants after assignment...");
+                    // ✅ Refresh RTK participant list to show newly assigned participant
+                    if (rtkMeeting) {
+                        console.log("[Lounge] Refreshing RTK participants after assignment...");
                         try {
                             // Refresh video subscriptions to detect new participant
-                            if (typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
-                                await dyteMeeting.participants.videoSubscribed.refresh();
-                                console.log("[Lounge] ✅ Dyte participants refreshed");
+                            if (typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                                await rtkMeeting.participants.videoSubscribed.refresh();
+                                console.log("[Lounge] ✅ RTK participants refreshed");
                             }
                             // Also try to refresh active participants list
-                            if (typeof dyteMeeting.participants?.refresh === 'function') {
-                                await dyteMeeting.participants.refresh();
+                            if (typeof rtkMeeting.participants?.refresh === 'function') {
+                                await rtkMeeting.participants.refresh();
                             }
                         } catch (e) {
-                            console.warn("[Lounge] Failed to refresh Dyte participants:", e);
+                            console.warn("[Lounge] Failed to refresh RTK participants:", e);
                         }
                     }
 
@@ -388,21 +388,21 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     // Someone was assigned to a breakout room - refresh that room's participant list
                     console.log("[Lounge] Refreshing breakout participants for room:", msg.room_id);
 
-                    // ✅ Refresh Dyte participants to sync with late joiner assignment
-                    if (dyteMeeting) {
-                        console.log("[Lounge] Refreshing Dyte participants due to assignment...");
+                    // ✅ Refresh RTK participants to sync with late joiner assignment
+                    if (rtkMeeting) {
+                        console.log("[Lounge] Refreshing RTK participants due to assignment...");
                         try {
                             // Refresh video subscriptions to detect newly assigned participant
-                            if (typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
-                                await dyteMeeting.participants.videoSubscribed.refresh();
-                                console.log("[Lounge] ✅ Dyte participants refreshed");
+                            if (typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                                await rtkMeeting.participants.videoSubscribed.refresh();
+                                console.log("[Lounge] ✅ RTK participants refreshed");
                             }
                             // Also try to refresh active participants list
-                            if (typeof dyteMeeting.participants?.refresh === 'function') {
-                                await dyteMeeting.participants.refresh();
+                            if (typeof rtkMeeting.participants?.refresh === 'function') {
+                                await rtkMeeting.participants.refresh();
                             }
                         } catch (e) {
-                            console.warn("[Lounge] Failed to refresh Dyte participants:", e);
+                            console.warn("[Lounge] Failed to refresh RTK participants:", e);
                         }
                     }
 
@@ -458,7 +458,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         }
     };
 
-    const handleLeaveTable = async (dyteMeeting) => {
+    const handleLeaveTable = async (rtkMeeting) => {
         console.log("[Lounge] Starting leave table process...");
 
         // ✅ CLEAR WAITING STATE: User is no longer waiting for assignment
@@ -805,7 +805,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
 
                                     // If at a table, leave it first (same as "Leave Table" button)
                                     if (isUserAtTable) {
-                                        handleLeaveTable(dyteMeeting);
+                                        handleLeaveTable(rtkMeeting);
                                     } else {
                                         // Otherwise, just close the lounge overlay
                                         onClose();
@@ -951,7 +951,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                                     handleJoinTable(tableId, seatIndex);
                                     handleEnterBreakout(tableId);
                                 }}
-                                onLeave={() => handleLeaveTable(dyteMeeting)}
+                                onLeave={() => handleLeaveTable(rtkMeeting)}
                                 currentUserId={myInternalId || currentUserId}
                                 myUsername={myUsername}
                                 isAdmin={isAdmin}
@@ -977,7 +977,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                                             handleJoinTable(tableId, seatIndex);
                                             handleEnterBreakout(tableId);
                                         }}
-                                        onLeave={() => handleLeaveTable(dyteMeeting)}
+                                        onLeave={() => handleLeaveTable(rtkMeeting)}
                                         currentUserId={myInternalId || currentUserId}
                                         myUsername={myUsername}
                                         isAdmin={isAdmin}
@@ -997,7 +997,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         </Box>
                     )}
 
-                    <MainRoomPeek dyteMeeting={dyteMeeting} />
+                    <MainRoomPeek rtkMeeting={rtkMeeting} />
                 </Box>
             </Dialog>
 

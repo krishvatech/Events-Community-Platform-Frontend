@@ -3220,7 +3220,7 @@ export default function ProfilePage() {
             {mode === "preview" && (
               loading ? (
                 // ================= SKELETON VIEW (LIKE HOME PAGE) ================
-                <Box>
+                (<Box>
                   {/* Header Skeleton */}
                   <Card
                     variant="outlined"
@@ -3252,7 +3252,6 @@ export default function ProfilePage() {
                       </Box>
                     </Stack>
                   </Card>
-
                   {/* Sections Skeleton Grid – same layout idea as HomePage */}
                   <Grid
                     container
@@ -3324,10 +3323,10 @@ export default function ProfilePage() {
                       <SectionSkeleton minHeight={140} lines={2} />
                     </Grid>
                   </Grid>
-                </Box>
+                </Box>)
               ) : (
                 // ================= NORMAL VIEW (YOUR EXISTING PREVIEW UI) ============
-                <Box>
+                (<Box>
                   {/* --- HEADER CARD (Matching HomePage) --- */}
                   <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
@@ -3414,7 +3413,6 @@ export default function ProfilePage() {
                       </Box>
                     </Stack>
                   </Card>
-
                   {/* --- CONTENT GRID --- */}
                   <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
                     {/* LEFT COLUMN */}
@@ -3537,11 +3535,11 @@ export default function ProfilePage() {
                           </>
                         ) : parseSkills(form.skillsText).length ? (
                           // Fallback for old data with no structured skills
-                          <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          (<Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
                             {parseSkills(form.skillsText).map((s, i) => (
                               <Chip key={i} size="small" label={s} />
                             ))}
-                          </Box>
+                          </Box>)
                         ) : (
                           <Typography variant="body2" color="text.secondary">
                             Add your top skills.
@@ -4495,13 +4493,12 @@ export default function ProfilePage() {
                       </SectionCard>
                     </Grid>
                   </Grid>
-                </Box>
+                </Box>)
               )
             )}
           </main>
         </div >
       </Container >
-
       {/* --- Avatar Upload Dialog --- */}
       < AvatarUploadDialog
         open={avatarDialogOpen}
@@ -4520,7 +4517,6 @@ export default function ProfilePage() {
         }}
         setSaving={setAvatarSaving}
       />
-
       {/* --- NEW DIALOG: Identity (Header Trigger) --- */}
       < BasicInfoDialog
         open={basicInfoOpen}
@@ -4532,7 +4528,6 @@ export default function ProfilePage() {
         }}
         onStartKYC={handleStartKYC}
       />
-
       {/* --- NEW DIALOG: Edit About Work --- */}
       < Dialog open={workOpen} onClose={() => setWorkOpen(false)} fullWidth maxWidth="sm" >
         <DialogTitle>Edit About your work</DialogTitle>
@@ -4554,7 +4549,6 @@ export default function ProfilePage() {
         </DialogContent>
         <DialogActions><Button onClick={() => setWorkOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAboutWork} disabled={saving || !latestExp}>Save</Button></DialogActions>
       </Dialog >
-
       {/* --- Email Verification Dialog --- */}
       < Dialog open={emailVerificationOpen} onClose={() => setEmailVerificationOpen(false)} maxWidth="xs" fullWidth >
         <DialogTitle>Verify Email</DialogTitle>
@@ -4589,7 +4583,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog >
-
       {/* --- Other Dialogs (Contact, Education, Experience, etc.) --- */}
       < Dialog open={contactOpen} onClose={closeContactEditor} fullWidth maxWidth="sm" fullScreen={isMobile} >
         <DialogTitle sx={{ fontWeight: 700 }}>
@@ -5125,7 +5118,6 @@ export default function ProfilePage() {
           <Button variant="contained" onClick={saveContact} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         </DialogActions>
       </Dialog >
-
       <Dialog open={locationOpen} onClose={() => setLocationOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>Edit Location</DialogTitle>
         <DialogContent dividers>
@@ -5177,7 +5169,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* --- Language Dialog --- */}
       <Dialog open={langOpen} onClose={() => setLangOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{editLangId ? "Edit Language" : "Add Language"}</DialogTitle>
@@ -5316,7 +5307,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       <Dialog open={eduOpen} onClose={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); setEduReqErrors({ school: "", degree: "", field: "", start: "" }); }} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editEduId ? "Edit education" : "Add education"}</DialogTitle>
         <DialogContent dividers>
@@ -5426,7 +5416,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* --- Delete Education Document ? Modern Confirmation Dialog --- */}
       <Dialog
         open={deleteDocDialog.open}
@@ -5464,7 +5453,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       <Dialog open={expOpen} onClose={() => setExpOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>{editExpId ? "Edit experience" : "Create experience"}</DialogTitle>
         <DialogContent dividers>
@@ -5546,7 +5534,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Training Add/Edit */}
       <Dialog open={trainingOpen} onClose={() => setTrainingOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editTrainingId ? "Edit Training" : "Add Training"}</DialogTitle>
@@ -5707,7 +5694,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Certification Add/Edit */}
       <Dialog open={certOpen} onClose={() => setCertOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editCertId ? "Edit Certification" : "Add Certification"}</DialogTitle>
@@ -5846,7 +5832,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Membership Add/Edit */}
       <Dialog open={memberOpen} onClose={() => setMemberOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editMemberId ? "Edit Membership" : "Add Membership"}</DialogTitle>
@@ -6020,7 +6005,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Delete Training */}
       <Dialog open={!!trainingDeleteId} onClose={() => setTrainingDeleteId(null)}>
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
@@ -6065,7 +6049,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Delete Certification */}
       <Dialog open={!!certDeleteId} onClose={() => setCertDeleteId(null)}>
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
@@ -6110,7 +6093,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Delete Membership */}
       <Dialog open={!!memberDeleteId} onClose={() => setMemberDeleteId(null)}>
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
@@ -6155,7 +6137,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* --- Modern Generic Delete Confirmation --- */}
       <Dialog
         open={confirm.open}
@@ -6194,7 +6175,6 @@ export default function ProfilePage() {
           </Button>
         </DialogActions>
       </Dialog>
-
       <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>{aboutMode === "skills" ? "Edit skills" : "Edit description"}</DialogTitle>
         <DialogContent dividers>
@@ -6321,7 +6301,6 @@ export default function ProfilePage() {
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}><Button onClick={() => setAboutOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAbout} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></DialogActions>
       </Dialog>
-
       {/* Name Change Request Dialog */}
       <NameChangeDialog
         open={nameChangeOpen}
@@ -6329,11 +6308,9 @@ export default function ProfilePage() {
         currentNames={{ first: form.first_name, middle: "", last: form.last_name }}
         showToast={showNotification}
       />
-
       <Snackbar open={snack.open} autoHideDuration={3500} onClose={() => setSnack({ ...snack, open: false })}>
         <Alert onClose={() => setSnack({ ...snack, open: false })} severity={snack.sev} variant="filled" sx={{ width: "100%" }}>{snack.msg}</Alert>
       </Snackbar>
-
       <RenewalDialog
         open={renewalOpen}
         onClose={(success) => {

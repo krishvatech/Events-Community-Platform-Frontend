@@ -80,7 +80,6 @@ const NotificationHistoryPanel = ({
           ×
         </IconButton>
       </Box>
-
       {/* Content */}
       <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {notifications && notifications.length > 0 ? (
@@ -179,7 +178,7 @@ const NotificationHistoryPanel = ({
           </List>
         ) : (
           /* Empty State */
-          <Box
+          (<Box
             sx={{
               display: 'flex',
               flexDirection: 'column',
@@ -195,10 +194,9 @@ const NotificationHistoryPanel = ({
             <Typography variant="caption" sx={{ mt: 1 }}>
               Late joiner notifications will appear here
             </Typography>
-          </Box>
+          </Box>)
         )}
       </Box>
-
       {/* Footer */}
       {notifications && notifications.length > 0 && (
         <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
@@ -222,7 +220,6 @@ const NotificationHistoryPanel = ({
           </Button>
         </Box>
       )}
-
       {/* Room Selection Menu */}
       <Menu
         anchorEl={assignMenuAnchor}

@@ -3722,11 +3722,11 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                         </Box>
                       ) : postsLoading ? (
                         // Skeletons while posts are loading
-                        <Stack spacing={2}>
+                        (<Stack spacing={2}>
                           <RichPostSkeleton />
                           <RichPostSkeleton />
                           <RichPostSkeleton />
-                        </Stack>
+                        </Stack>)
                       ) : posts.length === 0 ? (
                         <Typography variant="body2" color="text.secondary">
                           No posts yet.
@@ -4430,7 +4430,6 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
           </main>
         </div>
       </Container >
-
       {/* Connections Dialog */}
       < Dialog open={connOpen} onClose={() => setConnOpen(false)
       } fullWidth maxWidth="sm" >
@@ -4497,7 +4496,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
                               {String(f.id) === String(me?.id || "") ? (
                                 // self row → show a neutral chip instead of hiding the action area
-                                <Chip label="You" size="small" />
+                                (<Chip label="You" size="small" />)
                               ) : (() => {
                                 const status = (connFriendStatus[String(f.id)] || "none").toLowerCase();
                                 if (status === "friends") {
@@ -4608,7 +4607,6 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
           </Button>
         </DialogActions>
       </Dialog >
-
       <Dialog
         open={removeDialog.open}
         onClose={closeRemoveFriendDialog}
@@ -4681,7 +4679,6 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
           </Button>
         </DialogActions>
       </Dialog>
-
       <ReportProfileDialog
         open={reportOpen}
         onClose={() => setReportOpen(false)}

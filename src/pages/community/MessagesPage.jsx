@@ -716,7 +716,7 @@ const getLastTimeISO = (t) => {
   const lm = getLastMessageObj(t);
   return (
     // ✅ prefer sticky client-side values when present
-    t?._last_ts || t?.local_last_ts ||
+    (t?._last_ts || t?.local_last_ts ||
     // server-provided possibilities
     t?.last_message_created_at ||
     t?.last_message_at ||
@@ -724,7 +724,7 @@ const getLastTimeISO = (t) => {
     t?.last_message_timestamp ||
     lm?.created_at || lm?.timestamp || lm?.sent_at ||
     // fallbacks
-    t?.updated_at || t?.created_at || null
+    t?.updated_at || t?.created_at || null)
   );
 };
 
@@ -3395,7 +3395,6 @@ export default function MessagesPage() {
           if (newId) setActiveId(newId);
         }}
       />
-
       <Grid
         container
         rowSpacing={2}
@@ -4026,7 +4025,7 @@ export default function MessagesPage() {
 
                   {groupReadOnly ? (
                     // 🔒 WhatsApp-style read-only group banner
-                    <Box
+                    (<Box
                       sx={{
                         px: 2,
                         py: 1,
@@ -4037,9 +4036,8 @@ export default function MessagesPage() {
                         fontSize: 13,
                         textAlign: "center",
                       }}
-                    >
-                      Only admins can send messages in this group.
-                    </Box>
+                    >Only admins can send messages in this group.
+                                          </Box>)
                   ) : (
                     <Stack direction="row" spacing={1} alignItems="center">
                       {/* 🔹 1. Hidden Inputs for File and Camera */}
@@ -4218,7 +4216,6 @@ export default function MessagesPage() {
           {convMenuTarget?.is_pinned ? "Unpin Chat" : "Pin Chat"}
         </MenuItem>
       </Menu>
-
       {/* 🔹 Camera Modal */}
       <Dialog open={cameraOpen} onClose={handleCloseCamera} maxWidth="md">
         <DialogContent sx={{ p: 0, bgcolor: "black", display: "flex", justifyContent: "center" }}>

@@ -1890,7 +1890,6 @@ export default function AdminMessagesPage() {
         onStartStaffChat={(u) => openConversation(u)}
         onStartGroupChat={(g) => openGroupConversation(g)}
       />
-
       {/* Page header – similar to Community Groups */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
@@ -1915,7 +1914,6 @@ export default function AdminMessagesPage() {
           </Box>
         </Stack>
       </Stack>
-
       {/* outer card */}
       <Paper
         className="rounded-2xl border border-slate-200"
@@ -2874,7 +2872,7 @@ export default function AdminMessagesPage() {
 
                 {draftAttachments.length > 0 ? (
                   // 🔍 Media preview panel (like MessagesPage)
-                  (() => {
+                  ((() => {
                     const activeFile =
                       draftAttachments[activePreviewIndex] || draftAttachments[0];
                     const activeUrl =
@@ -3096,10 +3094,10 @@ export default function AdminMessagesPage() {
                         </Box>
                       </Box>
                     );
-                  })()
+                  })())
                 ) : (
                   // ✉️ Normal text-only composer
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                  (<Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                     <Tooltip title="Attach">
                       <IconButton
                         onClick={handleAttachClick}
@@ -3113,7 +3111,6 @@ export default function AdminMessagesPage() {
                         <AddRoundedIcon fontSize="medium" />
                       </IconButton>
                     </Tooltip>
-
                     <TextField
                       placeholder="Type a message…"
                       fullWidth
@@ -3140,7 +3137,7 @@ export default function AdminMessagesPage() {
                     >
                       Send
                     </Button>
-                  </Box>
+                  </Box>)
                 )}
                 {/* Attach menu: File Upload & Camera (same as MessagesPage) */}
                 <Menu
@@ -3217,7 +3214,6 @@ export default function AdminMessagesPage() {
           <MenuItem onClick={handleDeleteMessage}>Delete</MenuItem>
         )}
       </Menu>
-
       {/* Camera modal for capturing a photo */}
       <Dialog open={cameraOpen} onClose={handleCloseCamera} maxWidth="md">
         <DialogContent sx={{ p: 0, bgcolor: "black" }}>

@@ -2768,7 +2768,7 @@ export default function AdminPostsPage() {
           ) : items.length === 0 ? (
 
             // 2. EMPTY STATE
-            <Paper
+            (<Paper
               variant="outlined"
               sx={{
                 borderRadius: 3,
@@ -2779,11 +2779,11 @@ export default function AdminPostsPage() {
               }}
             >
               {loadingErr ? loadingErr : "No posts yet."}
-            </Paper>
+            </Paper>)
           ) : (
 
             // 3. POST LIST + INFINITE SCROLL
-            <>
+            (<>
               <Stack spacing={2}>
                 {/* Use visibleItems (Infinite Scroll) instead of pageItems */}
                 {visibleItems.map((it) => (
@@ -2798,7 +2798,6 @@ export default function AdminPostsPage() {
                   />
                 ))}
               </Stack>
-
               {/* 4. INFINITE SCROLL TRIGGER & BOTTOM SKELETON */}
               {items.length > visibleCount && (
                 <Box ref={observerTarget} sx={{ py: 2, mt: 1, textAlign: 'center' }}>
@@ -2810,11 +2809,10 @@ export default function AdminPostsPage() {
                   )}
                 </Box>
               )}
-            </>
+            </>)
           )}
         </Box>
       </Container>
-
       <CreatePostDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}

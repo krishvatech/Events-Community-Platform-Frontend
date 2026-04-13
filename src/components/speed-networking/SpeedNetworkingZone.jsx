@@ -83,7 +83,7 @@ export default function SpeedNetworkingZone({
     onNavigateMainRoom,
     onNavigateSocialLounge,
     onNavigateEventEnded,
-    dyteMeeting,
+    rtkMeeting,
     onEnterMatch,
     onNetworkingStateChange,
     lastMessage,
@@ -557,7 +557,7 @@ export default function SpeedNetworkingZone({
                     setTransitionMatch(null);
                     setInQueue(false);
                     setExitNavigation(null);
-                    // Join Dyte room for this match
+                    // Join RTK room for this match
                     if (onEnterMatch) {
                         onEnterMatch(data.match);
                     }

@@ -118,10 +118,10 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
+import { useRealtimeKitClient, RealtimeKitProvider } from '@cloudflare/realtimekit-react';
 import EmojiPicker from "emoji-picker-react";
 
-import { DyteParticipantsAudio } from "@dytesdk/react-ui-kit";
+import { RtkParticipantsAudio } from '@cloudflare/realtimekit-react-ui';
 import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
 import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
@@ -160,7 +160,7 @@ import {
   readFileAsDataUrl,
   saveBackgroundSelection,
   validateBackgroundUpload,
-} from "../utils/dyteBackground.js";
+} from '../utils/rtkBackground.js';
 
 // ================ Custom Lounge Icon ================
 const SocialLoungeIcon = (props) => (
@@ -267,8 +267,8 @@ function getMyUserIdFromJwt() {
   }
 }
 
-// -------- Dyte permission hook (copied from Old logic style) ----------
-function useDytePermissions(meeting) {
+// -------- RTK permission hook (copied from Old logic style) ----------
+function useRtkPermissions(meeting) {
   const [permissions, setPermissions] = useState(meeting?.self?.permissions || {});
 
   useEffect(() => {
@@ -519,10 +519,10 @@ function getBackendUserId(participant) {
   );
 }
 
-// ✅ PHASE 1: Match Dyte participant to backend user in lounge tables
-function findUserIdForDyteParticipant(dyteParticipantId, loungeTables, participantIdMapRef) {
-  if (!dyteParticipantId || !loungeTables) return null;
-  const key = String(dyteParticipantId);
+// ✅ PHASE 1: Match RTK participant to backend user in lounge tables
+function findUserIdForRtkParticipant(rtkParticipantId, loungeTables, participantIdMapRef) {
+  if (!rtkParticipantId || !loungeTables) return null;
+  const key = String(rtkParticipantId);
 
   // Check cache first
   const cached = participantIdMapRef.current?.get(key);
@@ -533,7 +533,7 @@ function findUserIdForDyteParticipant(dyteParticipantId, loungeTables, participa
     if (!table.participants || !Array.isArray(table.participants)) continue;
 
     const participant = table.participants.find(
-      p => String(p.dyte_participant_id || p.dyteParticipantId) === String(dyteParticipantId)
+      p => String(p.rtk_participant_id || p.rtkParticipantId) === String(rtkParticipantId)
     );
 
     if (participant) {
@@ -581,7 +581,7 @@ function ParticipantVideo({ participant, meeting, isSelf = false, expectedUserId
     // Always set these (helps iOS/Safari)
     el.autoplay = true;
     el.playsInline = true;
-    el.muted = true; // always mute video elements; audio comes from DyteParticipantsAudio
+    el.muted = true; // always mute video elements; audio comes from RtkParticipantsAudio
 
     // Track ownership verification
     if (expectedUserId && !isSelf) {
@@ -1409,7 +1409,6 @@ function PreEventLoungeGate({
           </Typography>
         </Box>
       </Box>
-
       {/* Bottom-left role badge */}
       <Box sx={{ position: "fixed", left: 16, bottom: 16, zIndex: 50 }}>
         <Chip
@@ -1424,7 +1423,6 @@ function PreEventLoungeGate({
           }}
         />
       </Box>
-
       {/* Center Card */}
       <Paper
         elevation={0}
@@ -1559,7 +1557,7 @@ function PreEventLoungeGate({
         {/* Action Buttons - Conditional based on role */}
         {isHost ? (
           // Host-specific UI
-          <>
+          (<>
             <Typography
               sx={{
                 fontSize: 14,
@@ -1572,7 +1570,6 @@ function PreEventLoungeGate({
             >
               Choose how you want to join:
             </Typography>
-
             <Button
               onClick={onJoinMain}
               variant="contained"
@@ -1591,7 +1588,6 @@ function PreEventLoungeGate({
             >
               Join as Host (Main Meeting)
             </Button>
-
             {loungeAvailable && isLoungeOpen && (
               <Button
                 onClick={onHostChooseLounge}
@@ -1617,10 +1613,10 @@ function PreEventLoungeGate({
                 Join Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
               </Button>
             )}
-          </>
+          </>)
         ) : (
           // Audience UI (existing behavior)
-          <>
+          (<>
             {isLoungeOpen && loungeAvailable && (
               <Button
                 onClick={onOpenLounge}
@@ -1646,7 +1642,6 @@ function PreEventLoungeGate({
                 Open Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
               </Button>
             )}
-
             {!isLoungeOpen && onJoinMain && (
               <Button
                 onClick={onJoinMain}
@@ -1666,7 +1661,7 @@ function PreEventLoungeGate({
                 Join Main Meeting
               </Button>
             )}
-          </>
+          </>)
         )}
 
         {/* Back button - always show */}
@@ -1696,11 +1691,9 @@ function PreEventLoungeGate({
           </Button>
         )}
       </Paper>
-
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
         Support request is temporarily unavailable while you are in the waiting room.
       </Typography>
-
       {/* Host Choice Confirmation Dialog */}
       <Dialog
         open={hostChoiceDialogOpen && isHost}
@@ -2189,7 +2182,7 @@ export default function NewLiveMeeting() {
   // ✅ Participant visibility filter for Host (Phase 5)
   const [participantRoomFilter, setParticipantRoomFilter] = useState("all"); // "all" | "main" | "breakout" | "lounge"
 
-  // ✅ Host permissions (synced to Dyte permissions)
+  // ✅ Host permissions (synced to RTK permissions)
   const [hostPerms, setHostPerms] = useState({
     chat: true,
     polls: true,
@@ -2521,7 +2514,7 @@ export default function NewLiveMeeting() {
   const stopFlowTimeoutRef = useRef(null);
   const stopFlowLogRef = useRef([]);
   const speedNetworkingStopPhaseRef = useRef('idle');
-  const dyteLoungeRoomConnectingRef = useRef(false);
+  const rtkLoungeRoomConnectingRef = useRef(false);
 
   useEffect(() => {
     speedNetworkingStateRef.current = speedNetworkingState;
@@ -2850,10 +2843,10 @@ export default function NewLiveMeeting() {
 
   // ✅ PHASE 1: Participant Visibility - Room Location Tracking
   const [participantRoomMap, setParticipantRoomMap] = useState(new Map());
-  // Map<dyte_participant_id, { type: "main"|"breakout"|"lounge", roomId, roomName, roomCategory }>
+  // Map<rtk_participant_id, { type: "main"|"breakout"|"lounge", roomId, roomName, roomCategory }>
 
   const participantIdMapRef = useRef(new Map());
-  // Map<backend_user_id, dyte_participant_id> for ID matching
+  // Map<backend_user_id, rtk_participant_id> for ID matching
 
   const lastParticipantSyncRef = useRef(0);
   // Track last sync timestamp for validation
@@ -3094,11 +3087,11 @@ export default function NewLiveMeeting() {
   const [scheduledLabel, setScheduledLabel] = useState("--");
   const [durationLabel, setDurationLabel] = useState("--");
 
-  // ---------- Dyte init ----------
-  const [dyteMeeting, initMeeting] = useDyteClient();
+  // ---------- RTK init ----------
+  const [rtkMeeting, initMeeting] = useRealtimeKitClient();
 
   const [initDone, setInitDone] = useState(false);
-  const selfPermissions = useDytePermissions(dyteMeeting);
+  const selfPermissions = useRtkPermissions(rtkMeeting);
   const selfCanProduceAudio = useMemo(() => {
     const value =
       selfPermissions?.canProduceAudio ??
@@ -3120,12 +3113,12 @@ export default function NewLiveMeeting() {
   }, [selfPermissions]);
 
   const myParticipantKey = useMemo(
-    () => getParticipantUserKey(dyteMeeting?.self),
-    [dyteMeeting?.self]
+    () => getParticipantUserKey(rtkMeeting?.self),
+    [rtkMeeting?.self]
   );
   const isSelfElevatedRole = useMemo(() => {
     const elevated = new Set(["Host", "Moderator", "Speaker"]);
-    const self = dyteMeeting?.self;
+    const self = rtkMeeting?.self;
     const candidates = [
       selfAssignedRole,
       normalizeDisplayRole(role),
@@ -3134,7 +3127,7 @@ export default function NewLiveMeeting() {
       role === "publisher" ? "Host" : "",
     ];
     return candidates.some((x) => elevated.has(x));
-  }, [dyteMeeting?.self, role, selfAssignedRole]);
+  }, [rtkMeeting?.self, role, selfAssignedRole]);
 
   const syncMoodMapFromApi = useCallback(async () => {
     if (!eventId) return;
@@ -3194,13 +3187,13 @@ export default function NewLiveMeeting() {
 
         if (nextMood) {
           persistRecentMood(nextMood);
-          dyteMeeting?.participants?.broadcastMessage?.("mood-updated", {
+          rtkMeeting?.participants?.broadcastMessage?.("mood-updated", {
             userKey: myParticipantKey,
             mood: nextMood,
             ts: Date.now(),
           });
         } else {
-          dyteMeeting?.participants?.broadcastMessage?.("mood-updated", {
+          rtkMeeting?.participants?.broadcastMessage?.("mood-updated", {
             userKey: myParticipantKey,
             mood: null,
             ts: Date.now(),
@@ -3212,11 +3205,11 @@ export default function NewLiveMeeting() {
         moodUpdateInFlightRef.current = false;
       }
     },
-    [dyteMeeting, eventId, moodMap, myParticipantKey, persistRecentMood]
+    [rtkMeeting, eventId, moodMap, myParticipantKey, persistRecentMood]
   );
 
   // Dual connection for main room peek
-  const [mainDyteMeeting, initMainMeeting] = useDyteClient();
+  const [mainRtkMeeting, initMainMeeting] = useRealtimeKitClient();
   const [mainRoomAuthToken, setMainRoomAuthToken] = useState(null);
   const [isInBreakoutRoom, setIsInBreakoutRoom] = useState(false);
   const [mainRoomPeekVisible, setMainRoomPeekVisible] = useState(true);
@@ -3242,7 +3235,7 @@ export default function NewLiveMeeting() {
   );
 
   const getSelfScreenShareActive = useCallback(() => {
-    const self = dyteMeeting?.self;
+    const self = rtkMeeting?.self;
     if (!self) return false;
 
     const enabled =
@@ -3277,14 +3270,14 @@ export default function NewLiveMeeting() {
     }
 
     return false;
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   const canSelfScreenShare =
-    selfPermissions?.canProduceScreenshare === "ALLOWED"; // Dyte permission string
+    selfPermissions?.canProduceScreenshare === "ALLOWED"; // RTK permission string
 
   const isSelfPresentationEligible =
-    matchesStageTarget(presentationTarget, dyteMeeting?.self) ||
-    matchesStageTarget(spotlightTarget, dyteMeeting?.self);
+    matchesStageTarget(presentationTarget, rtkMeeting?.self) ||
+    matchesStageTarget(spotlightTarget, rtkMeeting?.self);
 
   const screenShareDisabled =
     !roomJoined ||
@@ -3299,14 +3292,14 @@ export default function NewLiveMeeting() {
   const lastScreenShareStopAtRef = useRef(0);
 
   const waitForScreenSharePeerStable = useCallback(async (timeoutMs = 2500) => {
-    const pc = dyteMeeting?.self?.peerConnection;
+    const pc = rtkMeeting?.self?.peerConnection;
     if (!pc || typeof pc.signalingState !== "string") return;
 
     const startedAt = Date.now();
     while (pc.signalingState !== "stable" && Date.now() - startedAt < timeoutMs) {
       await new Promise((r) => setTimeout(r, 120));
     }
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   const isScreenShareRenegotiationError = useCallback((error) => {
     const message = String(error?.message || error || "").toLowerCase();
@@ -3319,14 +3312,14 @@ export default function NewLiveMeeting() {
 
   const stopSelfScreenShareWithCleanup = useCallback(async () => {
     try {
-      await dyteMeeting?.self?.disableScreenShare?.();
+      await rtkMeeting?.self?.disableScreenShare?.();
     } catch (e) {
       console.warn("[LiveMeeting] Failed to disable screen share during cleanup:", e);
     } finally {
       lastScreenShareStopAtRef.current = Date.now();
       setIsScreenSharing(getSelfScreenShareActive());
     }
-  }, [dyteMeeting, getSelfScreenShareActive]);
+  }, [rtkMeeting, getSelfScreenShareActive]);
 
   const startSelfScreenShareWithRecovery = useCallback(async () => {
     const sinceLastStop = Date.now() - (lastScreenShareStopAtRef.current || 0);
@@ -3339,10 +3332,10 @@ export default function NewLiveMeeting() {
     // ✅ PREEMPTIVE AUDIO DISABLE: Disable audio BEFORE screen share to prevent ERROR_CONTENT
     try {
       console.log("[LiveMeeting] Disabling audio before screen share...");
-      await dyteMeeting?.self?.disableAudio?.();
+      await rtkMeeting?.self?.disableAudio?.();
 
       // Also disable at WebRTC level
-      const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+      const audioSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
         (s) => s.track?.kind === "audio"
       ) || [];
       for (const sender of audioSenders) {
@@ -3355,14 +3348,14 @@ export default function NewLiveMeeting() {
     }
 
     try {
-      await dyteMeeting?.self?.enableScreenShare?.();
+      await rtkMeeting?.self?.enableScreenShare?.();
 
       // ✅ RE-ENABLE AUDIO after screen share is active (300ms delay for stability)
       setTimeout(async () => {
         try {
           console.log("[LiveMeeting] Re-enabling audio after screen share active...");
-          await dyteMeeting?.self?.enableAudio?.();
-          const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+          await rtkMeeting?.self?.enableAudio?.();
+          const audioSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "audio"
           ) || [];
           for (const sender of audioSenders) {
@@ -3386,8 +3379,8 @@ export default function NewLiveMeeting() {
 
       // ✅ Disable audio again before retry
       try {
-        await dyteMeeting?.self?.disableAudio?.();
-        const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+        await rtkMeeting?.self?.disableAudio?.();
+        const audioSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
           (s) => s.track?.kind === "audio"
         ) || [];
         for (const sender of audioSenders) {
@@ -3399,13 +3392,13 @@ export default function NewLiveMeeting() {
         console.warn("[LiveMeeting] Failed to disable audio on retry:", e);
       }
 
-      await dyteMeeting?.self?.enableScreenShare?.();
+      await rtkMeeting?.self?.enableScreenShare?.();
 
       // ✅ Re-enable audio after retry succeeds
       setTimeout(async () => {
         try {
-          await dyteMeeting?.self?.enableAudio?.();
-          const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+          await rtkMeeting?.self?.enableAudio?.();
+          const audioSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "audio"
           ) || [];
           for (const sender of audioSenders) {
@@ -3419,14 +3412,14 @@ export default function NewLiveMeeting() {
       }, 300);
     }
   }, [
-    dyteMeeting,
+    rtkMeeting,
     isScreenShareRenegotiationError,
     stopSelfScreenShareWithCleanup,
     waitForScreenSharePeerStable,
   ]);
 
   const getSelfScreenShareVideoTrack = useCallback(() => {
-    const self = dyteMeeting?.self;
+    const self = rtkMeeting?.self;
     if (!self) return null;
 
     const unwrapTrack = (candidate) => {
@@ -3474,7 +3467,7 @@ export default function NewLiveMeeting() {
     }
 
     return null;
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   const detachSelfScreenShareEndedBinding = useCallback(() => {
     const { track, handler } = selfScreenShareEndedBindingRef.current;
@@ -3609,21 +3602,21 @@ export default function NewLiveMeeting() {
 
   // Device state reconciliation
   useEffect(() => {
-    if (!dyteMeeting || !initDone) return;
+    if (!rtkMeeting || !initDone) return;
 
     const reconcile = async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const hasVideo = devices.some((d) => d.kind === "videoinput");
-        const dyteEnabled = dyteMeeting.self?.videoEnabled || false;
+        const rtkEnabled = rtkMeeting.self?.videoEnabled || false;
 
-        if (!hasVideo && dyteEnabled) {
+        if (!hasVideo && rtkEnabled) {
           console.warn("[DeviceState] Mismatch: Video on but no cameras");
-          await dyteMeeting.self.disableVideo();
+          await rtkMeeting.self.disableVideo();
           console.log("[DeviceState] Auto-disabled video");
         }
 
-        console.log("[DeviceState]", { hasVideo, dyteEnabled });
+        console.log("[DeviceState]", { hasVideo, rtkEnabled });
       } catch (err) {
         console.error("[DeviceState] Reconciliation failed:", err);
       }
@@ -3632,27 +3625,27 @@ export default function NewLiveMeeting() {
     reconcile();
 
     const handler = () => reconcile();
-    dyteMeeting.self.on("videoUpdate", handler);
+    rtkMeeting.self.on("videoUpdate", handler);
 
     return () => {
-      dyteMeeting.self.off("videoUpdate", handler);
+      rtkMeeting.self.off("videoUpdate", handler);
     };
-  }, [dyteMeeting, initDone]);
+  }, [rtkMeeting, initDone]);
 
   useEffect(() => {
-    if (!VIRTUAL_BG_FEATURE_ENABLED || !dyteMeeting?.self) return;
+    if (!VIRTUAL_BG_FEATURE_ENABLED || !rtkMeeting?.self || !roomJoined || !rtkMeeting.self.videoEnabled) return;
     let cancelled = false;
 
     const bootstrapVirtualBackground = async () => {
-      const meetingChanged = virtualBgMeetingRef.current !== dyteMeeting;
+      const meetingChanged = virtualBgMeetingRef.current !== rtkMeeting;
       if (meetingChanged) {
-        virtualBgMeetingRef.current = dyteMeeting;
+        virtualBgMeetingRef.current = rtkMeeting;
         virtualBgReadyRef.current = false;
       }
 
       if (virtualBgReadyRef.current) return;
 
-      const initResult = await initializeVirtualBackgroundMiddleware(dyteMeeting);
+      const initResult = await initializeVirtualBackgroundMiddleware(rtkMeeting);
       if (cancelled) return;
 
       if (!initResult.supported) {
@@ -3672,7 +3665,7 @@ export default function NewLiveMeeting() {
       setVirtualBgSupported(true);
       setVirtualBgError("");
 
-      const applyResult = await applyBackgroundSelection(dyteMeeting, virtualBgSelection);
+      const applyResult = await applyBackgroundSelection(rtkMeeting, virtualBgSelection);
       if (cancelled) return;
       if (!applyResult.ok) {
         console.warn("[LiveMeeting] virtual background middleware-apply-failed:", applyResult.error);
@@ -3685,32 +3678,41 @@ export default function NewLiveMeeting() {
     return () => {
       cancelled = true;
     };
-  }, [dyteMeeting, virtualBgSelection]);
+  }, [rtkMeeting, virtualBgSelection, roomJoined]);
 
   const applyAndPersistVirtualBackground = useCallback(async (nextSelection) => {
     const savedSelection = saveBackgroundSelection(nextSelection);
     setVirtualBgSelection(savedSelection);
     setVirtualBgError("");
 
-    if (!VIRTUAL_BG_FEATURE_ENABLED || !dyteMeeting?.self || !virtualBgReadyRef.current) {
+    if (!VIRTUAL_BG_FEATURE_ENABLED || !rtkMeeting?.self || !virtualBgReadyRef.current) {
       return;
     }
 
-    const result = await applyBackgroundSelection(dyteMeeting, savedSelection);
-    if (!result.ok) {
-      console.warn("[LiveMeeting] virtual background middleware-apply-failed:", result.error);
-      if (!result.supported) {
-        setVirtualBgSupported(false);
-        setVirtualBgError("Virtual background isn't supported on this browser/device.");
-      } else {
-        setVirtualBgError("Unable to apply virtual background right now.");
+    if (!rtkMeeting.self.videoEnabled) {
+      // Video middleware requires an active camera track — skip silently
+      return;
+    }
+
+    try {
+      const result = await applyBackgroundSelection(rtkMeeting, savedSelection);
+      if (!result.ok) {
+        console.warn("[LiveMeeting] virtual background middleware-apply-failed:", result.error);
+        if (!result.supported) {
+          setVirtualBgSupported(false);
+          setVirtualBgError("Virtual background isn't supported on this browser/device.");
+        } else {
+          setVirtualBgError("Unable to apply virtual background right now.");
+        }
+        return;
       }
-      return;
+      setVirtualBgSupported(true);
+      setVirtualBgError("");
+    } catch (err) {
+      console.warn("[LiveMeeting] virtual background apply-exception:", err);
+      setVirtualBgError("Unable to apply virtual background right now.");
     }
-
-    setVirtualBgSupported(true);
-    setVirtualBgError("");
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   const handleVirtualBgUpload = useCallback(async (event) => {
     const file = event?.target?.files?.[0];
@@ -3743,7 +3745,7 @@ export default function NewLiveMeeting() {
    * Uses replaceTrack for smooth transition without reconnecting
    */
   const switchAudioDevice = useCallback(async (deviceId) => {
-    if (!deviceId || !dyteMeeting?.self) return;
+    if (!deviceId || !rtkMeeting?.self) return;
 
     try {
       setDeviceSwitchError("");
@@ -3758,8 +3760,8 @@ export default function NewLiveMeeting() {
         throw new Error("No audio track in new stream");
       }
 
-      // Get sender from Dyte's WebRTC connection
-      const sender = dyteMeeting?.self?.peerConnection?.getSenders?.()?.find(
+      // Get sender from RTK's WebRTC connection
+      const sender = rtkMeeting?.self?.peerConnection?.getSenders?.()?.find(
         (s) => s.track?.kind === "audio"
       );
 
@@ -3783,11 +3785,11 @@ export default function NewLiveMeeting() {
       console.error("[LiveMeeting]", errMsg);
       setDeviceSwitchError(errMsg);
     }
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   const forceSelfAudioOffAtMediaLevel = useCallback(
     async ({ stopLocalStream = false, attempts = 1, delayMs = 80 } = {}) => {
-      if (!dyteMeeting?.self) return;
+      if (!rtkMeeting?.self) return;
       userMediaPreferenceRef.current.mic = false;
       setMicOn(false);
 
@@ -3803,11 +3805,11 @@ export default function NewLiveMeeting() {
 
       for (let i = 0; i < Math.max(1, attempts); i++) {
         try {
-          await dyteMeeting.self.disableAudio?.();
+          await rtkMeeting.self.disableAudio?.();
         } catch (_) { }
         try {
           const audioSenders =
-            dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+            rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
               (s) => s.track?.kind === "audio"
             ) || [];
           for (const sender of audioSenders) {
@@ -3825,12 +3827,12 @@ export default function NewLiveMeeting() {
         }
       }
     },
-    [dyteMeeting]
+    [rtkMeeting]
   );
 
   const setMainMeetingIsolationForSpeedNetworking = useCallback(
     async (shouldIsolate) => {
-      if (!dyteMeeting?.self) return;
+      if (!rtkMeeting?.self) return;
       if (speedNetworkingMainSwitchInFlightRef.current) return;
       if (speedNetworkingMainIsolation === shouldIsolate) return;
 
@@ -3839,10 +3841,10 @@ export default function NewLiveMeeting() {
         if (shouldIsolate) {
           setSpeedNetworkingMainIsolation(true);
           await forceSelfAudioOffAtMediaLevel({ stopLocalStream: true, attempts: 2, delayMs: 80 });
-          if (dyteMeeting.self.roomJoined) {
+          if (rtkMeeting.self.roomJoined) {
             ignoreRoomLeftRef.current = true;
             try {
-              await dyteMeeting.leaveRoom?.();
+              await rtkMeeting.leaveRoom?.();
             } finally {
               ignoreRoomLeftRef.current = false;
             }
@@ -3851,7 +3853,7 @@ export default function NewLiveMeeting() {
           joinedOnceRef.current = false;
           setMicOn(false);
         } else {
-          if (!dyteMeeting.self.roomJoined) {
+          if (!rtkMeeting.self.roomJoined) {
             setRoomJoined(false);
             joinedOnceRef.current = false;
             setSpeedNetworkingRejoinTick((v) => v + 1);
@@ -3864,7 +3866,7 @@ export default function NewLiveMeeting() {
         speedNetworkingMainSwitchInFlightRef.current = false;
       }
     },
-    [dyteMeeting, forceSelfAudioOffAtMediaLevel, speedNetworkingMainIsolation]
+    [rtkMeeting, forceSelfAudioOffAtMediaLevel, speedNetworkingMainIsolation]
   );
 
   const handleSpeedNetworkingStateChange = useCallback(
@@ -3900,15 +3902,15 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] Skipping break media lock - user is in lounge during break");
       return;
     }
-    if (!dyteMeeting?.self) return;
-    try { await dyteMeeting.self.disableAudio?.(); } catch (e) {
+    if (!rtkMeeting?.self) return;
+    try { await rtkMeeting.self.disableAudio?.(); } catch (e) {
       console.warn("[LiveMeeting] Failed to disable self audio during break:", e);
     }
-    try { await dyteMeeting.self.disableVideo?.(); } catch (e) {
+    try { await rtkMeeting.self.disableVideo?.(); } catch (e) {
       console.warn("[LiveMeeting] Failed to disable self video during break:", e);
     }
     try {
-      const senders = dyteMeeting?.self?.peerConnection?.getSenders?.() || [];
+      const senders = rtkMeeting?.self?.peerConnection?.getSenders?.() || [];
       for (const sender of senders) {
         if (sender?.track?.kind === "audio" || sender?.track?.kind === "video") {
           sender.track.enabled = false;
@@ -3919,11 +3921,11 @@ export default function NewLiveMeeting() {
     }
     setMicOn(false);
     setCamOn(false);
-  }, [dyteMeeting, isBreakout, isOnBreak]);
+  }, [rtkMeeting, isBreakout, isOnBreak]);
 
   const ensureVideoInputReady = useCallback(async () => {
-    if (!dyteMeeting?.self) return false;
-    if (dyteMeeting.self.videoInput) return true;
+    if (!rtkMeeting?.self) return false;
+    if (rtkMeeting.self.videoInput) return true;
 
     console.log("[LiveMeeting] No video input selected. Attempting camera device initialization...");
     try {
@@ -3961,8 +3963,8 @@ export default function NewLiveMeeting() {
       availableVideoDevices[0];
 
     try {
-      if (preferredDevice && typeof dyteMeeting.self.setDevice === "function") {
-        await dyteMeeting.self.setDevice(preferredDevice);
+      if (preferredDevice && typeof rtkMeeting.self.setDevice === "function") {
+        await rtkMeeting.self.setDevice(preferredDevice);
         setSelectedVideoDeviceId(preferredDevice.deviceId);
         console.log("[LiveMeeting] Video input initialized using device:", preferredDevice.deviceId);
         return true;
@@ -3971,11 +3973,11 @@ export default function NewLiveMeeting() {
       console.warn("[LiveMeeting] Failed to set video input device before enable:", e);
     }
 
-    return Boolean(dyteMeeting.self.videoInput);
-  }, [dyteMeeting, enumerateDevices, selectedVideoDeviceId]);
+    return Boolean(rtkMeeting.self.videoInput);
+  }, [rtkMeeting, enumerateDevices, selectedVideoDeviceId]);
 
   const handleToggleMic = useCallback(async () => {
-    if (!dyteMeeting?.self) return;
+    if (!rtkMeeting?.self) return;
 
     // // ✅ SCREEN SHARE AUDIO LOCK: Prevent mic toggle while screen sharing with audio
     // if (isScreenSharing) {
@@ -3992,13 +3994,13 @@ export default function NewLiveMeeting() {
     }
 
     try {
-      if (dyteMeeting.self.audioEnabled) {
+      if (rtkMeeting.self.audioEnabled) {
         console.log(
           "[LiveMeeting] 🔴 TOGGLING MIC OFF - isBreakout:",
           isBreakout,
           "Disabling audio...",
           "Current audioEnabled:",
-          dyteMeeting.self.audioEnabled
+          rtkMeeting.self.audioEnabled
         );
         // ✅ CRITICAL FIX: Save preference IMMEDIATELY to false, don't wait for SDK response
         userMediaPreferenceRef.current.mic = false;
@@ -4020,12 +4022,12 @@ export default function NewLiveMeeting() {
           }
         }
 
-        await dyteMeeting.self.disableAudio?.();
+        await rtkMeeting.self.disableAudio?.();
 
         // ✅ CRITICAL: Ensure audio track is fully muted at WebRTC level
         // This prevents any lingering audio transmission to other participants
         try {
-          const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+          const audioSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "audio"
           ) || [];
           console.log(
@@ -4046,7 +4048,7 @@ export default function NewLiveMeeting() {
 
         // Give SDK time to update internal state
         await new Promise((r) => setTimeout(r, 100));
-        const newState = Boolean(dyteMeeting.self.audioEnabled);
+        const newState = Boolean(rtkMeeting.self.audioEnabled);
         console.log(
           "[LiveMeeting] 🔴 Audio disabled -",
           isBreakout ? "LOUNGE" : "MAIN",
@@ -4079,11 +4081,11 @@ export default function NewLiveMeeting() {
         }
 
         console.log("[LiveMeeting] Enabling audio...");
-        await dyteMeeting.self.enableAudio?.();
+        await rtkMeeting.self.enableAudio?.();
 
         // ✅ CRITICAL: Ensure audio track is fully enabled at WebRTC level
         try {
-          const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+          const audioSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "audio"
           ) || [];
           for (const sender of audioSenders) {
@@ -4098,26 +4100,26 @@ export default function NewLiveMeeting() {
 
         // Give SDK time to update internal state
         await new Promise((r) => setTimeout(r, 100));
-        const newState = Boolean(dyteMeeting.self.audioEnabled);
+        const newState = Boolean(rtkMeeting.self.audioEnabled);
         setMicOn(newState);
       }
     } catch (e) {
       console.warn("[LiveMeeting] mic toggle failed:", e);
-      const newState = Boolean(dyteMeeting?.self?.audioEnabled);
+      const newState = Boolean(rtkMeeting?.self?.audioEnabled);
       setMicOn(newState);
       // ✅ Save to user preference ref
       userMediaPreferenceRef.current.mic = newState;
       if (!isBreakout) setMainMicHardMuted(!newState);
     }
-  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak, isBreakout, isScreenSharing]);
+  }, [rtkMeeting, enforceSelfBreakMediaLock, isOnBreak, isBreakout, isScreenSharing]);
 
   const requestMicUnmute = useCallback(() => {
-    if (!dyteMeeting?.self) return;
+    if (!rtkMeeting?.self) return;
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("participant-unmute-request", {
-        participantId: dyteMeeting.self.id || null,
-        participantUserKey: getParticipantUserKey(dyteMeeting.self) || null,
-        name: dyteMeeting.self.name || "Participant",
+      rtkMeeting?.participants?.broadcastMessage?.("participant-unmute-request", {
+        participantId: rtkMeeting.self.id || null,
+        participantUserKey: getParticipantUserKey(rtkMeeting.self) || null,
+        name: rtkMeeting.self.name || "Participant",
         ts: Date.now(),
       });
       showSnackbar("Unmute request sent to host/moderator/speaker.", "info");
@@ -4125,14 +4127,14 @@ export default function NewLiveMeeting() {
       console.warn("[LiveMeeting] Failed to send unmute request:", e);
       showSnackbar("Unable to send unmute request right now.", "error");
     }
-  }, [dyteMeeting, showSnackbar]);
+  }, [rtkMeeting, showSnackbar]);
 
   /**
    * Switch to a different video device
-   * Uses Dyte's official SDK method setDevice for reliable switching
+   * Uses RTK's official SDK method setDevice for reliable switching
    */
   const switchVideoDevice = useCallback(async (deviceId) => {
-    if (!deviceId || !dyteMeeting?.self) return;
+    if (!deviceId || !rtkMeeting?.self) return;
 
     try {
       setDeviceSwitchError("");
@@ -4140,9 +4142,9 @@ export default function NewLiveMeeting() {
 
       if (videoDevice) {
         console.log("[LiveMeeting] Switching video device to:", deviceId);
-        // Use the official Dyte SDK method to switch device
+        // Use the official RTK SDK method to switch device
         // This handles stopping old tracks and starting new ones internally
-        await dyteMeeting.self.setDevice(videoDevice);
+        await rtkMeeting.self.setDevice(videoDevice);
 
         setSelectedVideoDeviceId(deviceId);
       }
@@ -4150,7 +4152,7 @@ export default function NewLiveMeeting() {
       console.error("[LiveMeeting] Failed to switch video device:", err);
       setDeviceSwitchError("Failed to switch camera. Please try again.");
     }
-  }, [dyteMeeting, videoDevices]);
+  }, [rtkMeeting, videoDevices]);
 
   /**
    * Switch audio output device (speakers/headphones)
@@ -4172,7 +4174,7 @@ export default function NewLiveMeeting() {
         return;
       }
 
-      // 2. Find all audio elements (Dyte renders multiple audio tags)
+      // 2. Find all audio elements (RTK renders multiple audio tags)
       const container = remoteAudioRef.current;
       if (!container) return;
 
@@ -4187,7 +4189,7 @@ export default function NewLiveMeeting() {
         await Promise.all(promises);
         console.log(`[LiveMeeting] Switched output to ${deviceId} for ${promises.length} audio/video elements`);
       } else {
-        console.log("[LiveMeeting] No audio elements found to switch yet (will apply to future participants automatically if Dyte supports it, otherwise reload needed)");
+        console.log("[LiveMeeting] No audio elements found to switch yet (will apply to future participants automatically if RTK supports it, otherwise reload needed)");
       }
 
       setSelectedAudioOutputDeviceId(deviceId);
@@ -4205,8 +4207,8 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] 🎬 CAMERA ICON CLICKED - START");
       console.log("[LiveMeeting] Current states - isOnBreak:", isOnBreak, "isBreakout:", isBreakout, "role:", role);
 
-      if (!dyteMeeting?.self) {
-        console.error("[LiveMeeting] ❌ dyteMeeting.self not available");
+      if (!rtkMeeting?.self) {
+        console.error("[LiveMeeting] ❌ rtkMeeting.self not available");
         return;
       }
 
@@ -4223,28 +4225,28 @@ export default function NewLiveMeeting() {
       cameraToggleTimeRef.current = Date.now();
       console.log("[LiveMeeting] 📹 Camera toggle - cameraToggleTimeRef set");
 
-      console.log("[LiveMeeting] 📹 Current SDK videoEnabled:", dyteMeeting.self.videoEnabled);
-      console.log("[LiveMeeting] 📹 Video device:", dyteMeeting.self.videoInput);
+      console.log("[LiveMeeting] 📹 Current SDK videoEnabled:", rtkMeeting.self.videoEnabled);
+      console.log("[LiveMeeting] 📹 Video device:", rtkMeeting.self.videoInput);
 
-      // ✅ CRITICAL FIX: Use actual Dyte state, not local UI state
-      if (dyteMeeting.self.videoEnabled) {
+      // ✅ CRITICAL FIX: Use actual RTK state, not local UI state
+      if (rtkMeeting.self.videoEnabled) {
         console.log(
           "[LiveMeeting] 📹 TOGGLING CAMERA OFF - isBreakout:",
           isBreakout,
           "Current videoEnabled:",
-          dyteMeeting.self.videoEnabled
+          rtkMeeting.self.videoEnabled
         );
         // ✅ CRITICAL FIX: Save preference IMMEDIATELY to false, don't wait for SDK response
         userMediaPreferenceRef.current.cam = false;
 
         console.log("[LiveMeeting] Calling disableVideo()...");
-        await dyteMeeting.self.disableVideo();
+        await rtkMeeting.self.disableVideo();
         console.log("[LiveMeeting] ✅ disableVideo() completed");
 
         // ✅ CRITICAL: Ensure video track is fully muted at WebRTC level
         // This prevents any lingering video transmission to other participants
         try {
-          const videoSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+          const videoSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "video"
           ) || [];
           console.log(
@@ -4263,26 +4265,26 @@ export default function NewLiveMeeting() {
 
         // Give SDK time to update internal state
         await new Promise((r) => setTimeout(r, 100));
-        const newState = Boolean(dyteMeeting.self.videoEnabled);
+        const newState = Boolean(rtkMeeting.self.videoEnabled);
         console.log("[LiveMeeting] After disableVideo - SDK videoEnabled:", newState);
         setCamOn(newState);
       } else {
         console.log("[LiveMeeting] 📹 TOGGLING CAMERA ON");
-        console.log("[LiveMeeting] Current SDK state before enable - videoEnabled:", dyteMeeting.self.videoEnabled);
-        console.log("[LiveMeeting] Video device available:", dyteMeeting.self.videoInput);
+        console.log("[LiveMeeting] Current SDK state before enable - videoEnabled:", rtkMeeting.self.videoEnabled);
+        console.log("[LiveMeeting] Video device available:", rtkMeeting.self.videoInput);
 
         // ✅ CRITICAL FIX: Save preference IMMEDIATELY to true
         userMediaPreferenceRef.current.cam = true;
 
         // ✅ LOUNGE/BREAK FIX: ensure a video input is selected before enabling camera
-        if (!dyteMeeting.self.videoInput) {
+        if (!rtkMeeting.self.videoInput) {
           await ensureVideoInputReady();
         }
 
         console.log("[LiveMeeting] Calling enableVideo()...");
 
         // Add timeout to catch hanging calls
-        const enablePromise = dyteMeeting.self.enableVideo?.();
+        const enablePromise = rtkMeeting.self.enableVideo?.();
         if (!enablePromise) {
           console.error("[LiveMeeting] ❌ enableVideo() is not a function!");
           throw new Error("enableVideo is not available");
@@ -4300,18 +4302,18 @@ export default function NewLiveMeeting() {
           throw timeoutErr;
         }
 
-        console.log("[LiveMeeting] After enableVideo - SDK videoEnabled:", dyteMeeting.self.videoEnabled);
+        console.log("[LiveMeeting] After enableVideo - SDK videoEnabled:", rtkMeeting.self.videoEnabled);
 
         // Retry once if SDK still reports disabled
-        if (!dyteMeeting.self.videoEnabled) {
+        if (!rtkMeeting.self.videoEnabled) {
           console.warn("[LiveMeeting] Video still disabled after first enable attempt. Retrying bootstrap + enable...");
           await ensureVideoInputReady();
-          await dyteMeeting.self.enableVideo?.();
+          await rtkMeeting.self.enableVideo?.();
         }
 
         // ✅ CRITICAL: Ensure video track is fully enabled at WebRTC level
         try {
-          const videoSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+          const videoSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "video"
           ) || [];
           console.log("[LiveMeeting] Video senders found:", videoSenders.length);
@@ -4327,7 +4329,7 @@ export default function NewLiveMeeting() {
 
         // Give SDK time to update internal state
         await new Promise((r) => setTimeout(r, 100));
-        const newState = Boolean(dyteMeeting.self.videoEnabled);
+        const newState = Boolean(rtkMeeting.self.videoEnabled);
         console.log("[LiveMeeting] After all enable ops - final SDK videoEnabled:", newState);
         if (!newState) {
           showSnackbar("Unable to turn on camera. Please check browser/site camera permission.", "warning");
@@ -4337,15 +4339,15 @@ export default function NewLiveMeeting() {
     } catch (e) {
       console.error("[LiveMeeting] ❌ Failed to toggle camera:", e?.message || e);
       console.error("[LiveMeeting] Full error:", e);
-      // Sync UI state with actual Dyte state on error
-      const newState = Boolean(dyteMeeting?.self?.videoEnabled);
+      // Sync UI state with actual RTK state on error
+      const newState = Boolean(rtkMeeting?.self?.videoEnabled);
       console.log("[LiveMeeting] Setting camOn to:", newState);
       setCamOn(newState);
       // ✅ Save to user preference ref
       userMediaPreferenceRef.current.cam = newState;
     }
   }, [
-    dyteMeeting,
+    rtkMeeting,
     ensureVideoInputReady,
     enforceSelfBreakMediaLock,
     isOnBreak,
@@ -4355,7 +4357,7 @@ export default function NewLiveMeeting() {
   ]);
 
   const toggleScreenShareNow = useCallback(async () => {
-    if (!dyteMeeting?.self) return;
+    if (!rtkMeeting?.self) return;
     if (screenShareDisabled) return;
     if (screenShareToggleInFlightRef.current) return;
 
@@ -4378,14 +4380,14 @@ export default function NewLiveMeeting() {
 
         const requestPayload = {
           requestId: `ssr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          participantId: dyteMeeting?.self?.id || null,
-          participantUserKey: getParticipantUserKey(dyteMeeting?.self) || null,
-          name: dyteMeeting?.self?.name || "Participant",
+          participantId: rtkMeeting?.self?.id || null,
+          participantUserKey: getParticipantUserKey(rtkMeeting?.self) || null,
+          name: rtkMeeting?.self?.name || "Participant",
           ts: Date.now(),
         };
         setPendingMainStageScreenShareRequest(requestPayload);
         try {
-          dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-request", requestPayload);
+          rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-request", requestPayload);
           showSnackbar("Screen share request sent to host.", "info");
         } catch (e) {
           console.warn("[ScreenShare] Failed to send request:", e);
@@ -4423,7 +4425,7 @@ export default function NewLiveMeeting() {
     }
   }, [
     canSelfScreenShare,
-    dyteMeeting,
+    rtkMeeting,
     getSelfScreenShareActive,
     isSelfPresentationEligible,
     isSelfMainStageScreenShareApproved,
@@ -4441,7 +4443,7 @@ export default function NewLiveMeeting() {
   // const screenShareDisabled = isHost ? false : shouldHideScreenShare || !hostPerms.screenShare;
 
   useEffect(() => {
-    if (!dyteMeeting?.self) {
+    if (!rtkMeeting?.self) {
       detachSelfScreenShareEndedBinding();
       setIsScreenSharing(false);
       return;
@@ -4470,9 +4472,9 @@ export default function NewLiveMeeting() {
       }
     };
 
-    safeOn(dyteMeeting?.self, "screenShareUpdate");
-    safeOn(dyteMeeting?.self, "screenShareStarted");
-    safeOn(dyteMeeting?.self, "screenShareStopped");
+    safeOn(rtkMeeting?.self, "screenShareUpdate");
+    safeOn(rtkMeeting?.self, "screenShareStarted");
+    safeOn(rtkMeeting?.self, "screenShareStopped");
 
     const interval = setInterval(syncSelfScreenShareState, 800);
 
@@ -4486,7 +4488,7 @@ export default function NewLiveMeeting() {
   }, [
     attachSelfScreenShareEndedBinding,
     detachSelfScreenShareEndedBinding,
-    dyteMeeting,
+    rtkMeeting,
     getSelfScreenShareActive,
   ]);
 
@@ -4524,11 +4526,11 @@ export default function NewLiveMeeting() {
         console.log("[LiveMeeting] Transitioning to breakout room...");
 
         // 1. If currently in a meeting, leave it first
-        if (dyteMeeting) {
+        if (rtkMeeting) {
           console.log("[LiveMeeting] Switching rooms: Leaving current room explicitly...");
           ignoreRoomLeftRef.current = true;
           try {
-            await dyteMeeting.leaveRoom();
+            await rtkMeeting.leaveRoom();
             // Clear video elements
             document.querySelectorAll("video").forEach((v) => {
               if (v.srcObject) v.srcObject = null;
@@ -4572,10 +4574,10 @@ export default function NewLiveMeeting() {
 
         // ✅ CRITICAL FIX: DON'T lazily initialize main room here to avoid concurrent init conflicts
         // When user joins breakout, the main init effect tries to initialize at the same time
-        // This causes "Unsupported concurrent calls on Dyte method: DyteClient.init" error
+        // This causes "Unsupported concurrent calls on RTK method: RtkClient.init" error
         // Instead, let a separate effect handle main room initialization AFTER breakout is ready
         // The main room peek will initialize when both mainRoomAuthToken AND isBreakout are true
-        console.log("[LiveMeeting] Skipping lazy main room init in applyBreakoutToken to prevent concurrent Dyte init calls - will be handled by separate effect");
+        console.log("[LiveMeeting] Skipping lazy main room init in applyBreakoutToken to prevent concurrent RTK init calls - will be handled by separate effect");
 
         setIsBreakout(true);
         isBreakoutRef.current = true;
@@ -4591,11 +4593,11 @@ export default function NewLiveMeeting() {
       if (mainAuthTokenRef.current) {
         console.log("[LiveMeeting] Returning to main meeting...");
         setMainMicHardMuted(false);
-        if (dyteMeeting) {
+        if (rtkMeeting) {
           console.log("[LiveMeeting] Leaving breakout room explicitly...");
           ignoreRoomLeftRef.current = true;
           try {
-            await dyteMeeting.leaveRoom();
+            await rtkMeeting.leaveRoom();
             // Clear video elements
             document.querySelectorAll("video").forEach((v) => {
               if (v.srcObject) v.srcObject = null;
@@ -4636,10 +4638,10 @@ export default function NewLiveMeeting() {
 
         // ✅ Force refresh of video subscriptions for all participants
         // This ensures all returned participants' streams are properly subscribed
-        if (dyteMeeting && typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
+        if (rtkMeeting && typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
           console.log("[LiveMeeting] Forcing video stream refresh after returning to main");
           try {
-            await dyteMeeting.participants.videoSubscribed.refresh();
+            await rtkMeeting.participants.videoSubscribed.refresh();
             console.log("[LiveMeeting] Video streams refreshed successfully");
           } catch (e) {
             console.warn("[LiveMeeting] Video subscription refresh failed (non-critical):", e?.message);
@@ -4660,7 +4662,7 @@ export default function NewLiveMeeting() {
         setRoomChatConversationId(null);
       }
     },
-    [dyteMeeting, forceSelfAudioOffAtMediaLevel, initMainMeeting, isBreakout, mainRoomAuthToken, mainDyteMeeting]
+    [rtkMeeting, forceSelfAudioOffAtMediaLevel, initMainMeeting, isBreakout, mainRoomAuthToken, mainRtkMeeting]
   );
 
   // ✅ NEW: Auto-close lounge overlay once user is in breakout meeting (fixes rejoin UI issue)
@@ -4840,7 +4842,7 @@ export default function NewLiveMeeting() {
         console.log("[BREAKOUT] ✅ Successfully joined room", tableId);
         breakoutJoinSucceeded = true;
 
-        // Clear the join-in-progress flag once Dyte room join completes (see roomJoined handler).
+        // Clear the join-in-progress flag once RTK room join completes (see roomJoined handler).
         // Fallback timeout in case roomJoined never fires.
         breakoutJoinTimeoutRef.current = setTimeout(() => {
           breakoutJoinInProgressRef.current = false;
@@ -4923,7 +4925,7 @@ export default function NewLiveMeeting() {
 
   // ✅ NEW: Guest Profile Edit Handler
   const handleOpenGuestProfileEdit = async () => {
-    if (!isSelfMember(dyteMeeting?.self)) return;
+    if (!isSelfMember(rtkMeeting?.self)) return;
 
     setGuestProfileLoading(true);
     try {
@@ -4945,22 +4947,22 @@ export default function NewLiveMeeting() {
       const result = await response.json();
       const guest = result.guest;
 
-      // ✅ Store fetched profile data in Dyte participant's _raw object for other participants to see
-      if (dyteMeeting?.self && dyteMeeting.self._raw) {
-        dyteMeeting.self._raw.guest_first_name = guest.first_name;
-        dyteMeeting.self._raw.guest_last_name = guest.last_name;
-        dyteMeeting.self._raw.guest_company = guest.company;
-        dyteMeeting.self._raw.guest_job_title = guest.job_title;
-        dyteMeeting.self._raw.guest_email = guest.email;
+      // ✅ Store fetched profile data in RTK participant's _raw object for other participants to see
+      if (rtkMeeting?.self && rtkMeeting.self._raw) {
+        rtkMeeting.self._raw.guest_first_name = guest.first_name;
+        rtkMeeting.self._raw.guest_last_name = guest.last_name;
+        rtkMeeting.self._raw.guest_company = guest.company;
+        rtkMeeting.self._raw.guest_job_title = guest.job_title;
+        rtkMeeting.self._raw.guest_email = guest.email;
       }
 
-      // Populate form with fetched data (with fallback to cached values from Dyte and localStorage)
+      // Populate form with fetched data (with fallback to cached values from RTK and localStorage)
       setGuestProfileForm({
-        first_name: guest.first_name ?? dyteMeeting?.self?._raw?.guest_first_name ?? "",
-        last_name: guest.last_name ?? dyteMeeting?.self?._raw?.guest_last_name ?? "",
-        company: guest.company ?? dyteMeeting?.self?._raw?.guest_company ?? localStorage.getItem("guest_company") ?? "",
-        job_title: guest.job_title ?? dyteMeeting?.self?._raw?.guest_job_title ?? localStorage.getItem("guest_job_title") ?? "",
-        email: guest.email ?? dyteMeeting?.self?._raw?.guest_email ?? "",
+        first_name: guest.first_name ?? rtkMeeting?.self?._raw?.guest_first_name ?? "",
+        last_name: guest.last_name ?? rtkMeeting?.self?._raw?.guest_last_name ?? "",
+        company: guest.company ?? rtkMeeting?.self?._raw?.guest_company ?? localStorage.getItem("guest_company") ?? "",
+        job_title: guest.job_title ?? rtkMeeting?.self?._raw?.guest_job_title ?? localStorage.getItem("guest_job_title") ?? "",
+        email: guest.email ?? rtkMeeting?.self?._raw?.guest_email ?? "",
       });
 
       setGuestProfileEditOpen(true);
@@ -5032,15 +5034,15 @@ export default function NewLiveMeeting() {
 
       const result = await response.json();
 
-      // Update Dyte participant data
-      if (dyteMeeting?.self) {
-        dyteMeeting.self.name = result.guest.name;
-        if (dyteMeeting.self._raw) {
-          dyteMeeting.self._raw.guest_first_name = result.guest.first_name;
-          dyteMeeting.self._raw.guest_last_name = result.guest.last_name;
-          dyteMeeting.self._raw.guest_company = result.guest.company;
-          dyteMeeting.self._raw.guest_job_title = result.guest.job_title;
-          dyteMeeting.self._raw.guest_email = result.guest.email;
+      // Update RTK participant data
+      if (rtkMeeting?.self) {
+        rtkMeeting.self.name = result.guest.name;
+        if (rtkMeeting.self._raw) {
+          rtkMeeting.self._raw.guest_first_name = result.guest.first_name;
+          rtkMeeting.self._raw.guest_last_name = result.guest.last_name;
+          rtkMeeting.self._raw.guest_company = result.guest.company;
+          rtkMeeting.self._raw.guest_job_title = result.guest.job_title;
+          rtkMeeting.self._raw.guest_email = result.guest.email;
         }
       }
 
@@ -5055,7 +5057,7 @@ export default function NewLiveMeeting() {
         const broadcastPayload = {
           type: "guest_profile_updated",
           guest_id: result.guest.id,
-          participant_id: dyteMeeting?.self?.id,
+          participant_id: rtkMeeting?.self?.id,
           name: result.guest.name,
           first_name: result.guest.first_name,
           last_name: result.guest.last_name,
@@ -5064,7 +5066,7 @@ export default function NewLiveMeeting() {
           job_title: result.guest.job_title,
           timestamp: Date.now(),
         };
-        dyteMeeting?.participants?.broadcastMessage?.("guest_profile_updated", broadcastPayload);
+        rtkMeeting?.participants?.broadcastMessage?.("guest_profile_updated", broadcastPayload);
       } catch (e) {
         console.warn("[GuestProfileUpdate] Failed to broadcast update:", e);
       }
@@ -5092,14 +5094,14 @@ export default function NewLiveMeeting() {
       participantId: p.id || null,
       participantUserKey: getParticipantUserKey(p?._raw || p) || null,
       name: p.name || "Participant",
-      byHostId: dyteMeeting?.self?.id || null,
+      byHostId: rtkMeeting?.self?.id || null,
       expiresAt: Date.now() + SPOTLIGHT_INVITE_TIMEOUT_MS,
       ts: Date.now(),
     };
 
     setPendingSpotlightInvite(payload);
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("spotlight-invite", payload);
+      rtkMeeting?.participants?.broadcastMessage?.("spotlight-invite", payload);
     } catch (e) {
       console.warn("[Spotlight] Failed to broadcast spotlight-invite:", e);
     }
@@ -5123,7 +5125,7 @@ export default function NewLiveMeeting() {
       participantId: clearedSpotlight?.participantId || null,
       participantUserKey: clearedSpotlight?.participantUserKey || null,
       name: clearedSpotlight?.name || "Participant",
-      byHostId: dyteMeeting?.self?.id || null,
+      byHostId: rtkMeeting?.self?.id || null,
       ts: Date.now(),
     };
 
@@ -5135,22 +5137,22 @@ export default function NewLiveMeeting() {
     }
 
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("spotlight-clear", payload);
+      rtkMeeting?.participants?.broadcastMessage?.("spotlight-clear", payload);
       if (presentationToClear) {
-        dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+        rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
           requestId: `ssr-revoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           status: "revoked",
           participantId: presentationToClear?.participantId || null,
           participantUserKey: presentationToClear?.participantUserKey || null,
           name: presentationToClear?.name || payload.name,
-          byHostId: dyteMeeting?.self?.id || null,
+          byHostId: rtkMeeting?.self?.id || null,
           ts: Date.now(),
         });
-        dyteMeeting?.participants?.broadcastMessage?.("presentation-clear", {
+        rtkMeeting?.participants?.broadcastMessage?.("presentation-clear", {
           participantId: presentationToClear?.participantId || null,
           participantUserKey: presentationToClear?.participantUserKey || null,
           name: presentationToClear?.name || payload.name,
-          byHostId: dyteMeeting?.self?.id || null,
+          byHostId: rtkMeeting?.self?.id || null,
           ts: Date.now(),
         });
       }
@@ -5169,9 +5171,9 @@ export default function NewLiveMeeting() {
         status, // "accepted" | "declined" | "timeout"
         participantId: invite.participantId || null,
         participantUserKey: invite.participantUserKey || null,
-        name: dyteMeeting?.self?.name || invite?.name || "Participant",
-        byParticipantId: dyteMeeting?.self?.id || null,
-        byParticipantUserKey: getParticipantUserKey(dyteMeeting?.self) || null,
+        name: rtkMeeting?.self?.name || invite?.name || "Participant",
+        byParticipantId: rtkMeeting?.self?.id || null,
+        byParticipantUserKey: getParticipantUserKey(rtkMeeting?.self) || null,
         ts: Date.now(),
       };
 
@@ -5182,16 +5184,16 @@ export default function NewLiveMeeting() {
       if (status === "accepted") {
         setIsSelfMainStageScreenShareApproved(false);
         setSpotlightTarget({
-          participantId: invite.participantId || dyteMeeting?.self?.id || null,
-          participantUserKey: invite.participantUserKey || getParticipantUserKey(dyteMeeting?.self) || null,
-          name: dyteMeeting?.self?.name || invite?.name || "Participant",
+          participantId: invite.participantId || rtkMeeting?.self?.id || null,
+          participantUserKey: invite.participantUserKey || getParticipantUserKey(rtkMeeting?.self) || null,
+          name: rtkMeeting?.self?.name || invite?.name || "Participant",
           byHostId: invite.byHostId || null,
           ts: Date.now(),
         });
       }
 
       try {
-        dyteMeeting?.participants?.broadcastMessage?.("spotlight-invite-response", responsePayload);
+        rtkMeeting?.participants?.broadcastMessage?.("spotlight-invite-response", responsePayload);
       } catch (e) {
         console.warn("[Spotlight] Failed to broadcast spotlight-invite-response:", e);
       }
@@ -5204,11 +5206,11 @@ export default function NewLiveMeeting() {
         showSnackbar("Main stage invitation expired", "warning");
       }
     },
-    [incomingSpotlightInvite, dyteMeeting, showSnackbar]
+    [incomingSpotlightInvite, rtkMeeting, showSnackbar]
   );
 
   const handleLeaveMainStage = useCallback(() => {
-    const selfParticipant = dyteMeeting?.self;
+    const selfParticipant = rtkMeeting?.self;
     const selfId = selfParticipant?.id ? String(selfParticipant.id) : "";
     const selfKey = getParticipantUserKey(selfParticipant);
     if (!selfParticipant || !spotlightTarget) return;
@@ -5230,16 +5232,16 @@ export default function NewLiveMeeting() {
     setIsSelfMainStageScreenShareApproved(false);
 
     const payload = {
-      byHostId: dyteMeeting?.self?.id || null,
-      byParticipantId: dyteMeeting?.self?.id || null,
+      byHostId: rtkMeeting?.self?.id || null,
+      byParticipantId: rtkMeeting?.self?.id || null,
       byParticipantUserKey: selfKey || null,
       ts: Date.now(),
     };
 
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("spotlight-clear", payload);
+      rtkMeeting?.participants?.broadcastMessage?.("spotlight-clear", payload);
       if (isSelfPresenter) {
-        dyteMeeting?.participants?.broadcastMessage?.("presentation-clear", {
+        rtkMeeting?.participants?.broadcastMessage?.("presentation-clear", {
           participantId: selfParticipant?.id || null,
           participantUserKey: selfKey || null,
           name: selfParticipant?.name || "Participant",
@@ -5251,7 +5253,7 @@ export default function NewLiveMeeting() {
       console.warn("[Spotlight] Failed to broadcast spotlight-clear from participant:", e);
     }
     showSnackbar("You left the main stage", "info");
-  }, [dyteMeeting, presentationTarget, spotlightTarget, showSnackbar]);
+  }, [rtkMeeting, presentationTarget, spotlightTarget, showSnackbar]);
 
   const handleKickParticipant = () => {
     const p = participantMenuTarget;
@@ -5275,7 +5277,7 @@ export default function NewLiveMeeting() {
     if (!targetDjangoId) {
       try {
         targetDjangoId = p.id;
-        console.warn("[Kick] Warning: using Dyte ID as fallback:", targetDjangoId);
+        console.warn("[Kick] Warning: using RTK ID as fallback:", targetDjangoId);
       } catch (e) { }
     }
 
@@ -5296,11 +5298,11 @@ export default function NewLiveMeeting() {
       } else {
         const data = await res.json();
         console.log("[Kick] Success:", data);
-        if (dyteMeeting?.participants?.kick) {
+        if (rtkMeeting?.participants?.kick) {
           try {
-            console.log("[Kick] Executing Dyte kick on:", p.id);
-            dyteMeeting.participants.kick(p.id);
-          } catch (e) { console.warn("Dyte kick failed", e); }
+            console.log("[Kick] Executing RTK kick on:", p.id);
+            rtkMeeting.participants.kick(p.id);
+          } catch (e) { console.warn("RTK kick failed", e); }
         }
         setParticipantMenuTarget(null);
       }
@@ -5350,11 +5352,11 @@ export default function NewLiveMeeting() {
       } else {
         const data = await res.json();
         console.log("[Ban] Success:", data);
-        if (dyteMeeting?.participants?.kick) {
+        if (rtkMeeting?.participants?.kick) {
           try {
-            console.log("[Ban] Executing Dyte kick (for ban) on:", p.id);
-            dyteMeeting.participants.kick(p.id);
-          } catch (e) { console.warn("Dyte ban-kick failed", e); }
+            console.log("[Ban] Executing RTK kick (for ban) on:", p.id);
+            rtkMeeting.participants.kick(p.id);
+          } catch (e) { console.warn("RTK ban-kick failed", e); }
         }
       }
     } catch (e) {
@@ -5519,7 +5521,7 @@ export default function NewLiveMeeting() {
   }, [eventId, showSnackbar]);
 
   const getJoinedParticipants = useCallback(() => {
-    const participantsObj = dyteMeeting?.participants;
+    const participantsObj = rtkMeeting?.participants;
     if (!participantsObj) return [];
 
     const toArraySafe = (source) => {
@@ -5569,12 +5571,12 @@ export default function NewLiveMeeting() {
       deduped.push(p);
     }
     return deduped;
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   const getAudienceParticipantIds = useCallback(() => {
     const participants = getJoinedParticipants();
-    return participants.filter((p) => p.id !== dyteMeeting?.self?.id).map((p) => p.id);
-  }, [dyteMeeting?.self?.id, getJoinedParticipants]);
+    return participants.filter((p) => p.id !== rtkMeeting?.self?.id).map((p) => p.id);
+  }, [rtkMeeting?.self?.id, getJoinedParticipants]);
 
   const findParticipantByIdentity = useCallback(
     (participantId, participantUserKey) => {
@@ -5592,7 +5594,7 @@ export default function NewLiveMeeting() {
 
   const revokeMainStageScreenShare = useCallback(
     async (target) => {
-      if (!isHost || !dyteMeeting || !target) return;
+      if (!isHost || !rtkMeeting || !target) return;
 
       const idStr = target?.participantId ? String(target.participantId) : "";
       const keyStr = target?.participantUserKey ? String(target.participantUserKey) : "";
@@ -5600,7 +5602,7 @@ export default function NewLiveMeeting() {
 
       if (participant?.id) {
         try {
-          await dyteMeeting.participants.updatePermissions([participant.id], {
+          await rtkMeeting.participants.updatePermissions([participant.id], {
             canProduceScreenshare: "NOT_ALLOWED",
             requestProduceScreenshare: false,
           });
@@ -5615,7 +5617,7 @@ export default function NewLiveMeeting() {
         console.warn("Failed to stop participant screen share", e);
       }
     },
-    [dyteMeeting, findParticipantByIdentity, isHost]
+    [rtkMeeting, findParticipantByIdentity, isHost]
   );
 
   const handleRevokeParticipantScreenShare = useCallback(async () => {
@@ -5638,20 +5640,20 @@ export default function NewLiveMeeting() {
     // Notify the participant that their permission was revoked
     const revokeRequestId = `ssr-revoke-${Date.now()}`;
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+      rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
         requestId: revokeRequestId,
         status: "revoked",
         participantId: target.participantId || null,
         participantUserKey: target.participantUserKey || null,
         name: target.name,
-        byHostId: dyteMeeting?.self?.id || null,
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       });
-      dyteMeeting?.participants?.broadcastMessage?.("presentation-clear", {
+      rtkMeeting?.participants?.broadcastMessage?.("presentation-clear", {
         participantId: target.participantId || null,
         participantUserKey: target.participantUserKey || null,
         name: target.name,
-        byHostId: dyteMeeting?.self?.id || null,
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       });
     } catch (e) {
@@ -5661,7 +5663,7 @@ export default function NewLiveMeeting() {
     showSnackbar(`Presentation revoked for ${target.name}.`, "info");
   }, [
     approvedMainStageScreenShare,
-    dyteMeeting,
+    rtkMeeting,
     isHost,
     participantMenuTarget,
     revokeMainStageScreenShare,
@@ -5698,9 +5700,9 @@ export default function NewLiveMeeting() {
       await revokeMainStageScreenShare(approvedMainStageScreenShare);
     }
 
-    // Update Dyte permissions
+    // Update RTK permissions
     try {
-      await dyteMeeting.participants.updatePermissions([participant.id], {
+      await rtkMeeting.participants.updatePermissions([participant.id], {
         canProduceScreenshare: "ALLOWED",
         requestProduceScreenshare: true,
       });
@@ -5714,7 +5716,7 @@ export default function NewLiveMeeting() {
       participantId: participant.id || p.id || null,
       participantUserKey: targetKey || p.id || null,
       name: participant?.name || p?.name || "Participant",
-      byHostId: dyteMeeting?.self?.id || null,
+      byHostId: rtkMeeting?.self?.id || null,
       ts: Date.now(),
     };
     setApprovedMainStageScreenShare(approvedPayload);
@@ -5723,17 +5725,17 @@ export default function NewLiveMeeting() {
     // Notify the participant (reuses existing broadcast handler on participant side)
     const requestId = `ssr-grant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+      rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
         requestId,
         status: "approved",
         proactive: true,
         participantId: approvedPayload.participantId,
         participantUserKey: approvedPayload.participantUserKey,
         name: approvedPayload.name,
-        byHostId: dyteMeeting?.self?.id || null,
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       });
-      dyteMeeting?.participants?.broadcastMessage?.("presentation-target", approvedPayload);
+      rtkMeeting?.participants?.broadcastMessage?.("presentation-target", approvedPayload);
     } catch (e) {
       console.warn("[ScreenShare] Failed to broadcast proactive grant:", e);
     }
@@ -5741,7 +5743,7 @@ export default function NewLiveMeeting() {
     showSnackbar(`Presentation granted to ${approvedPayload.name}.`, "success");
   }, [
     approvedMainStageScreenShare,
-    dyteMeeting,
+    rtkMeeting,
     findParticipantByIdentity,
     hostPerms.screenShare,
     isHost,
@@ -5752,7 +5754,7 @@ export default function NewLiveMeeting() {
 
   const respondMainStageScreenShareRequest = useCallback(
     async (status) => {
-      if (!isHost || !dyteMeeting) return;
+      if (!isHost || !rtkMeeting) return;
       const request = incomingMainStageScreenShareRequest;
       if (!request) return;
 
@@ -5765,7 +5767,7 @@ export default function NewLiveMeeting() {
         participantId: request?.participantId || null,
         participantUserKey: request?.participantUserKey || null,
         name: targetName,
-        byHostId: dyteMeeting?.self?.id || null,
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       };
 
@@ -5781,7 +5783,7 @@ export default function NewLiveMeeting() {
             : (!isRequesterAllowed ? "not_allowed_presenter" : "denied"),
         };
         try {
-          dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", finalPayload);
+          rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", finalPayload);
         } catch (e) {
           console.warn("[ScreenShare] Failed to send deny response:", e);
         }
@@ -5799,7 +5801,7 @@ export default function NewLiveMeeting() {
       const participant = findParticipantByIdentity(request?.participantId, request?.participantUserKey);
       if (!participant?.id) {
         try {
-          dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+          rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
             ...payloadBase,
             status: "denied",
             reason: "participant_not_found",
@@ -5823,14 +5825,14 @@ export default function NewLiveMeeting() {
       }
 
       try {
-        await dyteMeeting.participants.updatePermissions([participant.id], {
+        await rtkMeeting.participants.updatePermissions([participant.id], {
           canProduceScreenshare: "ALLOWED",
           requestProduceScreenshare: true,
         });
       } catch (e) {
         console.warn("[ScreenShare] Failed to approve permission:", e);
         try {
-          dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+          rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
             ...payloadBase,
             status: "denied",
             reason: "permission_update_failed",
@@ -5844,18 +5846,18 @@ export default function NewLiveMeeting() {
         participantId: participant.id || request?.participantId || null,
         participantUserKey: participantKey || request?.participantUserKey || null,
         name: participant?.name || targetName,
-        byHostId: dyteMeeting?.self?.id || null,
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       };
       setApprovedMainStageScreenShare(approvedPayload);
       setPresentationTarget(approvedPayload);
 
       try {
-        dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+        rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
           ...payloadBase,
           status: "approved",
         });
-        dyteMeeting?.participants?.broadcastMessage?.("presentation-target", approvedPayload);
+        rtkMeeting?.participants?.broadcastMessage?.("presentation-target", approvedPayload);
       } catch (e) {
         console.warn("[ScreenShare] Failed to broadcast approval:", e);
       }
@@ -5863,7 +5865,7 @@ export default function NewLiveMeeting() {
     },
     [
       approvedMainStageScreenShare,
-      dyteMeeting,
+      rtkMeeting,
       findParticipantByIdentity,
       hostPerms.screenShare,
       incomingMainStageScreenShareRequest,
@@ -5877,22 +5879,22 @@ export default function NewLiveMeeting() {
 
   const updateAudiencePermissions = useCallback(
     async (permissionsPatch) => {
-      if (!isHost || !dyteMeeting) return;
+      if (!isHost || !rtkMeeting) return;
       const audienceIds = getAudienceParticipantIds();
       if (audienceIds.length === 0) return;
       try {
-        await dyteMeeting.participants.updatePermissions(audienceIds, permissionsPatch);
+        await rtkMeeting.participants.updatePermissions(audienceIds, permissionsPatch);
       } catch (e) {
         console.warn("Failed to update audience permissions:", e);
       }
     },
-    [dyteMeeting, getAudienceParticipantIds, isHost]
+    [rtkMeeting, getAudienceParticipantIds, isHost]
   );
 
   const updateAudienceMediaForBreak = useCallback(
     async (lockMedia) => {
-      if (!isHost || !dyteMeeting) return;
-      const joinedParticipants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+      if (!isHost || !rtkMeeting) return;
+      const joinedParticipants = getJoinedParticipants().filter((p) => p.id !== rtkMeeting?.self?.id);
       if (joinedParticipants.length === 0) return;
 
       const isParticipantInLoungeOrBreakout = (participant) => {
@@ -5922,7 +5924,7 @@ export default function NewLiveMeeting() {
       if (audienceIds.length === 0) return;
 
       try {
-        await dyteMeeting.participants.updatePermissions(
+        await rtkMeeting.participants.updatePermissions(
           audienceIds,
           lockMedia
             ? {
@@ -5948,14 +5950,14 @@ export default function NewLiveMeeting() {
         }
       }
     },
-    [dyteMeeting, getJoinedParticipants, isHost, loungeTables, getParticipantRoomInfo]
+    [rtkMeeting, getJoinedParticipants, isHost, loungeTables, getParticipantRoomInfo]
   );
 
   const forceMuteParticipant = useCallback(
     async (participant) => {
       console.log("[forceMuteParticipant] Called with participant:", participant?.id || participant?._raw?.id, "canManageParticipantMic:", canManageParticipantMic);
-      if (!canManageParticipantMic || !dyteMeeting) {
-        console.warn("[forceMuteParticipant] Permission check failed - canManageParticipantMic:", canManageParticipantMic, "dyteMeeting:", !!dyteMeeting);
+      if (!canManageParticipantMic || !rtkMeeting) {
+        console.warn("[forceMuteParticipant] Permission check failed - canManageParticipantMic:", canManageParticipantMic, "rtkMeeting:", !!rtkMeeting);
         return;
       }
       const raw = participant?._raw || participant;
@@ -5976,7 +5978,7 @@ export default function NewLiveMeeting() {
         }
 
         // Update permissions
-        await dyteMeeting.participants.updatePermissions([id], shouldUnmute ? {
+        await rtkMeeting.participants.updatePermissions([id], shouldUnmute ? {
           canProduceAudio: "ALLOWED",
           requestProduceAudio: true,
         } : {
@@ -5996,7 +5998,7 @@ export default function NewLiveMeeting() {
           console.log("[forceMuteParticipant] Mic unmuted");
           showSnackbar(`${participantName} unmuted`, "success");
           try {
-            dyteMeeting?.participants?.broadcastMessage?.("participant-force-unmute", {
+            rtkMeeting?.participants?.broadcastMessage?.("participant-force-unmute", {
               participantId: id,
               participantUserKey: participantUserKey || null,
               ts: Date.now(),
@@ -6012,7 +6014,7 @@ export default function NewLiveMeeting() {
           console.log("[forceMuteParticipant] Mic muted");
           showSnackbar(`${participantName} muted`, "success");
           try {
-            dyteMeeting?.participants?.broadcastMessage?.("participant-force-mute", {
+            rtkMeeting?.participants?.broadcastMessage?.("participant-force-mute", {
               participantId: id,
               participantUserKey: participantUserKey || null,
               ts: Date.now(),
@@ -6024,14 +6026,14 @@ export default function NewLiveMeeting() {
         showSnackbar("Failed to update participant mic settings", "error");
       }
     },
-    [canManageParticipantMic, dyteMeeting, hostMediaLocks.mic]
+    [canManageParticipantMic, rtkMeeting, hostMediaLocks.mic]
   );
 
   const forceToggleCameraParticipant = useCallback(
     async (participant) => {
       console.log("[forceToggleCameraParticipant] Called with participant:", participant?.id || participant?._raw?.id, "isHost:", isHost);
-      if (!isHost || !dyteMeeting) {
-        console.warn("[forceToggleCameraParticipant] Permission check failed - isHost:", isHost, "dyteMeeting:", !!dyteMeeting);
+      if (!isHost || !rtkMeeting) {
+        console.warn("[forceToggleCameraParticipant] Permission check failed - isHost:", isHost, "rtkMeeting:", !!rtkMeeting);
         return;
       }
       const raw = participant?._raw || participant;
@@ -6048,7 +6050,7 @@ export default function NewLiveMeeting() {
         console.log("[forceToggleCameraParticipant] Participant:", participantName, "currentCamState:", currentCamState, "shouldEnable:", shouldEnableCamera);
 
         // Update permissions - this is the key action for remote participants
-        await dyteMeeting.participants.updatePermissions([id], shouldEnableCamera ? {
+        await rtkMeeting.participants.updatePermissions([id], shouldEnableCamera ? {
           canProduceVideo: "ALLOWED",
           requestProduceVideo: true,
         } : {
@@ -6062,7 +6064,7 @@ export default function NewLiveMeeting() {
           console.log("[forceToggleCameraParticipant] Sending enable-video message to:", id, "userKey:", participantUserKey);
           showSnackbar(`${participantName} camera turned on`, "success");
           try {
-            const result = dyteMeeting?.participants?.broadcastMessage?.("participant-force-enable-video", {
+            const result = rtkMeeting?.participants?.broadcastMessage?.("participant-force-enable-video", {
               participantId: id,
               participantUserKey: participantUserKey || null,
               ts: Date.now(),
@@ -6081,7 +6083,7 @@ export default function NewLiveMeeting() {
             console.warn("[forceToggleCameraParticipant] disableVideo() failed:", e);
           }
           try {
-            const result = dyteMeeting?.participants?.broadcastMessage?.("participant-force-disable-video", {
+            const result = rtkMeeting?.participants?.broadcastMessage?.("participant-force-disable-video", {
               participantId: id,
               participantUserKey: participantUserKey || null,
               ts: Date.now(),
@@ -6096,12 +6098,12 @@ export default function NewLiveMeeting() {
         showSnackbar("Failed to update participant camera settings", "error");
       }
     },
-    [dyteMeeting, isHost]
+    [rtkMeeting, isHost]
   );
 
   const getAudienceParticipantsForBulkMedia = useCallback(() => {
-    if (!dyteMeeting) return [];
-    const selfId = String(dyteMeeting?.self?.id || "");
+    if (!rtkMeeting) return [];
+    const selfId = String(rtkMeeting?.self?.id || "");
     const elevatedRoles = new Set(["Host", "Moderator", "Speaker"]);
 
     return getJoinedParticipants().filter((participant) => {
@@ -6121,17 +6123,17 @@ export default function NewLiveMeeting() {
 
       return !elevatedRoles.has(resolvedRole);
     });
-  }, [assignedRoleByIdentity, dyteMeeting, getJoinedParticipants]);
+  }, [assignedRoleByIdentity, rtkMeeting, getJoinedParticipants]);
 
   const forceMuteAll = useCallback(async () => {
-    if (!canManageParticipantMic || !dyteMeeting) return;
+    if (!canManageParticipantMic || !rtkMeeting) return;
     setHostMediaLocks((prev) => ({ ...prev, mic: true }));
     // Only apply to audience members (exclude host/moderator/speaker)
     const participants = getAudienceParticipantsForBulkMedia();
     const ids = participants.map((p) => p.id).filter(Boolean);
     if (ids.length) {
       try {
-        await dyteMeeting.participants.updatePermissions(ids, {
+        await rtkMeeting.participants.updatePermissions(ids, {
           canProduceAudio: "NOT_ALLOWED",
           requestProduceAudio: false,
         });
@@ -6144,17 +6146,17 @@ export default function NewLiveMeeting() {
         await p?.disableAudio?.();
       } catch (_) { }
     }
-  }, [canManageParticipantMic, dyteMeeting, getAudienceParticipantsForBulkMedia]);
+  }, [canManageParticipantMic, rtkMeeting, getAudienceParticipantsForBulkMedia]);
 
   const forceCameraOffAll = useCallback(async () => {
-    if (!isHost || !dyteMeeting) return;
+    if (!isHost || !rtkMeeting) return;
     setHostMediaLocks((prev) => ({ ...prev, cam: true }));
     // Only apply to audience members (exclude host/moderator/speaker)
     const participants = getAudienceParticipantsForBulkMedia();
     const ids = participants.map((p) => p.id).filter(Boolean);
     if (ids.length) {
       try {
-        await dyteMeeting.participants.updatePermissions(ids, {
+        await rtkMeeting.participants.updatePermissions(ids, {
           canProduceVideo: "NOT_ALLOWED",
           requestProduceVideo: false,
         });
@@ -6167,10 +6169,10 @@ export default function NewLiveMeeting() {
         await p?.disableVideo?.();
       } catch (_) { }
     }
-  }, [dyteMeeting, getAudienceParticipantsForBulkMedia, isHost]);
+  }, [rtkMeeting, getAudienceParticipantsForBulkMedia, isHost]);
 
   const forceUnmuteAll = useCallback(async () => {
-    if (!canManageParticipantMic || !dyteMeeting) return;
+    if (!canManageParticipantMic || !rtkMeeting) return;
     console.log("[forceUnmuteAll] Starting permission unlock + global unmute signal...");
     setHostMediaLocks((prev) => ({ ...prev, mic: false }));
     // Only apply to audience members (exclude host/moderator/speaker)
@@ -6180,7 +6182,7 @@ export default function NewLiveMeeting() {
     // 1) Unlock audio permissions for audience only
     if (ids.length) {
       try {
-        await dyteMeeting.participants.updatePermissions(ids, {
+        await rtkMeeting.participants.updatePermissions(ids, {
           canProduceAudio: "ALLOWED",
           requestProduceAudio: true,
         });
@@ -6192,14 +6194,14 @@ export default function NewLiveMeeting() {
 
     // 2) Ask clients to self-enable mic (reliable path)
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("global-unmute-all", {
-        byHostId: dyteMeeting?.self?.id || null,
+      rtkMeeting?.participants?.broadcastMessage?.("global-unmute-all", {
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       });
       setTimeout(() => {
         try {
-          dyteMeeting?.participants?.broadcastMessage?.("global-unmute-all", {
-            byHostId: dyteMeeting?.self?.id || null,
+          rtkMeeting?.participants?.broadcastMessage?.("global-unmute-all", {
+            byHostId: rtkMeeting?.self?.id || null,
             ts: Date.now(),
             retry: true,
           });
@@ -6210,10 +6212,10 @@ export default function NewLiveMeeting() {
     }
 
     console.log("[forceUnmuteAll] Completed");
-  }, [canManageParticipantMic, dyteMeeting, getAudienceParticipantsForBulkMedia]);
+  }, [canManageParticipantMic, rtkMeeting, getAudienceParticipantsForBulkMedia]);
 
   const forceCameraOnAll = useCallback(async () => {
-    if (!isHost || !dyteMeeting) return;
+    if (!isHost || !rtkMeeting) return;
     console.log("[forceCameraOnAll] Starting force camera on for all...");
     setHostMediaLocks((prev) => ({ ...prev, cam: false }));
     // Only apply to audience members (exclude host/moderator/speaker)
@@ -6223,7 +6225,7 @@ export default function NewLiveMeeting() {
     // Update permissions to allow video
     if (ids.length) {
       try {
-        await dyteMeeting.participants.updatePermissions(ids, {
+        await rtkMeeting.participants.updatePermissions(ids, {
           canProduceVideo: "ALLOWED",
           requestProduceVideo: true,
         });
@@ -6236,8 +6238,8 @@ export default function NewLiveMeeting() {
     // Broadcast message to audience participants to enable their cameras
     try {
       console.log("[forceCameraOnAll] Broadcasting global enable-video message");
-      dyteMeeting?.participants?.broadcastMessage?.("global-enable-all-video", {
-        byHostId: dyteMeeting?.self?.id || null,
+      rtkMeeting?.participants?.broadcastMessage?.("global-enable-all-video", {
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       });
     } catch (e) {
@@ -6245,7 +6247,7 @@ export default function NewLiveMeeting() {
     }
 
     console.log("[forceCameraOnAll] Force camera on completed");
-  }, [dyteMeeting, getAudienceParticipantsForBulkMedia, isHost]);
+  }, [rtkMeeting, getAudienceParticipantsForBulkMedia, isHost]);
 
   // ---------- Read query params + fetch DB status ----------
   useEffect(() => {
@@ -6347,7 +6349,7 @@ export default function NewLiveMeeting() {
     }
   }, [eventId, joinMainRequested]);
 
-  // ---------- Join Dyte via your backend ----------
+  // ---------- Join RTK via your backend ----------
   useEffect(() => {
     if (!eventId) return;
 
@@ -6415,28 +6417,28 @@ export default function NewLiveMeeting() {
 
       try {
         const authHeaders = authHeader();
-        console.log("[DyteJoin] Fetching Dyte token...");
-        console.log("[DyteJoin] EventID:", eventId);
-        console.log("[DyteJoin] Role:", role);
-        console.log("[DyteJoin] Auth header:", authHeaders);
-        console.log("[DyteJoin] Token type:", authHeaders.Authorization ? authHeaders.Authorization.split(' ')[1]?.substring(0, 30) + "..." : "None");
+        console.log("[RTKJoin] Fetching RTK token...");
+        console.log("[RTKJoin] EventID:", eventId);
+        console.log("[RTKJoin] Role:", role);
+        console.log("[RTKJoin] Auth header:", authHeaders);
+        console.log("[RTKJoin] Token type:", authHeaders.Authorization ? authHeaders.Authorization.split(' ')[1]?.substring(0, 30) + "..." : "None");
 
-        const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
+        const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({ role }),
           signal: abortController.signal, // ✅ Add abort signal
         });
 
-        console.log("[DyteJoin] Response status:", res.status);
+        console.log("[RTKJoin] Response status:", res.status);
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          console.error("[DyteJoin] Join failed! Status:", res.status);
-          console.error("[DyteJoin] Error data:", errData);
+          console.error("[RTKJoin] Join failed! Status:", res.status);
+          console.error("[RTKJoin] Error data:", errData);
 
           if (errData.error === "banned" || res.status === 403) {
-            console.log("[DyteJoin] User is banned");
+            console.log("[RTKJoin] User is banned");
             setIsBanned(true);
             setLoadingJoin(false);
             return; // Stop execution
@@ -6445,10 +6447,10 @@ export default function NewLiveMeeting() {
         }
 
         const data = await res.json();
-        console.log("[DyteJoin] Join successful! Response:", data);
-        console.log("[DyteJoin] AuthToken received:", data.authToken ? "Yes" : "No");
-        console.log("[DyteJoin] IsGuest:", data.isGuest);
-        console.log("[DyteJoin] Role:", data.role);
+        console.log("[RTKJoin] Join successful! Response:", data);
+        console.log("[RTKJoin] AuthToken received:", data.authToken ? "Yes" : "No");
+        console.log("[RTKJoin] IsGuest:", data.isGuest);
+        console.log("[RTKJoin] Role:", data.role);
 
         if (data?.waiting) {
           setWaitingRoomActive(true);
@@ -6469,15 +6471,15 @@ export default function NewLiveMeeting() {
           return;
         }
 
-        console.log("[DyteJoin] Setting Dyte auth token...");
+        console.log("[RTKJoin] Setting RTK auth token...");
         setWaitingRoomActive(false);
         setAuthToken(data.authToken);
         mainAuthTokenRef.current = data.authToken;
-        console.log("[DyteJoin] Auth token set!");
+        console.log("[RTKJoin] Auth token set!");
 
         if (data.role) {
           const normalizedRole = normalizeRole(data.role);
-          console.log("[DyteJoin] Setting role:", data.role, "->", normalizedRole);
+          console.log("[RTKJoin] Setting role:", data.role, "->", normalizedRole);
           setRole(normalizedRole);
         }
       } catch (e) {
@@ -6486,7 +6488,7 @@ export default function NewLiveMeeting() {
           console.log("[LiveMeeting] Token fetch was cancelled (expected during room switch)");
           return;
         }
-        console.error("[LiveMeeting] Failed to fetch initial Dyte token:", e);
+        console.error("[LiveMeeting] Failed to fetch initial RTK token:", e);
         setJoinError(e.message || "Join failed");
       } finally {
         // ✅ Only mark complete if this is still the active fetch
@@ -6677,11 +6679,11 @@ export default function NewLiveMeeting() {
 
           // 🎥 Restore BOTH breakout room AND main room peek view after page reload
           // The main room peek is essential for the dual-screen layout
-          if (msg.main_room_meeting_id && !mainDyteMeeting) {
+          if (msg.main_room_meeting_id && !mainRtkMeeting) {
             (async () => {
               try {
                 console.log("[MainSocket] Getting main room token for peek view restoration");
-                const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
+                const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
                   method: "POST",
                   headers: { "Content-Type": "application/json", ...authHeader() },
                   body: JSON.stringify({ is_host: false }),
@@ -6709,14 +6711,14 @@ export default function NewLiveMeeting() {
           // Join the breakout room (happens in parallel with main room init)
           handleEnterBreakout(msg.table_id);
 
-          // ✅ NEW: After breakout rejoin, refresh Dyte SDK participant list
-          // When a participant rejoins a breakout room after page reload, the Dyte SDK
+          // ✅ NEW: After breakout rejoin, refresh RTK SDK participant list
+          // When a participant rejoins a breakout room after page reload, the RTK SDK
           // doesn't automatically sync existing participants. We need to force a refresh.
           // This ensures that other participants (e.g., Christopher) become visible to the
           // rejoining participant (e.g., Ravikumar) without requiring manual action.
           (async () => {
             try {
-              // Wait for Dyte SDK to initialize and room to be joined (timeout after 8 seconds)
+              // Wait for RTK SDK to initialize and room to be joined (timeout after 8 seconds)
               const maxWaitTime = 8000;
               const startTime = Date.now();
               while (!roomJoinedRef?.current && Date.now() - startTime < maxWaitTime) {
@@ -6725,19 +6727,19 @@ export default function NewLiveMeeting() {
 
               // Check if room joined successfully
               if (!roomJoinedRef?.current) {
-                console.warn("[MainSocket] Dyte room not joined after 8s, skipping participant refresh");
+                console.warn("[MainSocket] RTK room not joined after 8s, skipping participant refresh");
                 return;
               }
 
-              // Give Dyte SDK a moment to populate the initial participant list
+              // Give RTK SDK a moment to populate the initial participant list
               await new Promise((r) => setTimeout(r, 200));
 
               // Force refresh of participant list and video subscriptions
-              if (dyteMeeting && typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
-                console.log("[MainSocket] 🔄 Refreshing Dyte participant list after breakout rejoin");
+              if (rtkMeeting && typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                console.log("[MainSocket] 🔄 Refreshing RTK participant list after breakout rejoin");
                 try {
-                  await dyteMeeting.participants.videoSubscribed.refresh();
-                  console.log("[MainSocket] ✅ Dyte participant list refreshed successfully");
+                  await rtkMeeting.participants.videoSubscribed.refresh();
+                  console.log("[MainSocket] ✅ RTK participant list refreshed successfully");
                 } catch (e) {
                   console.warn("[MainSocket] Participant list refresh failed (non-critical):", e?.message);
                 }
@@ -6976,21 +6978,21 @@ export default function NewLiveMeeting() {
           console.log("[MainSocket] Late joiner assigned to room:", msg);
           showSnackbar(`You've been assigned to ${msg.room_name}!`, "success");
 
-          // ✅ Refresh Dyte participant list to show newly assigned participant
-          if (dyteMeeting) {
-            console.log("[MainSocket] Refreshing Dyte participants after assignment...");
+          // ✅ Refresh RTK participant list to show newly assigned participant
+          if (rtkMeeting) {
+            console.log("[MainSocket] Refreshing RTK participants after assignment...");
             try {
               // Refresh video subscriptions to detect new participant
-              if (typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
-                await dyteMeeting.participants.videoSubscribed.refresh();
-                console.log("[MainSocket] ✅ Dyte participants refreshed");
+              if (typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                await rtkMeeting.participants.videoSubscribed.refresh();
+                console.log("[MainSocket] ✅ RTK participants refreshed");
               }
               // Also try to refresh active participants list
-              if (typeof dyteMeeting.participants?.refresh === 'function') {
-                await dyteMeeting.participants.refresh();
+              if (typeof rtkMeeting.participants?.refresh === 'function') {
+                await rtkMeeting.participants.refresh();
               }
             } catch (e) {
-              console.warn("[MainSocket] Failed to refresh Dyte participants:", e);
+              console.warn("[MainSocket] Failed to refresh RTK participants:", e);
             }
           }
 
@@ -7007,21 +7009,21 @@ export default function NewLiveMeeting() {
           // Someone was assigned to a breakout room - refresh that room's participant list
           console.log("[MainSocket] Refreshing breakout participants for room:", msg.room_id);
 
-          // ✅ Refresh Dyte participants to sync with late joiner assignment
-          if (dyteMeeting) {
-            console.log("[MainSocket] Refreshing Dyte participants due to breakout assignment...");
+          // ✅ Refresh RTK participants to sync with late joiner assignment
+          if (rtkMeeting) {
+            console.log("[MainSocket] Refreshing RTK participants due to breakout assignment...");
             try {
               // Refresh video subscriptions to detect newly assigned participant
-              if (typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
-                await dyteMeeting.participants.videoSubscribed.refresh();
-                console.log("[MainSocket] ✅ Dyte participants refreshed for breakout room");
+              if (typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                await rtkMeeting.participants.videoSubscribed.refresh();
+                console.log("[MainSocket] ✅ RTK participants refreshed for breakout room");
               }
               // Also try to refresh active participants list
-              if (typeof dyteMeeting.participants?.refresh === 'function') {
-                await dyteMeeting.participants.refresh();
+              if (typeof rtkMeeting.participants?.refresh === 'function') {
+                await rtkMeeting.participants.refresh();
               }
             } catch (e) {
-              console.warn("[MainSocket] Failed to refresh Dyte participants:", e);
+              console.warn("[MainSocket] Failed to refresh RTK participants:", e);
             }
           }
 
@@ -7103,7 +7105,7 @@ export default function NewLiveMeeting() {
                 console.warn("[MainSocket] Failed to force return to main room after admit:", e);
               });
             }
-            // ✅ NEW: Ensure Dyte is initialized after admission
+            // ✅ NEW: Ensure RTK is initialized after admission
             setDbStatus("live");
             showSnackbar("You have been admitted to the meeting! 🎉", "success");
           } else if (newStatus === "waiting") {
@@ -7142,24 +7144,24 @@ export default function NewLiveMeeting() {
           let mapChanged = false;
 
           for (const update of msg.updates) {
-            const { user_id, dyte_participant_id, current_room, action } = update;
+            const { user_id, rtk_participant_id, current_room, action } = update;
 
-            // Cache the user_id → dyte_participant_id mapping
-            if (user_id && dyte_participant_id) {
-              participantIdMapRef.current.set(String(dyte_participant_id), String(user_id));
+            // Cache the user_id → rtk_participant_id mapping
+            if (user_id && rtk_participant_id) {
+              participantIdMapRef.current.set(String(rtk_participant_id), String(user_id));
             }
 
             if (action === "left" || !current_room) {
               // User left the meeting or a room
-              if (dyte_participant_id && newRoomMap.has(String(dyte_participant_id))) {
-                newRoomMap.delete(String(dyte_participant_id));
+              if (rtk_participant_id && newRoomMap.has(String(rtk_participant_id))) {
+                newRoomMap.delete(String(rtk_participant_id));
                 mapChanged = true;
                 console.log(`[MainSocket] Participant ${user_id} left room`);
               }
             } else {
               // User joined or switched rooms
-              if (dyte_participant_id) {
-                newRoomMap.set(String(dyte_participant_id), {
+              if (rtk_participant_id) {
+                newRoomMap.set(String(rtk_participant_id), {
                   type: current_room.type || "main",
                   roomId: current_room.room_id || null,
                   roomName: current_room.room_name || "Main Room",
@@ -7226,14 +7228,14 @@ export default function NewLiveMeeting() {
           const newRoomMap = new Map();
 
           for (const p of msg.participants) {
-            const { dyte_participant_id, user_id, current_room } = p;
+            const { rtk_participant_id, user_id, current_room } = p;
 
-            if (user_id && dyte_participant_id) {
-              participantIdMapRef.current.set(String(dyte_participant_id), String(user_id));
+            if (user_id && rtk_participant_id) {
+              participantIdMapRef.current.set(String(rtk_participant_id), String(user_id));
             }
 
-            if (dyte_participant_id && current_room) {
-              newRoomMap.set(String(dyte_participant_id), {
+            if (rtk_participant_id && current_room) {
+              newRoomMap.set(String(rtk_participant_id), {
                 type: current_room.type || "main",
                 roomId: current_room.room_id || null,
                 roomName: current_room.room_name || "Main Room",
@@ -7383,7 +7385,7 @@ export default function NewLiveMeeting() {
               window.dispatchEvent(new Event("auth:changed"));
             }
             setIsBanned(true);
-            if (dyteMeeting) dyteMeeting.leaveRoom();
+            if (rtkMeeting) rtkMeeting.leaveRoom();
           } else if (payload.type === "participant_kicked" || payload.type === "participant_banned") {
             // Refresh participant list when someone is kicked/banned
             console.log(`[MainSocket] Participant ${payload.type}:`, payload.kicked_user_id || payload.banned_user_id);
@@ -8658,14 +8660,14 @@ export default function NewLiveMeeting() {
     };
   }, [isBreakoutEnding, isInBreakoutRoom]);
 
-  // ---------- Init Dyte meeting ----------
+  // ---------- Init RTK meeting ----------
   useEffect(() => {
     if (!authToken) return;
     if (initInFlightRef.current) return;
     if (lastInitTokenRef.current === authToken && initDone) return;
 
     // CRITICAL: Skip initialization if host is in pre-event lounge without making a choice
-    // This prevents Dyte initialization until host confirms the dialog choice
+    // This prevents RTK initialization until host confirms the dialog choice
     // BUT: Allow initialization if already in breakout (joined a lounge table)
     const shouldSkipInitDueToPreEventLounge = preEventLoungeOpen && !joinMainRequested &&
       (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
@@ -8693,7 +8695,7 @@ export default function NewLiveMeeting() {
         }
 
         // Update breakout status IMMEDIATELY so UI reflects the change
-        // before waiting for the potentially slow Dyte init
+        // before waiting for the potentially slow RTK init
         setIsInBreakoutRoom(isBreakout);
 
         // Initialize active meeting (main or breakout)
@@ -8758,7 +8760,7 @@ export default function NewLiveMeeting() {
         }
       } catch (e) {
         console.error("[LiveMeeting] ❌ initMeeting FAILED:", e?.message || e);
-        if (!cancelled) setJoinError(e.message || "Failed to initialize Dyte meeting");
+        if (!cancelled) setJoinError(e.message || "Failed to initialize RTK meeting");
       } finally {
         console.log("[LiveMeeting] Init effect finally block - clearing initInFlightRef");
         initInFlightRef.current = false;
@@ -8780,14 +8782,14 @@ export default function NewLiveMeeting() {
 
   // ---------- Join main room (for peek functionality) ----------
   useEffect(() => {
-    if (!mainDyteMeeting?.self || !mainRoomAuthToken) return;
+    if (!mainRtkMeeting?.self || !mainRoomAuthToken) return;
 
     (async () => {
-      if (mainDyteMeeting.self.roomJoined || mainJoinInFlightRef.current) return;
+      if (mainRtkMeeting.self.roomJoined || mainJoinInFlightRef.current) return;
       mainJoinInFlightRef.current = true;
 
       try {
-        await mainDyteMeeting.join();
+        await mainRtkMeeting.join();
         console.log("[MainRoom] Joined main room for peek");
       } catch (e) {
         console.error("[MainRoom] Failed to join:", e);
@@ -8795,11 +8797,11 @@ export default function NewLiveMeeting() {
         mainJoinInFlightRef.current = false;
       }
     })();
-  }, [mainDyteMeeting, mainRoomAuthToken]);
+  }, [mainRtkMeeting, mainRoomAuthToken]);
 
   // ---------- Audio routing: Mute main room when in breakout ----------
   useEffect(() => {
-    if (!mainDyteMeeting?.self) return;
+    if (!mainRtkMeeting?.self) return;
 
     let isMounted = true;
 
@@ -8807,13 +8809,13 @@ export default function NewLiveMeeting() {
       try {
         if (isInBreakoutRoom) {
           // Mute main room to prevent echo
-          await mainDyteMeeting.self.disableAudio?.();
-          await mainDyteMeeting.self.disableVideo?.();
+          await mainRtkMeeting.self.disableAudio?.();
+          await mainRtkMeeting.self.disableVideo?.();
           if (isMounted) console.log("[MainRoom] Muted audio/video (in breakout)");
         } else {
           // Keep peek connection receive-only to avoid publishing mic/cam
-          await mainDyteMeeting.self.disableAudio?.();
-          await mainDyteMeeting.self.disableVideo?.();
+          await mainRtkMeeting.self.disableAudio?.();
+          await mainRtkMeeting.self.disableVideo?.();
           if (isMounted) console.log("[MainRoom] Kept peek connection muted (back in main)");
         }
       } catch (error) {
@@ -8826,12 +8828,12 @@ export default function NewLiveMeeting() {
     return () => {
       isMounted = false;
     };
-  }, [isInBreakoutRoom, mainDyteMeeting]);
+  }, [isInBreakoutRoom, mainRtkMeeting]);
 
-  // ---------- MUST join Dyte room (custom UI doesn't auto-join) ----------
+  // ---------- MUST join RTK room (custom UI doesn't auto-join) ----------
   useEffect(() => {
-    if (!dyteMeeting?.self || !initDone) {
-      console.log("[LiveMeeting] Join effect skipped - dyteMeeting?.self:", !!dyteMeeting?.self, "initDone:", initDone);
+    if (!rtkMeeting?.self || !initDone) {
+      console.log("[LiveMeeting] Join effect skipped - rtkMeeting?.self:", !!rtkMeeting?.self, "initDone:", initDone);
       return;
     }
 
@@ -8842,7 +8844,7 @@ export default function NewLiveMeeting() {
       return;
     }
 
-    console.log("[LiveMeeting] ✅ Join effect triggered! dyteMeeting.self exists and initDone is true");
+    console.log("[LiveMeeting] ✅ Join effect triggered! rtkMeeting.self exists and initDone is true");
 
     const onRoomJoined = async () => {
       // ✅ NEW: Mark stop flow as successfully joined
@@ -8887,8 +8889,8 @@ export default function NewLiveMeeting() {
         if (isOnBreak) {
           console.log("[LiveMeeting] 🔊 Joined lounge during break - disabling video to start OFF");
           try {
-            await dyteMeeting.self.disableVideo?.();
-            await dyteMeeting.self.disableAudio?.();
+            await rtkMeeting.self.disableVideo?.();
+            await rtkMeeting.self.disableAudio?.();
             const videoReady = await ensureVideoInputReady();
             if (!videoReady) {
               console.warn("[LiveMeeting] Camera input still unavailable after lounge join");
@@ -8908,15 +8910,15 @@ export default function NewLiveMeeting() {
       // Speed networking isolation leave/rejoin can leave participant collections stale
       // until next internal SDK sync; force a refresh so remote users appear immediately.
       try {
-        if (typeof dyteMeeting?.participants?.refresh === "function") {
-          await dyteMeeting.participants.refresh();
+        if (typeof rtkMeeting?.participants?.refresh === "function") {
+          await rtkMeeting.participants.refresh();
         }
       } catch (e) {
         console.warn("[LiveMeeting] participants.refresh failed after roomJoined:", e?.message || e);
       }
       try {
-        if (typeof dyteMeeting?.participants?.videoSubscribed?.refresh === "function") {
-          await dyteMeeting.participants.videoSubscribed.refresh();
+        if (typeof rtkMeeting?.participants?.videoSubscribed?.refresh === "function") {
+          await rtkMeeting.participants.videoSubscribed.refresh();
         }
       } catch (e) {
         console.warn("[LiveMeeting] participants.videoSubscribed.refresh failed after roomJoined:", e?.message || e);
@@ -8924,15 +8926,15 @@ export default function NewLiveMeeting() {
       // Retry refreshes shortly after join; some clients need extra time for remote track propagation.
       [500, 1500, 2600].forEach((delayMs) => {
         setTimeout(async () => {
-          if (!dyteMeeting?.self?.roomJoined) return;
+          if (!rtkMeeting?.self?.roomJoined) return;
           try {
-            if (typeof dyteMeeting?.participants?.refresh === "function") {
-              await dyteMeeting.participants.refresh();
+            if (typeof rtkMeeting?.participants?.refresh === "function") {
+              await rtkMeeting.participants.refresh();
             }
           } catch (_) { }
           try {
-            if (typeof dyteMeeting?.participants?.videoSubscribed?.refresh === "function") {
-              await dyteMeeting.participants.videoSubscribed.refresh();
+            if (typeof rtkMeeting?.participants?.videoSubscribed?.refresh === "function") {
+              await rtkMeeting.participants.videoSubscribed.refresh();
             }
           } catch (_) { }
         }, delayMs);
@@ -8940,18 +8942,18 @@ export default function NewLiveMeeting() {
 
       // ✅ Auto-record for direct joins (Waiting Room disabled)
       if (isHost && autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
-        // dyteMeeting.participants.joined is a MAP-like object (size/length vary by SDK)
-        const participantsCount = dyteMeeting.participants.joined?.size || dyteMeeting.participants.joined?.length || 0;
+        // rtkMeeting.participants.joined is a MAP-like object (size/length vary by SDK)
+        const participantsCount = rtkMeeting.participants.joined?.size || rtkMeeting.participants.joined?.length || 0;
         if (participantsCount > 0) {
           console.log("[LiveMeeting] Auto-recording triggered on Host join (participants already present)");
           triggerAutoRecordingIfEnabled();
         }
       }
     };
-    dyteMeeting.self.on?.("roomJoined", onRoomJoined);
+    rtkMeeting.self.on?.("roomJoined", onRoomJoined);
 
     // refresh case
-    if (dyteMeeting.self.roomJoined) setRoomJoined(true);
+    if (rtkMeeting.self.roomJoined) setRoomJoined(true);
 
     (async () => {
       // ✅ Multiple guards against concurrent join calls
@@ -8963,7 +8965,7 @@ export default function NewLiveMeeting() {
         console.log("[LiveMeeting] Already joined once, skipping");
         return;
       }
-      if (dyteMeeting.self.roomJoined) {
+      if (rtkMeeting.self.roomJoined) {
         console.log("[LiveMeeting] Already in room, skipping");
         return;
       }
@@ -9001,8 +9003,8 @@ export default function NewLiveMeeting() {
 
       // ✅ ACTUAL JOIN
       try {
-        console.log("[LiveMeeting] Calling dyteMeeting.joinRoom()...");
-        await dyteMeeting.joinRoom?.();
+        console.log("[LiveMeeting] Calling rtkMeeting.joinRoom()...");
+        await rtkMeeting.joinRoom?.();
         console.log("[LiveMeeting] ✅ joinRoom() completed successfully!");
       } catch (e) {
         console.error("[LiveMeeting] ❌ joinRoom failed:", e?.message || e);
@@ -9028,7 +9030,7 @@ export default function NewLiveMeeting() {
         );
         if (rejoinFromLoungeRef.current || loungeFlowDuringNetworking) {
           console.warn("[LiveMeeting] Skipping join retry due to lounge flow");
-          setJoinError(e?.message || "Failed to join Dyte room");
+          setJoinError(e?.message || "Failed to join RTK room");
           return;
         }
 
@@ -9043,21 +9045,21 @@ export default function NewLiveMeeting() {
           setJoinRequestTick((v) => v + 1);
           return;
         }
-        setJoinError(e?.message || "Failed to join Dyte room");
+        setJoinError(e?.message || "Failed to join RTK room");
       } finally {
         joinInFlightRef.current = false;
       }
     })();
 
     return () => {
-      dyteMeeting.self.off?.("roomJoined", onRoomJoined);
+      rtkMeeting.self.off?.("roomJoined", onRoomJoined);
     };
-  }, [dyteMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick, eventData?.lounge_enabled_speed_networking, networkingSessionId, loungeOpen, speedNetworkingState, stopFlowTransitionId]);
+  }, [rtkMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick, eventData?.lounge_enabled_speed_networking, networkingSessionId, loungeOpen, speedNetworkingState, stopFlowTransitionId]);
 
   // On lounge/breakout -> main transition, some SDKs recreate audio senders asynchronously.
   // Keep forcing hard mute briefly while mic UI is OFF to prevent ghost audio transmission.
   useEffect(() => {
-    if (!dyteMeeting?.self || !roomJoined || isBreakout || micOn) return;
+    if (!rtkMeeting?.self || !roomJoined || isBreakout || micOn) return;
 
     let ticks = 0;
     const interval = setInterval(async () => {
@@ -9071,14 +9073,14 @@ export default function NewLiveMeeting() {
     }, 200);
 
     return () => clearInterval(interval);
-  }, [dyteMeeting, forceSelfAudioOffAtMediaLevel, isBreakout, micOn, roomJoined]);
+  }, [rtkMeeting, forceSelfAudioOffAtMediaLevel, isBreakout, micOn, roomJoined]);
 
   useEffect(() => {
     if (isBreakout) setMainMicHardMuted(false);
   }, [isBreakout]);
 
   useEffect(() => {
-    if (!dyteMeeting?.self || !roomJoined || isBreakout || !mainMicHardMuted) return;
+    if (!rtkMeeting?.self || !roomJoined || isBreakout || !mainMicHardMuted) return;
     let cancelled = false;
     const interval = setInterval(async () => {
       if (cancelled) return;
@@ -9089,14 +9091,14 @@ export default function NewLiveMeeting() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [dyteMeeting, forceSelfAudioOffAtMediaLevel, isBreakout, mainMicHardMuted, roomJoined]);
+  }, [rtkMeeting, forceSelfAudioOffAtMediaLevel, isBreakout, mainMicHardMuted, roomJoined]);
 
   // ✅ NEW: Initialize main room peek AFTER breakout is ready (not during breakout join)
-  // This prevents concurrent Dyte init calls that cause "Unsupported concurrent calls" error
+  // This prevents concurrent RTK init calls that cause "Unsupported concurrent calls" error
   useEffect(() => {
     if (!isBreakout) return; // Only init main room peek when IN breakout
     if (!mainRoomAuthToken) return; // Need main token
-    if (mainDyteMeeting) return; // Already initialized
+    if (mainRtkMeeting) return; // Already initialized
     if (mainInitInFlightRef.current) return; // Already in flight
     // ✅ CRITICAL FIX: Do NOT check roomJoined for lounge flow
     // The main room peek is read-only and doesn't need lounge join to complete first
@@ -9121,7 +9123,7 @@ export default function NewLiveMeeting() {
         mainInitInFlightRef.current = false;
       }
     })();
-  }, [isBreakout, mainRoomAuthToken, mainDyteMeeting, initMainMeeting]);
+  }, [isBreakout, mainRoomAuthToken, mainRtkMeeting, initMainMeeting]);
 
   // Ensure main-room token exists for Main Room Peek even when main token fetch is skipped in lounge flow.
   useEffect(() => {
@@ -9134,10 +9136,10 @@ export default function NewLiveMeeting() {
     console.log("[LiveMeeting] Fetching main-room token for lounge peek");
     (async () => {
       try {
-        // ✅ CRITICAL FIX: Use /dyte/join/ endpoint (same as main token fetch) to get a valid token
+        // ✅ CRITICAL FIX: Use /rtk/join/ endpoint (same as main RTK token fetch) to get a valid token
         // The endpoint auto-detects if user is host based on event permissions
         // Token will be used for receive-only main room peek
-        const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
+        const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeader() },
         });
@@ -9320,10 +9322,10 @@ export default function NewLiveMeeting() {
     }
   }, [roomJoined, eventId, isGuest, checkAndAutoJoinSpeedNetworking]);
 
-  // Keep local button state in sync with Dyte actual state
+  // Keep local button state in sync with RTK actual state
 
   useEffect(() => {
-    if (!dyteMeeting?.self) return;
+    if (!rtkMeeting?.self) return;
 
     // ✅ STATE PRIORITY FIX: Skip sync during break + lounge
     // When user is in a lounge during break, they should control media without constant syncing
@@ -9335,36 +9337,36 @@ export default function NewLiveMeeting() {
     }
 
     const sync = () => {
-      const effectiveMicOn = mainMicHardMuted && !isBreakout ? false : Boolean(dyteMeeting.self.audioEnabled);
+      const effectiveMicOn = mainMicHardMuted && !isBreakout ? false : Boolean(rtkMeeting.self.audioEnabled);
       setMicOn(effectiveMicOn);
-      setCamOn(Boolean(dyteMeeting.self.videoEnabled));
+      setCamOn(Boolean(rtkMeeting.self.videoEnabled));
     };
 
     sync();
-    dyteMeeting.self.on?.("audioUpdate", sync);
-    dyteMeeting.self.on?.("videoUpdate", sync);
+    rtkMeeting.self.on?.("audioUpdate", sync);
+    rtkMeeting.self.on?.("videoUpdate", sync);
 
     return () => {
-      dyteMeeting.self.off?.("audioUpdate", sync);
-      dyteMeeting.self.off?.("videoUpdate", sync);
+      rtkMeeting.self.off?.("audioUpdate", sync);
+      rtkMeeting.self.off?.("videoUpdate", sync);
     };
-  }, [dyteMeeting, isOnBreak, isBreakout, mainMicHardMuted]);
+  }, [rtkMeeting, isOnBreak, isBreakout, mainMicHardMuted]);
   useEffect(() => {
-    if (!dyteMeeting?.self) return;
+    if (!rtkMeeting?.self) return;
 
     // ✅ STATE PRIORITY FIX: Skip sync during break + lounge
     if (isOnBreak && isBreakout) {
       return;
     }
 
-    setMicOn(mainMicHardMuted && !isBreakout ? false : Boolean(dyteMeeting.self.audioEnabled));
-    setCamOn(Boolean(dyteMeeting.self.videoEnabled));
-  }, [dyteMeeting, roomJoined, isOnBreak, isBreakout, mainMicHardMuted]);
+    setMicOn(mainMicHardMuted && !isBreakout ? false : Boolean(rtkMeeting.self.audioEnabled));
+    setCamOn(Boolean(rtkMeeting.self.videoEnabled));
+  }, [rtkMeeting, roomJoined, isOnBreak, isBreakout, mainMicHardMuted]);
 
   // ✅ CRITICAL FIX: Explicit media state sync when entering/leaving lounge (breakout)
   // This ensures UI state matches actual media track state when transitioning between rooms
   useEffect(() => {
-    if (!dyteMeeting?.self || !isBreakout) return;
+    if (!rtkMeeting?.self || !isBreakout) return;
 
     // ✅ STATE PRIORITY FIX: Skip sync during break + lounge
     // When user is in a lounge during break, maintain their media control without syncing
@@ -9377,21 +9379,21 @@ export default function NewLiveMeeting() {
 
     console.log(
       "[LiveMeeting] Syncing media state in lounge - Audio:",
-      dyteMeeting.self.audioEnabled,
+      rtkMeeting.self.audioEnabled,
       "Video:",
-      dyteMeeting.self.videoEnabled
+      rtkMeeting.self.videoEnabled
     );
 
     // Force sync on breakout entry (only outside of break)
-    setMicOn(mainMicHardMuted && !isBreakout ? false : Boolean(dyteMeeting.self.audioEnabled));
-    setCamOn(Boolean(dyteMeeting.self.videoEnabled));
-  }, [isBreakout, dyteMeeting?.self?.id, isOnBreak, mainMicHardMuted]); // Trigger when entering/leaving breakout
+    setMicOn(mainMicHardMuted && !isBreakout ? false : Boolean(rtkMeeting.self.audioEnabled));
+    setCamOn(Boolean(rtkMeeting.self.videoEnabled));
+  }, [isBreakout, rtkMeeting?.self?.id, isOnBreak, mainMicHardMuted]); // Trigger when entering/leaving breakout
 
   // ✅ CRITICAL FIX: Ensure media tracks are properly muted at WebRTC level when disabled
   // This adds an extra layer of protection specifically for lounge/breakout rooms
   // Run frequently to catch any tracks that get mysteriously re-enabled
   useEffect(() => {
-    if (!dyteMeeting?.self || !isBreakout) return;
+    if (!rtkMeeting?.self || !isBreakout) return;
 
     // ✅ STATE PRIORITY FIX: Skip enforcement during break + lounge
     // When user is in a lounge room during a break, they should have full media control
@@ -9414,9 +9416,9 @@ export default function NewLiveMeeting() {
       "camOn:",
       camOn,
       "audioEnabled:",
-      dyteMeeting.self.audioEnabled,
+      rtkMeeting.self.audioEnabled,
       "videoEnabled:",
-      dyteMeeting.self.videoEnabled,
+      rtkMeeting.self.videoEnabled,
       "isRecentToggle:",
       isRecentToggle
     );
@@ -9431,18 +9433,18 @@ export default function NewLiveMeeting() {
 
           // Enforce audio mute if mic is OFF
           if (!micOn) {
-            if (dyteMeeting.self.audioEnabled) {
-              dyteMeeting.self.disableAudio?.();
+            if (rtkMeeting.self.audioEnabled) {
+              rtkMeeting.self.disableAudio?.();
             }
             const audioSenders =
-              dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+              rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
                 (s) => s.track?.kind === "audio"
               ) || [];
             console.log(
               "[LiveMeeting LOUNGE] Audio enforcement - micOn=false, found senders:",
               audioSenders.length,
               "audioEnabled:",
-              dyteMeeting.self.audioEnabled
+              rtkMeeting.self.audioEnabled
             );
             for (const sender of audioSenders) {
               if (sender.track && sender.track.enabled) {
@@ -9454,18 +9456,18 @@ export default function NewLiveMeeting() {
 
           // Enforce video mute if camera is OFF
           if (!camOn) {
-            if (dyteMeeting.self.videoEnabled) {
-              dyteMeeting.self.disableVideo?.();
+            if (rtkMeeting.self.videoEnabled) {
+              rtkMeeting.self.disableVideo?.();
             }
             const videoSenders =
-              dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+              rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
                 (s) => s.track?.kind === "video"
               ) || [];
             console.log(
               "[LiveMeeting LOUNGE] Video enforcement - camOn=false, found senders:",
               videoSenders.length,
               "videoEnabled:",
-              dyteMeeting.self.videoEnabled
+              rtkMeeting.self.videoEnabled
             );
             for (const sender of videoSenders) {
               if (sender.track && sender.track.enabled) {
@@ -9495,11 +9497,11 @@ export default function NewLiveMeeting() {
       const interval = setInterval(() => {
         try {
           const audioSenders =
-            dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+            rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
               (s) => s.track?.kind === "audio"
             ) || [];
           const videoSenders =
-            dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+            rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
               (s) => s.track?.kind === "video"
             ) || [];
 
@@ -9509,11 +9511,11 @@ export default function NewLiveMeeting() {
               "[LiveMeeting] LOUNGE: Senders now available! Audio senders:",
               audioSenders.length,
               "Audio enabled:",
-              dyteMeeting.self.audioEnabled,
+              rtkMeeting.self.audioEnabled,
               "Video senders:",
               videoSenders.length,
               "Video enabled:",
-              dyteMeeting.self.videoEnabled
+              rtkMeeting.self.videoEnabled
             );
           }
 
@@ -9525,19 +9527,19 @@ export default function NewLiveMeeting() {
 
       return () => clearInterval(interval);
     }
-  }, [micOn, camOn, isBreakout, dyteMeeting]);
+  }, [micOn, camOn, isBreakout, rtkMeeting]);
 
   // Always default to mic/camera OFF when entering breakout/social lounge.
   useEffect(() => {
-    if (!dyteMeeting?.self || !isBreakout || !roomJoined) return;
+    if (!rtkMeeting?.self || !isBreakout || !roomJoined) return;
 
     const enforceDefaultMediaOffOnBreakoutJoin = async () => {
       try {
         console.log(
           "[LiveMeeting] Breakout/lounge joined: enforcing default mic/camera OFF. Current - Audio:",
-          dyteMeeting.self.audioEnabled,
+          rtkMeeting.self.audioEnabled,
           "Video:",
-          dyteMeeting.self.videoEnabled
+          rtkMeeting.self.videoEnabled
         );
 
         // Immediately reflect desired state in UI toggles.
@@ -9546,10 +9548,10 @@ export default function NewLiveMeeting() {
 
         // Try multiple times because SDK/media tracks can re-enable during room transition.
         for (let i = 0; i < 3; i++) {
-          try { await dyteMeeting.self.disableAudio?.(); } catch (e) {
+          try { await rtkMeeting.self.disableAudio?.(); } catch (e) {
             console.warn("[LiveMeeting] disableAudio failed on breakout join attempt", i + 1, e?.message || e);
           }
-          try { await dyteMeeting.self.disableVideo?.(); } catch (e) {
+          try { await rtkMeeting.self.disableVideo?.(); } catch (e) {
             console.warn("[LiveMeeting] disableVideo failed on breakout join attempt", i + 1, e?.message || e);
           }
           await new Promise((r) => setTimeout(r, 80));
@@ -9560,7 +9562,7 @@ export default function NewLiveMeeting() {
     };
 
     enforceDefaultMediaOffOnBreakoutJoin();
-  }, [isBreakout, roomJoined, dyteMeeting, activeTableId]);
+  }, [isBreakout, roomJoined, rtkMeeting, activeTableId]);
 
   // ---------- Update DB live-status (start/end) ----------
   const updateLiveStatus = useCallback(
@@ -9587,8 +9589,8 @@ export default function NewLiveMeeting() {
     }
 
     const userIdsOutsideLounge = new Set();
-    for (const [dyteParticipantId, roomInfo] of participantRoomMap.entries()) {
-      const userId = participantIdMapRef.current?.get(String(dyteParticipantId));
+    for (const [rtkParticipantId, roomInfo] of participantRoomMap.entries()) {
+      const userId = participantIdMapRef.current?.get(String(rtkParticipantId));
       if (!userId) continue;
       const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || "");
       if (roomType && roomType !== "lounge") {
@@ -9671,7 +9673,7 @@ export default function NewLiveMeeting() {
 
   async function forceFreshMainTokenForStopFlow(transitionId) {
     const tag = transitionId || `sn-stop-refresh-${Date.now()}`;
-    console.log(`[StopFlow:${tag}] 🔄 Requesting fresh main-room token via dyte/join`);
+    console.log(`[StopFlow:${tag}] 🔄 Requesting fresh main-room token via rtk/join`);
 
     // Never reuse cached token for stop-flow recovery.
     mainAuthTokenRef.current = "";
@@ -9682,7 +9684,7 @@ export default function NewLiveMeeting() {
     joinedOnceRef.current = false;
     setJoinMainRequested(true);
 
-    const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
+    const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeader() },
       body: JSON.stringify({ role }),
@@ -9736,21 +9738,21 @@ export default function NewLiveMeeting() {
     setLoadingJoin(true);  // Force JoiningMeetingScreen to show
     setJoinError("");
 
-    // ✅ PHASE 3: Force explicit Dyte room leave if in breakout
+    // ✅ PHASE 3: Force explicit RTK room leave if in breakout
     if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
       (async () => {
         try {
           speedNetworkingStopPhaseRef.current = 'leaving_lounge_room';
-          console.log(`[StopFlow:${transitionId}] Leaving lounge Dyte room...`);
+          console.log(`[StopFlow:${transitionId}] Leaving lounge RTK room...`);
 
-          dyteLoungeRoomConnectingRef.current = true;
+          rtkLoungeRoomConnectingRef.current = true;
           await applyBreakoutTokenRef.current(null, null, null, null);
 
           console.log(`[StopFlow:${transitionId}] ✅ Left lounge room`);
         } catch (e) {
           console.warn(`[StopFlow:${transitionId}] ⚠️ Error leaving lounge:`, e?.message);
         } finally {
-          dyteLoungeRoomConnectingRef.current = false;
+          rtkLoungeRoomConnectingRef.current = false;
 
           // ✅ PHASE 4: After lounge exit, IMMEDIATELY rejoin main room
           speedNetworkingStopPhaseRef.current = 'requesting_main_join';
@@ -9839,9 +9841,9 @@ export default function NewLiveMeeting() {
       }
 
       try {
-        await dyteMeeting?.leaveRoom?.();
-        await dyteMeeting?.leave?.();
-        console.log("[LiveMeeting] Left Dyte room");
+        await rtkMeeting?.leaveRoom?.();
+        await rtkMeeting?.leave?.();
+        console.log("[LiveMeeting] Left RTK room");
 
         // ✅ Clear guest session when leaving meeting
         // This ensures Events page shows all events, not filtered by guest token
@@ -9859,7 +9861,7 @@ export default function NewLiveMeeting() {
           window.dispatchEvent(new Event("auth:changed"));
         }
       } catch (e) {
-        console.warn("[LiveMeeting] Error leaving Dyte room:", e);
+        console.warn("[LiveMeeting] Error leaving RTK room:", e);
       }
 
       // ✅ IMPORTANT: Wait for meeting end to be processed on backend before fetching lounge status
@@ -9942,7 +9944,7 @@ export default function NewLiveMeeting() {
         };
       }
     },
-    [navigateAfterMeetingExit, updateLiveStatus, dyteMeeting, isBanned, eventId, role, loungeOpenStatus]
+    [navigateAfterMeetingExit, updateLiveStatus, rtkMeeting, isBanned, eventId, role, loungeOpenStatus]
   );
 
   // ✅ Handler for exiting post-event lounge
@@ -10040,7 +10042,7 @@ export default function NewLiveMeeting() {
   }, [isPostEventLounge, loungeHasEnded, postEventLoungeClosingTime]);
 
   useEffect(() => {
-    if (!dyteMeeting?.self) return;
+    if (!rtkMeeting?.self) return;
     const handleRoomLeft = ({ state }) => {
       if (ignoreRoomLeftRef.current) return;
       if (rejoinFromLoungeRef.current) return;
@@ -10048,29 +10050,29 @@ export default function NewLiveMeeting() {
         if (!isBreakout) handleMeetingEnd(state);
       }
     };
-    dyteMeeting.self.on("roomLeft", handleRoomLeft);
-    return () => dyteMeeting.self.off?.("roomLeft", handleRoomLeft);
-  }, [dyteMeeting, handleMeetingEnd, isBreakout]);
+    rtkMeeting.self.on("roomLeft", handleRoomLeft);
+    return () => rtkMeeting.self.off?.("roomLeft", handleRoomLeft);
+  }, [rtkMeeting, handleMeetingEnd, isBreakout]);
 
   // ---------- Detect host for audience (pin + waiting screen) ----------
   useEffect(() => {
-    if (!dyteMeeting || !initDone || !dyteMeeting.self) return;
+    if (!rtkMeeting || !initDone || !rtkMeeting.self) return;
 
     const enforceSpotlightLayout = () => {
-      if (dyteMeeting.participants && typeof dyteMeeting.participants.setViewMode === "function") {
-        dyteMeeting.participants.setViewMode("ACTIVE_GRID");
+      if (rtkMeeting.participants && typeof rtkMeeting.participants.setViewMode === "function") {
+        rtkMeeting.participants.setViewMode("ACTIVE_GRID");
       }
     };
 
     // Host case
     if (role === "publisher") {
       setHostJoined(true);
-      setPinnedHost(dyteMeeting.self);
+      setPinnedHost(rtkMeeting.self);
 
       const performHostSetup = async () => {
         try {
-          if (!dyteMeeting.self.isPinned && typeof dyteMeeting.self.pin === "function") {
-            await dyteMeeting.self.pin();
+          if (!rtkMeeting.self.isPinned && typeof rtkMeeting.self.pin === "function") {
+            await rtkMeeting.self.pin();
           }
           enforceSpotlightLayout();
         } catch (e) {
@@ -10080,18 +10082,18 @@ export default function NewLiveMeeting() {
 
       const handleRoomJoined = () => performHostSetup();
 
-      dyteMeeting.self.on("roomJoined", handleRoomJoined);
-      if (dyteMeeting.self.roomJoined) performHostSetup();
+      rtkMeeting.self.on("roomJoined", handleRoomJoined);
+      if (rtkMeeting.self.roomJoined) performHostSetup();
 
       return () => {
-        dyteMeeting.self.off?.("roomJoined", handleRoomJoined);
+        rtkMeeting.self.off?.("roomJoined", handleRoomJoined);
       };
     }
 
     // Audience: search host in joined participants
     const checkForHostAndPin = (participant) => {
       if (!participant) return;
-      if (!dyteMeeting?.self?.roomJoined) return;
+      if (!rtkMeeting?.self?.roomJoined) return;
       const preset = (participant.presetName || "").toLowerCase();
       const designatedHostId = hostIdRef.current || hostIdHint || null;
       const primaryHostKey = primaryHostUserId ? `id:${primaryHostUserId}` : "";
@@ -10112,7 +10114,7 @@ export default function NewLiveMeeting() {
         matchesKnownHostIdentity;
 
       // If we already have a designated host ID, still allow canonical host identity
-      // because Dyte participant IDs can change after room switches/rejoins.
+      // because RTK participant IDs can change after room switches/rejoins.
       if (
         designatedHostId &&
         participant.id !== designatedHostId &&
@@ -10137,21 +10139,21 @@ export default function NewLiveMeeting() {
     };
 
     getJoinedParticipants().forEach(checkForHostAndPin);
-    if (dyteMeeting.self) checkForHostAndPin(dyteMeeting.self);
+    if (rtkMeeting.self) checkForHostAndPin(rtkMeeting.self);
 
     const handleJoin = (p) => checkForHostAndPin(p);
-    dyteMeeting.participants?.joined?.on?.("participantJoined", handleJoin);
-    dyteMeeting.participants?.on?.("participantJoined", handleJoin);
+    rtkMeeting.participants?.joined?.on?.("participantJoined", handleJoin);
+    rtkMeeting.participants?.on?.("participantJoined", handleJoin);
 
     return () => {
-      dyteMeeting.participants?.joined?.off?.("participantJoined", handleJoin);
-      dyteMeeting.participants?.off?.("participantJoined", handleJoin);
+      rtkMeeting.participants?.joined?.off?.("participantJoined", handleJoin);
+      rtkMeeting.participants?.off?.("participantJoined", handleJoin);
     };
-  }, [dyteMeeting, getJoinedParticipants, initDone, role, hostIdHint, primaryHostUserId]);
+  }, [rtkMeeting, getJoinedParticipants, initDone, role, hostIdHint, primaryHostUserId]);
 
   // Listen for host broadcast updates (audience)
   useEffect(() => {
-    if (!dyteMeeting) return;
+    if (!rtkMeeting) return;
 
     const handleBroadcast = ({ type, payload }) => {
       if (type === "toggle-screen-share") {
@@ -10165,10 +10167,10 @@ export default function NewLiveMeeting() {
           userMediaPreferenceRef.current.mic = true;
           for (let i = 0; i < 20; i++) {
             try {
-              if (selfCanProduceAudio && dyteMeeting?.self?.enableAudio) {
-                await dyteMeeting.self.enableAudio();
-                setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
-                if (dyteMeeting?.self?.audioEnabled) return;
+              if (selfCanProduceAudio && rtkMeeting?.self?.enableAudio) {
+                await rtkMeeting.self.enableAudio();
+                setMicOn(Boolean(rtkMeeting?.self?.audioEnabled));
+                if (rtkMeeting?.self?.audioEnabled) return;
               }
             } catch (_) { }
             await new Promise((r) => setTimeout(r, 250));
@@ -10183,8 +10185,8 @@ export default function NewLiveMeeting() {
           console.log("[global-enable-all-video] Ignoring - elevated role client", {
             selfAssignedRole,
             role,
-            dyteRole: dyteMeeting?.self?.role || dyteMeeting?.self?.participantRole || "",
-            presetName: dyteMeeting?.self?.presetName || "",
+            rtkRole: rtkMeeting?.self?.role || rtkMeeting?.self?.participantRole || "",
+            presetName: rtkMeeting?.self?.presetName || "",
           });
           return;
         }
@@ -10192,10 +10194,10 @@ export default function NewLiveMeeting() {
         const tryEnableVideo = async () => {
           for (let i = 0; i < 20; i++) {
             try {
-              if (selfCanProduceVideo && dyteMeeting?.self?.enableVideo) {
-                await dyteMeeting.self.enableVideo();
+              if (selfCanProduceVideo && rtkMeeting?.self?.enableVideo) {
+                await rtkMeeting.self.enableVideo();
                           console.log("[global-enable-all-video] enableVideo success, iteration:", i);
-                if (dyteMeeting?.self?.videoEnabled) return;
+                if (rtkMeeting?.self?.videoEnabled) return;
               }
             } catch (_) { }
             await new Promise((r) => setTimeout(r, 250));
@@ -10206,8 +10208,8 @@ export default function NewLiveMeeting() {
       }
 
       if ((type === "participant-force-unmute" || type === "participant-force-mute") && (payload?.participantId || payload?.participantUserKey)) {
-        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
-        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const selfId = rtkMeeting?.self?.id ? String(rtkMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(rtkMeeting?.self);
         const targetId = payload?.participantId ? String(payload.participantId) : "";
         const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
         const isForSelf =
@@ -10221,10 +10223,10 @@ export default function NewLiveMeeting() {
             userMediaPreferenceRef.current.mic = true;
             for (let i = 0; i < 20; i++) {
               try {
-                if (selfCanProduceAudio && dyteMeeting?.self?.enableAudio) {
-                  await dyteMeeting.self.enableAudio();
-                  setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
-                  if (dyteMeeting?.self?.audioEnabled) return;
+                if (selfCanProduceAudio && rtkMeeting?.self?.enableAudio) {
+                  await rtkMeeting.self.enableAudio();
+                  setMicOn(Boolean(rtkMeeting?.self?.audioEnabled));
+                  if (rtkMeeting?.self?.audioEnabled) return;
                 }
               } catch (_) { }
               await new Promise((r) => setTimeout(r, 250));
@@ -10233,7 +10235,7 @@ export default function NewLiveMeeting() {
           enableSelf();
         } else {
           const muteSelf = async () => {
-            try { await dyteMeeting?.self?.disableAudio?.(); } catch { }
+            try { await rtkMeeting?.self?.disableAudio?.(); } catch { }
             setMicOn(false);
             userMediaPreferenceRef.current.mic = false;
           };
@@ -10244,8 +10246,8 @@ export default function NewLiveMeeting() {
       // Handle participant-force-enable-video message (camera on)
       if (type === "participant-force-enable-video" && (payload?.participantId || payload?.participantUserKey)) {
         console.log("[participant-force-enable-video] Message received, payload:", payload);
-        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
-        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const selfId = rtkMeeting?.self?.id ? String(rtkMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(rtkMeeting?.self);
         const targetId = payload?.participantId ? String(payload.participantId) : "";
         const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
         console.log("[participant-force-enable-video] selfId:", selfId, "targetId:", targetId, "selfKey:", selfKey, "targetKey:", targetKey);
@@ -10263,10 +10265,10 @@ export default function NewLiveMeeting() {
           console.log("[participant-force-enable-video] Attempting to enable video");
           for (let i = 0; i < 20; i++) {
             try {
-              if (selfCanProduceVideo && dyteMeeting?.self?.enableVideo) {
-                await dyteMeeting.self.enableVideo();
+              if (selfCanProduceVideo && rtkMeeting?.self?.enableVideo) {
+                await rtkMeeting.self.enableVideo();
                 console.log("[participant-force-enable-video] enableVideo() success, iteration:", i);
-                          if (dyteMeeting?.self?.videoEnabled) return;
+                          if (rtkMeeting?.self?.videoEnabled) return;
               }
             } catch (e) {
               console.warn("[participant-force-enable-video] enableVideo() attempt", i, "failed:", e);
@@ -10281,8 +10283,8 @@ export default function NewLiveMeeting() {
       // Handle participant-force-disable-video message (camera off)
       if (type === "participant-force-disable-video" && (payload?.participantId || payload?.participantUserKey)) {
         console.log("[participant-force-disable-video] Message received, payload:", payload);
-        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
-        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const selfId = rtkMeeting?.self?.id ? String(rtkMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(rtkMeeting?.self);
         const targetId = payload?.participantId ? String(payload.participantId) : "";
         const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
         console.log("[participant-force-disable-video] selfId:", selfId, "targetId:", targetId, "selfKey:", selfKey, "targetKey:", targetKey);
@@ -10299,7 +10301,7 @@ export default function NewLiveMeeting() {
         const disableVideoSelf = async () => {
           try {
             console.log("[participant-force-disable-video] Disabling video");
-            await dyteMeeting?.self?.disableVideo?.();
+            await rtkMeeting?.self?.disableVideo?.();
             console.log("[participant-force-disable-video] disableVideo() success");
           } catch (e) {
             console.warn("[participant-force-disable-video] disableVideo() failed:", e);
@@ -10310,10 +10312,10 @@ export default function NewLiveMeeting() {
 
       if (type === "meeting-ended" && payload?.hostId) {
         // ignore echo for host itself
-        if (dyteMeeting?.self?.id !== payload.hostId) {
+        if (rtkMeeting?.self?.id !== payload.hostId) {
           handleMeetingEnd("ended");
-          dyteMeeting?.leave?.();
-          dyteMeeting?.leaveRoom?.();
+          rtkMeeting?.leave?.();
+          rtkMeeting?.leaveRoom?.();
         }
       }
 
@@ -10351,7 +10353,7 @@ export default function NewLiveMeeting() {
         setIncomingSpotlightInvite(null);
         setSpotlightInviteSecondsLeft(0);
         setPendingMainStageScreenShareRequest(null);
-        if (!matchesStageTarget(presentationTarget, dyteMeeting?.self)) {
+        if (!matchesStageTarget(presentationTarget, rtkMeeting?.self)) {
           setIsSelfMainStageScreenShareApproved(false);
         }
         setSpotlightTarget({
@@ -10369,7 +10371,7 @@ export default function NewLiveMeeting() {
         setSpotlightInviteSecondsLeft(0);
         setPendingMainStageScreenShareRequest(null);
         setIncomingMainStageScreenShareRequest(null);
-        if (!matchesStageTarget(presentationTarget, dyteMeeting?.self)) {
+        if (!matchesStageTarget(presentationTarget, rtkMeeting?.self)) {
           setIsSelfMainStageScreenShareApproved(false);
         }
         setSpotlightTarget(null);
@@ -10386,7 +10388,7 @@ export default function NewLiveMeeting() {
       }
 
       if (type === "presentation-clear") {
-        const selfTarget = toStageTarget(dyteMeeting?.self);
+        const selfTarget = toStageTarget(rtkMeeting?.self);
         const wasSelfPresenter = matchesStageTarget(payload, selfTarget) || matchesStageTarget(presentationTarget, selfTarget);
         if (wasSelfPresenter) {
           setIsSelfMainStageScreenShareApproved(false);
@@ -10395,8 +10397,8 @@ export default function NewLiveMeeting() {
       }
 
       if (type === "spotlight-invite" && (payload?.participantId || payload?.participantUserKey)) {
-        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
-        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const selfId = rtkMeeting?.self?.id ? String(rtkMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(rtkMeeting?.self);
         const targetId = payload?.participantId ? String(payload.participantId) : "";
         const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
         const isForSelf =
@@ -10426,7 +10428,7 @@ export default function NewLiveMeeting() {
           participantId: pendingSpotlightInvite?.participantId || payload?.participantId || null,
           participantUserKey: pendingSpotlightInvite?.participantUserKey || payload?.participantUserKey || null,
           name: targetName,
-          byHostId: dyteMeeting?.self?.id || null,
+          byHostId: rtkMeeting?.self?.id || null,
           ts: Date.now(),
         };
 
@@ -10435,7 +10437,7 @@ export default function NewLiveMeeting() {
         if (status === "accepted") {
           setSpotlightTarget(acceptedPayload);
           try {
-            dyteMeeting?.participants?.broadcastMessage?.("spotlight-user", acceptedPayload);
+            rtkMeeting?.participants?.broadcastMessage?.("spotlight-user", acceptedPayload);
           } catch (e) {
             console.warn("[Spotlight] Failed to broadcast spotlight-user after accept:", e);
           }
@@ -10451,20 +10453,20 @@ export default function NewLiveMeeting() {
                 setApprovedMainStageScreenShare(null);
                 setPresentationTarget(null);
                 try {
-                  dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+                  rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
                     requestId: `ssr-revoke-${Date.now()}`,
                     status: "revoked",
                     participantId: oldTarget.participantId || null,
                     participantUserKey: oldTarget.participantUserKey || null,
                     name: oldTarget.name,
-                    byHostId: dyteMeeting?.self?.id || null,
+                    byHostId: rtkMeeting?.self?.id || null,
                     ts: Date.now(),
                   });
-                  dyteMeeting?.participants?.broadcastMessage?.("presentation-clear", {
+                  rtkMeeting?.participants?.broadcastMessage?.("presentation-clear", {
                     participantId: oldTarget.participantId || null,
                     participantUserKey: oldTarget.participantUserKey || null,
                     name: oldTarget.name,
-                    byHostId: dyteMeeting?.self?.id || null,
+                    byHostId: rtkMeeting?.self?.id || null,
                     ts: Date.now(),
                   });
                 } catch (e) {
@@ -10483,7 +10485,7 @@ export default function NewLiveMeeting() {
               }
 
               try {
-                await dyteMeeting.participants.updatePermissions([newParticipant.id], {
+                await rtkMeeting.participants.updatePermissions([newParticipant.id], {
                   canProduceScreenshare: "ALLOWED",
                   requestProduceScreenshare: true,
                 });
@@ -10496,7 +10498,7 @@ export default function NewLiveMeeting() {
                 participantId: newParticipant.id || acceptedPayload.participantId || null,
                 participantUserKey: newKey || newParticipant.id || null,
                 name: newParticipant?.name || acceptedPayload.name || "Participant",
-                byHostId: dyteMeeting?.self?.id || null,
+                byHostId: rtkMeeting?.self?.id || null,
                 ts: Date.now(),
               };
               setApprovedMainStageScreenShare(grantedPayload);
@@ -10504,17 +10506,17 @@ export default function NewLiveMeeting() {
 
               const grantRequestId = `ssr-grant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
               try {
-                dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+                rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
                   requestId: grantRequestId,
                   status: "approved",
                   proactive: true,
                   participantId: grantedPayload.participantId,
                   participantUserKey: grantedPayload.participantUserKey,
                   name: grantedPayload.name,
-                  byHostId: dyteMeeting?.self?.id || null,
+                  byHostId: rtkMeeting?.self?.id || null,
                   ts: Date.now(),
                 });
-                dyteMeeting?.participants?.broadcastMessage?.("presentation-target", grantedPayload);
+                rtkMeeting?.participants?.broadcastMessage?.("presentation-target", grantedPayload);
               } catch (e) {
                 console.warn("[Spotlight] Failed to broadcast presentation grant:", e);
               }
@@ -10536,14 +10538,14 @@ export default function NewLiveMeeting() {
 
         if (!isRequesterAllowed || !hostPerms.screenShare) {
           try {
-            dyteMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
+            rtkMeeting?.participants?.broadcastMessage?.("main-stage-screenshare-response", {
               requestId,
               status: "denied",
               reason: !hostPerms.screenShare ? "host_disabled" : "not_allowed_presenter",
               participantId: payload?.participantId || null,
               participantUserKey: payload?.participantUserKey || null,
               name: payload?.name || "Participant",
-              byHostId: dyteMeeting?.self?.id || null,
+              byHostId: rtkMeeting?.self?.id || null,
               ts: Date.now(),
             });
           } catch (e) {
@@ -10563,15 +10565,15 @@ export default function NewLiveMeeting() {
 
       if (type === "participant-unmute-request" && (payload?.participantId || payload?.participantUserKey)) {
         if (!canManageParticipantMic) return;
-        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
+        const selfId = rtkMeeting?.self?.id ? String(rtkMeeting.self.id) : "";
         const senderId = payload?.participantId ? String(payload.participantId) : "";
         if (selfId && senderId && selfId === senderId) return;
         showSnackbar(`${payload?.name || "A participant"} requested to be unmuted.`, "info");
       }
 
       if (type === "main-stage-screenshare-response" && payload?.requestId) {
-        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
-        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const selfId = rtkMeeting?.self?.id ? String(rtkMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(rtkMeeting?.self);
         const targetId = payload?.participantId ? String(payload.participantId) : "";
         const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
         const isForSelf =
@@ -10648,7 +10650,7 @@ export default function NewLiveMeeting() {
         );
 
         if (participant) {
-          // Update the participant name in Dyte
+          // Update the participant name in RTK
           participant.name = payload.name;
           if (participant._raw) {
             participant._raw.guest_first_name = payload.first_name;
@@ -10665,13 +10667,13 @@ export default function NewLiveMeeting() {
       }
     };
 
-    dyteMeeting.participants?.on?.("broadcastedMessage", handleBroadcast);
-    return () => dyteMeeting.participants?.off?.("broadcastedMessage", handleBroadcast);
+    rtkMeeting.participants?.on?.("broadcastedMessage", handleBroadcast);
+    return () => rtkMeeting.participants?.off?.("broadcastedMessage", handleBroadcast);
   }, [
     activeTableId,
     approvedMainStageScreenShare,
     canManageParticipantMic,
-    dyteMeeting,
+    rtkMeeting,
     findParticipantByIdentity,
     getJoinedParticipants,
     hostPerms.screenShare,
@@ -10737,7 +10739,7 @@ export default function NewLiveMeeting() {
   // ✅ If Host leaves MAIN MEETING, show waiting state for audience
   // NOTE: This should NOT trigger when host leaves a breakout room
   useEffect(() => {
-    if (!dyteMeeting) return;
+    if (!rtkMeeting) return;
     if (isHost) return; // host doesn't need to auto-leave (already leaving)
 
     // IMPORTANT: Only monitor for host leaving in the MAIN meeting, not breakouts
@@ -10774,21 +10776,21 @@ export default function NewLiveMeeting() {
       departedParticipantIdsRef.current.add(p.id);
     };
 
-    dyteMeeting.participants?.joined?.on?.("participantLeft", onParticipantLeft);
-    dyteMeeting.participants?.on?.("participantLeft", onParticipantLeft);
-    dyteMeeting?.on?.("participantLeft", onParticipantLeft);
+    rtkMeeting.participants?.joined?.on?.("participantLeft", onParticipantLeft);
+    rtkMeeting.participants?.on?.("participantLeft", onParticipantLeft);
+    rtkMeeting?.on?.("participantLeft", onParticipantLeft);
 
     return () => {
-      dyteMeeting.participants?.joined?.off?.("participantLeft", onParticipantLeft);
-      dyteMeeting.participants?.off?.("participantLeft", onParticipantLeft);
-      dyteMeeting?.off?.("participantLeft", onParticipantLeft);
+      rtkMeeting.participants?.joined?.off?.("participantLeft", onParticipantLeft);
+      rtkMeeting.participants?.off?.("participantLeft", onParticipantLeft);
+      rtkMeeting?.off?.("participantLeft", onParticipantLeft);
     };
-  }, [dyteMeeting, getJoinedParticipants, isHost, isBreakout, hostIdHint, pinnedHost, handleMeetingEnd, setLoungeTables]);
+  }, [rtkMeeting, getJoinedParticipants, isHost, isBreakout, hostIdHint, pinnedHost, handleMeetingEnd, setLoungeTables]);
 
   // If pinned host is no longer present, clear pinned state
   useEffect(() => {
     if (!pinnedHost) return;
-    if (!dyteMeeting?.self?.roomJoined) return;
+    if (!rtkMeeting?.self?.roomJoined) return;
     const current = getJoinedParticipants().find((p) => p?.id === pinnedHost?.id);
     if (current) return;
 
@@ -10796,27 +10798,27 @@ export default function NewLiveMeeting() {
       pinnedHost.unpin?.();
     } catch { }
     try {
-      dyteMeeting?.participants?.unpin?.(pinnedHost);
+      rtkMeeting?.participants?.unpin?.(pinnedHost);
     } catch { }
     try {
-      dyteMeeting?.participants?.unpin?.(pinnedHost?.id);
+      rtkMeeting?.participants?.unpin?.(pinnedHost?.id);
     } catch { }
 
     setHostJoined(false);
     setPinnedHost(null);
-  }, [dyteMeeting, getJoinedParticipants, pinnedHost]);
+  }, [rtkMeeting, getJoinedParticipants, pinnedHost]);
 
   // If spotlighted participant leaves, host clears spotlight and broadcasts clear.
   // Non-host clients should not auto-clear locally, otherwise layouts can diverge.
   useEffect(() => {
     if (!spotlightTarget) return;
     if (!isHost) return;
-    if (!dyteMeeting?.self?.roomJoined) return;
+    if (!rtkMeeting?.self?.roomJoined) return;
 
     const spotlightId = spotlightTarget.participantId ? String(spotlightTarget.participantId) : "";
     const spotlightKey = spotlightTarget.participantUserKey ? String(spotlightTarget.participantUserKey) : "";
     const currentParticipants = [
-      ...(dyteMeeting?.self ? [dyteMeeting.self] : []),
+      ...(rtkMeeting?.self ? [rtkMeeting.self] : []),
       ...getJoinedParticipants(),
     ];
     const exists = currentParticipants.some((pp) => {
@@ -10829,21 +10831,21 @@ export default function NewLiveMeeting() {
 
     setSpotlightTarget(null);
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("spotlight-clear", {
-        byHostId: dyteMeeting?.self?.id || null,
+      rtkMeeting?.participants?.broadcastMessage?.("spotlight-clear", {
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       });
     } catch (e) {
       console.warn("[Spotlight] Failed to auto-broadcast spotlight-clear:", e);
     }
-  }, [getJoinedParticipants, spotlightTarget, dyteMeeting, isHost]);
+  }, [getJoinedParticipants, spotlightTarget, rtkMeeting, isHost]);
 
   useEffect(() => {
     if (!presentationTarget || !isHost) return;
-    if (!dyteMeeting?.self?.roomJoined) return;
+    if (!rtkMeeting?.self?.roomJoined) return;
 
     const currentParticipants = [
-      ...(dyteMeeting?.self ? [dyteMeeting.self] : []),
+      ...(rtkMeeting?.self ? [rtkMeeting.self] : []),
       ...getJoinedParticipants(),
     ];
     const exists = currentParticipants.some((pp) => matchesStageTarget(presentationTarget, pp));
@@ -10853,30 +10855,30 @@ export default function NewLiveMeeting() {
     setApprovedMainStageScreenShare(null);
     setIncomingMainStageScreenShareRequest(null);
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("presentation-clear", {
+      rtkMeeting?.participants?.broadcastMessage?.("presentation-clear", {
         participantId: presentationTarget?.participantId || null,
         participantUserKey: presentationTarget?.participantUserKey || null,
         name: presentationTarget?.name || "Participant",
-        byHostId: dyteMeeting?.self?.id || null,
+        byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       });
     } catch (e) {
       console.warn("[Presentation] Failed to auto-broadcast presentation-clear:", e);
     }
-  }, [dyteMeeting, getJoinedParticipants, isHost, presentationTarget]);
+  }, [rtkMeeting, getJoinedParticipants, isHost, presentationTarget]);
 
   // Host broadcasts presence so audience can pin
   useEffect(() => {
-    if (!isHost || !dyteMeeting?.self) return;
-    if (!dyteMeeting.self.roomJoined) return;
+    if (!isHost || !rtkMeeting?.self) return;
+    if (!rtkMeeting.self.roomJoined) return;
     if (primaryHostUserId && !isPrimaryBroadcastHost) return;
 
     const broadcastPresence = () => {
-      const myId = dyteMeeting.self?.id;
-      const hostUserKey = getParticipantUserKey(dyteMeeting.self);
+      const myId = rtkMeeting.self?.id;
+      const hostUserKey = getParticipantUserKey(rtkMeeting.self);
       // Only broadcast after join is complete to avoid ERR1205
-      if (myId && dyteMeeting.self?.roomJoined) {
-        dyteMeeting.participants?.broadcastMessage?.("host-id", {
+      if (myId && rtkMeeting.self?.roomJoined) {
+        rtkMeeting.participants?.broadcastMessage?.("host-id", {
           hostId: myId,
           hostUserKey,
         });
@@ -10886,7 +10888,7 @@ export default function NewLiveMeeting() {
     broadcastPresence();
     const interval = setInterval(broadcastPresence, 4000);
     return () => clearInterval(interval);
-  }, [isHost, dyteMeeting, primaryHostUserId, isPrimaryBroadcastHost]);
+  }, [isHost, rtkMeeting, primaryHostUserId, isPrimaryBroadcastHost]);
 
   useEffect(() => {
     if (hostIdHint) hostIdRef.current = hostIdHint;
@@ -10901,12 +10903,12 @@ export default function NewLiveMeeting() {
   }, [loungePinnedId]);
 
   useEffect(() => {
-    if (isPrimaryBroadcastHost && dyteMeeting?.self?.id) hostIdRef.current = dyteMeeting.self.id;
-  }, [isPrimaryBroadcastHost, dyteMeeting?.self?.id]);
+    if (isPrimaryBroadcastHost && rtkMeeting?.self?.id) hostIdRef.current = rtkMeeting.self.id;
+  }, [isPrimaryBroadcastHost, rtkMeeting?.self?.id]);
 
   const getCurrentRoomParticipants = useCallback(() => {
     const list = [];
-    if (dyteMeeting?.self) list.push(dyteMeeting.self);
+    if (rtkMeeting?.self) list.push(rtkMeeting.self);
     getJoinedParticipants().forEach((p) => list.push(p));
     const seen = new Set();
     const deduped = [];
@@ -10918,7 +10920,7 @@ export default function NewLiveMeeting() {
       deduped.push(p);
     }
     return deduped;
-  }, [dyteMeeting?.self, getJoinedParticipants]);
+  }, [rtkMeeting?.self, getJoinedParticipants]);
 
   const pickFirstByJoinTime = useCallback((list) => {
     if (!Array.isArray(list) || list.length === 0) return null;
@@ -10945,7 +10947,7 @@ export default function NewLiveMeeting() {
   const departedParticipantIdsRef = useRef(new Set()); // track departed participants to prevent stale data
 
   useEffect(() => {
-    if (!dyteMeeting) return;
+    if (!rtkMeeting) return;
 
     if (!isLiveEventSocialLounge) {
       if (loungePinnedIdRef.current) setLoungePinnedId(null);
@@ -10979,14 +10981,14 @@ export default function NewLiveMeeting() {
         const first = pickFirstByJoinTime(getCurrentRoomParticipants());
         if (!first?.id) return;
         setLoungePinnedId(first.id);
-        dyteMeeting?.participants?.broadcastMessage?.("lounge-pin", {
+        rtkMeeting?.participants?.broadcastMessage?.("lounge-pin", {
           pinnedId: first.id,
           tableId: activeTableId || null,
         });
       }, 350);
     }
   }, [
-    dyteMeeting,
+    rtkMeeting,
     isLiveEventSocialLounge,
     participantsTick,
     activeTableId,
@@ -10998,9 +11000,9 @@ export default function NewLiveMeeting() {
 
   // Sync new joiners with host permission toggles
   useEffect(() => {
-    if (!isHost || !dyteMeeting?.participants?.joined || !dyteMeeting?.self) return;
+    if (!isHost || !rtkMeeting?.participants?.joined || !rtkMeeting?.self) return;
     const handleParticipantJoined = async (participant) => {
-      if (participant.id === dyteMeeting.self?.id) return;
+      if (participant.id === rtkMeeting.self?.id) return;
       const roomInfo = getParticipantRoomInfo(participant);
       const participantUserId = getBackendUserId(participant);
       const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || "");
@@ -11030,7 +11032,7 @@ export default function NewLiveMeeting() {
         ((approvedId && String(participant?.id || "") === approvedId) ||
           (approvedKey && participantKey && participantKey === approvedKey));
       try {
-        await dyteMeeting.participants.updatePermissions([participant.id], {
+        await rtkMeeting.participants.updatePermissions([participant.id], {
           canProduceScreenshare: isApprovedMainStageSharer ? "ALLOWED" : "NOT_ALLOWED",
           requestProduceScreenshare: isApprovedMainStageSharer,
           chat: {
@@ -11064,7 +11066,7 @@ export default function NewLiveMeeting() {
       // ✅ Re-sync presentation-target state to new joiner (fixes presenter label showing wrong name)
       if (approvedMainStageScreenShare && hostPerms.screenShare) {
         try {
-          dyteMeeting?.participants?.broadcastMessage?.("presentation-target", {
+          rtkMeeting?.participants?.broadcastMessage?.("presentation-target", {
             ...approvedMainStageScreenShare,
             ts: Date.now(),
           });
@@ -11076,7 +11078,7 @@ export default function NewLiveMeeting() {
       // ✅ Re-sync spotlight-user state to new joiner (fixes spotlighted speaker showing wrong person)
       if (spotlightTarget) {
         try {
-          dyteMeeting?.participants?.broadcastMessage?.("spotlight-user", {
+          rtkMeeting?.participants?.broadcastMessage?.("spotlight-user", {
             ...spotlightTarget,
             ts: Date.now(),
           });
@@ -11085,11 +11087,11 @@ export default function NewLiveMeeting() {
         }
       }
     };
-    dyteMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
-    return () => dyteMeeting.participants.joined.off("participantJoined", handleParticipantJoined);
+    rtkMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
+    return () => rtkMeeting.participants.joined.off("participantJoined", handleParticipantJoined);
   }, [
     approvedMainStageScreenShare,
-    dyteMeeting,
+    rtkMeeting,
     hostMediaLocks,
     hostPerms.chat,
     hostPerms.polls,
@@ -11102,22 +11104,22 @@ export default function NewLiveMeeting() {
   ]);
 
   useEffect(() => {
-    if (!dyteMeeting?.self) return;
+    if (!rtkMeeting?.self) return;
     if (isOnBreak) {
       enforceSelfBreakMediaLock();
     }
     if (isHost) {
       updateAudienceMediaForBreak(isOnBreak);
     }
-  }, [dyteMeeting, enforceSelfBreakMediaLock, isHost, isOnBreak, updateAudienceMediaForBreak]);
+  }, [rtkMeeting, enforceSelfBreakMediaLock, isHost, isOnBreak, updateAudienceMediaForBreak]);
 
   useEffect(() => {
-    if (!isOnBreak || !dyteMeeting?.self) return;
+    if (!isOnBreak || !rtkMeeting?.self) return;
     const interval = setInterval(() => {
       enforceSelfBreakMediaLock();
     }, 800);
     return () => clearInterval(interval);
-  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak]);
+  }, [rtkMeeting, enforceSelfBreakMediaLock, isOnBreak]);
 
   useEffect(() => {
     if (!roomJoined) {
@@ -11143,20 +11145,20 @@ export default function NewLiveMeeting() {
   }, [canManageParticipantMic, forceCameraOffAll, hostMediaLocks.cam, roomJoined]);
 
   useEffect(() => {
-    if (!dyteMeeting) return;
-    const hostId = hostIdHint || pinnedHost?.id || (isHost ? dyteMeeting?.self?.id : null);
+    if (!rtkMeeting) return;
+    const hostId = hostIdHint || pinnedHost?.id || (isHost ? rtkMeeting?.self?.id : null);
     if (!hostId) return;
     const all = getJoinedParticipants();
     const found =
       all.find((p) => p?.id === hostId) ||
-      (dyteMeeting?.self?.id === hostId ? dyteMeeting.self : null);
+      (rtkMeeting?.self?.id === hostId ? rtkMeeting.self : null);
     if (!found) return;
     const key = getParticipantUserKey(found);
     if (key) hostUserKeyRef.current = key;
-  }, [dyteMeeting, getJoinedParticipants, hostIdHint, pinnedHost?.id, isHost, participantsTick]);
+  }, [rtkMeeting, getJoinedParticipants, hostIdHint, pinnedHost?.id, isHost, participantsTick]);
 
   useEffect(() => {
-    if (!dyteMeeting?.participants) return;
+    if (!rtkMeeting?.participants) return;
 
     // Clear stale state when meeting changes
     observedParticipantsRef.current.clear();
@@ -11199,77 +11201,77 @@ export default function NewLiveMeeting() {
       }
     };
 
-    dyteMeeting.participants.joined?.on?.("participantJoined", bump);
-    dyteMeeting.participants.joined?.on?.("participantLeft", bump);
-    dyteMeeting.participants.joined?.on?.("participantUpdated", bump);
-    dyteMeeting.participants.joined?.on?.("participantJoined", upsert);
-    dyteMeeting.participants.joined?.on?.("participantLeft", remove);
-    dyteMeeting.participants.joined?.on?.("participantUpdated", upsert);
+    rtkMeeting.participants.joined?.on?.("participantJoined", bump);
+    rtkMeeting.participants.joined?.on?.("participantLeft", bump);
+    rtkMeeting.participants.joined?.on?.("participantUpdated", bump);
+    rtkMeeting.participants.joined?.on?.("participantJoined", upsert);
+    rtkMeeting.participants.joined?.on?.("participantLeft", remove);
+    rtkMeeting.participants.joined?.on?.("participantUpdated", upsert);
 
     // Some SDK versions fire events on the participants object instead of the joined map
-    dyteMeeting.participants?.on?.("participantJoined", bump);
-    dyteMeeting.participants?.on?.("participantLeft", bump);
-    dyteMeeting.participants?.on?.("participantUpdated", bump);
-    dyteMeeting.participants?.on?.("participantsUpdated", bump);
-    dyteMeeting.participants?.on?.("participantJoined", upsert);
-    dyteMeeting.participants?.on?.("participantLeft", remove);
-    dyteMeeting.participants?.on?.("participantUpdated", upsert);
-    dyteMeeting.participants?.on?.("participantsUpdated", bump);
-    dyteMeeting?.on?.("participantJoined", bump);
-    dyteMeeting?.on?.("participantLeft", bump);
-    dyteMeeting?.on?.("participantUpdated", bump);
-    dyteMeeting?.on?.("participantJoined", upsert);
-    dyteMeeting?.on?.("participantLeft", remove);
-    dyteMeeting?.on?.("participantUpdated", upsert);
+    rtkMeeting.participants?.on?.("participantJoined", bump);
+    rtkMeeting.participants?.on?.("participantLeft", bump);
+    rtkMeeting.participants?.on?.("participantUpdated", bump);
+    rtkMeeting.participants?.on?.("participantsUpdated", bump);
+    rtkMeeting.participants?.on?.("participantJoined", upsert);
+    rtkMeeting.participants?.on?.("participantLeft", remove);
+    rtkMeeting.participants?.on?.("participantUpdated", upsert);
+    rtkMeeting.participants?.on?.("participantsUpdated", bump);
+    rtkMeeting?.on?.("participantJoined", bump);
+    rtkMeeting?.on?.("participantLeft", bump);
+    rtkMeeting?.on?.("participantUpdated", bump);
+    rtkMeeting?.on?.("participantJoined", upsert);
+    rtkMeeting?.on?.("participantLeft", remove);
+    rtkMeeting?.on?.("participantUpdated", upsert);
 
     // ✅ Fix Audience Icons: Listen for specific audio/video events
-    dyteMeeting.participants.joined?.on?.("audioUpdate", bump);
-    dyteMeeting.participants.joined?.on?.("videoUpdate", bump);
-    dyteMeeting.participants?.on?.("audioUpdate", bump);
-    dyteMeeting.participants?.on?.("videoUpdate", bump);
-    dyteMeeting?.on?.("audioUpdate", bump);
-    dyteMeeting?.on?.("videoUpdate", bump);
+    rtkMeeting.participants.joined?.on?.("audioUpdate", bump);
+    rtkMeeting.participants.joined?.on?.("videoUpdate", bump);
+    rtkMeeting.participants?.on?.("audioUpdate", bump);
+    rtkMeeting.participants?.on?.("videoUpdate", bump);
+    rtkMeeting?.on?.("audioUpdate", bump);
+    rtkMeeting?.on?.("videoUpdate", bump);
 
     // Initial sync
     bump();
 
     // Fallback: periodic sync in case events are missed
     // Reduced from 2500ms to 1000ms for better real-time participant visibility
-    // especially for grace period joins which might have timing issues with Dyte SDK
+    // especially for grace period joins which might have timing issues with RTK SDK
     const poll = setInterval(bump, 1000);
 
     return () => {
-      dyteMeeting.participants.joined?.off?.("participantJoined", bump);
-      dyteMeeting.participants.joined?.off?.("participantLeft", bump);
-      dyteMeeting.participants.joined?.off?.("participantUpdated", bump);
-      dyteMeeting.participants.joined?.off?.("participantJoined", upsert);
-      dyteMeeting.participants.joined?.off?.("participantLeft", remove);
-      dyteMeeting.participants.joined?.off?.("participantUpdated", upsert);
-      dyteMeeting.participants?.off?.("participantJoined", bump);
-      dyteMeeting.participants?.off?.("participantLeft", bump);
-      dyteMeeting.participants?.off?.("participantUpdated", bump);
-      dyteMeeting.participants?.off?.("participantsUpdated", bump);
-      dyteMeeting.participants?.off?.("participantJoined", upsert);
-      dyteMeeting.participants?.off?.("participantLeft", remove);
-      dyteMeeting.participants?.off?.("participantUpdated", upsert);
-      dyteMeeting.participants?.off?.("participantsUpdated", bump);
-      dyteMeeting?.off?.("participantJoined", bump);
-      dyteMeeting?.off?.("participantLeft", bump);
-      dyteMeeting?.off?.("participantUpdated", bump);
-      dyteMeeting?.off?.("participantJoined", upsert);
-      dyteMeeting?.off?.("participantLeft", remove);
-      dyteMeeting?.off?.("participantUpdated", upsert);
+      rtkMeeting.participants.joined?.off?.("participantJoined", bump);
+      rtkMeeting.participants.joined?.off?.("participantLeft", bump);
+      rtkMeeting.participants.joined?.off?.("participantUpdated", bump);
+      rtkMeeting.participants.joined?.off?.("participantJoined", upsert);
+      rtkMeeting.participants.joined?.off?.("participantLeft", remove);
+      rtkMeeting.participants.joined?.off?.("participantUpdated", upsert);
+      rtkMeeting.participants?.off?.("participantJoined", bump);
+      rtkMeeting.participants?.off?.("participantLeft", bump);
+      rtkMeeting.participants?.off?.("participantUpdated", bump);
+      rtkMeeting.participants?.off?.("participantsUpdated", bump);
+      rtkMeeting.participants?.off?.("participantJoined", upsert);
+      rtkMeeting.participants?.off?.("participantLeft", remove);
+      rtkMeeting.participants?.off?.("participantUpdated", upsert);
+      rtkMeeting.participants?.off?.("participantsUpdated", bump);
+      rtkMeeting?.off?.("participantJoined", bump);
+      rtkMeeting?.off?.("participantLeft", bump);
+      rtkMeeting?.off?.("participantUpdated", bump);
+      rtkMeeting?.off?.("participantJoined", upsert);
+      rtkMeeting?.off?.("participantLeft", remove);
+      rtkMeeting?.off?.("participantUpdated", upsert);
 
-      dyteMeeting.participants.joined?.off?.("audioUpdate", bump);
-      dyteMeeting.participants.joined?.off?.("videoUpdate", bump);
-      dyteMeeting.participants?.off?.("audioUpdate", bump);
-      dyteMeeting.participants?.off?.("videoUpdate", bump);
-      dyteMeeting?.off?.("audioUpdate", bump);
-      dyteMeeting?.off?.("videoUpdate", bump);
+      rtkMeeting.participants.joined?.off?.("audioUpdate", bump);
+      rtkMeeting.participants.joined?.off?.("videoUpdate", bump);
+      rtkMeeting.participants?.off?.("audioUpdate", bump);
+      rtkMeeting.participants?.off?.("videoUpdate", bump);
+      rtkMeeting?.off?.("audioUpdate", bump);
+      rtkMeeting?.off?.("videoUpdate", bump);
 
       clearInterval(poll);
     };
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   useEffect(() => {
     // Reset fallback caches when switching between main and breakout rooms
@@ -11281,7 +11283,7 @@ export default function NewLiveMeeting() {
 
   // ✅ Initialize guest profile data when guest joins the meeting
   useEffect(() => {
-    if (!isGuest || !roomJoined || !dyteMeeting?.self || !eventId) return;
+    if (!isGuest || !roomJoined || !rtkMeeting?.self || !eventId) return;
 
     let mounted = true;
     const initializeGuestProfile = async () => {
@@ -11304,13 +11306,13 @@ export default function NewLiveMeeting() {
 
         if (!mounted) return;
 
-        // Store guest profile data in Dyte participant's _raw object for visibility to other participants
-        if (dyteMeeting?.self && dyteMeeting.self._raw) {
-          dyteMeeting.self._raw.guest_first_name = guest.first_name;
-          dyteMeeting.self._raw.guest_last_name = guest.last_name;
-          dyteMeeting.self._raw.guest_company = guest.company;
-          dyteMeeting.self._raw.guest_job_title = guest.job_title;
-          dyteMeeting.self._raw.guest_email = guest.email;
+        // Store guest profile data in RTK participant's _raw object for visibility to other participants
+        if (rtkMeeting?.self && rtkMeeting.self._raw) {
+          rtkMeeting.self._raw.guest_first_name = guest.first_name;
+          rtkMeeting.self._raw.guest_last_name = guest.last_name;
+          rtkMeeting.self._raw.guest_company = guest.company;
+          rtkMeeting.self._raw.guest_job_title = guest.job_title;
+          rtkMeeting.self._raw.guest_email = guest.email;
         }
 
         // Update localStorage as well
@@ -11328,11 +11330,11 @@ export default function NewLiveMeeting() {
 
     initializeGuestProfile();
     return () => { mounted = false; };
-  }, [isGuest, roomJoined, dyteMeeting, eventId]);
+  }, [isGuest, roomJoined, rtkMeeting, eventId]);
 
   // Explicit poll via SDK helper (getAll) for SDK variants that don't expose collections
   useEffect(() => {
-    if (!dyteMeeting?.participants) return;
+    if (!rtkMeeting?.participants) return;
 
     const bump = () => setParticipantsTick((v) => v + 1);
     const upsert = (p) => {
@@ -11347,16 +11349,16 @@ export default function NewLiveMeeting() {
       if (cancelled) return;
       try {
         let arr = [];
-        if (typeof dyteMeeting.participants.getAll === "function") {
-          arr = await dyteMeeting.participants.getAll();
-        } else if (typeof dyteMeeting.participants.toArray === "function") {
-          arr = dyteMeeting.participants.toArray();
+        if (typeof rtkMeeting.participants.getAll === "function") {
+          arr = await rtkMeeting.participants.getAll();
+        } else if (typeof rtkMeeting.participants.toArray === "function") {
+          arr = rtkMeeting.participants.toArray();
         }
         if (Array.isArray(arr)) {
           arr.forEach(upsert);
         }
       } catch (err) {
-        console.warn("Dyte participants getAll failed:", err);
+        console.warn("RTK participants getAll failed:", err);
       }
     };
 
@@ -11367,12 +11369,12 @@ export default function NewLiveMeeting() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   // Presence broadcast fallback: every client announces itself, listeners upsert into the fallback map
   useEffect(() => {
-    if (!dyteMeeting?.self) return;
-    if (!dyteMeeting.self.roomJoined) return;
+    if (!rtkMeeting?.self) return;
+    if (!rtkMeeting.self.roomJoined) return;
 
     const bump = () => setParticipantsTick((v) => v + 1);
     const upsertPresence = (payload) => {
@@ -11389,9 +11391,9 @@ export default function NewLiveMeeting() {
     };
 
     const broadcastPresence = () => {
-      const self = dyteMeeting.self;
+      const self = rtkMeeting.self;
       if (!self?.id) return;
-      dyteMeeting.participants?.broadcastMessage?.("presence", {
+      rtkMeeting.participants?.broadcastMessage?.("presence", {
         id: self.id,
         name: self.name,
         preset: self.presetName,
@@ -11413,18 +11415,18 @@ export default function NewLiveMeeting() {
       }
     };
 
-    dyteMeeting.participants?.on?.("broadcastedMessage", onBroadcast);
-    dyteMeeting.participants?.joined?.on?.("participantLeft", handleParticipantLeft);
+    rtkMeeting.participants?.on?.("broadcastedMessage", onBroadcast);
+    rtkMeeting.participants?.joined?.on?.("participantLeft", handleParticipantLeft);
 
     broadcastPresence();
     const interval = setInterval(broadcastPresence, 4000);
 
     return () => {
-      dyteMeeting.participants?.off?.("broadcastedMessage", onBroadcast);
-      dyteMeeting.participants?.joined?.off?.("participantLeft", handleParticipantLeft);
+      rtkMeeting.participants?.off?.("broadcastedMessage", onBroadcast);
+      rtkMeeting.participants?.joined?.off?.("participantLeft", handleParticipantLeft);
       clearInterval(interval);
     };
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   const participants = useMemo(() => {
     const loungeOccupantIds = new Set();
@@ -11434,8 +11436,8 @@ export default function NewLiveMeeting() {
       });
     });
 
-    // ✅ Get host ID from dyteMeeting for audience members
-    const hostFromMeeting = dyteMeeting?.host?.id || dyteMeeting?.meta?.hostId || dyteMeeting?.host?.participantId;
+    // ✅ Get host ID from rtkMeeting for audience members
+    const hostFromMeeting = rtkMeeting?.host?.id || rtkMeeting?.meta?.hostId || rtkMeeting?.host?.participantId;
 
     // Debug: Log lounge occupants
     if (loungeOccupantIds.size > 0 && participantsTick % 5 === 0) {
@@ -11445,12 +11447,12 @@ export default function NewLiveMeeting() {
     const list = [];
 
     // Prefer self, then joined, then fallback observed entries
-    if (dyteMeeting?.self) list.push(dyteMeeting.self);
+    if (rtkMeeting?.self) list.push(rtkMeeting.self);
     getJoinedParticipants().forEach((p) => list.push(p));
     observedParticipantsRef.current.forEach((p) => list.push(p));
 
     const joinedIds = new Set(getJoinedParticipants().map(p => p.id));
-    if (dyteMeeting?.self?.id) joinedIds.add(dyteMeeting.self.id);
+    if (rtkMeeting?.self?.id) joinedIds.add(rtkMeeting.self.id);
 
     const deduped = [];
     const seenKeys = new Set();
@@ -11523,7 +11525,7 @@ export default function NewLiveMeeting() {
       if (!pp?.id) return;
       if (participantJoinedAtRef.current.has(pp.id)) return;
 
-      const isSelf = dyteMeeting?.self?.id && pp.id === dyteMeeting.self.id;
+      const isSelf = rtkMeeting?.self?.id && pp.id === rtkMeeting.self.id;
       if (isSelf && joinedAtRef.current) {
         participantJoinedAtRef.current.set(pp.id, joinedAtRef.current);
       } else {
@@ -11603,19 +11605,19 @@ export default function NewLiveMeeting() {
         try { return Array.from(source); } catch { return []; }
       };
 
-      const isInHostSection = toArraySafe(dyteMeeting?.participants?.host).some(x => x?.id === p.id) ||
-        toArraySafe(dyteMeeting?.participants?.hosts).some(x => x?.id === p.id) ||
-        toArraySafe(dyteMeeting?.participants?.active).some(x => x?.id === p.id && (String(x?.role || "").toLowerCase().includes("host") || String(x?.presetName || "").toLowerCase().includes("host")));
+      const isInHostSection = toArraySafe(rtkMeeting?.participants?.host).some(x => x?.id === p.id) ||
+        toArraySafe(rtkMeeting?.participants?.hosts).some(x => x?.id === p.id) ||
+        toArraySafe(rtkMeeting?.participants?.active).some(x => x?.id === p.id && (String(x?.role || "").toLowerCase().includes("host") || String(x?.presetName || "").toLowerCase().includes("host")));
 
       // ✅ Also check raw properties that might indicate host role
       const participantRoleStr = String(p?.role || p?._raw?.role || "").toLowerCase();
       const participantPresetStr = String(p?.presetName || p?._raw?.presetName || "").toLowerCase();
       const hasHostRoleOrPreset = participantRoleStr.includes("host") || participantRoleStr.includes("publisher") ||
         participantPresetStr.includes("host") || participantPresetStr.includes("publisher");
-      const isSelfParticipant = Boolean(dyteMeeting?.self?.id && p.id === dyteMeeting.self.id);
+      const isSelfParticipant = Boolean(rtkMeeting?.self?.id && p.id === rtkMeeting.self.id);
       const sdkHostHeuristicMatch =
         (hostFromMeeting && p.id === hostFromMeeting) ||
-        (dyteMeeting?.host && (p.name === dyteMeeting.host.name || p.id === dyteMeeting.host.id)) ||
+        (rtkMeeting?.host && (p.name === rtkMeeting.host.name || p.id === rtkMeeting.host.id)) ||
         isInHostSection;
 
       const isHostParticipant =
@@ -11623,7 +11625,7 @@ export default function NewLiveMeeting() {
         hasHostRoleOrPreset ||
         (hostIdCurrent && p.id === hostIdCurrent) ||
         (hostUserKeyCurrent && participantUserKey && participantUserKey === hostUserKeyCurrent) ||
-        (isHost && dyteMeeting?.self?.id && p.id === dyteMeeting.self.id) ||
+        (isHost && rtkMeeting?.self?.id && p.id === rtkMeeting.self.id) ||
         // SDK host collections can be noisy in breakout context; don't let them mark audience self as Host.
         (sdkHostHeuristicMatch && (isHost || !isSelfParticipant));
 
@@ -11677,7 +11679,7 @@ export default function NewLiveMeeting() {
         id: p.id,
         name: p.name || "User",
         role: finalRole,
-        presetName: p.presetName || "", // ✅ Include Dyte SDK preset name for display
+        presetName: p.presetName || "", // ✅ Include RTK SDK preset name for display
         mic: Boolean(p.audioEnabled),
         cam: Boolean(p.videoEnabled),
         active: Boolean(p.isSpeaking),
@@ -11689,12 +11691,12 @@ export default function NewLiveMeeting() {
         _raw: p,
       };
     });
-  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity, moodMap]);
+  }, [rtkMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity, moodMap]);
 
   const roomTypeByUserId = useMemo(() => {
     const map = new Map();
-    for (const [dyteParticipantId, roomInfo] of participantRoomMap.entries()) {
-      const userId = participantIdMapRef.current?.get(String(dyteParticipantId));
+    for (const [rtkParticipantId, roomInfo] of participantRoomMap.entries()) {
+      const userId = participantIdMapRef.current?.get(String(rtkParticipantId));
       if (!userId) continue;
       const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || roomInfo?.roomName || "");
       if (roomType) map.set(String(userId), roomType);
@@ -11729,10 +11731,10 @@ export default function NewLiveMeeting() {
   const nonMainParticipantKeysForPeek = useMemo(() => {
     const keys = new Set();
 
-    for (const [dyteParticipantId, roomInfo] of participantRoomMap.entries()) {
+    for (const [rtkParticipantId, roomInfo] of participantRoomMap.entries()) {
       const roomType = normalizeRoomType(roomInfo?.type || roomInfo?.roomCategory || roomInfo?.roomName || "");
       if (!roomType || roomType === "main") continue;
-      const userId = participantIdMapRef.current?.get(String(dyteParticipantId));
+      const userId = participantIdMapRef.current?.get(String(rtkParticipantId));
       if (userId) keys.add(`id:${String(userId)}`);
     }
 
@@ -11849,12 +11851,12 @@ export default function NewLiveMeeting() {
       if (!isParticipantInMainRoom(participant)) return false;
       const inCurrentMainRoom =
         Boolean(participant?.inMeeting) ||
-        Boolean(dyteMeeting?.self?.id && participant.id === dyteMeeting.self.id);
+        Boolean(rtkMeeting?.self?.id && participant.id === rtkMeeting.self.id);
       return inCurrentMainRoom && isSupportLike(participant);
     });
 
     setHasLiveSupportPresenceInMainRoom(nextValue);
-  }, [isBreakout, participants, dyteMeeting?.self?.id, isParticipantInMainRoom]);
+  }, [isBreakout, participants, rtkMeeting?.self?.id, isParticipantInMainRoom]);
 
   // ✅ Phase 3: Sync loungeTables with participantRoomMap
   useEffect(() => {
@@ -11876,14 +11878,14 @@ export default function NewLiveMeeting() {
         for (const tableParticipant of participantsList) {
           const userId = String(tableParticipant.user_id || tableParticipant.userId);
 
-          // Find the corresponding Dyte participant
-          const dyteParticipant = participants.find(p => {
+          // Find the corresponding RTK participant
+          const rtkParticipant = participants.find(p => {
             const pUserId = getBackendUserId(p) || participantIdMapRef.current?.get(String(p.id));
             return pUserId && String(pUserId) === userId;
           });
 
-          if (dyteParticipant && dyteParticipant.id) {
-            newRoomMap.set(String(dyteParticipant.id), {
+          if (rtkParticipant && rtkParticipant.id) {
+            newRoomMap.set(String(rtkParticipant.id), {
               type: roomType,
               roomId: String(table.id),
               roomName: roomName,
@@ -11892,7 +11894,7 @@ export default function NewLiveMeeting() {
             });
 
             // Update cache
-            participantIdMapRef.current.set(String(dyteParticipant.id), userId);
+            participantIdMapRef.current.set(String(rtkParticipant.id), userId);
           }
         }
       }
@@ -11940,7 +11942,7 @@ export default function NewLiveMeeting() {
         // Must be in meeting
         if (!p.inMeeting) return false;
         // Exclude self (the current user)
-        if (dyteMeeting?.self?.id && p.id === dyteMeeting.self.id) return false;
+        if (rtkMeeting?.self?.id && p.id === rtkMeeting.self.id) return false;
         return true;
       })
       .map((p) => {
@@ -11961,17 +11963,17 @@ export default function NewLiveMeeting() {
           email: p._raw?.email || p._raw?.user_email || "",
         };
       });
-  }, [participants, dyteMeeting?.self?.id]);
+  }, [participants, rtkMeeting?.self?.id]);
 
   const breakoutParticipantCount = useMemo(() => {
     if (!isBreakout) return 0;
     const ids = new Set();
-    if (dyteMeeting?.self?.id) ids.add(dyteMeeting.self.id);
+    if (rtkMeeting?.self?.id) ids.add(rtkMeeting.self.id);
     getJoinedParticipants().forEach((p) => {
       if (p?.id) ids.add(p.id);
     });
     return ids.size;
-  }, [isBreakout, dyteMeeting?.self?.id, getJoinedParticipants, participantsTick]);
+  }, [isBreakout, rtkMeeting?.self?.id, getJoinedParticipants, participantsTick]);
 
   // ✅ Leave Breakout / Table logic
   const handleLeaveBreakout = useCallback(async () => {
@@ -12014,9 +12016,9 @@ export default function NewLiveMeeting() {
     if (!isPostEventLounge && loungeOpenStatus?.status === "OPEN" && isHost) {
       console.log("[LiveMeeting] During-event lounge - returning to lounge overlay after leaving table");
       try {
-        if (dyteMeeting) {
+        if (rtkMeeting) {
           try {
-            await dyteMeeting.leaveRoom();
+            await rtkMeeting.leaveRoom();
           } catch (e) {
             console.warn("[LiveMeeting] Error leaving lounge room:", e);
           }
@@ -12052,9 +12054,9 @@ export default function NewLiveMeeting() {
     if (isPostEventLounge) {
       console.log("[LiveMeeting] In post-event lounge - resetting breakout state only");
       try {
-        if (dyteMeeting) {
+        if (rtkMeeting) {
           try {
-            await dyteMeeting.leaveRoom();
+            await rtkMeeting.leaveRoom();
           } catch (e) {
             console.warn("[LiveMeeting] Error leaving lounge room:", e);
           }
@@ -12097,9 +12099,9 @@ export default function NewLiveMeeting() {
       if (applyBreakoutTokenRef.current) {
         await applyBreakoutTokenRef.current(null, null, null, null);
       } else {
-        if (dyteMeeting) {
+        if (rtkMeeting) {
           try {
-            await dyteMeeting.leaveRoom();
+            await rtkMeeting.leaveRoom();
           } catch (e) {
             console.warn("Error leaving breakout room:", e);
           }
@@ -12121,7 +12123,7 @@ export default function NewLiveMeeting() {
         leaveBreakoutInFlightRef.current = false;
       }, 300);
     }
-  }, [dyteMeeting, eventId, isPostEventLounge, loungeOpenStatus?.status, isHost]);
+  }, [rtkMeeting, eventId, isPostEventLounge, loungeOpenStatus?.status, isHost]);
 
   const forceRejoinMainFromLounge = useCallback(async () => {
     // Close lounge UI and force a fresh join via API (to respect waiting room/grace rules)
@@ -12138,10 +12140,10 @@ export default function NewLiveMeeting() {
       tokenFetchAbortControllerRef.current = null;
     }
 
-    if (dyteMeeting) {
+    if (rtkMeeting) {
       try {
         ignoreRoomLeftRef.current = true;
-        await dyteMeeting.leaveRoom();
+        await rtkMeeting.leaveRoom();
       } catch (e) {
         console.warn("[LiveMeeting] Error leaving lounge room:", e);
       } finally {
@@ -12165,7 +12167,7 @@ export default function NewLiveMeeting() {
     setTimeout(() => {
       rejoinFromLoungeRef.current = false;
     }, 500);
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   // ✅ Lounge close detection ref to prevent concurrent rejoin calls
   const loungeCloseDetectionRef = useRef({
@@ -12298,9 +12300,9 @@ export default function NewLiveMeeting() {
     shouldTriggerLoungeRejoin,
   ]);
 
-  // Debug: log what Dyte exposes so we can see why audience is missing
+  // Debug: log what RTK exposes so we can see why audience is missing
   useEffect(() => {
-    if (!dyteMeeting) return;
+    if (!rtkMeeting) return;
 
     const toArraySafe = (source) => {
       if (!source) return [];
@@ -12315,7 +12317,7 @@ export default function NewLiveMeeting() {
       }
     };
 
-    const participantsObj = dyteMeeting.participants;
+    const participantsObj = rtkMeeting.participants;
     const joinedRaw = participantsObj?.joined?.participants || participantsObj?.joined?._participants;
     const joinedFromRaw =
       joinedRaw && typeof joinedRaw.values === "function"
@@ -12347,22 +12349,22 @@ export default function NewLiveMeeting() {
         videoSubscribedSize: participantsObj?.videoSubscribed?.size,
         audioSubscribedSize: participantsObj?.audioSubscribed?.size,
       },
-      meetingKeys: Object.keys(dyteMeeting || {}),
+      meetingKeys: Object.keys(rtkMeeting || {}),
       observedFromEvents: Array.from(observedParticipantsRef.current.values()).map((p) => ({
         id: p?.id,
         name: p?.name,
         preset: p?.presetName,
       })),
       fromHelper: getJoinedParticipants()?.map((p) => ({ id: p.id, name: p.name, preset: p.presetName })),
-      self: dyteMeeting.self ? { id: dyteMeeting.self.id, name: dyteMeeting.self.name, preset: dyteMeeting.self.presetName } : null,
+      self: rtkMeeting.self ? { id: rtkMeeting.self.id, name: rtkMeeting.self.name, preset: rtkMeeting.self.presetName } : null,
     };
     // expose for manual inspection in DevTools
     if (typeof window !== "undefined") {
-      window.__dyteMeeting = dyteMeeting;
-      window.__dyteParticipantsSnapshot = snapshot;
+      window.__rtkMeeting = rtkMeeting;
+      window.__rtkParticipantsSnapshot = snapshot;
       window.__loungeTables = loungeTables;
     }
-  }, [dyteMeeting, getJoinedParticipants, participantsTick, loungeTables]);
+  }, [rtkMeeting, getJoinedParticipants, participantsTick, loungeTables]);
 
   // Pinned “host” view data
   const latestPinnedHost = useMemo(() => {
@@ -12402,15 +12404,15 @@ export default function NewLiveMeeting() {
         if (fromParticipants) return fromParticipants;
         const fromJoined = getJoinedParticipants().find((p) => getParticipantUserKey(p) === primaryKey);
         if (fromJoined) return fromJoined;
-        if (dyteMeeting?.self && getParticipantUserKey(dyteMeeting.self) === primaryKey) {
-          return dyteMeeting.self;
+        if (rtkMeeting?.self && getParticipantUserKey(rtkMeeting.self) === primaryKey) {
+          return rtkMeeting.self;
         }
       }
       const pinnedId = loungePinnedIdRef.current || loungePinnedId;
       if (!pinnedId) return null;
       const fresh =
         getJoinedParticipants().find((x) => x.id === pinnedId) ||
-        (dyteMeeting?.self?.id === pinnedId ? dyteMeeting.self : null);
+        (rtkMeeting?.self?.id === pinnedId ? rtkMeeting.self : null);
       if (fresh) return fresh;
       const fallback = participants.find((x) => x.id === pinnedId);
       return fallback?._raw || fallback || null;
@@ -12435,13 +12437,13 @@ export default function NewLiveMeeting() {
           participants.find((x) => getParticipantUserKey(x?._raw || x) === presentationKey) ||
           null;
       }
-      if (!presenter && dyteMeeting?.self) {
-        const selfKey = getParticipantUserKey(dyteMeeting.self);
+      if (!presenter && rtkMeeting?.self) {
+        const selfKey = getParticipantUserKey(rtkMeeting.self);
         if (
-          (presentationId && String(dyteMeeting.self.id) === presentationId) ||
+          (presentationId && String(rtkMeeting.self.id) === presentationId) ||
           (presentationKey && selfKey === presentationKey)
         ) {
-          presenter = dyteMeeting.self;
+          presenter = rtkMeeting.self;
         }
       }
       if (presenter && isParticipantInMainRoom(presenter) && !(suppressHostPresenceInMainRoom && isLikelyHostParticipant(presenter))) {
@@ -12468,10 +12470,10 @@ export default function NewLiveMeeting() {
           participants.find((x) => getParticipantUserKey(x?._raw || x) === spotlightKey) ||
           null;
       }
-      if (!spotlighted && dyteMeeting?.self) {
-        const selfKey = getParticipantUserKey(dyteMeeting.self);
-        if ((spotlightId && String(dyteMeeting.self.id) === spotlightId) || (spotlightKey && selfKey === spotlightKey)) {
-          spotlighted = dyteMeeting.self;
+      if (!spotlighted && rtkMeeting?.self) {
+        const selfKey = getParticipantUserKey(rtkMeeting.self);
+        if ((spotlightId && String(rtkMeeting.self.id) === spotlightId) || (spotlightKey && selfKey === spotlightKey)) {
+          spotlighted = rtkMeeting.self;
         }
       }
 
@@ -12480,9 +12482,9 @@ export default function NewLiveMeeting() {
       }
     }
 
-    const participantInCurrentDyteRoom = (participant) => {
+    const participantInCurrentRtkRoom = (participant) => {
       if (!participant?.id) return false;
-      if (dyteMeeting?.self?.id && participant.id === dyteMeeting.self.id) return true;
+      if (rtkMeeting?.self?.id && participant.id === rtkMeeting.self.id) return true;
       return getJoinedParticipants().some((x) => x?.id === participant.id);
     };
 
@@ -12492,7 +12494,7 @@ export default function NewLiveMeeting() {
       const creatorHost =
         getJoinedParticipants().find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
         participants.find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
-        (dyteMeeting?.self && getParticipantUserKey(dyteMeeting.self) === primaryHostKey ? dyteMeeting.self : null);
+        (rtkMeeting?.self && getParticipantUserKey(rtkMeeting.self) === primaryHostKey ? rtkMeeting.self : null);
       const creatorInMainRoom = creatorHost ? isParticipantInMainRoom(creatorHost) : false;
       if (creatorHost && creatorInMainRoom) {
         if (suppressHostPresenceInMainRoom && isLikelyHostParticipant(creatorHost)) {
@@ -12508,8 +12510,8 @@ export default function NewLiveMeeting() {
 
     // ✅ FORCE for primary host only: use self as source of truth
     // In breakout/lounge, always pin self if host is present
-    if (isPrimaryBroadcastHost && dyteMeeting?.self) {
-      const selfParticipant = participants.find(x => x.id === dyteMeeting.self.id);
+    if (isPrimaryBroadcastHost && rtkMeeting?.self) {
+      const selfParticipant = participants.find(x => x.id === rtkMeeting.self.id);
       const selfInMainRoom = selfParticipant ? isParticipantInMainRoom(selfParticipant) : false;
 
       // ✅ NEW RULE: If host is in lounge, ALWAYS show the host (not other participants)
@@ -12530,7 +12532,7 @@ export default function NewLiveMeeting() {
         // Don't show lounge participants in main area, only main area participants
         const mainAreaParticipants = participants.filter(
           x =>
-            x.id !== dyteMeeting.self.id &&  // Exclude self (host in lounge)
+            x.id !== rtkMeeting.self.id &&  // Exclude self (host in lounge)
             isParticipantInMainRoom(x) &&     // Only show main area participants
             x.id                              // Must have valid ID
         );
@@ -12573,7 +12575,7 @@ export default function NewLiveMeeting() {
         (primaryHostUserId
           ? participants.find((x) => String(getBackendUserId(x?._raw || x) || "") === String(primaryHostUserId))
           : null) ||
-        (dyteMeeting?.self?.id === designatedHostId ? dyteMeeting.self : null);
+        (rtkMeeting?.self?.id === designatedHostId ? rtkMeeting.self : null);
       if (designated) p = designated;
     }
 
@@ -12666,7 +12668,7 @@ export default function NewLiveMeeting() {
           const otherLoungeMembers = participants.filter(
             x =>
               x.id !== p.id &&
-              x.id !== dyteMeeting?.self?.id &&
+              x.id !== rtkMeeting?.self?.id &&
               x.inMeeting &&
               x.id
           );
@@ -12689,7 +12691,7 @@ export default function NewLiveMeeting() {
             x.id &&
             isParticipantInMainRoom(x) &&
             x.id !== p.id &&
-            x.id !== dyteMeeting?.self?.id &&
+            x.id !== rtkMeeting?.self?.id &&
             (!suppressHostPresenceInMainRoom || !isLikelyHostParticipant(x))
         );
 
@@ -12729,7 +12731,7 @@ export default function NewLiveMeeting() {
       const breakoutParticipants = participants.filter(
         (x) =>
           x.id &&
-          x.id !== dyteMeeting?.self?.id &&
+          x.id !== rtkMeeting?.self?.id &&
           !isParticipantHost(x)  // Exclude anyone who is the host
       );
 
@@ -12738,7 +12740,7 @@ export default function NewLiveMeeting() {
         p = breakoutParticipants[0];
       } else {
         // Fallback: If all other participants are host or self, show self
-        const selfParticipant = participants.find(x => x.id === dyteMeeting?.self?.id);
+        const selfParticipant = participants.find(x => x.id === rtkMeeting?.self?.id);
         if (selfParticipant) {
           console.log("[LoungePinning] Breakout fallback: Only host available, showing self");
           p = selfParticipant;
@@ -12760,7 +12762,7 @@ export default function NewLiveMeeting() {
           (x) =>
             x.id &&
             isParticipantInMainRoom(x) &&
-            x.id !== dyteMeeting?.self?.id &&
+            x.id !== rtkMeeting?.self?.id &&
             (!suppressHostPresenceInMainRoom || !isLikelyHostParticipant(x))
         );
         if (mainRoomParticipants.length > 0) {
@@ -12774,10 +12776,10 @@ export default function NewLiveMeeting() {
     }
 
     // ✅ NEW: If pinned participant is self and in lounge/breakout, show someone else instead
-    if (p && isBreakout && p.id === dyteMeeting?.self?.id) {
+    if (p && isBreakout && p.id === rtkMeeting?.self?.id) {
       console.log("[LoungePinning] Breakout: Self is pinned, looking for main area participant...", {
-        selfId: dyteMeeting?.self?.id,
-        selfName: dyteMeeting?.self?.name,
+        selfId: rtkMeeting?.self?.id,
+        selfName: rtkMeeting?.self?.name,
         pinnedId: p.id,
         isBreakout
       });
@@ -12786,7 +12788,7 @@ export default function NewLiveMeeting() {
       // Use participants array which has lounge status information
       const mainAreaParticipants = participants.filter(
         x =>
-          x.id !== dyteMeeting?.self?.id &&
+          x.id !== rtkMeeting?.self?.id &&
           !x.isOccupyingLounge && // Show only main area participants
           x.id
       );
@@ -12798,7 +12800,7 @@ export default function NewLiveMeeting() {
         p = mainAreaParticipants[0];
       } else {
         // No main area participants - fallback to other lounge participants
-        const otherLoungeParticipants = getJoinedParticipants().filter(x => x.id !== dyteMeeting?.self?.id);
+        const otherLoungeParticipants = getJoinedParticipants().filter(x => x.id !== rtkMeeting?.self?.id);
         console.log("[LoungePinning] Breakout: No main area participants, other lounge participants:", otherLoungeParticipants.map(x => ({ id: x.id, name: x.name })));
         if (otherLoungeParticipants.length > 0) {
           console.log("[LoungePinning] Breakout: Showing other lounge participant:", otherLoungeParticipants[0].name);
@@ -12813,16 +12815,16 @@ export default function NewLiveMeeting() {
     if (isBreakout && currentLoungeUserIds.size > 0 && p && !isInCurrentBreakoutTable(p)) {
       console.log("[LoungePinning] Pinned participant not in current breakout table; selecting in-table fallback");
       const selfFallback =
-        dyteMeeting?.self && isInCurrentBreakoutTable(dyteMeeting.self) ? dyteMeeting.self : null;
+        rtkMeeting?.self && isInCurrentBreakoutTable(rtkMeeting.self) ? rtkMeeting.self : null;
       const participantFallback = participants.find((x) => x?.id && isInCurrentBreakoutTable(x)) || null;
       p = selfFallback || participantFallback || null;
     }
 
     if (!p) return null;
 
-    // ✅ FIX: If p is self, return the current dyteMeeting.self which is always fresh
-    if (dyteMeeting?.self?.id && p.id === dyteMeeting.self.id) {
-      return dyteMeeting.self;
+    // ✅ FIX: If p is self, return the current rtkMeeting.self which is always fresh
+    if (rtkMeeting?.self?.id && p.id === rtkMeeting.self.id) {
+      return rtkMeeting.self;
     }
 
     // 1. Try to find the exact same participant ID in the fresh list
@@ -12856,7 +12858,7 @@ export default function NewLiveMeeting() {
     participantsTick,
     getJoinedParticipants,
     isBreakout,
-    dyteMeeting?.self,
+    rtkMeeting?.self,
     camOn,
     isHost,
     isPrimaryBroadcastHost,
@@ -12913,12 +12915,12 @@ export default function NewLiveMeeting() {
   // ✅ FIX: Use latestPinnedHost directly (has role field), fallback to _raw only for raw SDK data
   const pinnedRaw = latestPinnedHost || null;
 
-  const pinnedIsSelf = Boolean(pinnedRaw?.id && dyteMeeting?.self?.id && pinnedRaw.id === dyteMeeting.self.id);
+  const pinnedIsSelf = Boolean(pinnedRaw?.id && rtkMeeting?.self?.id && pinnedRaw.id === rtkMeeting.self.id);
 
   // ✅ Determine if pinned participant is the host using same logic as groupedMembers (right panel)
   const pinnedIsHost = useMemo(() => {
     if (!pinnedRaw?.id) return false;
-    const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || (isHost ? dyteMeeting?.self?.id : null);
+    const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || (isHost ? rtkMeeting?.self?.id : null);
     const hostUserKey = hostUserKeyRef.current;
     const hostFromKey = hostUserKey
       ? participants.find((p) => getParticipantUserKey(p?._raw || p) === hostUserKey)
@@ -12932,7 +12934,7 @@ export default function NewLiveMeeting() {
     }
     // Fallback to role check if no effective host ID
     return pinnedRaw.role === "Host";
-  }, [pinnedRaw?.id, pinnedRaw?.role, hostIdRef, pinnedHost?.id, hostIdHint, isHost, dyteMeeting?.self?.id, participants]);
+  }, [pinnedRaw?.id, pinnedRaw?.role, hostIdRef, pinnedHost?.id, hostIdHint, isHost, rtkMeeting?.self?.id, participants]);
 
   // ✅ Now this will correctly see 'true' when the host turns the camera on
   const pinnedHasVideo = Boolean(pinnedRaw?.videoEnabled);
@@ -12953,7 +12955,7 @@ export default function NewLiveMeeting() {
 
 
   // -------------------------
-  // Active screen-share (same behavior as the old DyteMeeting UI: when someone shares, it becomes the main stage)
+  // Active screen-share (same behavior as the old RtkMeeting UI: when someone shares, it becomes the main stage)
   // -------------------------
   const [activeScreenShareParticipant, setActiveScreenShareParticipant] = useState(null);
 
@@ -13029,7 +13031,7 @@ export default function NewLiveMeeting() {
   }, []);
 
   const findActiveScreenShareParticipant = useCallback(() => {
-    if (!dyteMeeting) return null;
+    if (!rtkMeeting) return null;
 
     const preferredTarget = presentationTarget || spotlightTarget;
     const joined = getJoinedParticipants();
@@ -13037,8 +13039,8 @@ export default function NewLiveMeeting() {
       const preferredParticipant = joined.find((p) => matchesStageTarget(preferredTarget, p) && isParticipantScreenSharing(p));
       if (preferredParticipant) return preferredParticipant;
 
-      if (matchesStageTarget(preferredTarget, dyteMeeting?.self) && isParticipantScreenSharing(dyteMeeting?.self)) {
-        return dyteMeeting.self;
+      if (matchesStageTarget(preferredTarget, rtkMeeting?.self) && isParticipantScreenSharing(rtkMeeting?.self)) {
+        return rtkMeeting.self;
       }
     }
 
@@ -13048,10 +13050,10 @@ export default function NewLiveMeeting() {
 
     // 2) Try common SDK collections (if available)
     const candidatesStores = [
-      dyteMeeting?.participants?.screenShares,
-      dyteMeeting?.participants?.screenshares,
-      dyteMeeting?.participants?.screenShare,
-      dyteMeeting?.participants?.screenshare,
+      rtkMeeting?.participants?.screenShares,
+      rtkMeeting?.participants?.screenshares,
+      rtkMeeting?.participants?.screenShare,
+      rtkMeeting?.participants?.screenshare,
     ].filter(Boolean);
 
     const toArr = (x) => {
@@ -13078,13 +13080,13 @@ export default function NewLiveMeeting() {
     }
 
     // 3) Self
-    if (isParticipantScreenSharing(dyteMeeting?.self)) return dyteMeeting.self;
+    if (isParticipantScreenSharing(rtkMeeting?.self)) return rtkMeeting.self;
 
     return null;
-  }, [dyteMeeting, getJoinedParticipants, isParticipantScreenSharing, presentationTarget, spotlightTarget]);
+  }, [rtkMeeting, getJoinedParticipants, isParticipantScreenSharing, presentationTarget, spotlightTarget]);
 
   useEffect(() => {
-    if (!dyteMeeting) return;
+    if (!rtkMeeting) return;
 
     const refresh = () => {
       const next = findActiveScreenShareParticipant();
@@ -13115,19 +13117,19 @@ export default function NewLiveMeeting() {
       }
     };
 
-    safeOn(dyteMeeting, "screenShareUpdate");
-    safeOn(dyteMeeting, "screenShareStarted");
-    safeOn(dyteMeeting, "screenShareStopped");
+    safeOn(rtkMeeting, "screenShareUpdate");
+    safeOn(rtkMeeting, "screenShareStarted");
+    safeOn(rtkMeeting, "screenShareStopped");
 
-    safeOn(dyteMeeting?.participants, "screenShareUpdate");
-    safeOn(dyteMeeting?.participants?.joined, "participantUpdated");
-    safeOn(dyteMeeting?.participants?.joined, "screenShareUpdate");
-    safeOn(dyteMeeting?.participants?.joined, "screenShareStarted");
-    safeOn(dyteMeeting?.participants?.joined, "screenShareStopped");
+    safeOn(rtkMeeting?.participants, "screenShareUpdate");
+    safeOn(rtkMeeting?.participants?.joined, "participantUpdated");
+    safeOn(rtkMeeting?.participants?.joined, "screenShareUpdate");
+    safeOn(rtkMeeting?.participants?.joined, "screenShareStarted");
+    safeOn(rtkMeeting?.participants?.joined, "screenShareStopped");
 
-    safeOn(dyteMeeting?.self, "screenShareUpdate");
-    safeOn(dyteMeeting?.self, "screenShareStarted");
-    safeOn(dyteMeeting?.self, "screenShareStopped");
+    safeOn(rtkMeeting?.self, "screenShareUpdate");
+    safeOn(rtkMeeting?.self, "screenShareStarted");
+    safeOn(rtkMeeting?.self, "screenShareStopped");
 
     // Poll fallback (covers SDKs that don't emit the events we subscribed to)
     const interval = setInterval(refresh, 800);
@@ -13138,7 +13140,7 @@ export default function NewLiveMeeting() {
         try { fn(); } catch { }
       });
     };
-  }, [dyteMeeting, findActiveScreenShareParticipant]);
+  }, [rtkMeeting, findActiveScreenShareParticipant]);
 
   const hasScreenshare = !!activeScreenShareParticipant;
   const activeScreensharePresenterHasCamera = isParticipantCameraActive(activeScreenShareParticipant);
@@ -13150,8 +13152,8 @@ export default function NewLiveMeeting() {
     hasStageSpeaker &&
     activeScreensharePresenterHasCamera;
   const isSelfSpotlighted = useMemo(() => {
-    return matchesStageTarget(spotlightTarget, dyteMeeting?.self);
-  }, [spotlightTarget, dyteMeeting]);
+    return matchesStageTarget(spotlightTarget, rtkMeeting?.self);
+  }, [spotlightTarget, rtkMeeting]);
 
   useEffect(() => {
     if (!isHost || !approvedMainStageScreenShare) return;
@@ -13173,13 +13175,13 @@ export default function NewLiveMeeting() {
   ]);
 
   useEffect(() => {
-    if (!isHost || !dyteMeeting || !presentationTarget) return;
+    if (!isHost || !rtkMeeting || !presentationTarget) return;
     if (matchesStageTarget(approvedMainStageScreenShare, presentationTarget) && hostPerms.screenShare) return;
 
     revokeMainStageScreenShare(presentationTarget);
   }, [
     approvedMainStageScreenShare,
-    dyteMeeting,
+    rtkMeeting,
     hostPerms.screenShare,
     isHost,
     presentationTarget,
@@ -13187,7 +13189,7 @@ export default function NewLiveMeeting() {
   ]);
 
   useEffect(() => {
-    if (isHost || !dyteMeeting?.self) return;
+    if (isHost || !rtkMeeting?.self) return;
     if (!isSelfPresentationEligible && isSelfMainStageScreenShareApproved) {
       setIsSelfMainStageScreenShareApproved(false);
     }
@@ -13195,7 +13197,7 @@ export default function NewLiveMeeting() {
 
     stopSelfScreenShareWithCleanup();
   }, [
-    dyteMeeting,
+    rtkMeeting,
     isHost,
     isScreenSharing,
     isSelfMainStageScreenShareApproved,
@@ -13530,8 +13532,8 @@ export default function NewLiveMeeting() {
 
     try {
       // 1. Determine Recipient ID
-      // We assume Dyte participant's `customParticipantId` holds the Django User ID.
-      // If not set, we fallback to `member.id` (though that might be a Dyte UUID).
+      // We assume RTK participant's `customParticipantId` holds the Django User ID.
+      // If not set, we fallback to `member.id` (though that might be an RTK UUID).
       const recipientId = member._raw?.customParticipantId || member.id;
 
       // 2. Ensure Conversation Exists
@@ -15089,7 +15091,7 @@ export default function NewLiveMeeting() {
     let qUserId = question.user_id ?? question.user?.id ?? question.user ?? null;
     if (typeof qUserId === "object" && qUserId) qUserId = qUserId.id ?? null;
 
-    const self = dyteMeeting?.self;
+    const self = rtkMeeting?.self;
     const selfCsid = self?.clientSpecificId || self?.customParticipantId || null;
     const selfUserId = myUserIdRef.current || getMyUserIdFromJwt() || null;
     const isSelfQuestion =
@@ -15137,7 +15139,7 @@ export default function NewLiveMeeting() {
       userId: qUserId,
       isAnonymous: Boolean(question.is_anonymous && !isSelfQuestion),
     };
-  }, [dyteMeeting?.self, participants]);
+  }, [rtkMeeting?.self, participants]);
 
   const buildDisplayedQuestionPayload = useCallback((question) => {
     if (!question) return null;
@@ -15159,11 +15161,11 @@ export default function NewLiveMeeting() {
 
   const broadcastDisplayedQuestionState = useCallback((payload) => {
     try {
-      dyteMeeting?.participants?.broadcastMessage?.(QNA_DISPLAY_BROADCAST_TYPE, payload);
+      rtkMeeting?.participants?.broadcastMessage?.(QNA_DISPLAY_BROADCAST_TYPE, payload);
     } catch (e) {
       console.warn("[Q&A] Failed to broadcast displayed question state:", e);
     }
-  }, [dyteMeeting]);
+  }, [rtkMeeting]);
 
   const handleDisplayQuestionOnScreen = useCallback((question, options = {}) => {
     const payload = buildDisplayedQuestionPayload(question);
@@ -15295,7 +15297,7 @@ export default function NewLiveMeeting() {
       return true;
     });
 
-    const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || (isHost ? dyteMeeting?.self?.id : null);
+    const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || (isHost ? rtkMeeting?.self?.id : null);
     const hostUserKey = hostUserKeyRef.current;
     const hostFromKey = hostUserKey
       ? scopedParticipants.find((p) => getParticipantUserKey(p?._raw || p) === hostUserKey)
@@ -15304,7 +15306,7 @@ export default function NewLiveMeeting() {
     const effectiveHostId = hostIdExists ? hostId : (hostFromKey?.id || null);
 
     // ✅ CRITICAL FIX: Apply lounge filter to hosts when not in breakout (main room context)
-    // ✅ CRITICAL FIX: Check assignedRoleByIdentity instead of Dyte role to avoid lounge participants with HOST preset
+    // ✅ CRITICAL FIX: Check assignedRoleByIdentity instead of RTK role to avoid lounge participants with HOST preset
     // When user is in main room, hosts occupying lounge should be filtered out
     // When user is in breakout, show all participants in that room (lounge filter doesn't apply)
     const suppressHostPresenceInMainRoom = !isHost && !isBreakout && isMainRoomSupportMissing;
@@ -15324,7 +15326,7 @@ export default function NewLiveMeeting() {
 
     const hostIdSet = new Set(host.map((p) => p.id));
     // ✅ PHASE 4: Host in main room should see ALL participants (including those in breakout/lounge)
-    // ✅ CRITICAL FIX: Use assignedRoleByIdentity to determine speakers (not Dyte role, which is "Host" for lounge participants)
+    // ✅ CRITICAL FIX: Use assignedRoleByIdentity to determine speakers (not RTK role, which is "Host" for lounge participants)
     const speakers = scopedParticipants.filter((p) => {
       if (hostIdSet.has(p.id)) return false; // Skip hosts
       if (isBreakout || isHost || !p.isOccupyingLounge) {
@@ -15337,7 +15339,7 @@ export default function NewLiveMeeting() {
       if (hostIdSet.has(p.id)) return false; // Skip hosts
       if (isBreakout || isHost || !p.isOccupyingLounge) {
         const assignedRole = getAssignedRoleForParticipant(p);
-        // Include if assigned role is not "Speaker" or "Host", or if Dyte role is neither "Speaker" nor "Host"
+        // Include if assigned role is not "Speaker" or "Host", or if RTK role is neither "Speaker" nor "Host"
         return assignedRole !== "Speaker" && assignedRole !== "Host" && p.role !== "Speaker";
       }
       return false;
@@ -15384,7 +15386,7 @@ export default function NewLiveMeeting() {
     pinnedHost,
     hostIdHint,
     isHost,
-    dyteMeeting?.self?.id,
+    rtkMeeting?.self?.id,
     isBreakout,
     currentLoungeUserIds,
     filteredPreEventLoungeParticipants,
@@ -15399,7 +15401,7 @@ export default function NewLiveMeeting() {
 
 
   // --- Self helpers for Members UI ---
-  const selfDyteId = dyteMeeting?.self?.id || null;
+  const selfRtkId = rtkMeeting?.self?.id || null;
 
   // ✅ Phase 5: Apply room filter to groupedMembers
   const filteredGroupedMembers = useMemo(() => {
@@ -15432,17 +15434,17 @@ export default function NewLiveMeeting() {
 
     // put self on top (only matters for Audience view, host won't be inside audience anyway)
     arr.sort((a, b) => {
-      const aSelf = Boolean(selfDyteId && a?.id === selfDyteId);
-      const bSelf = Boolean(selfDyteId && b?.id === selfDyteId);
+      const aSelf = Boolean(selfRtkId && a?.id === selfRtkId);
+      const bSelf = Boolean(selfRtkId && b?.id === selfRtkId);
       if (aSelf && !bSelf) return -1;
       if (!aSelf && bSelf) return 1;
       return String(a?.name || "").localeCompare(String(b?.name || ""));
     });
 
     return arr;
-  }, [filteredGroupedMembers?.audience, selfDyteId]);
+  }, [filteredGroupedMembers?.audience, selfRtkId]);
 
-  const isSelfMember = (m) => Boolean(selfDyteId && m?.id === selfDyteId);
+  const isSelfMember = (m) => Boolean(selfRtkId && m?.id === selfRtkId);
   const moodPickerOpen = Boolean(moodAnchorEl);
 
   const renderMemberAvatar = useCallback((member) => {
@@ -15561,7 +15563,7 @@ export default function NewLiveMeeting() {
   // Others only (Audience + Speaker), host is pinned already
   const stageOthers = useMemo(() => {
     const pinnedKey = latestPinnedHost ? getParticipantUserKey(latestPinnedHost?._raw || latestPinnedHost) : "";
-    const selfId = dyteMeeting?.self?.id || null;
+    const selfId = rtkMeeting?.self?.id || null;
     const pinnedId = latestPinnedHost?.id ? String(latestPinnedHost.id) : "";
     const pinnedBackendUserId = latestPinnedHost
       ? String(getBackendUserId(latestPinnedHost?._raw || latestPinnedHost) || "")
@@ -15599,7 +15601,7 @@ export default function NewLiveMeeting() {
     };
     if (isBreakout) {
       // ✅ CRITICAL FIX: In breakout/lounge, show ONLY participants actually in the current room
-      // When user joins a lounge table (breakout), they enter a separate Dyte room
+      // When user joins a lounge table (breakout), they enter a separate RTK room
       // This room should only include participants who are also in that table
       // Uses currentLoungeUserIds which is populated from the CURRENT breakout's participants
       // This works for BOTH social lounges AND regular breakout rooms
@@ -15641,7 +15643,7 @@ export default function NewLiveMeeting() {
     participants,
     isBreakout,
     latestPinnedHost,
-    dyteMeeting?.self?.id,
+    rtkMeeting?.self?.id,
     currentLoungeUserIds,
     isHost,
     isMainRoomSupportMissing,
@@ -15713,14 +15715,14 @@ export default function NewLiveMeeting() {
 
   const breakoutFallbackParticipant = useMemo(() => {
     if (!isBreakout || latestPinnedHost || participants.length === 0) return null;
-    const selfId = dyteMeeting?.self?.id || null;
+    const selfId = rtkMeeting?.self?.id || null;
     return (
       participants.find((p) => p?.id && p.id !== selfId && p.inMeeting) ||
       participants.find((p) => p?.id === selfId) ||
       participants[0] ||
       null
     );
-  }, [isBreakout, latestPinnedHost, participants, dyteMeeting?.self?.id]);
+  }, [isBreakout, latestPinnedHost, participants, rtkMeeting?.self?.id]);
 
 
   // When right panel is open on desktop, make tiles more compact
@@ -16007,7 +16009,7 @@ export default function NewLiveMeeting() {
         </>
       ) : (
         // ================= EXISTING TABS BODY (REUSED) =================
-        <>
+        (<>
           {/* Header */}
           <Box
             sx={{
@@ -16039,7 +16041,6 @@ export default function NewLiveMeeting() {
               <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
-
           {/* Body */}
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {/* CHAT */}
@@ -16556,7 +16557,7 @@ export default function NewLiveMeeting() {
                           const canViewVoters = isHost;
 
                           // Check if self
-                          const self = dyteMeeting?.self;
+                          const self = rtkMeeting?.self;
                           const selfCsid = self?.clientSpecificId || self?.customParticipantId;
                           // Fallback to myUserIdRef if CSID not available/matching
                           const meId = myUserIdRef.current;
@@ -18118,7 +18119,7 @@ export default function NewLiveMeeting() {
               />
             </TabPanel>
           </Box>
-        </>
+        </>)
       )}
     </Box>
   );
@@ -18364,7 +18365,7 @@ export default function NewLiveMeeting() {
         currentUserId={getMyUserIdFromJwt()}
         isAdmin={role === "publisher"}
         onEnterBreakout={applyBreakoutToken}
-        dyteMeeting={dyteMeeting}
+        rtkMeeting={rtkMeeting}
         onParticipantClick={openLoungeParticipantInfo}
         onJoinMain={forceRejoinMainFromLounge}
       />
@@ -18596,7 +18597,7 @@ export default function NewLiveMeeting() {
           currentUserId={getMyUserIdFromJwt()}
           isAdmin={role === "publisher"}
           onEnterBreakout={applyBreakoutToken}
-          dyteMeeting={dyteMeeting}
+          rtkMeeting={rtkMeeting}
           onParticipantClick={openLoungeParticipantInfo}
           onJoinMain={forceRejoinMainFromLounge}
         />
@@ -18604,7 +18605,7 @@ export default function NewLiveMeeting() {
     );
   }
 
-  if (!initDone || !dyteMeeting) {
+  if (!initDone || !rtkMeeting) {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
 
@@ -18881,7 +18882,7 @@ export default function NewLiveMeeting() {
   }
 
   return (
-    <DyteProvider value={dyteMeeting}>
+    <RealtimeKitProvider value={rtkMeeting}>
       <BreakCountdownBanner
         isOnBreak={isOnBreak}
         remainingSeconds={breakRemainingSeconds ?? 0}
@@ -18892,7 +18893,7 @@ export default function NewLiveMeeting() {
         ref={remoteAudioRef}
         style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
       >
-        {!speedNetworkingMainIsolation && <DyteParticipantsAudio meeting={dyteMeeting} />}
+        {!speedNetworkingMainIsolation && <RtkParticipantsAudio meeting={rtkMeeting} />}
       </div>
       <Box
         ref={rootRef}
@@ -19106,7 +19107,7 @@ export default function NewLiveMeeting() {
                 />
               )}
             </Stack>
-            {activeTableId && dyteMeeting && !isPostEventLounge && !mainRoomPeekVisible && (
+            {activeTableId && rtkMeeting && !isPostEventLounge && !mainRoomPeekVisible && (
               <Button
                 size="small"
                 variant="contained"
@@ -19158,7 +19159,7 @@ export default function NewLiveMeeting() {
                   sx={headerIconBtnSx}
                   aria-label={isHost ? "Host permissions" : "My controls"}
                   onClick={openPermMenu}
-                  disabled={!dyteMeeting?.self}
+                  disabled={!rtkMeeting?.self}
                 >
                   <SettingsIcon fontSize="small" />
                 </IconButton>
@@ -19645,7 +19646,7 @@ export default function NewLiveMeeting() {
                         >
                           <ScreenShareVideo
                             participant={activeScreenShareParticipant}
-                            meeting={dyteMeeting}
+                            meeting={rtkMeeting}
                           />
                           <Box
                             sx={{
@@ -19686,7 +19687,7 @@ export default function NewLiveMeeting() {
                             <ParticipantVideo
                               key={pinnedRaw?.id}
                               participant={pinnedRaw}
-                              meeting={dyteMeeting}
+                              meeting={rtkMeeting}
                               isSelf={pinnedIsSelf}
                             />
                           ) : (
@@ -19761,13 +19762,13 @@ export default function NewLiveMeeting() {
                         {hasScreenshare ? (
                           <ScreenShareVideo
                             participant={activeScreenShareParticipant}
-                            meeting={dyteMeeting}
+                            meeting={rtkMeeting}
                           />
                         ) : (
                           <ParticipantVideo
                             key={pinnedRaw?.id}
                             participant={pinnedRaw}
-                            meeting={dyteMeeting}
+                            meeting={rtkMeeting}
                             isSelf={pinnedIsSelf}
                           />
                         )}
@@ -20032,7 +20033,7 @@ export default function NewLiveMeeting() {
                   <StageMiniTile
                     key={`${p.name}-${idx}`}
                     p={p}
-                    meeting={dyteMeeting}
+                    meeting={rtkMeeting}
                     tileW={stageTileW}
                     tileH={stageTileH}
                     onMemberClick={openMemberInfo}
@@ -20655,10 +20656,10 @@ export default function NewLiveMeeting() {
               variant="text"
               onClick={async () => {
                 setLeaveDialogOpen(false);
-                const myId = dyteMeeting?.self?.id;
+                const myId = rtkMeeting?.self?.id;
                 if (myId) {
                   try {
-                    dyteMeeting?.participants?.broadcastMessage?.("meeting-ended", { hostId: myId });
+                    rtkMeeting?.participants?.broadcastMessage?.("meeting-ended", { hostId: myId });
                   } catch { }
                 }
                 await handleMeetingEnd("ended", { explicitEnd: true });
@@ -21597,7 +21598,7 @@ export default function NewLiveMeeting() {
           eventId={eventId}
           currentUserId={getMyUserIdFromJwt()}
           isAdmin={isHost}
-          dyteMeeting={dyteMeeting}
+          rtkMeeting={rtkMeeting}
           onParticipantClick={openLoungeParticipantInfo}
           onOpenSettings={() => setLoungeSettingsOpen(true)}
           onEnterBreakout={async (newToken, tableId, tableName, logoUrl) => {
@@ -21668,7 +21669,7 @@ export default function NewLiveMeeting() {
             onNavigateSocialLounge={handleSpeedNetworkingNavigateSocialLounge}
             onNavigateEventEnded={handleSpeedNetworkingNavigateEventEnded}
             onSessionStopping={handleSpeedNetworkingStopping}
-            dyteMeeting={dyteMeeting}
+            rtkMeeting={rtkMeeting}
             autoJoinOnOpen={speedNetworkingAutoJoinTrigger}
             onNetworkingStateChange={handleSpeedNetworkingStateChange}
             // Passing down the last WebSocket message to handle matching events
@@ -21695,8 +21696,8 @@ export default function NewLiveMeeting() {
           onLeave={() => {
             setShowNetworkingPrompt(false);
             // Leave meeting logic
-            if (dyteMeeting) {
-              dyteMeeting.leaveRoom();
+            if (rtkMeeting) {
+              rtkMeeting.leaveRoom();
             }
           }}
           isLoading={false}
@@ -21704,7 +21705,7 @@ export default function NewLiveMeeting() {
 
         {/* ✅ Main Room Peek (when seated at a lounge table) */}
         {/* ✅ CRITICAL: Hide main room peek during pre-event lounge - attendees should only see lounge */}
-        {activeTableId && dyteMeeting && !isPostEventLounge && !preEventLoungeOpen && mainRoomPeekVisible && showMainRoomPeek && (
+        {activeTableId && rtkMeeting && !isPostEventLounge && !preEventLoungeOpen && mainRoomPeekVisible && showMainRoomPeek && (
           <Box
             ref={mainRoomPeekRef}
             sx={{
@@ -21716,7 +21717,7 @@ export default function NewLiveMeeting() {
             }}
           >
             <MainRoomPeek
-              mainDyteMeeting={mainDyteMeeting}
+              mainRtkMeeting={mainRtkMeeting}
               isInBreakout={isInBreakoutForPeek}
               onClose={() => setMainRoomPeekVisible(false)}
               onHeaderPointerDown={handleMainRoomPeekDragStart}
@@ -22373,8 +22374,7 @@ export default function NewLiveMeeting() {
         </Menu>
 
       </Box>
-    </DyteProvider >
-
+    </RealtimeKitProvider >
   );
 }
 
@@ -22394,7 +22394,7 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
   useEffect(() => {
     let alive = true;
     const checkStatus = async () => {
-      // Use DB ID if available, else Dyte ID (though friends API needs DB ID usually)
+      // Use DB ID if available, else RTK ID (though friends API needs DB ID usually)
       const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
       if (!userId) {
         if (alive) setConnStatus("none");

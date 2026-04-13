@@ -1461,7 +1461,7 @@ export default function EventDetailsPage() {
                           </Button>
                         ) : event.registration_type === 'apply' && !canJoinEventNow && !isPast ? (
                           // --- APPLY FLOW ---
-                          <>
+                          (<>
                             {!myApplication || myApplication.status === 'none'
                               ? (
                                 <Button
@@ -1563,7 +1563,7 @@ export default function EventDetailsPage() {
                               )
                               : null
                             }
-                          </>
+                          </>)
                         ) : !canJoinEventNow && !isPast ? (
                           <>
                             <Button
@@ -1772,7 +1772,6 @@ export default function EventDetailsPage() {
           </main>
         </div>
       </Container>
-
       <ParticipantListDialog
         open={showParticipantsDialog}
         onClose={() => setShowParticipantsDialog(false)}
@@ -1783,7 +1782,6 @@ export default function EventDetailsPage() {
         hiddenRolesCount={participantHiddenRolesCount}
         totalRegisteredCount={participantTotalRegisteredCount}
       />
-
       {/* Guest Join Modal */}
       {event && (
         <>

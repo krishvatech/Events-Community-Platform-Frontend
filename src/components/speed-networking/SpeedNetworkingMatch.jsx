@@ -11,8 +11,8 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import BlurOnRoundedIcon from '@mui/icons-material/BlurOnRounded';
 import WallpaperRoundedIcon from '@mui/icons-material/WallpaperRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
-import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
-import { DyteMeeting, defaultConfig } from '@dytesdk/react-ui-kit';
+import { useRealtimeKitClient, RealtimeKitProvider } from '@cloudflare/realtimekit-react';
+import { RtkMeeting, defaultConfig } from '@cloudflare/realtimekit-react-ui';
 import InterestDisplay from './InterestDisplay';
 import {
     VIRTUAL_BG_FEATURE_ENABLED,
@@ -23,16 +23,16 @@ import {
     readFileAsDataUrl,
     saveBackgroundSelection,
     validateBackgroundUpload
-} from '../../utils/dyteBackground.js';
+} from '../../utils/rtkBackground.js';
 
-// Style to ensure Dyte UI controls don't overflow
-const dyteStyles = `
-    .dyte-meeting-ui {
+// Style to ensure RTK UI controls don't overflow
+const rtkStyles = `
+    .rtk-meeting-ui {
         width: 100% !important;
         height: 100% !important;
     }
     /* Ensure control bar buttons don't wrap or overflow */
-    .dyte-controlbar,
+    .rtk-controlbar,
     [class*="controlbar"] {
         display: flex !important;
         flex-wrap: nowrap !important;
@@ -41,27 +41,27 @@ const dyteStyles = `
         background: rgba(0,0,0,0.8) !important;
     }
     /* Ensure all control bar buttons are visible */
-    .dyte-controlbar button,
+    .rtk-controlbar button,
     [class*="controlbar"] button,
     [class*="control-item"] {
         min-width: auto !important;
         flex-shrink: 0 !important;
     }
     /* Hide non-essential features in speed networking */
-    dyte-chat-toggle,
-    dyte-participants-toggle,
-    dyte-polls-toggle,
-    dyte-plugins-toggle {
+    rtk-chat-toggle,
+    rtk-participants-toggle,
+    rtk-polls-toggle,
+    rtk-plugins-toggle {
         display: none !important;
     }
 `;
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 const HIDDEN_SPEED_NETWORKING_CONTROLS = new Set([
-    'dyte-chat-toggle',
-    'dyte-polls-toggle',
-    'dyte-participants-toggle',
-    'dyte-plugins-toggle'
+    'rtk-chat-toggle',
+    'rtk-polls-toggle',
+    'rtk-participants-toggle',
+    'rtk-plugins-toggle'
 ]);
 
 function stripHiddenControls(items = []) {
@@ -87,7 +87,7 @@ export default function SpeedNetworkingMatch({
     onMemberInfo,
     eventId
 }) {
-    const [meeting, initMeeting] = useDyteClient();
+    const [meeting, initMeeting] = useRealtimeKitClient();
     const [timeRemaining, setTimeRemaining] = useState(session.duration_minutes * 60);
     const [videoError, setVideoError] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
@@ -112,39 +112,39 @@ export default function SpeedNetworkingMatch({
     const virtualBgUploadInputRef = useRef(null);
 
     if (!speedNetworkingUiConfigRef.current) {
-        // Start from Dyte defaults and only remove the 4 requested controls.
+        // Start from RTK defaults and only remove the 4 requested controls.
         const uiConfig = JSON.parse(JSON.stringify(defaultConfig));
         if (uiConfig?.root) {
             uiConfig.root['div#controlbar-right'] = stripHiddenControls(uiConfig.root['div#controlbar-right']);
-            uiConfig.root['dyte-more-toggle.activeMoreMenu.sm'] = stripHiddenControls(uiConfig.root['dyte-more-toggle.activeMoreMenu.sm']);
-            uiConfig.root['dyte-more-toggle.activeMoreMenu.md'] = stripHiddenControls(uiConfig.root['dyte-more-toggle.activeMoreMenu.md']);
+            uiConfig.root['rtk-more-toggle.activeMoreMenu.sm'] = stripHiddenControls(uiConfig.root['rtk-more-toggle.activeMoreMenu.sm']);
+            uiConfig.root['rtk-more-toggle.activeMoreMenu.md'] = stripHiddenControls(uiConfig.root['rtk-more-toggle.activeMoreMenu.md']);
         }
         speedNetworkingUiConfigRef.current = uiConfig;
     }
 
-    // Inject Dyte UI layout styles
+    // Inject RTK UI layout styles
     useEffect(() => {
         const styleElement = document.createElement('style');
-        styleElement.textContent = dyteStyles;
-        styleElement.id = 'dyte-visibility-styles';
+        styleElement.textContent = rtkStyles;
+        styleElement.id = 'rtk-visibility-styles';
         document.head.appendChild(styleElement);
 
         return () => {
-            const existingStyle = document.getElementById('dyte-visibility-styles');
+            const existingStyle = document.getElementById('rtk-visibility-styles');
             if (existingStyle) {
                 existingStyle.remove();
             }
         };
     }, []);
 
-    // Initialize Dyte Meeting for this match.
+    // Initialize RTK Meeting for this match.
     // Important: do not re-init on every match object update (e.g. extension flags),
-    // otherwise Dyte briefly disconnects and shows "You left the meeting."
+    // otherwise RTK briefly disconnects and shows "You left the meeting."
     useEffect(() => {
-        if (match?.dyte_token) {
-            console.log("[SpeedNetworkingMatch] Initializing Dyte meeting with token for match:", match.id);
+        if (match?.rtk_token) {
+            console.log("[SpeedNetworkingMatch] Initializing RTK meeting with token for match:", match.id);
             initMeeting({
-                authToken: match.dyte_token,
+                authToken: match.rtk_token,
                 defaults: {
                     audio: false,
                     video: false,
@@ -152,13 +152,13 @@ export default function SpeedNetworkingMatch({
             });
             setVideoError(null);
         } else {
-            console.error("Missing Dyte Token for match:", match);
-            const errorMessage = match?.dyte_error
-                ? `Video connection failed: ${match.dyte_error}`
+            console.error("Missing RTK Token for match:", match);
+            const errorMessage = match?.rtk_error
+                ? `Video connection failed: ${match.rtk_error}`
                 : "Video connection unavailable (Server Error)";
             setVideoError(errorMessage);
         }
-    }, [match?.id, match?.dyte_token, initMeeting]);
+    }, [match?.id, match?.rtk_token, initMeeting]);
 
     // Log participants when meeting changes and listen for real-time join/leave
     useEffect(() => {
@@ -298,7 +298,7 @@ export default function SpeedNetworkingMatch({
         }
     };
 
-    // Track whether partner has actually joined the Dyte room
+    // Track whether partner has actually joined the RTK room
     useEffect(() => {
         if (!meeting) {
             setHasRemoteParticipant(false);
@@ -621,15 +621,14 @@ export default function SpeedNetworkingMatch({
                     </Box>
                 )}
             </Box>
-
-            {/* Main Content: Dyte + Partner Profile Sidebar */}
+            {/* Main Content: RTK + Partner Profile Sidebar */}
             <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-                {/* Left: Dyte Meeting */}
+                {/* Left: RTK Meeting */}
                 <Box sx={{
                     flex: 1,
                     position: 'relative',
                     minWidth: 0,
-                    '& .dyte-meeting': {
+                    '& .rtk-meeting': {
                         width: '100%',
                         height: '100%'
                     },
@@ -655,14 +654,14 @@ export default function SpeedNetworkingMatch({
                         </Box>
                     ) : meeting ? (
                         <>
-                            <DyteProvider value={meeting}>
-                                <DyteMeeting
+                            <RealtimeKitProvider value={meeting}>
+                                <RtkMeeting
                                     mode="fill"
                                     meeting={meeting}
                                     showSetupScreen={false}
                                     config={speedNetworkingUiConfigRef.current}
                                 />
-                            </DyteProvider>
+                            </RealtimeKitProvider>
                             {VIRTUAL_BG_FEATURE_ENABLED && (
                                 <IconButton
                                     onClick={() => setShowVirtualBgDialog(true)}
@@ -824,7 +823,6 @@ export default function SpeedNetworkingMatch({
                     </Box>
                 )}
             </Box>
-
             {/* Bottom Controls */}
             <Box sx={{
                 p: 2,
@@ -866,7 +864,6 @@ export default function SpeedNetworkingMatch({
                     Leave Session
                 </Button>
             </Box>
-
             {VIRTUAL_BG_FEATURE_ENABLED && (
                 <Dialog
                     open={showVirtualBgDialog}
@@ -963,7 +960,6 @@ export default function SpeedNetworkingMatch({
                     </DialogActions>
                 </Dialog>
             )}
-
         </Box>
     );
 }

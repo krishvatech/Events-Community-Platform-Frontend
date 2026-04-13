@@ -412,13 +412,13 @@ export default function MyResourcesPage() {
                             secondaryAction={
                               isMobile ? (
                                 // 👇 MOBILE: three-dot menu
-                                <IconButton
+                                (<IconButton
                                   size="small"
                                   onClick={(e) => handleMenuOpen(e, resource)}
                                   title="More actions"
                                 >
                                   <MoreVertRoundedIcon />
-                                </IconButton>
+                                </IconButton>)
                               ) : (
                                 <Stack direction="row" spacing={1} alignItems="center">
                                   <Chip label={resource.type} size="small" />

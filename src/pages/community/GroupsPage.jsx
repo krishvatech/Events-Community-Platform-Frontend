@@ -1359,7 +1359,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
           {/* === GROUP GRID: exactly 3 cards per row on md+ === */}
           {loading ? (
             // 🔹 Skeleton loading state (keep layout same as real grid)
-            <Box
+            (<Box
               sx={{
                 display: "grid",
                 gridTemplateColumns: {
@@ -1376,7 +1376,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   <GroupGridCardSkeleton />
                 </Box>
               ))}
-            </Box>
+            </Box>)
           ) : paginatedGroups.length > 0 ? (
             <Box
               sx={{

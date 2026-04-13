@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@dytesdk/react-ui-kit": "^3.0.8",
-    "@dytesdk/react-web-core": "^3.1.11",
-    "@dytesdk/ui-kit-addons": "^4.1.0",
+    "@cloudflare/realtimekit-react": "^1.3.0",
+    "@cloudflare/realtimekit-react-ui": "^1.1.2",
+    "@cloudflare/realtimekit-ui-addons": "^0.1.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@fontsource/roboto": "^5.2.8",

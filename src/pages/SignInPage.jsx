@@ -154,6 +154,8 @@ export default function SignInPage() {
 
       localStorage.setItem("user", JSON.stringify(userObj || {}));
       saveLoginPayload(data, { email: data?.email || "" });
+      // Notify app now that user data is fully stored — GuestOnly will read the correct role
+      window.dispatchEvent(new Event("auth:changed"));
 
       // Get role and redirect path
       const accessTokenForGroups = data?.access || localStorage.getItem("access_token") || "";

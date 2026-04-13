@@ -5111,14 +5111,14 @@ export default function GroupManagePage() {
                                     <Tab label="Relations" value={2} />
                                 ) : (
                                     // keep index #2 but hide it so other tabs keep their indices
-                                    <Tab sx={{ display: "none" }} disabled value={2} />
+                                    (<Tab sx={{ display: "none" }} disabled value={2} />)
                                 )}
 
                                 {canSeeSettingsTab ? (
                                     <Tab label="Settings" value={3} />
                                 ) : (
                                     // keep index #3 but hide it so other tabs keep their indices
-                                    <Tab sx={{ display: "none" }} disabled value={3} />
+                                    (<Tab sx={{ display: "none" }} disabled value={3} />)
                                 )}
 
                                 <Tab label="Posts" value={4} />
@@ -5222,7 +5222,7 @@ export default function GroupManagePage() {
                                             <Stack direction="row" spacing={1}>
                                                 {canAddMembersDirectly && (
                                                     // Owner + Admin → Export CSV
-                                                    <Button
+                                                    (<Button
                                                         variant="outlined"
                                                         className="rounded-xl"
                                                         startIcon={<FileDownloadRoundedIcon />}
@@ -5231,12 +5231,12 @@ export default function GroupManagePage() {
                                                         onClick={handleExportCSV}
                                                     >
                                                         {exportingCSV ? "Exporting..." : "Export CSV"}
-                                                    </Button>
+                                                    </Button>)
                                                 )}
 
                                                 {canAddMembersDirectly && (
                                                     // Owner + Admin → real "Add members" (opens dialog)
-                                                    <>
+                                                    (<>
                                                         <Button
                                                             variant="contained"
                                                             className="rounded-xl"
@@ -5254,12 +5254,12 @@ export default function GroupManagePage() {
                                                         >
                                                             Invite by Email
                                                         </Button>
-                                                    </>
+                                                    </>)
                                                 )}
 
                                                 {canRequestMemberChanges && !canAddMembersDirectly && (
                                                     // Moderator → can only *request* adding members (no real add)
-                                                    <Button
+                                                    (<Button
                                                         variant="outlined"
                                                         className="rounded-xl"
                                                         sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
@@ -5267,9 +5267,8 @@ export default function GroupManagePage() {
                                                             fetchRequests();
                                                             setRequestAddOpen(true);
                                                         }}
-                                                    >
-                                                        Request to add members
-                                                    </Button>
+                                                    >Request to add members
+                                                                                                            </Button>)
                                                 )}
                                             </Stack>
 
@@ -5318,7 +5317,7 @@ export default function GroupManagePage() {
                                                                         <Stack direction="row" alignItems="center" spacing={0.5}>
                                                                             <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
                                                                             {m.user?.kyc_status === "approved" && (
-                                                                                <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} /> // Cyan verified icon
+                                                                                (<VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />) // Cyan verified icon
                                                                             )}
                                                                         </Stack>
                                                                         <Stack direction="row" spacing={2}>
@@ -5337,9 +5336,7 @@ export default function GroupManagePage() {
                                                                             )}
                                                                         </Stack>
                                                                     </Box>
-
                                                                     <RoleBadge role={role} />
-
                                                                     {(canHardManageMembers || canRequestMemberChanges) && (
                                                                         <IconButton
                                                                             size="small"
@@ -5356,7 +5353,6 @@ export default function GroupManagePage() {
                                                                             <MoreVertRoundedIcon fontSize="small" />
                                                                         </IconButton>
                                                                     )}
-
                                                                 </Stack>
                                                             );
                                                         })}
