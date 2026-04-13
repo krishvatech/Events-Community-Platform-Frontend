@@ -3645,6 +3645,10 @@ export default function NewLiveMeeting() {
 
       if (virtualBgReadyRef.current) return;
 
+      // Wait for the camera stream to deliver frames before initializing the background transformer
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      if (cancelled) return;
+
       const initResult = await initializeVirtualBackgroundMiddleware(rtkMeeting);
       if (cancelled) return;
 
@@ -3678,7 +3682,7 @@ export default function NewLiveMeeting() {
     return () => {
       cancelled = true;
     };
-  }, [rtkMeeting, virtualBgSelection, roomJoined]);
+  }, [rtkMeeting, virtualBgSelection, roomJoined, rtkMeeting?.self?.videoEnabled]);
 
   const applyAndPersistVirtualBackground = useCallback(async (nextSelection) => {
     const savedSelection = saveBackgroundSelection(nextSelection);
