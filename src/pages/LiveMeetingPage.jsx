@@ -3325,6 +3325,26 @@ export default function NewLiveMeeting() {
     } finally {
       lastScreenShareStopAtRef.current = Date.now();
       setIsScreenSharing(getSelfScreenShareActive());
+
+      // ✅ RE-ENABLE AUDIO after screen share stops
+      setTimeout(async () => {
+        try {
+          console.log("[LiveMeeting] Re-enabling audio after screen share stopped...");
+          await dyteMeeting?.self?.enableAudio?.();
+
+          // Also re-enable at WebRTC level
+          const audioSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
+            (s) => s.track?.kind === "audio"
+          ) || [];
+          for (const sender of audioSenders) {
+            if (sender.track) {
+              sender.track.enabled = true;
+            }
+          }
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to re-enable audio after screen share stopped:", e);
+        }
+      }, 300);
     }
   }, [dyteMeeting, getSelfScreenShareActive]);
 
