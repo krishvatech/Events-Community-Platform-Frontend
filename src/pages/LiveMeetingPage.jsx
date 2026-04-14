@@ -43,6 +43,7 @@ import {
   FormControlLabel,
   Radio,
   Backdrop,
+  Slider,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -62,6 +63,7 @@ import MicOffIcon from "@mui/icons-material/MicOff";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import VideocamOffIcon from "@mui/icons-material/VideocamOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import LogoutIcon from "@mui/icons-material/Logout"; // <--- ADDED for Leave Table
@@ -125,6 +127,18 @@ import { DyteParticipantsAudio } from "@dytesdk/react-ui-kit";
 import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
 import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
+import PresenterAudioControls from "../components/meeting/PresenterAudioControls.jsx";
+import { PresenterAudioManager } from "../utils/PresenterAudioManager.js";
+import usePresenterAudio from "../hooks/usePresenterAudio.ts";
+import {
+  logPresenterAudioAction,
+  isCurrentUser,
+  createPresenterSnapshot,
+} from "../utils/presenterAudioUtils.js";
+import {
+  broadcastPresentationTarget,
+  broadcastPresentationClear,
+} from "../utils/presentationEventBroadcaster.js";
 import PostEventLoungeScreen from "../components/lounge/PostEventLoungeScreen.jsx";
 import NotificationHistoryPanel from "../components/lounge/NotificationHistoryPanel.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
@@ -3236,6 +3250,19 @@ export default function NewLiveMeeting() {
   const mainInitInFlightRef = useRef(false); // ✅ Track if main meeting init is in flight to prevent concurrent calls
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareAudioEnabled, setScreenShareAudioEnabled] = useState(false);
+  const [screenShareAudioVolume, setScreenShareAudioVolume] = useState(1.0);
+  const [screenShareSystemAudioAvailable, setScreenShareSystemAudioAvailable] = useState(false);
+  const screenShareAudioContextRef = useRef(null);
+  const screenShareGainNodeRef = useRef(null);
+  const screenShareRawAudioTrackRef = useRef(null);
+  const screenShareAudioSenderRef = useRef(null);
+
+  // ✅ PHASE 2: Presenter-aware audio management
+  const [activePresenterAudio, setActivePresenterAudio] = useState(null); // { participantId, audioManager, enabled, volume }
+  const presenterAudioManagerRef = useRef(null); // Current presenter's audio manager
+  const capturedPresenterStreamRef = useRef(null); // Screen capture stream for current presenter
+  const lastPresenterIdRef = useRef(null); // Track presenter changes
   const mainRoomPeekPrefKey = useMemo(
     () => `main-room-peek-visible:${String(eventId || "")}`,
     [eventId]
@@ -3326,6 +3353,28 @@ export default function NewLiveMeeting() {
       lastScreenShareStopAtRef.current = Date.now();
       setIsScreenSharing(getSelfScreenShareActive());
 
+      // ✅ CLEANUP: Screen share audio resources
+      if (screenShareRawAudioTrackRef.current) {
+        screenShareRawAudioTrackRef.current.stop();
+        screenShareRawAudioTrackRef.current = null;
+      }
+      if (screenShareAudioContextRef.current) {
+        screenShareAudioContextRef.current.close();
+        screenShareAudioContextRef.current = null;
+      }
+      screenShareGainNodeRef.current = null;
+      if (screenShareAudioSenderRef.current) {
+        try {
+          dyteMeeting?.self?.peerConnection?.removeTrack?.(screenShareAudioSenderRef.current);
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to remove screen share audio sender:", e);
+        }
+        screenShareAudioSenderRef.current = null;
+      }
+      setScreenShareAudioEnabled(false);
+      setScreenShareAudioVolume(1.0);
+      setScreenShareSystemAudioAvailable(false);
+
       // ✅ RE-ENABLE AUDIO after screen share stops
       setTimeout(async () => {
         try {
@@ -3347,6 +3396,50 @@ export default function NewLiveMeeting() {
       }, 300);
     }
   }, [dyteMeeting, getSelfScreenShareActive]);
+
+  // ✅ Helper: Setup screen share audio with Web Audio pipeline
+  const setupScreenShareAudio = useCallback((capturedStream) => {
+    try {
+      const audioTracks = capturedStream?.getAudioTracks?.() || [];
+      if (audioTracks.length === 0) {
+        console.log("[LiveMeeting] No audio track in screen share stream — browser did not capture system audio");
+        setScreenShareSystemAudioAvailable(false);
+        showSnackbar(
+          "No system audio captured. To share audio, select a Chrome Tab instead of a window or full screen.",
+          "info"
+        );
+        return;
+      }
+
+      const rawAudioTrack = audioTracks[0];
+      screenShareRawAudioTrackRef.current = rawAudioTrack;
+
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(new MediaStream([rawAudioTrack]));
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 1.0;
+      const destination = audioContext.createMediaStreamDestination();
+      source.connect(gainNode);
+      gainNode.connect(destination);
+
+      screenShareAudioContextRef.current = audioContext;
+      screenShareGainNodeRef.current = gainNode;
+
+      const pc = dyteMeeting?.self?.peerConnection;
+      if (pc?.addTrack) {
+        const processedAudioTrack = destination.stream.getAudioTracks()[0];
+        const sender = pc.addTrack(processedAudioTrack, destination.stream);
+        screenShareAudioSenderRef.current = sender;
+        console.log("[LiveMeeting] Screen share audio track added to peer connection");
+      }
+
+      setScreenShareSystemAudioAvailable(true);
+      setScreenShareAudioEnabled(true);
+      setScreenShareAudioVolume(1.0);
+    } catch (error) {
+      console.warn("[LiveMeeting] Failed to setup screen share audio:", error);
+    }
+  }, [dyteMeeting, showSnackbar]);
 
   const startSelfScreenShareWithRecovery = useCallback(async () => {
     const sinceLastStop = Date.now() - (lastScreenShareStopAtRef.current || 0);
@@ -3375,7 +3468,22 @@ export default function NewLiveMeeting() {
     }
 
     try {
-      await dyteMeeting?.self?.enableScreenShare?.();
+      // ✅ INTERCEPT getDisplayMedia to capture audio track
+      const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+      let capturedStream = null;
+
+      navigator.mediaDevices.getDisplayMedia = async (constraints) => {
+        const stream = await originalGetDisplayMedia({ ...constraints, audio: true });
+        capturedStream = stream;
+        return stream;
+      };
+
+      try {
+        await dyteMeeting?.self?.enableScreenShare?.();
+        setupScreenShareAudio(capturedStream);
+      } finally {
+        navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
+      }
 
       // ✅ RE-ENABLE AUDIO after screen share is active (300ms delay for stability)
       setTimeout(async () => {
@@ -3419,7 +3527,22 @@ export default function NewLiveMeeting() {
         console.warn("[LiveMeeting] Failed to disable audio on retry:", e);
       }
 
-      await dyteMeeting?.self?.enableScreenShare?.();
+      // ✅ INTERCEPT getDisplayMedia for retry as well
+      const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+      let capturedStream = null;
+
+      navigator.mediaDevices.getDisplayMedia = async (constraints) => {
+        const stream = await originalGetDisplayMedia({ ...constraints, audio: true });
+        capturedStream = stream;
+        return stream;
+      };
+
+      try {
+        await dyteMeeting?.self?.enableScreenShare?.();
+        setupScreenShareAudio(capturedStream);
+      } finally {
+        navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
+      }
 
       // ✅ Re-enable audio after retry succeeds
       setTimeout(async () => {
@@ -3441,9 +3564,45 @@ export default function NewLiveMeeting() {
   }, [
     dyteMeeting,
     isScreenShareRenegotiationError,
+    setupScreenShareAudio,
     stopSelfScreenShareWithCleanup,
     waitForScreenSharePeerStable,
   ]);
+
+  // ✅ PHASE 2: Presenter audio toggle handler
+  const handleTogglePresenterAudio = useCallback((enabled) => {
+    if (!screenShareRawAudioTrackRef.current) {
+      console.warn("[LiveMeeting] No audio track to toggle");
+      return;
+    }
+
+    try {
+      screenShareRawAudioTrackRef.current.enabled = enabled;
+      setScreenShareAudioEnabled(enabled);
+      logPresenterAudioAction("presenter_audio_toggled", { enabled });
+    } catch (error) {
+      console.error("[LiveMeeting] Failed to toggle presenter audio:", error);
+      showSnackbar("Failed to toggle screen audio", "error");
+    }
+  }, [showSnackbar]);
+
+  // ✅ PHASE 2: Presenter volume change handler
+  const handlePresenterVolumeChange = useCallback((value) => {
+    const cleanValue = Math.max(0, Math.min(1, Number(value) || 0));
+
+    if (!screenShareGainNodeRef.current) {
+      console.warn("[LiveMeeting] No gain node to set volume");
+      return;
+    }
+
+    try {
+      screenShareGainNodeRef.current.gain.value = cleanValue;
+      setScreenShareAudioVolume(cleanValue);
+      logPresenterAudioAction("presenter_volume_changed", { volume: cleanValue });
+    } catch (error) {
+      console.error("[LiveMeeting] Failed to set presenter volume:", error);
+    }
+  }, []);
 
   const getSelfScreenShareVideoTrack = useCallback(() => {
     const self = dyteMeeting?.self;
@@ -4147,6 +4306,25 @@ export default function NewLiveMeeting() {
     }
   }, [dyteMeeting, showSnackbar]);
 
+  // ✅ Toggle screen share audio on/off
+  const handleToggleScreenShareAudio = useCallback(() => {
+    const track = screenShareRawAudioTrackRef.current;
+    if (!track) return;
+    const next = !screenShareAudioEnabled;
+    track.enabled = next;
+    setScreenShareAudioEnabled(next);
+    console.log("[LiveMeeting] Screen share audio toggled:", next);
+  }, [screenShareAudioEnabled]);
+
+  // ✅ Control screen share audio volume
+  const handleScreenShareVolumeChange = useCallback((_, value) => {
+    const gainNode = screenShareGainNodeRef.current;
+    if (gainNode) {
+      gainNode.gain.value = value;
+    }
+    setScreenShareAudioVolume(value);
+  }, []);
+
   /**
    * Switch to a different video device
    * Uses Dyte's official SDK method setDevice for reliable switching
@@ -4509,6 +4687,87 @@ export default function NewLiveMeeting() {
     dyteMeeting,
     getSelfScreenShareActive,
   ]);
+
+  // ✅ PHASE 2: Handle presentation target changes (grant/revoke presentation)
+  useEffect(() => {
+    if (!dyteMeeting?.participants) return;
+
+    const handlePresentationTarget = (messageData) => {
+      try {
+        // Handle both direct data and wrapped message formats
+        const data = messageData?.data || messageData;
+
+        console.log("[LiveMeeting] Presentation target received:", {
+          participantId: data?.participantId,
+          participantName: data?.participantName,
+          isForSelf: data?.participantId === dyteMeeting?.self?.id,
+        });
+
+        logPresenterAudioAction("presentation_target_event", {
+          participantId: data?.participantId,
+          participantName: data?.participantName,
+        });
+
+        // Update presentation target state
+        setPresentationTarget({
+          participantId: data?.participantId,
+          participantUserKey: data?.participantUserId,
+          name: data?.participantName,
+          byHostId: data?.byHostId,
+          ts: data?.ts || Date.now(),
+        });
+
+        // If this is for self, we might share screen now
+        if (data?.participantId === dyteMeeting?.self?.id) {
+          logPresenterAudioAction("self_became_presenter", {
+            participantId: data?.participantId,
+          });
+          console.log("[LiveMeeting] Self is now presenter - ready for screen share");
+        }
+      } catch (error) {
+        console.error("[LiveMeeting] Error handling presentation target:", error);
+      }
+    };
+
+    const handlePresentationClear = () => {
+      try {
+        logPresenterAudioAction("presentation_clear_event");
+        setPresentationTarget(null);
+        setScreenShareAudioEnabled(false);
+        setScreenShareAudioVolume(1.0);
+      } catch (error) {
+        console.error("[LiveMeeting] Error handling presentation clear:", error);
+      }
+    };
+
+    const onBroadcastMessage = ({ type, payload }) => {
+      try {
+        if (type === "presentation-target") {
+          handlePresentationTarget(payload);
+        } else if (type === "presentation-clear") {
+          handlePresentationClear();
+        }
+      } catch (error) {
+        console.error("[LiveMeeting] Error processing broadcast message:", error);
+      }
+    };
+
+    try {
+      // Listen for broadcasted presentation messages
+      dyteMeeting.participants?.on?.("broadcastedMessage", onBroadcastMessage);
+      console.log("[LiveMeeting] Presentation event listeners attached");
+    } catch (e) {
+      console.warn("[LiveMeeting] Failed to attach presentation listeners:", e);
+    }
+
+    return () => {
+      try {
+        dyteMeeting?.participants?.off?.("broadcastedMessage", onBroadcastMessage);
+      } catch (e) {
+        console.warn("[LiveMeeting] Failed to detach presentation listeners:", e);
+      }
+    };
+  }, [dyteMeeting]);
 
   // ---------- Host detection (for audience waiting screen) ----------
   const [hostJoined, setHostJoined] = useState(false);
@@ -5753,7 +6012,13 @@ export default function NewLiveMeeting() {
         byHostId: dyteMeeting?.self?.id || null,
         ts: Date.now(),
       });
-      dyteMeeting?.participants?.broadcastMessage?.("presentation-target", approvedPayload);
+      dyteMeeting?.participants?.broadcastMessage?.("presentation-target", {
+        participantId: approvedPayload.participantId,
+        participantUserId: approvedPayload.participantUserKey,
+        participantName: approvedPayload.name,
+        byHostId: approvedPayload.byHostId,
+        ts: approvedPayload.ts,
+      });
     } catch (e) {
       console.warn("[ScreenShare] Failed to broadcast proactive grant:", e);
     }
@@ -5875,7 +6140,13 @@ export default function NewLiveMeeting() {
           ...payloadBase,
           status: "approved",
         });
-        dyteMeeting?.participants?.broadcastMessage?.("presentation-target", approvedPayload);
+        dyteMeeting?.participants?.broadcastMessage?.("presentation-target", {
+          participantId: approvedPayload.participantId,
+          participantUserId: approvedPayload.participantUserKey,
+          participantName: approvedPayload.name,
+          byHostId: approvedPayload.byHostId,
+          ts: approvedPayload.ts,
+        });
       } catch (e) {
         console.warn("[ScreenShare] Failed to broadcast approval:", e);
       }
@@ -10534,7 +10805,13 @@ export default function NewLiveMeeting() {
                   byHostId: dyteMeeting?.self?.id || null,
                   ts: Date.now(),
                 });
-                dyteMeeting?.participants?.broadcastMessage?.("presentation-target", grantedPayload);
+                dyteMeeting?.participants?.broadcastMessage?.("presentation-target", {
+                  participantId: grantedPayload.participantId,
+                  participantUserId: grantedPayload.participantUserKey,
+                  participantName: grantedPayload.name,
+                  byHostId: grantedPayload.byHostId,
+                  ts: grantedPayload.ts,
+                });
               } catch (e) {
                 console.warn("[Spotlight] Failed to broadcast presentation grant:", e);
               }
@@ -11085,7 +11362,10 @@ export default function NewLiveMeeting() {
       if (approvedMainStageScreenShare && hostPerms.screenShare) {
         try {
           dyteMeeting?.participants?.broadcastMessage?.("presentation-target", {
-            ...approvedMainStageScreenShare,
+            participantId: approvedMainStageScreenShare.participantId,
+            participantUserId: approvedMainStageScreenShare.participantUserKey,
+            participantName: approvedMainStageScreenShare.name,
+            byHostId: approvedMainStageScreenShare.byHostId,
             ts: Date.now(),
           });
         } catch (e) {
@@ -20222,6 +20502,93 @@ export default function NewLiveMeeting() {
                       </span>
                     </Tooltip>
                   )}
+
+                  {isScreenSharing &&
+                    (screenShareSystemAudioAvailable ? (
+                      /* ── Audio controls: shown when system audio is captured ── */
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          bgcolor: "rgba(255,255,255,0.06)",
+                          borderRadius: 1.5,
+                          px: 1,
+                          py: 0.5,
+                        }}
+                      >
+                        <Tooltip
+                          title={
+                            screenShareAudioEnabled
+                              ? "Mute screen audio"
+                              : "Unmute screen audio"
+                          }
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={handleToggleScreenShareAudio}
+                            sx={{
+                              color: screenShareAudioEnabled
+                                ? "#22c55e"
+                                : "rgba(255,255,255,0.4)",
+                              "&:hover": {
+                                bgcolor: "rgba(255,255,255,0.10)",
+                              },
+                            }}
+                            aria-label="Toggle screen share audio"
+                          >
+                            {screenShareAudioEnabled ? (
+                              <VolumeUpIcon fontSize="small" />
+                            ) : (
+                              <VolumeOffIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </Tooltip>
+                        <Slider
+                          size="small"
+                          value={screenShareAudioVolume}
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          onChange={handleScreenShareVolumeChange}
+                          disabled={!screenShareAudioEnabled}
+                          sx={{
+                            width: 70,
+                            color: "#22c55e",
+                          }}
+                          aria-label="Screen share audio volume"
+                        />
+                      </Box>
+                    ) : (
+                      /* ── No-audio hint: shown when browser didn't capture audio ── */
+                      <Tooltip title="System audio unavailable. For audio, stop sharing and re-share by selecting a Chrome Tab.">
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                            bgcolor: "rgba(255,255,255,0.04)",
+                            borderRadius: 1.5,
+                            px: 1,
+                            py: 0.5,
+                            cursor: "default",
+                            opacity: 0.7,
+                          }}
+                        >
+                          <VolumeOffIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.35)" }} />
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "rgba(255,255,255,0.4)",
+                              fontSize: "0.65rem",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Share Chrome Tab for audio
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    ))}
 
                   <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : "Chat"}>
                     <span>
