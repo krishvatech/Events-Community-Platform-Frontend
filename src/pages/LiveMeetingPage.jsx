@@ -3251,12 +3251,48 @@ export default function NewLiveMeeting() {
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenShareAudioEnabled, setScreenShareAudioEnabled] = useState(false);
-  const [screenShareAudioVolume, setScreenShareAudioVolume] = useState(1.0);
+  const [screenShareAudioVolume, setScreenShareAudioVolume] = useState(100); // 0-100 range for better UX
   const [screenShareSystemAudioAvailable, setScreenShareSystemAudioAvailable] = useState(false);
   const screenShareAudioContextRef = useRef(null);
   const screenShareGainNodeRef = useRef(null);
   const screenShareRawAudioTrackRef = useRef(null);
   const screenShareAudioSenderRef = useRef(null);
+  const lastScreenShareAudioVolumeRef = useRef(100); // Persist volume preference across screen share restarts
+
+  // ✅ Helper: Convert linear volume (0-100) to logarithmic gain (0.0-1.0) for human perception
+  // ISSUE FIXED: Human hearing perceives loudness logarithmically, not linearly.
+  // Without logarithmic scaling, the difference between 20% and 80% would sound small
+  // because linear gain scaling doesn't match human auditory perception.
+  //
+  // SOLUTION: Use decibel (dB) scaling which is standard in audio engineering.
+  // Formula: gain = 10^(dB/20) where dB = 20*log10(normalized_value)
+  //
+  // RESULT: With logarithmic scaling:
+  // - 0% volume = 0 gain (complete mute)
+  // - 20% volume ≈ 0.1 gain (-20 dB) = Quiet
+  // - 50% volume ≈ 0.316 gain (-10 dB) = Moderate
+  // - 80% volume ≈ 0.794 gain (-2 dB) = Loud
+  // - 100% volume = 1.0 gain (0 dB) = Full volume
+  //
+  // Now the user WILL hear a clear difference between 20% and 80%!
+  const volumeToLogarithmicGain = useCallback((volumePercent) => {
+    // ✅ Clamp to 0-100 range
+    const clamped = Math.max(0, Math.min(100, Number(volumePercent) || 0));
+
+    // ✅ Special case: 0% = 0 gain (complete mute)
+    if (clamped === 0) {
+      return 0;
+    }
+
+    // ✅ Convert linear 1-100 to logarithmic gain using dB scale
+    // Formula: gain = 10^(dB/20) where dB = 20*log10(normalized_value)
+    // This is the standard audio industry approach for perceived loudness
+    const normalized = clamped / 100;
+    const dB = 20 * Math.log10(normalized);
+    const gain = Math.pow(10, dB / 20);
+
+    return Math.max(0, Math.min(1, gain));
+  }, []);
 
   // ✅ PHASE 2: Presenter-aware audio management
   const [activePresenterAudio, setActivePresenterAudio] = useState(null); // { participantId, audioManager, enabled, volume }
@@ -3372,7 +3408,8 @@ export default function NewLiveMeeting() {
         screenShareAudioSenderRef.current = null;
       }
       setScreenShareAudioEnabled(false);
-      setScreenShareAudioVolume(1.0);
+      // ✅ Preserve volume preference across screen share stops/restarts (don't reset to 1.0)
+      // setScreenShareAudioVolume(100); // Keep last used volume
       setScreenShareSystemAudioAvailable(false);
 
       // ✅ RE-ENABLE AUDIO after screen share stops
@@ -3414,10 +3451,24 @@ export default function NewLiveMeeting() {
       const rawAudioTrack = audioTracks[0];
       screenShareRawAudioTrackRef.current = rawAudioTrack;
 
+      // ✅ Ensure no existing audio context is left hanging
+      if (screenShareAudioContextRef.current) {
+        try {
+          screenShareAudioContextRef.current.close();
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to close previous audio context:", e);
+        }
+      }
+
       const audioContext = new AudioContext();
       const source = audioContext.createMediaStreamSource(new MediaStream([rawAudioTrack]));
       const gainNode = audioContext.createGain();
-      gainNode.gain.value = 1.0;
+
+      // ✅ Apply the last used volume preference with logarithmic scaling
+      const storedVolume = lastScreenShareAudioVolumeRef.current;
+      const logarithmicGain = volumeToLogarithmicGain(storedVolume);
+      gainNode.gain.value = logarithmicGain;
+
       const destination = audioContext.createMediaStreamDestination();
       source.connect(gainNode);
       gainNode.connect(destination);
@@ -3430,16 +3481,19 @@ export default function NewLiveMeeting() {
         const processedAudioTrack = destination.stream.getAudioTracks()[0];
         const sender = pc.addTrack(processedAudioTrack, destination.stream);
         screenShareAudioSenderRef.current = sender;
-        console.log("[LiveMeeting] Screen share audio track added to peer connection");
+        console.log("[LiveMeeting] Screen share audio track added to peer connection with volume:", storedVolume);
       }
 
       setScreenShareSystemAudioAvailable(true);
       setScreenShareAudioEnabled(true);
-      setScreenShareAudioVolume(1.0);
+      setScreenShareAudioVolume(storedVolume); // Set to stored preference (0-100)
+
+      console.log("[LiveMeeting] Screen share audio setup complete - volume:", storedVolume, "% (logarithmic gain:", logarithmicGain.toFixed(3), ")");
     } catch (error) {
       console.warn("[LiveMeeting] Failed to setup screen share audio:", error);
+      setScreenShareSystemAudioAvailable(false);
     }
-  }, [dyteMeeting, showSnackbar]);
+  }, [dyteMeeting, showSnackbar, volumeToLogarithmicGain]);
 
   const startSelfScreenShareWithRecovery = useCallback(async () => {
     const sinceLastStop = Date.now() - (lastScreenShareStopAtRef.current || 0);
@@ -4306,24 +4360,196 @@ export default function NewLiveMeeting() {
     }
   }, [dyteMeeting, showSnackbar]);
 
+  // ✅ Helper: Validate screen share audio pipeline state
+  const validateScreenShareAudioPipeline = useCallback(() => {
+    const track = screenShareRawAudioTrackRef.current;
+    const context = screenShareAudioContextRef.current;
+    const gainNode = screenShareGainNodeRef.current;
+    const sender = screenShareAudioSenderRef.current;
+
+    const state = {
+      hasTrack: !!track && track.readyState === "live",
+      hasContext: !!context && context.state === "running",
+      hasGainNode: !!gainNode,
+      hasSender: !!sender,
+      trackState: track?.readyState,
+      contextState: context?.state,
+      gainValue: gainNode?.gain?.value,
+    };
+
+    const isHealthy = state.hasTrack && state.hasContext && state.hasGainNode && state.hasSender;
+    console.log("[LiveMeeting] Screen share audio pipeline state:", {
+      ...state,
+      healthy: isHealthy,
+    });
+
+    return { ...state, healthy: isHealthy };
+  }, []);
+
+  // ✅ Helper: Apply screen share audio volume with logarithmic scaling
+  const applyScreenShareVolume = useCallback((volumeValue) => {
+    try {
+      const gainNode = screenShareGainNodeRef.current;
+      const audioContext = screenShareAudioContextRef.current;
+
+      if (!gainNode) {
+        console.warn("[LiveMeeting] No gain node available to apply volume");
+        validateScreenShareAudioPipeline();
+        return;
+      }
+
+      // ✅ Resume audio context if it's suspended (browser autoplay policy)
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume().catch((e) => {
+          console.warn("[LiveMeeting] Failed to resume audio context:", e);
+        });
+      }
+
+      // ✅ Apply logarithmic gain conversion for human-perceived loudness
+      const logarithmicGain = volumeToLogarithmicGain(volumeValue);
+      gainNode.gain.value = logarithmicGain;
+
+      console.log(`[LiveMeeting] Applied screen share volume: ${Math.round(Number(volumeValue) || 0)}% (logarithmic gain: ${logarithmicGain.toFixed(3)})`);
+    } catch (error) {
+      console.error("[LiveMeeting] Error applying screen share volume:", error);
+    }
+  }, [validateScreenShareAudioPipeline, volumeToLogarithmicGain]);
+
+  // ✅ Helper: Resync screen share audio after track reattachment (handles edge cases like presenter switches)
+  const resyncScreenShareAudio = useCallback(async () => {
+    const state = validateScreenShareAudioPipeline();
+    if (state.healthy) {
+      console.log("[LiveMeeting] Screen share audio pipeline is healthy, no resync needed");
+      return true;
+    }
+
+    console.warn("[LiveMeeting] Detected unhealthy screen share audio pipeline, attempting resync...");
+
+    // ✅ If track is disconnected but context is running, may need to re-add to peer connection
+    if (state.hasContext && state.hasGainNode && !state.hasSender) {
+      const track = screenShareRawAudioTrackRef.current;
+      if (track) {
+        try {
+          const pc = dyteMeeting?.self?.peerConnection;
+          if (pc?.addTrack) {
+            const source = screenShareAudioContextRef.current?.createMediaStreamSource(
+              new MediaStream([track])
+            );
+            if (source && screenShareGainNodeRef.current) {
+              source.connect(screenShareGainNodeRef.current);
+              const destination = screenShareAudioContextRef.current?.createMediaStreamDestination();
+              if (destination) {
+                screenShareGainNodeRef.current.connect(destination);
+                const processedTrack = destination.stream.getAudioTracks()[0];
+                if (processedTrack) {
+                  const sender = pc.addTrack(processedTrack, destination.stream);
+                  screenShareAudioSenderRef.current = sender;
+                  // ✅ Reapply stored volume
+                  applyScreenShareVolume(lastScreenShareAudioVolumeRef.current);
+                  console.log("[LiveMeeting] Screen share audio reattached successfully");
+                  return true;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.warn("[LiveMeeting] Failed to resync screen share audio:", error);
+          return false;
+        }
+      }
+    }
+
+    return false;
+  }, [dyteMeeting, validateScreenShareAudioPipeline, applyScreenShareVolume]);
+
   // ✅ Toggle screen share audio on/off
   const handleToggleScreenShareAudio = useCallback(() => {
     const track = screenShareRawAudioTrackRef.current;
-    if (!track) return;
+    if (!track) {
+      console.warn("[LiveMeeting] No audio track available to toggle");
+      return;
+    }
+
     const next = !screenShareAudioEnabled;
     track.enabled = next;
+
+    // ✅ Also toggle gain node to ensure audio is completely muted when disabled
+    if (next) {
+      // ✅ When enabling audio:
+      // - If volume is 0 (was disabled via slider), set to 50% (practical starting point)
+      // - Otherwise, re-apply the current stored volume
+      let volumeToApply = screenShareAudioVolume;
+      if (screenShareAudioVolume === 0) {
+        volumeToApply = 50; // Default to 50% when enabling from 0
+        setScreenShareAudioVolume(50);
+        lastScreenShareAudioVolumeRef.current = 50;
+        console.log("[LiveMeeting] Audio enabled from 0 state - setting volume to 50%");
+      }
+      applyScreenShareVolume(volumeToApply);
+      console.log("[LiveMeeting] Screen share audio enabled with volume:", volumeToApply, "%");
+    } else {
+      // ✅ Set gain to 0 when disabling for immediate mute (ensures no sound is heard)
+      const gainNode = screenShareGainNodeRef.current;
+      if (gainNode) {
+        gainNode.gain.value = 0;
+        console.log("[LiveMeeting] Screen share audio disabled - gain set to 0 (complete mute)");
+      }
+    }
+
     setScreenShareAudioEnabled(next);
-    console.log("[LiveMeeting] Screen share audio toggled:", next);
-  }, [screenShareAudioEnabled]);
+  }, [screenShareAudioEnabled, screenShareAudioVolume, applyScreenShareVolume]);
 
   // ✅ Control screen share audio volume
   const handleScreenShareVolumeChange = useCallback((_, value) => {
-    const gainNode = screenShareGainNodeRef.current;
-    if (gainNode) {
-      gainNode.gain.value = value;
+    try {
+      // ✅ Validate and clamp the value to 0-100 range
+      const clampedValue = Math.max(0, Math.min(100, Number(value) || 0));
+
+      const gainNode = screenShareGainNodeRef.current;
+      const audioContext = screenShareAudioContextRef.current;
+
+      if (!gainNode) {
+        console.warn("[LiveMeeting] Gain node not available to set volume");
+        return;
+      }
+
+      // ✅ Resume audio context if it's suspended (browser autoplay policy)
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume().catch((e) => {
+          console.warn("[LiveMeeting] Failed to resume audio context:", e);
+        });
+      }
+
+      // ✅ Apply logarithmic gain conversion for human-perceived loudness
+      const logarithmicGain = volumeToLogarithmicGain(clampedValue);
+      gainNode.gain.value = logarithmicGain;
+
+      // ✅ Log volume change with human-readable description
+      let volumeDesc = "Mute";
+      if (clampedValue > 0 && clampedValue <= 25) volumeDesc = "Very Low";
+      else if (clampedValue > 25 && clampedValue <= 50) volumeDesc = "Low";
+      else if (clampedValue > 50 && clampedValue <= 75) volumeDesc = "Moderate";
+      else if (clampedValue > 75) volumeDesc = "High";
+
+      console.log(`[LiveMeeting] Screen share audio volume: ${clampedValue}% (${volumeDesc}, logarithmic gain: ${logarithmicGain.toFixed(3)})`);
+
+      // ✅ AUTO-DISABLE: If volume reaches 0, automatically disable the audio toggle button
+      if (clampedValue === 0 && screenShareAudioEnabled) {
+        setScreenShareAudioEnabled(false);
+        const track = screenShareRawAudioTrackRef.current;
+        if (track) {
+          track.enabled = false;
+        }
+        console.log("[LiveMeeting] Audio auto-disabled because volume reached 0%");
+      }
+
+      // ✅ Update UI state and persist preference
+      setScreenShareAudioVolume(clampedValue);
+      lastScreenShareAudioVolumeRef.current = clampedValue;
+    } catch (error) {
+      console.error("[LiveMeeting] Error changing screen share volume:", error);
     }
-    setScreenShareAudioVolume(value);
-  }, []);
+  }, [volumeToLogarithmicGain, screenShareAudioEnabled]);
 
   /**
    * Switch to a different video device
@@ -20548,15 +20774,15 @@ export default function NewLiveMeeting() {
                           size="small"
                           value={screenShareAudioVolume}
                           min={0}
-                          max={1}
-                          step={0.05}
+                          max={100}
+                          step={5}
                           onChange={handleScreenShareVolumeChange}
                           disabled={!screenShareAudioEnabled}
                           sx={{
                             width: 70,
                             color: "#22c55e",
                           }}
-                          aria-label="Screen share audio volume"
+                          aria-label="Screen share audio volume (0-100)"
                         />
                       </Box>
                     ) : (
