@@ -792,7 +792,7 @@ export default function SingleEventMarketingPage() {
 
     // Static event data
     const staticEventData = {
-      id: 1,
+      id: 402,
       slug: slug,
       title: "Investing in the Age of AI",
       subtitle: "Damodaran. Live. Free.",

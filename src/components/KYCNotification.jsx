@@ -28,7 +28,7 @@ export default function KYCNotification() {
   const location = useLocation();
 
   // Hide on auth pages and live meeting routes
-  const hideOnRoutes = ["/signin", "/signup", "/live"];
+  const hideOnRoutes = ["/signin", "/signup", "/live", "/public", "/landing"];
   const shouldHide = hideOnRoutes.some((route) => location.pathname.startsWith(route));
 
   const [authTick, setAuthTick] = useState(0);
