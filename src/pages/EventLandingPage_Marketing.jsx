@@ -9,7 +9,7 @@ import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
 import puntingImg from "../assets/oxford/Oxford_Punting.png";
 import bbqImg from "../assets/oxford/Oxford_BBQ_2.png";
 import jesuCollegeLogo from "../assets/oxford/Jesus_College_Crest_Logo.png";
-import bancorLogo from "../assets/oxford/Bancor_Logo.jpeg";
+import bancorLogo from "../assets/Bancor Gray Different file format/Bancor Gray Transparent BG.png";
 import "../styles/OxfordSymposium2026.css";
 
 // Design System
@@ -1509,6 +1509,7 @@ function MoreThanSessions() {
             border: `1px solid ${C.cool20}`,
             borderRadius: 4,
             borderLeft: `3px solid ${C.brightBlue}`,
+            minHeight: 200,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>

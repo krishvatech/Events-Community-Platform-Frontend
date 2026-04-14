@@ -61,6 +61,7 @@ import CoursePlayerPage from "./pages/CoursePlayerPage.jsx";
 import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
 import VirtualSpeakersPage from "./pages/VirtualSpeakersPage.jsx";
 import EventLandingPage_Marketing from "./pages/EventLandingPage_Marketing.jsx";
+import SingleEventMarketingPage from "./pages/SingleEventMarketingPage.jsx";
 import { CircularProgress } from "@mui/material";
 
 
@@ -149,6 +150,17 @@ const AppShell = () => {
 
 
   // Hide header & footer on auth pages, live meeting routes, and public branded event pages
+  // Also hide chrome on event marketing pages (single slug route or /landing/:slug)
+  const isSingleEventPage = (location.pathname.startsWith("/landing/") && location.pathname !== "/landing") ||
+                            (!location.pathname.startsWith("/events") &&
+                            !location.pathname.startsWith("/account") &&
+                            !location.pathname.startsWith("/admin") &&
+                            !location.pathname.startsWith("/community") &&
+                            !location.pathname.startsWith("/landing") &&
+                            location.pathname !== "/" &&
+                            location.pathname !== "/about" &&
+                            location.pathname !== "/cms" &&
+                            location.pathname.match(/^\/[a-zA-Z0-9\-]+\/?$/));
   const hideChrome =
     location.pathname === "/signin" ||
     location.pathname === "/signup" ||
@@ -158,7 +170,8 @@ const AppShell = () => {
     location.pathname === "/cognito/callback" ||
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/") ||
-    location.pathname.startsWith("/public/");
+    location.pathname.startsWith("/public/") ||
+    isSingleEventPage;
 
   const showSidebar = authed && !hideChrome;
   const showHeader = !authed && !hideChrome;
@@ -245,6 +258,7 @@ const AppShell = () => {
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
+          <Route path="/landing/:slug" element={<SingleEventMarketingPage />} />
           <Route path="/events/:slug" element={<EventDetailsPage />} />
           <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />

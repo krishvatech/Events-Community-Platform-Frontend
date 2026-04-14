@@ -43,6 +43,7 @@ import {
   FormControlLabel,
   Radio,
   Backdrop,
+  Slider,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -62,6 +63,7 @@ import MicOffIcon from "@mui/icons-material/MicOff";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import VideocamOffIcon from "@mui/icons-material/VideocamOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import LogoutIcon from "@mui/icons-material/Logout"; // <--- ADDED for Leave Table
@@ -125,6 +127,18 @@ import { RtkParticipantsAudio } from '@cloudflare/realtimekit-react-ui';
 import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
 import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
+import PresenterAudioControls from "../components/meeting/PresenterAudioControls.jsx";
+import { PresenterAudioManager } from "../utils/PresenterAudioManager.js";
+import usePresenterAudio from "../hooks/usePresenterAudio.ts";
+import {
+  logPresenterAudioAction,
+  isCurrentUser,
+  createPresenterSnapshot,
+} from "../utils/presenterAudioUtils.js";
+import {
+  broadcastPresentationTarget,
+  broadcastPresentationClear,
+} from "../utils/presentationEventBroadcaster.js";
 import PostEventLoungeScreen from "../components/lounge/PostEventLoungeScreen.jsx";
 import NotificationHistoryPanel from "../components/lounge/NotificationHistoryPanel.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
@@ -3229,6 +3243,55 @@ export default function NewLiveMeeting() {
   const mainInitInFlightRef = useRef(false); // ✅ Track if main meeting init is in flight to prevent concurrent calls
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareAudioEnabled, setScreenShareAudioEnabled] = useState(false);
+  const [screenShareAudioVolume, setScreenShareAudioVolume] = useState(100); // 0-100 range for better UX
+  const [screenShareSystemAudioAvailable, setScreenShareSystemAudioAvailable] = useState(false);
+  const screenShareAudioContextRef = useRef(null);
+  const screenShareGainNodeRef = useRef(null);
+  const screenShareRawAudioTrackRef = useRef(null);
+ const lastScreenShareAudioVolumeRef = useRef(100); // Persist volume preference across screen share restarts
+
+  // ✅ Helper: Convert linear volume (0-100) to logarithmic gain (0.0-1.0) for human perception
+  // ISSUE FIXED: Human hearing perceives loudness logarithmically, not linearly.
+  // Without logarithmic scaling, the difference between 20% and 80% would sound small
+  // because linear gain scaling doesn't match human auditory perception.
+  //
+  // SOLUTION: Use decibel (dB) scaling which is standard in audio engineering.
+  // Formula: gain = 10^(dB/20) where dB = 20*log10(normalized_value)
+  //
+  // RESULT: With logarithmic scaling:
+  // - 0% volume = 0 gain (complete mute)
+  // - 20% volume ≈ 0.1 gain (-20 dB) = Quiet
+  // - 50% volume ≈ 0.316 gain (-10 dB) = Moderate
+  // - 80% volume ≈ 0.794 gain (-2 dB) = Loud
+  // - 100% volume = 1.0 gain (0 dB) = Full volume
+  //
+  // Now the user WILL hear a clear difference between 20% and 80%!
+  const volumeToLogarithmicGain = useCallback((volumePercent) => {
+    // ✅ Clamp to 0-100 range
+    const clamped = Math.max(0, Math.min(100, Number(volumePercent) || 0));
+
+    // ✅ Special case: 0% = 0 gain (complete mute)
+    if (clamped === 0) {
+      return 0;
+    }
+
+    // ✅ Convert linear 1-100 to logarithmic gain using dB scale
+    // Formula: gain = 10^(dB/20) where dB = 20*log10(normalized_value)
+    // This is the standard audio industry approach for perceived loudness
+    const normalized = clamped / 100;
+    const dB = 20 * Math.log10(normalized);
+    const gain = Math.pow(10, dB / 20);
+
+    return Math.max(0, Math.min(1, gain));
+  }, []);
+
+
+  // ✅ PHASE 2: Presenter-aware audio management
+  const [activePresenterAudio, setActivePresenterAudio] = useState(null); // { participantId, audioManager, enabled, volume }
+  const presenterAudioManagerRef = useRef(null); // Current presenter's audio manager
+  const capturedPresenterStreamRef = useRef(null); // Screen capture stream for current presenter
+  const lastPresenterIdRef = useRef(null); // Track presenter changes
   const mainRoomPeekPrefKey = useMemo(
     () => `main-room-peek-visible:${String(eventId || "")}`,
     [eventId]
@@ -3318,8 +3381,93 @@ export default function NewLiveMeeting() {
     } finally {
       lastScreenShareStopAtRef.current = Date.now();
       setIsScreenSharing(getSelfScreenShareActive());
+
+      // ✅ CLEANUP: Screen share audio resources
+      if (screenShareRawAudioTrackRef.current) {
+        screenShareRawAudioTrackRef.current.stop();
+        screenShareRawAudioTrackRef.current = null;
+      }
+      if (screenShareAudioContextRef.current) {
+        screenShareAudioContextRef.current.close();
+        screenShareAudioContextRef.current = null;
+      }
+      screenShareGainNodeRef.current = null;
+      if (screenShareAudioSenderRef.current) {
+        try {
+          rtkMeeting?.self?.peerConnection?.removeTrack?.(screenShareAudioSenderRef.current);
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to remove screen share audio sender:", e);
+        }
+        screenShareAudioSenderRef.current = null;
+      }
+      setScreenShareAudioEnabled(false);
+      // ✅ Preserve volume preference across screen share stops/restarts (don't reset to 1.0)
+      // setScreenShareAudioVolume(100); // Keep last used volume
+      setScreenShareSystemAudioAvailable(false);
+
     }
   }, [rtkMeeting, getSelfScreenShareActive]);
+
+
+  // ✅ Helper: Setup screen share audio with Web Audio pipeline
+  const setupScreenShareAudio = useCallback((capturedStream) => {
+    try {
+      const audioTracks = capturedStream?.getAudioTracks?.() || [];
+      if (audioTracks.length === 0) {
+        console.log("[LiveMeeting] No audio track in screen share stream — browser did not capture system audio");
+        setScreenShareSystemAudioAvailable(false);
+        showSnackbar(
+          "No system audio captured. To share audio, select a Chrome Tab instead of a window or full screen.",
+          "info"
+        );
+        return;
+      }
+
+      const rawAudioTrack = audioTracks[0];
+      screenShareRawAudioTrackRef.current = rawAudioTrack;
+
+      // ✅ Ensure no existing audio context is left hanging
+      if (screenShareAudioContextRef.current) {
+        try {
+          screenShareAudioContextRef.current.close();
+        } catch (e) {
+          console.warn("[LiveMeeting] Failed to close previous audio context:", e);
+        }
+      }
+
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(new MediaStream([rawAudioTrack]));
+      const gainNode = audioContext.createGain();
+
+      // ✅ Apply the last used volume preference with logarithmic scaling
+      const storedVolume = lastScreenShareAudioVolumeRef.current;
+      const logarithmicGain = volumeToLogarithmicGain(storedVolume);
+      gainNode.gain.value = logarithmicGain;
+
+      const destination = audioContext.createMediaStreamDestination();
+      source.connect(gainNode);
+      gainNode.connect(destination);
+
+      screenShareAudioContextRef.current = audioContext;
+      screenShareGainNodeRef.current = gainNode;
+
+      const pc = rtkMeeting?.self?.peerConnection;
+      if (pc?.addTrack) {
+        const processedAudioTrack = destination.stream.getAudioTracks()[0];
+        const sender = pc.addTrack(processedAudioTrack, destination.stream);
+        screenShareAudioSenderRef.current = sender;
+        console.log("[LiveMeeting] Screen share audio track added to peer connection with volume:", storedVolume);
+      }
+
+      setScreenShareSystemAudioAvailable(true);
+      setScreenShareAudioEnabled(true);
+      setScreenShareAudioVolume(storedVolume); // Set to stored preference (0-100)
+
+      console.log("[LiveMeeting] Screen share audio setup complete - volume:", storedVolume, "% (logarithmic gain:", logarithmicGain.toFixed(3), ")");
+    } catch (error) {
+      console.warn("[LiveMeeting] Failed to setup screen share audio:", error);
+    }
+  }, [rtkMeeting, showSnackbar, volumeToLogarithmicGain]);
 
   const startSelfScreenShareWithRecovery = useCallback(async () => {
     const sinceLastStop = Date.now() - (lastScreenShareStopAtRef.current || 0);
@@ -3348,8 +3496,23 @@ export default function NewLiveMeeting() {
     }
 
     try {
-      await rtkMeeting?.self?.enableScreenShare?.();
+      // ✅ INTERCEPT getDisplayMedia to capture audio track
+      const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+      let capturedStream = null;
 
+      navigator.mediaDevices.getDisplayMedia = async (constraints) => {
+        const stream = await originalGetDisplayMedia({ ...constraints, audio: true });
+        capturedStream = stream;
+        return stream;
+      };
+
+      try {
+        await rtkMeeting?.self?.enableScreenShare?.();
+        setupScreenShareAudio(capturedStream);
+      } finally {
+        navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
+      }
+      
       // ✅ RE-ENABLE AUDIO after screen share is active (300ms delay for stability)
       setTimeout(async () => {
         try {
@@ -3392,7 +3555,22 @@ export default function NewLiveMeeting() {
         console.warn("[LiveMeeting] Failed to disable audio on retry:", e);
       }
 
-      await rtkMeeting?.self?.enableScreenShare?.();
+      // ✅ INTERCEPT getDisplayMedia for retry as well
+      const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+      let capturedStream = null;
+
+      navigator.mediaDevices.getDisplayMedia = async (constraints) => {
+        const stream = await originalGetDisplayMedia({ ...constraints, audio: true });
+        capturedStream = stream;
+        return stream;
+      };
+
+      try {
+        await rtkMeeting?.self?.enableScreenShare?.();
+        setupScreenShareAudio(capturedStream);
+      } finally {
+        navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
+      }
 
       // ✅ Re-enable audio after retry succeeds
       setTimeout(async () => {
@@ -3414,9 +3592,45 @@ export default function NewLiveMeeting() {
   }, [
     rtkMeeting,
     isScreenShareRenegotiationError,
+    setupScreenShareAudio,
     stopSelfScreenShareWithCleanup,
     waitForScreenSharePeerStable,
   ]);
+
+  // ✅ PHASE 2: Presenter audio toggle handler
+  const handleTogglePresenterAudio = useCallback((enabled) => {
+    if (!screenShareRawAudioTrackRef.current) {
+      console.warn("[LiveMeeting] No audio track to toggle");
+      return;
+    }
+
+    try {
+      screenShareRawAudioTrackRef.current.enabled = enabled;
+      setScreenShareAudioEnabled(enabled);
+      logPresenterAudioAction("presenter_audio_toggled", { enabled });
+    } catch (error) {
+      console.error("[LiveMeeting] Failed to toggle presenter audio:", error);
+      showSnackbar("Failed to toggle screen audio", "error");
+    }
+  }, [showSnackbar]);
+
+  // ✅ PHASE 2: Presenter volume change handler
+  const handlePresenterVolumeChange = useCallback((value) => {
+    const cleanValue = Math.max(0, Math.min(1, Number(value) || 0));
+
+    if (!screenShareGainNodeRef.current) {
+      console.warn("[LiveMeeting] No gain node to set volume");
+      return;
+    }
+
+    try {
+      screenShareGainNodeRef.current.gain.value = cleanValue;
+      setScreenShareAudioVolume(cleanValue);
+      logPresenterAudioAction("presenter_volume_changed", { volume: cleanValue });
+    } catch (error) {
+      console.error("[LiveMeeting] Failed to set presenter volume:", error);
+    }
+  }, []);
 
   const getSelfScreenShareVideoTrack = useCallback(() => {
     const self = rtkMeeting?.self;
@@ -4133,6 +4347,197 @@ export default function NewLiveMeeting() {
     }
   }, [rtkMeeting, showSnackbar]);
 
+  // ✅ Helper: Validate screen share audio pipeline state
+  const validateScreenShareAudioPipeline = useCallback(() => {
+    const track = screenShareRawAudioTrackRef.current;
+    const context = screenShareAudioContextRef.current;
+    const gainNode = screenShareGainNodeRef.current;
+    const sender = screenShareAudioSenderRef.current;
+
+    const state = {
+      hasTrack: !!track && track.readyState === "live",
+      hasContext: !!context && context.state === "running",
+      hasGainNode: !!gainNode,
+      hasSender: !!sender,
+      trackState: track?.readyState,
+      contextState: context?.state,
+      gainValue: gainNode?.gain?.value,
+    };
+
+    const isHealthy = state.hasTrack && state.hasContext && state.hasGainNode && state.hasSender;
+    console.log("[LiveMeeting] Screen share audio pipeline state:", {
+      ...state,
+      healthy: isHealthy,
+    });
+
+    return { ...state, healthy: isHealthy };
+  }, []);
+
+  // ✅ Helper: Apply screen share audio volume with logarithmic scaling
+  const applyScreenShareVolume = useCallback((volumeValue) => {
+    try {
+      const gainNode = screenShareGainNodeRef.current;
+      const audioContext = screenShareAudioContextRef.current;
+
+      if (!gainNode) {
+        console.warn("[LiveMeeting] No gain node available to apply volume");
+        validateScreenShareAudioPipeline();
+        return;
+      }
+
+      // ✅ Resume audio context if it's suspended (browser autoplay policy)
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume().catch((e) => {
+          console.warn("[LiveMeeting] Failed to resume audio context:", e);
+        });
+      }
+
+      // ✅ Apply logarithmic gain conversion for human-perceived loudness
+      const logarithmicGain = volumeToLogarithmicGain(volumeValue);
+      gainNode.gain.value = logarithmicGain;
+
+      console.log(`[LiveMeeting] Applied screen share volume: ${Math.round(Number(volumeValue) || 0)}% (logarithmic gain: ${logarithmicGain.toFixed(3)})`);
+    } catch (error) {
+      console.error("[LiveMeeting] Error applying screen share volume:", error);
+    }
+  }, [validateScreenShareAudioPipeline, volumeToLogarithmicGain]);
+
+  // ✅ Helper: Resync screen share audio after track reattachment (handles edge cases like presenter switches)
+  const resyncScreenShareAudio = useCallback(async () => {
+    const state = validateScreenShareAudioPipeline();
+    if (state.healthy) {
+      console.log("[LiveMeeting] Screen share audio pipeline is healthy, no resync needed");
+      return true;
+    }
+
+    console.warn("[LiveMeeting] Detected unhealthy screen share audio pipeline, attempting resync...");
+
+    // ✅ If track is disconnected but context is running, may need to re-add to peer connection
+    if (state.hasContext && state.hasGainNode && !state.hasSender) {
+      const track = screenShareRawAudioTrackRef.current;
+      if (track) {
+        try {
+          const pc = rtkMeeting?.self?.peerConnection;
+          if (pc?.addTrack) {
+            const source = screenShareAudioContextRef.current?.createMediaStreamSource(
+              new MediaStream([track])
+            );
+            if (source && screenShareGainNodeRef.current) {
+              source.connect(screenShareGainNodeRef.current);
+              const destination = screenShareAudioContextRef.current?.createMediaStreamDestination();
+              if (destination) {
+                screenShareGainNodeRef.current.connect(destination);
+                const processedTrack = destination.stream.getAudioTracks()[0];
+                if (processedTrack) {
+                  const sender = pc.addTrack(processedTrack, destination.stream);
+                  screenShareAudioSenderRef.current = sender;
+                  // ✅ Reapply stored volume
+                  applyScreenShareVolume(lastScreenShareAudioVolumeRef.current);
+                  console.log("[LiveMeeting] Screen share audio reattached successfully");
+                  return true;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.warn("[LiveMeeting] Failed to resync screen share audio:", error);
+          return false;
+        }
+      }
+    }
+
+    return false;
+  }, [rtkMeeting, validateScreenShareAudioPipeline, applyScreenShareVolume]);
+
+  // ✅ Toggle screen share audio on/off
+  const handleToggleScreenShareAudio = useCallback(() => {
+    const track = screenShareRawAudioTrackRef.current;
+    if (!track) {
+      console.warn("[LiveMeeting] No audio track available to toggle");
+      return;
+    }
+    const next = !screenShareAudioEnabled;
+    track.enabled = next;
+
+    // ✅ Also toggle gain node to ensure audio is completely muted when disabled
+    if (next) {
+      // ✅ When enabling audio:
+      // - If volume is 0 (was disabled via slider), set to 50% (practical starting point)
+      // - Otherwise, re-apply the current stored volume
+      let volumeToApply = screenShareAudioVolume;
+      if (screenShareAudioVolume === 0) {
+        volumeToApply = 50; // Default to 50% when enabling from 0
+        setScreenShareAudioVolume(50);
+        lastScreenShareAudioVolumeRef.current = 50;
+        console.log("[LiveMeeting] Audio enabled from 0 state - setting volume to 50%");
+      }
+      applyScreenShareVolume(volumeToApply);
+      console.log("[LiveMeeting] Screen share audio enabled with volume:", volumeToApply, "%");
+    } else {
+      // ✅ Set gain to 0 when disabling for immediate mute (ensures no sound is heard)
+      const gainNode = screenShareGainNodeRef.current;
+      if (gainNode) {
+        gainNode.gain.value = 0;
+        console.log("[LiveMeeting] Screen share audio disabled - gain set to 0 (complete mute)");
+      }
+    }
+    
+    setScreenShareAudioEnabled(next);
+    console.log("[LiveMeeting] Screen share audio toggled:", next);
+  }, [screenShareAudioEnabled, screenShareAudioVolume, applyScreenShareVolume]);
+
+  // ✅ Control screen share audio volume
+  const handleScreenShareVolumeChange = useCallback((_, value) => {
+    try {
+      // ✅ Validate and clamp the value to 0-100 range
+      const clampedValue = Math.max(0, Math.min(100, Number(value) || 0));
+
+      const gainNode = screenShareGainNodeRef.current;
+      const audioContext = screenShareAudioContextRef.current;
+
+      if (!gainNode) {
+        console.warn("[LiveMeeting] Gain node not available to set volume");
+        return;
+      }
+
+      // ✅ Resume audio context if it's suspended (browser autoplay policy)
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume().catch((e) => {
+          console.warn("[LiveMeeting] Failed to resume audio context:", e);
+        });
+      }
+
+      // ✅ Apply logarithmic gain conversion for human-perceived loudness
+      const logarithmicGain = volumeToLogarithmicGain(clampedValue);
+      gainNode.gain.value = logarithmicGain;
+
+      // ✅ Log volume change with human-readable description
+      let volumeDesc = "Mute";
+      if (clampedValue > 0 && clampedValue <= 25) volumeDesc = "Very Low";
+      else if (clampedValue > 25 && clampedValue <= 50) volumeDesc = "Low";
+      else if (clampedValue > 50 && clampedValue <= 75) volumeDesc = "Moderate";
+      else if (clampedValue > 75) volumeDesc = "High";
+
+      console.log(`[LiveMeeting] Screen share audio volume: ${clampedValue}% (${volumeDesc}, logarithmic gain: ${logarithmicGain.toFixed(3)})`);
+
+      // ✅ AUTO-DISABLE: If volume reaches 0, automatically disable the audio toggle button
+      if (clampedValue === 0 && screenShareAudioEnabled) {
+        setScreenShareAudioEnabled(false);
+        const track = screenShareRawAudioTrackRef.current;
+        if (track) {
+          track.enabled = false;
+        }
+        console.log("[LiveMeeting] Audio auto-disabled because volume reached 0%");
+      }
+
+      // ✅ Update UI state and persist preference
+      setScreenShareAudioVolume(clampedValue);
+      lastScreenShareAudioVolumeRef.current = clampedValue;
+    } catch (error) {
+      console.error("[LiveMeeting] Error changing screen share volume:", error);
+    }
+  }, [volumeToLogarithmicGain, screenShareAudioEnabled]);
+
   /**
    * Switch to a different video device
    * Uses RTK's official SDK method setDevice for reliable switching
@@ -4495,6 +4900,88 @@ export default function NewLiveMeeting() {
     rtkMeeting,
     getSelfScreenShareActive,
   ]);
+
+
+  // ✅ PHASE 2: Handle presentation target changes (grant/revoke presentation)
+  useEffect(() => {
+    if (!rtkMeeting?.participants) return;
+
+    const handlePresentationTarget = (messageData) => {
+      try {
+        // Handle both direct data and wrapped message formats
+        const data = messageData?.data || messageData;
+
+        console.log("[LiveMeeting] Presentation target received:", {
+          participantId: data?.participantId,
+          participantName: data?.participantName,
+          isForSelf: data?.participantId === rtkMeeting?.self?.id,
+        });
+
+        logPresenterAudioAction("presentation_target_event", {
+          participantId: data?.participantId,
+          participantName: data?.participantName,
+        });
+
+        // Update presentation target state
+        setPresentationTarget({
+          participantId: data?.participantId,
+          participantUserKey: data?.participantUserId,
+          name: data?.participantName,
+          byHostId: data?.byHostId,
+          ts: data?.ts || Date.now(),
+        });
+
+        // If this is for self, we might share screen now
+        if (data?.participantId === rtkMeeting?.self?.id) {
+          logPresenterAudioAction("self_became_presenter", {
+            participantId: data?.participantId,
+          });
+          console.log("[LiveMeeting] Self is now presenter - ready for screen share");
+        }
+      } catch (error) {
+        console.error("[LiveMeeting] Error handling presentation target:", error);
+      }
+    };
+
+    const handlePresentationClear = () => {
+      try {
+        logPresenterAudioAction("presentation_clear_event");
+        setPresentationTarget(null);
+        setScreenShareAudioEnabled(false);
+        setScreenShareAudioVolume(1.0);
+      } catch (error) {
+        console.error("[LiveMeeting] Error handling presentation clear:", error);
+      }
+    };
+
+    const onBroadcastMessage = ({ type, payload }) => {
+      try {
+        if (type === "presentation-target") {
+          handlePresentationTarget(payload);
+        } else if (type === "presentation-clear") {
+          handlePresentationClear();
+        }
+      } catch (error) {
+        console.error("[LiveMeeting] Error processing broadcast message:", error);
+      }
+    };
+
+    try {
+      // Listen for broadcasted presentation messages
+      rtkMeeting.participants?.on?.("broadcastedMessage", onBroadcastMessage);
+      console.log("[LiveMeeting] Presentation event listeners attached");
+    } catch (e) {
+      console.warn("[LiveMeeting] Failed to attach presentation listeners:", e);
+    }
+
+    return () => {
+      try {
+        rtkMeeting?.participants?.off?.("broadcastedMessage", onBroadcastMessage);
+      } catch (e) {
+        console.warn("[LiveMeeting] Failed to detach presentation listeners:", e);
+      }
+    };
+  }, [rtkMeeting]);
 
   // ---------- Host detection (for audience waiting screen) ----------
   const [hostJoined, setHostJoined] = useState(false);
@@ -5739,7 +6226,13 @@ export default function NewLiveMeeting() {
         byHostId: rtkMeeting?.self?.id || null,
         ts: Date.now(),
       });
-      rtkMeeting?.participants?.broadcastMessage?.("presentation-target", approvedPayload);
+      rtkMeeting?.participants?.broadcastMessage?.("presentation-target", {
+        participantId: approvedPayload.participantId,
+        participantUserId: approvedPayload.participantUserKey,
+        participantName: approvedPayload.name,
+        byHostId: approvedPayload.byHostId,
+        ts: approvedPayload.ts,
+      });
     } catch (e) {
       console.warn("[ScreenShare] Failed to broadcast proactive grant:", e);
     }
@@ -5861,7 +6354,13 @@ export default function NewLiveMeeting() {
           ...payloadBase,
           status: "approved",
         });
-        rtkMeeting?.participants?.broadcastMessage?.("presentation-target", approvedPayload);
+        rtkMeeting?.participants?.broadcastMessage?.("presentation-target", {
+          participantId: approvedPayload.participantId,
+          participantUserId: approvedPayload.participantUserKey,
+          participantName: approvedPayload.name,
+          byHostId: approvedPayload.byHostId,
+          ts: approvedPayload.ts,
+        });
       } catch (e) {
         console.warn("[ScreenShare] Failed to broadcast approval:", e);
       }
@@ -9960,17 +10459,29 @@ export default function NewLiveMeeting() {
   // Poll event status so clients exit when backend ends the meeting
   useEffect(() => {
     if (!eventId) return;
+    const controller = new AbortController();
     let cancelled = false;
+    let failureCount = 0;
+    let timerId = null;
 
     const fetchStatus = async () => {
+      if (cancelled) return;
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
-        const res = await fetch(toApiUrl(`events/${eventId}/`), { headers: authHeader() });
+        const res = await fetch(toApiUrl(`events/${eventId}/`), {
+          headers: authHeader(),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
         if (!res.ok) {
           console.warn("[LiveMeeting] Status poll failed:", res.status);
+          failureCount++;
+          scheduleNext();
           return;
         }
         const data = await res.json();
         if (cancelled) return;
+        failureCount = 0;
 
         const previousStatus = dbStatus;
         if (data?.status) {
@@ -9991,18 +10502,28 @@ export default function NewLiveMeeting() {
             console.error("[LiveMeeting] Error in handleMeetingEnd:", error);
           }
         }
+        scheduleNext();
       } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') return; // expected on cleanup or timeout
         console.error("[LiveMeeting] Status poll error:", err);
+        failureCount++;
+        scheduleNext();
       }
+    };
+
+    const scheduleNext = () => {
+      if (cancelled) return;
+      const delay = failureCount === 0 ? 2000 : Math.min(2000 * 2 ** failureCount, 30000);
+      timerId = setTimeout(fetchStatus, delay);
     };
 
     // ✅ Fetch immediately on mount
     fetchStatus();
-    // ✅ Poll more frequently (every 2 seconds instead of 3) for faster end detection
-    const interval = setInterval(fetchStatus, 2000);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      controller.abort();
+      if (timerId) clearTimeout(timerId);
     };
   }, [eventId, handleMeetingEnd]);
 
@@ -10520,7 +11041,13 @@ export default function NewLiveMeeting() {
                   byHostId: rtkMeeting?.self?.id || null,
                   ts: Date.now(),
                 });
-                rtkMeeting?.participants?.broadcastMessage?.("presentation-target", grantedPayload);
+                rtkMeeting?.participants?.broadcastMessage?.("presentation-target", {
+                  participantId: grantedPayload.participantId,
+                  participantUserId: grantedPayload.participantUserKey,
+                  participantName: grantedPayload.name,
+                  byHostId: grantedPayload.byHostId,
+                  ts: grantedPayload.ts,
+                });
               } catch (e) {
                 console.warn("[Spotlight] Failed to broadcast presentation grant:", e);
               }
@@ -11071,7 +11598,10 @@ export default function NewLiveMeeting() {
       if (approvedMainStageScreenShare && hostPerms.screenShare) {
         try {
           rtkMeeting?.participants?.broadcastMessage?.("presentation-target", {
-            ...approvedMainStageScreenShare,
+            participantId: approvedMainStageScreenShare.participantId,
+            participantUserId: approvedMainStageScreenShare.participantUserKey,
+            participantName: approvedMainStageScreenShare.name,
+            byHostId: approvedMainStageScreenShare.byHostId,
             ts: Date.now(),
           });
         } catch (e) {
@@ -20207,6 +20737,92 @@ export default function NewLiveMeeting() {
                       </span>
                     </Tooltip>
                   )}
+                  {isScreenSharing &&
+                    (screenShareSystemAudioAvailable ? (
+                      /* ── Audio controls: shown when system audio is captured ── */
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          bgcolor: "rgba(255,255,255,0.06)",
+                          borderRadius: 1.5,
+                          px: 1,
+                          py: 0.5,
+                        }}
+                      >
+                        <Tooltip
+                          title={
+                            screenShareAudioEnabled
+                              ? "Mute screen audio"
+                              : "Unmute screen audio"
+                          }
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={handleToggleScreenShareAudio}
+                            sx={{
+                              color: screenShareAudioEnabled
+                                ? "#22c55e"
+                                : "rgba(255,255,255,0.4)",
+                              "&:hover": {
+                                bgcolor: "rgba(255,255,255,0.10)",
+                              },
+                            }}
+                            aria-label="Toggle screen share audio"
+                          >
+                            {screenShareAudioEnabled ? (
+                              <VolumeUpIcon fontSize="small" />
+                            ) : (
+                              <VolumeOffIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </Tooltip>
+                        <Slider
+                          size="small"
+                          value={screenShareAudioVolume}
+                          min={0}
+                          max={100}
+                          step={5}
+                          onChange={handleScreenShareVolumeChange}
+                          disabled={!screenShareAudioEnabled}
+                          sx={{
+                            width: 70,
+                            color: "#22c55e",
+                          }}
+                          aria-label="Screen share audio volume (0-100)"
+                        />
+                      </Box>
+                    ) : (
+                      /* ── No-audio hint: shown when browser didn't capture audio ── */
+                      <Tooltip title="System audio unavailable. For audio, stop sharing and re-share by selecting a Chrome Tab.">
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                            bgcolor: "rgba(255,255,255,0.04)",
+                            borderRadius: 1.5,
+                            px: 1,
+                            py: 0.5,
+                            cursor: "default",
+                            opacity: 0.7,
+                          }}
+                        >
+                          <VolumeOffIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.35)" }} />
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "rgba(255,255,255,0.4)",
+                              fontSize: "0.65rem",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Share Chrome Tab for audio
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    ))}
 
                   <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : "Chat"}>
                     <span>
