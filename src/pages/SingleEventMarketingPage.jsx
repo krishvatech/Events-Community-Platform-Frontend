@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import speakerImage from "../assets/prof-dr-aswath-damodaran-12b35a4e.png";
 
 const C = {
@@ -28,14 +28,135 @@ function Section({ children, bg = C.white, id, style: s = {} }) { const isMobile
 
 
 // HERO – Registration above the fold
-function Hero({ eventData = {} }) {
+function Hero({ eventData = {}, eventId }) {
+  const navigate = useNavigate();
   const [ld, sLd] = useState(false);
   const [form, setForm] = useState({ first: "", last: "", email: "" });
-  const [done, setDone] = useState(false);
+  const [step, setStep] = useState("form"); // "form", "otp", or "success"
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSentEmail, setOtpSentEmail] = useState("");
   const valid = form.first && form.last && form.email;
   const isMobile = useIsMobile();
+
+  const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
+  const API_BASE = RAW_BASE.replace(/\/+$/, "");
+  const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path}`}`;
+
   useEffect(() => { setTimeout(() => sLd(true), 300); }, []);
   const a = (d) => ({ opacity: ld ? 1 : 0, transform: ld ? "translateY(0)" : "translateY(24px)", transition: `all 0.7s cubic-bezier(0.22,1,0.36,1) ${d}s` });
+
+  const handleSendOtp = async () => {
+    setError("");
+    if (!valid) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(urlJoin(API_BASE, `/events/${eventId}/guest-join/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: form.first.trim(),
+          last_name: form.last.trim(),
+          email: form.email.trim().toLowerCase(),
+          job_title: "",
+          company_name: "",
+        }),
+      });
+
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        if (data.error === "account_exists") {
+          setError("You already have an account for this event. Please sign in.");
+          return;
+        }
+        throw new Error(data.error || data.message || text || `Failed to send verification code (${res.status})`);
+      }
+
+      if (!data?.otp_required) {
+        throw new Error("OTP was not requested by server.");
+      }
+
+      setOtpSentEmail(form.email.trim().toLowerCase());
+      setStep("otp");
+      setOtpCode("");
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+      console.error("Guest join error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setError("");
+    if (!otpCode.trim()) {
+      setError("Please enter the verification code");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(urlJoin(API_BASE, `/events/${eventId}/guest-verify-otp/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: otpSentEmail,
+          first_name: form.first.trim(),
+          last_name: form.last.trim(),
+          otp_code: otpCode.trim(),
+          job_title: "",
+          company: "",
+        }),
+      });
+
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        if (data.error === "account_exists") {
+          setError("You already have an account for this event. Please sign in.");
+          return;
+        }
+        throw new Error(data.error || data.message || text || `Failed to verify code (${res.status})`);
+      }
+
+      if (!data?.token) {
+        throw new Error("OTP verification succeeded but no token was returned.");
+      }
+
+      localStorage.setItem("guest_token", data.token);
+      localStorage.setItem("is_guest", "true");
+      localStorage.setItem("guest_email", data.email);
+      localStorage.setItem("guest_name", data.name);
+      localStorage.setItem("guest_id", String(data.guest_id));
+
+      window.dispatchEvent(new Event("auth:changed"));
+
+      // Auto-redirect to meeting page
+      const livePath = `/live/${eventData.slug || eventId}?id=${eventId}&role=audience`;
+      navigate(livePath, { state: { event: eventData } });
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+      console.error("OTP verification error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const Ck = ({ children }) => <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg><span style={{ fontFamily: F.body, fontSize: isMobile ? 13 : 14, color: C.white }}>{children}</span></div>;
 
   return (
@@ -119,15 +240,73 @@ function Hero({ eventData = {} }) {
               </div>
             )}
             <div style={{ background: C.midBlue, borderRadius: 8, padding: isMobile ? "20px 16px" : "28px 26px", boxSizing: "border-box" }}>
-              {!done ? (<>
-                <div style={{ fontFamily: F.display, fontSize: isMobile ? 18 : 22, fontWeight: 700, color: C.white, marginBottom: 6 }}>Register free</div>
-                <div style={{ fontFamily: F.body, fontSize: isMobile ? 12 : 13, color: C.lightBlue, marginBottom: isMobile ? 14 : 18 }}>Replay will be available.</div>
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 6 : 8, marginBottom: isMobile ? 6 : 8, width: "100%", boxSizing: "border-box" }}>
+              {step === "form" ? (
+                <>
+                  <div style={{ fontFamily: F.display, fontSize: isMobile ? 18 : 22, fontWeight: 700, color: C.white, marginBottom: 6 }}>Register free</div>
+                  <div style={{ fontFamily: F.body, fontSize: isMobile ? 12 : 13, color: C.lightBlue, marginBottom: isMobile ? 14 : 18 }}>Replay will be available.</div>
+
+                  {error && (
+                    <div style={{ background: "rgba(240, 88, 67, 0.15)", border: `1px solid ${C.coral}`, color: C.coral, padding: "12px", borderRadius: 4, marginBottom: 12, fontSize: 13, fontFamily: F.body }}>
+                      {error}
+                    </div>
+                  )}
+
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 6 : 8, marginBottom: isMobile ? 6 : 8, width: "100%", boxSizing: "border-box" }}>
+                    <input
+                      value={form.first}
+                      onChange={e => setForm(f => ({ ...f, first: e.target.value }))}
+                      placeholder="First name"
+                      disabled={loading}
+                      style={{
+                        padding: "12px 14px",
+                        border: `1.5px solid ${C.cool60}`,
+                        borderRadius: 4,
+                        fontSize: 13,
+                        fontFamily: F.body,
+                        background: `${C.white}08`,
+                        color: C.white,
+                        outline: "none",
+                        boxSizing: "border-box",
+                        transition: "all 0.3s ease",
+                        width: "100%",
+                        opacity: loading ? 0.6 : 1,
+                        cursor: loading ? "not-allowed" : "text"
+                      }}
+                      onFocus={(e) => { if (!loading) { e.target.style.borderColor = C.lightBlue; e.target.style.background = `${C.white}12`; } }}
+                      onBlur={(e) => { e.target.style.borderColor = C.cool60; e.target.style.background = `${C.white}08`; }}
+                    />
+                    <input
+                      value={form.last}
+                      onChange={e => setForm(f => ({ ...f, last: e.target.value }))}
+                      placeholder="Last name"
+                      disabled={loading}
+                      style={{
+                        padding: "12px 14px",
+                        border: `1.5px solid ${C.cool60}`,
+                        borderRadius: 4,
+                        fontSize: 13,
+                        fontFamily: F.body,
+                        background: `${C.white}08`,
+                        color: C.white,
+                        outline: "none",
+                        boxSizing: "border-box",
+                        transition: "all 0.3s ease",
+                        width: "100%",
+                        opacity: loading ? 0.6 : 1,
+                        cursor: loading ? "not-allowed" : "text"
+                      }}
+                      onFocus={(e) => { if (!loading) { e.target.style.borderColor = C.lightBlue; e.target.style.background = `${C.white}12`; } }}
+                      onBlur={(e) => { e.target.style.borderColor = C.cool60; e.target.style.background = `${C.white}08`; }}
+                    />
+                  </div>
                   <input
-                    value={form.first}
-                    onChange={e => setForm(f => ({ ...f, first: e.target.value }))}
-                    placeholder="First name"
+                    value={form.email}
+                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="Email"
+                    type="email"
+                    disabled={loading}
                     style={{
+                      width: "100%",
                       padding: "12px 14px",
                       border: `1.5px solid ${C.cool60}`,
                       borderRadius: 4,
@@ -137,91 +316,136 @@ function Hero({ eventData = {} }) {
                       color: C.white,
                       outline: "none",
                       boxSizing: "border-box",
+                      marginBottom: 16,
                       transition: "all 0.3s ease",
-                      width: "100%"
+                      opacity: loading ? 0.6 : 1,
+                      cursor: loading ? "not-allowed" : "text"
                     }}
-                    onFocus={(e) => { e.target.style.borderColor = C.lightBlue; e.target.style.background = `${C.white}12`; }}
+                    onFocus={(e) => { if (!loading) { e.target.style.borderColor = C.lightBlue; e.target.style.background = `${C.white}12`; } }}
                     onBlur={(e) => { e.target.style.borderColor = C.cool60; e.target.style.background = `${C.white}08`; }}
                   />
-                  <input
-                    value={form.last}
-                    onChange={e => setForm(f => ({ ...f, last: e.target.value }))}
-                    placeholder="Last name"
+                  <button
+                    onClick={handleSendOtp}
+                    disabled={!valid || loading}
                     style={{
-                      padding: "12px 14px",
+                      width: "100%",
+                      padding: "13px",
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: C.white,
+                      background: C.coral,
+                      border: "none",
+                      borderRadius: 4,
+                      cursor: valid && !loading ? "pointer" : "default",
+                      fontFamily: F.body,
+                      opacity: valid && !loading ? 1 : 0.5,
+                      transition: "all 0.3s ease",
+                      letterSpacing: "0.03em"
+                    }}
+                    onMouseEnter={(e) => { if (valid && !loading) { e.target.style.transform = "translateY(-2px)"; e.target.style.boxShadow = "0 8px 16px rgba(240, 88, 67, 0.3)"; } }}
+                    onMouseLeave={(e) => { e.target.style.transform = "translateY(0)"; e.target.style.boxShadow = "none"; }}
+                  >
+                    {loading ? "Sending..." : "Register for Free →"}
+                  </button>
+                  <div style={{ textAlign: "center", marginTop: 12 }}>
+                    <a href="/login" style={{ fontFamily: F.body, fontSize: 12, color: C.cool50, textDecoration: "none" }}>
+                      Already registered? <span style={{ color: C.lightBlue, fontWeight: 500 }}>Log in</span>
+                    </a>
+                  </div>
+                </>
+              ) : step === "otp" ? (
+                <>
+                  <div style={{ fontFamily: F.display, fontSize: isMobile ? 18 : 22, fontWeight: 700, color: C.white, marginBottom: 6 }}>Verify Email</div>
+                  <div style={{ fontFamily: F.body, fontSize: isMobile ? 12 : 13, color: C.lightBlue, marginBottom: isMobile ? 14 : 18 }}>Enter the code sent to {otpSentEmail}</div>
+
+                  {error && (
+                    <div style={{ background: "rgba(240, 88, 67, 0.15)", border: `1px solid ${C.coral}`, color: C.coral, padding: "12px", borderRadius: 4, marginBottom: 12, fontSize: 13, fontFamily: F.body }}>
+                      {error}
+                    </div>
+                  )}
+
+                  <input
+                    value={otpCode}
+                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="000000"
+                    maxLength="6"
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "16px 14px",
                       border: `1.5px solid ${C.cool60}`,
                       borderRadius: 4,
-                      fontSize: 13,
-                      fontFamily: F.body,
+                      fontSize: 24,
+                      fontFamily: F.mono,
                       background: `${C.white}08`,
                       color: C.white,
                       outline: "none",
                       boxSizing: "border-box",
+                      marginBottom: 16,
                       transition: "all 0.3s ease",
-                      width: "100%"
+                      textAlign: "center",
+                      letterSpacing: "0.25em",
+                      opacity: loading ? 0.6 : 1,
+                      cursor: loading ? "not-allowed" : "text"
                     }}
-                    onFocus={(e) => { e.target.style.borderColor = C.lightBlue; e.target.style.background = `${C.white}12`; }}
+                    onFocus={(e) => { if (!loading) { e.target.style.borderColor = C.lightBlue; e.target.style.background = `${C.white}12`; } }}
                     onBlur={(e) => { e.target.style.borderColor = C.cool60; e.target.style.background = `${C.white}08`; }}
                   />
-                </div>
-                <input
-                  value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  placeholder="Email"
-                  type="email"
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    border: `1.5px solid ${C.cool60}`,
-                    borderRadius: 4,
-                    fontSize: 13,
-                    fontFamily: F.body,
-                    background: `${C.white}08`,
-                    color: C.white,
-                    outline: "none",
-                    boxSizing: "border-box",
-                    marginBottom: 16,
-                    transition: "all 0.3s ease"
-                  }}
-                  onFocus={(e) => { e.target.style.borderColor = C.lightBlue; e.target.style.background = `${C.white}12`; }}
-                  onBlur={(e) => { e.target.style.borderColor = C.cool60; e.target.style.background = `${C.white}08`; }}
-                />
-                <button
-                  onClick={() => valid && setDone(true)}
-                  style={{
-                    width: "100%",
-                    padding: "13px",
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: C.white,
-                    background: C.coral,
-                    border: "none",
-                    borderRadius: 4,
-                    cursor: valid ? "pointer" : "default",
-                    fontFamily: F.body,
-                    opacity: valid ? 1 : 0.5,
-                    transition: "all 0.3s ease",
-                    letterSpacing: "0.03em"
-                  }}
-                  onMouseEnter={(e) => { if (valid) e.target.style.transform = "translateY(-2px)"; e.target.style.boxShadow = "0 8px 16px rgba(240, 88, 67, 0.3)"; }}
-                  onMouseLeave={(e) => { e.target.style.transform = "translateY(0)"; e.target.style.boxShadow = "none"; }}
-                >
-                  Register for Free →
-                </button>
-                <div style={{ textAlign: "center", marginTop: 12 }}>
-                  <a href="/login" style={{ fontFamily: F.body, fontSize: 12, color: C.cool50, textDecoration: "none" }}>
-                    Already registered? <span style={{ color: C.lightBlue, fontWeight: 500 }}>Log in</span>
-                  </a>
-                </div>
-              </>) : (
-                <div style={{ textAlign: "center", padding: "24px 0" }}>
-                  <div style={{ fontSize: 40, marginBottom: 12, fontWeight: 700 }}>✓</div>
-                  <div style={{ fontFamily: F.display, fontSize: 18, fontWeight: 700, color: C.white, marginBottom: 8 }}>You're registered!</div>
-                  <p style={{ fontFamily: F.body, fontSize: 13, color: C.lightBlue, margin: 0, lineHeight: 1.5 }}>Check your inbox for the confirmation. We'll send a reminder before the session.</p>
-                </div>
-              )}
+
+                  <div style={{ fontFamily: F.body, fontSize: 12, color: C.cool50, marginBottom: 16 }}>Code expires in 10 minutes</div>
+
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={otpCode.length !== 6 || loading}
+                    style={{
+                      width: "100%",
+                      padding: "13px",
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: C.white,
+                      background: C.coral,
+                      border: "none",
+                      borderRadius: 4,
+                      cursor: otpCode.length === 6 && !loading ? "pointer" : "default",
+                      fontFamily: F.body,
+                      opacity: otpCode.length === 6 && !loading ? 1 : 0.5,
+                      transition: "all 0.3s ease",
+                      letterSpacing: "0.03em",
+                      marginBottom: 12
+                    }}
+                    onMouseEnter={(e) => { if (otpCode.length === 6 && !loading) { e.target.style.transform = "translateY(-2px)"; e.target.style.boxShadow = "0 8px 16px rgba(240, 88, 67, 0.3)"; } }}
+                    onMouseLeave={(e) => { e.target.style.transform = "translateY(0)"; e.target.style.boxShadow = "none"; }}
+                  >
+                    {loading ? "Verifying..." : "Verify Code"}
+                  </button>
+
+                  <button
+                    onClick={() => { setStep("form"); setOtpCode(""); setError(""); setOtpSentEmail(""); }}
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: C.lightBlue,
+                      background: "transparent",
+                      border: "none",
+                      borderRadius: 4,
+                      cursor: loading ? "not-allowed" : "pointer",
+                      fontFamily: F.body,
+                      transition: "all 0.3s ease",
+                      opacity: loading ? 0.5 : 1
+                    }}
+                    onMouseEnter={(e) => { if (!loading) e.target.style.color = C.white; }}
+                    onMouseLeave={(e) => { e.target.style.color = C.lightBlue; }}
+                  >
+                    ← Back to Form
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
+
         </div>
       </div>
     </section>
@@ -566,8 +790,10 @@ export default function SingleEventMarketingPage() {
     link.rel = "stylesheet";
     document.head.appendChild(link);
 
-    // Example event data - replace with actual API call
-    const exampleEventData = {
+    // Static event data
+    const staticEventData = {
+      id: 1,
+      slug: slug,
       title: "Investing in the Age of AI",
       subtitle: "Damodaran. Live. Free.",
       description: "AI may challenge some of the core functions of investment banking, PE, and consulting. Damodaran shares what he's learned first-hand – including from bots built around his own material.",
@@ -617,19 +843,7 @@ export default function SingleEventMarketingPage() {
       ],
     };
 
-    setEventData(exampleEventData);
-
-    // TODO: Uncomment to fetch real data from API
-    // const fetchEventData = async () => {
-    //   try {
-    //     const response = await fetch(`/api/events/${slug}/`);
-    //     const data = await response.json();
-    //     setEventData(data);
-    //   } catch (error) {
-    //     console.error('Failed to fetch event data:', error);
-    //   }
-    // };
-    // fetchEventData();
+    setEventData(staticEventData);
   }, [slug]);
 
   if (!eventData) {
@@ -642,7 +856,7 @@ export default function SingleEventMarketingPage() {
 
   return (
     <div style={{ fontFamily: F.body, WebkitFontSmoothing: "antialiased" }}>
-      <Hero eventData={eventData} />
+      <Hero eventData={eventData} eventId={eventData?.id || slug} />
       <WhatHellCover eventData={eventData} />
       <EventExperience />
       <AboutImaa />
