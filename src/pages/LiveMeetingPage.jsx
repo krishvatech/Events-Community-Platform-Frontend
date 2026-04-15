@@ -2718,28 +2718,22 @@ export default function NewLiveMeeting() {
     }
 
     const headers = { accept: "application/json", ...authHeader() };
-    const urls = [
-      toApiUrl(`users/${userId}/`),
-      toApiUrl(`users/${userId}/profile/`),
-    ];
+    const url = toApiUrl(`users/${userId}/`);
 
     let isMounted = true;
     (async () => {
-      for (const url of urls) {
-        try {
-          const res = await fetch(url, { headers });
-          if (!res.ok) continue;
-          const data = await res.json().catch(() => null);
-          if (!isMounted || !data) break;
+      try {
+        const res = await fetch(url, { headers });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!isMounted || !data) return;
 
-          const kycStatus = data?.kyc_status || data?.profile?.kyc_status || "";
-          if (isMounted && kycStatus) {
-            setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus }));
-          }
-          break;
-        } catch (e) {
-          // try next URL
+        const kycStatus = data?.kyc_status || data?.profile?.kyc_status || "";
+        if (isMounted && kycStatus) {
+          setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus }));
         }
+      } catch (e) {
+        // User not found or not accessible
       }
     })();
 
@@ -5422,7 +5416,7 @@ export default function NewLiveMeeting() {
     setGuestProfileLoading(true);
     try {
       const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
-      const token = localStorage.getItem("access_token");
+      const token = localStorage.getItem("guest_token");
 
       const response = await fetch(`${API_BASE}/events/${eventId}/guest-profile/`, {
         method: "GET",
@@ -5502,7 +5496,7 @@ export default function NewLiveMeeting() {
     setGuestProfileLoading(true);
     try {
       const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
-      const token = localStorage.getItem("access_token");
+      const token = localStorage.getItem("guest_token");
 
       const response = await fetch(`${API_BASE}/events/${eventId}/guest-profile/`, {
         method: "PATCH",
@@ -11823,7 +11817,7 @@ export default function NewLiveMeeting() {
     let mounted = true;
     const initializeGuestProfile = async () => {
       try {
-        const token = localStorage.getItem("access_token");
+        const token = localStorage.getItem("guest_token");
         if (!token) return;
 
         const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -23181,43 +23175,39 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
     const fetchProfile = async () => {
       if (alive) setProfileLoading(true);
       const headers = { accept: "application/json", ...authHeader() };
-      const urls = [
-        toApiUrl(`users/${userId}/`),
-        toApiUrl(`users/${userId}/profile/`),
-        toApiUrl(`profile/${userId}/`),
-      ];
+      const url = toApiUrl(`users/${userId}/`);
 
-      for (const url of urls) {
-        try {
-          const res = await fetch(url, { headers });
-          if (!res.ok) continue;
-          const data = await res.json().catch(() => null);
-          if (!alive || !data) break;
-
-          const base = pickJobAndCompany(data);
-          const fromExp = pickFromExperiences(data);
-          const location = pickLocation(data) || fromExp.location || "";
-          const jobTitle = base.jobTitle || fromExp.jobTitle || "";
-          const company = base.company || fromExp.company || "";
-
-          // Extract kyc_status from various possible locations
-          const kycStatus =
-            data?.kyc_status ||
-            data?.profile?.kyc_status ||
-            data?.user?.kyc_status ||
-            data?.user?.profile?.kyc_status ||
-            "";
-
-          setProfileInfo({
-            jobTitle: jobTitle || "",
-            company: company || "",
-            location: location || "",
-            kycStatus: kycStatus,
-          });
-          break;
-        } catch (e) {
-          // try next URL
+      try {
+        const res = await fetch(url, { headers });
+        if (!res.ok) {
+          if (alive) setProfileLoading(false);
+          return;
         }
+        const data = await res.json().catch(() => null);
+        if (!alive || !data) return;
+
+        const base = pickJobAndCompany(data);
+        const fromExp = pickFromExperiences(data);
+        const location = pickLocation(data) || fromExp.location || "";
+        const jobTitle = base.jobTitle || fromExp.jobTitle || "";
+        const company = base.company || fromExp.company || "";
+
+        // Extract kyc_status from various possible locations
+        const kycStatus =
+          data?.kyc_status ||
+          data?.profile?.kyc_status ||
+          data?.user?.kyc_status ||
+          data?.user?.profile?.kyc_status ||
+          "";
+
+        setProfileInfo({
+          jobTitle: jobTitle || "",
+          company: company || "",
+          location: location || "",
+          kycStatus: kycStatus,
+        });
+      } catch (e) {
+        // User not found or not accessible
       }
       if (alive) setProfileLoading(false);
     };
