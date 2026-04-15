@@ -670,7 +670,7 @@ function MoreFromImaa() {
                   <span key={i} style={{ fontFamily: F.body, fontSize: 11, fontWeight: 600, color: C.cool80, background: C.cool10, padding: "4px 10px", borderRadius: 3 }}>{city}</span>
                 ))}
               </div>
-              <a href="/events" style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.brightBlue, textDecoration: "none" }}>Explore onsite programmes →</a>
+              <a href="https://imaa-institute.org/m-and-a-trainings/" style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.brightBlue, textDecoration: "none" }}>Explore onsite programmes →</a>
             </div>
           </div>
         </FadeIn>
@@ -690,7 +690,7 @@ function MoreFromImaa() {
               <div style={{ fontFamily: F.body, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.brightBlue, marginBottom: 10 }}>Virtual live</div>
               <h3 style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.deepBlue, margin: "0 0 12px" }}>Live. Interactive. From anywhere.</h3>
               <p style={{ fontFamily: F.body, fontSize: 13, color: C.cool60, margin: "0 0 16px", lineHeight: 1.55 }}>Multi-session programmes with live instruction, real-time Q&A, and interaction with your cohort. Same depth as onsite – without the travel.</p>
-              <a href="/events" style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.brightBlue, textDecoration: "none" }}>Explore virtual programmes →</a>
+              <a href="https://imaa-institute.org/m-and-a-trainings/" style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.brightBlue, textDecoration: "none" }}>Explore virtual programmes →</a>
             </div>
           </div>
         </FadeIn>
@@ -708,7 +708,7 @@ function MoreFromImaa() {
               <div style={{ fontFamily: F.body, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.midBlue, marginBottom: 10 }}>Online</div>
               <h3 style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.deepBlue, margin: "0 0 12px" }}>Learn at your own pace.</h3>
               <p style={{ fontFamily: F.body, fontSize: 13, color: C.cool60, margin: "0 0 16px", lineHeight: 1.55 }}>Recorded programmes you can start anytime. Video lessons, downloadable materials, and certification – on your schedule.</p>
-              <a href="/events" style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.brightBlue, textDecoration: "none" }}>Explore online programmes →</a>
+              <a href="https://imaa-institute.org/m-and-a-trainings/" style={{ fontFamily: F.body, fontSize: 12, fontWeight: 600, color: C.brightBlue, textDecoration: "none" }}>Explore online programmes →</a>
             </div>
           </div>
         </FadeIn>
