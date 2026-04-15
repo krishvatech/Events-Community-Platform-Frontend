@@ -3249,6 +3249,7 @@ export default function NewLiveMeeting() {
   const screenShareAudioContextRef = useRef(null);
   const screenShareGainNodeRef = useRef(null);
   const screenShareRawAudioTrackRef = useRef(null);
+  const screenShareAudioSenderRef = useRef(null);
  const lastScreenShareAudioVolumeRef = useRef(100); // Persist volume preference across screen share restarts
 
   // ✅ Helper: Convert linear volume (0-100) to logarithmic gain (0.0-1.0) for human perception
