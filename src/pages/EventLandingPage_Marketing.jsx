@@ -2093,12 +2093,20 @@ export default function OxfordSymposium2026() {
   // Guest apply modal state (for apply-type events)
   const [guestApplyModalOpen, setGuestApplyModalOpen] = useState(false);
 
+  const ALLOWED_SLUG = 'the-oxford-m-a-symposium-2026';
+
   const handleGuestJoinRequested = (eventData) => {
     setGuestJoinEvent(eventData);
     setGuestModalOpen(true);
   };
 
   useEffect(() => {
+    // Validate slug - only allow specific event
+    if (slug && slug !== ALLOWED_SLUG) {
+      navigate('/events');
+      return;
+    }
+
     const fetchEventData = async () => {
       try {
         setLoading(true);
