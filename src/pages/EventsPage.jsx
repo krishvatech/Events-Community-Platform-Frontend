@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
@@ -1785,6 +1785,8 @@ function EventRowSkeleton() {
 // ————————————————————————————————————————
 export default function EventsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const filterEventId = searchParams.get("id");
   // which events the logged-in user has registered for
   const [myRegistrations, setMyRegistrations] = useState({}); // { eventId: registrationObj }
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)
@@ -2216,7 +2218,12 @@ export default function EventsPage() {
           const startMs = ev?.start_time ? new Date(ev.start_time).getTime() : null;
 
           const endedByTime = endMs ? endMs < now : (startMs ? startMs < now : false);
-          return !(isEndedStatus || endedByTime);
+          if (isEndedStatus || endedByTime) return false;
+
+          // Filter by event ID if provided via URL parameter
+          if (filterEventId && String(ev?.id) !== filterEventId) return false;
+
+          return true;
         });
 
         setRawEvents(filtered);
@@ -2228,9 +2235,9 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange]);
+  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId]);
 
-  useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation]);
+  useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, filterEventId]);
 
   useEffect(() => {
     const ctrl = new AbortController();
