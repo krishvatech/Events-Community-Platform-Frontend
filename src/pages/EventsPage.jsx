@@ -9,6 +9,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
+import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import {
   Box,
@@ -441,7 +442,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
   const [myApplication, setMyApplication] = React.useState(null);
-  const [applyAsGuestOnly, setApplyAsGuestOnly] = React.useState(false);
+  const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
 
   // Timezone logic
   const organizerTimezone = normalizeTimezoneName(ev.timezone);
@@ -1160,10 +1161,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       variant="outlined"
                       size="medium"
                       color="primary"
-                      onClick={() => {
-                        setApplyAsGuestOnly(true);
-                        setApplyModalOpen(true);
-                      }}
+                      onClick={() => setGuestApplyModalOpen(true)}
                       className="normal-case rounded-full px-4"
                     >
                       {isGuest ? "Continue Applying as Guest" : "Apply as Guest"}
@@ -1205,7 +1203,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         event={ev}
         token={token}
         onSuccess={(app) => setMyApplication(app)}
-        guestOnly={applyAsGuestOnly}
+      />
+      <GuestApplyModal
+        open={guestApplyModalOpen}
+        onClose={() => setGuestApplyModalOpen(false)}
+        event={ev}
+        livePath={`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`}
       />
     </MUICard>
   );
@@ -1273,7 +1276,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
   const [myApplication, setMyApplication] = React.useState(null);
-  const [applyAsGuestOnly, setApplyAsGuestOnly] = React.useState(false);
+  const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
 
   // Fetch application status for apply-type events
   React.useEffect(() => {
@@ -1683,10 +1686,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                         variant="outlined"
                         size="medium"
                         color="primary"
-                        onClick={() => {
-                          setApplyAsGuestOnly(true);
-                          setApplyModalOpen(true);
-                        }}
+                        onClick={() => setGuestApplyModalOpen(true)}
                         className="normal-case rounded-full px-4"
                       >
                         {isGuest ? "Continue Applying as Guest" : "Apply as Guest"}
@@ -1730,7 +1730,12 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
         event={ev}
         token={token}
         onSuccess={(app) => setMyApplication(app)}
-        guestOnly={applyAsGuestOnly}
+      />
+      <GuestApplyModal
+        open={guestApplyModalOpen}
+        onClose={() => setGuestApplyModalOpen(false)}
+        event={ev}
+        livePath={`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`}
       />
     </MUICard>
   );

@@ -20,6 +20,7 @@ import {
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
+import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
@@ -378,6 +379,9 @@ export default function EventDetailsPage() {
 
   // Guest Join Modal
   const [guestModalOpen, setGuestModalOpen] = useState(false);
+
+  // Guest Apply Modal (for apply-type events)
+  const [guestApplyModalOpen, setGuestApplyModalOpen] = useState(false);
 
   // Apply Modal
   const [applyModalOpen, setApplyModalOpen] = useState(false);
@@ -1464,26 +1468,28 @@ export default function EventDetailsPage() {
                           (<>
                             {!myApplication || myApplication.status === 'none'
                               ? (
-                                <Button
-                                  onClick={() => {
-                                    // For authenticated users, submit directly
-                                    if (token) {
-                                      handleApplyDirect();
-                                    } else {
-                                      // For guests, open modal
-                                      setApplyModalOpen(true);
-                                    }
-                                  }}
-                                  variant="contained"
-                                  sx={{
-                                    textTransform: "none",
-                                    backgroundColor: "#10b8a6",
-                                    "&:hover": { backgroundColor: "#0ea5a4" },
-                                  }}
-                                  className="rounded-xl"
-                                >
-                                  Apply Now
-                                </Button>
+                                <>
+                                  <Button
+                                    onClick={() => {
+                                      // For authenticated users, submit directly
+                                      if (token) {
+                                        handleApplyDirect();
+                                      } else {
+                                        // For guests, open guest apply modal
+                                        setGuestApplyModalOpen(true);
+                                      }
+                                    }}
+                                    variant="contained"
+                                    sx={{
+                                      textTransform: "none",
+                                      backgroundColor: "#10b8a6",
+                                      "&:hover": { backgroundColor: "#0ea5a4" },
+                                    }}
+                                    className="rounded-xl"
+                                  >
+                                    {token ? "Apply Now" : "Apply as Guest"}
+                                  </Button>
+                                </>
                               )
                               : myApplication.status === 'approved'
                               ? (() => {
@@ -1798,6 +1804,13 @@ export default function EventDetailsPage() {
             event={event}
             token={token}
             onSuccess={(app) => setMyApplication(app)}
+          />
+
+          <GuestApplyModal
+            open={guestApplyModalOpen}
+            onClose={() => setGuestApplyModalOpen(false)}
+            event={event}
+            livePath={livePath}
           />
         </>
       )}

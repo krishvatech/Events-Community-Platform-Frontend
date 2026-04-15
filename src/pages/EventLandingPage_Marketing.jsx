@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button, Alert } from "@mui/material";
 import ApplyNowModal from "../components/ApplyNowModal";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
+import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import heroImg from "../assets/oxford/Oxford_Jesus-College.png";
 import receptionImg from "../assets/oxford/Oxford_Reception.png";
 import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
@@ -2084,11 +2085,13 @@ export default function OxfordSymposium2026() {
   const token = localStorage.getItem("access_token") || localStorage.getItem("access");
   const isGuest = localStorage.getItem("is_guest") === "true";
   const [myApplication, setMyApplication] = useState(null);
-  const [applyAsGuestOnly, setApplyAsGuestOnly] = useState(false);
 
   // Guest join modal state
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestJoinEvent, setGuestJoinEvent] = useState(null);
+
+  // Guest apply modal state (for apply-type events)
+  const [guestApplyModalOpen, setGuestApplyModalOpen] = useState(false);
 
   const handleGuestJoinRequested = (eventData) => {
     setGuestJoinEvent(eventData);
@@ -2176,13 +2179,12 @@ export default function OxfordSymposium2026() {
     return <div style={{ padding: "100px 40px", textAlign: "center", color: "red" }}>Error: {error}</div>;
   }
 
-  const handleApplyClick = () => {
-    // Prevent guest users from applying
-    if (isGuest) {
-      return;
-    }
+  const handleGuestApplyRequested = (eventData) => {
+    setGuestApplyModalOpen(true);
+  };
 
-    // For guest users on free events
+  const handleApplyClick = () => {
+    // For unauthenticated users on free events
     if (!token) {
       const isFreeEvent = !eventData?.price || Number(eventData?.price) === 0;
 
@@ -2192,16 +2194,14 @@ export default function OxfordSymposium2026() {
         return;
       }
 
-      // Apply registration + free = show apply modal as guest
+      // Apply registration + free = show guest apply modal
       if (eventData?.registration_type === 'apply' && isFreeEvent) {
-        setApplyAsGuestOnly(true);
-        setApplyOpen(true);
+        handleGuestApplyRequested(eventData);
         return;
       }
     }
 
     // Default: show apply modal for authenticated users or paid events
-    setApplyAsGuestOnly(false);
     setApplyOpen(true);
   };
 
@@ -2215,21 +2215,7 @@ export default function OxfordSymposium2026() {
 
   const handleApplicationSuccess = (app) => {
     setMyApplication(app);
-
-    // Only auto-join if guest application was APPROVED (not pending)
-    if (app.guest_token && app.guest_id && applyAsGuestOnly && app.status === "approved") {
-      // Store guest session
-      localStorage.setItem("guest_token", app.guest_token);
-      localStorage.setItem("guest_id", String(app.guest_id));
-      localStorage.setItem("is_guest", "true");
-
-      // Navigate to meeting
-      if (eventData?.slug) {
-        navigate(`/live/${eventData.slug}?id=${eventData.id}&role=audience`);
-      } else if (eventData?.id) {
-        navigate(`/live/${eventData.id}?id=${eventData.id}&role=audience`);
-      }
-    }
+    // Guest token is now handled by GuestApplyModal with OTP verification
   };
 
   return (
@@ -2250,7 +2236,6 @@ export default function OxfordSymposium2026() {
         event={eventData}
         token={token}
         onSuccess={handleApplicationSuccess}
-        guestOnly={applyAsGuestOnly}
       />
       {guestJoinEvent && (
         <GuestJoinModal
@@ -2263,6 +2248,12 @@ export default function OxfordSymposium2026() {
           livePath={`/live/${guestJoinEvent.slug || guestJoinEvent.id}?id=${guestJoinEvent.id}&role=audience`}
         />
       )}
+      <GuestApplyModal
+        open={guestApplyModalOpen}
+        onClose={() => setGuestApplyModalOpen(false)}
+        event={eventData}
+        livePath={eventData ? `/live/${eventData.slug || eventData.id}?id=${eventData.id}&role=audience` : ""}
+      />
     </div>
   );
 }
