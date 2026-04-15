@@ -94,11 +94,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
     setLoading(true);
     try {
       const result = await cognitoSignIn({ usernameOrEmail: loginEmail.trim(), password: loginPassword });
-      saveLoginPayload({ id_token: result.idToken, refresh: result.refreshToken });
 
-      window.dispatchEvent(new Event("auth:changed"));
-
-      // Call parent's onLoginSuccess if provided
+      // Call parent's onLoginSuccess if provided — let it handle token storage and redirect
       if (onLoginSuccess) {
         const data = {
           access_token: result.idToken || "",
@@ -110,6 +107,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
         };
         onLoginSuccess(data);
       } else {
+        saveLoginPayload({ id_token: result.idToken, refresh: result.refreshToken });
+        window.dispatchEvent(new Event("auth:changed"));
         // Redirect to community home
         handleClose();
         navigate("/community?view=home", { replace: true });

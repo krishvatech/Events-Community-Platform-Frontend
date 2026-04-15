@@ -765,7 +765,7 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
       <Box sx={{ mt: 2 }}>
         {loading ? (
           // Show 3 comment skeletons
-          <ListSkeleton count={3} />
+          (<ListSkeleton count={3} />)
         ) : (
           roots.slice(0, inline ? visibleCount : undefined).map(c => <CommentItem key={c.id} c={c} />)
         )}
@@ -983,9 +983,9 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
       <DialogContent dividers>
         {loading ? (
           // Show 5 friend list items skeletons
-          <Box sx={{ py: 1 }}>
+          (<Box sx={{ py: 1 }}>
             <ListSkeleton count={5} type="short" />
-          </Box>
+          </Box>)
         ) : friends.length === 0 ? (
           <Typography color="text.secondary">
             {groupId ? "No friends found in this group." : "No friends found."}

@@ -500,7 +500,7 @@ export default function LiveQnAPanel({
                       >
                         {isEditing ? (
                           // --- EDIT MODE ---
-                          <Box component="form" onSubmit={(e) => { e.preventDefault(); handleEditSubmit(q.id); }}>
+                          (<Box component="form" onSubmit={(e) => { e.preventDefault(); handleEditSubmit(q.id); }}>
                             <TextField
                               fullWidth
                               size="small"
@@ -533,10 +533,10 @@ export default function LiveQnAPanel({
                                 Save
                               </Button>
                             </Stack>
-                          </Box>
+                          </Box>)
                         ) : (
                           // --- VIEW MODE ---
-                          <Stack
+                          (<Stack
                             direction="row"
                             spacing={1}
                             justifyContent="space-between"
@@ -582,7 +582,6 @@ export default function LiveQnAPanel({
                                 </Stack>
                               )}
                             </Box>
-
                             <Box
                               sx={{
                                 display: "flex",
@@ -651,7 +650,7 @@ export default function LiveQnAPanel({
                                 {q.upvote_count ?? 0}
                               </Typography>
                             </Box>
-                          </Stack>
+                          </Stack>)
                         )}
                       </Paper>
                     </ListItem>

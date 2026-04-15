@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
@@ -703,7 +703,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           </span>
         )}
       </Box>
-
       <CardContent className="p-4 sm:p-5 md:p-6 flex-1 flex flex-col min-h-[260px] sm:min-h-[280px] md:min-h-[300px]">
         <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 leading-snug two-line">
           {ev.title}
@@ -965,7 +964,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
         <div className="mt-auto" />
       </CardContent>
-
       {/* Footer */}
       <div className="flex items-center justify-between border-t p-6">
         <div className="text-base font-semibold text-neutral-900">
@@ -1062,7 +1060,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             <div className="flex items-center gap-2">
               {ev.registration_type === 'apply' ? (
                 // APPLY FLOW
-                <>
+                (<>
                   {!myApplication || myApplication.status === 'none'
                     ? (
                       <Button
@@ -1171,10 +1169,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       {isGuest ? "Continue Applying as Guest" : "Apply as Guest"}
                     </Button>
                   )}
-                </>
+                </>)
               ) : (
                 // REGISTER FLOW
-                <>
+                (<>
                   <Button
                     variant="contained"
                     size="medium"
@@ -1195,13 +1193,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       {isGuest ? "Continue as Guest" : "Join as Guest"}
                     </Button>
                   )}
-                </>
+                </>)
               )}
             </div>
           )
         )}
       </div>
-
       <ApplyNowModal
         open={applyModalOpen}
         onClose={() => setApplyModalOpen(false)}
@@ -1788,6 +1785,8 @@ function EventRowSkeleton() {
 // ————————————————————————————————————————
 export default function EventsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const filterEventId = searchParams.get("id");
   // which events the logged-in user has registered for
   const [myRegistrations, setMyRegistrations] = useState({}); // { eventId: registrationObj }
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)
@@ -2219,7 +2218,12 @@ export default function EventsPage() {
           const startMs = ev?.start_time ? new Date(ev.start_time).getTime() : null;
 
           const endedByTime = endMs ? endMs < now : (startMs ? startMs < now : false);
-          return !(isEndedStatus || endedByTime);
+          if (isEndedStatus || endedByTime) return false;
+
+          // Filter by event ID if provided via URL parameter
+          if (filterEventId && String(ev?.id) !== filterEventId) return false;
+
+          return true;
         });
 
         setRawEvents(filtered);
@@ -2231,9 +2235,9 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange]);
+  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId]);
 
-  useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation]);
+  useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, filterEventId]);
 
   useEffect(() => {
     const ctrl = new AbortController();

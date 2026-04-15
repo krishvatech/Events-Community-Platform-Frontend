@@ -4652,63 +4652,56 @@ export default function EventManagePage() {
 
             {isOwner ? (
               // Host Button for Owner
-              status === "cancelled" ? (
-                <Button
-                  disabled
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 999,
-                    textTransform: "none",
-                    px: 2.5,
-                    backgroundColor: "#fef2f2 !important",
-                    color: "#b91c1c !important",
-                    borderColor: "#fecaca !important",
-                  }}
-                >
-                  Cancelled
-                </Button>
-              ) : (
-                <Button
-                  onClick={onHost}
-                  startIcon={<LiveTvRoundedIcon />}
-                  variant="contained"
-                  sx={{
-                    borderRadius: 999,
-                    textTransform: "none",
-                    px: 2.5,
-                    bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
-                    "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
-                  }}
-                  disabled={!!hostingId || isPast}
-                >
-                  {hostingId ? <CircularProgress size={18} color="inherit" /> : (isPast ? "Ended" : "Host")}
-                </Button>
-              )
+              (status === "cancelled" ? (<Button
+                disabled
+                variant="outlined"
+                sx={{
+                  borderRadius: 999,
+                  textTransform: "none",
+                  px: 2.5,
+                  backgroundColor: "#fef2f2 !important",
+                  color: "#b91c1c !important",
+                  borderColor: "#fecaca !important",
+                }}
+              >Cancelled
+                                </Button>) : (<Button
+                onClick={onHost}
+                startIcon={<LiveTvRoundedIcon />}
+                variant="contained"
+                sx={{
+                  borderRadius: 999,
+                  textTransform: "none",
+                  px: 2.5,
+                  bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
+                  "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
+                }}
+                disabled={!!hostingId || isPast}
+              >
+                {hostingId ? <CircularProgress size={18} color="inherit" /> : (isPast ? "Ended" : "Host")}
+              </Button>))
             ) : (
               // Join Button for Staff/Member
-              canShowActiveJoin && (
-                <Button
-                  onClick={handleJoinLive}
-                  variant="contained"
-                  sx={{
-                    borderRadius: 999,
-                    textTransform: "none",
-                    px: 2.5,
-                    bgcolor: "#10b8a6",
-                    "&:hover": { bgcolor: "#0ea5a4" },
-                  }}
-                  disabled={!!joiningId}
-                >
-                  {joiningId ? (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <CircularProgress size={18} color="inherit" />
-                      <span>Joining...</span>
-                    </Stack>
-                  ) : (
-                    joinLabel
-                  )}
-                </Button>
-              )
+              (canShowActiveJoin && (<Button
+                onClick={handleJoinLive}
+                variant="contained"
+                sx={{
+                  borderRadius: 999,
+                  textTransform: "none",
+                  px: 2.5,
+                  bgcolor: "#10b8a6",
+                  "&:hover": { bgcolor: "#0ea5a4" },
+                }}
+                disabled={!!joiningId}
+              >
+                {joiningId ? (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <CircularProgress size={18} color="inherit" />
+                    <span>Joining...</span>
+                  </Stack>
+                ) : (
+                  joinLabel
+                )}
+              </Button>))
             )}
 
             <Button

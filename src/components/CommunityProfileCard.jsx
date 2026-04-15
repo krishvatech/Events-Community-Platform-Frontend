@@ -51,9 +51,8 @@ const getCookie = (name) =>
 // ---- helpers for data wiring (single-file) ----
 // Support BOTH env names used across your app.
 const RAW_BASE = (
-  import.meta?.env?.VITE_API_BASE_URL ??
-  window.API_BASE_URL ??
-  "http://127.0.0.1:8000/api"   // <-- safe local fallback
+  (import.meta?.env?.VITE_API_BASE_URL ??
+  window.API_BASE_URL ?? "http://127.0.0.1:8000/api")   // <-- safe local fallback
 ).trim();
 
 function resolveMediaUrl(url) {

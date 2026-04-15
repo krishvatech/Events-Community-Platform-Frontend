@@ -4008,11 +4008,11 @@ export default function LiveFeedPage({
           {loading && posts.length === 0 ? (
             // [CHANGE 1] Show Skeletons on first load instead of "Loading..." text
             // Ensure <PostSkeleton /> is defined or imported as shown in the previous step
-            <>
+            (<>
               <PostSkeleton />
               <PostSkeleton />
               <PostSkeleton />
-            </>
+            </>)
           ) : displayPosts.length === 0 ? (
             <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
               <Typography variant="body2" color="text.secondary">No posts match your filters.</Typography>

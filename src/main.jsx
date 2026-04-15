@@ -1,6 +1,15 @@
 // src/main.jsx
 import './utils/fetchInterceptor';
 import './setupPolyfills';
+
+// Suppress internal RealtimeKit SDK unhandled promise rejections (request timeout noise).
+// These are fired by the SDK's own retry/polling internals and do not affect functionality.
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = event?.reason?.message || '';
+  if (msg.includes('request timeout for callback')) {
+    event.preventDefault();
+  }
+});
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -11,9 +20,9 @@ import "leaflet/dist/leaflet.css";
 
 const DEFAULT_LOCALE = "en-US";
 const wrapLocale = (fn) =>
-  function localeWrapper(_locales, options) {
+  (function localeWrapper(_locales, options) {
     return fn.call(this, DEFAULT_LOCALE, options);
-  };
+  });
 
 if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
   const OriginalDateTimeFormat = Intl.DateTimeFormat;

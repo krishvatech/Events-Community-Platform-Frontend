@@ -161,7 +161,6 @@ const AppShell = () => {
                             location.pathname !== "/about" &&
                             location.pathname !== "/cms" &&
                             location.pathname.match(/^\/[a-zA-Z0-9\-]+\/?$/));
-
   const hideChrome =
     location.pathname === "/signin" ||
     location.pathname === "/signup" ||

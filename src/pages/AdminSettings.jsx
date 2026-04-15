@@ -2909,13 +2909,11 @@ export default function AdminSettings() {
         <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 } }}>
           {loading ? (
             // 🔹 OWNER SKELETON
-            <Stack spacing={3}>
+            (<Stack spacing={3}>
               {/* Title skeleton */}
               <Skeleton variant="text" width="55%" height={32} />
-
               {/* Main profile card skeleton */}
               <SectionSkeleton minHeight={260} lines={3} />
-
               {/* Extra sections skeleton (About, Contact, etc.) */}
               <Grid container spacing={{ xs: 2, md: 3 }}>
                 <Grid item xs={12} md={6}>
@@ -2925,7 +2923,7 @@ export default function AdminSettings() {
                   <SectionSkeleton minHeight={180} lines={3} />
                 </Grid>
               </Grid>
-            </Stack>
+            </Stack>)
           ) : (
             <Stack spacing={3}>
               <Box><Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: 0.2 }}>Admin Settings</Typography><Typography variant="body2" sx={{ color: "text.secondary" }}>Update how you appear as an admin across the community.</Typography></Box>
@@ -2963,12 +2961,11 @@ export default function AdminSettings() {
         </Container>
       ) : (
         // STAFF VIEW
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+        (<Container maxWidth="lg" sx={{ py: 4 }}>
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Profile</Typography>
-
           {loading ? (
             // 🔹 STAFF SKELETON
-            <Stack spacing={2.5}>
+            (<Stack spacing={2.5}>
               {/* Top strip skeleton */}
               <Card variant="outlined" sx={{ mb: 1.5, borderRadius: 3 }}>
                 <Box
@@ -2995,7 +2992,6 @@ export default function AdminSettings() {
                   </Box>
                 </Box>
               </Card>
-
               {/* 2-column skeleton for detail sections */}
               <Grid container spacing={2.5}>
                 <Grid item xs={12} md={6}>
@@ -3005,7 +3001,7 @@ export default function AdminSettings() {
                   <SectionSkeleton minHeight={160} lines={3} />
                 </Grid>
               </Grid>
-            </Stack>
+            </Stack>)
           ) : (
             <>
               <Card variant="outlined" sx={{ mb: 2.5, borderRadius: 3 }}>
@@ -3891,10 +3887,9 @@ export default function AdminSettings() {
               </Grid>
             </>
           )}
-        </Container>
+        </Container>)
       )
       }
-
       {/* --- Language Dialog --- */}
       <Dialog open={langOpen} onClose={() => setLangOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{editLangId ? "Edit Language" : "Add Language"}</DialogTitle>
@@ -4051,7 +4046,6 @@ export default function AdminSettings() {
           <Button variant="contained" onClick={saveAboutWork} disabled={saving || !latestExp}>Save</Button>
         </DialogActions>
       </Dialog>
-
       {/* --- Other Dialogs (Avatar, Contact, Edu, Exp, etc.) --- */}
       <Dialog open={avatarDialogOpen} onClose={closeAvatarDialog} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 700 }}>Update profile photo</DialogTitle>
@@ -4068,7 +4062,6 @@ export default function AdminSettings() {
           <Button variant="contained" onClick={saveAvatarDialog} disabled={saving || !avatarMode}>{saving ? "Saving…" : "Save"}</Button>
         </DialogActions>
       </Dialog>
-
       <Dialog open={contactOpen} onClose={closeContactEditor} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 700 }}>
           {contactEditSection === "emails"
@@ -4583,7 +4576,6 @@ export default function AdminSettings() {
           <Button variant="contained" onClick={saveContact} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         </DialogActions>
       </Dialog>
-
       <Dialog open={locationOpen} onClose={() => setLocationOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Edit Location</DialogTitle>
         <DialogContent>
@@ -4620,7 +4612,6 @@ export default function AdminSettings() {
           <Button variant="contained" onClick={saveLocation} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         </DialogActions>
       </Dialog>
-
       {/* --- Education Dialog --- */}
       <Dialog open={eduOpen} onClose={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); setEduReqErrors({ school: "", degree: "", field: "", start: "" }); }} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>{editEduId ? "Edit education" : "Add education"}</DialogTitle>
@@ -4703,7 +4694,6 @@ export default function AdminSettings() {
           <Button variant="contained" onClick={createEducation} disabled={saving}>{editEduId ? "Save changes" : "Save"}</Button>
         </DialogActions>
       </Dialog>
-
       {/* --- Delete education document confirmation dialog --- */}
       <Dialog
         open={deleteDocDialog.open}
@@ -4734,8 +4724,6 @@ export default function AdminSettings() {
           </Button>
         </DialogActions>
       </Dialog>
-
-
       {/* --- Experience Dialog --- */}
       <Dialog open={expOpen} onClose={() => { setExpOpen(false); setEditExpId(null); }} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>{editExpId ? "Edit experience" : "Create experience"}</DialogTitle>
@@ -4793,7 +4781,6 @@ export default function AdminSettings() {
           <Button variant="contained" onClick={createExperience} disabled={saving}>{editExpId ? "Save changes" : "Save"}</Button>
         </DialogActions>
       </Dialog>
-
       {/* Training Add/Edit */}
       <Dialog open={trainingOpen} onClose={() => setTrainingOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editTrainingId ? "Edit Training" : "Add Training"}</DialogTitle>
@@ -4876,7 +4863,6 @@ export default function AdminSettings() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Certification Add/Edit */}
       <Dialog open={certOpen} onClose={() => setCertOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editCertId ? "Edit Certification" : "Add Certification"}</DialogTitle>
@@ -4957,7 +4943,6 @@ export default function AdminSettings() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Membership Add/Edit */}
       <Dialog open={memberOpen} onClose={() => setMemberOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editMemberId ? "Edit Membership" : "Add Membership"}</DialogTitle>
@@ -5042,7 +5027,6 @@ export default function AdminSettings() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* --- Modern Generic Delete Confirmation --- */}
       <Dialog
         open={confirm.open}
@@ -5074,7 +5058,6 @@ export default function AdminSettings() {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* --- Edit About dialog --- */}
       <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{aboutMode === "description" ? "Edit About" : "Edit Skills"}</DialogTitle>
@@ -5163,7 +5146,6 @@ export default function AdminSettings() {
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}><Button onClick={() => setAboutOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAbout} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></DialogActions>
       </Dialog>
-
       {/* --- NEW DIALOG: Identity (Header Trigger) --- */}
       <BasicInfoDialog
         open={basicInfoOpen}
@@ -5175,7 +5157,6 @@ export default function AdminSettings() {
         }}
         onStartKYC={handleStartKYC}
       />
-
       {/* Name Change Request Dialog */}
       <NameChangeDialog
         open={nameChangeOpen}
@@ -5187,7 +5168,6 @@ export default function AdminSettings() {
         }}
         showToast={showNotification}
       />
-
       <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
         <Alert variant="filled" severity={toast.type === "error" ? "error" : "success"} onClose={() => setToast((t) => ({ ...t, open: false }))}>{toast.msg}</Alert>
       </Snackbar>

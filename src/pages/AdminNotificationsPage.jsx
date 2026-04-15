@@ -973,7 +973,6 @@ export default function AdminNotificationsPage() {
 
   return (
     <Container maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6 }}>
-
       {/* Header */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={2} sx={{ mb: 4 }}>
         <Stack direction="row" alignItems="center" spacing={2}>
@@ -998,7 +997,6 @@ export default function AdminNotificationsPage() {
           </Button>
         )}
       </Stack>
-
       {/* Filters */}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 3 }}>
         <Stack direction="row" alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
@@ -1029,7 +1027,6 @@ export default function AdminNotificationsPage() {
           </Select>
         </FormControl>
       </Stack>
-
       {/* List */}
       <Box>
         {/* 1. INITIAL LOADING STATE - Show Skeletons */}
@@ -1042,12 +1039,12 @@ export default function AdminNotificationsPage() {
           </Stack>
         ) : items.length === 0 ? (
           // 2. EMPTY STATE
-          <Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: '#f8fafc', borderStyle: 'dashed' }}>
+          (<Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: '#f8fafc', borderStyle: 'dashed' }}>
             <Typography color="text.secondary" fontWeight={500}>No notifications found.</Typography>
-          </Paper>
+          </Paper>)
         ) : (
           // 3. LIST + INFINITE SCROLL
-          <>
+          (<>
             <Stack spacing={1}>
               {visibleItems.map((n) => (
                 <AdminNotificationRow
@@ -1065,7 +1062,6 @@ export default function AdminNotificationsPage() {
                 />
               ))}
             </Stack>
-
             {/* 4. INFINITE SCROLL TRIGGER & BOTTOM SKELETON */}
             {items.length > visibleCount && (
               <Box ref={observerTarget} sx={{ py: 2, mt: 1, textAlign: 'center' }}>
@@ -1077,10 +1073,9 @@ export default function AdminNotificationsPage() {
                 )}
               </Box>
             )}
-          </>
+          </>)
         )}
       </Box>
-
       <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
         <Alert variant="filled" severity={toast.type === "error" ? "error" : "success"} onClose={() => setToast((t) => ({ ...t, open: false }))}>{toast.msg}</Alert>
       </Snackbar>

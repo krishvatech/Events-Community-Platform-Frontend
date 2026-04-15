@@ -4,8 +4,8 @@
  * Ensures all devices know when presentation changes
  */
 
-export function broadcastPresentationTarget(dyteMeeting, targetParticipant, byHostId) {
-  if (!dyteMeeting?.participants?.broadcastMessage) {
+export function broadcastPresentationTarget(rtkMeeting, targetParticipant, byHostId) {
+  if (!rtkMeeting?.participants?.broadcastMessage) {
     console.warn("[PresentationBroadcaster] Cannot broadcast - broadcastMessage not available");
     return false;
   }
@@ -20,7 +20,7 @@ export function broadcastPresentationTarget(dyteMeeting, targetParticipant, byHo
       ts: Date.now(),
     };
 
-    dyteMeeting.participants.broadcastMessage("presentation-target", message);
+    rtkMeeting.participants.broadcastMessage("presentation-target", message);
     console.log("[PresentationBroadcaster] Broadcast presentation-target:", message);
     return true;
   } catch (error) {
@@ -29,14 +29,14 @@ export function broadcastPresentationTarget(dyteMeeting, targetParticipant, byHo
   }
 }
 
-export function broadcastPresentationClear(dyteMeeting) {
-  if (!dyteMeeting?.participants?.broadcastMessage) {
+export function broadcastPresentationClear(rtkMeeting) {
+  if (!rtkMeeting?.participants?.broadcastMessage) {
     console.warn("[PresentationBroadcaster] Cannot broadcast - broadcastMessage not available");
     return false;
   }
 
   try {
-    dyteMeeting.participants.broadcastMessage("presentation-clear", {
+    rtkMeeting.participants.broadcastMessage("presentation-clear", {
       type: "presentation-clear",
       ts: Date.now(),
     });
@@ -52,13 +52,13 @@ export function broadcastPresentationClear(dyteMeeting) {
  * When granting presentation to a user, call this function
  * Example usage in your grant presentation handler:
  *
- * const targetParticipant = dyteMeeting.participants.joined.get(participantId);
- * broadcastPresentationTarget(dyteMeeting, targetParticipant, dyteMeeting.self?.id);
+ * const targetParticipant = rtkMeeting.participants.joined.get(participantId);
+ * broadcastPresentationTarget(rtkMeeting, targetParticipant, rtkMeeting.self?.id);
  */
 
 /**
  * When revoking presentation, call this function
  * Example usage:
  *
- * broadcastPresentationClear(dyteMeeting);
+ * broadcastPresentationClear(rtkMeeting);
  */

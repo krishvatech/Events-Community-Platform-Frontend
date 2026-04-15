@@ -2049,15 +2049,14 @@ export default function MyPostsPage() {
         </div>
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)}>Create Post</Button>
       </div>
-
       {loading ? (
         // 🔹 Initial loading → show 4 skeleton cards instead of spinner
-        <>
+        (<>
           <PostSkeleton />
           <PostSkeleton />
           <PostSkeleton />
           <PostSkeleton />
-        </>
+        </>)
       ) : (
         <>
           {posts.length === 0 && (
@@ -2083,7 +2082,6 @@ export default function MyPostsPage() {
           ))}
         </>
       )}
-
       {/* Infinite-scroll trigger + bottom skeleton (like Live Feed) */}
       {posts.length > visibleCount && (
         <Box
@@ -2098,7 +2096,6 @@ export default function MyPostsPage() {
           )}
         </Box>
       )}
-
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Create Post</DialogTitle><DialogContent><PostComposer communityId={myCommunityId} onCreate={handleCreate} /></DialogContent>
       </Dialog>
@@ -2107,7 +2104,6 @@ export default function MyPostsPage() {
       <CommentsDialog open={!!commentId} postId={commentId} onClose={() => setCommentId(null)} isPostOwner={true} />
       <LikesDialog open={!!likesId} postId={likesId} onClose={() => setLikesId(null)} />
       <SharesDialog open={!!sharesId} postId={sharesId} onClose={() => setSharesId(null)} />
-
       {/* The New Share-To-Friend Dialog */}
       <ShareToFriendDialog
         open={!!shareActionPostId}

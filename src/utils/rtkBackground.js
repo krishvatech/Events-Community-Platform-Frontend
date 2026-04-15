@@ -1,7 +1,7 @@
-import VideoBGAddon from "@dytesdk/ui-kit-addons/video-background";
+import VideoBGAddon from "@cloudflare/realtimekit-ui-addons/video-background";
 
-const STORAGE_SELECTION_KEY = "dyte_vb_selection_v1";
-const STORAGE_UPLOAD_CACHE_KEY = "dyte_vb_upload_cache_v1";
+const STORAGE_SELECTION_KEY = "rtk_vb_selection_v1";
+const STORAGE_UPLOAD_CACHE_KEY = "rtk_vb_upload_cache_v1";
 const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 const addonRegistry = new WeakMap();
 

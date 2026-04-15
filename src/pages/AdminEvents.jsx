@@ -1347,7 +1347,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Box sx={{ mb: 2 }}>
             {format === "virtual" ? (
               // Virtual: Country only
-              <Autocomplete
+              (<Autocomplete
                 fullWidth
                 options={COUNTRY_OPTIONS}
                 autoHighlight
@@ -1386,10 +1386,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     }}
                   />
                 )}
-              />
+              />)
             ) : (
               // In-person/Hybrid: City and Country separate
-              <>
+              (<>
                 <CityAutocompleteOpenMeteo
                   label="Location *"
                   value={locationCity}
@@ -1404,7 +1404,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   error={!!errors.location}
                   helperText={errors.location}
                 />
-
                 {/* Country field - can be manually edited */}
                 <Box sx={{ mt: 2 }}>
                   <Autocomplete
@@ -1445,7 +1444,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     )}
                   />
                 </Box>
-
                 {/* Venue Name - Optional */}
                 <Box sx={{ mt: 2 }}>
                   <TextField
@@ -1457,7 +1455,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     helperText="Hotel name, office building, or venue name"
                   />
                 </Box>
-
                 {/* Venue Address - Optional and private */}
                 <Box sx={{ mt: 2 }}>
                   <TextField
@@ -1471,7 +1468,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     helperText="🔒 Only visible to registered/accepted members"
                   />
                 </Box>
-              </>
+              </>)
             )}
           </Box>
 
@@ -2575,7 +2572,6 @@ function AdminEventCard({
           </IconButton>
         )}
       </Box>
-
       {/* Content */}
       <Box className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-center justify-between gap-2">
@@ -2765,7 +2761,7 @@ function AdminEventCard({
                 <>
                   {ev.recording_url ? (
                     // Event ended & recording available → Watch Recording
-                    <Button
+                    (<Button
                       component="a"
                       href={resolveRecordingUrl(ev.recording_url)}
                       target="_blank"
@@ -2786,10 +2782,10 @@ function AdminEventCard({
                       <Box component="span" sx={{ display: { xs: "inline", lg: "none" } }}>
                         Watch
                       </Box>
-                    </Button>
+                    </Button>)
                   ) : (
                     // Event ended, no recording → disabled Event Ended
-                    <Button
+                    (<Button
                       disabled
                       variant="contained"
                       className="rounded-xl flex-1"
@@ -2806,7 +2802,7 @@ function AdminEventCard({
                       <Box component="span" sx={{ display: { xs: "inline", lg: "none" } }}>
                         Ended
                       </Box>
-                    </Button>
+                    </Button>)
                   )}
 
                   {/* Past -> View Details (Recording Details Page) */}
@@ -2922,7 +2918,7 @@ function AdminEventCard({
                 </Button>
               ) : canShowActiveJoin ? (
                 // Live OR within 15 min before start → Join
-                <Button
+                (<Button
                   onClick={() => onJoinLive?.(ev)}
                   variant="contained"
                   className="rounded-xl"
@@ -2960,10 +2956,10 @@ function AdminEventCard({
                       </Box>
                     </>
                   )}
-                </Button>
+                </Button>)
               ) : isPast && ev.recording_url ? (
                 // Ended + recording → Watch Recording
-                <Button
+                (<Button
                   component="a"
                   href={resolveRecordingUrl(ev.recording_url)}
                   target="_blank"
@@ -2989,10 +2985,10 @@ function AdminEventCard({
                   >
                     Watch
                   </Box>
-                </Button>
+                </Button>)
               ) : isPast && !ev.recording_url ? (
                 // Ended, no recording → disabled Event Ended
-                <Button
+                (<Button
                   disabled
                   variant="contained"
                   className="rounded-xl"
@@ -3014,10 +3010,10 @@ function AdminEventCard({
                   >
                     Ended
                   </Box>
-                </Button>
+                </Button>)
               ) : (
                 // Upcoming but more than 15 min away → disabled Join
-                <Button
+                (<Button
                   disabled
                   variant="contained"
                   className="rounded-xl"
@@ -3039,7 +3035,7 @@ function AdminEventCard({
                   >
                     Not Live
                   </Box>
-                </Button>
+                </Button>)
               )}
             </>
           )}
