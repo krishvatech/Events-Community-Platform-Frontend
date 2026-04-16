@@ -396,6 +396,10 @@ export default function EventManagePage() {
   const isStaff = isStaffUser();
   const canManageLounge = isOwner || isStaff;
 
+  // Q&A Export State
+  const [qnaExportLoading, setQnaExportLoading] = useState({ csv: false, pdf: false });
+  const [qnaExportError, setQnaExportError] = useState("");
+
   // Cancel Event State
   const [cancelEventOpen, setCancelEventOpen] = useState(false);
   const [cancelEventLoading, setCancelEventLoading] = useState(false);
@@ -2001,11 +2005,90 @@ export default function EventManagePage() {
                     onClick={() => handleSaveVisibilitySettings(participantVisibility)}
                     disabled={visibilitySettingsSaving}
                     size="small"
+                    sx={{
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                      letterSpacing: 0.5,
+                      borderRadius: 2,
+                      px: 3,
+                      bgcolor: "#10b8a6",
+                      "&:hover": { bgcolor: "#0ea5a4" },
+                      "&.Mui-disabled": { bgcolor: "grey.300", color: "grey.500" },
+                    }}
                   >
                     {visibilitySettingsSaving ? "Saving..." : "Save Settings"}
                   </Button>
                 </Box>
               </Stack>
+            </Paper>
+          </Grid>
+        )}
+
+        {/* Q&A Export (host / staff only) — shown below Participant Visibility */}
+        {(isHost || isOwner || isStaff) && (
+          <Grid item xs={12}>
+            <Paper
+              elevation={0}
+              sx={{
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "divider",
+                p: { xs: 2, sm: 3 },
+                bgcolor: "background.paper",
+              }}
+            >
+              <Box mb={1.5}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Q&amp;A Export
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Download all Q&amp;A questions for this event including moderation status, answers, and upvotes.
+                </Typography>
+              </Box>
+
+              {!isPast ? (
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                  Q&amp;A export is available after the event ends.
+                </Typography>
+              ) : (
+                <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={qnaExportLoading.csv}
+                    onClick={() => handleQnaExport("csv")}
+                    startIcon={
+                      qnaExportLoading.csv
+                        ? <CircularProgress size={14} color="inherit" />
+                        : <AttachFileRoundedIcon />
+                    }
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                  >
+                    {qnaExportLoading.csv ? "Exporting…" : "Download Q&A CSV"}
+                  </Button>
+
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={qnaExportLoading.pdf}
+                    onClick={() => handleQnaExport("pdf")}
+                    startIcon={
+                      qnaExportLoading.pdf
+                        ? <CircularProgress size={14} color="inherit" />
+                        : <VideoLibraryRoundedIcon />
+                    }
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                  >
+                    {qnaExportLoading.pdf ? "Exporting…" : "Download Q&A PDF"}
+                  </Button>
+                </Stack>
+              )}
+
+              {qnaExportError && (
+                <Typography variant="caption" color="error" sx={{ display: "block", mt: 1 }}>
+                  {qnaExportError}
+                </Typography>
+              )}
             </Paper>
           </Grid>
         )}
@@ -4590,6 +4673,40 @@ export default function EventManagePage() {
         />
       </Paper>
     );
+  };
+
+  // ── Q&A export download ──────────────────────────────────────────────────
+  const handleQnaExport = async (fmt) => {
+    if (!event) return;
+    setQnaExportLoading((prev) => ({ ...prev, [fmt]: true }));
+    setQnaExportError("");
+    try {
+      const token = getToken();
+      const url = `${API_ROOT}/interactions/questions/export/?event_id=${event.id}&export_format=${fmt}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const nameMatch = disposition.match(/filename="([^"]+)"/);
+      const filename = nameMatch ? nameMatch[1] : `qna_export.${fmt}`;
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objUrl);
+    } catch (err) {
+      setQnaExportError(err.message || "Export failed. Please try again.");
+    } finally {
+      setQnaExportLoading((prev) => ({ ...prev, [fmt]: false }));
+    }
   };
 
   // ---- render ----
