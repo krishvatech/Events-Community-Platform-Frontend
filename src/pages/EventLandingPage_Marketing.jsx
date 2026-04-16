@@ -1050,7 +1050,7 @@ function Speakers({ eventData = {} }) {
             fontFamily: F.body,
           }}
         >
-          Speakers provoke, challenge, and frame insights through diverse expertise and conviction.
+          Speakers provoke, challenge, and frame. So does every participant - each bringing experience, conviction, and perspective. That is where insight is created that cannot be found anywhere else.
         </p>
         <p style={{ fontSize: 12, color: C.cool50, marginBottom: 28, fontFamily: F.body, fontStyle: "italic" }}>
           A selection from a growing list of confirmed speakers and panellists.
