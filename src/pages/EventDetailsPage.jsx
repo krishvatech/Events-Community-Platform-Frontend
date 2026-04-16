@@ -124,6 +124,22 @@ function canEarlyJoin(ev) {
   return now >= startMs - EARLY_JOIN_MINUTES * 60 * 1000 && now < startMs;
 }
 
+function isWithinGuestJoinWindow(eventStartTime) {
+  if (!eventStartTime) return false;
+
+  const now = Date.now();
+  const startMs = parseDateSafe(eventStartTime)?.getTime();
+
+  if (!startMs) return false;
+
+  const timeUntilStartMs = startMs - now;
+  const timeUntilStartMinutes = timeUntilStartMs / (1000 * 60);
+
+  // Show button only when event is 1-2 hours away
+  // 60 minutes <= time until start <= 120 minutes
+  return timeUntilStartMinutes >= 60 && timeUntilStartMinutes <= 120;
+}
+
 function canViewParticipants(event, owner, staff) {
   if (!event) return false;
   if (owner || staff) return true;
@@ -1466,7 +1482,7 @@ export default function EventDetailsPage() {
                         ) : event.registration_type === 'apply' && !canJoinEventNow && !isPast ? (
                           // --- APPLY FLOW ---
                           (<>
-                            {!myApplication || myApplication.status === 'none'
+                            {(!myApplication || myApplication.status === 'none') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
                               ? (
                                 <>
                                   <Button
@@ -1584,7 +1600,7 @@ export default function EventDetailsPage() {
                             >
                               Register Now
                             </Button>
-                            {(!token || isGuest) && (
+                            {(!token || isGuest) && isWithinGuestJoinWindow(event.start_time) && (
                               <Button
                                 onClick={() => setGuestModalOpen(true)}
                                 variant="outlined"

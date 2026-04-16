@@ -353,6 +353,22 @@ function canJoinEarly(ev, minutes = 15) {
   return diff > 0 && diff <= windowMs;
 }
 
+function isWithinGuestJoinWindow(eventStartTime) {
+  if (!eventStartTime) return false;
+
+  const now = Date.now();
+  const startMs = new Date(eventStartTime).getTime();
+
+  if (!Number.isFinite(startMs)) return false;
+
+  const timeUntilStartMs = startMs - now;
+  const timeUntilStartMinutes = timeUntilStartMs / (1000 * 60);
+
+  // Show button only when event is 1-2 hours away
+  // 60 minutes <= time until start <= 120 minutes
+  return timeUntilStartMinutes >= 60 && timeUntilStartMinutes <= 120;
+}
+
 function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
   if (!participants.length) return null;
 
@@ -1156,7 +1172,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     )
                     : null
                   }
-                  {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.status !== 'approved') && (
+                  {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.status !== 'approved') && isWithinGuestJoinWindow(ev.start) && (
                     <Button
                       variant="outlined"
                       size="medium"
@@ -1180,7 +1196,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   >
                     Register Now
                   </Button>
-                  {!isAuthenticatedUser && isFreeEvent && (
+                  {!isAuthenticatedUser && isFreeEvent && isWithinGuestJoinWindow(ev.start) && (
                     <Button
                       variant="outlined"
                       size="medium"
