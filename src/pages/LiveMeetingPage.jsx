@@ -105,6 +105,7 @@ import ThumbUpAltIcon from "@mui/icons-material/ThumbUpAlt";
 import ViewSidebarIcon from "@mui/icons-material/ViewSidebar";
 import DirectionsWalkIcon from "@mui/icons-material/DirectionsWalk";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import BlurOnRoundedIcon from "@mui/icons-material/BlurOnRounded";
@@ -5784,6 +5785,40 @@ export default function NewLiveMeeting() {
     showSnackbar("You left the main stage", "info");
   }, [rtkMeeting, presentationTarget, spotlightTarget, showSnackbar]);
 
+  const handleAssignHost = async () => {
+    const p = participantMenuTarget;
+    handleCloseParticipantMenu();
+    if (!isHost || !p) return;
+
+    // Extract the Django user ID from the participant's metadata
+    const djangoUserId = p.clientSpecificId || p._raw?.clientSpecificId
+      || p.customParticipantId || p._raw?.customParticipantId;
+    if (!djangoUserId || String(djangoUserId).startsWith("guest_")) {
+      showSnackbar("Cannot assign host role to guest participants.", "warning");
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `${API_ROOT}/events/${eventId}/assign-host/`.replace(/([^:]\/)\/+/g, "$1"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ user_id: djangoUserId }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        showSnackbar(data.detail || "Host role assigned successfully.", "success");
+      } else {
+        showSnackbar(data.detail || "Failed to assign host role.", "error");
+      }
+    } catch (e) {
+      console.error("[AssignHost] Error:", e);
+      showSnackbar("Failed to assign host role.", "error");
+    }
+  };
+
   const handleKickParticipant = () => {
     const p = participantMenuTarget;
     handleCloseParticipantMenu();
@@ -7675,6 +7710,25 @@ export default function NewLiveMeeting() {
               navigate(`/community/${currentCommunitySlug}/events/${eventId}`);
             }, 3000);
           }
+        } else if (msg.type === "host_role_assigned") {
+          // ✅ The current user has been promoted to host by the meeting organizer.
+          // We need to re-join the RTK meeting with a publisher (host) preset so the
+          // backend grants full host privileges (breakout control, kick/ban, etc.).
+          console.log("[MainSocket] 🎉 Host role assigned by:", msg.assigned_by_name);
+          showSnackbar(
+            `You have been assigned as host by ${msg.assigned_by_name || "the organizer"}. Reconnecting with host access...`,
+            "success"
+          );
+          // Clear current auth token to force a fresh token fetch with publisher preset.
+          // The token-fetch effect will call rtk/join which now returns publisher preset
+          // because the EventParticipant record was just created with role="host".
+          setAuthToken("");
+          mainAuthTokenRef.current = "";
+          setRole("publisher");
+          // Trigger re-join: the token-fetch effect watches joinRequestTick + role
+          setJoinMainRequested(true);
+          setJoinRequestTick((v) => v + 1);
+
         } else if (msg.type === "participant_location_update") {
           // ✅ PHASE 2: Handle when a user joins/leaves/switches rooms
           console.log("[MainSocket] Participant location update:", msg);
@@ -21986,6 +22040,26 @@ export default function NewLiveMeeting() {
                 )}
               </>
             );
+          })()}
+          {(() => {
+            // Show "Assign as Host" only for registered (non-guest) participants
+            const targetId = participantMenuTarget?.clientSpecificId
+              || participantMenuTarget?._raw?.clientSpecificId
+              || participantMenuTarget?.customParticipantId
+              || participantMenuTarget?._raw?.customParticipantId;
+            const isGuestTarget = targetId && String(targetId).startsWith("guest_");
+            const alreadyHost = targetId && assignedRoleByIdentity.get(`id:${targetId}`) === "Host";
+            if (!isGuestTarget && !alreadyHost) {
+              return (
+                <MenuItem onClick={handleAssignHost}>
+                  <ListItemIcon>
+                    <AdminPanelSettingsIcon fontSize="small" sx={{ color: "#818cf8" }} />
+                  </ListItemIcon>
+                  <ListItemText>Assign as Host</ListItemText>
+                </MenuItem>
+              );
+            }
+            return null;
           })()}
           <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
           <MenuItem onClick={handleKickParticipant}>
