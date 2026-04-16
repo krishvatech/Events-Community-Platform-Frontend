@@ -9340,6 +9340,43 @@ export default function NewLiveMeeting() {
     })();
   }, [mainRtkMeeting, mainRoomAuthToken]);
 
+  // ---------- Sync stage/spotlight state from main room while in breakout ----------
+  // When a participant is inside a breakout room their `rtkMeeting` IS the breakout
+  // meeting, so all broadcastedMessage listeners on it only receive breakout-room
+  // messages.  Main-room spotlight changes (spotlight-user / spotlight-clear) sent by
+  // the host in the main room never reach breakout participants through that channel.
+  //
+  // `mainRtkMeeting` is a separate, always-connected listener session to the main room.
+  // Its broadcastedMessage events DO fire for every main-room broadcast.  We use this
+  // to keep `spotlightTarget` up-to-date so that MainRoomPeek always shows the correct
+  // person on stage in real time.
+  useEffect(() => {
+    if (!mainRtkMeeting?.participants || !isBreakout) return;
+
+    const handleMainRoomBroadcast = ({ type, payload }) => {
+      if (type === "spotlight-user" && (payload?.participantId || payload?.participantUserKey)) {
+        console.log("[MainRoomBroadcast] spotlight-user received via mainRtkMeeting:", payload?.name);
+        setSpotlightTarget({
+          participantId: payload?.participantId || null,
+          participantUserKey: payload?.participantUserKey || null,
+          name: payload?.name || "Participant",
+          byHostId: payload?.byHostId || null,
+          ts: payload?.ts || Date.now(),
+        });
+      }
+
+      if (type === "spotlight-clear") {
+        console.log("[MainRoomBroadcast] spotlight-clear received via mainRtkMeeting");
+        setSpotlightTarget(null);
+      }
+    };
+
+    mainRtkMeeting.participants?.on?.("broadcastedMessage", handleMainRoomBroadcast);
+    return () => {
+      mainRtkMeeting.participants?.off?.("broadcastedMessage", handleMainRoomBroadcast);
+    };
+  }, [mainRtkMeeting, isBreakout]);
+
   // ---------- Audio routing: Mute main room when in breakout ----------
   useEffect(() => {
     if (!mainRtkMeeting?.self) return;
@@ -10968,7 +11005,11 @@ export default function NewLiveMeeting() {
           (targetId && selfId && targetId === selfId) ||
           (targetKey && selfKey && targetKey === selfKey);
 
-        if (isForSelf && !isHost) {
+        // Show the invite dialog for ANY targeted participant regardless of their role.
+        // A secondary host is a valid spotlight target — the !isHost guard was wrong
+        // because it silently dropped the invitation for co-hosts.
+        // isForSelf is the only guard needed: only the named target should react.
+        if (isForSelf) {
           const expiresAt = Number(payload?.expiresAt) || Date.now() + SPOTLIGHT_INVITE_TIMEOUT_MS;
           setIncomingSpotlightInvite({
             inviteId: payload?.inviteId || `spotlight-${Date.now()}`,
@@ -22382,6 +22423,7 @@ export default function NewLiveMeeting() {
               isDragging={isDraggingMainRoomPeek}
               pinnedParticipantId={pinnedRaw?.id}
               loungeParticipantKeys={nonMainParticipantKeysForPeek}
+              spotlightTarget={spotlightTarget}
             />
           </Box>
         )}

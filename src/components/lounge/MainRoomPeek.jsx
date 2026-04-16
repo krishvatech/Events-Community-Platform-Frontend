@@ -59,6 +59,7 @@ export default function MainRoomPeek({
     isInBreakout,
     pinnedParticipantId,
     loungeParticipantKeys,
+    spotlightTarget,
     onClose,
     onHeaderPointerDown,
     isDragging = false,
@@ -87,84 +88,106 @@ export default function MainRoomPeek({
 
             const loungeKeySet = new Set(loungeParticipantKeys || []);
 
-            // ✅ PRIORITY 0: Always prioritize host first (host should always be visible in main room peek)
-            const host = allParticipants.find(p =>
-                p.presetName?.toLowerCase().includes('host') ||
-                p.presetName?.toLowerCase().includes('admin') ||
-                p.presetName?.toLowerCase().includes('webinar_presenter') ||
-                p.presetName?.toLowerCase().includes('publisher')
-            );
+            // Helper: true if participant is in main room (not moved to a lounge/breakout)
+            const isInMainRoom = (p) => {
+                const key = getParticipantUserKey(p);
+                return !key || !loungeKeySet.has(key);
+            };
 
-            if (host) {
-                const hostKey = getParticipantUserKey(host);
-                if (!hostKey || !loungeKeySet.has(hostKey)) {
-                    console.log('[MainRoomPeek] Using host:', host.name);
-                    setPrimaryParticipant(host);
-                    return;
-                }
-                console.log('[MainRoomPeek] Host is not in main room, falling back');
+            // ✅ PRIORITY 0: Active screen share in main room.
+            // Screen sharing definitively means "on stage" — show whoever is presenting.
+            const screenSharer = allParticipants.find(p => p.screenShareEnabled && isInMainRoom(p));
+            if (screenSharer) {
+                console.log('[MainRoomPeek] Using screen sharer:', screenSharer.name);
+                setPrimaryParticipant(screenSharer);
+                return;
             }
 
-            // ✅ PRIORITY 1: Use pinned participant if available and in main room
+            // ✅ PRIORITY 1: Host-spotlighted participant.
+            // The host explicitly placed this person on stage via the spotlight feature.
+            // This is the most authoritative signal of who is "on stage" and must override
+            // heuristics like active-speaker or preset-name ordering, both of which can
+            // resolve to the wrong host when multiple hosts are in the main room.
+            // spotlightTarget.participantId is the Dyte participant ID in the main room
+            // meeting, so it matches directly against mainRtkMeeting participants.
+            if (spotlightTarget) {
+                const spotlightId = spotlightTarget.participantId ? String(spotlightTarget.participantId) : "";
+                const spotlightKey = spotlightTarget.participantUserKey ? String(spotlightTarget.participantUserKey) : "";
+                const spotlightedParticipant = allParticipants.find(p => {
+                    if (spotlightId && String(p.id) === spotlightId) return true;
+                    const pKey = getParticipantUserKey(p);
+                    return spotlightKey && pKey && pKey === spotlightKey;
+                });
+                if (spotlightedParticipant && isInMainRoom(spotlightedParticipant)) {
+                    console.log('[MainRoomPeek] Using spotlighted participant:', spotlightedParticipant.name);
+                    setPrimaryParticipant(spotlightedParticipant);
+                    return;
+                }
+                console.log('[MainRoomPeek] Spotlighted participant not found in main room participants yet, falling back');
+            }
+
+            // ✅ PRIORITY 2: Active speaker in main room.
+            // Prefer the person currently talking over any static role label.
+            const activeSpeaker = mainRtkMeeting.participants.activeSpeaker;
+            if (activeSpeaker && isInMainRoom(activeSpeaker)) {
+                console.log('[MainRoomPeek] Using active speaker:', activeSpeaker.name);
+                setPrimaryParticipant(activeSpeaker);
+                return;
+            }
+
+            // ✅ PRIORITY 3: Pinned / spotlighted participant in main room.
+            // The host explicitly pinned this person — treat them as "on stage".
             if (pinnedParticipantId) {
                 console.log('[MainRoomPeek] Looking for pinned participant:', pinnedParticipantId);
                 const pinnedParticipant = allParticipants.find(p => p.id === pinnedParticipantId);
-                const pinnedKey = pinnedParticipant ? getParticipantUserKey(pinnedParticipant) : "";
-                if (pinnedParticipant && (!pinnedKey || !loungeKeySet.has(pinnedKey))) {
+                if (pinnedParticipant && isInMainRoom(pinnedParticipant)) {
                     console.log('[MainRoomPeek] Found pinned participant:', pinnedParticipant.name);
                     setPrimaryParticipant(pinnedParticipant);
                     return;
-                } else {
-                    console.log('[MainRoomPeek] Pinned participant not in main room, falling back to next priority');
                 }
+                console.log('[MainRoomPeek] Pinned participant not found in main room, falling back');
             }
 
-            // ✅ PRIORITY 2: Find first participant NOT in lounge (main area participants only)
-            if (loungeKeySet.size > 0) {
-                console.log('[MainRoomPeek] Filtering out lounge participants:', loungeParticipantKeys);
-                const mainAreaParticipant = allParticipants.find(p => {
-                    const key = getParticipantUserKey(p);
-                    return !key || !loungeKeySet.has(key);
-                });
-                if (mainAreaParticipant) {
-                    console.log('[MainRoomPeek] Found main area participant:', mainAreaParticipant.name);
-                    setPrimaryParticipant(mainAreaParticipant);
-                    return;
-                }
+            // ✅ PRIORITY 4: Host/publisher preset participant in main room.
+            // When multiple hosts are present (e.g. original host + co-host who started
+            // the breakout), DO NOT just pick the first one — that could be the co-host.
+            // Instead prefer the one who is actively presenting (screen share or camera on),
+            // which is the most reliable proxy for "the person on stage".
+            const isHostPreset = (p) =>
+                p.presetName?.toLowerCase().includes('host') ||
+                p.presetName?.toLowerCase().includes('admin') ||
+                p.presetName?.toLowerCase().includes('webinar_presenter') ||
+                p.presetName?.toLowerCase().includes('publisher');
+
+            const mainRoomHosts = allParticipants.filter(p => isHostPreset(p) && isInMainRoom(p));
+            if (mainRoomHosts.length > 0) {
+                // Among hosts, prefer whoever has screen share or camera on
+                const activeHost =
+                    mainRoomHosts.find(p => p.screenShareEnabled) ||
+                    mainRoomHosts.find(p => p.videoEnabled) ||
+                    mainRoomHosts[0];
+                console.log('[MainRoomPeek] Using host (active):', activeHost.name,
+                    `(${mainRoomHosts.length} host(s) in main room)`);
+                setPrimaryParticipant(activeHost);
+                return;
             }
 
-            // ✅ PRIORITY 3: Try to find the active speaker
-            const activeSpeaker = mainRtkMeeting.participants.activeSpeaker;
-            if (activeSpeaker) {
-                const activeKey = getParticipantUserKey(activeSpeaker);
-                if (activeKey && loungeKeySet.has(activeKey)) {
-                    console.log('[MainRoomPeek] Active speaker is in lounge, ignoring for main room peek');
-                } else {
-                    console.log('[MainRoomPeek] Using active speaker:', activeSpeaker.name);
-                    setPrimaryParticipant(activeSpeaker);
-                    return;
-                }
-            }
-
-            // ✅ PRIORITY 5: Fallback to first participant with video enabled (not in lounge)
-            const videoParticipant = allParticipants.find(p =>
-                !loungeKeySet.has(getParticipantUserKey(p)) && p.videoEnabled
-            );
+            // ✅ PRIORITY 5: First non-lounge participant with video on
+            const videoParticipant = allParticipants.find(p => isInMainRoom(p) && p.videoEnabled);
             if (videoParticipant) {
                 console.log('[MainRoomPeek] Using video participant:', videoParticipant.name);
                 setPrimaryParticipant(videoParticipant);
                 return;
             }
 
-            // ✅ PRIORITY 6: Last resort: any main area participant
-            const anyParticipant = allParticipants.find(p => !loungeKeySet.has(getParticipantUserKey(p)));
+            // ✅ PRIORITY 6: Last resort — any main room participant
+            const anyParticipant = allParticipants.find(p => isInMainRoom(p));
             if (anyParticipant) {
                 console.log('[MainRoomPeek] Using any main area participant:', anyParticipant.name);
                 setPrimaryParticipant(anyParticipant);
                 return;
             }
 
-            // If only lounge participants, show them as fallback
             console.log('[MainRoomPeek] No main room participants available, showing empty state');
             setPrimaryParticipant(null);
         };
@@ -188,7 +211,7 @@ export default function MainRoomPeek({
             mainRtkMeeting.participants.removeListener('activeSpeakerChanged', handleActiveSpeakerChanged);
             mainRtkMeeting.participants.joined.removeListener('videoUpdate', handleVideoUpdate);
         };
-    }, [mainRtkMeeting, pinnedParticipantId, loungeParticipantKeys]);
+    }, [mainRtkMeeting, pinnedParticipantId, loungeParticipantKeys, spotlightTarget]);
 
     // Attach video track or screen share to video element
     useEffect(() => {
