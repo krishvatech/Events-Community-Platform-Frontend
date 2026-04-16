@@ -160,6 +160,7 @@ import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodU
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
 import GuestBanner from "../components/GuestBanner.jsx";
+import QnAEngagementPromptBanner from "../components/QnAEngagementPromptBanner.jsx";
 import ClearMediaCacheDialog from "../components/ClearMediaCacheDialog.jsx";
 import { useClearMediaCache } from "../hooks/useClearMediaCache.js";
 import GuestRegistrationModal from "../components/GuestRegistrationModal.jsx";
@@ -3245,7 +3246,7 @@ export default function NewLiveMeeting() {
   const screenShareGainNodeRef = useRef(null);
   const screenShareRawAudioTrackRef = useRef(null);
   const screenShareAudioSenderRef = useRef(null);
- const lastScreenShareAudioVolumeRef = useRef(100); // Persist volume preference across screen share restarts
+  const lastScreenShareAudioVolumeRef = useRef(100); // Persist volume preference across screen share restarts
 
   // ✅ Helper: Convert linear volume (0-100) to logarithmic gain (0.0-1.0) for human perception
   // ISSUE FIXED: Human hearing perceives loudness logarithmically, not linearly.
@@ -3514,7 +3515,7 @@ export default function NewLiveMeeting() {
       } finally {
         navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
       }
-      
+
       // ✅ RESTORE MIC STATE after screen share is active (300ms delay for stability)
       setTimeout(async () => {
         try {
@@ -4520,7 +4521,7 @@ export default function NewLiveMeeting() {
         console.log("[LiveMeeting] Screen share audio disabled - gain set to 0 (complete mute)");
       }
     }
-    
+
     setScreenShareAudioEnabled(next);
     console.log("[LiveMeeting] Screen share audio toggled:", next);
   }, [screenShareAudioEnabled, screenShareAudioVolume, applyScreenShareVolume]);
@@ -8417,10 +8418,10 @@ export default function NewLiveMeeting() {
         String(entry.id) !== String(requestId)
           ? entry
           : {
-              ...entry,
-              status: "resolved",
-              resolvedAt: new Date().toISOString(),
-            }
+            ...entry,
+            status: "resolved",
+            resolvedAt: new Date().toISOString(),
+          }
       )
     );
     showSnackbar(
@@ -8561,10 +8562,10 @@ export default function NewLiveMeeting() {
     onRequestAssistance:
       attendeeSupportFeedback.kind === "chat_started"
         ? () => {
-            setSupportDialogOpen(false);
-            if (isMdUp) setRightPanelOpen(true);
-            else setRightOpen(true);
-          }
+          setSupportDialogOpen(false);
+          if (isMdUp) setRightPanelOpen(true);
+          else setRightOpen(true);
+        }
         : requestMainRoomAssistance,
     onResetPermissions: resetBrowserPermissions,
     resettingPermissions,
@@ -8574,20 +8575,20 @@ export default function NewLiveMeeting() {
         ? `Request Assistance (${assistanceCooldownRemaining}s)`
         : attendeeSupportFeedback.kind === "chat_started"
           ? "Open Chat"
-        : attendeeSupportFeedback.kind === "resolved"
-          ? "Request Again"
-        : attendeeSupportFeedback.kind === "sent"
-          ? "Request Sent"
-          : attendeeSupportFeedback.kind === "queued"
-            ? "Queued"
-            : "Request Assistance",
+          : attendeeSupportFeedback.kind === "resolved"
+            ? "Request Again"
+            : attendeeSupportFeedback.kind === "sent"
+              ? "Request Sent"
+              : attendeeSupportFeedback.kind === "queued"
+                ? "Queued"
+                : "Request Assistance",
     statusText: attendeeSupportStatusText,
     helperText: "Need help? Notify the host team and we'll get to you shortly.",
     infoText: getAttendeeSupportInfoText(),
     infoSeverity:
       attendeeSupportFeedback.reason === "server_error" ||
-      attendeeSupportFeedback.reason === "banned" ||
-      attendeeSupportFeedback.reason === "rejected"
+        attendeeSupportFeedback.reason === "banned" ||
+        attendeeSupportFeedback.reason === "rejected"
         ? "error"
         : attendeeSupportFeedback.reason === "queued_for_follow_up"
           ? "warning"
@@ -10850,7 +10851,7 @@ export default function NewLiveMeeting() {
             try {
               if (selfCanProduceVideo && rtkMeeting?.self?.enableVideo) {
                 await rtkMeeting.self.enableVideo();
-                          console.log("[global-enable-all-video] enableVideo success, iteration:", i);
+                console.log("[global-enable-all-video] enableVideo success, iteration:", i);
                 if (rtkMeeting?.self?.videoEnabled) return;
               }
             } catch (_) { }
@@ -10922,7 +10923,7 @@ export default function NewLiveMeeting() {
               if (selfCanProduceVideo && rtkMeeting?.self?.enableVideo) {
                 await rtkMeeting.self.enableVideo();
                 console.log("[participant-force-enable-video] enableVideo() success, iteration:", i);
-                          if (rtkMeeting?.self?.videoEnabled) return;
+                if (rtkMeeting?.self?.videoEnabled) return;
               }
             } catch (e) {
               console.warn("[participant-force-enable-video] enableVideo() attempt", i, "failed:", e);
@@ -14029,6 +14030,10 @@ export default function NewLiveMeeting() {
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [qnaUnreadCount, setQnaUnreadCount] = useState(0);
 
+  // Q&A Engagement Prompt Banner state
+  const [qnaPromptBanner, setQnaPromptBanner] = useState(null); // ack payload or null
+  const qnaPromptTimerRef = useRef(null);
+
   // ✅ Private chat unread (per user)
   const [privateUnreadByUserId, setPrivateUnreadByUserId] = useState({});
   const isRoomChatActive = Boolean(isBreakout && activeTableId);
@@ -15300,11 +15305,11 @@ export default function NewLiveMeeting() {
             prev.map((q) =>
               q.id === msg.question_id
                 ? {
-                    ...q,
-                    is_answered: msg.is_answered,
-                    answered_at: msg.answered_at,
-                    requires_followup: msg.requires_followup,
-                  }
+                  ...q,
+                  is_answered: msg.is_answered,
+                  answered_at: msg.answered_at,
+                  requires_followup: msg.requires_followup,
+                }
                 : q
             )
           );
@@ -15340,6 +15345,30 @@ export default function NewLiveMeeting() {
                 : q
             )
           );
+        }
+
+        // Q&A Engagement Prompt: host broadcasts → attendees call ack → banner shown
+        if (msg.type === "qna.engagement_prompt") {
+          // Hosts should NOT see the attendee banner (they triggered it)
+          if (!isHostRef.current) {
+            const promptId = msg.prompt_id;
+            fetch(
+              toApiUrl(`interactions/questions/engagement-prompt/${promptId}/ack/`),
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...authHeader() },
+              }
+            )
+              .then((r) => r.json())
+              .then((data) => {
+                if (data.show) {
+                  // Clear any running timer for previous banner
+                  clearTimeout(qnaPromptTimerRef.current);
+                  setQnaPromptBanner(data);
+                }
+              })
+              .catch((e) => console.warn("[QnAPrompt] ack error", e));
+          }
         }
 
       } catch { }
@@ -15653,7 +15682,7 @@ export default function NewLiveMeeting() {
       unpinned = unpinned.sort((a, b) => {
         if (a.is_answered !== b.is_answered) return a.is_answered ? 1 : -1;
         return (b.upvote_count ?? 0) - (a.upvote_count ?? 0) ||
-               new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          new Date(b.created_at || 0) - new Date(a.created_at || 0);
       });
     } else if (qnaSortMode === "manual") {
       unpinned = unpinned.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
@@ -15798,11 +15827,11 @@ export default function NewLiveMeeting() {
       : isSelfQuestion
         ? (question.is_anonymous ? "You (anonymous)" : "You")
         : question.user_name ||
-          question.user_display ||
-          question.user ||
-          question.user?.name ||
-          matchedParticipant?.name ||
-          (qUserId ? `User ${qUserId}` : "Audience");
+        question.user_display ||
+        question.user ||
+        question.user?.name ||
+        matchedParticipant?.name ||
+        (qUserId ? `User ${qUserId}` : "Audience");
 
     const avatarUrl = resolveMediaUrl(
       question.user_avatar_url ||
@@ -16766,203 +16795,203 @@ export default function NewLiveMeeting() {
                       ) : (
                         <Stack spacing={1.25}>
                           {chatMessages.map((m) => (
-                        <Paper
-                          key={m.id}
-                          variant="outlined"
-                          sx={{
-                            p: 1.25,
-                            bgcolor: "rgba(255,255,255,0.03)",
-                            borderColor: "rgba(255,255,255,0.08)",
-                            borderRadius: 2,
-                          }}
-                        >
-                          <Stack direction="row" alignItems="center" justifyContent="space-between">
-                            <Stack direction="row" alignItems="center" spacing={0.8} sx={{ flex: 1, minWidth: 0 }}>
-                              <Avatar
-                                src={
-                                  getParticipantFromMessage(m)?.picture ||
-                                  m.sender_avatar ||
-                                  m.sender_image ||
-                                  m.sender_profile_image ||
-                                  m.sender?.avatar ||
-                                  m.sender?.profile_image ||
-                                  ""
-                                }
-                                sx={{
-                                  width: 28,
-                                  height: 28,
-                                  fontSize: 12,
-                                  bgcolor: "rgba(255,255,255,0.12)",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {(m.sender_display || m.sender_name || "U").slice(0, 1)}
-                              </Avatar>
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
-                                <Typography
-                                  onClick={() => {
-                                    const member = getParticipantFromMessage(m);
-                                    if (member) openMemberInfo(member);
-                                  }}
-                                  sx={{
-                                    fontWeight: 600,
-                                    fontSize: 13,
-                                    cursor: "pointer",
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    "&:hover": { textDecoration: "underline" },
-                                    color: "rgba(255,255,255,0.9)",
-                                  }}
-                                  role="button"
-                                  tabIndex={0}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                      e.preventDefault();
-                                      const member = getParticipantFromMessage(m);
-                                      if (member) openMemberInfo(member);
+                            <Paper
+                              key={m.id}
+                              variant="outlined"
+                              sx={{
+                                p: 1.25,
+                                bgcolor: "rgba(255,255,255,0.03)",
+                                borderColor: "rgba(255,255,255,0.08)",
+                                borderRadius: 2,
+                              }}
+                            >
+                              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                <Stack direction="row" alignItems="center" spacing={0.8} sx={{ flex: 1, minWidth: 0 }}>
+                                  <Avatar
+                                    src={
+                                      getParticipantFromMessage(m)?.picture ||
+                                      m.sender_avatar ||
+                                      m.sender_image ||
+                                      m.sender_profile_image ||
+                                      m.sender?.avatar ||
+                                      m.sender?.profile_image ||
+                                      ""
                                     }
-                                  }}
-                                >
-                                  {m.sender_display || m.sender_name || "User"}
-                                </Typography>
-                                {(() => {
-                                  const participant = getParticipantFromMessage(m);
-                                  const userId = participant?._raw?.customParticipantId || participant?.id;
-
-                                  // Fetch kyc_status if not cached
-                                  if (userId && !participantKycCache[userId]) {
-                                    fetchAndCacheKycStatus(userId);
-                                  }
-
-                                  const isVerified = participantKycCache[userId] === "approved";
-                                  return isVerified ? (
-                                    <VerifiedRoundedIcon
-                                      sx={{
-                                        fontSize: 16,
-                                        color: "#14b8a6",
-                                        flexShrink: 0,
+                                    sx={{
+                                      width: 28,
+                                      height: 28,
+                                      fontSize: 12,
+                                      bgcolor: "rgba(255,255,255,0.12)",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {(m.sender_display || m.sender_name || "U").slice(0, 1)}
+                                  </Avatar>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
+                                    <Typography
+                                      onClick={() => {
+                                        const member = getParticipantFromMessage(m);
+                                        if (member) openMemberInfo(member);
                                       }}
-                                    />
-                                  ) : null;
-                                })()}
-                              </Box>
-                            </Stack>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
-                                {formatChatTime(m.created_at)}
-                              </Typography>
-                              <Stack direction="row" spacing={0.5} alignItems="center">
-                                <Tooltip title={copiedMessageId === m.id ? "Copied!" : "Copy message"}>
-                                  <IconButton
-                                    size="small"
-                                    aria-label="Copy message"
-                                    onClick={() => copyChatMessage(m.id, m.body)}
-                                    sx={{
-                                      color: copiedMessageId === m.id ? "#22c55e" : "inherit",
-                                    }}
-                                  >
-                                    <FileCopyIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                {isHost && m.is_flagged && (
-                                  <IconButton
-                                    size="small"
-                                    aria-label="Flagged message"
-                                    sx={{ color: "#f59e0b" }}
-                                  >
-                                    <FlagOutlinedIcon fontSize="small" />
-                                  </IconButton>
-                                )}
-                                {(m.mine || isHost) && (
-                                  <IconButton
-                                    size="small"
-                                    aria-label="Edit message"
-                                    onClick={() => {
-                                      setChatEditId(m.id);
-                                      setChatEditBody(m.body || "");
-                                    }}
-                                  >
-                                    <EditRoundedIcon fontSize="small" />
-                                  </IconButton>
-                                )}
-                                {(m.mine || isHost) && (
-                                  <IconButton
-                                    size="small"
-                                    aria-label="Delete message"
-                                    onClick={() => {
-                                      setChatDeleteTarget(m.id);
-                                      setChatDeleteOpen(true);
-                                    }}
-                                  >
-                                    <DeleteOutlineRoundedIcon fontSize="small" />
-                                  </IconButton>
-                                )}
-                                {!isHost && !m.mine && (
-                                  <IconButton
-                                    size="small"
-                                    aria-label="Flag message"
-                                    onClick={() => flagChatMessage(m.id)}
-                                    sx={{
-                                      color: m.is_flagged_by_me ? "#f59e0b" : "inherit",
-                                      fontWeight: m.is_flagged_by_me ? 700 : 400,
-                                    }}
-                                  >
-                                    <FlagOutlinedIcon fontSize="small" />
-                                  </IconButton>
-                                )}
+                                      sx={{
+                                        fontWeight: 600,
+                                        fontSize: 13,
+                                        cursor: "pointer",
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        "&:hover": { textDecoration: "underline" },
+                                        color: "rgba(255,255,255,0.9)",
+                                      }}
+                                      role="button"
+                                      tabIndex={0}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                          e.preventDefault();
+                                          const member = getParticipantFromMessage(m);
+                                          if (member) openMemberInfo(member);
+                                        }
+                                      }}
+                                    >
+                                      {m.sender_display || m.sender_name || "User"}
+                                    </Typography>
+                                    {(() => {
+                                      const participant = getParticipantFromMessage(m);
+                                      const userId = participant?._raw?.customParticipantId || participant?.id;
+
+                                      // Fetch kyc_status if not cached
+                                      if (userId && !participantKycCache[userId]) {
+                                        fetchAndCacheKycStatus(userId);
+                                      }
+
+                                      const isVerified = participantKycCache[userId] === "approved";
+                                      return isVerified ? (
+                                        <VerifiedRoundedIcon
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#14b8a6",
+                                            flexShrink: 0,
+                                          }}
+                                        />
+                                      ) : null;
+                                    })()}
+                                  </Box>
+                                </Stack>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
+                                    {formatChatTime(m.created_at)}
+                                  </Typography>
+                                  <Stack direction="row" spacing={0.5} alignItems="center">
+                                    <Tooltip title={copiedMessageId === m.id ? "Copied!" : "Copy message"}>
+                                      <IconButton
+                                        size="small"
+                                        aria-label="Copy message"
+                                        onClick={() => copyChatMessage(m.id, m.body)}
+                                        sx={{
+                                          color: copiedMessageId === m.id ? "#22c55e" : "inherit",
+                                        }}
+                                      >
+                                        <FileCopyIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    {isHost && m.is_flagged && (
+                                      <IconButton
+                                        size="small"
+                                        aria-label="Flagged message"
+                                        sx={{ color: "#f59e0b" }}
+                                      >
+                                        <FlagOutlinedIcon fontSize="small" />
+                                      </IconButton>
+                                    )}
+                                    {(m.mine || isHost) && (
+                                      <IconButton
+                                        size="small"
+                                        aria-label="Edit message"
+                                        onClick={() => {
+                                          setChatEditId(m.id);
+                                          setChatEditBody(m.body || "");
+                                        }}
+                                      >
+                                        <EditRoundedIcon fontSize="small" />
+                                      </IconButton>
+                                    )}
+                                    {(m.mine || isHost) && (
+                                      <IconButton
+                                        size="small"
+                                        aria-label="Delete message"
+                                        onClick={() => {
+                                          setChatDeleteTarget(m.id);
+                                          setChatDeleteOpen(true);
+                                        }}
+                                      >
+                                        <DeleteOutlineRoundedIcon fontSize="small" />
+                                      </IconButton>
+                                    )}
+                                    {!isHost && !m.mine && (
+                                      <IconButton
+                                        size="small"
+                                        aria-label="Flag message"
+                                        onClick={() => flagChatMessage(m.id)}
+                                        sx={{
+                                          color: m.is_flagged_by_me ? "#f59e0b" : "inherit",
+                                          fontWeight: m.is_flagged_by_me ? 700 : 400,
+                                        }}
+                                      >
+                                        <FlagOutlinedIcon fontSize="small" />
+                                      </IconButton>
+                                    )}
+                                  </Stack>
+                                </Stack>
                               </Stack>
-                            </Stack>
-                          </Stack>
-                          {chatEditId === m.id ? (
-                            <Box sx={{ mt: 1 }}>
-                              <TextField
-                                fullWidth
-                                size="small"
-                                value={chatEditBody}
-                                onChange={(e) => setChatEditBody(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" && !e.shiftKey) {
-                                    e.preventDefault();
-                                    updateChatMessage(m.id, chatEditBody);
-                                  }
-                                }}
-                                sx={{
-                                  "& .MuiOutlinedInput-root": {
-                                    bgcolor: "rgba(255,255,255,0.03)",
-                                    borderRadius: 2,
-                                  },
-                                }}
-                              />
-                              <Stack direction="row" spacing={1} sx={{ mt: 1 }} justifyContent="flex-end">
-                                <Button
-                                  size="small"
-                                  onClick={() => {
-                                    setChatEditId(null);
-                                    setChatEditBody("");
-                                  }}
-                                  sx={{ textTransform: "none" }}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="contained"
-                                  onClick={() => updateChatMessage(m.id, chatEditBody)}
-                                  disabled={chatEditSaving || !chatEditBody.trim()}
-                                  sx={{ textTransform: "none" }}
-                                >
-                                  {chatEditSaving ? "Saving..." : "Save"}
-                                </Button>
-                              </Stack>
-                            </Box>
-                          ) : (
-                            <Typography sx={{ mt: 0.5, fontSize: 13, opacity: 0.9 }}>{m.body}</Typography>
-                          )}
-                        </Paper>
-                      ))}
-                    </Stack>
-                  )}
+                              {chatEditId === m.id ? (
+                                <Box sx={{ mt: 1 }}>
+                                  <TextField
+                                    fullWidth
+                                    size="small"
+                                    value={chatEditBody}
+                                    onChange={(e) => setChatEditBody(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        updateChatMessage(m.id, chatEditBody);
+                                      }
+                                    }}
+                                    sx={{
+                                      "& .MuiOutlinedInput-root": {
+                                        bgcolor: "rgba(255,255,255,0.03)",
+                                        borderRadius: 2,
+                                      },
+                                    }}
+                                  />
+                                  <Stack direction="row" spacing={1} sx={{ mt: 1 }} justifyContent="flex-end">
+                                    <Button
+                                      size="small"
+                                      onClick={() => {
+                                        setChatEditId(null);
+                                        setChatEditBody("");
+                                      }}
+                                      sx={{ textTransform: "none" }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      onClick={() => updateChatMessage(m.id, chatEditBody)}
+                                      disabled={chatEditSaving || !chatEditBody.trim()}
+                                      sx={{ textTransform: "none" }}
+                                    >
+                                      {chatEditSaving ? "Saving..." : "Save"}
+                                    </Button>
+                                  </Stack>
+                                </Box>
+                              ) : (
+                                <Typography sx={{ mt: 0.5, fontSize: 13, opacity: 0.9 }}>{m.body}</Typography>
+                              )}
+                            </Paper>
+                          ))}
+                        </Stack>
+                      )}
 
                       <Box ref={chatBottomRef} />
                     </Box>
@@ -17096,189 +17125,230 @@ export default function NewLiveMeeting() {
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
               <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-                  {/* Moderation Control (Host Only) */}
-                  {isHost && (
-                    <Box sx={{ px: 2, py: 1, borderBottom: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography variant="caption" color="text.secondary">Pre-approval</Typography>
-                      <Switch
-                        size="small"
-                        checked={qnaModerationEnabled}
-                        onChange={handleToggleQnaModeration}
-                        color="warning"
-                      />
-                      {qnaModerationEnabled && (
-                        <Chip label="Moderation ON" size="small" color="warning" variant="outlined" />
-                      )}
-                    </Box>
-                  )}
-
-                  {/* Pending Review Queue (Host Only) */}
-                  {isHost && qnaModerationEnabled && pendingQuestions.length > 0 && (
-                    <Box sx={{ borderBottom: "1px solid rgba(255,165,0,0.3)", mb: 1 }}>
-                      <Typography variant="caption" sx={{ px: 2, color: "warning.main", display: "block", py: 1 }}>
-                        Pending Review ({pendingQuestions.length}) — A=Approve R=Reject ↑↓=Navigate
-                      </Typography>
-                      {pendingQuestions.map((q, idx) => (
-                        <Paper
-                          key={q.id}
+                {/* Moderation Control (Host Only) */}
+                {isHost && (
+                  <Box sx={{ px: 2, py: 1, borderBottom: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                    <Typography variant="caption" color="text.secondary">Pre-approval</Typography>
+                    <Switch
+                      size="small"
+                      checked={qnaModerationEnabled}
+                      onChange={handleToggleQnaModeration}
+                      color="warning"
+                    />
+                    {qnaModerationEnabled && (
+                      <Chip label="Moderation ON" size="small" color="warning" variant="outlined" />
+                    )}
+                    {/* Q&A Engagement Prompt – host trigger button */}
+                    <Box sx={{ ml: "auto" }}>
+                      <Tooltip title="Send a banner to all attendees prompting them to ask questions" arrow>
+                        <Button
+                          size="small"
                           variant="outlined"
-                          onClick={() => setFocusedPendingIdx(idx)}
-                          onTouchStart={(e) => {
-                            e.currentTarget._touchStartX = e.touches[0].clientX;
-                          }}
-                          onTouchEnd={(e) => {
-                            const diff = e.changedTouches[0].clientX - (e.currentTarget._touchStartX || 0);
-                            if (diff > 80) approveQuestion(q.id);      // Swipe right = approve
-                            if (diff < -80) rejectQuestion(q.id);       // Swipe left = reject
+                          startIcon={<AnnouncementIcon sx={{ fontSize: 16 }} />}
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(
+                                toApiUrl("interactions/questions/engagement-prompt/trigger/"),
+                                {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json", ...authHeader() },
+                                  body: JSON.stringify({ event_id: eventId }),
+                                }
+                              );
+                              if (res.ok) {
+                                setSnackbar({ open: true, message: "Q&A prompt sent to attendees!", severity: "success" });
+                              } else {
+                                const data = await res.json().catch(() => ({}));
+                                setSnackbar({ open: true, message: data.detail || "Failed to send Q&A prompt.", severity: "error" });
+                              }
+                            } catch (e) {
+                              console.error("[QnAPrompt] trigger error", e);
+                              setSnackbar({ open: true, message: "Failed to send Q&A prompt.", severity: "error" });
+                            }
                           }}
                           sx={{
-                            p: 1,
-                            mx: 1,
-                            mb: 0.5,
-                            bgcolor: "rgba(255,165,0,0.08)",
-                            borderColor: focusedPendingIdx === idx ? "warning.main" : "rgba(255,165,0,0.2)",
-                            borderWidth: focusedPendingIdx === idx ? 2 : 1,
-                            cursor: "pointer",
-                            transition: "all 0.2s",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: 1,
-                            "&:hover": {
-                              bgcolor: "rgba(255,165,0,0.12)",
-                              borderColor: "warning.main",
-                            },
+                            color: "#63b3ed",
+                            borderColor: "rgba(99,179,237,0.4)",
+                            fontSize: "0.7rem",
+                            py: 0.3,
+                            textTransform: "none",
+                            "&:hover": { borderColor: "#63b3ed", bgcolor: "rgba(99,179,237,0.08)" },
                           }}
                         >
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Chip label="PENDING" size="small" color="warning" variant="filled" sx={{ mb: 0.5 }} />
-                            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-                              {q.content}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {q.user_name} • {new Date(q.created_at).toLocaleTimeString()}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
-                            <IconButton
-                              size="small"
-                              color="success"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                approveQuestion(q.id);
-                              }}
-                              title="Approve (A)"
-                            >
-                              <CheckIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                rejectQuestion(q.id);
-                              }}
-                              title="Reject (R)"
-                            >
-                              <CloseIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </Paper>
-                      ))}
+                          Prompt Audience
+                        </Button>
+                      </Tooltip>
                     </Box>
+                  </Box>
+                )}
+
+                {/* Pending Review Queue (Host Only) */}
+                {isHost && qnaModerationEnabled && pendingQuestions.length > 0 && (
+                  <Box sx={{ borderBottom: "1px solid rgba(255,165,0,0.3)", mb: 1 }}>
+                    <Typography variant="caption" sx={{ px: 2, color: "warning.main", display: "block", py: 1 }}>
+                      Pending Review ({pendingQuestions.length}) — A=Approve R=Reject ↑↓=Navigate
+                    </Typography>
+                    {pendingQuestions.map((q, idx) => (
+                      <Paper
+                        key={q.id}
+                        variant="outlined"
+                        onClick={() => setFocusedPendingIdx(idx)}
+                        onTouchStart={(e) => {
+                          e.currentTarget._touchStartX = e.touches[0].clientX;
+                        }}
+                        onTouchEnd={(e) => {
+                          const diff = e.changedTouches[0].clientX - (e.currentTarget._touchStartX || 0);
+                          if (diff > 80) approveQuestion(q.id);      // Swipe right = approve
+                          if (diff < -80) rejectQuestion(q.id);       // Swipe left = reject
+                        }}
+                        sx={{
+                          p: 1,
+                          mx: 1,
+                          mb: 0.5,
+                          bgcolor: "rgba(255,165,0,0.08)",
+                          borderColor: focusedPendingIdx === idx ? "warning.main" : "rgba(255,165,0,0.2)",
+                          borderWidth: focusedPendingIdx === idx ? 2 : 1,
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 1,
+                          "&:hover": {
+                            bgcolor: "rgba(255,165,0,0.12)",
+                            borderColor: "warning.main",
+                          },
+                        }}
+                      >
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Chip label="PENDING" size="small" color="warning" variant="filled" sx={{ mb: 0.5 }} />
+                          <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                            {q.content}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {q.user_name} • {new Date(q.created_at).toLocaleTimeString()}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
+                          <IconButton
+                            size="small"
+                            color="success"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              approveQuestion(q.id);
+                            }}
+                            title="Approve (A)"
+                          >
+                            <CheckIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              rejectQuestion(q.id);
+                            }}
+                            title="Reject (R)"
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Paper>
+                    ))}
+                  </Box>
+                )}
+
+                {/* Q&A Messages Area */}
+                <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
+                  {qnaError && (
+                    <Typography color="error" sx={{ mb: 1 }}>
+                      {qnaError}
+                    </Typography>
                   )}
 
-                  {/* Q&A Messages Area */}
-                  <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
-                    {qnaError && (
-                      <Typography color="error" sx={{ mb: 1 }}>
-                        {qnaError}
-                      </Typography>
-                    )}
+                  {/* Sort Tabs */}
+                  <Stack direction="row" spacing={0.5} sx={{ pt: 1, pb: 0.5, flexWrap: "wrap", gap: 0.5 }}>
+                    {[
+                      { key: "hot", label: "🔥 Hot" },
+                      { key: "most_voted", label: "▲ Votes" },
+                      { key: "newest", label: "🕐 New" },
+                      ...(isHost ? [{ key: "manual", label: "⇅ Manual" }] : []),
+                    ].map(({ key, label }) => (
+                      <Chip
+                        key={key}
+                        label={label}
+                        size="small"
+                        clickable
+                        onClick={() => setQnaSortMode(key)}
+                        variant={qnaSortMode === key ? "filled" : "outlined"}
+                        sx={{
+                          fontSize: 11,
+                          height: 22,
+                          bgcolor: qnaSortMode === key ? "rgba(255,255,255,0.15)" : "transparent",
+                          borderColor: "rgba(255,255,255,0.2)",
+                          color: "rgba(255,255,255,0.85)",
+                          cursor: "pointer",
+                        }}
+                      />
+                    ))}
+                  </Stack>
 
-                    {/* Sort Tabs */}
-                    <Stack direction="row" spacing={0.5} sx={{ pt: 1, pb: 0.5, flexWrap: "wrap", gap: 0.5 }}>
-                      {[
-                        { key: "hot", label: "🔥 Hot" },
-                        { key: "most_voted", label: "▲ Votes" },
-                        { key: "newest", label: "🕐 New" },
-                        ...(isHost ? [{ key: "manual", label: "⇅ Manual" }] : []),
-                      ].map(({ key, label }) => (
-                        <Chip
-                          key={key}
-                          label={label}
-                          size="small"
-                          clickable
-                          onClick={() => setQnaSortMode(key)}
-                          variant={qnaSortMode === key ? "filled" : "outlined"}
-                          sx={{
-                            fontSize: 11,
-                            height: 22,
-                            bgcolor: qnaSortMode === key ? "rgba(255,255,255,0.15)" : "transparent",
-                            borderColor: "rgba(255,255,255,0.2)",
-                            color: "rgba(255,255,255,0.85)",
-                            cursor: "pointer",
-                          }}
-                        />
-                      ))}
-                    </Stack>
+                  {qnaLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                      <CircularProgress size={22} />
+                    </Box>
+                  ) : (qaSorted.pinned.length + qaSorted.unpinned.length) === 0 ? (
+                    <Typography sx={{ opacity: 0.75 }}>No questions yet. Be the first to ask!</Typography>
+                  ) : (
+                    <Stack spacing={1.5}>
+                      {/* PINNED SECTION HEADER */}
+                      {qaSorted.pinned.length > 0 && (
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 0.5 }}>
+                          <PushPinIcon sx={{ fontSize: 13, color: "#facc15" }} />
+                          <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#facc15" }}>
+                            PINNED ({qaSorted.pinned.length}/3)
+                          </Typography>
+                        </Stack>
+                      )}
 
-                    {qnaLoading ? (
-                      <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                        <CircularProgress size={22} />
-                      </Box>
-                    ) : (qaSorted.pinned.length + qaSorted.unpinned.length) === 0 ? (
-                      <Typography sx={{ opacity: 0.75 }}>No questions yet. Be the first to ask!</Typography>
-                    ) : (
-                      <Stack spacing={1.5}>
-                        {/* PINNED SECTION HEADER */}
-                        {qaSorted.pinned.length > 0 && (
-                          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 0.5 }}>
-                            <PushPinIcon sx={{ fontSize: 13, color: "#facc15" }} />
-                            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#facc15" }}>
-                              PINNED ({qaSorted.pinned.length}/3)
-                            </Typography>
-                          </Stack>
-                        )}
+                      {/* ALL QUESTIONS - PINNED FIRST, THEN UNPINNED */}
+                      {[...qaSorted.pinned, ...qaSorted.unpinned].map((q, idx) => {
+                        const showUnpinnedDivider = idx === qaSorted.pinned.length && qaSorted.pinned.length > 0 && qaSorted.unpinned.length > 0;
+                        const voters = q.upvoters ?? [];
+                        const votes = q.upvote_count ?? voters.length;
+                        const hasVoted = Boolean(q.user_upvoted);
+                        const canViewVoters = isHost;
 
-                        {/* ALL QUESTIONS - PINNED FIRST, THEN UNPINNED */}
-                        {[...qaSorted.pinned, ...qaSorted.unpinned].map((q, idx) => {
-                          const showUnpinnedDivider = idx === qaSorted.pinned.length && qaSorted.pinned.length > 0 && qaSorted.unpinned.length > 0;
-                          const voters = q.upvoters ?? [];
-                          const votes = q.upvote_count ?? voters.length;
-                          const hasVoted = Boolean(q.user_upvoted);
-                          const canViewVoters = isHost;
+                        // Check if self
+                        const self = rtkMeeting?.self;
+                        const selfCsid = self?.clientSpecificId || self?.customParticipantId;
+                        // Fallback to myUserIdRef if CSID not available/matching
+                        const meId = myUserIdRef.current;
 
-                          // Check if self
-                          const self = rtkMeeting?.self;
-                          const selfCsid = self?.clientSpecificId || self?.customParticipantId;
-                          // Fallback to myUserIdRef if CSID not available/matching
-                          const meId = myUserIdRef.current;
+                        // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
+                        let qUserId = q.user_id ?? q.user;
+                        if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
 
-                          // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
-                          let qUserId = q.user_id ?? q.user;
-                          if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
+                        const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
 
-                          const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
+                        const questionDisplayMeta = resolveQuestionDisplayMeta(q);
+                        const askedBy = questionDisplayMeta.askedBy;
 
-                          const questionDisplayMeta = resolveQuestionDisplayMeta(q);
-                          const askedBy = questionDisplayMeta.askedBy;
+                        const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
 
-                          const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
+                        const canManage = isHost || isSelfQuestion;
+                        const isEditing = qnaEditingId === q.id;
+                        const isDisplayedOnScreen = displayedQuestion?.question_id === q.id && displayedQuestion?.visible !== false;
+                        const detectedUrls = qnaQuestionUrls[q.id] || [];
+                        const previewUrl = detectedUrls[0] || "";
+                        const preview = previewUrl ? qnaLinkPreviewCache[previewUrl] : null;
 
-                          const canManage = isHost || isSelfQuestion;
-                          const isEditing = qnaEditingId === q.id;
-                          const isDisplayedOnScreen = displayedQuestion?.question_id === q.id && displayedQuestion?.visible !== false;
-                          const detectedUrls = qnaQuestionUrls[q.id] || [];
-                          const previewUrl = detectedUrls[0] || "";
-                          const preview = previewUrl ? qnaLinkPreviewCache[previewUrl] : null;
-
-                          return (
-                            <>
-                              {showUnpinnedDivider && (
-                                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 1 }} />
-                              )}
-                              <Paper
+                        return (
+                          <>
+                            {showUnpinnedDivider && (
+                              <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 1 }} />
+                            )}
+                            <Paper
                               key={q.id}
                               variant="outlined"
                               sx={{
@@ -17743,69 +17813,69 @@ export default function NewLiveMeeting() {
                               )}
                             </Paper>
                           </>
-                          );
-                        })}
-                      </Stack>
-                    )}
-                  </Box>
-
-                  <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
-
-                  {/* Q&A Input Area */}
-                  <Box
-                    component="form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      submitQuestion();
-                    }}
-                    sx={{ p: 2 }}
-                  >
-                    <TextField
-                      fullWidth
-                      placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
-                      size="small"
-                      value={newQuestion}
-                      disabled={qnaSubmitting}
-                      onChange={(e) => setNewQuestion(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          submitQuestion();
-                        }
-                      }}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              size="small"
-                              aria-label="Send question"
-                              onClick={submitQuestion}
-                              disabled={qnaSubmitting || newQuestion.trim().length === 0}
-                            >
-                              {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          bgcolor: "rgba(255,255,255,0.03)",
-                          borderRadius: 2,
-                        },
-                      }}
-                    />
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.75, px: 0.5 }}>
-                      <Switch
-                        size="small"
-                        checked={qnaAnonymousModeEnabled || isAnonymousQuestion}
-                        disabled={qnaAnonymousModeEnabled}
-                        onChange={(e) => setIsAnonymousQuestion(e.target.checked)}
-                      />
-                      <Typography sx={{ fontSize: 11, opacity: 0.7 }}>
-                        {qnaAnonymousModeEnabled ? "Anonymous mode (forced)" : "Post anonymously"}
-                      </Typography>
+                        );
+                      })}
                     </Stack>
-                  </Box>
+                  )}
+                </Box>
+
+                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+
+                {/* Q&A Input Area */}
+                <Box
+                  component="form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    submitQuestion();
+                  }}
+                  sx={{ p: 2 }}
+                >
+                  <TextField
+                    fullWidth
+                    placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
+                    size="small"
+                    value={newQuestion}
+                    disabled={qnaSubmitting}
+                    onChange={(e) => setNewQuestion(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        submitQuestion();
+                      }
+                    }}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            aria-label="Send question"
+                            onClick={submitQuestion}
+                            disabled={qnaSubmitting || newQuestion.trim().length === 0}
+                          >
+                            {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        bgcolor: "rgba(255,255,255,0.03)",
+                        borderRadius: 2,
+                      },
+                    }}
+                  />
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.75, px: 0.5 }}>
+                    <Switch
+                      size="small"
+                      checked={qnaAnonymousModeEnabled || isAnonymousQuestion}
+                      disabled={qnaAnonymousModeEnabled}
+                      onChange={(e) => setIsAnonymousQuestion(e.target.checked)}
+                    />
+                    <Typography sx={{ fontSize: 11, opacity: 0.7 }}>
+                      {qnaAnonymousModeEnabled ? "Anonymous mode (forced)" : "Post anonymously"}
+                    </Typography>
+                  </Stack>
+                </Box>
               </Box>
             </TabPanel>
 
@@ -17909,7 +17979,7 @@ export default function NewLiveMeeting() {
                             key={idx}
                             disablePadding
                           >
-                              <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
+                            <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                               <ListItemAvatar>
                                 {renderMemberAvatar(m)}
                               </ListItemAvatar>
@@ -18075,7 +18145,7 @@ export default function NewLiveMeeting() {
                                   </Stack>
                                 }
                               />
-                              </ListItemButton>
+                            </ListItemButton>
                           </ListItem>
                         ))}
                       </List>
@@ -18342,7 +18412,7 @@ export default function NewLiveMeeting() {
                             key={idx}
                             disablePadding
                           >
-                              <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
+                            <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                               <ListItemAvatar>
                                 {renderMemberAvatar(m)}
                               </ListItemAvatar>
@@ -18387,35 +18457,35 @@ export default function NewLiveMeeting() {
                                     {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (canManageParticipantMic ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")))}>
-                                      <IconButton
-                                        data-no-member-info="true"
-                                        size="small"
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (isSelfMember(m)) {
-                                            handleToggleMic();
-                                            return;
-                                          }
-                                          if (canManageParticipantMic) {
-                                            (async () => {
-                                              await forceMuteParticipant(m);
-                                            })();
-                                          }
-                                        }}
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (canManageParticipantMic ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")))}>
+                                        <IconButton
+                                          data-no-member-info="true"
+                                          size="small"
+                                          onMouseDown={(e) => e.stopPropagation()}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (isSelfMember(m)) {
+                                              handleToggleMic();
+                                              return;
+                                            }
+                                            if (canManageParticipantMic) {
+                                              (async () => {
+                                                await forceMuteParticipant(m);
+                                              })();
+                                            }
+                                          }}
                                           disabled={isOnBreak || (!isSelfMember(m) && !canManageParticipantMic)}
-                                        sx={{
-                                          bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                          border: "1px solid",
-                                          borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                          color: m.mic ? "#22c55e" : "#ef4444",
-                                          padding: "4px",
-                                          cursor: (isSelfMember(m) || canManageParticipantMic) ? "pointer" : "default",
-                                          "&:hover": {
-                                            bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                          }
-                                        }}
+                                          sx={{
+                                            bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                            border: "1px solid",
+                                            borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                            color: m.mic ? "#22c55e" : "#ef4444",
+                                            padding: "4px",
+                                            cursor: (isSelfMember(m) || canManageParticipantMic) ? "pointer" : "default",
+                                            "&:hover": {
+                                              bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                            }
+                                          }}
                                         >
                                           {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
                                         </IconButton>
@@ -18491,7 +18561,7 @@ export default function NewLiveMeeting() {
                                 }
                                 secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
                               />
-                              </ListItemButton>
+                            </ListItemButton>
                           </ListItem>
                         ))}
                       </List>
@@ -18503,55 +18573,55 @@ export default function NewLiveMeeting() {
                     eventData?.lounge_enabled_waiting_room &&
                     filteredPreEventLoungeParticipants.length > 0 &&
                     (participantRoomFilter === "all" || participantRoomFilter === "lounge") && (
-                    <Box sx={{ mb: 2 }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                        <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
-                          PRE-EVENT LOUNGE ({filteredPreEventLoungeParticipants.length})
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            sx={{ fontSize: 10, bgcolor: "rgba(34, 197, 94, 0.8)" }}
-                            onClick={() => admitAllFromLounge(filteredPreEventLoungeParticipants.map(p => p.user_id))}
-                          >
-                            Admit All to Main Room
-                          </Button>
-                          {eventData?.waiting_room_enabled && (
+                      <Box sx={{ mb: 2 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                          <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
+                            PRE-EVENT LOUNGE ({filteredPreEventLoungeParticipants.length})
+                          </Typography>
+                          <Stack direction="row" spacing={1}>
                             <Button
                               size="small"
-                              variant="outlined"
-                              sx={{ fontSize: 10, borderColor: "rgba(250, 204, 21, 0.7)", color: "rgba(250, 204, 21, 0.95)" }}
-                              onClick={() => admitAllToWaitingFromLounge(filteredPreEventLoungeParticipants.map(p => p.user_id))}
+                              variant="contained"
+                              sx={{ fontSize: 10, bgcolor: "rgba(34, 197, 94, 0.8)" }}
+                              onClick={() => admitAllFromLounge(filteredPreEventLoungeParticipants.map(p => p.user_id))}
                             >
-                              Admit All to Waiting Room
+                              Admit All to Main Room
                             </Button>
-                          )}
-                        </Stack>
-                      </Stack>
-
-                      <Paper variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
-                        <Stack spacing={0.5} sx={{ p: 1 }}>
-                          {filteredPreEventLoungeParticipants.map(p => (
-                            <Stack key={p.user_id} direction="row" alignItems="center" spacing={1} sx={{ py: 0.5, px: 0.75, borderRadius: 1, bgcolor: "rgba(255,255,255,0.02)" }}>
-                              <Avatar sx={{ width: 24, height: 24, fontSize: 10 }}>
-                                {(p.full_name || p.user_name || "U").charAt(0).toUpperCase()}
-                              </Avatar>
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Typography noWrap sx={{ fontWeight: 600, fontSize: 11 }}>
-                                  {p.full_name || p.user_name}
-                                </Typography>
-                              </Box>
-                              <Button size="small" variant="contained" sx={{ fontSize: 9, minWidth: 42, flexShrink: 0, bgcolor: "rgba(34, 197, 94, 0.7)" }}
-                                onClick={() => admitFromLounge([p.user_id])}>
-                                Admit
+                            {eventData?.waiting_room_enabled && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontSize: 10, borderColor: "rgba(250, 204, 21, 0.7)", color: "rgba(250, 204, 21, 0.95)" }}
+                                onClick={() => admitAllToWaitingFromLounge(filteredPreEventLoungeParticipants.map(p => p.user_id))}
+                              >
+                                Admit All to Waiting Room
                               </Button>
-                            </Stack>
-                          ))}
+                            )}
+                          </Stack>
                         </Stack>
-                      </Paper>
-                    </Box>
-                  )}
+
+                        <Paper variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+                          <Stack spacing={0.5} sx={{ p: 1 }}>
+                            {filteredPreEventLoungeParticipants.map(p => (
+                              <Stack key={p.user_id} direction="row" alignItems="center" spacing={1} sx={{ py: 0.5, px: 0.75, borderRadius: 1, bgcolor: "rgba(255,255,255,0.02)" }}>
+                                <Avatar sx={{ width: 24, height: 24, fontSize: 10 }}>
+                                  {(p.full_name || p.user_name || "U").charAt(0).toUpperCase()}
+                                </Avatar>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography noWrap sx={{ fontWeight: 600, fontSize: 11 }}>
+                                    {p.full_name || p.user_name}
+                                  </Typography>
+                                </Box>
+                                <Button size="small" variant="contained" sx={{ fontSize: 9, minWidth: 42, flexShrink: 0, bgcolor: "rgba(34, 197, 94, 0.7)" }}
+                                  onClick={() => admitFromLounge([p.user_id])}>
+                                  Admit
+                                </Button>
+                              </Stack>
+                            ))}
+                          </Stack>
+                        </Paper>
+                      </Box>
+                    )}
 
                   <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                     <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
@@ -18620,7 +18690,7 @@ export default function NewLiveMeeting() {
                           key={idx}
                           disablePadding
                         >
-                            <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
+                          <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                             <ListItemAvatar>
                               {renderMemberAvatar(m)}
                             </ListItemAvatar>
@@ -18825,7 +18895,7 @@ export default function NewLiveMeeting() {
                                 </Stack>
                               }
                             />
-                            </ListItemButton>
+                          </ListItemButton>
                         </ListItem>
                       ))}
                     </List>
@@ -19169,8 +19239,8 @@ export default function NewLiveMeeting() {
           speedNetworkingState === 'stopping'
             ? 'Stopping networking...'
             : speedNetworkingState === 'rejoining_main'
-            ? 'Returning to main meeting...'
-            : 'Joining meeting...'
+              ? 'Returning to main meeting...'
+              : 'Joining meeting...'
         }
       />
     );
@@ -19666,6 +19736,45 @@ export default function NewLiveMeeting() {
           />
         )}
 
+        {/* Q&A Engagement Prompt Banner – shown to attendees only */}
+        {!isHost && qnaPromptBanner && (
+          <QnAEngagementPromptBanner
+            prompt={qnaPromptBanner}
+            onClose={async () => {
+              clearTimeout(qnaPromptTimerRef.current);
+              const promptId = qnaPromptBanner.prompt_id;
+              setQnaPromptBanner(null);
+              // Notify backend of manual dismiss (best-effort, no await needed)
+              fetch(
+                toApiUrl(`interactions/questions/engagement-prompt/${promptId}/dismiss/`),
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", ...authHeader() },
+                }
+              ).catch(() => { });
+            }}
+            onOpenQnA={() => {
+              clearTimeout(qnaPromptTimerRef.current);
+              const promptId = qnaPromptBanner?.prompt_id;
+              setQnaPromptBanner(null);
+              // Open right sidebar on Q&A tab (tab index 1)
+              setRightPanelOpen(true);
+              setRightOpen(true);
+              setTab(1);
+              // Best-effort dismiss
+              if (promptId) {
+                fetch(
+                  toApiUrl(`interactions/questions/engagement-prompt/${promptId}/dismiss/`),
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", ...authHeader() },
+                  }
+                ).catch(() => { });
+              }
+            }}
+          />
+        )}
+
         {/* Guest Registration Modal */}
         <GuestRegistrationModal
           open={guestRegModalOpen}
@@ -20141,12 +20250,12 @@ export default function NewLiveMeeting() {
         {/* Main Layout - Hidden if Speed Networking is active */}
         {!showSpeedNetworking && (
           <Box
-              sx={{
-                display: "flex",
-                height: `calc(100vh - ${LAYOUT_TOP_OFFSET}px)`,
-                overflow: "hidden",
-              }}
-            >
+            sx={{
+              display: "flex",
+              height: `calc(100vh - ${LAYOUT_TOP_OFFSET}px)`,
+              overflow: "hidden",
+            }}
+          >
             {/* Left/Main */}
             <Box
               sx={{
@@ -20905,9 +21014,9 @@ export default function NewLiveMeeting() {
                               ? "Request host approval to present"
                               : !canSelfScreenShare
                                 ? "Waiting for permission update"
-                              : (!isHost && hostForceBlock)
-                                ? "Screen share blocked for audience"
-                                : (isScreenSharing ? "Stop sharing" : "Share screen")
+                                : (!isHost && hostForceBlock)
+                                  ? "Screen share blocked for audience"
+                                  : (isScreenSharing ? "Stop sharing" : "Share screen")
                       }
                     >
                       <span>
@@ -23209,7 +23318,7 @@ export default function NewLiveMeeting() {
 }
 
 // ✅ Separate sub-component to handle async friendship logic locally
-function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp = () => {}, eventId = null }) {
+function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp = () => { }, eventId = null }) {
   const [connStatus, setConnStatus] = useState("loading"); // "loading" | "none" | "friends" | "pending_outgoing" | "pending_incoming"
   const [connLoading, setConnLoading] = useState(false);
   const [profileInfo, setProfileInfo] = useState(null);
