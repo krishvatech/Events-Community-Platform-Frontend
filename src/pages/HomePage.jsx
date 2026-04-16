@@ -1,6 +1,6 @@
 ﻿// src/pages/HomePage.jsx
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams, Navigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "../utils/api";
 import AuthModal from "../components/AuthModal.jsx";
 import {
@@ -110,10 +110,6 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
 );
 
 export default function HomePage() {
-  // TEMPORARY: Redirect to default event instead of marketing landing page
-  return <Navigate to="/events/m-a-in-uncertain-times" replace />;
-
-  /* COMMENTED OUT: Original marketing landing page code - restore by removing the above redirect
   const [searchParams] = useSearchParams();
   const authed = isAuthed();
   const [modalOpen, setModalOpen] = useState(false);
@@ -141,7 +137,7 @@ export default function HomePage() {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#FFFFFF" }}>
 
-      {/* HERO *//*
+      {/* HERO */}
       <Box component="section" sx={{
         position: "relative", minHeight: { xs: 520, md: 620 }, overflow: "hidden",
         display: "flex", alignItems: "center",
@@ -235,7 +231,7 @@ export default function HomePage() {
         </Container>
       </Box>
 
-      {/* FEATURES *//*
+      {/* FEATURES */}
       <Box
         component="section"
         sx={{
@@ -337,7 +333,7 @@ export default function HomePage() {
         </Container>
       </Box>
 
-      {/* CTA BANNER *//*
+      {/* CTA BANNER */}
       {!authed && (
         <Box component="section" sx={{
           py: { xs: 8, md: 10 },
@@ -368,5 +364,4 @@ export default function HomePage() {
       <AuthModal open={modalOpen} onClose={() => setModalOpen(false)} initialMode={modalMode} key={modalMode} />
     </Box>
   );
-  */
 }
