@@ -3348,6 +3348,7 @@ export default function NewLiveMeeting() {
   const selfScreenShareEndedBindingRef = useRef({ track: null, handler: null });
   const screenShareToggleInFlightRef = useRef(false);
   const lastScreenShareStopAtRef = useRef(0);
+  const micStateBeforeScreenShareRef = useRef(null); // ✅ Preserve mic state during screen share
 
   const waitForScreenSharePeerStable = useCallback(async (timeoutMs = 2500) => {
     const pc = rtkMeeting?.self?.peerConnection;
@@ -3472,6 +3473,11 @@ export default function NewLiveMeeting() {
 
     await waitForScreenSharePeerStable();
 
+    // ✅ PRESERVE MIC STATE: Save current microphone state before any audio modifications
+    const currentMicState = micOn; // Store the user's current mic on/off state
+    micStateBeforeScreenShareRef.current = currentMicState;
+    console.log("[LiveMeeting] Saved mic state before screen share:", currentMicState ? "ON" : "MUTED");
+
     // ✅ PREEMPTIVE AUDIO DISABLE: Disable audio BEFORE screen share to prevent ERROR_CONTENT
     try {
       console.log("[LiveMeeting] Disabling audio before screen share...");
@@ -3508,21 +3514,38 @@ export default function NewLiveMeeting() {
         navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
       }
       
-      // ✅ RE-ENABLE AUDIO after screen share is active (300ms delay for stability)
+      // ✅ RESTORE MIC STATE after screen share is active (300ms delay for stability)
       setTimeout(async () => {
         try {
-          console.log("[LiveMeeting] Re-enabling audio after screen share active...");
+          const savedMicState = micStateBeforeScreenShareRef.current;
+          const shouldEnableMic = savedMicState !== false; // Restore to previous state
+
+          console.log("[LiveMeeting] Restoring audio after screen share - mic state:", shouldEnableMic ? "ON" : "MUTED");
+
+          // Always enable audio stream first (SDK requirement)
           await rtkMeeting?.self?.enableAudio?.();
+
+          // Then set mic to the correct state based on saved state
           const audioSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "audio"
           ) || [];
           for (const sender of audioSenders) {
             if (sender.track) {
-              sender.track.enabled = true;
+              sender.track.enabled = shouldEnableMic;
+              console.log("[LiveMeeting] Set audio track enabled to:", shouldEnableMic);
             }
           }
+
+          // Ensure UI state matches the restored mic state
+          if (shouldEnableMic && !micOn) {
+            console.log("[LiveMeeting] Syncing UI: Setting mic ON");
+            setMicOn(true);
+          } else if (!shouldEnableMic && micOn) {
+            console.log("[LiveMeeting] Syncing UI: Setting mic MUTED");
+            setMicOn(false);
+          }
         } catch (e) {
-          console.warn("[LiveMeeting] Failed to re-enable audio after screen share:", e);
+          console.warn("[LiveMeeting] Failed to restore audio after screen share:", e);
         }
       }, 300);
 
@@ -3567,20 +3590,38 @@ export default function NewLiveMeeting() {
         navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
       }
 
-      // ✅ Re-enable audio after retry succeeds
+      // ✅ RESTORE MIC STATE after retry succeeds (300ms delay for stability)
       setTimeout(async () => {
         try {
+          const savedMicState = micStateBeforeScreenShareRef.current;
+          const shouldEnableMic = savedMicState !== false; // Restore to previous state
+
+          console.log("[LiveMeeting] Restoring audio after retry - mic state:", shouldEnableMic ? "ON" : "MUTED");
+
+          // Always enable audio stream first (SDK requirement)
           await rtkMeeting?.self?.enableAudio?.();
+
+          // Then set mic to the correct state based on saved state
           const audioSenders = rtkMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "audio"
           ) || [];
           for (const sender of audioSenders) {
             if (sender.track) {
-              sender.track.enabled = true;
+              sender.track.enabled = shouldEnableMic;
+              console.log("[LiveMeeting] Set audio track enabled to:", shouldEnableMic);
             }
           }
+
+          // Ensure UI state matches the restored mic state
+          if (shouldEnableMic && !micOn) {
+            console.log("[LiveMeeting] Syncing UI: Setting mic ON");
+            setMicOn(true);
+          } else if (!shouldEnableMic && micOn) {
+            console.log("[LiveMeeting] Syncing UI: Setting mic MUTED");
+            setMicOn(false);
+          }
         } catch (e) {
-          console.warn("[LiveMeeting] Failed to re-enable audio after retry:", e);
+          console.warn("[LiveMeeting] Failed to restore audio after retry:", e);
         }
       }, 300);
     }
@@ -3590,6 +3631,8 @@ export default function NewLiveMeeting() {
     setupScreenShareAudio,
     stopSelfScreenShareWithCleanup,
     waitForScreenSharePeerStable,
+    micOn,
+    setMicOn,
   ]);
 
   // ✅ PHASE 2: Presenter audio toggle handler
