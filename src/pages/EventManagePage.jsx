@@ -1614,7 +1614,13 @@ export default function EventManagePage() {
                     <TextField
                       fullWidth
                       size="small"
-                      value={`${window.location.origin}/public/${event.slug}`}
+                      value={
+                        event.slug === 'prof-damodaran-on-investing-in-the-age-of-ai'
+                          ? `${window.location.origin}/landing/${event.slug}`
+                          : event.slug === 'the-oxford-m-a-symposium-2026'
+                            ? `${window.location.origin}/public/the-oxford-m-a-symposium-2026/`
+                            : `${window.location.origin}/events/${event.slug}`
+                      }
                       InputProps={{
                         readOnly: true,
                         startAdornment: (
@@ -1633,9 +1639,13 @@ export default function EventManagePage() {
                       variant="outlined"
                       size="small"
                       onClick={() => {
-                        navigator.clipboard.writeText(
-                          `${window.location.origin}/public/${event.slug}`
-                        );
+                        const landingUrl =
+                          event.slug === 'prof-damodaran-on-investing-in-the-age-of-ai'
+                            ? `${window.location.origin}/landing/${event.slug}`
+                            : event.slug === 'the-oxford-m-a-symposium-2026'
+                              ? `${window.location.origin}/public/the-oxford-m-a-symposium-2026/`
+                              : `${window.location.origin}/events/${event.slug}`;
+                        navigator.clipboard.writeText(landingUrl);
                         toast.success("Link copied to clipboard!");
                       }}
                       sx={{ whiteSpace: "nowrap" }}
