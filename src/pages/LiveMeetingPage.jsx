@@ -15096,12 +15096,15 @@ export default function NewLiveMeeting() {
       if (!res.ok) throw new Error("Failed to load questions.");
       const data = await res.json();
 
-      // Map questions and ensure visibility fields are present
+      // Map questions and ensure all fields are present
       const mapped = (data || []).map(q => ({
         ...q,
         is_hidden: q.is_hidden || false,
         hidden_by: q.hidden_by || null,
-        hidden_at: q.hidden_at || null
+        hidden_at: q.hidden_at || null,
+        is_seed: q.is_seed || false,
+        attribution_label: q.attribution_label || "",
+        speaker_note: q.speaker_note || "",
       }));
 
       setQuestions(mapped);
@@ -15224,10 +15227,12 @@ export default function NewLiveMeeting() {
               upvote_count: msg.upvote_count ?? 0,
               user_upvoted: false,
               upvoters: msg.upvoters ?? [],
-              lounge_table_id: msg.lounge_table_id, // Store it
+              lounge_table_id: msg.lounge_table_id,
               created_at: msg.created_at,
               is_anonymous: Boolean(msg.is_anonymous),
               display_order: msg.display_order ?? 0,
+              is_seed: Boolean(msg.is_seed),
+              attribution_label: msg.attribution_label || "",
             };
             return [newQ, ...prev];
           });
@@ -17506,8 +17511,38 @@ export default function NewLiveMeeting() {
                                   )}
 
                                   <Stack direction="column" spacing={0.75} sx={{ mt: 1 }}>
-                                    <Stack direction="row" spacing={0.5} alignItems="center">
-                                      <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                    {/* Seed question speaker note — host only */}
+                                    {q.is_seed && isHost && q.speaker_note && (
+                                      <Box sx={{
+                                        display: "flex", alignItems: "flex-start", gap: 0.5,
+                                        bgcolor: "rgba(99,102,241,0.08)", borderRadius: 1,
+                                        border: "1px solid rgba(99,102,241,0.2)", px: 1, py: 0.5,
+                                      }}>
+                                        <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#818cf8", mr: 0.5, flexShrink: 0 }}>
+                                          NOTE:
+                                        </Typography>
+                                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}>
+                                          {q.speaker_note}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                    <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
+                                      {q.is_seed ? (
+                                        <>
+                                          <Chip
+                                            size="small"
+                                            label={q.attribution_label || "Event Team"}
+                                            sx={{ bgcolor: "rgba(16,184,166,0.12)", color: "#5eead4", border: "1px solid rgba(16,184,166,0.3)", fontSize: 10, height: 18 }}
+                                          />
+                                          <Chip
+                                            label="SEED"
+                                            size="small"
+                                            sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}
+                                          />
+                                        </>
+                                      ) : (
+                                        <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                      )}
                                       {q.requires_followup && (
                                         <Chip
                                           label="Follow-up"

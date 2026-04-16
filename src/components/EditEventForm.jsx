@@ -15,6 +15,8 @@ import {
     Switch,
     IconButton,
     InputAdornment,
+    Tooltip,
+    Collapse,
     Dialog,
     DialogTitle,
     DialogContent,
@@ -35,6 +37,11 @@ import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import RecordVoiceOverRoundedIcon from "@mui/icons-material/RecordVoiceOverRounded";
+import QuizOutlinedIcon from "@mui/icons-material/QuizOutlined";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 // Components
 import ParticipantForm from "./ParticipantForm";
@@ -394,6 +401,18 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [replayDuration, setReplayDuration] = React.useState("");
     const [autoPublish, setAutoPublish] = React.useState(true); // ✅ Default true, sync from event in useEffect
 
+    // ----- Seed Questions -----
+    const [seedQuestions, setSeedQuestions] = useState([]);
+    const [seedLoading, setSeedLoading] = useState(false);
+    const [newSeedContent, setNewSeedContent] = useState("");
+    const [newSeedAttribution, setNewSeedAttribution] = useState("");
+    const [newSeedNote, setNewSeedNote] = useState("");
+    const [addingSeed, setAddingSeed] = useState(false);
+    const [editingSeedId, setEditingSeedId] = useState(null);
+    const [editSeedContent, setEditSeedContent] = useState("");
+    const [editSeedAttribution, setEditSeedAttribution] = useState("");
+    const [editSeedNote, setEditSeedNote] = useState("");
+
     // Memoize dayjs objects to prevent DatePicker from snapping back while navigating calendar
     const startDateValue = useMemo(() => startDate ? dayjs(startDate) : null, [startDate]);
     const endDateValue = useMemo(() => endDate ? dayjs(endDate) : null, [endDate]);
@@ -628,6 +647,97 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             cancelled = true;
         };
     }, [event?.id, token, isMultiDay, normalizeSession, withSequentialSessionOrder]);
+
+    // ----- Seed Questions CRUD -----
+    const seedHeaders = useCallback(() => ({
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    }), [token]);
+
+    const loadSeedQuestions = useCallback(async () => {
+        if (!event?.id) return;
+        setSeedLoading(true);
+        try {
+            const res = await fetch(
+                `${API_ROOT}/interactions/questions/?event_id=${event.id}&is_seed=1`,
+                { headers: seedHeaders() }
+            );
+            if (!res.ok) return;
+            const data = await res.json();
+            setSeedQuestions(Array.isArray(data) ? data : []);
+        } catch (e) {
+            // silently fail; seed section just stays empty
+        } finally {
+            setSeedLoading(false);
+        }
+    }, [event?.id, seedHeaders]);
+
+    useEffect(() => {
+        loadSeedQuestions();
+    }, [loadSeedQuestions]);
+
+    const addSeedQuestion = useCallback(async () => {
+        const content = newSeedContent.trim();
+        if (!content || !event?.id) return;
+        setAddingSeed(true);
+        try {
+            const res = await fetch(`${API_ROOT}/interactions/questions/seed/`, {
+                method: "POST",
+                headers: seedHeaders(),
+                body: JSON.stringify({
+                    event: event.id,
+                    content,
+                    attribution_label: newSeedAttribution.trim(),
+                    speaker_note: newSeedNote.trim(),
+                }),
+            });
+            if (!res.ok) throw new Error("Failed to create seed question");
+            const created = await res.json();
+            setSeedQuestions((prev) => [...prev, created]);
+            setNewSeedContent("");
+            setNewSeedAttribution("");
+            setNewSeedNote("");
+        } catch (e) {
+            setToast({ open: true, type: "error", msg: e.message || "Failed to add seed question" });
+        } finally {
+            setAddingSeed(false);
+        }
+    }, [event?.id, newSeedContent, newSeedAttribution, newSeedNote, seedHeaders]);
+
+    const saveSeedEdit = useCallback(async (id) => {
+        try {
+            const res = await fetch(`${API_ROOT}/interactions/questions/${id}/seed/`, {
+                method: "PATCH",
+                headers: seedHeaders(),
+                body: JSON.stringify({
+                    content: editSeedContent.trim(),
+                    attribution_label: editSeedAttribution.trim(),
+                    speaker_note: editSeedNote.trim(),
+                }),
+            });
+            if (!res.ok) throw new Error("Failed to update seed question");
+            const updated = await res.json();
+            setSeedQuestions((prev) =>
+                prev.map((q) => (q.id === id ? { ...q, ...updated } : q))
+            );
+            setEditingSeedId(null);
+        } catch (e) {
+            setToast({ open: true, type: "error", msg: e.message || "Failed to update seed question" });
+        }
+    }, [editSeedContent, editSeedAttribution, editSeedNote, seedHeaders]);
+
+    const deleteSeedQuestion = useCallback(async (id) => {
+        try {
+            const res = await fetch(`${API_ROOT}/interactions/questions/${id}/`, {
+                method: "DELETE",
+                headers: seedHeaders(),
+            });
+            if (!res.ok) throw new Error("Failed to delete seed question");
+            setSeedQuestions((prev) => prev.filter((q) => q.id !== id));
+        } catch (e) {
+            setToast({ open: true, type: "error", msg: e.message || "Failed to delete seed question" });
+        }
+    }, [seedHeaders]);
 
     const persistSessionOrder = useCallback(async (orderedSessions) => {
         if (!event?.id) return true;
@@ -2133,6 +2243,178 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 </Box>
             </Grid>
 
+
+            {/* ── Seed Questions Section ─────────────────────────────── */}
+            {event?.id && (
+                <Box sx={{ mt: 4 }}>
+                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                        <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                            <QuizOutlinedIcon color="action" />
+                            <Typography variant="h6" className="font-semibold">
+                                Seed Questions (Q&amp;A)
+                            </Typography>
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary" mb={2}>
+                            Pre-arrange questions that appear in the Q&amp;A feed when the event goes live.
+                            Use an attribution label like <strong>Event Team</strong> or <strong>Dr. Smith</strong> instead of your name.
+                            Speaker notes are private — only you see them.
+                        </Typography>
+
+                        {/* Existing seed questions list */}
+                        {seedLoading ? (
+                            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+                                <CircularProgress size={22} />
+                            </Box>
+                        ) : seedQuestions.length === 0 ? (
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: "italic" }}>
+                                No seed questions yet.
+                            </Typography>
+                        ) : (
+                            <Stack spacing={1.5} mb={2}>
+                                {seedQuestions.map((q) => (
+                                    <Paper key={q.id} variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, bgcolor: "rgba(16,184,166,0.04)", borderColor: "rgba(16,184,166,0.25)" }}>
+                                        {editingSeedId === q.id ? (
+                                            <Stack spacing={1}>
+                                                <TextField
+                                                    label="Question"
+                                                    fullWidth size="small" multiline minRows={2}
+                                                    value={editSeedContent}
+                                                    onChange={(e) => setEditSeedContent(e.target.value)}
+                                                />
+                                                <TextField
+                                                    label="Attribution label"
+                                                    fullWidth size="small"
+                                                    placeholder="e.g. Event Team, Dr. Smith, Host"
+                                                    value={editSeedAttribution}
+                                                    onChange={(e) => setEditSeedAttribution(e.target.value)}
+                                                />
+                                                <TextField
+                                                    label="Speaker note (private)"
+                                                    fullWidth size="small" multiline minRows={1}
+                                                    placeholder="Reminder visible only to you"
+                                                    value={editSeedNote}
+                                                    onChange={(e) => setEditSeedNote(e.target.value)}
+                                                    InputProps={{
+                                                        startAdornment: (
+                                                            <InputAdornment position="start">
+                                                                <Tooltip title="Only visible to you (the host)">
+                                                                    <LockOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                                                                </Tooltip>
+                                                            </InputAdornment>
+                                                        ),
+                                                    }}
+                                                />
+                                                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                                    <Button size="small" onClick={() => setEditingSeedId(null)}>Cancel</Button>
+                                                    <Button
+                                                        size="small" variant="contained"
+                                                        startIcon={<SaveRoundedIcon />}
+                                                        onClick={() => saveSeedEdit(q.id)}
+                                                        sx={{ bgcolor: "#10b8a6", "&:hover": { bgcolor: "#0ea5a4" } }}
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                </Stack>
+                                            </Stack>
+                                        ) : (
+                                            <Stack direction="row" alignItems="flex-start" spacing={1}>
+                                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" mb={0.5}>
+                                                        <Chip
+                                                            label={q.attribution_label || "Event Team"}
+                                                            size="small"
+                                                            sx={{ fontSize: 11, height: 20, bgcolor: "rgba(16,184,166,0.12)", color: "#10b8a6", border: "1px solid rgba(16,184,166,0.3)" }}
+                                                        />
+                                                        <Chip label="SEED" size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }} />
+                                                    </Stack>
+                                                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                                                        {q.content}
+                                                    </Typography>
+                                                    {q.speaker_note && (
+                                                        <Stack direction="row" spacing={0.5} alignItems="center" mt={0.5}>
+                                                            <LockOutlinedIcon sx={{ fontSize: 12, color: "text.disabled" }} />
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                                                                {q.speaker_note}
+                                                            </Typography>
+                                                        </Stack>
+                                                    )}
+                                                </Box>
+                                                <Stack direction="row" spacing={0}>
+                                                    <Tooltip title="Edit">
+                                                        <IconButton size="small" onClick={() => {
+                                                            setEditingSeedId(q.id);
+                                                            setEditSeedContent(q.content);
+                                                            setEditSeedAttribution(q.attribution_label || "");
+                                                            setEditSeedNote(q.speaker_note || "");
+                                                        }}>
+                                                            <EditRoundedIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Delete">
+                                                        <IconButton size="small" color="error" onClick={() => deleteSeedQuestion(q.id)}>
+                                                            <DeleteOutlineRoundedIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Stack>
+                                            </Stack>
+                                        )}
+                                    </Paper>
+                                ))}
+                            </Stack>
+                        )}
+
+                        {/* Add new seed question form */}
+                        <Stack spacing={1.5}>
+                            <TextField
+                                label="Question text"
+                                fullWidth size="small" multiline minRows={2}
+                                placeholder="e.g. What's the biggest challenge AI faces in diagnostics today?"
+                                value={newSeedContent}
+                                onChange={(e) => setNewSeedContent(e.target.value)}
+                            />
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                                <TextField
+                                    label="Attribution label"
+                                    size="small" fullWidth
+                                    placeholder="e.g. Event Team, Host, Dr. Smith"
+                                    value={newSeedAttribution}
+                                    onChange={(e) => setNewSeedAttribution(e.target.value)}
+                                    helperText="Shown instead of your name"
+                                />
+                                <TextField
+                                    label="Speaker note (private)"
+                                    size="small" fullWidth
+                                    placeholder="Private reminder, not visible to attendees"
+                                    value={newSeedNote}
+                                    onChange={(e) => setNewSeedNote(e.target.value)}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <Tooltip title="Only visible to you (the host)">
+                                                    <LockOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                                                </Tooltip>
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                    helperText="Only you can see this"
+                                />
+                            </Stack>
+                            <Box>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={addingSeed ? <CircularProgress size={14} /> : <AddRoundedIcon />}
+                                    disabled={addingSeed || !newSeedContent.trim()}
+                                    onClick={addSeedQuestion}
+                                    sx={{ borderColor: "#10b8a6", color: "#10b8a6", "&:hover": { borderColor: "#0ea5a4", bgcolor: "rgba(16,184,166,0.06)" } }}
+                                >
+                                    Add Seed Question
+                                </Button>
+                            </Box>
+                        </Stack>
+                    </Paper>
+                </Box>
+            )}
 
             <Box className="mt-6 flex justify-end gap-2">
                 {onCancel && <Button onClick={onCancel} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>}
