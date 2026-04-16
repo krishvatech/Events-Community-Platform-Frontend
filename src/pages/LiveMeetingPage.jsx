@@ -12549,13 +12549,22 @@ export default function NewLiveMeeting() {
   const availableParticipantsForAssign = useMemo(() => {
     if (!participants || participants.length === 0) return [];
 
-    // Filter to include all participants in the meeting, excluding the current user (host/self)
+    // Mirror the backend exclusion logic in perform_random_assignment:
+    // hosts/moderators/publishers are never auto-assigned to breakout rooms, so
+    // exclude them from the count to keep the "This will use X table(s)" preview
+    // in sync with what the backend will actually do.
+    const HOST_PRESETS = ["host", "admin", "webinar_presenter", "publisher", "moderator"];
+    const isHostPreset = (p) =>
+      HOST_PRESETS.some((s) => p.presetName?.toLowerCase().includes(s));
+
     return participants
       .filter((p) => {
         // Must be in meeting
         if (!p.inMeeting) return false;
-        // Exclude self (the current user)
+        // Exclude self (the current user / triggering host)
         if (rtkMeeting?.self?.id && p.id === rtkMeeting.self.id) return false;
+        // Exclude all other hosts / moderators — they stay in the main room
+        if (isHostPreset(p)) return false;
         return true;
       })
       .map((p) => {
@@ -16223,17 +16232,29 @@ export default function NewLiveMeeting() {
         if (!p.inMeeting) return false;
         if (isPinnedParticipant(p)) return false;
         const isSelfParticipant = Boolean(selfId && p?.id === selfId);
-        // Audience breakout view should not render host in strip tiles.
-        // Host is already represented by pinned/main participant area.
-        if (!isHost && isLikelyHostParticipant(p) && !isSelfParticipant) return false;
 
         // ✅ FIX: Use currentLoungeUserIds for ALL breakout contexts
         // This set contains user_id from the current table's LoungeParticipant records
+        // NOTE: Do NOT apply isLikelyHostParticipant filter here — all breakout participants
+        // join with RTK_PRESET_HOST (full media permissions), so that check would incorrectly
+        // filter out regular attendees. The currentLoungeUserIds check below is the correct
+        // mechanism for filtering to only participants assigned to this specific table.
         if (currentLoungeUserIds.size > 0) {
           const key = getParticipantUserKey(p?._raw || p);
           const userId = key.startsWith("id:") ? key.replace("id:", "") : null;
+          // Fallback: check participantIdMapRef which caches rtk_participant_id → user_id
+          // mappings from WebSocket location updates (handles participants whose Dyte metadata
+          // doesn't embed the DB user_id as clientSpecificId/customParticipantId).
+          const fallbackUserId = (!userId || !currentLoungeUserIds.has(String(userId)))
+            ? (participantIdMapRef.current?.get(String(p.id)) || null)
+            : null;
+          const resolvedUserId = (userId && currentLoungeUserIds.has(String(userId)))
+            ? userId
+            : fallbackUserId;
           // Show only if the participant is actually in THIS breakout room
-          if ((!userId || !currentLoungeUserIds.has(String(userId))) && !isSelfParticipant) return false;
+          if (!resolvedUserId || !currentLoungeUserIds.has(String(resolvedUserId))) {
+            if (!isSelfParticipant) return false;
+          }
         } else {
           // If we don't have participant data yet (data still syncing), don't filter
           // The video grid will show empty and update once data arrives
