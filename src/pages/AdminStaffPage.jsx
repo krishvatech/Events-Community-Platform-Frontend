@@ -556,9 +556,19 @@ export default function AdminStaffPage() {
                         </Avatar>
 
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="h5" className="font-extrabold">
-                                {owner ? "Users Management" : "User Profile Access"}
-                            </Typography>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                                <Typography variant="h5" className="font-extrabold">
+                                    {owner ? "Users Management" : "User Profile Access"}
+                                </Typography>
+                                {!loading && (
+                                    <Chip
+                                        label={`${totalCount} Registered users`}
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ borderColor: "#0ea5a4", color: "#0ea5a4" }}
+                                    />
+                                )}
+                            </Box>
                             <Typography className="text-slate-500">
                                 {owner
                                     ? "Be careful! Granting staff or superuser access gives significant permissions."
