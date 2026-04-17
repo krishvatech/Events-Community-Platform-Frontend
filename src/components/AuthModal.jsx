@@ -165,15 +165,40 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
     if (!validateSignup()) return;
     setLoading(true);
     try {
+      // ✅ CHECK: Email already registered?
+      const email = (signupData.email || "").toLowerCase().trim();
+      try {
+        const checkResponse = await fetch(`${API_BASE}/auth/check-email/?email=${encodeURIComponent(email)}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (checkResponse.ok) {
+          const data = await checkResponse.json();
+          if (data.exists === true) {
+            // Email already registered
+            setError(`❌ This email is already registered.`);
+            setMode("login");
+            setLoginEmail(email);
+            toast.info("📩 You can log in with your existing account or reset your password.");
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (checkErr) {
+        console.warn("Email check failed (non-blocking):", checkErr);
+        // Continue with signup even if check fails
+      }
+
       // Auto-generate username from email prefix + random suffix
-      let emailPrefix = (signupData.email || "").split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      let emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
       if (!emailPrefix) emailPrefix = "user";
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const username = `${emailPrefix}${randomSuffix}`;
 
       await cognitoSignUp({
         username,
-        email: (signupData.email || "").toLowerCase().trim(),
+        email: email,
         firstName: (signupData.firstName || "").trim(),
         lastName: (signupData.lastName || "").trim(),
         password: signupData.password,
