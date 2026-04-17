@@ -20,7 +20,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
-import { listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deleteAdminUser } from "../utils/api";
+import { listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deleteAdminUser, mergeAdminUsers } from "../utils/api";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
@@ -379,7 +379,18 @@ export default function AdminStaffPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
     const [userToDelete, setUserToDelete] = React.useState(null);
 
+    // Duplicate Accounts Tab State
+    const [dupGroups, setDupGroups] = React.useState([]);
+    const [dupLoading, setDupLoading] = React.useState(false);
+    const [mergeDialog, setMergeDialog] = React.useState({ open: false, group: null });
+    const [dryRunResult, setDryRunResult] = React.useState(null);
+    const [mergeLoading, setMergeLoading] = React.useState(false);
+    const [selectedPrimaryId, setSelectedPrimaryId] = React.useState(null);
+
     const fetchData = React.useCallback(async () => {
+        // Skip fetchData if on duplicates tab
+        if (userTypeFilter === "duplicates") return;
+
         setLoading(true);
         try {
             const params = {
@@ -398,12 +409,47 @@ export default function AdminStaffPage() {
         }
     }, [q, communityId, page, userTypeFilter]);
 
+    // Fetch and group duplicate users by email
+    const fetchDuplicates = React.useCallback(async () => {
+        setDupLoading(true);
+        try {
+            const params = { limit: 2000, ordering: "email", user_type_filter: "duplicates" };
+            if (communityId) params.community_id = communityId;
+            const data = await listAdminUsers(params);
+            const all = data.results ?? data;
+            const emailMap = {};
+            all.forEach(u => {
+                const k = u.email?.toLowerCase();
+                if (!k) return;
+                if (!emailMap[k]) emailMap[k] = [];
+                emailMap[k].push(u);
+            });
+            const groups = Object.entries(emailMap)
+                .filter(([, users]) => users.length > 1)
+                .map(([email, users]) => ({
+                    email,
+                    users: [...users].sort((a, b) => new Date(a.date_joined) - new Date(b.date_joined)),
+                }))
+                .sort((a, b) => b.users.length - a.users.length);
+            setDupGroups(groups);
+        } finally {
+            setDupLoading(false);
+        }
+    }, [communityId]);
+
     // Reset page on search or filter change
     React.useEffect(() => {
         setPage(1);
     }, [q, userTypeFilter]);
 
     React.useEffect(() => { fetchData(); }, [fetchData]);
+
+    // Trigger fetchDuplicates when switching to duplicates tab
+    React.useEffect(() => {
+        if (userTypeFilter === "duplicates") {
+            fetchDuplicates();
+        }
+    }, [userTypeFilter, fetchDuplicates]);
 
     const handleOpenCreate = () => {
         setDialogMode("create");
@@ -490,6 +536,46 @@ export default function AdminStaffPage() {
             });
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    // Handle opening merge confirmation with dry-run preview
+    const handleOpenMerge = async (group) => {
+        setMergeDialog({ open: true, group });
+        setSelectedPrimaryId(group.users[0].id); // default to oldest
+        setMergeLoading(true);
+        try {
+            const primary = group.users[0]; // oldest = primary
+            const secondary = group.users[1]; // newer = duplicate
+            const result = await mergeAdminUsers(primary.id, secondary.id, true); // dry_run=true
+            setDryRunResult(result);
+        } catch (e) {
+            console.error("Dry-run failed:", e);
+            setDryRunResult(null);
+            setSnack({ open: true, severity: "error", message: "Failed to preview merge" });
+        } finally {
+            setMergeLoading(false);
+        }
+    };
+
+    // Execute the actual merge
+    const handleExecuteMerge = async () => {
+        if (!mergeDialog.group || !selectedPrimaryId) return;
+        const primary = mergeDialog.group.users.find(u => u.id === selectedPrimaryId);
+        const secondary = mergeDialog.group.users.find(u => u.id !== selectedPrimaryId);
+        setMergeLoading(true);
+        try {
+            await mergeAdminUsers(primary.id, secondary.id, false);
+            setMergeDialog({ open: false, group: null });
+            setSelectedPrimaryId(null);
+            setDryRunResult(null);
+            setDupGroups(prev => prev.filter(g => g.email !== mergeDialog.group.email));
+            setSnack({ open: true, severity: "success", message: `✅ Merged: ${secondary.email}` });
+        } catch (e) {
+            console.error("Merge failed:", e);
+            setSnack({ open: true, severity: "error", message: "Merge failed: " + (e.response?.data?.error || e.message) });
+        } finally {
+            setMergeLoading(false);
         }
     };
 
@@ -635,10 +721,13 @@ export default function AdminStaffPage() {
                         <Tab label="Superuser" value="superuser" />
                         <Tab label="Staff" value="staff" />
                         <Tab label="Normal User" value="normal" />
+                        {owner && <Tab label="Duplicate Accounts" value="duplicates" />}
                     </Tabs>
 
-                    <TableContainer component={Paper} variant="outlined">
-                        <Table>
+                    {userTypeFilter !== "duplicates" ? (
+                        <Box>
+                            <TableContainer component={Paper} variant="outlined">
+                            <Table>
                             <TableHead>
                                 <TableRow>
                                     <TableCell>User</TableCell>
@@ -785,18 +874,104 @@ export default function AdminStaffPage() {
                                 )}
                             </TableBody>
                         </Table>
-                    </TableContainer>
+                            </TableContainer>
 
-                    {/* Pagination control */}
-                    {totalCount > PAGE_SIZE && (
-                        <Box mt={2} display="flex" justifyContent="flex-end">
-                            <Pagination
-                                count={totalPages}
-                                page={page}
-                                onChange={(_, value) => setPage(value)}
-                                color="primary"
-                                size="small"
-                            />
+                            {/* Pagination control */}
+                            {totalCount > PAGE_SIZE && (
+                                <Box mt={2} display="flex" justifyContent="flex-end">
+                                    <Pagination
+                                        count={totalPages}
+                                        page={page}
+                                        onChange={(_, value) => setPage(value)}
+                                        color="primary"
+                                        size="small"
+                                    />
+                                </Box>
+                            )}
+                        </Box>
+                    ) : (
+                        <Box>
+                            {/* Duplicates Tab View */}
+                            {dupLoading ? (
+                                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : dupGroups.length === 0 ? (
+                                <Alert severity="success" sx={{ mb: 2 }}>
+                                    ✅ No duplicate accounts found!
+                                </Alert>
+                            ) : (
+                                <TableContainer component={Paper} variant="outlined">
+                                    <Table>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Email</TableCell>
+                                                <TableCell>Primary Account (Keep)</TableCell>
+                                                <TableCell>Duplicate Account (Delete)</TableCell>
+                                                <TableCell align="right">Action</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {dupGroups.map((group) => {
+                                                const primary = group.users[0]; // oldest
+                                                const secondary = group.users[1]; // newer (and any more)
+                                                return (
+                                                    <TableRow key={group.email} hover>
+                                                        <TableCell sx={{ fontWeight: 600 }}>{group.email}</TableCell>
+                                                        <TableCell>
+                                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                                <Avatar src={primary.avatar_url} sx={{ width: 32, height: 32 }}>
+                                                                    {primary.username?.[0]?.toUpperCase()}
+                                                                </Avatar>
+                                                                <Box>
+                                                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                                        {primary.first_name || primary.username}
+                                                                    </Typography>
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        ID: {primary.id} • {new Date(primary.date_joined).toLocaleDateString()}
+                                                                    </Typography>
+                                                                </Box>
+                                                                <Chip label="Primary" size="small" color="primary" variant="outlined" />
+                                                            </Stack>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Stack direction="column" spacing={1}>
+                                                                {group.users.slice(1).map((dup, idx) => (
+                                                                    <Box key={dup.id} sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                                                                        <Avatar src={dup.avatar_url} sx={{ width: 32, height: 32 }}>
+                                                                            {dup.username?.[0]?.toUpperCase()}
+                                                                        </Avatar>
+                                                                        <Box sx={{ flex: 1 }}>
+                                                                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                                                {dup.first_name || dup.username}
+                                                                            </Typography>
+                                                                            <Typography variant="caption" color="text.secondary">
+                                                                                ID: {dup.id} • {new Date(dup.date_joined).toLocaleDateString()}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Chip label="Duplicate" size="small" color="warning" variant="filled" />
+                                                                    </Box>
+                                                                ))}
+                                                            </Stack>
+                                                        </TableCell>
+                                                        <TableCell align="right">
+                                                            <Button
+                                                                variant="contained"
+                                                                color="error"
+                                                                size="small"
+                                                                onClick={() => handleOpenMerge(group)}
+                                                                sx={{ textTransform: "none" }}
+                                                            >
+                                                                Merge
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            )}
                         </Box>
                     )}
 
@@ -847,6 +1022,114 @@ export default function AdminStaffPage() {
                                 startIcon={actionLoading ? <CircularProgress size={20} color="inherit" /> : null}
                             >
                                 {actionLoading ? "Deleting..." : "Delete User"}
+                            </Button>
+                        </DialogActions>
+                    </Dialog>
+
+                    {/* Merge Confirmation Dialog */}
+                    <Dialog
+                        open={mergeDialog.open}
+                        onClose={() => setMergeDialog({ open: false, group: null })}
+                        maxWidth="sm"
+                        fullWidth
+                    >
+                        <DialogTitle>Merge Duplicate Accounts</DialogTitle>
+                        <DialogContent dividers>
+                            {mergeDialog.group && (
+                                <Stack spacing={3}>
+                                    <Alert severity="info">
+                                        This will merge the duplicate account into the primary account.
+                                    </Alert>
+
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                                        Select which account to keep:
+                                    </Typography>
+
+                                    {/* Account Selection */}
+                                    {mergeDialog.group?.users.map((user) => (
+                                        <Box
+                                            key={user.id}
+                                            onClick={() => setSelectedPrimaryId(user.id)}
+                                            sx={{
+                                                p: 2,
+                                                borderRadius: 1,
+                                                border: "2px solid",
+                                                borderColor: selectedPrimaryId === user.id ? "#10b981" : "#e5e7eb",
+                                                bgcolor: selectedPrimaryId === user.id ? "#f0fdf4" : "#ffffff",
+                                                cursor: "pointer",
+                                                transition: "all 0.2s",
+                                                "&:hover": {
+                                                    borderColor: "#10b981",
+                                                    bgcolor: "#f9fafb",
+                                                },
+                                            }}
+                                        >
+                                            <Stack direction="row" spacing={2} alignItems="flex-start">
+                                                <Box sx={{ mt: 0.5 }}>
+                                                    <Checkbox
+                                                        checked={selectedPrimaryId === user.id}
+                                                        onChange={() => setSelectedPrimaryId(user.id)}
+                                                        sx={{ p: 0 }}
+                                                    />
+                                                </Box>
+                                                <Avatar src={user.avatar_url} sx={{ width: 48, height: 48 }}>
+                                                    {user.username?.[0]?.toUpperCase()}
+                                                </Avatar>
+                                                <Box sx={{ flex: 1 }}>
+                                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                            {user.first_name || user.username}
+                                                        </Typography>
+                                                        {selectedPrimaryId === user.id && (
+                                                            <Chip label="KEEP" size="small" color="success" variant="outlined" />
+                                                        )}
+                                                    </Stack>
+                                                    <Typography variant="caption" color="text.secondary" display="block">
+                                                        ID: {user.id} • {user.email}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary" display="block">
+                                                        Created: {new Date(user.date_joined).toLocaleString()}
+                                                    </Typography>
+                                                </Box>
+                                            </Stack>
+                                        </Box>
+                                    ))}
+
+                                    {/* Dry-run Preview */}
+                                    {dryRunResult && (
+                                        <Box sx={{ p: 2, bgcolor: "#f3f4f6", borderRadius: 1 }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                                                Merge Preview:
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                • Cognito Identities to transfer: {dryRunResult.cognito_identities_to_merge || 0}
+                                            </Typography>
+                                        </Box>
+                                    )}
+
+                                    {/* Warning */}
+                                    <Alert severity="warning">
+                                        ⚠️ This action <strong>cannot be undone</strong>. The duplicate account will be permanently deleted.
+                                    </Alert>
+                                </Stack>
+                            )}
+                        </DialogContent>
+                        <DialogActions>
+                            <Button
+                                onClick={() => setMergeDialog({ open: false, group: null })}
+                                color="inherit"
+                                disabled={mergeLoading}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleExecuteMerge}
+                                color="error"
+                                variant="contained"
+                                disabled={mergeLoading}
+                                startIcon={mergeLoading ? <CircularProgress size={20} color="inherit" /> : null}
+                            >
+                                {mergeLoading ? "Merging..." : "Merge Accounts"}
                             </Button>
                         </DialogActions>
                     </Dialog>

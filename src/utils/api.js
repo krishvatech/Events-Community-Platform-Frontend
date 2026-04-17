@@ -279,6 +279,13 @@ export const updateAdminUser = (id, data) =>
 export const deleteAdminUser = (id) =>
   apiClient.delete(`${ADMIN_USERS_BASE}/${id}/`).then((r) => r.data);
 
+export const mergeAdminUsers = (primaryUserId, secondaryUserId, dryRun = false) =>
+  apiClient.post(`/auth/admin/merge-users/`, {
+    primary_user_id: primaryUserId,
+    secondary_user_id: secondaryUserId,
+    dry_run: dryRun,
+  }).then((r) => r.data);
+
 const adminUserBase = (userId) => `${ADMIN_USERS_BASE}/${userId}`;
 
 const adminSub = (userId, resource) => {
