@@ -14,6 +14,13 @@ import {
   CircularProgress,
   Tooltip,
   Collapse,
+  Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Card,
+  CardContent,
 } from "@mui/material";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbUpAltIcon from "@mui/icons-material/ThumbUpAlt";
@@ -218,6 +225,9 @@ function QuestionItem({
   onReplyDelete,
   onEditQuestion,
   onDeleteQuestion,
+  selectable,
+  selected,
+  onSelect,
 }) {
   const canManage = isHost || (currentUserId && q.user_id === currentUserId);
 
@@ -286,6 +296,14 @@ function QuestionItem({
           </Box>
         ) : (
           <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="flex-start">
+            {selectable && (
+              <Checkbox
+                checked={selected}
+                onChange={() => onSelect(q.id)}
+                size="small"
+                sx={{ p: 0, mt: 0.5, color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#4dabf5" } }}
+              />
+            )}
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <ListItemText
                 primary={q.content}
@@ -478,6 +496,17 @@ export default function LiveQnAPanel({
   currentGuestId, // numeric guest ID (without "guest_" prefix)
 }) {
   const [questions, setQuestions] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+
+  const [groupingMode, setGroupingMode] = useState(false);
+  const [selectedQs, setSelectedQs] = useState([]);
+  const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
+  const [newGroupTitle, setNewGroupTitle] = useState("");
+  const [newGroupSummary, setNewGroupSummary] = useState("");
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
@@ -516,10 +545,38 @@ export default function LiveQnAPanel({
     }
   }, [eventId]);
 
+  const loadGroups = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`interactions/qna-groups/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
+      if (res.ok) {
+        const data = await res.json();
+        setGroups(data);
+      }
+    } catch (e) {
+      console.error("Failed to load Q&A groups", e);
+    }
+  }, [eventId]);
+
+  const loadAiSuggestions = useCallback(async () => {
+    if (!eventId || !isHost) return;
+    try {
+      const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
+      if (res.ok) {
+        const data = await res.json();
+        setAiSuggestions(data);
+      }
+    } catch (e) {
+      console.error("Failed to load AI suggestions", e);
+    }
+  }, [eventId, isHost]);
+
   useEffect(() => {
     if (!open) return;
     loadQuestions();
-  }, [open, loadQuestions]);
+    loadGroups();
+    if (isHost) loadAiSuggestions();
+  }, [open, loadQuestions, loadGroups, loadAiSuggestions, isHost]);
 
   // ── sendQnaTyping helper ─────────────────────────────────────────────────
   const sendQnaTyping = useCallback((isTyping) => {
@@ -716,6 +773,14 @@ export default function LiveQnAPanel({
                 : q
             )
           );
+        }
+
+        // Group events
+        if (msg.type.startsWith("qna.group_")) {
+          loadGroups();
+          if (isHost && msg.type.includes("suggestion")) {
+            loadAiSuggestions();
+          }
         }
       } catch (e) {
         console.warn("Failed to parse QnA WS message", e);
@@ -998,7 +1063,22 @@ export default function LiveQnAPanel({
                 },
               }}
             />
-            <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
+            <Stack direction="row" justifyContent={isHost ? "space-between" : "flex-end"} alignItems="center" sx={{ mt: 1 }}>
+              {isHost && (
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+                  <Button size="small" variant="contained" onClick={() => setGroupingMode(!groupingMode)} sx={{ textTransform: "none", bgcolor: groupingMode ? "#d32f2f" : "#1976d2" }}>
+                    {groupingMode ? "Cancel Grouping" : "Group Mode"}
+                  </Button>
+                  {groupingMode && selectedQs.length >= 1 && (
+                    <Button size="small" variant="contained" color="secondary" onClick={() => setCreateGroupModalOpen(true)} sx={{ textTransform: "none" }}>
+                      Create Group ({selectedQs.length})
+                    </Button>
+                  )}
+                  <Button size="small" variant="outlined" color="info" onClick={() => setAiModalOpen(true)} sx={{ textTransform: "none" }}>
+                    AI Suggestions
+                  </Button>
+                </Stack>
+              )}
               <Button
                 type="submit"
                 size="small"
@@ -1061,27 +1141,141 @@ export default function LiveQnAPanel({
                   "&::-webkit-scrollbar-thumb:hover": { backgroundColor: "rgba(255,255,255,0.5)" },
                 }}
               >
-                {questions.map((q) => (
-                  <QuestionItem
-                    key={q.id}
-                    q={q}
-                    isHost={isHost}
-                    currentUserId={currentUserId}
-                    currentGuestId={currentGuestId}
-                    onUpvote={handleUpvote}
-                    onReplyUpvote={handleReplyUpvote}
-                    onReplyCreate={handleReplyCreate}
-                    onReplyEdit={handleReplyEdit}
-                    onReplyDelete={handleReplyDelete}
-                    onEditQuestion={handleEditQuestion}
-                    onDeleteQuestion={handleDeleteQuestion}
-                  />
-                ))}
+                {(() => {
+                  const groupedQuestions = {};
+                  const ungroupedQuestions = [];
+                  const visibleGroups = isHost ? groups : groups.filter(g => g.is_visible_to_attendees);
+                  visibleGroups.forEach(g => { groupedQuestions[g.id] = []; });
+
+                  questions.forEach(q => {
+                    let assigned = false;
+                    for (const g of visibleGroups) {
+                      if (g.memberships && g.memberships.some(m => m.question === q.id)) {
+                        groupedQuestions[g.id].push(q);
+                        assigned = true;
+                        break;
+                      }
+                    }
+                    if (!assigned) ungroupedQuestions.push(q);
+                  });
+
+                  const toggleSelect = (id) => setSelectedQs(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+
+                  return (
+                    <React.Fragment>
+                      {visibleGroups.map(g => (
+                        <Box key={g.id} sx={{ mb: 1.5, pl: 1, borderLeft: '2px solid #4dabf5', bgcolor: 'rgba(77, 171, 245, 0.05)' }}>
+                          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1, pt: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ color: '#4dabf5', fontWeight: 'bold' }}>{g.title}</Typography>
+                            {isHost && (
+                              <IconButton size="small" onClick={async () => {
+                                if (window.confirm('Delete group?')) {
+                                  await fetch(toApiUrl(`interactions/qna-groups/${g.id}/`), { method: "DELETE", headers: authHeader() });
+                                  loadGroups();
+                                }
+                              }} sx={{ color: "rgba(255,255,255,0.4)" }}>
+                                <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            )}
+                          </Stack>
+                          {g.summary && <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', px: 1, mb: 1 }}>{g.summary}</Typography>}
+                          <List dense disablePadding>
+                            {groupedQuestions[g.id].map(q => (
+                              <QuestionItem
+                                key={q.id} q={q} isHost={isHost} currentUserId={currentUserId} currentGuestId={currentGuestId}
+                                onUpvote={handleUpvote} onReplyUpvote={handleReplyUpvote} onReplyCreate={handleReplyCreate}
+                                onReplyEdit={handleReplyEdit} onReplyDelete={handleReplyDelete} onEditQuestion={handleEditQuestion}
+                                onDeleteQuestion={handleDeleteQuestion}
+                                selectable={groupingMode} selected={selectedQs.includes(q.id)} onSelect={toggleSelect}
+                              />
+                            ))}
+                          </List>
+                        </Box>
+                      ))}
+                      {visibleGroups.length > 0 && ungroupedQuestions.length > 0 && <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 1, mt: 1, pl: 1 }}>Ungrouped Questions</Typography>}
+                      {ungroupedQuestions.map((q) => (
+                        <QuestionItem
+                          key={q.id} q={q} isHost={isHost} currentUserId={currentUserId} currentGuestId={currentGuestId}
+                          onUpvote={handleUpvote} onReplyUpvote={handleReplyUpvote} onReplyCreate={handleReplyCreate}
+                          onReplyEdit={handleReplyEdit} onReplyDelete={handleReplyDelete} onEditQuestion={handleEditQuestion}
+                          onDeleteQuestion={handleDeleteQuestion}
+                          selectable={groupingMode} selected={selectedQs.includes(q.id)} onSelect={toggleSelect}
+                        />
+                      ))}
+                    </React.Fragment>
+                  );
+                })()}
               </List>
             )}
           </Box>
         </Box>
       </Box>
+
+      {/* Manual Group Modal */}
+      <Dialog open={createGroupModalOpen} onClose={() => setCreateGroupModalOpen(false)} PaperProps={{ sx: { bgcolor: "#1e1e1e", color: "#fff" } }}>
+        <DialogTitle>Create Q&A Group</DialogTitle>
+        <DialogContent>
+          <TextField fullWidth size="small" label="Group Title" value={newGroupTitle} onChange={(e) => setNewGroupTitle(e.target.value)} sx={{ mt: 1, mb: 2, input: { color: "#fff" }, label: { color: "gray" }, fieldset: { borderColor: "gray" } }} />
+          <TextField fullWidth size="small" multiline rows={3} label="Group Summary (Optional)" value={newGroupSummary} onChange={(e) => setNewGroupSummary(e.target.value)} sx={{ input: { color: "#fff" }, textarea: { color: "#fff" }, label: { color: "gray" }, fieldset: { borderColor: "gray" } }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateGroupModalOpen(false)} sx={{ color: "gray" }}>Cancel</Button>
+          <Button variant="contained" onClick={async () => {
+            const res = await fetch(toApiUrl(`interactions/qna-groups/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ event: eventId, title: newGroupTitle, summary: newGroupSummary }) });
+            if (res.ok) {
+              const g = await res.json();
+              if (selectedQs.length) await fetch(toApiUrl(`interactions/qna-groups/${g.id}/add_questions/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ question_ids: selectedQs }) });
+              setCreateGroupModalOpen(false); setGroupingMode(false); setSelectedQs([]); setNewGroupTitle(""); setNewGroupSummary(""); loadGroups();
+            }
+          }}>Create Group</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* AI Suggestion Modal */}
+      <Dialog open={aiModalOpen} onClose={() => setAiModalOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { bgcolor: "#1e1e1e", color: "#fff", minHeight: '50vh' } }}>
+        <DialogTitle>AI Group Suggestions</DialogTitle>
+        <DialogContent>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)" }}>Pending AI suggestions for this event.</Typography>
+            <Button variant="contained" disabled={aiLoading} onClick={async () => {
+              setAiLoading(true);
+              try {
+                const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggest/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ event_id: eventId }) });
+                if (res.ok) loadAiSuggestions(); else alert(await res.text());
+              } finally { setAiLoading(false); }
+            }}>
+              {aiLoading ? "Generating..." : "Generate New"}
+            </Button>
+          </Stack>
+          {aiSuggestions.filter(s => s.status === 'pending').length === 0 && <Typography variant="caption" sx={{ color: 'gray' }}>No pending AI suggestions right now.</Typography>}
+          <Stack spacing={2}>
+            {aiSuggestions.filter(s => s.status === 'pending').map(s => (
+              <Card key={s.id} sx={{ bgcolor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.2)" }}>
+                <CardContent>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="subtitle1" sx={{ color: "#fff", fontWeight: "bold" }}>{s.suggested_title} (Confidence: {s.confidence_score})</Typography>
+                    <Stack direction="row" spacing={1}>
+                      <Button size="small" variant="contained" color="success" onClick={async () => {
+                        await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/approve/`), { method: "POST", headers: authHeader() });
+                        loadAiSuggestions(); loadGroups();
+                      }}>Approve</Button>
+                      <Button size="small" variant="contained" color="error" onClick={async () => {
+                        await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/reject/`), { method: "POST", headers: authHeader() });
+                        loadAiSuggestions();
+                      }}>Reject</Button>
+                    </Stack>
+                  </Stack>
+                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mt: 1 }}>{s.suggested_summary}</Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mt: 1, display: 'block' }}>Suggests {s.suggested_question_ids.length} questions.</Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAiModalOpen(false)} sx={{ color: "gray" }}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

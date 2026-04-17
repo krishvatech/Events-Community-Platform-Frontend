@@ -45,6 +45,8 @@ import {
   Backdrop,
   Slider,
   Collapse,
+  Card,
+  CardContent,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -98,6 +100,7 @@ import FileCopyIcon from "@mui/icons-material/FileCopy";
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
+import FolderIcon from "@mui/icons-material/Folder";
 
 import GroupIcon from "@mui/icons-material/Group";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -15073,6 +15076,42 @@ export default function NewLiveMeeting() {
 
   // ── Q&A state ──────────────────────────────────────────────────────────────
   const [questions, setQuestions] = useState([]);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [groupCollapsed, setGroupCollapsed] = useState({});
+
+  const [groups, setGroups] = useState([]);
+  const loadGroups = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`interactions/qna-groups/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
+      if (res.ok) {
+        const data = await res.json();
+        setGroups(data.results || (Array.isArray(data) ? data : []));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [eventId]);
+
+  const loadAiSuggestions = useCallback(async () => {
+    if (!eventId || !isHost) return;
+    try {
+      const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
+      if (res.ok) {
+        const data = await res.json();
+        setAiSuggestions(data.results || (Array.isArray(data) ? data : []));
+      }
+    } catch (e) { console.error(e); }
+  }, [eventId, isHost]);
+
+  useEffect(() => {
+    if (eventId) {
+      loadGroups();
+      if (isHost) loadAiSuggestions();
+    }
+  }, [eventId, isHost, loadAiSuggestions, loadGroups]);
   const [qnaLoading, setQnaLoading] = useState(false);
   const [qnaSubmitting, setQnaSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
@@ -15212,6 +15251,11 @@ export default function NewLiveMeeting() {
           console.log("[WS] Lounge settings updated:", msg.settings);
           setEventData((prev) => ({ ...prev, ...msg.settings }));
         }
+
+        if (msg.type === "qna.group_created") setGroups(prev => [...prev, msg.group]);
+        if (msg.type === "qna.group_updated") setGroups(prev => prev.map(g => g.id === msg.group.id ? msg.group : g));
+        if (msg.type === "qna.group_deleted") setGroups(prev => prev.filter(g => g.id !== msg.group_id));
+        if (msg.type === "qna.group_suggestion_reviewed") setAiSuggestions(prev => prev.filter(s => s.id !== msg.suggestion_id));
 
         if (msg.type === "qna.upvote") {
           setQuestions((prev) =>
@@ -17415,6 +17459,64 @@ export default function NewLiveMeeting() {
               </DialogActions>
             </Dialog>
 
+            {/* AI Suggestion Modal */}
+            <Dialog open={aiModalOpen} onClose={() => setAiModalOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { bgcolor: "#1e1e1e", color: "#fff", minHeight: '50vh' } }}>
+              <DialogTitle>AI Group Suggestions</DialogTitle>
+              <DialogContent>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)" }}>Pending AI suggestions for this event.</Typography>
+                  <Button variant="contained" disabled={aiLoading} onClick={async () => {
+                    setAiLoading(true);
+                    try {
+                      const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggest/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ event_id: eventId }) });
+                      if (res.ok) loadAiSuggestions(); else alert(await res.text());
+                    } finally { setAiLoading(false); }
+                  }}>
+                    {aiLoading ? "Generating..." : "Generate New"}
+                  </Button>
+                </Stack>
+                {aiSuggestions.filter(s => s.status === 'pending').length === 0 && <Typography variant="caption" sx={{ color: 'gray' }}>No pending AI suggestions right now.</Typography>}
+                <Stack spacing={2}>
+                  {aiSuggestions.filter(s => s.status === 'pending').map(s => (
+                    <Card key={s.id} sx={{ bgcolor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.2)" }}>
+                      <CardContent>
+                        <Stack direction="row" justifyContent="space-between">
+                          <Typography variant="subtitle1" sx={{ color: "#fff", fontWeight: "bold" }}>{s.suggested_title} (Confidence: {s.confidence_score})</Typography>
+                          <Stack direction="row" spacing={1}>
+                            <Button size="small" variant="contained" color="success" onClick={async () => {
+                              try {
+                                const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/approve/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() } });
+                                if (!res.ok) {
+                                  alert("Approve Failed: " + await res.text());
+                                } else {
+                                  loadAiSuggestions();
+                                }
+                              } catch (e) { alert("Network Error: " + e.message); }
+                            }}>Approve</Button>
+                            <Button size="small" variant="contained" color="error" onClick={async () => {
+                              try {
+                                const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/reject/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() } });
+                                if (!res.ok) {
+                                  alert("Reject Failed: " + await res.text());
+                                } else {
+                                  loadAiSuggestions();
+                                }
+                              } catch (e) { alert("Network Error: " + e.message); }
+                            }}>Reject</Button>
+                          </Stack>
+                        </Stack>
+                        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mt: 1 }}>{s.suggested_summary}</Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mt: 1, display: 'block' }}>Suggests {s.suggested_question_ids.length} questions.</Typography>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setAiModalOpen(false)} sx={{ color: "gray" }}>Close</Button>
+              </DialogActions>
+            </Dialog>
+
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
               <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -17509,6 +17611,24 @@ export default function NewLiveMeeting() {
                           }}
                         >
                           Modal Prompt
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title="Suggest Q&A groups using AI" arrow>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setAiModalOpen(true)}
+                          sx={{
+                            color: "#4dabf5",
+                            borderColor: "rgba(77,171,245,0.4)",
+                            fontSize: "0.68rem",
+                            py: 0.3,
+                            px: 1,
+                            textTransform: "none",
+                            "&:hover": { borderColor: "#4dabf5", bgcolor: "rgba(77,171,245,0.08)" },
+                          }}
+                        >
+                          AI Grouping Suggest
                         </Button>
                       </Tooltip>
                     </Box>
@@ -17645,730 +17765,787 @@ export default function NewLiveMeeting() {
                       )}
 
                       {/* ALL QUESTIONS - PINNED FIRST, THEN UNPINNED */}
-                      {[...qaSorted.pinned, ...qaSorted.unpinned].map((q, idx) => {
-                        const showUnpinnedDivider = idx === qaSorted.pinned.length && qaSorted.pinned.length > 0 && qaSorted.unpinned.length > 0;
-                        const voters = q.upvoters ?? [];
-                        const votes = q.upvote_count ?? voters.length;
-                        const hasVoted = Boolean(q.user_upvoted);
-                        const canViewVoters = isHost;
+                      {(() => {
+                        const allQs = [...qaSorted.pinned, ...qaSorted.unpinned];
+                        const qToGroup = {};
+                        groups.forEach(g => {
+                          if (!Array.isArray(g.memberships)) return;
+                          g.memberships.forEach(m => {
+                            qToGroup[m.question] = g;
+                          });
+                        });
+                        const renderedGroups = {};
+                        const ungroupedNodes = [];
 
-                        // Check if self
-                        const self = rtkMeeting?.self;
-                        const selfCsid = self?.clientSpecificId || self?.customParticipantId;
-                        // Fallback to myUserIdRef if CSID not available/matching
-                        const meId = myUserIdRef.current;
+                        allQs.forEach((q, idx) => {
+                          const showUnpinnedDivider = idx === qaSorted.pinned.length && qaSorted.pinned.length > 0 && qaSorted.unpinned.length > 0;
+                          const voters = q.upvoters ?? [];
+                          const votes = q.upvote_count ?? voters.length;
+                          const hasVoted = Boolean(q.user_upvoted);
+                          const canViewVoters = isHost;
 
-                        // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
-                        let qUserId = q.user_id ?? q.user;
-                        if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
+                          // Check if self
+                          const self = rtkMeeting?.self;
+                          const selfCsid = self?.clientSpecificId || self?.customParticipantId;
+                          // Fallback to myUserIdRef if CSID not available/matching
+                          const meId = myUserIdRef.current;
 
-                        const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
+                          // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
+                          let qUserId = q.user_id ?? q.user;
+                          if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
 
-                        const questionDisplayMeta = resolveQuestionDisplayMeta(q);
-                        const askedBy = questionDisplayMeta.askedBy;
+                          const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
 
-                        const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
+                          const questionDisplayMeta = resolveQuestionDisplayMeta(q);
+                          const askedBy = questionDisplayMeta.askedBy;
 
-                        const canManage = isHost || isSelfQuestion;
-                        const isEditing = qnaEditingId === q.id;
-                        const isDisplayedOnScreen = displayedQuestion?.question_id === q.id && displayedQuestion?.visible !== false;
-                        const detectedUrls = qnaQuestionUrls[q.id] || [];
-                        const previewUrl = detectedUrls[0] || "";
-                        const preview = previewUrl ? qnaLinkPreviewCache[previewUrl] : null;
+                          const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
 
-                        return (
-                          <>
-                            {showUnpinnedDivider && (
-                              <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 1 }} />
-                            )}
-                            <Paper
-                              key={q.id}
-                              variant="outlined"
-                              sx={{
-                                p: 1.5,
-                                bgcolor: q.is_answered
-                                  ? "rgba(34,197,94,0.05)"
-                                  : q.is_hidden
-                                    ? "rgba(251, 191, 36, 0.08)"
-                                    : "rgba(255,255,255,0.03)",
-                                borderColor: q.is_pinned
-                                  ? "rgba(250,204,21,0.5)"
-                                  : q.is_answered
-                                    ? "rgba(34,197,94,0.2)"
+                          const canManage = isHost || isSelfQuestion;
+                          const isEditing = qnaEditingId === q.id;
+                          const isDisplayedOnScreen = displayedQuestion?.question_id === q.id && displayedQuestion?.visible !== false;
+                          const detectedUrls = qnaQuestionUrls[q.id] || [];
+                          const previewUrl = detectedUrls[0] || "";
+                          const preview = previewUrl ? qnaLinkPreviewCache[previewUrl] : null;
+
+                          const node = (
+                            <React.Fragment key={q.id}>
+                              {showUnpinnedDivider && (
+                                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 1 }} />
+                              )}
+                              <Paper
+                                key={q.id}
+                                variant="outlined"
+                                sx={{
+                                  p: 1.5,
+                                  bgcolor: q.is_answered
+                                    ? "rgba(34,197,94,0.05)"
                                     : q.is_hidden
-                                      ? "rgba(251, 191, 36, 0.3)"
-                                      : "rgba(255,255,255,0.08)",
-                                borderRadius: 2,
-                                position: "relative",
-                                opacity: q.is_answered ? 0.75 : 1,
-                                ...(q.is_hidden && {
-                                  "&::before": {
-                                    content: '"HIDDEN"',
-                                    position: "absolute",
-                                    top: 8,
-                                    right: 8,
-                                    fontSize: 10,
-                                    fontWeight: 700,
-                                    color: "#fbbf24",
-                                    bgcolor: "rgba(251, 191, 36, 0.15)",
-                                    px: 1,
-                                    py: 0.25,
-                                    borderRadius: 1,
-                                    border: "1px solid rgba(251, 191, 36, 0.3)"
-                                  }
-                                })
-                              }}
-                            >
-                              {isEditing ? (
-                                <Box component="form" onSubmit={(e) => { e.preventDefault(); handleQnaEditSubmit(q.id); }}>
-                                  <TextField
-                                    fullWidth
-                                    size="small"
-                                    autoFocus
-                                    value={qnaEditContent}
-                                    onChange={(e) => setQnaEditContent(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Escape") {
-                                        setQnaEditingId(null);
-                                      }
-                                    }}
-                                    sx={{
-                                      mb: 1,
-                                      "& .MuiOutlinedInput-root": {
-                                        color: "#fff",
-                                        bgcolor: "rgba(255,255,255,0.1)",
-                                        "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
-                                      }
-                                    }}
-                                  />
-                                  <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                    <Button
+                                      ? "rgba(251, 191, 36, 0.08)"
+                                      : "rgba(255,255,255,0.03)",
+                                  borderColor: q.is_pinned
+                                    ? "rgba(250,204,21,0.5)"
+                                    : q.is_answered
+                                      ? "rgba(34,197,94,0.2)"
+                                      : q.is_hidden
+                                        ? "rgba(251, 191, 36, 0.3)"
+                                        : "rgba(255,255,255,0.08)",
+                                  borderRadius: 2,
+                                  position: "relative",
+                                  opacity: q.is_answered ? 0.75 : 1,
+                                  ...(q.is_hidden && {
+                                    "&::before": {
+                                      content: '"HIDDEN"',
+                                      position: "absolute",
+                                      top: 8,
+                                      right: 8,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      color: "#fbbf24",
+                                      bgcolor: "rgba(251, 191, 36, 0.15)",
+                                      px: 1,
+                                      py: 0.25,
+                                      borderRadius: 1,
+                                      border: "1px solid rgba(251, 191, 36, 0.3)"
+                                    }
+                                  })
+                                }}
+                              >
+                                {isEditing ? (
+                                  <Box component="form" onSubmit={(e) => { e.preventDefault(); handleQnaEditSubmit(q.id); }}>
+                                    <TextField
+                                      fullWidth
                                       size="small"
-                                      onClick={() => setQnaEditingId(null)}
-                                      sx={{ color: "rgba(255,255,255,0.7)" }}
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button type="submit" size="small" variant="contained">
-                                      Save
-                                    </Button>
-                                  </Stack>
-                                </Box>
-                              ) : (
-                                <>
-                                  <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                    <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
-
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <Tooltip
-                                        arrow
-                                        placement="left"
-                                        onOpen={() => {
-                                          if (isHost) loadQuestions({ silent: true });
-                                        }}
-                                        title={
-                                          canViewVoters ? (
-                                            <Box sx={{ p: 1 }}>
-                                              <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
-                                              {votes ? (
-                                                <Stack spacing={0.25}>
-                                                  {voters.slice(0, 8).map((voter, idx) => (
-                                                    <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
-                                                      {voter?.name || voter?.username || voter?.id || "User"}
-                                                    </Typography>
-                                                  ))}
-                                                  {votes > 8 && (
-                                                    <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
-                                                  )}
-                                                </Stack>
-                                              ) : (
-                                                <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
-                                              )}
-                                            </Box>
-                                          ) : hasVoted ? (
-                                            "Remove your vote"
-                                          ) : (
-                                            "Vote for this question"
-                                          )
+                                      autoFocus
+                                      value={qnaEditContent}
+                                      onChange={(e) => setQnaEditContent(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Escape") {
+                                          setQnaEditingId(null);
                                         }
-                                        componentsProps={{
-                                          tooltip: {
-                                            sx: {
-                                              bgcolor: "rgba(0,0,0,0.92)",
-                                              border: "1px solid rgba(255,255,255,0.10)",
-                                              borderRadius: 2,
+                                      }}
+                                      sx={{
+                                        mb: 1,
+                                        "& .MuiOutlinedInput-root": {
+                                          color: "#fff",
+                                          bgcolor: "rgba(255,255,255,0.1)",
+                                          "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                                        }
+                                      }}
+                                    />
+                                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                      <Button
+                                        size="small"
+                                        onClick={() => setQnaEditingId(null)}
+                                        sx={{ color: "rgba(255,255,255,0.7)" }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button type="submit" size="small" variant="contained">
+                                        Save
+                                      </Button>
+                                    </Stack>
+                                  </Box>
+                                ) : (
+                                  <>
+                                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                      <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
+
+                                      <Stack direction="row" spacing={1} alignItems="center">
+                                        <Tooltip
+                                          arrow
+                                          placement="left"
+                                          onOpen={() => {
+                                            if (isHost) loadQuestions({ silent: true });
+                                          }}
+                                          title={
+                                            canViewVoters ? (
+                                              <Box sx={{ p: 1 }}>
+                                                <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
+                                                {votes ? (
+                                                  <Stack spacing={0.25}>
+                                                    {voters.slice(0, 8).map((voter, idx) => (
+                                                      <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
+                                                        {voter?.name || voter?.username || voter?.id || "User"}
+                                                      </Typography>
+                                                    ))}
+                                                    {votes > 8 && (
+                                                      <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
+                                                    )}
+                                                  </Stack>
+                                                ) : (
+                                                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
+                                                )}
+                                              </Box>
+                                            ) : hasVoted ? (
+                                              "Remove your vote"
+                                            ) : (
+                                              "Vote for this question"
+                                            )
+                                          }
+                                          componentsProps={{
+                                            tooltip: {
+                                              sx: {
+                                                bgcolor: "rgba(0,0,0,0.92)",
+                                                border: "1px solid rgba(255,255,255,0.10)",
+                                                borderRadius: 2,
+                                              },
                                             },
+                                          }}
+                                        >
+                                          <Box>
+                                            <Chip
+                                              size="small"
+                                              clickable
+                                              onClick={() => upvoteQuestion(q.id)}
+                                              icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
+                                              label={votes}
+                                              sx={{
+                                                bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                                                border: "1px solid rgba(255,255,255,0.10)",
+                                                "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                                              }}
+                                            />
+                                          </Box>
+                                        </Tooltip>
+
+                                        {q.is_answered && (
+                                          <Chip
+                                            size="small"
+                                            icon={<CheckCircleIcon sx={{ fontSize: 14, color: "#22c55e" }} />}
+                                            label="ANSWERED"
+                                            sx={{
+                                              bgcolor: "rgba(34,197,94,0.12)",
+                                              border: "1px solid rgba(34,197,94,0.4)",
+                                              color: "#22c55e",
+                                              fontWeight: 700,
+                                              fontSize: 10,
+                                              height: 20
+                                            }}
+                                          />
+                                        )}
+
+                                        <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
+                                      </Stack>
+                                    </Stack>
+
+                                    <Typography
+                                      component="div"
+                                      sx={{
+                                        mt: 0.75,
+                                        fontSize: 13,
+                                        opacity: 0.92,
+                                        whiteSpace: "pre-wrap",
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {renderTextWithDetectedLinks(q.content)}
+                                    </Typography>
+
+                                    {previewUrl && preview && (
+                                      <Paper
+                                        component="a"
+                                        href={preview.url || previewUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        variant="outlined"
+                                        sx={{
+                                          mt: 1,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1,
+                                          p: 1,
+                                          bgcolor: "rgba(125,211,252,0.06)",
+                                          borderColor: "rgba(125,211,252,0.2)",
+                                          borderRadius: 2,
+                                          textDecoration: "none",
+                                          "&:hover": {
+                                            bgcolor: "rgba(125,211,252,0.1)",
+                                            borderColor: "rgba(125,211,252,0.32)",
                                           },
                                         }}
                                       >
-                                        <Box>
-                                          <Chip
-                                            size="small"
-                                            clickable
-                                            onClick={() => upvoteQuestion(q.id)}
-                                            icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
-                                            label={votes}
+                                        <Avatar
+                                          src={preview.favicon_url || ""}
+                                          variant="rounded"
+                                          sx={{
+                                            width: 28,
+                                            height: 28,
+                                            bgcolor: "rgba(255,255,255,0.08)",
+                                            borderRadius: 1.2,
+                                          }}
+                                        >
+                                          {(preview.hostname || previewUrl).slice(0, 1).toUpperCase()}
+                                        </Avatar>
+                                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                                          <Typography
                                             sx={{
-                                              bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                                              border: "1px solid rgba(255,255,255,0.10)",
-                                              "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                                              fontSize: 12,
+                                              fontWeight: 700,
+                                              color: "#e2f3ff",
+                                              whiteSpace: "nowrap",
+                                              overflow: "hidden",
+                                              textOverflow: "ellipsis",
                                             }}
-                                          />
+                                          >
+                                            {preview.title || preview.hostname || previewUrl}
+                                          </Typography>
+                                          <Typography
+                                            sx={{
+                                              fontSize: 11,
+                                              opacity: 0.68,
+                                              whiteSpace: "nowrap",
+                                              overflow: "hidden",
+                                              textOverflow: "ellipsis",
+                                            }}
+                                          >
+                                            {preview.hostname || previewUrl}
+                                          </Typography>
                                         </Box>
-                                      </Tooltip>
-
-                                      {q.is_answered && (
-                                        <Chip
-                                          size="small"
-                                          icon={<CheckCircleIcon sx={{ fontSize: 14, color: "#22c55e" }} />}
-                                          label="ANSWERED"
-                                          sx={{
-                                            bgcolor: "rgba(34,197,94,0.12)",
-                                            border: "1px solid rgba(34,197,94,0.4)",
-                                            color: "#22c55e",
-                                            fontWeight: 700,
-                                            fontSize: 10,
-                                            height: 20
-                                          }}
-                                        />
-                                      )}
-
-                                      <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
-                                    </Stack>
-                                  </Stack>
-
-                                  <Typography
-                                    component="div"
-                                    sx={{
-                                      mt: 0.75,
-                                      fontSize: 13,
-                                      opacity: 0.92,
-                                      whiteSpace: "pre-wrap",
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {renderTextWithDetectedLinks(q.content)}
-                                  </Typography>
-
-                                  {previewUrl && preview && (
-                                    <Paper
-                                      component="a"
-                                      href={preview.url || previewUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      variant="outlined"
-                                      sx={{
-                                        mt: 1,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 1,
-                                        p: 1,
-                                        bgcolor: "rgba(125,211,252,0.06)",
-                                        borderColor: "rgba(125,211,252,0.2)",
-                                        borderRadius: 2,
-                                        textDecoration: "none",
-                                        "&:hover": {
-                                          bgcolor: "rgba(125,211,252,0.1)",
-                                          borderColor: "rgba(125,211,252,0.32)",
-                                        },
-                                      }}
-                                    >
-                                      <Avatar
-                                        src={preview.favicon_url || ""}
-                                        variant="rounded"
-                                        sx={{
-                                          width: 28,
-                                          height: 28,
-                                          bgcolor: "rgba(255,255,255,0.08)",
-                                          borderRadius: 1.2,
-                                        }}
-                                      >
-                                        {(preview.hostname || previewUrl).slice(0, 1).toUpperCase()}
-                                      </Avatar>
-                                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                                        <Typography
-                                          sx={{
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            color: "#e2f3ff",
-                                            whiteSpace: "nowrap",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                          }}
-                                        >
-                                          {preview.title || preview.hostname || previewUrl}
-                                        </Typography>
-                                        <Typography
-                                          sx={{
-                                            fontSize: 11,
-                                            opacity: 0.68,
-                                            whiteSpace: "nowrap",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                          }}
-                                        >
-                                          {preview.hostname || previewUrl}
-                                        </Typography>
-                                      </Box>
-                                    </Paper>
-                                  )}
-
-                                  <Stack direction="column" spacing={0.75} sx={{ mt: 1 }}>
-                                    {/* Seed question speaker note — host only */}
-                                    {q.is_seed && isHost && q.speaker_note && (
-                                      <Box sx={{
-                                        display: "flex", alignItems: "flex-start", gap: 0.5,
-                                        bgcolor: "rgba(99,102,241,0.08)", borderRadius: 1,
-                                        border: "1px solid rgba(99,102,241,0.2)", px: 1, py: 0.5,
-                                      }}>
-                                        <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#818cf8", mr: 0.5, flexShrink: 0 }}>
-                                          NOTE:
-                                        </Typography>
-                                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}>
-                                          {q.speaker_note}
-                                        </Typography>
-                                      </Box>
+                                      </Paper>
                                     )}
-                                    <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
-                                      {q.is_seed ? (
-                                        <>
-                                          <Chip
-                                            size="small"
-                                            label={q.attribution_label || "Event Team"}
-                                            sx={{ bgcolor: "rgba(16,184,166,0.12)", color: "#5eead4", border: "1px solid rgba(16,184,166,0.3)", fontSize: 10, height: 18 }}
-                                          />
-                                          <Chip
-                                            label="SEED"
-                                            size="small"
-                                            sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}
-                                          />
-                                        </>
-                                      ) : (
-                                        <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
-                                      )}
-                                      {q.requires_followup && (
-                                        <Chip
-                                          label="Follow-up"
-                                          size="small"
-                                          icon={<FlagOutlinedIcon />}
-                                          sx={{
-                                            fontSize: 10,
-                                            height: 18,
-                                            color: "#f97316",
-                                            borderColor: "rgba(249,115,22,0.4)"
-                                          }}
-                                          variant="outlined"
-                                        />
-                                      )}
-                                      {q.is_anonymous && (
-                                        <Chip
-                                          label="Anonymous"
-                                          size="small"
-                                          icon={<VisibilityOffIcon />}
-                                          sx={{
-                                            fontSize: 10,
-                                            height: 18,
-                                            color: "rgba(255,255,255,0.6)",
-                                            borderColor: "rgba(255,255,255,0.25)"
-                                          }}
-                                          variant="outlined"
-                                        />
-                                      )}
-                                      {qnaSortMode === "hot" && qnaHotScore(q) > QNA_FLAME_THRESHOLD && (
-                                        <Chip
-                                          label="🔥 Trending"
-                                          size="small"
-                                          sx={{
-                                            fontSize: 10,
-                                            height: 18,
-                                            bgcolor: "rgba(251,146,60,0.15)",
-                                            color: "#fb923c",
-                                            borderColor: "rgba(251,146,60,0.3)"
-                                          }}
-                                          variant="outlined"
-                                        />
-                                      )}
-                                    </Stack>
 
-                                    {canManage && (
-                                      <Stack direction="row" spacing={0} justifyContent="flex-end">
-                                        {isHost && qnaSortMode === "manual" && !q.is_pinned && (
+                                    <Stack direction="column" spacing={0.75} sx={{ mt: 1 }}>
+                                      {/* Seed question speaker note — host only */}
+                                      {q.is_seed && isHost && q.speaker_note && (
+                                        <Box sx={{
+                                          display: "flex", alignItems: "flex-start", gap: 0.5,
+                                          bgcolor: "rgba(99,102,241,0.08)", borderRadius: 1,
+                                          border: "1px solid rgba(99,102,241,0.2)", px: 1, py: 0.5,
+                                        }}>
+                                          <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#818cf8", mr: 0.5, flexShrink: 0 }}>
+                                            NOTE:
+                                          </Typography>
+                                          <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.65)", fontStyle: "italic" }}>
+                                            {q.speaker_note}
+                                          </Typography>
+                                        </Box>
+                                      )}
+                                      <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
+                                        {q.is_seed ? (
                                           <>
-                                            <Tooltip title="Move up">
-                                              <span>
-                                                <IconButton
-                                                  size="small"
-                                                  disabled={qnaReordering || qaSorted.unpinned.indexOf(q) === 0}
-                                                  onClick={() => handleMoveQuestion(q.id, qaSorted.unpinned.indexOf(q), qaSorted.unpinned.indexOf(q) - 1, qaSorted.unpinned)}
-                                                  sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
-                                                >
-                                                  <ArrowUpwardIcon sx={{ fontSize: 16 }} />
-                                                </IconButton>
-                                              </span>
-                                            </Tooltip>
-                                            <Tooltip title="Move down">
-                                              <span>
-                                                <IconButton
-                                                  size="small"
-                                                  disabled={qnaReordering || qaSorted.unpinned.indexOf(q) === qaSorted.unpinned.length - 1}
-                                                  onClick={() => handleMoveQuestion(q.id, qaSorted.unpinned.indexOf(q), qaSorted.unpinned.indexOf(q) + 1, qaSorted.unpinned)}
-                                                  sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
-                                                >
-                                                  <ArrowDownwardIcon sx={{ fontSize: 16 }} />
-                                                </IconButton>
-                                              </span>
-                                            </Tooltip>
+                                            <Chip
+                                              size="small"
+                                              label={q.attribution_label || "Event Team"}
+                                              sx={{ bgcolor: "rgba(16,184,166,0.12)", color: "#5eead4", border: "1px solid rgba(16,184,166,0.3)", fontSize: 10, height: 18 }}
+                                            />
+                                            <Chip
+                                              label="SEED"
+                                              size="small"
+                                              sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}
+                                            />
                                           </>
+                                        ) : (
+                                          <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
                                         )}
-                                        {isHost && (
-                                          <Tooltip title={isDisplayedOnScreen ? "Question is live on the main screen" : "Show on the main screen"}>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => handleDisplayQuestionOnScreen(q)}
-                                              sx={{
-                                                color: isDisplayedOnScreen ? "#38bdf8" : "rgba(255,255,255,0.45)",
-                                                p: 0.5,
-                                                "&:hover": {
-                                                  color: "#7dd3fc",
-                                                }
-                                              }}
-                                            >
-                                              <AnnouncementIcon sx={{ fontSize: 16 }} />
-                                            </IconButton>
-                                          </Tooltip>
+                                        {q.requires_followup && (
+                                          <Chip
+                                            label="Follow-up"
+                                            size="small"
+                                            icon={<FlagOutlinedIcon />}
+                                            sx={{
+                                              fontSize: 10,
+                                              height: 18,
+                                              color: "#f97316",
+                                              borderColor: "rgba(249,115,22,0.4)"
+                                            }}
+                                            variant="outlined"
+                                          />
                                         )}
-                                        <IconButton
-                                          size="small"
-                                          onClick={() => {
-                                            setQnaEditingId(q.id);
-                                            setQnaEditContent(q.content);
-                                          }}
-                                          sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
-                                        >
-                                          <EditRoundedIcon sx={{ fontSize: 16 }} />
-                                        </IconButton>
-                                        {isHost && (
-                                          <Tooltip title={q.is_pinned ? "Unpin question" : "Pin question"}>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => handlePinQuestion(q.id)}
-                                              sx={{
-                                                color: q.is_pinned ? "#facc15" : "rgba(255,255,255,0.4)",
-                                                p: 0.5,
-                                                "&:hover": {
-                                                  color: q.is_pinned ? "#facc15" : "rgba(255,255,255,0.9)"
-                                                }
-                                              }}
-                                            >
-                                              {q.is_pinned ? <PushPinIcon sx={{ fontSize: 16 }} /> : <PushPinOutlinedIcon sx={{ fontSize: 16 }} />}
-                                            </IconButton>
-                                          </Tooltip>
+                                        {q.is_anonymous && (
+                                          <Chip
+                                            label="Anonymous"
+                                            size="small"
+                                            icon={<VisibilityOffIcon />}
+                                            sx={{
+                                              fontSize: 10,
+                                              height: 18,
+                                              color: "rgba(255,255,255,0.6)",
+                                              borderColor: "rgba(255,255,255,0.25)"
+                                            }}
+                                            variant="outlined"
+                                          />
                                         )}
-                                        {isHost && (
-                                          <Tooltip title={q.is_hidden ? "Unhide Question" : "Hide Question"}>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => toggleQuestionVisibility(q.id)}
-                                              sx={{
-                                                color: q.is_hidden ? "rgba(251, 191, 36, 0.7)" : "rgba(255,255,255,0.5)",
-                                                p: 0.5,
-                                                "&:hover": {
-                                                  color: q.is_hidden ? "#fbbf24" : "rgba(255,255,255,0.9)"
-                                                }
-                                              }}
-                                            >
-                                              {q.is_hidden ? <VisibilityIcon sx={{ fontSize: 16 }} /> : <VisibilityOffIcon sx={{ fontSize: 16 }} />}
-                                            </IconButton>
-                                          </Tooltip>
+                                        {qnaSortMode === "hot" && qnaHotScore(q) > QNA_FLAME_THRESHOLD && (
+                                          <Chip
+                                            label="🔥 Trending"
+                                            size="small"
+                                            sx={{
+                                              fontSize: 10,
+                                              height: 18,
+                                              bgcolor: "rgba(251,146,60,0.15)",
+                                              color: "#fb923c",
+                                              borderColor: "rgba(251,146,60,0.3)"
+                                            }}
+                                            variant="outlined"
+                                          />
                                         )}
-                                        {isHost && (
-                                          <Tooltip title={q.is_answered ? "Mark as unanswered" : "Mark as answered"}>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => handleMarkAnswered(q.id, q.requires_followup)}
-                                              sx={{
-                                                color: q.is_answered ? "#22c55e" : "rgba(255,255,255,0.4)",
-                                                p: 0.5,
-                                                "&:hover": {
-                                                  color: q.is_answered ? "#22c55e" : "rgba(255,255,255,0.9)"
-                                                }
-                                              }}
-                                            >
-                                              {q.is_answered ? <CheckCircleIcon sx={{ fontSize: 16 }} /> : <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />}
-                                            </IconButton>
-                                          </Tooltip>
-                                        )}
-                                        {isHost && (
-                                          <Tooltip title={q.requires_followup ? "Remove follow-up flag" : "Flag for follow-up"}>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => handleMarkAnswered(q.id, !q.requires_followup)}
-                                              sx={{
-                                                color: q.requires_followup ? "#f97316" : "rgba(255,255,255,0.4)",
-                                                p: 0.5,
-                                                "&:hover": {
-                                                  color: q.requires_followup ? "#f97316" : "rgba(255,255,255,0.9)"
-                                                }
-                                              }}
-                                            >
-                                              <FlagOutlinedIcon sx={{ fontSize: 16 }} />
-                                            </IconButton>
-                                          </Tooltip>
-                                        )}
-                                        {isHost && (
-                                          <Tooltip title={q.is_anonymous ? "De-anonymize question" : "Anonymize question"}>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => handleAnonymizeQuestion(q.id)}
-                                              sx={{
-                                                color: q.is_anonymous ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)",
-                                                p: 0.5,
-                                                "&:hover": {
-                                                  color: q.is_anonymous ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.9)"
-                                                }
-                                              }}
-                                            >
-                                              <VisibilityOffIcon sx={{ fontSize: 16 }} />
-                                            </IconButton>
-                                          </Tooltip>
-                                        )}
-                                        <IconButton
-                                          size="small"
-                                          onClick={() => handleQnaDelete(q.id)}
-                                          sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
-                                        >
-                                          <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                                        </IconButton>
                                       </Stack>
-                                    )}
 
-                                    {/* ── Reply button ─────────────────────────── */}
-                                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.25 }}>
-                                      <Button
-                                        size="small"
-                                        startIcon={<ReplyIcon sx={{ fontSize: "13px !important" }} />}
-                                        onClick={() => setQnaReplyOpen((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
-                                        sx={{
-                                          color: qnaReplyOpen[q.id] ? "#4dabf5" : "rgba(255,255,255,0.45)",
-                                          textTransform: "none",
-                                          fontSize: 11,
-                                          p: "2px 6px",
-                                          minWidth: 0,
-                                        }}
-                                      >
-                                        Reply{q.reply_count > 0 ? ` (${q.reply_count})` : ""}
-                                      </Button>
-                                    </Stack>
-
-                                    {/* ── Inline reply input ───────────────────── */}
-                                    <Collapse in={Boolean(qnaReplyOpen[q.id])}>
-                                      <Box
-                                        component="form"
-                                        onSubmit={(e) => { e.preventDefault(); submitReply(q.id); }}
-                                        sx={{ mt: 0.75, ml: 1 }}
-                                      >
-                                        <TextField
-                                          fullWidth
-                                          size="small"
-                                          placeholder="Write a reply…"
-                                          value={qnaReplyText[q.id] || ""}
-                                          onChange={(e) => setQnaReplyText((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                                          onKeyDown={(e) => {
-                                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitReply(q.id); }
-                                            if (e.key === "Escape") setQnaReplyOpen((prev) => ({ ...prev, [q.id]: false }));
-                                          }}
-                                          sx={{
-                                            "& .MuiOutlinedInput-root": {
-                                              bgcolor: "rgba(255,255,255,0.04)",
-                                              borderRadius: 2,
-                                              fontSize: 13,
-                                            },
-                                          }}
-                                        />
-                                        <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 0.5 }}>
-                                          <Button
-                                            size="small"
-                                            onClick={() => setQnaReplyOpen((prev) => ({ ...prev, [q.id]: false }))}
-                                            sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none", fontSize: 11 }}
-                                          >
-                                            Cancel
-                                          </Button>
-                                          <Button
-                                            type="submit"
-                                            size="small"
-                                            variant="contained"
-                                            disabled={!(qnaReplyText[q.id] || "").trim()}
-                                            sx={{ textTransform: "none", fontSize: 11 }}
-                                          >
-                                            Reply
-                                          </Button>
-                                        </Stack>
-                                      </Box>
-                                    </Collapse>
-
-                                    {/* ── Replies list ─────────────────────────── */}
-                                    {(q.replies?.length > 0) && (() => {
-                                      const allReplies = q.replies;
-                                      const expanded = Boolean(qnaRepliesExpanded[q.id]);
-                                      const visible = expanded ? allReplies : allReplies.slice(0, 3);
-                                      const hiddenCount = allReplies.length - 3;
-                                      return (
-                                        <Box sx={{ mt: 0.5 }}>
-                                          {visible.map((r) => {
-                                            const myId = String(myUserIdRef.current || "");
-                                            const authorId = String(r.author_id ?? "");
-                                            const canManageReply = isHost || (myId && authorId && authorId === myId);
-                                            const isEditingReply = qnaReplyEditingId === r.id;
-                                            return (
-                                              <Box
-                                                key={r.id}
+                                      {canManage && (
+                                        <Stack direction="row" spacing={0} justifyContent="flex-end">
+                                          {isHost && qnaSortMode === "manual" && !q.is_pinned && (
+                                            <>
+                                              <Tooltip title="Move up">
+                                                <span>
+                                                  <IconButton
+                                                    size="small"
+                                                    disabled={qnaReordering || qaSorted.unpinned.indexOf(q) === 0}
+                                                    onClick={() => handleMoveQuestion(q.id, qaSorted.unpinned.indexOf(q), qaSorted.unpinned.indexOf(q) - 1, qaSorted.unpinned)}
+                                                    sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                                  >
+                                                    <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+                                                  </IconButton>
+                                                </span>
+                                              </Tooltip>
+                                              <Tooltip title="Move down">
+                                                <span>
+                                                  <IconButton
+                                                    size="small"
+                                                    disabled={qnaReordering || qaSorted.unpinned.indexOf(q) === qaSorted.unpinned.length - 1}
+                                                    onClick={() => handleMoveQuestion(q.id, qaSorted.unpinned.indexOf(q), qaSorted.unpinned.indexOf(q) + 1, qaSorted.unpinned)}
+                                                    sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                                  >
+                                                    <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+                                                  </IconButton>
+                                                </span>
+                                              </Tooltip>
+                                            </>
+                                          )}
+                                          {isHost && (
+                                            <Tooltip title={isDisplayedOnScreen ? "Question is live on the main screen" : "Show on the main screen"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handleDisplayQuestionOnScreen(q)}
                                                 sx={{
-                                                  ml: 2,
-                                                  mt: 0.5,
-                                                  pl: 1.5,
-                                                  borderLeft: "2px solid rgba(255,255,255,0.1)",
+                                                  color: isDisplayedOnScreen ? "#38bdf8" : "rgba(255,255,255,0.45)",
+                                                  p: 0.5,
+                                                  "&:hover": {
+                                                    color: "#7dd3fc",
+                                                  }
                                                 }}
                                               >
-                                                {isEditingReply ? (
-                                                  <Box>
-                                                    <TextField
-                                                      fullWidth
-                                                      size="small"
-                                                      autoFocus
-                                                      value={qnaReplyEditContent}
-                                                      onChange={(e) => setQnaReplyEditContent(e.target.value)}
-                                                      onKeyDown={(e) => {
-                                                        if (e.key === "Escape") { setQnaReplyEditingId(null); setQnaReplyEditContent(""); }
-                                                        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveReplyEdit(r.id); }
-                                                      }}
-                                                      sx={{
-                                                        mb: 0.5,
-                                                        "& .MuiOutlinedInput-root": {
-                                                          bgcolor: "rgba(255,255,255,0.06)",
-                                                          borderRadius: 1.5,
-                                                          fontSize: 12,
-                                                        },
-                                                      }}
-                                                    />
-                                                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                      <Button size="small" onClick={() => { setQnaReplyEditingId(null); setQnaReplyEditContent(""); }} sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none", fontSize: 11 }}>
-                                                        Cancel
-                                                      </Button>
-                                                      <Button size="small" variant="contained" onClick={() => saveReplyEdit(r.id)} sx={{ textTransform: "none", fontSize: 11 }}>
-                                                        Save
-                                                      </Button>
-                                                    </Stack>
-                                                  </Box>
-                                                ) : (
-                                                  <Stack direction="row" spacing={0.5} alignItems="flex-start" justifyContent="space-between">
-                                                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                                                      <Stack direction="row" spacing={0.75} alignItems="baseline" flexWrap="wrap">
-                                                        <Typography sx={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
-                                                          {r.author_name || "Anonymous"}
-                                                        </Typography>
-                                                        <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
-                                                          {r.created_at ? new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
-                                                        </Typography>
-                                                      </Stack>
-                                                      <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.88)", whiteSpace: "pre-wrap", wordBreak: "break-word", mt: 0.25 }}>
-                                                        {r.content}
-                                                      </Typography>
-                                                      {canManageReply && (
-                                                        <Stack direction="row" sx={{ mt: 0.25 }}>
-                                                          <IconButton
-                                                            size="small"
-                                                            onClick={() => { setQnaReplyEditingId(r.id); setQnaReplyEditContent(r.content); }}
-                                                            sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
-                                                          >
-                                                            <EditRoundedIcon sx={{ fontSize: 12 }} />
-                                                          </IconButton>
-                                                          <IconButton
-                                                            size="small"
-                                                            onClick={() => deleteReply(r.id)}
-                                                            sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
-                                                          >
-                                                            <DeleteOutlineRoundedIcon sx={{ fontSize: 12 }} />
-                                                          </IconButton>
-                                                        </Stack>
-                                                      )}
-                                                    </Box>
-                                                    {/* Reply upvote */}
-                                                    <Tooltip
-                                                      arrow
-                                                      placement="left"
-                                                      title={
-                                                        isHost ? (
-                                                          <Box sx={{ p: 1 }}>
-                                                            <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
-                                                            {(r.upvoters?.length > 0) ? (
-                                                              <Stack spacing={0.25}>
-                                                                {(r.upvoters || []).slice(0, 8).map((voter, vi) => (
-                                                                  <Typography key={`${voter?.id || vi}`} sx={{ fontSize: 12, opacity: 0.9 }}>
-                                                                    {voter?.name || voter?.username || "User"}
-                                                                  </Typography>
-                                                                ))}
-                                                                {r.upvoters.length > 8 && (
-                                                                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{r.upvoters.length - 8} more</Typography>
-                                                                )}
-                                                              </Stack>
-                                                            ) : (
-                                                              <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
-                                                            )}
-                                                          </Box>
-                                                        ) : r.user_upvoted ? "Remove your vote" : "Upvote reply"
-                                                      }
-                                                      componentsProps={{
-                                                        tooltip: {
-                                                          sx: {
-                                                            bgcolor: "rgba(0,0,0,0.92)",
-                                                            border: "1px solid rgba(255,255,255,0.10)",
-                                                            borderRadius: 2,
-                                                          },
-                                                        },
-                                                      }}
-                                                    >
-                                                      <Stack alignItems="center" sx={{ minWidth: 28, flexShrink: 0 }}>
-                                                        <IconButton
-                                                          size="small"
-                                                          onClick={() => upvoteReply(r.id)}
-                                                          sx={{ color: r.user_upvoted ? "#4dabf5" : "rgba(255,255,255,0.4)", p: 0.25 }}
-                                                        >
-                                                          {r.user_upvoted
-                                                            ? <ThumbUpAltIcon sx={{ fontSize: 12 }} />
-                                                            : <ThumbUpAltOutlinedIcon sx={{ fontSize: 12 }} />}
-                                                        </IconButton>
-                                                        {r.upvote_count > 0 && (
-                                                          <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
-                                                            {r.upvote_count}
-                                                          </Typography>
-                                                        )}
-                                                      </Stack>
-                                                    </Tooltip>
-                                                  </Stack>
-                                                )}
-                                              </Box>
-                                            );
-                                          })}
-                                          {allReplies.length > 3 && (
+                                                <AnnouncementIcon sx={{ fontSize: 16 }} />
+                                              </IconButton>
+                                            </Tooltip>
+                                          )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                              setQnaEditingId(q.id);
+                                              setQnaEditContent(q.content);
+                                            }}
+                                            sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                          >
+                                            <EditRoundedIcon sx={{ fontSize: 16 }} />
+                                          </IconButton>
+                                          {isHost && (
+                                            <Tooltip title={q.is_pinned ? "Unpin question" : "Pin question"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handlePinQuestion(q.id)}
+                                                sx={{
+                                                  color: q.is_pinned ? "#facc15" : "rgba(255,255,255,0.4)",
+                                                  p: 0.5,
+                                                  "&:hover": {
+                                                    color: q.is_pinned ? "#facc15" : "rgba(255,255,255,0.9)"
+                                                  }
+                                                }}
+                                              >
+                                                {q.is_pinned ? <PushPinIcon sx={{ fontSize: 16 }} /> : <PushPinOutlinedIcon sx={{ fontSize: 16 }} />}
+                                              </IconButton>
+                                            </Tooltip>
+                                          )}
+                                          {isHost && (
+                                            <Tooltip title={q.is_hidden ? "Unhide Question" : "Hide Question"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => toggleQuestionVisibility(q.id)}
+                                                sx={{
+                                                  color: q.is_hidden ? "rgba(251, 191, 36, 0.7)" : "rgba(255,255,255,0.5)",
+                                                  p: 0.5,
+                                                  "&:hover": {
+                                                    color: q.is_hidden ? "#fbbf24" : "rgba(255,255,255,0.9)"
+                                                  }
+                                                }}
+                                              >
+                                                {q.is_hidden ? <VisibilityIcon sx={{ fontSize: 16 }} /> : <VisibilityOffIcon sx={{ fontSize: 16 }} />}
+                                              </IconButton>
+                                            </Tooltip>
+                                          )}
+                                          {isHost && (
+                                            <Tooltip title={q.is_answered ? "Mark as unanswered" : "Mark as answered"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handleMarkAnswered(q.id, q.requires_followup)}
+                                                sx={{
+                                                  color: q.is_answered ? "#22c55e" : "rgba(255,255,255,0.4)",
+                                                  p: 0.5,
+                                                  "&:hover": {
+                                                    color: q.is_answered ? "#22c55e" : "rgba(255,255,255,0.9)"
+                                                  }
+                                                }}
+                                              >
+                                                {q.is_answered ? <CheckCircleIcon sx={{ fontSize: 16 }} /> : <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />}
+                                              </IconButton>
+                                            </Tooltip>
+                                          )}
+                                          {isHost && (
+                                            <Tooltip title={q.requires_followup ? "Remove follow-up flag" : "Flag for follow-up"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handleMarkAnswered(q.id, !q.requires_followup)}
+                                                sx={{
+                                                  color: q.requires_followup ? "#f97316" : "rgba(255,255,255,0.4)",
+                                                  p: 0.5,
+                                                  "&:hover": {
+                                                    color: q.requires_followup ? "#f97316" : "rgba(255,255,255,0.9)"
+                                                  }
+                                                }}
+                                              >
+                                                <FlagOutlinedIcon sx={{ fontSize: 16 }} />
+                                              </IconButton>
+                                            </Tooltip>
+                                          )}
+                                          {isHost && (
+                                            <Tooltip title={q.is_anonymous ? "De-anonymize question" : "Anonymize question"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handleAnonymizeQuestion(q.id)}
+                                                sx={{
+                                                  color: q.is_anonymous ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)",
+                                                  p: 0.5,
+                                                  "&:hover": {
+                                                    color: q.is_anonymous ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.9)"
+                                                  }
+                                                }}
+                                              >
+                                                <VisibilityOffIcon sx={{ fontSize: 16 }} />
+                                              </IconButton>
+                                            </Tooltip>
+                                          )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => handleQnaDelete(q.id)}
+                                            sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                          >
+                                            <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                                          </IconButton>
+                                        </Stack>
+                                      )}
+
+                                      {/* ── Reply button ─────────────────────────── */}
+                                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.25 }}>
+                                        <Button
+                                          size="small"
+                                          startIcon={<ReplyIcon sx={{ fontSize: "13px !important" }} />}
+                                          onClick={() => setQnaReplyOpen((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
+                                          sx={{
+                                            color: qnaReplyOpen[q.id] ? "#4dabf5" : "rgba(255,255,255,0.45)",
+                                            textTransform: "none",
+                                            fontSize: 11,
+                                            p: "2px 6px",
+                                            minWidth: 0,
+                                          }}
+                                        >
+                                          Reply{q.reply_count > 0 ? ` (${q.reply_count})` : ""}
+                                        </Button>
+                                      </Stack>
+
+                                      {/* ── Inline reply input ───────────────────── */}
+                                      <Collapse in={Boolean(qnaReplyOpen[q.id])}>
+                                        <Box
+                                          component="form"
+                                          onSubmit={(e) => { e.preventDefault(); submitReply(q.id); }}
+                                          sx={{ mt: 0.75, ml: 1 }}
+                                        >
+                                          <TextField
+                                            fullWidth
+                                            size="small"
+                                            placeholder="Write a reply…"
+                                            value={qnaReplyText[q.id] || ""}
+                                            onChange={(e) => setQnaReplyText((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                                            onKeyDown={(e) => {
+                                              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitReply(q.id); }
+                                              if (e.key === "Escape") setQnaReplyOpen((prev) => ({ ...prev, [q.id]: false }));
+                                            }}
+                                            sx={{
+                                              "& .MuiOutlinedInput-root": {
+                                                bgcolor: "rgba(255,255,255,0.04)",
+                                                borderRadius: 2,
+                                                fontSize: 13,
+                                              },
+                                            }}
+                                          />
+                                          <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 0.5 }}>
                                             <Button
                                               size="small"
-                                              onClick={() => setQnaRepliesExpanded((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
-                                              startIcon={expanded ? <ExpandLess sx={{ fontSize: 13 }} /> : <ExpandMore sx={{ fontSize: 13 }} />}
-                                              sx={{ ml: 2, mt: 0.25, color: "rgba(255,255,255,0.45)", textTransform: "none", fontSize: 11, p: "2px 4px" }}
+                                              onClick={() => setQnaReplyOpen((prev) => ({ ...prev, [q.id]: false }))}
+                                              sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none", fontSize: 11 }}
                                             >
-                                              {expanded ? "Collapse replies" : `View ${hiddenCount} more ${hiddenCount === 1 ? "reply" : "replies"}`}
+                                              Cancel
                                             </Button>
-                                          )}
+                                            <Button
+                                              type="submit"
+                                              size="small"
+                                              variant="contained"
+                                              disabled={!(qnaReplyText[q.id] || "").trim()}
+                                              sx={{ textTransform: "none", fontSize: 11 }}
+                                            >
+                                              Reply
+                                            </Button>
+                                          </Stack>
                                         </Box>
-                                      );
-                                    })()}
+                                      </Collapse>
+
+                                      {/* ── Replies list ─────────────────────────── */}
+                                      {(q.replies?.length > 0) && (() => {
+                                        const allReplies = q.replies;
+                                        const expanded = Boolean(qnaRepliesExpanded[q.id]);
+                                        const visible = expanded ? allReplies : allReplies.slice(0, 3);
+                                        const hiddenCount = allReplies.length - 3;
+                                        return (
+                                          <Box sx={{ mt: 0.5 }}>
+                                            {visible.map((r) => {
+                                              const myId = String(myUserIdRef.current || "");
+                                              const authorId = String(r.author_id ?? "");
+                                              const canManageReply = isHost || (myId && authorId && authorId === myId);
+                                              const isEditingReply = qnaReplyEditingId === r.id;
+                                              return (
+                                                <Box
+                                                  key={r.id}
+                                                  sx={{
+                                                    ml: 2,
+                                                    mt: 0.5,
+                                                    pl: 1.5,
+                                                    borderLeft: "2px solid rgba(255,255,255,0.1)",
+                                                  }}
+                                                >
+                                                  {isEditingReply ? (
+                                                    <Box>
+                                                      <TextField
+                                                        fullWidth
+                                                        size="small"
+                                                        autoFocus
+                                                        value={qnaReplyEditContent}
+                                                        onChange={(e) => setQnaReplyEditContent(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                          if (e.key === "Escape") { setQnaReplyEditingId(null); setQnaReplyEditContent(""); }
+                                                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveReplyEdit(r.id); }
+                                                        }}
+                                                        sx={{
+                                                          mb: 0.5,
+                                                          "& .MuiOutlinedInput-root": {
+                                                            bgcolor: "rgba(255,255,255,0.06)",
+                                                            borderRadius: 1.5,
+                                                            fontSize: 12,
+                                                          },
+                                                        }}
+                                                      />
+                                                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                                        <Button size="small" onClick={() => { setQnaReplyEditingId(null); setQnaReplyEditContent(""); }} sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none", fontSize: 11 }}>
+                                                          Cancel
+                                                        </Button>
+                                                        <Button size="small" variant="contained" onClick={() => saveReplyEdit(r.id)} sx={{ textTransform: "none", fontSize: 11 }}>
+                                                          Save
+                                                        </Button>
+                                                      </Stack>
+                                                    </Box>
+                                                  ) : (
+                                                    <Stack direction="row" spacing={0.5} alignItems="flex-start" justifyContent="space-between">
+                                                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                        <Stack direction="row" spacing={0.75} alignItems="baseline" flexWrap="wrap">
+                                                          <Typography sx={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                                                            {r.author_name || "Anonymous"}
+                                                          </Typography>
+                                                          <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                                                            {r.created_at ? new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                                                          </Typography>
+                                                        </Stack>
+                                                        <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.88)", whiteSpace: "pre-wrap", wordBreak: "break-word", mt: 0.25 }}>
+                                                          {r.content}
+                                                        </Typography>
+                                                        {canManageReply && (
+                                                          <Stack direction="row" sx={{ mt: 0.25 }}>
+                                                            <IconButton
+                                                              size="small"
+                                                              onClick={() => { setQnaReplyEditingId(r.id); setQnaReplyEditContent(r.content); }}
+                                                              sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
+                                                            >
+                                                              <EditRoundedIcon sx={{ fontSize: 12 }} />
+                                                            </IconButton>
+                                                            <IconButton
+                                                              size="small"
+                                                              onClick={() => deleteReply(r.id)}
+                                                              sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
+                                                            >
+                                                              <DeleteOutlineRoundedIcon sx={{ fontSize: 12 }} />
+                                                            </IconButton>
+                                                          </Stack>
+                                                        )}
+                                                      </Box>
+                                                      {/* Reply upvote */}
+                                                      <Tooltip
+                                                        arrow
+                                                        placement="left"
+                                                        title={
+                                                          isHost ? (
+                                                            <Box sx={{ p: 1 }}>
+                                                              <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
+                                                              {(r.upvoters?.length > 0) ? (
+                                                                <Stack spacing={0.25}>
+                                                                  {(r.upvoters || []).slice(0, 8).map((voter, vi) => (
+                                                                    <Typography key={`${voter?.id || vi}`} sx={{ fontSize: 12, opacity: 0.9 }}>
+                                                                      {voter?.name || voter?.username || "User"}
+                                                                    </Typography>
+                                                                  ))}
+                                                                  {r.upvoters.length > 8 && (
+                                                                    <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{r.upvoters.length - 8} more</Typography>
+                                                                  )}
+                                                                </Stack>
+                                                              ) : (
+                                                                <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
+                                                              )}
+                                                            </Box>
+                                                          ) : r.user_upvoted ? "Remove your vote" : "Upvote reply"
+                                                        }
+                                                        componentsProps={{
+                                                          tooltip: {
+                                                            sx: {
+                                                              bgcolor: "rgba(0,0,0,0.92)",
+                                                              border: "1px solid rgba(255,255,255,0.10)",
+                                                              borderRadius: 2,
+                                                            },
+                                                          },
+                                                        }}
+                                                      >
+                                                        <Stack alignItems="center" sx={{ minWidth: 28, flexShrink: 0 }}>
+                                                          <IconButton
+                                                            size="small"
+                                                            onClick={() => upvoteReply(r.id)}
+                                                            sx={{ color: r.user_upvoted ? "#4dabf5" : "rgba(255,255,255,0.4)", p: 0.25 }}
+                                                          >
+                                                            {r.user_upvoted
+                                                              ? <ThumbUpAltIcon sx={{ fontSize: 12 }} />
+                                                              : <ThumbUpAltOutlinedIcon sx={{ fontSize: 12 }} />}
+                                                          </IconButton>
+                                                          {r.upvote_count > 0 && (
+                                                            <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
+                                                              {r.upvote_count}
+                                                            </Typography>
+                                                          )}
+                                                        </Stack>
+                                                      </Tooltip>
+                                                    </Stack>
+                                                  )}
+                                                </Box>
+                                              );
+                                            })}
+                                            {allReplies.length > 3 && (
+                                              <Button
+                                                size="small"
+                                                onClick={() => setQnaRepliesExpanded((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
+                                                startIcon={expanded ? <ExpandLess sx={{ fontSize: 13 }} /> : <ExpandMore sx={{ fontSize: 13 }} />}
+                                                sx={{ ml: 2, mt: 0.25, color: "rgba(255,255,255,0.45)", textTransform: "none", fontSize: 11, p: "2px 4px" }}
+                                              >
+                                                {expanded ? "Collapse replies" : `View ${hiddenCount} more ${hiddenCount === 1 ? "reply" : "replies"}`}
+                                              </Button>
+                                            )}
+                                          </Box>
+                                        );
+                                      })()}
+                                    </Stack>
+                                  </>
+                                )}
+                              </Paper>
+                            </React.Fragment>
+                          );
+
+                          if (qToGroup[q.id]) {
+                            const gId = qToGroup[q.id].id;
+                            if (!renderedGroups[gId]) renderedGroups[gId] = { group: qToGroup[q.id], nodes: [] };
+                            renderedGroups[gId].nodes.push(node);
+                          } else {
+                            ungroupedNodes.push(node);
+                          }
+                        });
+
+                        return (
+                          <>
+                            {Object.values(renderedGroups).map(rg => (
+                              <Paper key={rg.group.id} variant="outlined" sx={{ mb: 2, p: 1.5, backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                                <Stack
+                                  direction="row"
+                                  alignItems="center"
+                                  justifyContent="space-between"
+                                  spacing={1}
+                                  sx={{ mb: 1, cursor: 'pointer', "&:hover": { opacity: 0.8 } }}
+                                  onClick={() => setGroupCollapsed(prev => ({ ...prev, [rg.group.id]: !prev[rg.group.id] }))}
+                                >
+                                  <Stack direction="row" alignItems="center" spacing={1}>
+                                    <FolderIcon fontSize="small" sx={{ color: 'primary.main' }} />
+                                    <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 'bold' }}>{rg.group.title}</Typography>
                                   </Stack>
-                                </>
-                              )}
-                            </Paper>
+                                  <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}>
+                                    {groupCollapsed[rg.group.id] ? <ExpandMore fontSize="small" /> : <ExpandLess fontSize="small" />}
+                                  </IconButton>
+                                </Stack>
+                                <Collapse in={!groupCollapsed[rg.group.id]}>
+                                  {rg.group.summary && <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mb: 2, display: 'block' }}>{rg.group.summary}</Typography>}
+                                  <Box sx={{ pl: 1, pt: 1, borderLeft: '2px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    {rg.nodes}
+                                  </Box>
+                                </Collapse>
+                              </Paper>
+                            ))}
+
+                            {ungroupedNodes.length > 0 && Object.values(renderedGroups).length > 0 && (
+                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1, mt: 2 }}>Other Questions</Typography>
+                            )}
+                            {ungroupedNodes.map(n => n)}
                           </>
                         );
-                      })}
+                      })()}
                     </Stack>
                   )}
                 </Box>
