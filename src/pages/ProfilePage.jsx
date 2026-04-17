@@ -1955,24 +1955,35 @@ export default function ProfilePage() {
       );
 
       // 3. Upsert each selected skill
-      await Promise.all(
-        (selectedSkills || []).map((s) =>
-          fetch(`${API_BASE}/auth/me/skills/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...tokenHeader(),
-            },
-            body: JSON.stringify({
-              skill_uri: s.uri,
-              preferred_label: s.label,
-              proficiency_level: s.proficiency_level ?? 3, // Default to 3 if not set
-              assessment_type: "self",
-              notes: "",
-            }),
-          })
-        )
-      );
+      const skillPromises = (selectedSkills || []).map((s) => {
+        // Generate pseudo-URI for custom skills (those without a URI)
+        const skillUri = s.uri || `urn:custom:${s.label.toLowerCase().replace(/\s+/g, '-')}`;
+
+        return fetch(`${API_BASE}/auth/me/skills/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...tokenHeader(),
+          },
+          body: JSON.stringify({
+            skill_uri: skillUri,
+            preferred_label: s.label,
+            proficiency_level: s.proficiency_level ?? 3,
+            assessment_type: "self",
+            notes: "",
+          }),
+        }).then(res => {
+          if (!res.ok) {
+            return res.json().then(data => {
+              console.error(`Failed to save skill "${s.label}":`, data);
+              throw new Error(`Skill save failed: ${data.detail || res.statusText}`);
+            });
+          }
+          return res.json();
+        })
+      });
+
+      await Promise.all(skillPromises);
 
       // 4. Update local state WITH SORTING (Fixes the "Expert on top" issue)
       const sortedSkills = [...(selectedSkills || [])].sort((a, b) => {
@@ -2287,12 +2298,17 @@ export default function ProfilePage() {
     }
   }
 
-  const handleSkillLevelChange = (uri, level) => {
+  const handleSkillLevelChange = (skillIdentifier, level) => {
     const numeric = Array.isArray(level) ? level[0] : level;
     setAboutSkills((prev) =>
-      prev.map((s) =>
-        s.uri === uri ? { ...s, proficiency_level: numeric } : s
-      )
+      prev.map((s) => {
+        // Match by URI for ESCO skills
+        if (s.uri) {
+          return s.uri === skillIdentifier ? { ...s, proficiency_level: numeric } : s;
+        }
+        // Match by label for custom skills
+        return s.label === skillIdentifier ? { ...s, proficiency_level: numeric } : s;
+      })
     );
   };
 
@@ -6201,11 +6217,20 @@ export default function ProfilePage() {
 
               <Autocomplete
                 multiple
+                freeSolo={true}
                 options={skillOptions}
                 value={aboutSkills}
                 onChange={(_, newValue) => {
                   setAboutSkills((prev) => {
                     const merged = (newValue || []).map((skill) => {
+                      // Handle custom (free text) skills
+                      if (typeof skill === "string") {
+                        const existing = prev.find((s) => s.label === skill);
+                        return existing
+                          ? existing
+                          : { label: skill, uri: null, proficiency_level: 3 }; // Custom skill
+                      }
+                      // Handle ESCO skills
                       const existing = prev.find((s) => s.uri === skill.uri);
                       return existing
                         ? existing // keep old proficiency_level
@@ -6227,6 +6252,9 @@ export default function ProfilePage() {
                 }}
                 getOptionLabel={(option) => {
                   if (!option) return "";
+                  // Handle string values (free text)
+                  if (typeof option === "string") return option;
+                  // Handle ESCO object
                   const lbl = option.label;
                   if (typeof lbl === "string") return lbl;
                   if (lbl && typeof lbl === "object") {
@@ -6238,14 +6266,28 @@ export default function ProfilePage() {
                   }
                   return "";
                 }}
-                isOptionEqualToValue={(option, value) => option.uri === value.uri}
+                isOptionEqualToValue={(option, value) => {
+                  // Handle custom skills
+                  if (typeof value === "string" || !value.uri) {
+                    return typeof option === "string"
+                      ? option === value
+                      : option.label === (typeof value === "string" ? value : value.label);
+                  }
+                  // Handle ESCO skills
+                  return option.uri === value.uri;
+                }}
                 filterSelectedOptions
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="Search skills"
-                    placeholder="Start typing to search ESCO skills…"
+                    placeholder="Search ESCO skills or type your own…"
                     fullWidth
+                    helperText={
+                      skillSearch && skillSearch.trim().length > 0
+                        ? "Press Enter to add as custom skill"
+                        : ""
+                    }
                   />
                 )}
               />
@@ -6262,9 +6304,10 @@ export default function ProfilePage() {
                   <Stack spacing={1.5}>
                     {aboutSkills.map((skill) => {
                       const lvl = skill.proficiency_level || 3;
+                      const skillKey = skill.uri || `custom-${skill.label}`;
                       return (
                         <Box
-                          key={skill.uri}
+                          key={skillKey}
                           sx={{ display: "flex", alignItems: "center", gap: 2 }}
                         >
                           <Typography
@@ -6281,7 +6324,7 @@ export default function ProfilePage() {
                             marks
                             sx={{ flex: 1 }}
                             onChange={(_, value) =>
-                              handleSkillLevelChange(skill.uri, value)
+                              handleSkillLevelChange(skill.uri || skill.label, value)
                             }
                           />
                           <Typography
