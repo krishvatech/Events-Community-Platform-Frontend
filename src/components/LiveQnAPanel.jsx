@@ -520,6 +520,11 @@ export default function LiveQnAPanel({
   const [newQuestion, setNewQuestion] = useState("");
   const [error, setError] = useState("");
 
+  // ── Polish-draft AI state ─────────────────────────────────────────────────
+  const [polishLoading, setPolishLoading] = useState(false);
+  const [polishDialog, setPolishDialog] = useState(null); // null | { original, improved }
+  const [polishError, setPolishError] = useState("");
+
   // ── Typing indicator state ────────────────────────────────────────────────
   // Map keyed by user_id, value: { user_id, user_name, last_seen (ms) }
   const [typingUsers, setTypingUsers] = useState({});
@@ -828,6 +833,33 @@ export default function LiveQnAPanel({
     return () => clearInterval(interval);
   }, []);
 
+  // ── Polish draft question via AI ──────────────────────────────────────────
+  const handlePolish = async () => {
+    const content = newQuestion.trim();
+    if (!content || content.length < 5 || !eventId) return;
+    setPolishLoading(true);
+    setPolishError("");
+    try {
+      const res = await fetch(
+        toApiUrl("interactions/questions/polish-draft/"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event_id: eventId, content }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Could not polish the question right now.");
+      }
+      setPolishDialog({ original: data.original, improved: data.improved });
+    } catch (e) {
+      setPolishError(e.message || "Could not polish the question right now. Please try again.");
+    } finally {
+      setPolishLoading(false);
+    }
+  };
+
   // ── Submit question ───────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1087,15 +1119,52 @@ export default function LiveQnAPanel({
                   </Button>
                 </Stack>
               )}
-              <Button
-                type="submit"
-                size="small"
-                variant="contained"
-                disabled={!eventId || submitting || newQuestion.trim().length === 0}
-              >
-                Send
-              </Button>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Tooltip title="Polish my question">
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handlePolish}
+                      disabled={
+                        !eventId ||
+                        submitting ||
+                        polishLoading ||
+                        newQuestion.trim().length < 5
+                      }
+                      startIcon={polishLoading ? <CircularProgress size={13} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 14 }} />}
+                      sx={{
+                        textTransform: "none",
+                        borderColor: "rgba(255,255,255,0.6)",
+                        color: "#ffffff !important",
+                        "& .MuiButton-startIcon": { color: "#ffffff !important" },
+                        "&:hover": { borderColor: "#fff", color: "#ffffff !important" },
+                        "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.25) !important" },
+                        fontSize: "0.75rem",
+                        py: 0.4,
+                      }}
+                    >
+                      {polishLoading ? "Polishing…" : "Polish"}
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Button
+                  type="submit"
+                  size="small"
+                  variant="contained"
+                  disabled={!eventId || submitting || newQuestion.trim().length === 0}
+                >
+                  Send
+                </Button>
+              </Stack>
             </Stack>
+
+            {/* Polish inline error */}
+            {polishError && (
+              <Typography variant="caption" sx={{ color: "#f88", display: "block", mt: 0.5 }}>
+                {polishError}
+              </Typography>
+            )}
           </Box>
 
           {/* Typing indicator */}
@@ -1488,6 +1557,163 @@ export default function LiveQnAPanel({
             sx={{ textTransform: "none", fontWeight: 500, borderRadius: "8px", px: 2.5, color: "rgba(255,255,255,0.5)", "&:hover": { bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)" } }}
           >
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Polish Question Dialog ─────────────────────────────────────── */}
+      <Dialog
+        open={Boolean(polishDialog)}
+        onClose={() => setPolishDialog(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "#141414",
+            color: "#fff",
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,0.1)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            pb: 1,
+            fontSize: "1rem",
+            fontWeight: 600,
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          <AutoAwesomeIcon sx={{ fontSize: 18, color: "#9c7bff" }} />
+          Polish my question
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 2, pb: 1 }}>
+          <Stack spacing={2}>
+            {/* Original */}
+            <Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "rgba(255,255,255,0.45)",
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  mb: 0.5,
+                  display: "block",
+                }}
+              >
+                Original
+              </Typography>
+              <Box
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "8px",
+                  px: 1.5,
+                  py: 1.25,
+                  fontSize: "0.875rem",
+                  lineHeight: 1.55,
+                  color: "rgba(255,255,255,0.75)",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                }}
+              >
+                {polishDialog?.original}
+              </Box>
+            </Box>
+
+            {/* Improved */}
+            <Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "#9c7bff",
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  mb: 0.5,
+                  display: "block",
+                }}
+              >
+                Improved
+              </Typography>
+              <Box
+                sx={{
+                  bgcolor: "rgba(156,123,255,0.08)",
+                  border: "1px solid rgba(156,123,255,0.35)",
+                  borderRadius: "8px",
+                  px: 1.5,
+                  py: 1.25,
+                  fontSize: "0.875rem",
+                  lineHeight: 1.55,
+                  color: "#fff",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                }}
+              >
+                {polishDialog?.improved}
+              </Box>
+            </Box>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            px: 2.5,
+            py: 1.75,
+            bgcolor: "#141414",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            gap: 1,
+          }}
+        >
+          <Button
+            onClick={() => setPolishDialog(null)}
+            sx={{
+              textTransform: "none",
+              color: "rgba(255,255,255,0.5)",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)" },
+              borderRadius: "8px",
+              px: 2,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => setPolishDialog(null)}
+            variant="outlined"
+            sx={{
+              textTransform: "none",
+              borderColor: "rgba(255,255,255,0.3)",
+              color: "rgba(255,255,255,0.75)",
+              "&:hover": { borderColor: "#fff", color: "#fff" },
+              borderRadius: "8px",
+              px: 2,
+            }}
+          >
+            Keep original
+          </Button>
+          <Button
+            onClick={() => {
+              if (polishDialog?.improved) {
+                setNewQuestion(polishDialog.improved);
+              }
+              setPolishDialog(null);
+            }}
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              bgcolor: "#7c5cbf",
+              "&:hover": { bgcolor: "#6a4daa" },
+              borderRadius: "8px",
+              px: 2.5,
+              fontWeight: 600,
+            }}
+          >
+            Use improved
           </Button>
         </DialogActions>
       </Dialog>

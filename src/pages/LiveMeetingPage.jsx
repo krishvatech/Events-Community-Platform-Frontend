@@ -15125,6 +15125,11 @@ export default function NewLiveMeeting() {
   const [newQuestion, setNewQuestion] = useState("");
   const [qnaError, setQnaError] = useState("");
 
+  // Polish-draft AI state
+  const [qnaPolishLoading, setQnaPolishLoading] = useState(false);
+  const [qnaPolishDialog, setQnaPolishDialog] = useState(null); // null | { original, improved }
+  const [qnaPolishError, setQnaPolishError] = useState("");
+
   // Typing indicator
   const [typingUsers, setTypingUsers] = useState({});
   const qnaWsRef = useRef(null);               // live Q&A WebSocket instance
@@ -15710,6 +15715,29 @@ export default function NewLiveMeeting() {
       setQnaError(e.message || "Failed to create question.");
     } finally {
       setQnaSubmitting(false);
+    }
+  };
+
+  const handleQnaPolish = async () => {
+    const content = newQuestion.trim();
+    if (!content || content.length < 5 || !eventId) return;
+    setQnaPolishLoading(true);
+    setQnaPolishError("");
+    try {
+      const res = await fetch(toApiUrl("interactions/questions/polish-draft/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ event_id: eventId, content }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Could not polish the question right now.");
+      }
+      setQnaPolishDialog({ original: data.original, improved: data.improved });
+    } catch (e) {
+      setQnaPolishError(e.message || "Could not polish the question right now. Please try again.");
+    } finally {
+      setQnaPolishLoading(false);
     }
   };
 
@@ -17484,6 +17512,121 @@ export default function NewLiveMeeting() {
               </DialogActions>
             </Dialog>
 
+            {/* Q&A Polish Dialog */}
+            <Dialog
+              open={Boolean(qnaPolishDialog)}
+              onClose={() => setQnaPolishDialog(null)}
+              maxWidth="sm"
+              fullWidth
+              PaperProps={MODAL_PAPER_PROPS}
+            >
+              <DialogTitle
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  pb: 1,
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <AutoAwesomeIcon sx={{ fontSize: 18, color: "#b39ddb" }} />
+                Polish my question
+              </DialogTitle>
+              <DialogContent sx={{ pt: 2, pb: 1 }}>
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "rgba(255,255,255,0.4)",
+                        fontWeight: 600,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
+                        mb: 0.5,
+                        display: "block",
+                      }}
+                    >
+                      Original
+                    </Typography>
+                    <Box
+                      sx={{
+                        bgcolor: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: 2,
+                        px: 1.5,
+                        py: 1.25,
+                        fontSize: "0.875rem",
+                        lineHeight: 1.55,
+                        color: "rgba(255,255,255,0.65)",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {qnaPolishDialog?.original}
+                    </Box>
+                  </Box>
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#b39ddb",
+                        fontWeight: 600,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
+                        mb: 0.5,
+                        display: "block",
+                      }}
+                    >
+                      Improved
+                    </Typography>
+                    <Box
+                      sx={{
+                        bgcolor: "rgba(179,157,219,0.07)",
+                        border: "1px solid rgba(179,157,219,0.35)",
+                        borderRadius: 2,
+                        px: 1.5,
+                        py: 1.25,
+                        fontSize: "0.875rem",
+                        lineHeight: 1.55,
+                        color: "#fff",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {qnaPolishDialog?.improved}
+                    </Box>
+                  </Box>
+                </Stack>
+              </DialogContent>
+              <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: "1px solid rgba(255,255,255,0.06)", gap: 1 }}>
+                <Button
+                  onClick={() => setQnaPolishDialog(null)}
+                  sx={{ textTransform: "none", color: "rgba(255,255,255,0.5)", "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => setQnaPolishDialog(null)}
+                  sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.7)", "&:hover": { borderColor: "#fff", color: "#fff" } }}
+                >
+                  Keep original
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    if (qnaPolishDialog?.improved) setNewQuestion(qnaPolishDialog.improved);
+                    setQnaPolishDialog(null);
+                  }}
+                  sx={{ textTransform: "none", bgcolor: "#6a4daa", "&:hover": { bgcolor: "#5c3d99" }, fontWeight: 600 }}
+                >
+                  Use improved
+                </Button>
+              </DialogActions>
+            </Dialog>
+
             {/* Manual Grouping Modal */}
             <Dialog
               open={manualGroupModalOpen}
@@ -18967,6 +19110,7 @@ export default function NewLiveMeeting() {
                       },
                     }}
                   />
+                  {/* Anonymous toggle row */}
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.75, px: 0.5 }}>
                     <Switch
                       size="small"
@@ -18978,6 +19122,50 @@ export default function NewLiveMeeting() {
                       {qnaAnonymousModeEnabled ? "Anonymous mode (forced)" : "Post anonymously"}
                     </Typography>
                   </Stack>
+
+                  {/* Polish button row — always on its own line so it never gets clipped */}
+                  <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.5, px: 0.5 }}>
+                    <Tooltip title="Polish my question with AI">
+                      <span>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={handleQnaPolish}
+                          disabled={
+                            qnaSubmitting ||
+                            qnaPolishLoading ||
+                            newQuestion.trim().length < 5
+                          }
+                          startIcon={
+                            qnaPolishLoading
+                              ? <CircularProgress size={11} color="inherit" />
+                              : <AutoAwesomeIcon sx={{ fontSize: 13 }} />
+                          }
+                          sx={{
+                            textTransform: "none",
+                            fontSize: "0.7rem",
+                            py: 0.3,
+                            px: 1.25,
+                            borderColor: "rgba(255,255,255,0.6)",
+                            color: "#ffffff !important",
+                            "& .MuiButton-startIcon": { color: "#ffffff !important" },
+                            "&:hover": { borderColor: "#b39ddb", color: "#b39ddb !important", "& .MuiButton-startIcon": { color: "#b39ddb !important" } },
+                            "&.Mui-disabled": {
+                              borderColor: "rgba(255,255,255,0.12)",
+                              color: "rgba(255,255,255,0.25) !important",
+                            },
+                          }}
+                        >
+                          {qnaPolishLoading ? "Polishing…" : "Polish"}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </Stack>
+                  {qnaPolishError && (
+                    <Typography sx={{ fontSize: 10, color: "#f88", px: 0.5, mt: 0.25 }}>
+                      {qnaPolishError}
+                    </Typography>
+                  )}
                 </Box>
               </Box>
             </TabPanel>
@@ -20897,6 +21085,7 @@ export default function NewLiveMeeting() {
           <QnAEngagementPromptModal
             open={Boolean(qnaPromptModal)}
             prompt={qnaPromptModal}
+            eventId={eventId}
             anonymousMode={qnaAnonymousModeEnabled}
             allowAnonToggle={true}
             onClose={() => {
