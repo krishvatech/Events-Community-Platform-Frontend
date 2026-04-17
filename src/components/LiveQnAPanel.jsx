@@ -483,6 +483,15 @@ export default function LiveQnAPanel({
   const [newQuestion, setNewQuestion] = useState("");
   const [error, setError] = useState("");
 
+  // ── Typing indicator state ────────────────────────────────────────────────
+  // Map keyed by user_id, value: { user_id, user_name, last_seen (ms) }
+  const [typingUsers, setTypingUsers] = useState({});
+
+  // Refs for WS access and timer handles
+  const wsRef = useRef(null);               // live WebSocket instance
+  const typingThrottleRef = useRef(0);      // timestamp of last is_typing=true send
+  const typingDebounceRef = useRef(null);   // setTimeout id for auto-send is_typing=false
+
   // ── Load questions (includes replies) ───────────────────────────────────
   const loadQuestions = useCallback(async () => {
     if (!eventId) return;
@@ -512,6 +521,17 @@ export default function LiveQnAPanel({
     loadQuestions();
   }, [open, loadQuestions]);
 
+  // ── sendQnaTyping helper ─────────────────────────────────────────────────
+  const sendQnaTyping = useCallback((isTyping) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    try {
+      ws.send(JSON.stringify({ type: "qna.typing", is_typing: isTyping }));
+    } catch (e) {
+      console.warn("QnA typing send failed:", e);
+    }
+  }, []);
+
   // ── WebSocket ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open || !eventId) return;
@@ -521,6 +541,8 @@ export default function LiveQnAPanel({
     const token = getToken();
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     const ws = new WebSocket(`${WS_ROOT}/ws/events/${eventId}/qna/${qs}`);
+
+    wsRef.current = ws; // store ref so sendQnaTyping can access it
 
     ws.onmessage = (event) => {
       try {
@@ -560,7 +582,7 @@ export default function LiveQnAPanel({
         } else if (msg.type === "qna.delete") {
           setQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
 
-        // ── reply events ─────────────────────────────────────────────────────
+          // ── reply events ─────────────────────────────────────────────────────
         } else if (msg.type === "qna.reply") {
           // New reply: add to the parent question's replies array
           setQuestions((prev) =>
@@ -593,11 +615,11 @@ export default function LiveQnAPanel({
             prev.map((q) =>
               q.id === msg.question_id
                 ? {
-                    ...q,
-                    replies: (q.replies || []).map((r) =>
-                      r.id === msg.reply_id ? { ...r, content: msg.content } : r
-                    ),
-                  }
+                  ...q,
+                  replies: (q.replies || []).map((r) =>
+                    r.id === msg.reply_id ? { ...r, content: msg.content } : r
+                  ),
+                }
                 : q
             )
           );
@@ -606,10 +628,10 @@ export default function LiveQnAPanel({
             prev.map((q) =>
               q.id === msg.question_id
                 ? {
-                    ...q,
-                    replies: (q.replies || []).filter((r) => r.id !== msg.reply_id),
-                    reply_count: Math.max(0, (q.reply_count ?? 1) - 1),
-                  }
+                  ...q,
+                  replies: (q.replies || []).filter((r) => r.id !== msg.reply_id),
+                  reply_count: Math.max(0, (q.reply_count ?? 1) - 1),
+                }
                 : q
             )
           );
@@ -618,13 +640,13 @@ export default function LiveQnAPanel({
             prev.map((q) =>
               q.id === msg.question_id
                 ? {
-                    ...q,
-                    replies: (q.replies || []).map((r) =>
-                      r.id === msg.reply_id
-                        ? { ...r, upvote_count: msg.upvote_count }
-                        : r
-                    ),
-                  }
+                  ...q,
+                  replies: (q.replies || []).map((r) =>
+                    r.id === msg.reply_id
+                      ? { ...r, upvote_count: msg.upvote_count }
+                      : r
+                  ),
+                }
                 : q
             )
           );
@@ -634,11 +656,11 @@ export default function LiveQnAPanel({
             prev.map((q) =>
               q.id === msg.question_id
                 ? {
-                    ...q,
-                    replies: (q.replies || []).map((r) =>
-                      r.id === msg.reply_id ? { ...r, moderation_status: "approved" } : r
-                    ),
-                  }
+                  ...q,
+                  replies: (q.replies || []).map((r) =>
+                    r.id === msg.reply_id ? { ...r, moderation_status: "approved" } : r
+                  ),
+                }
                 : q
             )
           );
@@ -647,30 +669,50 @@ export default function LiveQnAPanel({
             prev.map((q) =>
               q.id === msg.question_id
                 ? {
-                    ...q,
-                    replies: (q.replies || []).filter((r) => r.id !== msg.reply_id),
-                    reply_count: Math.max(0, (q.reply_count ?? 1) - 1),
-                  }
+                  ...q,
+                  replies: (q.replies || []).filter((r) => r.id !== msg.reply_id),
+                  reply_count: Math.max(0, (q.reply_count ?? 1) - 1),
+                }
                 : q
             )
           );
+          // ── typing indicator ──────────────────────────────────────────────
+        } else if (msg.type === "qna.typing") {
+          const { user_id: uid, user_name, is_typing } = msg;
+          // Determine current user id — support both authenticated and guest
+          const myId = currentUserId != null ? String(currentUserId)
+            : currentGuestId != null ? `guest_${currentGuestId}` : null;
+          if (uid && uid !== myId) {
+            if (is_typing) {
+              setTypingUsers((prev) => ({
+                ...prev,
+                [uid]: { user_id: uid, user_name: user_name || uid, last_seen: Date.now() },
+              }));
+            } else {
+              setTypingUsers((prev) => {
+                const next = { ...prev };
+                delete next[uid];
+                return next;
+              });
+            }
+          }
         } else if (msg.type === "qna.reply_anonymized") {
           setQuestions((prev) =>
             prev.map((q) =>
               q.id === msg.question_id
                 ? {
-                    ...q,
-                    replies: (q.replies || []).map((r) =>
-                      r.id === msg.reply_id
-                        ? {
-                            ...r,
-                            is_anonymous: msg.is_anonymous,
-                            author_name: msg.is_anonymous ? "Anonymous" : r.author_name,
-                            author_id: msg.is_anonymous ? null : r.author_id,
-                          }
-                        : r
-                    ),
-                  }
+                  ...q,
+                  replies: (q.replies || []).map((r) =>
+                    r.id === msg.reply_id
+                      ? {
+                        ...r,
+                        is_anonymous: msg.is_anonymous,
+                        author_name: msg.is_anonymous ? "Anonymous" : r.author_name,
+                        author_id: msg.is_anonymous ? null : r.author_id,
+                      }
+                      : r
+                  ),
+                }
                 : q
             )
           );
@@ -684,15 +726,43 @@ export default function LiveQnAPanel({
     ws.onclose = (e) => console.debug("QnA WebSocket closed", e.code, e.reason);
 
     return () => {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+      // Notify peers that this user stopped typing before disconnecting
+      if (ws.readyState === WebSocket.OPEN) {
+        try { ws.send(JSON.stringify({ type: "qna.typing", is_typing: false })); } catch (_) { }
+        ws.close();
+      }
+      wsRef.current = null;
+      // Clear typing debounce timer
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+      typingThrottleRef.current = 0;
+      // Clear any stale typing users
+      setTypingUsers({});
     };
   }, [open, eventId]);
+
+  // ── Auto-expire stale typing users (runs every 1 s) ─────────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTypingUsers((prev) => {
+        const expired = Object.keys(prev).filter((k) => now - prev[k].last_seen > 5000);
+        if (expired.length === 0) return prev;
+        const next = { ...prev };
+        expired.forEach((k) => delete next[k]);
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Submit question ───────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     const content = newQuestion.trim();
     if (!content || !eventId) return;
+    // Clear typing indicator before submitting
+    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+    sendQnaTyping(false);
     setSubmitting(true);
     setError("");
     try {
@@ -892,7 +962,27 @@ export default function LiveQnAPanel({
               size="small"
               placeholder="Ask a question for the host..."
               value={newQuestion}
-              onChange={(e) => setNewQuestion(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setNewQuestion(val);
+
+                if (val.length >= 3) {
+                  // Debounce: reset the auto-false timer every keystroke
+                  if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+                  typingDebounceRef.current = setTimeout(() => sendQnaTyping(false), 3000);
+
+                  // Throttle: send true at most once per 2 s
+                  const now = Date.now();
+                  if (now - typingThrottleRef.current >= 2000) {
+                    typingThrottleRef.current = now;
+                    sendQnaTyping(true);
+                  }
+                } else {
+                  // Below threshold — clear immediately
+                  if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+                  sendQnaTyping(false);
+                }
+              }}
               disabled={!eventId || submitting}
               sx={{
                 "& .MuiOutlinedInput-root": {
@@ -919,6 +1009,26 @@ export default function LiveQnAPanel({
               </Button>
             </Stack>
           </Box>
+
+          {/* Typing indicator */}
+          {Object.keys(typingUsers).length > 0 && (
+            <Typography
+              variant="caption"
+              sx={{
+                display: "block",
+                color: "rgba(255,255,255,0.5)",
+                fontStyle: "italic",
+                px: 0.5,
+                mt: 0.25,
+                mb: 0.25,
+                letterSpacing: 0.1,
+              }}
+            >
+              {Object.keys(typingUsers).length === 1
+                ? "1 person is writing..."
+                : `${Object.keys(typingUsers).length} people are writing...`}
+            </Typography>
+          )}
 
           {/* Question list */}
           <Box sx={{ flex: 1, minHeight: 0, mt: 1, overflow: "hidden" }}>

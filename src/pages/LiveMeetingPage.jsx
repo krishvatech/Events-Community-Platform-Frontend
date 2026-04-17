@@ -14045,6 +14045,7 @@ export default function NewLiveMeeting() {
   // refs so WS doesn't need to reconnect on every tab change
   const isQnaActiveRef = useRef(false);
   const myUserIdRef = useRef(myUserId);
+  const selfCsidRef = useRef(null);
 
   useEffect(() => {
     isQnaActiveRef.current = isQnaActive;
@@ -14054,6 +14055,11 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     myUserIdRef.current = myUserId;
   }, [myUserId]);
+
+  useEffect(() => {
+    const self = rtkMeeting?.self;
+    selfCsidRef.current = self?.clientSpecificId || self?.customParticipantId || null;
+  }, [rtkMeeting?.self]);
 
   const activeChatConversationId = isRoomChatActive
     ? roomChatConversationId
@@ -15059,12 +15065,18 @@ export default function NewLiveMeeting() {
     );
   }, [participants]);
 
-  // -------- Q&A (real backend logic from LiveQnAPanel) ----------
+  // ── Q&A state ──────────────────────────────────────────────────────────────
   const [questions, setQuestions] = useState([]);
   const [qnaLoading, setQnaLoading] = useState(false);
   const [qnaSubmitting, setQnaSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
   const [qnaError, setQnaError] = useState("");
+
+  // Typing indicator
+  const [typingUsers, setTypingUsers] = useState({});
+  const qnaWsRef = useRef(null);               // live Q&A WebSocket instance
+  const qnaThrottleRef = useRef(0);            // timestamp of last is_typing=true send
+  const qnaDebounceRef = useRef(null);         // setTimeout id for auto-send is_typing=false
 
   // Editing state
   const [qnaEditingId, setQnaEditingId] = useState(null);
@@ -15169,6 +15181,7 @@ export default function NewLiveMeeting() {
     const wsUrl = `${WS_ROOT}/ws/events/${eventId}/qna/${qs}`;
 
     const ws = new WebSocket(wsUrl);
+    qnaWsRef.current = ws; // store ref so sendQnaTyping can access it
 
     ws.onmessage = (event) => {
       try {
@@ -15400,14 +15413,14 @@ export default function NewLiveMeeting() {
           setQuestions((prev) => prev.map((q) =>
             q.id === msg.question_id
               ? {
-                  ...q,
-                  replies: (q.replies || []).map((r) => {
-                    if (r.id !== msg.reply_id) return r;
-                    const updated = { ...r, upvote_count: msg.upvote_count };
-                    if (isMe) updated.user_upvoted = msg.upvoted;
-                    return updated;
-                  }),
-                }
+                ...q,
+                replies: (q.replies || []).map((r) => {
+                  if (r.id !== msg.reply_id) return r;
+                  const updated = { ...r, upvote_count: msg.upvote_count };
+                  if (isMe) updated.user_upvoted = msg.upvoted;
+                  return updated;
+                }),
+              }
               : q
           ));
         }
@@ -15429,13 +15442,13 @@ export default function NewLiveMeeting() {
           setQuestions((prev) => prev.map((q) =>
             q.id === msg.question_id
               ? {
-                  ...q,
-                  replies: (q.replies || []).map((r) =>
-                    r.id === msg.reply_id
-                      ? { ...r, is_anonymous: msg.is_anonymous, author_name: msg.is_anonymous ? "Anonymous" : r.author_name, author_id: msg.is_anonymous ? null : r.author_id }
-                      : r
-                  ),
-                }
+                ...q,
+                replies: (q.replies || []).map((r) =>
+                  r.id === msg.reply_id
+                    ? { ...r, is_anonymous: msg.is_anonymous, author_name: msg.is_anonymous ? "Anonymous" : r.author_name, author_id: msg.is_anonymous ? null : r.author_id }
+                    : r
+                ),
+              }
               : q
           ));
         }
@@ -15464,10 +15477,46 @@ export default function NewLiveMeeting() {
           }
         }
 
+        // ── Typing Indicator ──────────────────────────────────────────────
+        if (msg.type === "qna.typing") {
+          const { user_id: uid, user_name, is_typing } = msg;
+          const myId = String(myUserIdRef.current || currentUserId || "");
+          const myCsid = String(selfCsidRef.current || "");
+
+          // Identity check: matches either JWT id or RTK clientSpecificId (guest_N)
+          const isMe = (uid && myId && String(uid) === myId) ||
+            (uid && myCsid && String(uid) === myCsid);
+
+          if (uid && !isMe) {
+            if (is_typing) {
+              setTypingUsers((prev) => ({
+                ...prev,
+                [uid]: { user_id: uid, user_name: user_name || uid, last_seen: Date.now() },
+              }));
+            } else {
+              setTypingUsers((prev) => {
+                const next = { ...prev };
+                delete next[uid];
+                return next;
+              });
+            }
+          }
+        }
+
       } catch { }
     };
 
-    return () => ws.close();
+    return () => {
+      // Notify peers this user stopped typing before disconnecting
+      if (ws.readyState === WebSocket.OPEN) {
+        try { ws.send(JSON.stringify({ type: "qna.typing", is_typing: false })); } catch (_) { }
+      }
+      ws.close();
+      qnaWsRef.current = null;
+      if (qnaDebounceRef.current) clearTimeout(qnaDebounceRef.current);
+      qnaThrottleRef.current = 0;
+      setTypingUsers({});
+    };
   }, [tab, isPanelOpen, eventId, activeTableId, isGuest]); // Re-connect when activeTableId changes
 
   // Keyboard shortcuts for moderation panel (A=approve, R=reject, arrows=navigate)
@@ -15503,9 +15552,39 @@ export default function NewLiveMeeting() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [tab, isHost, qnaModerationEnabled, pendingQuestions, focusedPendingIdx]);
 
+  // ── sendQnaTyping helper ──────────────────────────────────────────────────
+  const sendQnaTyping = useCallback((isTyping) => {
+    const ws = qnaWsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    try {
+      ws.send(JSON.stringify({ type: "qna.typing", is_typing: isTyping }));
+    } catch (e) {
+      console.warn("[QnA] typing send failed:", e);
+    }
+  }, []);
+
+  // ── Auto-expire stale typing users (1 s tick) ─────────────────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTypingUsers((prev) => {
+        const expired = Object.keys(prev).filter((k) => now - prev[k].last_seen > 5000);
+        if (expired.length === 0) return prev;
+        const next = { ...prev };
+        expired.forEach((k) => delete next[k]);
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const submitQuestion = async () => {
     const content = newQuestion.trim();
     if (!content || !eventId) return;
+
+    // Clear typing indicator immediately on submit
+    if (qnaDebounceRef.current) clearTimeout(qnaDebounceRef.current);
+    sendQnaTyping(false);
 
     setQnaSubmitting(true);
     setQnaError("");
@@ -17994,227 +18073,227 @@ export default function NewLiveMeeting() {
                                       </Stack>
                                     )}
 
-                                  {/* ── Reply button ─────────────────────────── */}
-                                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.25 }}>
-                                    <Button
-                                      size="small"
-                                      startIcon={<ReplyIcon sx={{ fontSize: "13px !important" }} />}
-                                      onClick={() => setQnaReplyOpen((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
-                                      sx={{
-                                        color: qnaReplyOpen[q.id] ? "#4dabf5" : "rgba(255,255,255,0.45)",
-                                        textTransform: "none",
-                                        fontSize: 11,
-                                        p: "2px 6px",
-                                        minWidth: 0,
-                                      }}
-                                    >
-                                      Reply{q.reply_count > 0 ? ` (${q.reply_count})` : ""}
-                                    </Button>
-                                  </Stack>
-
-                                  {/* ── Inline reply input ───────────────────── */}
-                                  <Collapse in={Boolean(qnaReplyOpen[q.id])}>
-                                    <Box
-                                      component="form"
-                                      onSubmit={(e) => { e.preventDefault(); submitReply(q.id); }}
-                                      sx={{ mt: 0.75, ml: 1 }}
-                                    >
-                                      <TextField
-                                        fullWidth
+                                    {/* ── Reply button ─────────────────────────── */}
+                                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.25 }}>
+                                      <Button
                                         size="small"
-                                        placeholder="Write a reply…"
-                                        value={qnaReplyText[q.id] || ""}
-                                        onChange={(e) => setQnaReplyText((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                                        onKeyDown={(e) => {
-                                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitReply(q.id); }
-                                          if (e.key === "Escape") setQnaReplyOpen((prev) => ({ ...prev, [q.id]: false }));
-                                        }}
+                                        startIcon={<ReplyIcon sx={{ fontSize: "13px !important" }} />}
+                                        onClick={() => setQnaReplyOpen((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
                                         sx={{
-                                          "& .MuiOutlinedInput-root": {
-                                            bgcolor: "rgba(255,255,255,0.04)",
-                                            borderRadius: 2,
-                                            fontSize: 13,
-                                          },
+                                          color: qnaReplyOpen[q.id] ? "#4dabf5" : "rgba(255,255,255,0.45)",
+                                          textTransform: "none",
+                                          fontSize: 11,
+                                          p: "2px 6px",
+                                          minWidth: 0,
                                         }}
-                                      />
-                                      <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 0.5 }}>
-                                        <Button
-                                          size="small"
-                                          onClick={() => setQnaReplyOpen((prev) => ({ ...prev, [q.id]: false }))}
-                                          sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none", fontSize: 11 }}
-                                        >
-                                          Cancel
-                                        </Button>
-                                        <Button
-                                          type="submit"
-                                          size="small"
-                                          variant="contained"
-                                          disabled={!(qnaReplyText[q.id] || "").trim()}
-                                          sx={{ textTransform: "none", fontSize: 11 }}
-                                        >
-                                          Reply
-                                        </Button>
-                                      </Stack>
-                                    </Box>
-                                  </Collapse>
+                                      >
+                                        Reply{q.reply_count > 0 ? ` (${q.reply_count})` : ""}
+                                      </Button>
+                                    </Stack>
 
-                                  {/* ── Replies list ─────────────────────────── */}
-                                  {(q.replies?.length > 0) && (() => {
-                                    const allReplies = q.replies;
-                                    const expanded = Boolean(qnaRepliesExpanded[q.id]);
-                                    const visible = expanded ? allReplies : allReplies.slice(0, 3);
-                                    const hiddenCount = allReplies.length - 3;
-                                    return (
-                                      <Box sx={{ mt: 0.5 }}>
-                                        {visible.map((r) => {
-                                          const myId = String(myUserIdRef.current || "");
-                                          const authorId = String(r.author_id ?? "");
-                                          const canManageReply = isHost || (myId && authorId && authorId === myId);
-                                          const isEditingReply = qnaReplyEditingId === r.id;
-                                          return (
-                                            <Box
-                                              key={r.id}
-                                              sx={{
-                                                ml: 2,
-                                                mt: 0.5,
-                                                pl: 1.5,
-                                                borderLeft: "2px solid rgba(255,255,255,0.1)",
-                                              }}
-                                            >
-                                              {isEditingReply ? (
-                                                <Box>
-                                                  <TextField
-                                                    fullWidth
-                                                    size="small"
-                                                    autoFocus
-                                                    value={qnaReplyEditContent}
-                                                    onChange={(e) => setQnaReplyEditContent(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                      if (e.key === "Escape") { setQnaReplyEditingId(null); setQnaReplyEditContent(""); }
-                                                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveReplyEdit(r.id); }
-                                                    }}
-                                                    sx={{
-                                                      mb: 0.5,
-                                                      "& .MuiOutlinedInput-root": {
-                                                        bgcolor: "rgba(255,255,255,0.06)",
-                                                        borderRadius: 1.5,
-                                                        fontSize: 12,
-                                                      },
-                                                    }}
-                                                  />
-                                                  <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                    <Button size="small" onClick={() => { setQnaReplyEditingId(null); setQnaReplyEditContent(""); }} sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none", fontSize: 11 }}>
-                                                      Cancel
-                                                    </Button>
-                                                    <Button size="small" variant="contained" onClick={() => saveReplyEdit(r.id)} sx={{ textTransform: "none", fontSize: 11 }}>
-                                                      Save
-                                                    </Button>
-                                                  </Stack>
-                                                </Box>
-                                              ) : (
-                                                <Stack direction="row" spacing={0.5} alignItems="flex-start" justifyContent="space-between">
-                                                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                                                    <Stack direction="row" spacing={0.75} alignItems="baseline" flexWrap="wrap">
-                                                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
-                                                        {r.author_name || "Anonymous"}
-                                                      </Typography>
-                                                      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
-                                                        {r.created_at ? new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
-                                                      </Typography>
-                                                    </Stack>
-                                                    <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.88)", whiteSpace: "pre-wrap", wordBreak: "break-word", mt: 0.25 }}>
-                                                      {r.content}
-                                                    </Typography>
-                                                    {canManageReply && (
-                                                      <Stack direction="row" sx={{ mt: 0.25 }}>
-                                                        <IconButton
-                                                          size="small"
-                                                          onClick={() => { setQnaReplyEditingId(r.id); setQnaReplyEditContent(r.content); }}
-                                                          sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
-                                                        >
-                                                          <EditRoundedIcon sx={{ fontSize: 12 }} />
-                                                        </IconButton>
-                                                        <IconButton
-                                                          size="small"
-                                                          onClick={() => deleteReply(r.id)}
-                                                          sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
-                                                        >
-                                                          <DeleteOutlineRoundedIcon sx={{ fontSize: 12 }} />
-                                                        </IconButton>
-                                                      </Stack>
-                                                    )}
-                                                  </Box>
-                                                  {/* Reply upvote */}
-                                                  <Tooltip
-                                                    arrow
-                                                    placement="left"
-                                                    title={
-                                                      isHost ? (
-                                                        <Box sx={{ p: 1 }}>
-                                                          <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
-                                                          {(r.upvoters?.length > 0) ? (
-                                                            <Stack spacing={0.25}>
-                                                              {(r.upvoters || []).slice(0, 8).map((voter, vi) => (
-                                                                <Typography key={`${voter?.id || vi}`} sx={{ fontSize: 12, opacity: 0.9 }}>
-                                                                  {voter?.name || voter?.username || "User"}
-                                                                </Typography>
-                                                              ))}
-                                                              {r.upvoters.length > 8 && (
-                                                                <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{r.upvoters.length - 8} more</Typography>
-                                                              )}
-                                                            </Stack>
-                                                          ) : (
-                                                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
-                                                          )}
-                                                        </Box>
-                                                      ) : r.user_upvoted ? "Remove your vote" : "Upvote reply"
-                                                    }
-                                                    componentsProps={{
-                                                      tooltip: {
-                                                        sx: {
-                                                          bgcolor: "rgba(0,0,0,0.92)",
-                                                          border: "1px solid rgba(255,255,255,0.10)",
-                                                          borderRadius: 2,
-                                                        },
-                                                      },
-                                                    }}
-                                                  >
-                                                  <Stack alignItems="center" sx={{ minWidth: 28, flexShrink: 0 }}>
-                                                    <IconButton
-                                                      size="small"
-                                                      onClick={() => upvoteReply(r.id)}
-                                                      sx={{ color: r.user_upvoted ? "#4dabf5" : "rgba(255,255,255,0.4)", p: 0.25 }}
-                                                    >
-                                                      {r.user_upvoted
-                                                        ? <ThumbUpAltIcon sx={{ fontSize: 12 }} />
-                                                        : <ThumbUpAltOutlinedIcon sx={{ fontSize: 12 }} />}
-                                                    </IconButton>
-                                                    {r.upvote_count > 0 && (
-                                                      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
-                                                        {r.upvote_count}
-                                                      </Typography>
-                                                    )}
-                                                  </Stack>
-                                                  </Tooltip>
-                                                </Stack>
-                                              )}
-                                            </Box>
-                                          );
-                                        })}
-                                        {allReplies.length > 3 && (
+                                    {/* ── Inline reply input ───────────────────── */}
+                                    <Collapse in={Boolean(qnaReplyOpen[q.id])}>
+                                      <Box
+                                        component="form"
+                                        onSubmit={(e) => { e.preventDefault(); submitReply(q.id); }}
+                                        sx={{ mt: 0.75, ml: 1 }}
+                                      >
+                                        <TextField
+                                          fullWidth
+                                          size="small"
+                                          placeholder="Write a reply…"
+                                          value={qnaReplyText[q.id] || ""}
+                                          onChange={(e) => setQnaReplyText((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitReply(q.id); }
+                                            if (e.key === "Escape") setQnaReplyOpen((prev) => ({ ...prev, [q.id]: false }));
+                                          }}
+                                          sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                              bgcolor: "rgba(255,255,255,0.04)",
+                                              borderRadius: 2,
+                                              fontSize: 13,
+                                            },
+                                          }}
+                                        />
+                                        <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 0.5 }}>
                                           <Button
                                             size="small"
-                                            onClick={() => setQnaRepliesExpanded((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
-                                            startIcon={expanded ? <ExpandLess sx={{ fontSize: 13 }} /> : <ExpandMore sx={{ fontSize: 13 }} />}
-                                            sx={{ ml: 2, mt: 0.25, color: "rgba(255,255,255,0.45)", textTransform: "none", fontSize: 11, p: "2px 4px" }}
+                                            onClick={() => setQnaReplyOpen((prev) => ({ ...prev, [q.id]: false }))}
+                                            sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none", fontSize: 11 }}
                                           >
-                                            {expanded ? "Collapse replies" : `View ${hiddenCount} more ${hiddenCount === 1 ? "reply" : "replies"}`}
+                                            Cancel
                                           </Button>
-                                        )}
+                                          <Button
+                                            type="submit"
+                                            size="small"
+                                            variant="contained"
+                                            disabled={!(qnaReplyText[q.id] || "").trim()}
+                                            sx={{ textTransform: "none", fontSize: 11 }}
+                                          >
+                                            Reply
+                                          </Button>
+                                        </Stack>
                                       </Box>
-                                    );
-                                  })()}
-                                </Stack>
+                                    </Collapse>
+
+                                    {/* ── Replies list ─────────────────────────── */}
+                                    {(q.replies?.length > 0) && (() => {
+                                      const allReplies = q.replies;
+                                      const expanded = Boolean(qnaRepliesExpanded[q.id]);
+                                      const visible = expanded ? allReplies : allReplies.slice(0, 3);
+                                      const hiddenCount = allReplies.length - 3;
+                                      return (
+                                        <Box sx={{ mt: 0.5 }}>
+                                          {visible.map((r) => {
+                                            const myId = String(myUserIdRef.current || "");
+                                            const authorId = String(r.author_id ?? "");
+                                            const canManageReply = isHost || (myId && authorId && authorId === myId);
+                                            const isEditingReply = qnaReplyEditingId === r.id;
+                                            return (
+                                              <Box
+                                                key={r.id}
+                                                sx={{
+                                                  ml: 2,
+                                                  mt: 0.5,
+                                                  pl: 1.5,
+                                                  borderLeft: "2px solid rgba(255,255,255,0.1)",
+                                                }}
+                                              >
+                                                {isEditingReply ? (
+                                                  <Box>
+                                                    <TextField
+                                                      fullWidth
+                                                      size="small"
+                                                      autoFocus
+                                                      value={qnaReplyEditContent}
+                                                      onChange={(e) => setQnaReplyEditContent(e.target.value)}
+                                                      onKeyDown={(e) => {
+                                                        if (e.key === "Escape") { setQnaReplyEditingId(null); setQnaReplyEditContent(""); }
+                                                        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveReplyEdit(r.id); }
+                                                      }}
+                                                      sx={{
+                                                        mb: 0.5,
+                                                        "& .MuiOutlinedInput-root": {
+                                                          bgcolor: "rgba(255,255,255,0.06)",
+                                                          borderRadius: 1.5,
+                                                          fontSize: 12,
+                                                        },
+                                                      }}
+                                                    />
+                                                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                                      <Button size="small" onClick={() => { setQnaReplyEditingId(null); setQnaReplyEditContent(""); }} sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none", fontSize: 11 }}>
+                                                        Cancel
+                                                      </Button>
+                                                      <Button size="small" variant="contained" onClick={() => saveReplyEdit(r.id)} sx={{ textTransform: "none", fontSize: 11 }}>
+                                                        Save
+                                                      </Button>
+                                                    </Stack>
+                                                  </Box>
+                                                ) : (
+                                                  <Stack direction="row" spacing={0.5} alignItems="flex-start" justifyContent="space-between">
+                                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                      <Stack direction="row" spacing={0.75} alignItems="baseline" flexWrap="wrap">
+                                                        <Typography sx={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>
+                                                          {r.author_name || "Anonymous"}
+                                                        </Typography>
+                                                        <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                                                          {r.created_at ? new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                                                        </Typography>
+                                                      </Stack>
+                                                      <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.88)", whiteSpace: "pre-wrap", wordBreak: "break-word", mt: 0.25 }}>
+                                                        {r.content}
+                                                      </Typography>
+                                                      {canManageReply && (
+                                                        <Stack direction="row" sx={{ mt: 0.25 }}>
+                                                          <IconButton
+                                                            size="small"
+                                                            onClick={() => { setQnaReplyEditingId(r.id); setQnaReplyEditContent(r.content); }}
+                                                            sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
+                                                          >
+                                                            <EditRoundedIcon sx={{ fontSize: 12 }} />
+                                                          </IconButton>
+                                                          <IconButton
+                                                            size="small"
+                                                            onClick={() => deleteReply(r.id)}
+                                                            sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
+                                                          >
+                                                            <DeleteOutlineRoundedIcon sx={{ fontSize: 12 }} />
+                                                          </IconButton>
+                                                        </Stack>
+                                                      )}
+                                                    </Box>
+                                                    {/* Reply upvote */}
+                                                    <Tooltip
+                                                      arrow
+                                                      placement="left"
+                                                      title={
+                                                        isHost ? (
+                                                          <Box sx={{ p: 1 }}>
+                                                            <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
+                                                            {(r.upvoters?.length > 0) ? (
+                                                              <Stack spacing={0.25}>
+                                                                {(r.upvoters || []).slice(0, 8).map((voter, vi) => (
+                                                                  <Typography key={`${voter?.id || vi}`} sx={{ fontSize: 12, opacity: 0.9 }}>
+                                                                    {voter?.name || voter?.username || "User"}
+                                                                  </Typography>
+                                                                ))}
+                                                                {r.upvoters.length > 8 && (
+                                                                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{r.upvoters.length - 8} more</Typography>
+                                                                )}
+                                                              </Stack>
+                                                            ) : (
+                                                              <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
+                                                            )}
+                                                          </Box>
+                                                        ) : r.user_upvoted ? "Remove your vote" : "Upvote reply"
+                                                      }
+                                                      componentsProps={{
+                                                        tooltip: {
+                                                          sx: {
+                                                            bgcolor: "rgba(0,0,0,0.92)",
+                                                            border: "1px solid rgba(255,255,255,0.10)",
+                                                            borderRadius: 2,
+                                                          },
+                                                        },
+                                                      }}
+                                                    >
+                                                      <Stack alignItems="center" sx={{ minWidth: 28, flexShrink: 0 }}>
+                                                        <IconButton
+                                                          size="small"
+                                                          onClick={() => upvoteReply(r.id)}
+                                                          sx={{ color: r.user_upvoted ? "#4dabf5" : "rgba(255,255,255,0.4)", p: 0.25 }}
+                                                        >
+                                                          {r.user_upvoted
+                                                            ? <ThumbUpAltIcon sx={{ fontSize: 12 }} />
+                                                            : <ThumbUpAltOutlinedIcon sx={{ fontSize: 12 }} />}
+                                                        </IconButton>
+                                                        {r.upvote_count > 0 && (
+                                                          <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
+                                                            {r.upvote_count}
+                                                          </Typography>
+                                                        )}
+                                                      </Stack>
+                                                    </Tooltip>
+                                                  </Stack>
+                                                )}
+                                              </Box>
+                                            );
+                                          })}
+                                          {allReplies.length > 3 && (
+                                            <Button
+                                              size="small"
+                                              onClick={() => setQnaRepliesExpanded((prev) => ({ ...prev, [q.id]: !prev[q.id] }))}
+                                              startIcon={expanded ? <ExpandLess sx={{ fontSize: 13 }} /> : <ExpandMore sx={{ fontSize: 13 }} />}
+                                              sx={{ ml: 2, mt: 0.25, color: "rgba(255,255,255,0.45)", textTransform: "none", fontSize: 11, p: "2px 4px" }}
+                                            >
+                                              {expanded ? "Collapse replies" : `View ${hiddenCount} more ${hiddenCount === 1 ? "reply" : "replies"}`}
+                                            </Button>
+                                          )}
+                                        </Box>
+                                      );
+                                    })()}
+                                  </Stack>
                                 </>
                               )}
                             </Paper>
@@ -18236,13 +18315,48 @@ export default function NewLiveMeeting() {
                   }}
                   sx={{ p: 2 }}
                 >
+                  {/* Typing indicator */}
+                  {Object.keys(typingUsers).length > 0 && (
+                    <Typography
+                      sx={{
+                        fontSize: 11,
+                        fontStyle: "italic",
+                        opacity: 0.55,
+                        px: 0.5,
+                        pb: 0.75,
+                        display: "block",
+                      }}
+                    >
+                      {Object.keys(typingUsers).length === 1
+                        ? "1 person is writing..."
+                        : `${Object.keys(typingUsers).length} people are writing...`}
+                    </Typography>
+                  )}
                   <TextField
                     fullWidth
                     placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
                     size="small"
                     value={newQuestion}
                     disabled={qnaSubmitting}
-                    onChange={(e) => setNewQuestion(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewQuestion(val);
+                      if (val.length >= 3) {
+                        // Debounce: reset auto-false timer on each keystroke
+                        if (qnaDebounceRef.current) clearTimeout(qnaDebounceRef.current);
+                        qnaDebounceRef.current = setTimeout(() => sendQnaTyping(false), 3000);
+                        // Throttle: send true at most once per 2 s
+                        const now = Date.now();
+                        if (now - qnaThrottleRef.current >= 2000) {
+                          qnaThrottleRef.current = now;
+                          sendQnaTyping(true);
+                        }
+                      } else {
+                        // Below threshold — clear immediately
+                        if (qnaDebounceRef.current) clearTimeout(qnaDebounceRef.current);
+                        sendQnaTyping(false);
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
