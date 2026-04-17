@@ -30,6 +30,14 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ReplyIcon from "@mui/icons-material/Reply";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import GroupAddIcon from "@mui/icons-material/GroupAdd";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import BoltIcon from "@mui/icons-material/Bolt";
+import Divider from "@mui/material/Divider";
+import Chip from "@mui/material/Chip";
+import LinearProgress from "@mui/material/LinearProgress";
 
 // --- same API pattern as other pages ---
 const API_ROOT = (
@@ -1212,68 +1220,275 @@ export default function LiveQnAPanel({
       </Box>
 
       {/* Manual Group Modal */}
-      <Dialog open={createGroupModalOpen} onClose={() => setCreateGroupModalOpen(false)} PaperProps={{ sx: { bgcolor: "#1e1e1e", color: "#fff" } }}>
-        <DialogTitle>Create Q&A Group</DialogTitle>
-        <DialogContent>
-          <TextField fullWidth size="small" label="Group Title" value={newGroupTitle} onChange={(e) => setNewGroupTitle(e.target.value)} sx={{ mt: 1, mb: 2, input: { color: "#fff" }, label: { color: "gray" }, fieldset: { borderColor: "gray" } }} />
-          <TextField fullWidth size="small" multiline rows={3} label="Group Summary (Optional)" value={newGroupSummary} onChange={(e) => setNewGroupSummary(e.target.value)} sx={{ input: { color: "#fff" }, textarea: { color: "#fff" }, label: { color: "gray" }, fieldset: { borderColor: "gray" } }} />
+      <Dialog
+        open={createGroupModalOpen}
+        onClose={() => setCreateGroupModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "#141414",
+            color: "#fff",
+            borderRadius: "16px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
+            overflow: "hidden",
+          },
+        }}
+      >
+        {/* Gradient Header */}
+        <Box sx={{ background: "linear-gradient(135deg, #1a237e 0%, #283593 50%, #1565c0 100%)", px: 3, py: 2.5, position: "relative" }}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box sx={{ width: 36, height: 36, borderRadius: "10px", bgcolor: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" }}>
+              <GroupAddIcon sx={{ fontSize: 20, color: "#fff" }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1rem", color: "#fff", lineHeight: 1.2 }}>
+                Create Q&amp;A Group
+              </Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)", fontSize: "0.72rem" }}>
+                Organise selected questions into a named group
+              </Typography>
+            </Box>
+          </Stack>
+          {selectedQs.length > 0 && (
+            <Chip
+              label={`${selectedQs.length} question${selectedQs.length > 1 ? "s" : ""} selected`}
+              size="small"
+              sx={{ position: "absolute", top: 14, right: 16, bgcolor: "rgba(255,255,255,0.15)", color: "#fff", fontSize: "0.7rem", fontWeight: 600, backdropFilter: "blur(8px)" }}
+            />
+          )}
+        </Box>
+
+        <DialogContent sx={{ px: 3, pt: 3, pb: 1, bgcolor: "#141414" }}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Group Title"
+            value={newGroupTitle}
+            onChange={(e) => setNewGroupTitle(e.target.value)}
+            sx={{
+              mb: 2.5,
+              "& .MuiInputBase-input": { color: "#fff", fontSize: "0.9rem" },
+              "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.45)" },
+              "& .MuiInputLabel-root.Mui-focused": { color: "#64b5f6" },
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+                "& fieldset": { borderColor: "rgba(255,255,255,0.12)" },
+                "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                "&.Mui-focused fieldset": { borderColor: "#1976d2" },
+              },
+            }}
+          />
+          <TextField
+            fullWidth
+            size="small"
+            multiline
+            rows={3}
+            label="Summary (Optional)"
+            value={newGroupSummary}
+            onChange={(e) => setNewGroupSummary(e.target.value)}
+            sx={{
+              "& .MuiInputBase-input": { color: "#fff", fontSize: "0.85rem" },
+              "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.45)" },
+              "& .MuiInputLabel-root.Mui-focused": { color: "#64b5f6" },
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+                "& fieldset": { borderColor: "rgba(255,255,255,0.12)" },
+                "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                "&.Mui-focused fieldset": { borderColor: "#1976d2" },
+              },
+            }}
+          />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateGroupModalOpen(false)} sx={{ color: "gray" }}>Cancel</Button>
-          <Button variant="contained" onClick={async () => {
-            const res = await fetch(toApiUrl(`interactions/qna-groups/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ event: eventId, title: newGroupTitle, summary: newGroupSummary }) });
-            if (res.ok) {
-              const g = await res.json();
-              if (selectedQs.length) await fetch(toApiUrl(`interactions/qna-groups/${g.id}/add_questions/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ question_ids: selectedQs }) });
-              setCreateGroupModalOpen(false); setGroupingMode(false); setSelectedQs([]); setNewGroupTitle(""); setNewGroupSummary(""); loadGroups();
-            }
-          }}>Create Group</Button>
+
+        <DialogActions sx={{ px: 3, py: 2.5, bgcolor: "#141414", gap: 1 }}>
+          <Button
+            onClick={() => setCreateGroupModalOpen(false)}
+            sx={{
+              color: "rgba(255,255,255,0.5)",
+              textTransform: "none",
+              fontWeight: 500,
+              borderRadius: "8px",
+              px: 2,
+              "&:hover": { bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)" },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!newGroupTitle.trim()}
+            onClick={async () => {
+              const res = await fetch(toApiUrl(`interactions/qna-groups/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ event: eventId, title: newGroupTitle, summary: newGroupSummary }) });
+              if (res.ok) {
+                const g = await res.json();
+                if (selectedQs.length) await fetch(toApiUrl(`interactions/qna-groups/${g.id}/add_questions/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ question_ids: selectedQs }) });
+                setCreateGroupModalOpen(false); setGroupingMode(false); setSelectedQs([]); setNewGroupTitle(""); setNewGroupSummary(""); loadGroups();
+              }
+            }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: "8px",
+              px: 3,
+              background: "linear-gradient(135deg, #1976d2, #1565c0)",
+              boxShadow: "0 4px 14px rgba(25,118,210,0.4)",
+              "&:hover": { background: "linear-gradient(135deg, #1565c0, #0d47a1)", boxShadow: "0 6px 20px rgba(25,118,210,0.5)" },
+              "&.Mui-disabled": { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)", boxShadow: "none" },
+            }}
+          >
+            Create Group
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* AI Suggestion Modal */}
-      <Dialog open={aiModalOpen} onClose={() => setAiModalOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { bgcolor: "#1e1e1e", color: "#fff", minHeight: '50vh' } }}>
-        <DialogTitle>AI Group Suggestions</DialogTitle>
-        <DialogContent>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)" }}>Pending AI suggestions for this event.</Typography>
-            <Button variant="contained" disabled={aiLoading} onClick={async () => {
-              setAiLoading(true);
-              try {
-                const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggest/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ event_id: eventId }) });
-                if (res.ok) loadAiSuggestions(); else alert(await res.text());
-              } finally { setAiLoading(false); }
-            }}>
-              {aiLoading ? "Generating..." : "Generate New"}
+      <Dialog
+        open={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "#141414",
+            color: "#fff",
+            borderRadius: "16px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
+            overflow: "hidden",
+            minHeight: "52vh",
+          },
+        }}
+      >
+        {/* Gradient Header */}
+        <Box sx={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)", px: 3, py: 2.5, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Box sx={{ width: 38, height: 38, borderRadius: "10px", background: "linear-gradient(135deg, #7c4dff, #651fff)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(124,77,255,0.4)" }}>
+                <AutoAwesomeIcon sx={{ fontSize: 20, color: "#fff" }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1rem", color: "#fff", lineHeight: 1.2 }}>
+                  AI Group Suggestions
+                </Typography>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.72rem" }}>
+                  Pending suggestions for this event
+                </Typography>
+              </Box>
+            </Stack>
+            <Button
+              variant="contained"
+              disabled={aiLoading}
+              startIcon={aiLoading ? null : <BoltIcon sx={{ fontSize: 16 }} />}
+              onClick={async () => {
+                setAiLoading(true);
+                try {
+                  const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggest/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ event_id: eventId }) });
+                  if (res.ok) loadAiSuggestions(); else alert(await res.text());
+                } finally { setAiLoading(false); }
+              }}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                borderRadius: "9px",
+                px: 2.5,
+                py: 0.9,
+                fontSize: "0.8rem",
+                background: aiLoading ? "rgba(255,255,255,0.07)" : "linear-gradient(135deg, #7c4dff, #651fff)",
+                boxShadow: aiLoading ? "none" : "0 4px 14px rgba(124,77,255,0.4)",
+                color: aiLoading ? "rgba(255,255,255,0.3)" : "#fff",
+                "&:hover": { background: "linear-gradient(135deg, #651fff, #4527a0)", boxShadow: "0 6px 18px rgba(124,77,255,0.5)" },
+                "&.Mui-disabled": { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.25)" },
+              }}
+            >
+              {aiLoading ? "Generating…" : "Generate New"}
             </Button>
           </Stack>
-          {aiSuggestions.filter(s => s.status === 'pending').length === 0 && <Typography variant="caption" sx={{ color: 'gray' }}>No pending AI suggestions right now.</Typography>}
-          <Stack spacing={2}>
-            {aiSuggestions.filter(s => s.status === 'pending').map(s => (
-              <Card key={s.id} sx={{ bgcolor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.2)" }}>
-                <CardContent>
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="subtitle1" sx={{ color: "#fff", fontWeight: "bold" }}>{s.suggested_title} (Confidence: {s.confidence_score})</Typography>
-                    <Stack direction="row" spacing={1}>
-                      <Button size="small" variant="contained" color="success" onClick={async () => {
-                        await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/approve/`), { method: "POST", headers: authHeader() });
-                        loadAiSuggestions(); loadGroups();
-                      }}>Approve</Button>
-                      <Button size="small" variant="contained" color="error" onClick={async () => {
-                        await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/reject/`), { method: "POST", headers: authHeader() });
-                        loadAiSuggestions();
-                      }}>Reject</Button>
-                    </Stack>
-                  </Stack>
-                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mt: 1 }}>{s.suggested_summary}</Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mt: 1, display: 'block' }}>Suggests {s.suggested_question_ids.length} questions.</Typography>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
+          {aiLoading && <LinearProgress sx={{ mt: 2, borderRadius: 4, bgcolor: "rgba(255,255,255,0.06)", "& .MuiLinearProgress-bar": { background: "linear-gradient(90deg, #7c4dff, #651fff)" } }} />}
+        </Box>
+
+        <DialogContent sx={{ px: 3, py: 2.5, bgcolor: "#141414" }}>
+          {aiSuggestions.filter(s => s.status === "pending").length === 0 ? (
+            <Stack alignItems="center" justifyContent="center" spacing={2} sx={{ py: 6 }}>
+              <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: "rgba(124,77,255,0.1)", border: "1px solid rgba(124,77,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <AutoAwesomeIcon sx={{ fontSize: 28, color: "rgba(124,77,255,0.6)" }} />
+              </Box>
+              <Box sx={{ textAlign: "center" }}>
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.55)", fontWeight: 500 }}>
+                  No pending AI suggestions right now
+                </Typography>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)", mt: 0.5, display: "block" }}>
+                  Click "Generate New" to create AI-powered group suggestions
+                </Typography>
+              </Box>
+            </Stack>
+          ) : (
+            <Stack spacing={2}>
+              {aiSuggestions.filter(s => s.status === "pending").map(s => {
+                const confidence = Math.round((s.confidence_score || 0) * 100);
+                return (
+                  <Card key={s.id} sx={{ bgcolor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", transition: "border-color 0.2s", "&:hover": { borderColor: "rgba(124,77,255,0.35)" } }}>
+                    <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+                        <Box sx={{ flex: 1 }}>
+                          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ color: "#fff", fontWeight: 700, fontSize: "0.88rem" }}>
+                              {s.suggested_title}
+                            </Typography>
+                            <Chip
+                              label={`${confidence}%`}
+                              size="small"
+                              sx={{ height: 18, fontSize: "0.65rem", fontWeight: 700, bgcolor: confidence >= 70 ? "rgba(76,175,80,0.15)" : "rgba(255,167,38,0.15)", color: confidence >= 70 ? "#81c784" : "#ffb74d", border: `1px solid ${confidence >= 70 ? "rgba(76,175,80,0.3)" : "rgba(255,167,38,0.3)"}` }}
+                            />
+                          </Stack>
+                          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.55)", fontSize: "0.8rem", lineHeight: 1.5 }}>
+                            {s.suggested_summary}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "rgba(124,77,255,0.7)", mt: 0.8, display: "block", fontWeight: 500 }}>
+                            {s.suggested_question_ids.length} question{s.suggested_question_ids.length !== 1 ? "s" : ""} suggested
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+                          <Button
+                            size="small"
+                            startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 15 }} />}
+                            onClick={async () => {
+                              await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/approve/`), { method: "POST", headers: authHeader() });
+                              loadAiSuggestions(); loadGroups();
+                            }}
+                            sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.75rem", borderRadius: "7px", px: 1.5, py: 0.6, bgcolor: "rgba(76,175,80,0.12)", color: "#81c784", border: "1px solid rgba(76,175,80,0.25)", "&:hover": { bgcolor: "rgba(76,175,80,0.22)", borderColor: "rgba(76,175,80,0.5)" } }}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="small"
+                            startIcon={<HighlightOffIcon sx={{ fontSize: 15 }} />}
+                            onClick={async () => {
+                              await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/reject/`), { method: "POST", headers: authHeader() });
+                              loadAiSuggestions();
+                            }}
+                            sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.75rem", borderRadius: "7px", px: 1.5, py: 0.6, bgcolor: "rgba(244,67,54,0.1)", color: "#ef9a9a", border: "1px solid rgba(244,67,54,0.2)", "&:hover": { bgcolor: "rgba(244,67,54,0.2)", borderColor: "rgba(244,67,54,0.45)" } }}
+                          >
+                            Reject
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Stack>
+          )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAiModalOpen(false)} sx={{ color: "gray" }}>Close</Button>
+
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: "#141414", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <Button
+            onClick={() => setAiModalOpen(false)}
+            sx={{ textTransform: "none", fontWeight: 500, borderRadius: "8px", px: 2.5, color: "rgba(255,255,255,0.5)", "&:hover": { bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)" } }}
+          >
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
