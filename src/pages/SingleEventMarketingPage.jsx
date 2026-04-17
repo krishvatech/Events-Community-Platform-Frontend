@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import speakerImage from "../assets/prof-dr-aswath-damodaran-12b35a4e.png";
+import citiesImage from "../assets/cities.png";
+import virtualImage from "../assets/virtual.png";
+import onlineImage from "../assets/online.png";
 
 const C = {
   deepBlue: "#284D61", midBlue: "#37738D", brightBlue: "#159AC9", lightBlue: "#B9CED7",
@@ -652,14 +655,7 @@ function MoreFromImaa() {
         {/* Onsite */}
         <FadeIn delay={0.08}>
           <div style={{ background: C.white, border: `1px solid ${C.cool20}`, borderRadius: 4, overflow: "hidden", height: "100%", boxSizing: "border-box" }}>
-            <div style={{ height: 140, background: `linear-gradient(135deg, ${C.deepBlue}, ${C.midBlue})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-              <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
-                {[40, 60, 80, 50, 70, 45, 65].map((h, i) => (
-                  <div key={i} style={{ width: 8, height: h, background: `rgba(255,255,255,${0.1 + i * 0.04})`, borderRadius: "2px 2px 0 0" }} />
-                ))}
-              </div>
-              <div style={{ position: "absolute", bottom: 12, left: 16, fontFamily: F.body, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>Replace with city images</div>
-            </div>
+            <img src={citiesImage} alt="Around the globe" style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }} />
             <div style={{ padding: "20px 22px" }}>
               <div style={{ fontFamily: F.body, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.coral, marginBottom: 10 }}>In person</div>
               <h3 style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.deepBlue, margin: "0 0 12px" }}>Around the globe</h3>
@@ -677,14 +673,7 @@ function MoreFromImaa() {
         {/* Virtual Live */}
         <FadeIn delay={0.12}>
           <div style={{ background: C.white, border: `1px solid ${C.cool20}`, borderRadius: 4, overflow: "hidden", height: "100%", boxSizing: "border-box" }}>
-            <div style={{ height: 140, background: `linear-gradient(135deg, ${C.midBlue}, ${C.brightBlue})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-              <div style={{ width: 64, height: 44, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                  {[1,2,3,4].map(i => <div key={i} style={{ width: 16, height: 12, background: "rgba(255,255,255,0.15)", borderRadius: 2 }} />)}
-                </div>
-              </div>
-              <div style={{ position: "absolute", bottom: 12, left: 16, fontFamily: F.body, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>Replace with virtual image</div>
-            </div>
+            <img src={virtualImage} alt="Live. Interactive. From anywhere." style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }} />
             <div style={{ padding: "20px 22px" }}>
               <div style={{ fontFamily: F.body, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.brightBlue, marginBottom: 10 }}>Virtual live</div>
               <h3 style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.deepBlue, margin: "0 0 12px" }}>Live. Interactive. From anywhere.</h3>
@@ -697,12 +686,7 @@ function MoreFromImaa() {
         {/* Online */}
         <FadeIn delay={0.16}>
           <div style={{ background: C.white, border: `1px solid ${C.cool20}`, borderRadius: 4, overflow: "hidden", height: "100%", boxSizing: "border-box" }}>
-            <div style={{ height: 140, background: `linear-gradient(135deg, ${C.cool80}, ${C.midBlue})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-              <div style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ width: 0, height: 0, borderTop: "10px solid transparent", borderBottom: "10px solid transparent", borderLeft: "16px solid rgba(255,255,255,0.4)", marginLeft: 4 }} />
-              </div>
-              <div style={{ position: "absolute", bottom: 12, left: 16, fontFamily: F.body, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>Replace with online image</div>
-            </div>
+            <img src={onlineImage} alt="Learn at your own pace." style={{ width: "100%", height: 140, objectFit: "cover", display: "block" }} />
             <div style={{ padding: "20px 22px" }}>
               <div style={{ fontFamily: F.body, fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.midBlue, marginBottom: 10 }}>Online</div>
               <h3 style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: C.deepBlue, margin: "0 0 12px" }}>Learn at your own pace.</h3>
