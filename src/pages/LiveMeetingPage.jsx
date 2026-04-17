@@ -163,6 +163,7 @@ import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
 import GuestBanner from "../components/GuestBanner.jsx";
 import QnAEngagementPromptBanner from "../components/QnAEngagementPromptBanner.jsx";
+import QnAEngagementPromptModal from "../components/QnAEngagementPromptModal.jsx";
 import ClearMediaCacheDialog from "../components/ClearMediaCacheDialog.jsx";
 import { useClearMediaCache } from "../hooks/useClearMediaCache.js";
 import GuestRegistrationModal from "../components/GuestRegistrationModal.jsx";
@@ -14036,6 +14037,11 @@ export default function NewLiveMeeting() {
   const [qnaPromptBanner, setQnaPromptBanner] = useState(null); // ack payload or null
   const qnaPromptTimerRef = useRef(null);
 
+  // Q&A Engagement Prompt Modal state (Feature #14)
+  const [qnaPromptModal, setQnaPromptModal] = useState(null); // ack payload or null
+  const [qnaIconPulse, setQnaIconPulse] = useState(false);
+  const qnaIconPulseTimerRef = useRef(null);
+
   // ✅ Private chat unread (per user)
   const [privateUnreadByUserId, setPrivateUnreadByUserId] = useState({});
   const isRoomChatActive = Boolean(isBreakout && activeTableId);
@@ -15151,6 +15157,21 @@ export default function NewLiveMeeting() {
     loadQuestions();
   }, [tab, isPanelOpen, loadQuestions]);
 
+  // Cleanup Q&A modal prompt and icon pulse timer on event change or unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(qnaIconPulseTimerRef.current);
+    };
+  }, [eventId]);
+
+  // Stop icon pulse when Q&A tab becomes active
+  useEffect(() => {
+    if (tab === 1 && isPanelOpen && qnaIconPulse) {
+      clearTimeout(qnaIconPulseTimerRef.current);
+      setQnaIconPulse(false);
+    }
+  }, [tab, isPanelOpen, qnaIconPulse]);
+
   // WS live updates while Q&A tab open
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
@@ -15453,9 +15474,9 @@ export default function NewLiveMeeting() {
           ));
         }
 
-        // Q&A Engagement Prompt: host broadcasts → attendees call ack → banner shown
+        // Q&A Engagement Prompt: host broadcasts → attendees call ack → banner or modal shown
         if (msg.type === "qna.engagement_prompt") {
-          // Hosts should NOT see the attendee banner (they triggered it)
+          // Hosts should NOT see the attendee prompt (they triggered it)
           if (!isHostRef.current) {
             const promptId = msg.prompt_id;
             fetch(
@@ -15468,9 +15489,17 @@ export default function NewLiveMeeting() {
               .then((r) => r.json())
               .then((data) => {
                 if (data.show) {
-                  // Clear any running timer for previous banner
-                  clearTimeout(qnaPromptTimerRef.current);
-                  setQnaPromptBanner(data);
+                  // Only one prompt UI active at a time: clear the other
+                  if (data.prompt_type === "modal") {
+                    clearTimeout(qnaPromptTimerRef.current);
+                    setQnaPromptBanner(null);
+                    setQnaPromptModal(data);
+                  } else {
+                    // banner (default)
+                    clearTimeout(qnaPromptTimerRef.current);
+                    setQnaPromptModal(null);
+                    setQnaPromptBanner(data);
+                  }
                 }
               })
               .catch((e) => console.warn("[QnAPrompt] ack error", e));
@@ -17402,13 +17431,13 @@ export default function NewLiveMeeting() {
                     {qnaModerationEnabled && (
                       <Chip label="Moderation ON" size="small" color="warning" variant="outlined" />
                     )}
-                    {/* Q&A Engagement Prompt – host trigger button */}
-                    <Box sx={{ ml: "auto" }}>
-                      <Tooltip title="Send a banner to all attendees prompting them to ask questions" arrow>
+                    {/* Q&A Engagement Prompt – host trigger buttons (banner + modal) */}
+                    <Box sx={{ ml: "auto", display: "flex", gap: 0.75 }}>
+                      <Tooltip title="Send a bottom banner to all attendees prompting them to ask questions" arrow>
                         <Button
                           size="small"
                           variant="outlined"
-                          startIcon={<AnnouncementIcon sx={{ fontSize: 16 }} />}
+                          startIcon={<AnnouncementIcon sx={{ fontSize: 14 }} />}
                           onClick={async () => {
                             try {
                               const res = await fetch(
@@ -17416,30 +17445,70 @@ export default function NewLiveMeeting() {
                                 {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json", ...authHeader() },
-                                  body: JSON.stringify({ event_id: eventId }),
+                                  body: JSON.stringify({ event_id: eventId, prompt_type: "banner" }),
                                 }
                               );
                               if (res.ok) {
-                                setSnackbar({ open: true, message: "Q&A prompt sent to attendees!", severity: "success" });
+                                setSnackbar({ open: true, message: "Q&A banner prompt sent!", severity: "success" });
                               } else {
                                 const data = await res.json().catch(() => ({}));
-                                setSnackbar({ open: true, message: data.detail || "Failed to send Q&A prompt.", severity: "error" });
+                                setSnackbar({ open: true, message: data.detail || "Failed to send prompt.", severity: "error" });
                               }
                             } catch (e) {
                               console.error("[QnAPrompt] trigger error", e);
-                              setSnackbar({ open: true, message: "Failed to send Q&A prompt.", severity: "error" });
+                              setSnackbar({ open: true, message: "Failed to send prompt.", severity: "error" });
                             }
                           }}
                           sx={{
                             color: "#63b3ed",
                             borderColor: "rgba(99,179,237,0.4)",
-                            fontSize: "0.7rem",
+                            fontSize: "0.68rem",
                             py: 0.3,
+                            px: 1,
                             textTransform: "none",
                             "&:hover": { borderColor: "#63b3ed", bgcolor: "rgba(99,179,237,0.08)" },
                           }}
                         >
-                          Prompt Audience
+                          Banner Prompt
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title="Send a centered modal to all attendees with an embedded question input" arrow>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<QuestionAnswerIcon sx={{ fontSize: 14 }} />}
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(
+                                toApiUrl("interactions/questions/engagement-prompt/trigger/"),
+                                {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json", ...authHeader() },
+                                  body: JSON.stringify({ event_id: eventId, prompt_type: "modal" }),
+                                }
+                              );
+                              if (res.ok) {
+                                setSnackbar({ open: true, message: "Q&A modal prompt sent!", severity: "success" });
+                              } else {
+                                const data = await res.json().catch(() => ({}));
+                                setSnackbar({ open: true, message: data.detail || "Failed to send prompt.", severity: "error" });
+                              }
+                            } catch (e) {
+                              console.error("[QnAPrompt] trigger error", e);
+                              setSnackbar({ open: true, message: "Failed to send prompt.", severity: "error" });
+                            }
+                          }}
+                          sx={{
+                            color: "#9f7aea",
+                            borderColor: "rgba(159,122,234,0.4)",
+                            fontSize: "0.68rem",
+                            py: 0.3,
+                            px: 1,
+                            textTransform: "none",
+                            "&:hover": { borderColor: "#9f7aea", bgcolor: "rgba(159,122,234,0.08)" },
+                          }}
+                        >
+                          Modal Prompt
                         </Button>
                       </Tooltip>
                     </Box>
@@ -19497,6 +19566,11 @@ export default function NewLiveMeeting() {
               setTab(1);
               if (privateChatUser) setPrivateChatUser(null);
             }
+            // Stop pulse when user opens Q&A panel
+            if (qnaIconPulse) {
+              clearTimeout(qnaIconPulseTimerRef.current);
+              setQnaIconPulse(false);
+            }
           }}
           sx={{
             width: 44,
@@ -19506,6 +19580,15 @@ export default function NewLiveMeeting() {
             border: (!privateChatUser && tab === 1 && rightPanelOpen) ? "1px solid rgba(20,184,177,0.3)" : "1px solid transparent",
             "&:hover": { bgcolor: "rgba(20,184,177,0.08)", color: "#fff" },
             transition: "all 0.2s",
+            // Pulse animation when attendee dismissed/auto-closed a modal prompt
+            ...(qnaIconPulse && {
+              animation: "qnaIconPulse 1.2s ease-in-out infinite",
+              "@keyframes qnaIconPulse": {
+                "0%": { transform: "scale(1)", boxShadow: "0 0 0 rgba(99,179,237,0)" },
+                "50%": { transform: "scale(1.12)", boxShadow: "0 0 10px rgba(99,179,237,0.5)" },
+                "100%": { transform: "scale(1)", boxShadow: "0 0 0 rgba(99,179,237,0)" },
+              },
+            }),
           }}
         >
           <Badge
@@ -20291,6 +20374,73 @@ export default function NewLiveMeeting() {
                   }
                 ).catch(() => { });
               }
+            }}
+          />
+        )}
+
+        {/* Q&A Engagement Prompt Modal – shown to attendees only (Feature #14) */}
+        {!isHost && (
+          <QnAEngagementPromptModal
+            open={Boolean(qnaPromptModal)}
+            prompt={qnaPromptModal}
+            anonymousMode={qnaAnonymousModeEnabled}
+            allowAnonToggle={true}
+            onClose={() => {
+              const promptId = qnaPromptModal?.prompt_id;
+              setQnaPromptModal(null);
+              // Start Q&A icon pulse to remind attendee
+              clearTimeout(qnaIconPulseTimerRef.current);
+              setQnaIconPulse(true);
+              qnaIconPulseTimerRef.current = setTimeout(() => setQnaIconPulse(false), 13000);
+              // Best-effort dismiss
+              if (promptId) {
+                fetch(
+                  toApiUrl(`interactions/questions/engagement-prompt/${promptId}/dismiss/`),
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", ...authHeader() },
+                  }
+                ).catch(() => { });
+              }
+            }}
+            onOpenQnA={() => {
+              const promptId = qnaPromptModal?.prompt_id;
+              setQnaPromptModal(null);
+              // Stop pulse – user is opening Q&A
+              clearTimeout(qnaIconPulseTimerRef.current);
+              setQnaIconPulse(false);
+              // Open right sidebar on Q&A tab
+              setRightPanelOpen(true);
+              setRightOpen(true);
+              setTab(1);
+              if (privateChatUser) setPrivateChatUser(null);
+              // Best-effort dismiss
+              if (promptId) {
+                fetch(
+                  toApiUrl(`interactions/questions/engagement-prompt/${promptId}/dismiss/`),
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", ...authHeader() },
+                  }
+                ).catch(() => { });
+              }
+            }}
+            onSubmit={async (content, isAnonymous) => {
+              const res = await fetch(toApiUrl("interactions/questions/"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...authHeader() },
+                body: JSON.stringify({
+                  event: eventId,
+                  content,
+                  is_anonymous: isAnonymous,
+                }),
+              });
+              if (!res.ok) {
+                throw new Error("Submit failed");
+              }
+              // Close modal on success
+              setQnaPromptModal(null);
+              setSnackbar({ open: true, message: "Question submitted!", severity: "success" });
             }}
           />
         )}
