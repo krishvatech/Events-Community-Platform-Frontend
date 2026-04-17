@@ -47,6 +47,7 @@ import {
   Switch,
   FormControlLabel,
   Autocomplete,
+  Tooltip,
 } from "@mui/material";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import EditEventForm from "../components/EditEventForm.jsx";
@@ -60,6 +61,7 @@ import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import VideoLibraryRoundedIcon from "@mui/icons-material/VideoLibraryRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
@@ -413,6 +415,14 @@ export default function EventManagePage() {
   const [notifyParticipants, setNotifyParticipants] = useState(true);
   const [hostedEvents, setHostedEvents] = useState([]);
 
+  // Hide Event State (platform_admin only, for cancelled events)
+  const [hideEventOpen, setHideEventOpen] = useState(false);
+  const [hideEventLoading, setHideEventLoading] = useState(false);
+
+  // Delete Event State (platform_admin only, for cancelled events)
+  const [deleteEventOpen, setDeleteEventOpen] = useState(false);
+  const [deleteEventLoading, setDeleteEventLoading] = useState(false);
+
   // Fetch hosted events for recommendation dropdown
   useEffect(() => {
     if (!cancelEventOpen || !isOwner) return;
@@ -467,6 +477,53 @@ export default function EventManagePage() {
       toast.error(err.message);
     } finally {
       setCancelEventLoading(false);
+    }
+  };
+
+  const handleHideEvent = async () => {
+    if (!eventId || hideEventLoading) return;
+    setHideEventLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_hidden: !event.is_hidden }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || "Failed to update event visibility");
+      toast.success(event.is_hidden ? "Event is now visible on the platform." : "Event hidden from platform.");
+      setHideEventOpen(false);
+      refreshEvent();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setHideEventLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!eventId || deleteEventLoading) return;
+    setDeleteEventLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok && res.status !== 204) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.detail || `HTTP ${res.status}`);
+      }
+      toast.success("Event deleted permanently.");
+      navigate(-1);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setDeleteEventLoading(false);
     }
   };
 
@@ -1779,37 +1836,39 @@ export default function EventManagePage() {
               <Box sx={{ mb: 2 }}>
                 {isOwner ? (
                   <Stack spacing={1.5}>
-                    <Button
-                      onClick={onHost}
-                      startIcon={<LiveTvRoundedIcon />}
-                      variant="contained"
-                      fullWidth
-                      sx={{
-                        borderRadius: 2,
-                        textTransform: "none",
-                        bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
-                        py: 1,
-                        fontSize: 15,
-                        fontWeight: 600,
-                        "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
-                        ...(status === "cancelled" && {
-                          "&.Mui-disabled": {
-                            bgcolor: "#fef2f2",
-                            color: "#b91c1c"
-                          }
-                        })
-                      }}
-                      disabled={!!hostingId || isPast || status === "cancelled"}
-                    >
-                      {hostingId ? (
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <CircularProgress size={20} color="inherit" />
-                          <span>Starting...</span>
-                        </Stack>
-                      ) : (
-                        isPast ? "Event Ended" : status === "cancelled" ? "Cancelled" : "Host Event"
-                      )}
-                    </Button>
+                    <Tooltip title={event?.is_hidden ? "Please unhide the event to host it" : ""} disableInteractive={false}>
+                      <Button
+                        onClick={onHost}
+                        startIcon={<LiveTvRoundedIcon />}
+                        variant="contained"
+                        fullWidth
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: "none",
+                          bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
+                          py: 1,
+                          fontSize: 15,
+                          fontWeight: 600,
+                          "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
+                          ...(status === "cancelled" && {
+                            "&.Mui-disabled": {
+                              bgcolor: "#fef2f2",
+                              color: "#b91c1c"
+                            }
+                          })
+                        }}
+                        disabled={!!hostingId || isPast || status === "cancelled" || event?.is_hidden}
+                      >
+                        {hostingId ? (
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <CircularProgress size={20} color="inherit" />
+                            <span>Starting...</span>
+                          </Stack>
+                        ) : (
+                          isPast ? "Event Ended" : status === "cancelled" ? "Cancelled" : "Host Event"
+                        )}
+                      </Button>
+                    </Tooltip>
                     {status !== "cancelled" && status !== "past" && event.status !== "ended" && event.status !== "cancelled" && (
                       <Button
                         onClick={() => setCancelEventOpen(true)}
@@ -1825,6 +1884,43 @@ export default function EventManagePage() {
                       >
                         Cancel Event
                       </Button>
+                    )}
+                    {/* Platform Admin: Hide / Delete any event */}
+                    {isOwner && (
+                      <>
+                        <Button
+                          onClick={() => setHideEventOpen(true)}
+                          variant="outlined"
+                          fullWidth
+                          startIcon={event.is_hidden ? <VisibilityRoundedIcon /> : <VisibilityOffRoundedIcon />}
+                          sx={{
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontSize: 15,
+                            fontWeight: 600,
+                            borderColor: event.is_hidden ? "success.main" : "text.disabled",
+                            color: event.is_hidden ? "success.main" : "text.secondary",
+                            "&:hover": { borderColor: event.is_hidden ? "success.dark" : "text.secondary", bgcolor: "action.hover" },
+                          }}
+                        >
+                          {event.is_hidden ? "Unhide from Platform" : "Hide from Platform"}
+                        </Button>
+                        <Button
+                          onClick={() => setDeleteEventOpen(true)}
+                          variant="outlined"
+                          color="error"
+                          fullWidth
+                          startIcon={<DeleteOutlineRoundedIcon />}
+                          sx={{
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontSize: 15,
+                            fontWeight: 600,
+                          }}
+                        >
+                          Delete Event Permanently
+                        </Button>
+                      </>
                     )}
                   </Stack>
                 ) : (
@@ -4919,21 +5015,23 @@ export default function EventManagePage() {
                   borderColor: "#fecaca !important",
                 }}
               >Cancelled
-                                </Button>) : (<Button
-                onClick={onHost}
-                startIcon={<LiveTvRoundedIcon />}
-                variant="contained"
-                sx={{
-                  borderRadius: 999,
-                  textTransform: "none",
-                  px: 2.5,
-                  bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
-                  "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
-                }}
-                disabled={!!hostingId || isPast}
-              >
-                {hostingId ? <CircularProgress size={18} color="inherit" /> : (isPast ? "Ended" : "Host")}
-              </Button>))
+                                </Button>) : (<Tooltip title={event?.is_hidden ? "Please unhide the event to host it" : ""} disableInteractive={false}>
+                <Button
+                  onClick={onHost}
+                  startIcon={<LiveTvRoundedIcon />}
+                  variant="contained"
+                  sx={{
+                    borderRadius: 999,
+                    textTransform: "none",
+                    px: 2.5,
+                    bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
+                    "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
+                  }}
+                  disabled={!!hostingId || isPast || event?.is_hidden}
+                >
+                  {hostingId ? <CircularProgress size={18} color="inherit" /> : (isPast ? "Ended" : "Host")}
+                </Button>
+              </Tooltip>))
             ) : (
               // Join Button for Staff/Member
               (canShowActiveJoin && (<Button
@@ -5958,6 +6056,95 @@ export default function EventManagePage() {
                 </Stack>
               ) : (
                 "Yes, Cancel Event"
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Hide Event Dialog (platform_admin only) */}
+        <Dialog
+          open={hideEventOpen}
+          onClose={() => !hideEventLoading && setHideEventOpen(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 800 }}>
+            {event?.is_hidden ? "Unhide Event" : "Hide Event from Platform"}
+          </DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" color="text.secondary">
+              {event?.is_hidden
+                ? "This will make the event visible again on the platform. All users will be able to find and view it."
+                : "This will hide the event from the platform. Regular users and participants will no longer be able to find or view this event. You can unhide it at any time."}
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button
+              onClick={() => setHideEventOpen(false)}
+              disabled={hideEventLoading}
+              sx={{ textTransform: "none", color: "text.secondary", fontWeight: 600 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleHideEvent}
+              disabled={hideEventLoading}
+              variant="contained"
+              color={event?.is_hidden ? "success" : "inherit"}
+              sx={{ textTransform: "none", borderRadius: 2, fontWeight: 600, ...(!event?.is_hidden && { bgcolor: "grey.700", "&:hover": { bgcolor: "grey.800" } }) }}
+            >
+              {hideEventLoading ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CircularProgress size={20} color="inherit" />
+                  <span>{event?.is_hidden ? "Unhiding..." : "Hiding..."}</span>
+                </Stack>
+              ) : (
+                event?.is_hidden ? "Yes, Unhide Event" : "Yes, Hide Event"
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Event Dialog (platform_admin only) */}
+        <Dialog
+          open={deleteEventOpen}
+          onClose={() => !deleteEventLoading && setDeleteEventOpen(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 800, color: "error.main" }}>Delete Event Permanently</DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              <strong>This action is permanent and cannot be undone.</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Deleting this event will permanently remove all associated data, including registrations, sessions, resources, lounge tables, speed networking sessions, and all other related records. This cannot be reversed.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button
+              onClick={() => setDeleteEventOpen(false)}
+              disabled={deleteEventLoading}
+              sx={{ textTransform: "none", color: "text.secondary", fontWeight: 600 }}
+            >
+              Keep Event
+            </Button>
+            <Button
+              onClick={handleDeleteEvent}
+              disabled={deleteEventLoading}
+              variant="contained"
+              color="error"
+              sx={{ textTransform: "none", borderRadius: 2, fontWeight: 600 }}
+            >
+              {deleteEventLoading ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CircularProgress size={20} color="inherit" />
+                  <span>Deleting...</span>
+                </Stack>
+              ) : (
+                "Yes, Delete Permanently"
               )}
             </Button>
           </DialogActions>

@@ -3036,30 +3036,32 @@ function AdminEventCard({
                       </Box>
                     </Button>
                   ) : (
-                    <Button
-                      onClick={() => onHost(ev)}
-                      startIcon={<LiveTvRoundedIcon />}
-                      variant="contained"
-                      className="rounded-xl flex-1"
-                      sx={{
-                        textTransform: "none",
-                        backgroundColor: "#10b8a6",
-                        "&:hover": { backgroundColor: "#0ea5a4" },
-                        minWidth: 0,
-                        px: 1,
-                      }}
-                      disabled={isHosting}
-                    >
-                      {isHosting ? (
-                        <span className="flex items-center gap-2">
-                          <CircularProgress size={18} />
-                        </span>
-                      ) : (
-                        <Box component="span" sx={{ whiteSpace: "nowrap" }}>
-                          Host
-                        </Box>
-                      )}
-                    </Button>
+                    <Tooltip title={ev.is_hidden ? "Please unhide the event to host it" : ""} disableInteractive={false}>
+                      <Button
+                        onClick={() => onHost(ev)}
+                        startIcon={<LiveTvRoundedIcon />}
+                        variant="contained"
+                        className="rounded-xl flex-1"
+                        sx={{
+                          textTransform: "none",
+                          backgroundColor: "#10b8a6",
+                          "&:hover": { backgroundColor: "#0ea5a4" },
+                          minWidth: 0,
+                          px: 1,
+                        }}
+                        disabled={isHosting || ev.is_hidden}
+                      >
+                        {isHosting ? (
+                          <span className="flex items-center gap-2">
+                            <CircularProgress size={18} />
+                          </span>
+                        ) : (
+                          <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+                            Host
+                          </Box>
+                        )}
+                      </Button>
+                    </Tooltip>
                   )}
 
                   {/* Upcoming/Live → View Details (Event Manage) */}
@@ -3269,7 +3271,7 @@ function EventsPage() {
   // Pagination & Filtering
   const PAGE_SIZE = 6;
   const [page, setPage] = useState(1);
-  const [tab, setTab] = useState(0); // 0=All, 1=Upcoming, 2=Live, 3=Past
+  const [tab, setTab] = useState(0); // 0=All, 1=Upcoming, 2=Live, 3=Past, 4=Cancelled, 5=Hidden
   const [q, setQ] = useState("");
   const [refreshKey, setRefreshKey] = useState(0); // to force refetch
 
@@ -3326,6 +3328,11 @@ function EventsPage() {
         const bucket = statusTabMap[tab];
         if (bucket) {
           url.searchParams.set("bucket", bucket); // upcoming | live | past
+        }
+
+        // Tab 5: Hidden events
+        if (tab === 5) {
+          url.searchParams.set("is_hidden", "true");
         }
 
         // Ordering defaults
@@ -3530,6 +3537,7 @@ function EventsPage() {
           <Tab label="Live" />
           <Tab label="Past" />
           <Tab label="Cancelled" />
+          {isOwner && <Tab label="Hidden" />}
         </Tabs>
       </Paper>
 

@@ -945,6 +945,9 @@ function mapFeedItem(item) {
   }
 
   if (t === "event" || t === "event_update" || isEventVerb || hasEventFields) {
+    // Filter out event posts from hidden events
+    if (m.is_hidden || m.event_is_hidden) return null;
+
     const eventId = m.event_id ?? item.target_object_id ?? item.id ?? null;
     return {
       ...base,
