@@ -336,9 +336,8 @@ function Hero({ eventData = {}, eventId }) {
                       background: C.coral,
                       border: "none",
                       borderRadius: 4,
-                      cursor: valid && !loading ? "pointer" : "default",
+                      cursor: valid && !loading ? "pointer" : "not-allowed",
                       fontFamily: F.body,
-                      opacity: valid && !loading ? 1 : 0.5,
                       transition: "all 0.3s ease",
                       letterSpacing: "0.03em"
                     }}
@@ -746,7 +745,7 @@ function FinalCTA({ eventData = {} }) {
             </div>
             <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 6, maxWidth: 440, margin: "0 auto 12px" }}>
               <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email" type="email" style={{ flex: 1, padding: "11px 14px", border: `1.5px solid ${C.cool60}`, borderRadius: 4, fontSize: 13, fontFamily: F.body, background: "transparent", color: C.white, outline: "none" }} />
-              <button onClick={() => valid && setDone(true)} style={{ padding: "11px 24px", fontSize: 14, fontWeight: 700, color: C.white, background: C.coral, border: "none", borderRadius: 4, cursor: valid ? "pointer" : "default", fontFamily: F.body, whiteSpace: "nowrap", opacity: valid ? 1 : 0.6 }}>Register →</button>
+              <button onClick={() => valid && setDone(true)} style={{ padding: "11px 24px", fontSize: 14, fontWeight: 700, color: C.white, background: C.coral, border: "none", borderRadius: 4, cursor: valid ? "pointer" : "not-allowed", fontFamily: F.body, whiteSpace: "nowrap" }}>Register →</button>
             </div>
             <div><a href="/login" style={{ fontFamily: F.body, fontSize: 11, color: C.cool50, textDecoration: "none" }}>Already registered? <span style={{ color: C.lightBlue }}>Log in</span></a></div>
           </>) : (
