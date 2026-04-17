@@ -344,6 +344,11 @@ export default function EventManagePage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
+  // Connection Request State
+  const [connectionRequestLoading, setConnectionRequestLoading] = useState({});
+  const [connectionRequestError, setConnectionRequestError] = useState("");
+  const [friendStatusByUser, setFriendStatusByUser] = useState({});
+
   // Lounge Settings State
   const [loungeSettingsSaving, setLoungeSettingsSaving] = useState(false);
   const [loungeSettings, setLoungeSettings] = useState({
@@ -1248,6 +1253,70 @@ export default function EventManagePage() {
     }
   };
 
+  // Fetch friend status for a user
+  const fetchFriendStatus = async (userId) => {
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/friends/status/?user_id=${userId}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return "none";
+
+      const status = (data?.status || "").toLowerCase();
+      if (status === "incoming_pending") return "pending_incoming";
+      if (status === "outgoing_pending") return "pending_outgoing";
+      if (["friends", "friend", "accepted"].includes(status)) return "friends";
+      return "none";
+    } catch (err) {
+      console.error("Failed to fetch friend status:", err);
+      return "none";
+    }
+  };
+
+  // Handle Connection Request (Add as Contact)
+  const handleRequestConnection = async (userId) => {
+    if (!userId) {
+      toast.error("User ID not available");
+      return;
+    }
+
+    setConnectionRequestLoading(prev => ({ ...prev, [userId]: true }));
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/friend-requests/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({ to_user: Number(userId) }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok && res.status !== 200 && res.status !== 201) {
+        let msg = json?.detail || json?.non_field_errors?.[0];
+        if (!msg && typeof json === "object") {
+          const firstKey = Object.keys(json)[0];
+          if (firstKey && Array.isArray(json[firstKey])) msg = json[firstKey][0];
+        }
+        throw new Error(msg || `HTTP ${res.status}`);
+      }
+
+      // Update friend status to pending_outgoing
+      setFriendStatusByUser(prev => ({ ...prev, [userId]: "pending_outgoing" }));
+      toast.success("Contact request sent!");
+    } catch (err) {
+      toast.error(err.message || "Failed to send contact request");
+    } finally {
+      setConnectionRequestLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
   // ---- Host / Join Handlers ----
   const onHost = async () => {
     if (!event?.id) return;
@@ -1370,6 +1439,25 @@ export default function EventManagePage() {
     (memberPage - 1) * MEMBERS_PER_PAGE,
     memberPage * MEMBERS_PER_PAGE
   );
+
+  // Load friend statuses for visible members
+  useEffect(() => {
+    if (!isOwner || !pagedMembers.length) return;
+
+    const loadStatuses = async () => {
+      const statuses = {};
+      for (const member of pagedMembers) {
+        if (member.user_id && !friendStatusByUser[member.user_id]) {
+          statuses[member.user_id] = await fetchFriendStatus(member.user_id);
+        }
+      }
+      if (Object.keys(statuses).length > 0) {
+        setFriendStatusByUser(prev => ({ ...prev, ...statuses }));
+      }
+    };
+
+    loadStatuses();
+  }, [pagedMembers, isOwner, friendStatusByUser]);
 
   const filteredGuestAuditRows = useMemo(() => {
     let rows = guestAuditRows.slice();
@@ -2970,6 +3058,12 @@ export default function EventManagePage() {
                                   height: 28,
                                   bgcolor: "primary.light",
                                   fontSize: 13,
+                                  cursor: r.user_id ? "pointer" : "default",
+                                }}
+                                onClick={() => {
+                                  if (r.user_id) {
+                                    window.open(`/community/rich-profile/${r.user_id}`, '_blank');
+                                  }
                                 }}
                               >
                                 {(name[0] || "U").toUpperCase()}
@@ -2977,7 +3071,16 @@ export default function EventManagePage() {
                               <Box>
                                 <Typography
                                   variant="body2"
-                                  sx={{ fontWeight: 500 }}
+                                  sx={{
+                                    fontWeight: 500,
+                                    cursor: r.user_id ? "pointer" : "default",
+                                    color: "text.primary",
+                                  }}
+                                  onClick={() => {
+                                    if (r.user_id) {
+                                      window.open(`/community/rich-profile/${r.user_id}`, '_blank');
+                                    }
+                                  }}
                                 >
                                   {name}
                                   {isVerified && (
@@ -2990,7 +3093,20 @@ export default function EventManagePage() {
                             </Stack>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2">{email}</Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                cursor: r.user_id ? "pointer" : "default",
+                                color: "text.primary",
+                              }}
+                              onClick={() => {
+                                if (r.user_id) {
+                                  window.open(`/community/rich-profile/${r.user_id}`, '_blank');
+                                }
+                              }}
+                            >
+                              {email}
+                            </Typography>
                           </TableCell>
                           <TableCell>
                             <Chip
@@ -3007,7 +3123,19 @@ export default function EventManagePage() {
                             <Typography variant="body2">{purchased}</Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                            <Stack direction="row" justifyContent="flex-end" spacing={1} flexWrap="wrap">
+                              {r.user_id && currentUser?.id !== r.user_id && !['friends', 'pending_outgoing'].includes((friendStatusByUser?.[r.user_id] || '').toLowerCase()) && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  disabled={connectionRequestLoading[r.user_id]}
+                                  onClick={() => handleRequestConnection(r.user_id)}
+                                  sx={{ textTransform: "none" }}
+                                >
+                                  {connectionRequestLoading[r.user_id] ? "Sending..." : "Connect"}
+                                </Button>
+                              )}
+
                               {['registered', 'cancellation_requested'].includes(r.status) ? (
                                 <Button
                                   size="small"
