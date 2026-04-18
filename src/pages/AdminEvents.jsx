@@ -521,6 +521,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [editSeedContent, setEditSeedContent] = React.useState("");
   const [editSeedAttribution, setEditSeedAttribution] = React.useState("");
   const [editSeedNote, setEditSeedNote] = React.useState("");
+  const [qnaAiPublicSuggestionsEnabled, setQnaAiPublicSuggestionsEnabled] = React.useState(false);
 
   // 🔴 DEBUG: Wrapper to track startTime changes
   const originalSetStartTime = setStartTime;
@@ -743,6 +744,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setNewSeedAttribution("");
     setNewSeedNote("");
     setEditingSeedIdx(null);
+    setQnaAiPublicSuggestionsEnabled(false);
 
     setErrors({});
   };
@@ -911,6 +913,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("start_time", startISO);
     fd.append("end_time", endISO);
     fd.append("recording_url", "");
+    fd.append("qna_ai_public_suggestions_enabled", String(qnaAiPublicSuggestionsEnabled));
 
     const publishMode = autoPublish ? "auto_publish" : "manual_review";
     console.log("🔍 AdminEvents - Creating event with replay_publishing_mode:", publishMode, "autoPublish:", autoPublish);
@@ -2337,6 +2340,32 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               Use an attribution label like <strong>Event Team</strong> or <strong>Dr. Smith</strong>.
               Speaker notes are private — only you see them.
             </Typography>
+
+            <Box sx={{ mb: 2, p: 1, bgcolor: "rgba(156,123,255,0.08)", borderRadius: 1, border: "1px dashed rgba(156,123,255,0.3)" }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={qnaAiPublicSuggestionsEnabled}
+                    onChange={(e) => setQnaAiPublicSuggestionsEnabled(e.target.checked)}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: "#9c7bff" },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#9c7bff" }
+                    }}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: "#9c7bff" }}>
+                      Enable AI Question Adoption
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Allow participants to adopt AI-generated questions.
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
 
             {/* Draft seed list */}
             {draftSeeds.length === 0 ? (
