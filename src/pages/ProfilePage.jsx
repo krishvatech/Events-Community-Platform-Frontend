@@ -338,7 +338,7 @@ function createEmptyContactForm() {
     emails: [],
     phones: [],
     websites: [],
-    scheduler: { label: "Calendly", url: "https://calendly.com/me", visibility: "private" },
+    scheduler: { label: "", url: "", visibility: "private" },
     socials: { linkedin: "", x: "", facebook: "", instagram: "", github: "" },
     main_email: { type: "", visibility: "contacts" },
     require_verified: false,
@@ -395,8 +395,8 @@ function buildContactFormFromLinks(links) {
       visibility: item?.visibility || "private",
     })),
     scheduler: {
-      label: scheduler?.label || "Calendly",
-      url: scheduler?.url || "https://calendly.com/me",
+      label: scheduler?.label || "",
+      url: scheduler?.url || "",
       visibility: scheduler?.visibility || "private",
     },
     socials: {
@@ -4112,7 +4112,9 @@ export default function ProfilePage() {
                               </Typography>
                             </>
                           ) : (
-                            <Typography variant="body2" color="text.secondary">\u2014</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              The member has not yet provided any scheduling link.
+                            </Typography>
                           )}
                         </Box>
                       </SectionCard>
@@ -4128,17 +4130,23 @@ export default function ProfilePage() {
                           </Tooltip>
                         }
                       >
-                        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-                          <PlaceIcon fontSize="small" sx={{ mt: 0.5 }} />
-                          <Box>
-                            <Typography variant="body2" display="block">
-                              {parsedLocation.city || "\u2014"}
-                            </Typography>
-                            <Typography variant="body2" display="block">
-                              {parsedLocation.country || "\u2014"}
-                            </Typography>
+                        {parsedLocation.city || parsedLocation.country ? (
+                          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                            <PlaceIcon fontSize="small" sx={{ mt: 0.5 }} />
+                            <Box>
+                              <Typography variant="body2" display="block">
+                                {parsedLocation.city || "\u2014"}
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                {parsedLocation.country || "\u2014"}
+                              </Typography>
+                            </Box>
                           </Box>
-                        </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            The member has not yet provided any location.
+                          </Typography>
+                        )}
                       </SectionCard>
 
                       <SectionCard
