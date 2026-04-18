@@ -518,7 +518,16 @@ export default function LiveQnAPanel({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
+  const [adoptedSuggestionId, setAdoptedSuggestionId] = useState(null); // A3: track source suggeston
   const [error, setError] = useState("");
+
+  // --- A3: Public AI Question Suggestions (Host + Participant) ---
+  const [publicSuggestions, setPublicSuggestions] = useState([]);
+  const [publicSuggLoading, setPublicSuggLoading] = useState(false);
+  const [publicSuggError, setPublicSuggError] = useState("");
+  const [publicSuggGenerating, setPublicSuggGenerating] = useState(false);
+  const [publicSuggHubOpen, setPublicSuggHubOpen] = useState(false); // Host Hub
+  const [publicSuggSectionOpen, setPublicSuggSectionOpen] = useState(true); // Participant toggle
 
   // ── Polish-draft AI state ─────────────────────────────────────────────────
   const [polishLoading, setPolishLoading] = useState(false);
@@ -606,6 +615,9 @@ export default function LiveQnAPanel({
     loadQuestions();
     loadGroups();
     if (isHost) loadAiSuggestions();
+    // Auto-fetch A3 public suggestions
+    fetchPublicSuggestions();
+
     // Auto-fetch A2 suggestions on first open (not dismissed, not already loaded)
     if (!aiQSuggDismissed && aiQSugg.length === 0) {
       fetchAiQSuggestions();
@@ -817,6 +829,11 @@ export default function LiveQnAPanel({
             loadAiSuggestions();
           }
         }
+
+        // A3: Public AI Suggestion Refresh
+        if (msg.type === "qna.ai_public_suggestions_refresh") {
+          fetchPublicSuggestions();
+        }
       } catch (e) {
         console.warn("Failed to parse QnA WS message", e);
       }
@@ -951,6 +968,69 @@ export default function LiveQnAPanel({
     }
   };
 
+  // ── A3: Public AI Question Suggestions Hub (Host) ──────────────────────────
+  const fetchPublicSuggestions = async () => {
+    if (!eventId) return;
+    setPublicSuggLoading(true);
+    setPublicSuggError("");
+    try {
+      const res = await fetch(toApiUrl(`interactions/ai-public-suggestions/?event_id=${eventId}`), {
+        headers: authHeader(),
+      });
+      const data = await res.json().catch(() => []);
+      if (!res.ok) throw new Error(data.detail || "Could not load suggestions.");
+      setPublicSuggestions(data);
+    } catch (e) {
+      setPublicSuggError(e.message);
+    } finally {
+      setPublicSuggLoading(false);
+    }
+  };
+
+  const handleGeneratePublicSuggestions = async () => {
+    if (!eventId) return;
+    setPublicSuggGenerating(true);
+    setPublicSuggError("");
+    try {
+      const res = await fetch(toApiUrl("interactions/ai-public-suggestions/generate/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ event_id: eventId, count: 5 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Generation failed.");
+      // Refresh list
+      await fetchPublicSuggestions();
+    } catch (e) {
+      setPublicSuggError(e.message);
+    } finally {
+      setPublicSuggGenerating(false);
+    }
+  };
+
+  const handleSuggestionAction = async (id, action) => {
+    try {
+      const res = await fetch(toApiUrl(`interactions/ai-public-suggestions/${id}/${action}/`), {
+        method: "POST",
+        headers: authHeader(),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Action ${action} failed.`);
+      }
+      await fetchPublicSuggestions();
+    } catch (e) {
+      setPublicSuggError(e.message);
+    }
+  };
+
+  const handleAdoptSuggestion = async (suggestion) => {
+    // Pre-fill the input
+    setNewQuestion(suggestion.question_text);
+    // Store the ID to link it when submitting
+    setAdoptedSuggestionId(suggestion.id);
+  };
+
   // ── Submit question ───────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -965,13 +1045,18 @@ export default function LiveQnAPanel({
       const res = await fetch(toApiUrl("interactions/questions/"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ event: eventId, content }),
+        body: JSON.stringify({
+          event: eventId,
+          content,
+          adopted_suggestion_id: adoptedSuggestionId
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || "Failed to create question.");
       }
       setNewQuestion("");
+      setAdoptedSuggestionId(null);
       await loadQuestions();
     } catch (e) {
       setError(e.message || "Failed to create question.");
@@ -1224,6 +1309,25 @@ export default function LiveQnAPanel({
                   <Button size="small" variant="outlined" color="info" onClick={() => setAiModalOpen(true)} sx={{ textTransform: "none" }}>
                     AI Suggestions
                   </Button>
+                  {meeting?.event?.qna_ai_public_suggestions_enabled && (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => {
+                        setPublicSuggHubOpen(true);
+                        fetchPublicSuggestions();
+                      }}
+                      sx={{
+                        textTransform: "none",
+                        bgcolor: "rgba(156,123,255,0.2)",
+                        color: "#c4a8ff",
+                        border: "1px solid rgba(156,123,255,0.4)",
+                        "&:hover": { bgcolor: "rgba(156,123,255,0.3)" },
+                      }}
+                    >
+                      💡 Suggestion Hub
+                    </Button>
+                  )}
                   <Button
                     size="small"
                     variant="outlined"
@@ -1407,6 +1511,126 @@ export default function LiveQnAPanel({
                   </Button>
                 </Stack>
               )}
+            </Box>
+          )}
+
+          {/* ── A3: Public Suggested Questions (Participant) ───────────── */}
+          {meeting?.event?.qna_ai_public_suggestions_enabled && publicSuggestions.length > 0 && (
+            <Box
+              sx={{
+                mt: 1,
+                mb: 0.5,
+                borderRadius: 2,
+                border: "1px solid rgba(139, 92, 246, 0.3)",
+                bgcolor: "rgba(139, 92, 246, 0.04)",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <Box
+                sx={{
+                  px: 1.5,
+                  py: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { bgcolor: "rgba(139, 92, 246, 0.08)" },
+                }}
+                onClick={() => setPublicSuggSectionOpen(!publicSuggSectionOpen)}
+              >
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Box sx={{ color: "#9c7bff", display: "flex", alignItems: "center" }}>
+                    <Typography sx={{ fontSize: 16 }}>💡</Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{ color: "#c4a8ff", fontWeight: 700, fontSize: "0.75rem" }}>
+                    Suggested Questions
+                  </Typography>
+                </Stack>
+                {publicSuggSectionOpen ? (
+                  <ExpandLessIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.4)" }} />
+                ) : (
+                  <ExpandMoreIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.4)" }} />
+                )}
+              </Box>
+
+              <Collapse in={publicSuggSectionOpen}>
+                <Box sx={{ px: 1.25, pb: 1.25 }}>
+                  <Stack spacing={0.75}>
+                    {publicSuggestions.map((s) => (
+                      <Stack
+                        key={s.id}
+                        direction="row"
+                        alignItems="flex-start"
+                        spacing={1.5}
+                        sx={{
+                          p: 1.25,
+                          borderRadius: 2,
+                          bgcolor: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.06)",
+                          transition: "all 0.2s ease",
+                          "&:hover": {
+                            bgcolor: "rgba(255,255,255,0.06)",
+                            borderColor: "rgba(255,255,255,0.12)",
+                            transform: "translateX(2px)",
+                          },
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: "rgba(255,255,255,0.9)",
+                            fontSize: "0.82rem",
+                            lineHeight: 1.5,
+                            flex: 1,
+                            minWidth: 0,
+                          }}
+                        >
+                          {s.question_text}
+                        </Typography>
+                        <Button
+                          size="small"
+                          onClick={() => handleAdoptSuggestion(s)}
+                          sx={{
+                            flexShrink: 0,
+                            textTransform: "none",
+                            fontSize: "0.7rem",
+                            py: 0.4,
+                            px: 1.25,
+                            minWidth: 0,
+                            borderRadius: "8px",
+                            bgcolor: "rgba(124,77,255,0.15)",
+                            color: "#c4a8ff",
+                            border: "1px solid rgba(124,77,255,0.25)",
+                            "&:hover": {
+                              bgcolor: "rgba(124,77,255,0.3)",
+                              borderColor: "rgba(124,77,255,0.5)",
+                              boxShadow: "0 4px 12px rgba(124,77,255,0.2)",
+                            },
+                          }}
+                        >
+                          Use this
+                        </Button>
+                      </Stack>
+                    ))}
+                  </Stack>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      mt: 1.25,
+                      textAlign: "center",
+                      color: "rgba(255,255,255,0.3)",
+                      fontSize: "0.68rem",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    Host has approved these questions for participant use.
+                  </Typography>
+                </Box>
+              </Collapse>
             </Box>
           )}
 
@@ -2075,6 +2299,160 @@ export default function LiveQnAPanel({
             Use improved
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* ── A3: Public AI Suggestion Hub (Host Only) ────────────────────── */}
+      <Dialog
+        open={publicSuggHubOpen}
+        onClose={() => setPublicSuggHubOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "#0a0a0a",
+            color: "#fff",
+            borderRadius: "20px",
+            border: "1px solid rgba(156,123,255,0.15)",
+            boxShadow: "0 30px 100px rgba(0,0,0,0.8)",
+            overflow: "hidden",
+          },
+        }}
+      >
+        <Box sx={{ background: "linear-gradient(135deg, #1a0a3e 0%, #2d1b69 60%, #3d1f8a 100%)", px: 3, py: 2.5 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Box sx={{ width: 42, height: 42, borderRadius: "12px", bgcolor: "rgba(156,123,255,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <AutoAwesomeIcon sx={{ color: "#c4a8ff", fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 800, fontSize: "1.1rem", color: "#fff", letterSpacing: -0.2 }}>
+                  AI Suggestion Hub
+                </Typography>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontWeight: 500 }}>
+                  Generate and publish questions for attendees to adopt.
+                </Typography>
+              </Box>
+            </Stack>
+            <IconButton onClick={() => setPublicSuggHubOpen(false)} sx={{ color: "rgba(255,255,255,0.4)", "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.06)" } }}>
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </Box>
+
+        <DialogContent sx={{ p: 0, bgcolor: "#0a0a0a" }}>
+          <Box sx={{ p: 3, borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Box>
+              <Typography variant="subtitle2" sx={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
+                Candidate Questions
+              </Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                Drafts are private. Published questions appear for all participants.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              disabled={publicSuggGenerating}
+              onClick={handleGeneratePublicSuggestions}
+              startIcon={publicSuggGenerating ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
+              sx={{
+                textTransform: "none",
+                borderRadius: "10px",
+                bgcolor: "#7c5cbf",
+                px: 3,
+                "&:hover": { bgcolor: "#6a4daa" },
+              }}
+            >
+              {publicSuggGenerating ? "Generating..." : "Generate AI Suggestions"}
+            </Button>
+          </Box>
+
+          <Box sx={{ minHeight: 400, maxHeight: 600, overflowY: "auto", p: 2 }}>
+            {publicSuggLoading && publicSuggestions.length === 0 ? (
+              <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+                <CircularProgress size={30} sx={{ color: "#9c7bff" }} />
+              </Box>
+            ) : publicSuggestions.length === 0 ? (
+              <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", py: 10, opacity: 0.5 }}>
+                <AutoAwesomeIcon sx={{ fontSize: 60, mb: 2, color: "rgba(156,123,255,0.3)" }} />
+                <Typography variant="body2">No suggestions generated yet.</Typography>
+              </Box>
+            ) : (
+              <Stack spacing={2}>
+                {publicSuggestions.map((s) => (
+                  <Card
+                    key={s.id}
+                    sx={{
+                      bgcolor: "rgba(255,255,255,0.03)",
+                      border: "1px solid",
+                      borderColor: s.status === "published" ? "rgba(102, 187, 106, 0.3)" : "rgba(255,255,255,0.08)",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+                        <Box sx={{ flex: 1 }}>
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                            <Chip
+                              label={s.status.toUpperCase()}
+                              size="small"
+                              sx={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                height: 20,
+                                bgcolor: s.status === "published" ? "rgba(76, 175, 80, 0.2)" : "rgba(255,255,255,0.1)",
+                                color: s.status === "published" ? "#81c784" : "rgba(255,255,255,0.6)",
+                                border: "1px solid",
+                                borderColor: s.status === "published" ? "rgba(76, 175, 80, 0.3)" : "rgba(255,255,255,0.15)",
+                              }}
+                            />
+                            {s.confidence_score > 0 && (
+                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)", fontSize: "11px" }}>
+                                AI Confidence: {(s.confidence_score * 100).toFixed(0)}%
+                              </Typography>
+                            )}
+                          </Stack>
+                          <Typography variant="body1" sx={{ color: "#fff", fontWeight: 500, mb: 1.5, lineHeight: 1.5 }}>
+                            {s.question_text}
+                          </Typography>
+                          {s.rationale && (
+                            <Box sx={{ p: 1.5, bgcolor: "rgba(156,123,255,0.05)", borderRadius: "8px", borderLeft: "3px solid #9c7bff" }}>
+                              <Typography variant="caption" sx={{ color: "rgba(196,168,255,0.8)", fontStyle: "italic", display: "block" }}>
+                                Rationale: {s.rationale}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                        <Stack spacing={1}>
+                          {s.status !== "published" && (
+                            <Button
+                              variant="contained"
+                              size="small"
+                              color="success"
+                              onClick={() => handleSuggestionAction(s.id, "publish")}
+                              sx={{ textTransform: "none", bgcolor: "#2e7d32", "&:hover": { bgcolor: "#1b5e20" } }}
+                            >
+                              Publish
+                            </Button>
+                          )}
+                          {s.status === "draft" && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => handleSuggestionAction(s.id, "reject")}
+                              sx={{ textTransform: "none", color: "#ef5350", borderColor: "rgba(239, 83, 80, 0.4)" }}
+                            >
+                              Reject
+                            </Button>
+                          )}
+                        </Stack>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            )}
+          </Box>
+        </DialogContent>
       </Dialog>
     </Box>
   );

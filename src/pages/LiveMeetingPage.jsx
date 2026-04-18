@@ -15148,6 +15148,12 @@ export default function NewLiveMeeting() {
   // Incremented after context is saved to force a re-fetch of AI suggestions
   const [aiSuggRefreshKey, setAiSuggRefreshKey] = useState(0);
 
+  // ── A3: AI Question Adoption (Public Suggestions) ───────────────────────
+  const [publicSuggestions, setPublicSuggestions] = useState([]);
+  const [publicSuggHubOpen, setPublicSuggHubOpen] = useState(false);
+  const [publicSuggGenerating, setPublicSuggGenerating] = useState(false);
+  const [attendeeShowSuggestions, setAttendeeShowSuggestions] = useState(true);
+
   // ── A2: host context modal state ──────────────────────────────────────────
   const [contextModalOpen, setContextModalOpen] = useState(false);
   const [contextText, setContextText] = useState("");
@@ -15439,6 +15445,10 @@ export default function NewLiveMeeting() {
           });
         }
 
+        if (msg.type === "qna.ai_public_suggestions_refresh") {
+          console.log("[WS] A3: Refreshing public suggestions");
+          fetchPublicSuggestions();
+        }
         if (msg.type === "qna.rejected") {
           // Remove from pending queue (only host cares about this)
           setPendingQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
@@ -15719,10 +15729,12 @@ export default function NewLiveMeeting() {
     setQnaError("");
 
     try {
+      const adoptedId = localStorage.getItem(`adopted_suggestion_id_${eventId}`);
       const payload = {
         event: eventId,
         content,
         is_anonymous: qnaAnonymousModeEnabled || isAnonymousQuestion,
+        adopted_suggestion_id: adoptedId || null,
       };
       if (activeTableId) {
         payload.lounge_table = activeTableId;
@@ -15736,6 +15748,7 @@ export default function NewLiveMeeting() {
       if (!res.ok) throw new Error("Failed to create question.");
       setNewQuestion("");
       setIsAnonymousQuestion(false);  // Reset toggle after submit
+      localStorage.removeItem(`adopted_suggestion_id_${eventId}`);
       await loadQuestions();
     } catch (e) {
       setQnaError(e.message || "Failed to create question.");
@@ -15837,11 +15850,90 @@ export default function NewLiveMeeting() {
     }
   };
 
+  // ── A3: AI Question Adoption (mirror of LiveQnAPanel) ───────────────────────
+  const fetchPublicSuggestions = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`interactions/ai-public-suggestions/?event_id=${eventId}`), {
+        headers: { ...authHeader() },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPublicSuggestions(data.results || (Array.isArray(data) ? data : []));
+      }
+    } catch (e) {
+      console.error("[A3] fetch error", e);
+    }
+  }, [eventId]);
+
+  const handleGeneratePublicSuggestions = async () => {
+    if (!eventId) return;
+    setPublicSuggGenerating(true);
+    try {
+      const res = await fetch(toApiUrl(`interactions/ai-public-suggestions/generate/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ event_id: eventId }),
+      });
+      if (res.ok) {
+        await fetchPublicSuggestions();
+        setSnackbar({ open: true, message: "AI is crafting public suggestions...", severity: "info" });
+      } else {
+        const data = await res.json();
+        setSnackbar({ open: true, message: data.detail || "Failed to generate suggestions", severity: "error" });
+      }
+    } catch (e) {
+      setSnackbar({ open: true, message: "Network error", severity: "error" });
+    } finally {
+      setPublicSuggGenerating(false);
+    }
+  };
+
+  const handlePublishSuggestion = async (id) => {
+    try {
+      const res = await fetch(toApiUrl(`interactions/ai-public-suggestions/${id}/publish/`), {
+        method: "POST",
+        headers: { ...authHeader() },
+      });
+      if (res.ok) {
+        setPublicSuggestions((prev) => prev.filter((s) => s.id !== id));
+        setSnackbar({ open: true, message: "Suggestion published!", severity: "success" });
+      }
+    } catch (e) {
+      setSnackbar({ open: true, message: "Failed to publish", severity: "error" });
+    }
+  };
+
+  const handleRejectSuggestion = async (id) => {
+    try {
+      const res = await fetch(toApiUrl(`interactions/ai-public-suggestions/${id}/reject/`), {
+        method: "POST",
+        headers: { ...authHeader() },
+      });
+      if (res.ok) {
+        setPublicSuggestions((prev) => prev.filter((s) => s.id !== id));
+      }
+    } catch (e) {
+      setSnackbar({ open: true, message: "Failed to reject", severity: "error" });
+    }
+  };
+
+
+  const handleAdoptSuggestion = async (suggestion) => {
+    setNewQuestion(suggestion.question_text);
+    setAttendeeShowSuggestions(false);
+    localStorage.setItem(`adopted_suggestion_id_${eventId}`, suggestion.id);
+  };
+
   useEffect(() => {
     if (tab === 1 && eventId && !aiQSuggDismissed && aiQSugg.length === 0) {
       fetchAiQSuggestions();
     }
-  }, [tab, aiQSuggDismissed, aiQSugg.length, fetchAiQSuggestions, aiSuggRefreshKey]);
+    if (tab === 1 && eventId) {
+      fetchPublicSuggestions();
+    }
+  }, [tab, aiQSuggDismissed, aiQSugg.length, fetchAiQSuggestions, aiSuggRefreshKey, fetchPublicSuggestions, eventId]);
+
 
   const handleQnaEditSubmit = async (qId) => {
     if (!qnaEditContent.trim()) return;
@@ -18214,6 +18306,88 @@ export default function NewLiveMeeting() {
               </DialogActions>
             </Dialog>
 
+            {/* A3: Public Suggestion Hub Modal (Mirror of LiveQnAPanel) */}
+            <Dialog
+              open={publicSuggHubOpen}
+              onClose={() => setPublicSuggHubOpen(false)}
+              maxWidth="md"
+              fullWidth
+              PaperProps={{
+                sx: { bgcolor: "#141414", color: "#fff", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 24px 80px rgba(0,0,0,0.7)", overflow: "hidden" }
+              }}
+            >
+              <Box sx={{ background: "linear-gradient(135deg, #1a0a3e 0%, #2d1b69 60%, #3d1f8a 100%)", px: 3, py: 2.5 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <Box sx={{ width: 38, height: 38, borderRadius: "10px", background: "linear-gradient(135deg, #9c7bff, #7c4dff)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(156,123,255,0.4)" }}>
+                      <Typography sx={{ fontSize: 20 }}>💡</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1rem", color: "#fff" }}>Suggestion Hub</Typography>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)" }}>Manage AI-generated public question suggestions</Typography>
+                    </Box>
+                  </Stack>
+                  <Button
+                    variant="contained"
+                    disabled={publicSuggGenerating}
+                    onClick={handleGeneratePublicSuggestions}
+                    sx={{ textTransform: "none", fontWeight: 600, borderRadius: "9px", bgcolor: "#9c7bff", "&:hover": { bgcolor: "#7c4dff" } }}
+                  >
+                    {publicSuggGenerating ? "Generating..." : "Generate Suggestions"}
+                  </Button>
+                  <IconButton
+                    onClick={() => setPublicSuggHubOpen(false)}
+                    sx={{ color: "rgba(255,255,255,0.4)", "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.06)" } }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                </Stack>
+              </Box>
+              <DialogContent sx={{ px: 3, py: 2.5, bgcolor: "#141414", minHeight: "40vh", ...scrollSx }}>
+                {publicSuggestions.filter(s => s.status === 'draft').length === 0 ? (
+                  <Stack alignItems="center" justifyContent="center" spacing={2} sx={{ py: 6 }}>
+                    <Typography sx={{ color: "rgba(255,255,255,0.4)" }}>No draft suggestions. Click generate to get started!</Typography>
+                  </Stack>
+                ) : (
+                  <Stack spacing={2}>
+                    {publicSuggestions.filter(s => s.status === 'draft').map(s => (
+                      <Card key={s.id} sx={{ bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", transition: "all 0.2s", "&:hover": { bgcolor: "rgba(255,255,255,0.05)", borderColor: "rgba(156,123,255,0.3)" } }}>
+                        <CardContent sx={{ p: 2.5 }}>
+                          <Typography variant="body1" sx={{ color: "#fff", fontWeight: 500, mb: 1.5, lineHeight: 1.5 }}>{s.question_text}</Typography>
+                          {s.rationale && (
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", display: "block", mb: 2, fontStyle: "italic", bgcolor: "rgba(255,255,255,0.03)", p: 1, borderRadius: "6px" }}>
+                              <span style={{ color: "#9c7bff", fontWeight: 700, marginRight: "4px" }}>Why:</span> {s.rationale}
+                            </Typography>
+                          )}
+                          <Stack direction="row" spacing={1.5}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => handlePublishSuggestion(s.id)}
+                              sx={{ textTransform: "uppercase", fontWeight: 700, fontSize: "0.7rem", bgcolor: "#22c55e", "&:hover": { bgcolor: "#16a34a" }, px: 2 }}
+                            >
+                              Publish
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => handleRejectSuggestion(s.id)}
+                              sx={{ textTransform: "uppercase", fontWeight: 700, fontSize: "0.7rem", color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.4)", "&:hover": { borderColor: "#ef4444", bgcolor: "rgba(239,68,68,0.08)" } }}
+                            >
+                              Reject
+                            </Button>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Stack>
+                )}
+              </DialogContent>
+              <DialogActions sx={{ px: 3, py: 2, bgcolor: "#141414", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <Button onClick={() => setPublicSuggHubOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+              </DialogActions>
+            </Dialog>
+
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
               <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -18266,180 +18440,205 @@ export default function NewLiveMeeting() {
                     </Box>
                     {/* Action Buttons Grid - Collapsible */}
                     {!qnaToolbarCollapsed && (
-                    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 0.9 }}>
-                      <Tooltip title="Send a bottom banner to all attendees prompting them to ask questions" arrow>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<AnnouncementIcon sx={{ fontSize: 15 }} />}
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(
-                                toApiUrl("interactions/questions/engagement-prompt/trigger/"),
-                                {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json", ...authHeader() },
-                                  body: JSON.stringify({ event_id: eventId, prompt_type: "banner" }),
+                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 0.9 }}>
+                        <Tooltip title="Send a bottom banner to all attendees prompting them to ask questions" arrow>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<AnnouncementIcon sx={{ fontSize: 15 }} />}
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(
+                                  toApiUrl("interactions/questions/engagement-prompt/trigger/"),
+                                  {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json", ...authHeader() },
+                                    body: JSON.stringify({ event_id: eventId, prompt_type: "banner" }),
+                                  }
+                                );
+                                if (res.ok) {
+                                  setSnackbar({ open: true, message: "Q&A banner prompt sent!", severity: "success" });
+                                } else {
+                                  const data = await res.json().catch(() => ({}));
+                                  setSnackbar({ open: true, message: data.detail || "Failed to send prompt.", severity: "error" });
                                 }
-                              );
-                              if (res.ok) {
-                                setSnackbar({ open: true, message: "Q&A banner prompt sent!", severity: "success" });
-                              } else {
-                                const data = await res.json().catch(() => ({}));
-                                setSnackbar({ open: true, message: data.detail || "Failed to send prompt.", severity: "error" });
+                              } catch (e) {
+                                console.error("[QnAPrompt] trigger error", e);
+                                setSnackbar({ open: true, message: "Failed to send prompt.", severity: "error" });
                               }
-                            } catch (e) {
-                              console.error("[QnAPrompt] trigger error", e);
-                              setSnackbar({ open: true, message: "Failed to send prompt.", severity: "error" });
-                            }
-                          }}
-                          sx={{
-                            color: "#63b3ed",
-                            borderColor: "rgba(99,179,237,0.6)",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            py: 0.6,
-                            px: 1.5,
-                            textTransform: "none",
-                            borderWidth: "1.5px",
-                            transition: "all 0.2s",
-                            "&:hover": {
-                              borderColor: "#63b3ed",
-                              bgcolor: "rgba(99,179,237,0.12)",
-                              transform: "translateY(-1px)",
-                              boxShadow: "0 2px 8px rgba(99,179,237,0.2)"
-                            },
-                          }}
-                        >
-                          Banner Prompt
-                        </Button>
-                      </Tooltip>
-                      <Tooltip title="Send a centered modal to all attendees with an embedded question input" arrow>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<QuestionAnswerIcon sx={{ fontSize: 15 }} />}
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(
-                                toApiUrl("interactions/questions/engagement-prompt/trigger/"),
-                                {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json", ...authHeader() },
-                                  body: JSON.stringify({ event_id: eventId, prompt_type: "modal" }),
+                            }}
+                            sx={{
+                              color: "#63b3ed",
+                              borderColor: "rgba(99,179,237,0.6)",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              py: 0.6,
+                              px: 1.5,
+                              textTransform: "none",
+                              borderWidth: "1.5px",
+                              transition: "all 0.2s",
+                              "&:hover": {
+                                borderColor: "#63b3ed",
+                                bgcolor: "rgba(99,179,237,0.12)",
+                                transform: "translateY(-1px)",
+                                boxShadow: "0 2px 8px rgba(99,179,237,0.2)"
+                              },
+                            }}
+                          >
+                            Banner Prompt
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Send a centered modal to all attendees with an embedded question input" arrow>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<QuestionAnswerIcon sx={{ fontSize: 15 }} />}
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(
+                                  toApiUrl("interactions/questions/engagement-prompt/trigger/"),
+                                  {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json", ...authHeader() },
+                                    body: JSON.stringify({ event_id: eventId, prompt_type: "modal" }),
+                                  }
+                                );
+                                if (res.ok) {
+                                  setSnackbar({ open: true, message: "Q&A modal prompt sent!", severity: "success" });
+                                } else {
+                                  const data = await res.json().catch(() => ({}));
+                                  setSnackbar({ open: true, message: data.detail || "Failed to send prompt.", severity: "error" });
                                 }
-                              );
-                              if (res.ok) {
-                                setSnackbar({ open: true, message: "Q&A modal prompt sent!", severity: "success" });
-                              } else {
-                                const data = await res.json().catch(() => ({}));
-                                setSnackbar({ open: true, message: data.detail || "Failed to send prompt.", severity: "error" });
+                              } catch (e) {
+                                console.error("[QnAPrompt] trigger error", e);
+                                setSnackbar({ open: true, message: "Failed to send prompt.", severity: "error" });
                               }
-                            } catch (e) {
-                              console.error("[QnAPrompt] trigger error", e);
-                              setSnackbar({ open: true, message: "Failed to send prompt.", severity: "error" });
-                            }
-                          }}
-                          sx={{
-                            color: "#9f7aea",
-                            borderColor: "rgba(159,122,234,0.6)",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            py: 0.6,
-                            px: 1.5,
-                            textTransform: "none",
-                            borderWidth: "1.5px",
-                            transition: "all 0.2s",
-                            "&:hover": {
-                              borderColor: "#9f7aea",
-                              bgcolor: "rgba(159,122,234,0.12)",
-                              transform: "translateY(-1px)",
-                              boxShadow: "0 2px 8px rgba(159,122,234,0.2)"
-                            },
-                          }}
-                        >
-                          Modal Prompt
-                        </Button>
-                      </Tooltip>
-                      <Tooltip title="Create manual Q&A group" arrow>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => setManualGroupModalOpen(true)}
-                          sx={{
-                            color: "#4dabf5",
-                            borderColor: "rgba(77,171,245,0.6)",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            py: 0.6,
-                            px: 1.5,
-                            textTransform: "none",
-                            borderWidth: "1.5px",
-                            transition: "all 0.2s",
-                            "&:hover": {
-                              borderColor: "#4dabf5",
-                              bgcolor: "rgba(77,171,245,0.12)",
-                              transform: "translateY(-1px)",
-                              boxShadow: "0 2px 8px rgba(77,171,245,0.2)"
-                            },
-                          }}
-                        >
-                          Manual Grouping
-                        </Button>
-                      </Tooltip>
-                      <Tooltip title="Suggest Q&A groups using AI" arrow>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => setAiModalOpen(true)}
-                          sx={{
-                            color: "#4dabf5",
-                            borderColor: "rgba(77,171,245,0.6)",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            py: 0.6,
-                            px: 1.5,
-                            textTransform: "none",
-                            borderWidth: "1.5px",
-                            transition: "all 0.2s",
-                            "&:hover": {
-                              borderColor: "#4dabf5",
-                              bgcolor: "rgba(77,171,245,0.12)",
-                              transform: "translateY(-1px)",
-                              boxShadow: "0 2px 8px rgba(77,171,245,0.2)"
-                            },
-                          }}
-                        >
-                          AI Grouping
-                        </Button>
-                      </Tooltip>
-                      <Tooltip title="Add presentation text to ground AI suggestions" arrow>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => { setContextModalOpen(true); setContextSaved(false); setContextSaveError(""); }}
-                          sx={{
-                            color: "#c4a8ff",
-                            borderColor: "rgba(156,123,255,0.6)",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            py: 0.6,
-                            px: 1.5,
-                            textTransform: "none",
-                            borderWidth: "1.5px",
-                            transition: "all 0.2s",
-                            "&:hover": {
-                              borderColor: "#c4a8ff",
-                              bgcolor: "rgba(124,77,255,0.12)",
-                              transform: "translateY(-1px)",
-                              boxShadow: "0 2px 8px rgba(124,77,255,0.2)"
-                            },
-                          }}
-                        >
-                          📋 Add Context
-                        </Button>
-                      </Tooltip>
-                    </Box>
+                            }}
+                            sx={{
+                              color: "#9f7aea",
+                              borderColor: "rgba(159,122,234,0.6)",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              py: 0.6,
+                              px: 1.5,
+                              textTransform: "none",
+                              borderWidth: "1.5px",
+                              transition: "all 0.2s",
+                              "&:hover": {
+                                borderColor: "#9f7aea",
+                                bgcolor: "rgba(159,122,234,0.12)",
+                                transform: "translateY(-1px)",
+                                boxShadow: "0 2px 8px rgba(159,122,234,0.2)"
+                              },
+                            }}
+                          >
+                            Modal Prompt
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Create manual Q&A group" arrow>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setManualGroupModalOpen(true)}
+                            sx={{
+                              color: "#4dabf5",
+                              borderColor: "rgba(77,171,245,0.6)",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              py: 0.6,
+                              px: 1.5,
+                              textTransform: "none",
+                              borderWidth: "1.5px",
+                              transition: "all 0.2s",
+                              "&:hover": {
+                                borderColor: "#4dabf5",
+                                bgcolor: "rgba(77,171,245,0.12)",
+                                transform: "translateY(-1px)",
+                                boxShadow: "0 2px 8px rgba(77,171,245,0.2)"
+                              },
+                            }}
+                          >
+                            Manual Grouping
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Suggest Q&A groups using AI" arrow>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setAiModalOpen(true)}
+                            sx={{
+                              color: "#4dabf5",
+                              borderColor: "rgba(77,171,245,0.6)",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              py: 0.6,
+                              px: 1.5,
+                              textTransform: "none",
+                              borderWidth: "1.5px",
+                              transition: "all 0.2s",
+                              "&:hover": {
+                                borderColor: "#4dabf5",
+                                bgcolor: "rgba(77,171,245,0.12)",
+                                transform: "translateY(-1px)",
+                                boxShadow: "0 2px 8px rgba(77,171,245,0.2)"
+                              },
+                            }}
+                          >
+                            AI Grouping
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Add presentation text to ground AI suggestions" arrow>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => { setContextModalOpen(true); setContextSaved(false); setContextSaveError(""); }}
+                            sx={{
+                              color: "#c4a8ff",
+                              borderColor: "rgba(156,123,255,0.6)",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              py: 0.6,
+                              px: 1.5,
+                              textTransform: "none",
+                              borderWidth: "1.5px",
+                              transition: "all 0.2s",
+                              "&:hover": {
+                                borderColor: "#c4a8ff",
+                                bgcolor: "rgba(124,77,255,0.12)",
+                                transform: "translateY(-1px)",
+                                boxShadow: "0 2px 8px rgba(124,77,255,0.2)"
+                              },
+                            }}
+                          >
+                            📋 Add Context
+                          </Button>
+                        </Tooltip>
+                        {eventData?.qna_ai_public_suggestions_enabled && (
+                          <Tooltip title="Manage AI-generated public question suggestions" arrow>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => {
+                                setPublicSuggHubOpen(true);
+                                fetchPublicSuggestions();
+                              }}
+                              sx={{
+                                textTransform: "none",
+                                fontWeight: 600,
+                                fontSize: "0.75rem",
+                                py: 0.6,
+                                px: 1.5,
+                                bgcolor: "rgba(156,123,255,0.2)",
+                                color: "#c4a8ff",
+                                border: "1.5px solid rgba(156,123,255,0.4)",
+                                "&:hover": { bgcolor: "rgba(156,123,255,0.3)", borderColor: "#c4a8ff" },
+                              }}
+                            >
+                              💡 Suggestion Hub
+                            </Button>
+                          </Tooltip>
+                        )}
+                      </Box>
                     )}
                   </Box>
                 )}
@@ -18526,6 +18725,53 @@ export default function NewLiveMeeting() {
                     <Typography color="error" sx={{ mb: 1 }}>
                       {qnaError}
                     </Typography>
+                  )}
+
+                  {/* A3: Participant Suggested Questions List (Mirror of LiveQnAPanel) */}
+                  {!isHost && eventData?.qna_ai_public_suggestions_enabled && (
+                    <Box sx={{ mt: 1, mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="caption" sx={{ color: "#c4a8ff", fontWeight: 700, letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: 0.5 }}>
+                            <span role="img" aria-label="lightbulb">💡</span> SUGGESTED QUESTIONS
+                          </Typography>
+                          <Chip label={publicSuggestions.filter(s => s.status === 'published').length} size="small" sx={{ height: 16, fontSize: '0.65rem', bgcolor: 'rgba(156,123,255,0.2)', color: '#c4a8ff', fontWeight: 700 }} />
+                        </Stack>
+                        <Button
+                          size="small"
+                          onClick={() => setAttendeeShowSuggestions(!attendeeShowSuggestions)}
+                          sx={{ fontSize: '0.65rem', textTransform: 'none', color: 'rgba(255,255,255,0.5)', minWidth: 0, p: 0 }}
+                        >
+                          {attendeeShowSuggestions ? "Hide" : "Show"}
+                        </Button>
+                      </Box>
+                      {attendeeShowSuggestions && (
+                        <Stack spacing={1}>
+                          {publicSuggestions.filter(s => s.status === 'published').map(s => (
+                            <Paper
+                              key={s.id}
+                              variant="outlined"
+                              sx={{
+                                p: 1.25,
+                                bgcolor: "rgba(156,123,255,0.05)",
+                                borderColor: "rgba(156,123,255,0.15)",
+                                cursor: "pointer",
+                                "&:hover": { bgcolor: "rgba(156,123,255,0.1)", borderColor: "rgba(156,123,255,0.3)" }
+                              }}
+                              onClick={() => handleAdoptSuggestion(s)}
+                            >
+                              <Typography variant="body2" sx={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.9)', mb: 1 }}>{s.question_text}</Typography>
+                              <Button size="small" sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#c4a8ff', p: 0, minWidth: 0 }}>Use this →</Button>
+                            </Paper>
+                          ))}
+                          {publicSuggestions.filter(s => s.status === 'published').length === 0 && (
+                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', textAlign: 'center', display: 'block' }}>
+                              No suggested questions yet.
+                            </Typography>
+                          )}
+                        </Stack>
+                      )}
+                    </Box>
                   )}
 
                   {/* Sort Tabs */}

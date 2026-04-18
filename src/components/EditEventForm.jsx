@@ -80,154 +80,154 @@ const formats = [
 ];
 
 const tokenHeader = () => {
-  const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access") ||
-    localStorage.getItem("jwt");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+    const t =
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("access") ||
+        localStorage.getItem("jwt");
+    return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
 // City Autocomplete Component - fetches from backend DB
 function CityAutocompleteOpenMeteo({ label = "City", value, onSelect, error, helperText }) {
-  const [open, setOpen] = React.useState(false);
-  const [options, setOptions] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
-  const [inputValue, setInputValue] = React.useState("");
+    const [open, setOpen] = React.useState(false);
+    const [options, setOptions] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const [inputValue, setInputValue] = React.useState("");
 
-  React.useEffect(() => {
-    const q = (inputValue || "").trim();
-    if (q.length < 2) {
-      setOptions(value ? [value] : []);
-      return;
-    }
+    React.useEffect(() => {
+        const q = (inputValue || "").trim();
+        if (q.length < 2) {
+            setOptions(value ? [value] : []);
+            return;
+        }
 
-    let active = true;
-    const controller = new AbortController();
+        let active = true;
+        const controller = new AbortController();
 
-    const run = async () => {
-      setLoading(true);
-      try {
-        const url = `${API_ROOT}/auth/cities/search/?q=${encodeURIComponent(q)}&limit=10`;
-        const r = await fetch(url, {
-          signal: controller.signal,
-          headers: tokenHeader(),
-        });
-        if (!r.ok) return;
+        const run = async () => {
+            setLoading(true);
+            try {
+                const url = `${API_ROOT}/auth/cities/search/?q=${encodeURIComponent(q)}&limit=10`;
+                const r = await fetch(url, {
+                    signal: controller.signal,
+                    headers: tokenHeader(),
+                });
+                if (!r.ok) return;
 
-        const data = await r.json();
-        const results = (data?.results || [])
-          .map((x) => ({
-            geoname_id: x.geoname_id, // unique identifier
-            name: x.name || "",
-            admin1: x.is_other ? "Other / Not listed" : "",
-            country: x.country_name || "",
-            country_code: x.country_code || "",
-            latitude: x.lat,
-            longitude: x.lng,
-            label: x.label,
-            timezone: x.timezone || "",
-          }))
-          .filter((x) => x.name && x.country);
+                const data = await r.json();
+                const results = (data?.results || [])
+                    .map((x) => ({
+                        geoname_id: x.geoname_id, // unique identifier
+                        name: x.name || "",
+                        admin1: x.is_other ? "Other / Not listed" : "",
+                        country: x.country_name || "",
+                        country_code: x.country_code || "",
+                        latitude: x.lat,
+                        longitude: x.lng,
+                        label: x.label,
+                        timezone: x.timezone || "",
+                    }))
+                    .filter((x) => x.name && x.country);
 
-        if (active) setOptions(results);
-      } catch (e) {
-        if (e?.name !== "AbortError") console.error("City search failed", e);
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
+                if (active) setOptions(results);
+            } catch (e) {
+                if (e?.name !== "AbortError") console.error("City search failed", e);
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
 
-    const t = setTimeout(run, 350);
-    return () => {
-      active = false;
-      controller.abort();
-      clearTimeout(t);
-    };
-  }, [inputValue, value]);
+        const t = setTimeout(run, 350);
+        return () => {
+            active = false;
+            controller.abort();
+            clearTimeout(t);
+        };
+    }, [inputValue, value]);
 
-  return (
-    <Autocomplete
-      open={open}
-      onOpen={() => setOpen(true)}
-      onClose={() => setOpen(false)}
-      options={options}
-      loading={loading}
-      value={value || null}
-      inputValue={inputValue}
-      onInputChange={(_, v) => setInputValue(v)}
-      isOptionEqualToValue={(o, v) =>
-        (o?.geoname_id && v?.geoname_id && o.geoname_id === v.geoname_id) ||
-        (o?.name === v?.name &&
-          o?.country === v?.country &&
-          o?.admin1 === v?.admin1)
-      }
-      getOptionLabel={(o) => o?.name || ""}
-      onChange={(_, newValue) => {
-        onSelect?.(newValue || null);
-      }}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          label={label}
-          fullWidth
-          placeholder="Type city name..."
-          error={error}
-          helperText={helperText}
-          InputProps={{
-            ...params.InputProps,
-            endAdornment: (
-              <>
-                {loading ? <CircularProgress size={18} /> : null}
-                {params.InputProps.endAdornment}
-              </>
-            ),
-          }}
+    return (
+        <Autocomplete
+            open={open}
+            onOpen={() => setOpen(true)}
+            onClose={() => setOpen(false)}
+            options={options}
+            loading={loading}
+            value={value || null}
+            inputValue={inputValue}
+            onInputChange={(_, v) => setInputValue(v)}
+            isOptionEqualToValue={(o, v) =>
+                (o?.geoname_id && v?.geoname_id && o.geoname_id === v.geoname_id) ||
+                (o?.name === v?.name &&
+                    o?.country === v?.country &&
+                    o?.admin1 === v?.admin1)
+            }
+            getOptionLabel={(o) => o?.name || ""}
+            onChange={(_, newValue) => {
+                onSelect?.(newValue || null);
+            }}
+            renderInput={(params) => (
+                <TextField
+                    {...params}
+                    label={label}
+                    fullWidth
+                    placeholder="Type city name..."
+                    error={error}
+                    helperText={helperText}
+                    InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                            <>
+                                {loading ? <CircularProgress size={18} /> : null}
+                                {params.InputProps.endAdornment}
+                            </>
+                        ),
+                    }}
+                />
+            )}
+            renderOption={(props, option) => (
+                <li {...props} key={option.geoname_id || `${option.name}-${option.country}`}>
+                    <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {option.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            {option.country}
+                        </Typography>
+                    </Box>
+                </li>
+            )}
         />
-      )}
-      renderOption={(props, option) => (
-        <li {...props} key={option.geoname_id || `${option.name}-${option.country}`}>
-          <Box>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {option.name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {option.country}
-            </Typography>
-          </Box>
-        </li>
-      )}
-    />
-  );
+    );
 }
 
 // Helper to parse "City, Country" string into city object for in_person/hybrid
 function parseLocationString(locationString, format) {
-  if (format === "virtual" || !locationString) return null;
+    if (format === "virtual" || !locationString) return null;
 
-  const parts = (locationString || "").trim().split(",").map(p => p.trim()).filter(Boolean);
-  if (parts.length >= 2) {
-    return {
-      name: parts[0],
-      country: parts[parts.length - 1],
-      admin1: "",
-      country_code: "",
-      latitude: null,
-      longitude: null,
-      timezone: "",
-    };
-  } else if (parts.length === 1) {
-    return {
-      name: parts[0],
-      country: "",
-      admin1: "",
-      country_code: "",
-      latitude: null,
-      longitude: null,
-      timezone: "",
-    };
-  }
-  return null;
+    const parts = (locationString || "").trim().split(",").map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+        return {
+            name: parts[0],
+            country: parts[parts.length - 1],
+            admin1: "",
+            country_code: "",
+            latitude: null,
+            longitude: null,
+            timezone: "",
+        };
+    } else if (parts.length === 1) {
+        return {
+            name: parts[0],
+            country: "",
+            admin1: "",
+            country_code: "",
+            latitude: null,
+            longitude: null,
+            timezone: "",
+        };
+    }
+    return null;
 }
 
 export default function EditEventForm({ event, onUpdated, onCancel }) {
@@ -247,18 +247,18 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [description, setDescription] = useState(event?.description || "");
     const eventFormat = event?.format || "virtual";
     const [location, setLocation] = useState(() => {
-      // For in_person/hybrid: parse location string to city object
-      if (["in_person", "hybrid"].includes(eventFormat)) {
-        return parseLocationString(event?.location, eventFormat);
-      }
-      // For virtual: keep as string (country name)
-      return event?.location || "";
+        // For in_person/hybrid: parse location string to city object
+        if (["in_person", "hybrid"].includes(eventFormat)) {
+            return parseLocationString(event?.location, eventFormat);
+        }
+        // For virtual: keep as string (country name)
+        return event?.location || "";
     });
     const [locationCity, setLocationCity] = useState(() => {
-      if (["in_person", "hybrid"].includes(eventFormat) && event?.location_city) {
-        return { name: event.location_city, country: event.location_country };
-      }
-      return null;
+        if (["in_person", "hybrid"].includes(eventFormat) && event?.location_city) {
+            return { name: event.location_city, country: event.location_country };
+        }
+        return null;
     });
     const [locationCountry, setLocationCountry] = useState(event?.location_country || "");
     const [venueName, setVenueName] = useState(event?.venue_name || "");
@@ -273,6 +273,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [registrationType, setRegistrationType] = useState(event?.registration_type || "open");
     const [maxParticipants, setMaxParticipants] = useState(event?.max_participants || "");
     const [loungeTableCapacity, setLoungeTableCapacity] = useState(event?.lounge_table_capacity || 4);
+    const [qnaAiPublicSuggestionsEnabled, setQnaAiPublicSuggestionsEnabled] = useState(
+        Boolean(event?.qna_ai_public_suggestions_enabled)
+    );
 
 
     const [isMultiDay, setIsMultiDay] = useState(() => Boolean(event?.is_multi_day));
@@ -527,9 +530,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setDescription(event?.description || "");
         // Parse location based on format
         if (["in_person", "hybrid"].includes(eventFormat)) {
-          setLocation(parseLocationString(event?.location, eventFormat));
+            setLocation(parseLocationString(event?.location, eventFormat));
         } else {
-          setLocation(event?.location || "");
+            setLocation(event?.location || "");
         }
         setCategory(event?.category || "Workshop");
         setFormat(eventFormat);
@@ -537,6 +540,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setIsFree(event?.is_free || false);
         setMaxParticipants(event?.max_participants || "");
         setLoungeTableCapacity(event?.lounge_table_capacity || 4);
+        setQnaAiPublicSuggestionsEnabled(Boolean(event?.qna_ai_public_suggestions_enabled));
 
 
         const start = event?.start_time ? dayjs(event.start_time).tz(tz) : dayjs();
@@ -1181,21 +1185,21 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
         // Build location string and send separate fields
         if (format === "virtual") {
-          // Virtual: send country as location string
-          fd.append("location", (location || "").trim());
-          fd.append("location_city", "");
-          fd.append("location_country", (location || "").trim());
+            // Virtual: send country as location string
+            fd.append("location", (location || "").trim());
+            fd.append("location_city", "");
+            fd.append("location_country", (location || "").trim());
         } else {
-          // In-person/hybrid: send city, country separately and build location string
-          const cityName = (locationCity?.name || "").trim();
-          const countryName = (locationCountry || "").trim();
-          const locationStr = [cityName, countryName].filter(Boolean).join(", ");
+            // In-person/hybrid: send city, country separately and build location string
+            const cityName = (locationCity?.name || "").trim();
+            const countryName = (locationCountry || "").trim();
+            const locationStr = [cityName, countryName].filter(Boolean).join(", ");
 
-          fd.append("location", locationStr);
-          fd.append("location_city", cityName);
-          fd.append("location_country", countryName);
-          fd.append("venue_name", (venueName || "").trim());
-          fd.append("venue_address", (venueAddress || "").trim());
+            fd.append("location", locationStr);
+            fd.append("location_city", cityName);
+            fd.append("location_country", countryName);
+            fd.append("venue_name", (venueName || "").trim());
+            fd.append("venue_address", (venueAddress || "").trim());
         }
 
         fd.append("category", category);
@@ -1210,6 +1214,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             fd.append("max_participants", "");
         }
         fd.append("lounge_table_capacity", String(loungeTableCapacity || 4));
+        fd.append("qna_ai_public_suggestions_enabled", String(qnaAiPublicSuggestionsEnabled));
         fd.append("timezone", timezone);
         fd.append("is_multi_day", String(isMultiDay));
         fd.append("start_time", combineToISO(startDate, startTime));
@@ -1327,661 +1332,661 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             <Box sx={{ p: 2 }}>
                 <Typography variant="h5" className="font-extrabold mb-4">Edit Event</Typography>
 
-            <Typography variant="body2" className="text-slate-500 mb-4">
-                Update the fields and click Save.
-            </Typography>
+                <Typography variant="body2" className="text-slate-500 mb-4">
+                    Update the fields and click Save.
+                </Typography>
 
-            <Box className="flex items-start mb-4">
+                <Box className="flex items-start mb-4">
+                    <TextField
+                        label="Name of the Event *"
+                        value={title}
+                        onChange={(e) => {
+                            const v = e.target.value;
+                            setTitle(v);
+                            if (!slug || slug === slugifyLocal(title)) setSlug(slugifyLocal(v));
+                        }}
+                        fullWidth
+                        error={!!errors.title}
+                        helperText={errors.title}
+                        className="mb-3"
+                    />
+                </Box>
+
                 <TextField
-                    label="Name of the Event *"
-                    value={title}
+                    label="Description *"
+                    multiline minRows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    fullWidth className="mb-3"
+                    error={!!errors.description} helperText={errors.description}
+                />
+
+                <TextField
+                    label="Slug *"
+                    placeholder="enter-event-slug"
+                    value={slug}
                     onChange={(e) => {
-                        const v = e.target.value;
-                        setTitle(v);
-                        if (!slug || slug === slugifyLocal(title)) setSlug(slugifyLocal(v));
+                        setSlug(sanitizeSlugInput(e.target.value));
+                        setErrors((prev) => ({ ...prev, slug: "" }));
                     }}
                     fullWidth
-                    error={!!errors.title}
-                    helperText={errors.title}
                     className="mb-3"
+                    error={!!errors.slug}
+                    helperText={errors.slug || "Lowercase letters, numbers, underscores, special chars (@$&) allowed. No forward slashes."}
                 />
-            </Box>
 
-            <TextField
-                label="Description *"
-                multiline minRows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                fullWidth className="mb-3"
-                error={!!errors.description} helperText={errors.description}
-            />
+                <TextField
+                    label="Format"
+                    select
+                    value={format}
+                    onChange={(e) => {
+                        const next = e.target.value;
+                        setFormat(next);
+                        if (next === "virtual") {
+                            setLocation("");
+                            setLocationCity(null);
+                            setLocationCountry("");
+                            setVenueName("");
+                            setVenueAddress("");
+                            setErrors((prev) => ({ ...prev, location: "" }));
+                        } else {
+                            setLocation(null);
+                            setErrors((prev) => ({ ...prev, location: "" }));
+                        }
+                    }}
+                    fullWidth
+                    className="mb-3"
+                >
+                    {formats.map((f) => (
+                        <MenuItem key={f.value} value={f.value}>
+                            {f.label}
+                        </MenuItem>
+                    ))}
+                </TextField>
 
-            <TextField
-                label="Slug *"
-                placeholder="enter-event-slug"
-                value={slug}
-                onChange={(e) => {
-                    setSlug(sanitizeSlugInput(e.target.value));
-                    setErrors((prev) => ({ ...prev, slug: "" }));
-                }}
-                fullWidth
-                className="mb-3"
-                error={!!errors.slug}
-                helperText={errors.slug || "Lowercase letters, numbers, underscores, special chars (@$&) allowed. No forward slashes."}
-            />
-
-            <TextField
-                label="Format"
-                select
-                value={format}
-                onChange={(e) => {
-                    const next = e.target.value;
-                    setFormat(next);
-                    if (next === "virtual") {
-                        setLocation("");
-                        setLocationCity(null);
-                        setLocationCountry("");
-                        setVenueName("");
-                        setVenueAddress("");
-                        setErrors((prev) => ({ ...prev, location: "" }));
-                    } else {
-                        setLocation(null);
-                        setErrors((prev) => ({ ...prev, location: "" }));
-                    }
-                }}
-                fullWidth
-                className="mb-3"
-            >
-                {formats.map((f) => (
-                    <MenuItem key={f.value} value={f.value}>
-                        {f.label}
-                    </MenuItem>
-                ))}
-            </TextField>
-
-            {/* Replay Options - Only for Virtual/Hybrid (EDIT MODE) */}
-            {(format === "virtual" || format === "hybrid") && (
-                <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-                    <Typography variant="h6" className="font-semibold mb-3">Replay Options</Typography>
-                    <Stack direction="column" spacing={2}>
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={replayAvailable}
-                                    onChange={(e) => setReplayAvailable(e.target.checked)}
-                                />
-                            }
-                            label="Replay will be available"
-                            sx={{ m: 0 }}
-                        />
-
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 2 }}>
+                {/* Replay Options - Only for Virtual/Hybrid (EDIT MODE) */}
+                {(format === "virtual" || format === "hybrid") && (
+                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+                        <Typography variant="h6" className="font-semibold mb-3">Replay Options</Typography>
+                        <Stack direction="column" spacing={2}>
                             <FormControlLabel
                                 control={
                                     <Switch
-                                        checked={autoPublish}
-                                        onChange={(e) => setAutoPublish(e.target.checked)}
+                                        checked={replayAvailable}
+                                        onChange={(e) => setReplayAvailable(e.target.checked)}
                                     />
                                 }
-                                label="Auto Publish"
-                                sx={{
-                                    m: 0,
-                                    justifyContent: "flex-start",
-                                    gap: 1.5,
-                                    "& .MuiFormControlLabel-label": { marginLeft: 0 },
-                                }}
+                                label="Replay will be available"
+                                sx={{ m: 0 }}
                             />
-                            <Chip
-                                label={autoPublish ? "Auto Publish: ON" : "Auto Publish: OFF"}
-                                color={autoPublish ? "success" : "default"}
-                                variant={autoPublish ? "filled" : "outlined"}
-                                size="small"
-                                sx={{
-                                    fontWeight: 600,
-                                    minWidth: 150
-                                }}
-                            />
-                        </Box>
 
-                        <Typography variant="caption" color="text.secondary">
-                            {autoPublish
-                                ? "✓ Recording will be automatically published to participants when ready"
-                                : "Recording will remain private until you manually publish it"}
-                        </Typography>
-
-                        {replayAvailable && (
-                            <TextField
-                                select
-                                label="Available for"
-                                value={replayDuration}
-                                onChange={(e) => setReplayDuration(e.target.value)}
-                                size="small"
-                                sx={{ minWidth: 200 }}
-                            >
-                                {[
-                                    "7 Days",
-                                    "14 Days",
-                                    "30 Days",
-                                    "60 Days",
-                                    "90 Days",
-                                    "6 Months",
-                                    "1 Year",
-                                    "Unlimited"
-                                ].map((option) => (
-                                    <MenuItem key={option} value={option}>
-                                        {option}
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-                        )}
-                    </Stack>
-                </Paper>
-            )}
-
-            <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
-                {/* Left */}
-                <Grid item xs={12} md={12}>
-                    {format === "virtual" ? (
-                        <Autocomplete
-                            size="small"
-                            fullWidth
-                            className="mb-3"
-                            options={COUNTRY_OPTIONS}
-                            autoHighlight
-                            value={getSelectedCountry({ location })}
-                            getOptionLabel={(opt) => opt?.label ?? ""}
-                            isOptionEqualToValue={(o, v) => o.code === v.code}
-                            onChange={(_, newVal) => {
-                                setLocation(newVal ? newVal.label : "");
-                                setErrors((prev) => ({ ...prev, location: "" }));
-                            }}
-                            ListboxProps={{
-                                style: {
-                                    maxHeight: 36 * 7,
-                                    overflowY: "auto",
-                                    paddingTop: 0,
-                                    paddingBottom: 0,
-                                },
-                            }}
-                            renderOption={(props, option) => (
-                                <li {...props} key={option.code}>
-                                    <span style={{ marginRight: 8 }}>{option.emoji}</span>
-                                    {option.label}
-                                </li>
-                            )}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label="Country"
-                                    placeholder="Select country"
-                                    fullWidth
-                                    error={!!errors.location}
-                                    helperText={errors.location}
-                                    inputProps={{
-                                        ...params.inputProps,
-                                        autoComplete: "new-password",
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 2 }}>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={autoPublish}
+                                            onChange={(e) => setAutoPublish(e.target.checked)}
+                                        />
+                                    }
+                                    label="Auto Publish"
+                                    sx={{
+                                        m: 0,
+                                        justifyContent: "flex-start",
+                                        gap: 1.5,
+                                        "& .MuiFormControlLabel-label": { marginLeft: 0 },
                                     }}
                                 />
+                                <Chip
+                                    label={autoPublish ? "Auto Publish: ON" : "Auto Publish: OFF"}
+                                    color={autoPublish ? "success" : "default"}
+                                    variant={autoPublish ? "filled" : "outlined"}
+                                    size="small"
+                                    sx={{
+                                        fontWeight: 600,
+                                        minWidth: 150
+                                    }}
+                                />
+                            </Box>
+
+                            <Typography variant="caption" color="text.secondary">
+                                {autoPublish
+                                    ? "✓ Recording will be automatically published to participants when ready"
+                                    : "Recording will remain private until you manually publish it"}
+                            </Typography>
+
+                            {replayAvailable && (
+                                <TextField
+                                    select
+                                    label="Available for"
+                                    value={replayDuration}
+                                    onChange={(e) => setReplayDuration(e.target.value)}
+                                    size="small"
+                                    sx={{ minWidth: 200 }}
+                                >
+                                    {[
+                                        "7 Days",
+                                        "14 Days",
+                                        "30 Days",
+                                        "60 Days",
+                                        "90 Days",
+                                        "6 Months",
+                                        "1 Year",
+                                        "Unlimited"
+                                    ].map((option) => (
+                                        <MenuItem key={option} value={option}>
+                                            {option}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
                             )}
-                        />
-                    ) : (
-                        <>
-                            <CityAutocompleteOpenMeteo
-                                label="Location *"
-                                value={locationCity}
-                                onSelect={(city) => {
-                                    setLocationCity(city);
-                                    if (city?.country) {
-                                        setLocationCountry(city.country);
-                                    }
+                        </Stack>
+                    </Paper>
+                )}
+
+                <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
+                    {/* Left */}
+                    <Grid item xs={12} md={12}>
+                        {format === "virtual" ? (
+                            <Autocomplete
+                                size="small"
+                                fullWidth
+                                className="mb-3"
+                                options={COUNTRY_OPTIONS}
+                                autoHighlight
+                                value={getSelectedCountry({ location })}
+                                getOptionLabel={(opt) => opt?.label ?? ""}
+                                isOptionEqualToValue={(o, v) => o.code === v.code}
+                                onChange={(_, newVal) => {
+                                    setLocation(newVal ? newVal.label : "");
                                     setErrors((prev) => ({ ...prev, location: "" }));
                                 }}
-                                error={!!errors.location}
-                                helperText={errors.location}
+                                ListboxProps={{
+                                    style: {
+                                        maxHeight: 36 * 7,
+                                        overflowY: "auto",
+                                        paddingTop: 0,
+                                        paddingBottom: 0,
+                                    },
+                                }}
+                                renderOption={(props, option) => (
+                                    <li {...props} key={option.code}>
+                                        <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                                        {option.label}
+                                    </li>
+                                )}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Country"
+                                        placeholder="Select country"
+                                        fullWidth
+                                        error={!!errors.location}
+                                        helperText={errors.location}
+                                        inputProps={{
+                                            ...params.inputProps,
+                                            autoComplete: "new-password",
+                                        }}
+                                    />
+                                )}
+                            />
+                        ) : (
+                            <>
+                                <CityAutocompleteOpenMeteo
+                                    label="Location *"
+                                    value={locationCity}
+                                    onSelect={(city) => {
+                                        setLocationCity(city);
+                                        if (city?.country) {
+                                            setLocationCountry(city.country);
+                                        }
+                                        setErrors((prev) => ({ ...prev, location: "" }));
+                                    }}
+                                    error={!!errors.location}
+                                    helperText={errors.location}
+                                />
+
+                                {/* Country field - can be manually edited */}
+                                <Box sx={{ mt: 2 }}>
+                                    <Autocomplete
+                                        size="small"
+                                        fullWidth
+                                        options={COUNTRY_OPTIONS}
+                                        autoHighlight
+                                        value={COUNTRY_OPTIONS.find((opt) => opt.label === locationCountry) || null}
+                                        getOptionLabel={(opt) => opt?.label ?? ""}
+                                        isOptionEqualToValue={(o, v) => o.code === v.code}
+                                        onChange={(_, newVal) => {
+                                            setLocationCountry(newVal ? newVal.label : "");
+                                        }}
+                                        ListboxProps={{
+                                            style: {
+                                                maxHeight: 36 * 7,
+                                                overflowY: "auto",
+                                                paddingTop: 0,
+                                                paddingBottom: 0,
+                                            },
+                                        }}
+                                        renderOption={(props, option) => (
+                                            <li {...props} key={option.code}>
+                                                <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                                                {option.label}
+                                            </li>
+                                        )}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Country"
+                                                placeholder="Select country"
+                                                fullWidth
+                                                inputProps={{
+                                                    ...params.inputProps,
+                                                    autoComplete: "new-password",
+                                                }}
+                                            />
+                                        )}
+                                    />
+                                </Box>
+
+                                {/* Venue Name - Optional */}
+                                <Box sx={{ mt: 2 }}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Venue Name (Optional)"
+                                        placeholder="e.g., Marriott Hotel, Tech Hub Office"
+                                        value={venueName}
+                                        onChange={(e) => setVenueName(e.target.value)}
+                                        helperText="Hotel name, office building, or venue name"
+                                    />
+                                </Box>
+
+                                {/* Venue Address - Optional and private */}
+                                <Box sx={{ mt: 2 }}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Exact Address (Optional)"
+                                        placeholder="e.g., 123 Main St, Suite 100"
+                                        value={venueAddress}
+                                        onChange={(e) => setVenueAddress(e.target.value)}
+                                        multiline
+                                        rows={2}
+                                        helperText="🔒 Only visible to registered/accepted members"
+                                    />
+                                </Box>
+                            </>
+                        )}
+
+                        <TextField
+                            label="Category" select fullWidth
+                            value={category} onChange={(e) => setCategory(e.target.value)}
+                            sx={{ mt: 1 }}
+                        >
+                            {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                        </TextField>
+
+                        <Box sx={{ mt: 3, mb: 3 }}>
+                            <FormControlLabel
+                                control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+                                label="Free Event (all users can register)"
+                                sx={{ mb: 2 }}
                             />
 
-                            {/* Country field - can be manually edited */}
-                            <Box sx={{ mt: 2 }}>
-                                <Autocomplete
-                                    size="small"
-                                    fullWidth
-                                    options={COUNTRY_OPTIONS}
-                                    autoHighlight
-                                    value={COUNTRY_OPTIONS.find((opt) => opt.label === locationCountry) || null}
-                                    getOptionLabel={(opt) => opt?.label ?? ""}
-                                    isOptionEqualToValue={(o, v) => o.code === v.code}
-                                    onChange={(_, newVal) => {
-                                        setLocationCountry(newVal ? newVal.label : "");
-                                    }}
-                                    ListboxProps={{
-                                        style: {
-                                            maxHeight: 36 * 7,
-                                            overflowY: "auto",
-                                            paddingTop: 0,
-                                            paddingBottom: 0,
-                                        },
-                                    }}
-                                    renderOption={(props, option) => (
-                                        <li {...props} key={option.code}>
-                                            <span style={{ marginRight: 8 }}>{option.emoji}</span>
-                                            {option.label}
-                                        </li>
-                                    )}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Country"
-                                            placeholder="Select country"
-                                            fullWidth
-                                            inputProps={{
-                                                ...params.inputProps,
-                                                autoComplete: "new-password",
-                                            }}
-                                        />
-                                    )}
-                                />
-                            </Box>
+                            {/* Pricing Section - Only show when NOT free */}
+                            {!isFree && (
+                                <Box sx={{
+                                    p: 2.5,
+                                    border: "1px solid #e0e0e0",
+                                    borderRadius: 2,
+                                    bgcolor: "#fafafa",
+                                    mt: 2
+                                }}>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: "#333" }}>
+                                        Pricing Options
+                                    </Typography>
 
-                            {/* Venue Name - Optional */}
-                            <Box sx={{ mt: 2 }}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Venue Name (Optional)"
-                                    placeholder="e.g., Marriott Hotel, Tech Hub Office"
-                                    value={venueName}
-                                    onChange={(e) => setVenueName(e.target.value)}
-                                    helperText="Hotel name, office building, or venue name"
-                                />
-                            </Box>
+                                    <Grid container spacing={2}>
+                                        {/* Price Field */}
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                label="Price" type="number" fullWidth
+                                                value={price || ""} onChange={(e) => setPrice(e.target.value === "" ? "" : e.target.value)}
+                                                inputProps={{ min: 0, step: "0.01" }}
+                                                error={!!errors.price}
+                                                helperText={errors.price}
+                                                size="small"
+                                            />
+                                        </Grid>
 
-                            {/* Venue Address - Optional and private */}
-                            <Box sx={{ mt: 2 }}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Exact Address (Optional)"
-                                    placeholder="e.g., 123 Main St, Suite 100"
-                                    value={venueAddress}
-                                    onChange={(e) => setVenueAddress(e.target.value)}
-                                    multiline
-                                    rows={2}
-                                    helperText="🔒 Only visible to registered/accepted members"
-                                />
-                            </Box>
-                        </>
-                    )}
+                                        {/* Price Label Field */}
+                                        <Grid item xs={12} sm={6}>
+                                            <TextField
+                                                label="Price Label" fullWidth
+                                                placeholder='e.g. "By application only"'
+                                                value={priceLabel} onChange={(e) => setPriceLabel(e.target.value)}
+                                                inputProps={{ maxLength: 100 }}
+                                                size="small"
+                                            />
+                                        </Grid>
+                                    </Grid>
+                                </Box>
+                            )}
+                        </Box>
 
-                    <TextField
-                        label="Category" select fullWidth
-                        value={category} onChange={(e) => setCategory(e.target.value)}
-                        sx={{ mt: 1 }}
-                    >
-                        {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                    </TextField>
-
-                    <Box sx={{ mt: 3, mb: 3 }}>
-                        <FormControlLabel
-                            control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
-                            label="Free Event (all users can register)"
-                            sx={{ mb: 2 }}
+                        <TextField
+                            label="Max Participants" type="number" fullWidth
+                            value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)}
+                            inputProps={{ min: 1, step: 1 }}
+                            helperText="Leave empty for unlimited"
+                            sx={{ mt: 0.5, mb: 2 }}
                         />
 
-                        {/* Pricing Section - Only show when NOT free */}
-                        {!isFree && (
-                            <Box sx={{
-                                p: 2.5,
-                                border: "1px solid #e0e0e0",
-                                borderRadius: 2,
-                                bgcolor: "#fafafa",
-                                mt: 2
-                            }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: "#333" }}>
-                                    Pricing Options
+                        <TextField
+                            label="Max Participants per Table (Social Lounge)" type="number" fullWidth
+                            value={loungeTableCapacity} onChange={(e) => setLoungeTableCapacity(e.target.value)}
+                            inputProps={{ min: 1, step: 1 }}
+                            helperText="Default is 4"
+                            sx={{ mt: 0.5, mb: 2 }}
+                        />
+
+                        <Box sx={{ mt: 3, mb: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                                Registration Type
+                            </Typography>
+                            <TextField
+                                select
+                                fullWidth
+                                value={registrationType}
+                                onChange={(e) => setRegistrationType(e.target.value)}
+                                helperText="Open: Users register instantly. Apply: Users submit applications for host approval."
+                            >
+                                <MenuItem value="open">Open Registration</MenuItem>
+                                <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
+                            </TextField>
+                        </Box>
+
+                    </Grid>
+
+                    {/* Images Row - Three Equal Columns */}
+                    <Box sx={{ mt: 3, width: '100%' }}>
+                        <Box
+                            sx={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                                gap: 2,
+                            }}
+                        >
+                            {/* Update Logo / Picture */}
+                            <Box>
+                                <Typography variant="subtitle1" className="font-semibold">Logo / Picture</Typography>
+                                <Typography variant="caption" className="text-slate-500 block mb-2">
+                                    Recommended 200x200px - Max 5 MB
                                 </Typography>
 
-                                <Grid container spacing={2}>
-                                    {/* Price Field */}
-                                    <Grid item xs={12} sm={6}>
-                                        <TextField
-                                            label="Price" type="number" fullWidth
-                                            value={price || ""} onChange={(e) => setPrice(e.target.value === "" ? "" : e.target.value)}
-                                            inputProps={{ min: 0, step: "0.01" }}
-                                            error={!!errors.price}
-                                            helperText={errors.price}
-                                            size="small"
-                                        />
-                                    </Grid>
+                                <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                                    sx={{ height: 150, position: "relative", overflow: "hidden" }}>
+                                    {localLogoImagePreview ? (
+                                        <img src={localLogoImagePreview} alt="logo preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    ) : logoImage ? (
+                                        <img src={logoImage} alt="logo preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    ) : (
+                                        <Stack alignItems="center" spacing={1}>
+                                            <ImageRoundedIcon />
+                                            <Typography variant="body2" className="text-slate-600">Logo / Picture</Typography>
+                                        </Stack>
+                                    )}
+                                    <input id="edit-ev-logo-image-file" type="file" accept="image/*" style={{ display: "none" }}
+                                        onChange={(e) => onPickLogoImage(e.target.files?.[0])} />
+                                </Box>
 
-                                    {/* Price Label Field */}
-                                    <Grid item xs={12} sm={6}>
-                                        <TextField
-                                            label="Price Label" fullWidth
-                                            placeholder='e.g. "By application only"'
-                                            value={priceLabel} onChange={(e) => setPriceLabel(e.target.value)}
-                                            inputProps={{ maxLength: 100 }}
-                                            size="small"
-                                        />
-                                    </Grid>
-                                </Grid>
+                                <label htmlFor="edit-ev-logo-image-file">
+                                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
+                                        Upload Logo
+                                    </Button>
+                                </label>
                             </Box>
-                        )}
+
+                            {/* Cover Image */}
+                            <Box>
+                                <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+                                <Typography variant="caption" className="text-slate-500 block mb-2">
+                                    Recommended 1280x720px - Max 5 MB
+                                </Typography>
+
+                                <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                                    sx={{ height: 150, position: "relative", overflow: "hidden" }}>
+                                    {localCoverImagePreview ? (
+                                        <img src={localCoverImagePreview} alt="cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    ) : coverImage ? (
+                                        <img src={coverImage} alt="cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    ) : (
+                                        <Stack alignItems="center" spacing={1}>
+                                            <ImageRoundedIcon />
+                                            <Typography variant="body2" className="text-slate-600">Cover Image</Typography>
+                                        </Stack>
+                                    )}
+                                    <input id="edit-ev-cover-image-file" type="file" accept="image/*" style={{ display: "none" }}
+                                        onChange={(e) => onPickCoverImage(e.target.files?.[0])} />
+                                </Box>
+
+                                <label htmlFor="edit-ev-cover-image-file">
+                                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
+                                        Upload Cover
+                                    </Button>
+                                </label>
+                            </Box>
+
+                            {/* Waiting Room Image */}
+                            <Box>
+                                <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
+                                <Typography variant="caption" className="text-slate-500 block mb-2">
+                                    Recommended 1280x720px - Max 5 MB
+                                </Typography>
+
+                                <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                                    sx={{ height: 150, position: "relative", overflow: "hidden" }}>
+                                    {localWaitingRoomImagePreview ? (
+                                        <img src={localWaitingRoomImagePreview} alt="waiting room preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    ) : waitingRoomImage ? (
+                                        <img src={waitingRoomImage} alt="waiting room preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    ) : (
+                                        <Stack alignItems="center" spacing={1}>
+                                            <ImageRoundedIcon />
+                                            <Typography variant="body2" className="text-slate-600">Waiting Room</Typography>
+                                        </Stack>
+                                    )}
+                                    <input id="edit-ev-waiting-room-image-file" type="file" accept="image/*" style={{ display: "none" }}
+                                        onChange={(e) => onPickWaitingRoomImage(e.target.files?.[0])} />
+                                </Box>
+
+                                <label htmlFor="edit-ev-waiting-room-image-file">
+                                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
+                                        Upload Waiting Room
+                                    </Button>
+                                </label>
+
+                            </Box>
+                        </Box>
                     </Box>
 
-                    <TextField
-                        label="Max Participants" type="number" fullWidth
-                        value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)}
-                        inputProps={{ min: 1, step: 1 }}
-                        helperText="Leave empty for unlimited"
-                        sx={{ mt: 0.5, mb: 2 }}
-                    />
-
-                    <TextField
-                        label="Max Participants per Table (Social Lounge)" type="number" fullWidth
-                        value={loungeTableCapacity} onChange={(e) => setLoungeTableCapacity(e.target.value)}
-                        inputProps={{ min: 1, step: 1 }}
-                        helperText="Default is 4"
-                        sx={{ mt: 0.5, mb: 2 }}
-                    />
-
-                    <Box sx={{ mt: 3, mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                            Registration Type
-                        </Typography>
-                        <TextField
-                            select
-                            fullWidth
-                            value={registrationType}
-                            onChange={(e) => setRegistrationType(e.target.value)}
-                            helperText="Open: Users register instantly. Apply: Users submit applications for host approval."
-                        >
-                            <MenuItem value="open">Open Registration</MenuItem>
-                            <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
-                        </TextField>
-                    </Box>
-
-                </Grid>
-
-                {/* Images Row - Three Equal Columns */}
-                <Box sx={{ mt: 3, width: '100%' }}>
                     <Box
                         sx={{
+                            mt: 2,
+                            width: "100%",
                             display: "grid",
-                            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                            gap: 2,
+                            gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                            gap: 1.5,
+                            alignItems: "center",
                         }}
                     >
-                        {/* Update Logo / Picture */}
-                        <Box>
-                            <Typography variant="subtitle1" className="font-semibold">Logo / Picture</Typography>
-                            <Typography variant="caption" className="text-slate-500 block mb-2">
-                                Recommended 200x200px - Max 5 MB
-                            </Typography>
-
-                            <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                                sx={{ height: 150, position: "relative", overflow: "hidden" }}>
-                                {localLogoImagePreview ? (
-                                    <img src={localLogoImagePreview} alt="logo preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                ) : logoImage ? (
-                                    <img src={logoImage} alt="logo preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                ) : (
-                                    <Stack alignItems="center" spacing={1}>
-                                        <ImageRoundedIcon />
-                                        <Typography variant="body2" className="text-slate-600">Logo / Picture</Typography>
-                                    </Stack>
-                                )}
-                                <input id="edit-ev-logo-image-file" type="file" accept="image/*" style={{ display: "none" }}
-                                    onChange={(e) => onPickLogoImage(e.target.files?.[0])} />
-                            </Box>
-
-                            <label htmlFor="edit-ev-logo-image-file">
-                                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
-                                    Upload Logo
-                                </Button>
-                            </label>
-                        </Box>
-
-                        {/* Cover Image */}
-                        <Box>
-                            <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
-                            <Typography variant="caption" className="text-slate-500 block mb-2">
-                                Recommended 1280x720px - Max 5 MB
-                            </Typography>
-
-                            <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                                sx={{ height: 150, position: "relative", overflow: "hidden" }}>
-                                {localCoverImagePreview ? (
-                                    <img src={localCoverImagePreview} alt="cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                ) : coverImage ? (
-                                    <img src={coverImage} alt="cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                ) : (
-                                    <Stack alignItems="center" spacing={1}>
-                                        <ImageRoundedIcon />
-                                        <Typography variant="body2" className="text-slate-600">Cover Image</Typography>
-                                    </Stack>
-                                )}
-                                <input id="edit-ev-cover-image-file" type="file" accept="image/*" style={{ display: "none" }}
-                                    onChange={(e) => onPickCoverImage(e.target.files?.[0])} />
-                            </Box>
-
-                            <label htmlFor="edit-ev-cover-image-file">
-                                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
-                                    Upload Cover
-                                </Button>
-                            </label>
-                        </Box>
-
-                        {/* Waiting Room Image */}
-                        <Box>
-                            <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
-                            <Typography variant="caption" className="text-slate-500 block mb-2">
-                                Recommended 1280x720px - Max 5 MB
-                            </Typography>
-
-                            <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                                sx={{ height: 150, position: "relative", overflow: "hidden" }}>
-                                {localWaitingRoomImagePreview ? (
-                                    <img src={localWaitingRoomImagePreview} alt="waiting room preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                ) : waitingRoomImage ? (
-                                    <img src={waitingRoomImage} alt="waiting room preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                ) : (
-                                    <Stack alignItems="center" spacing={1}>
-                                        <ImageRoundedIcon />
-                                        <Typography variant="body2" className="text-slate-600">Waiting Room</Typography>
-                                    </Stack>
-                                )}
-                                <input id="edit-ev-waiting-room-image-file" type="file" accept="image/*" style={{ display: "none" }}
-                                    onChange={(e) => onPickWaitingRoomImage(e.target.files?.[0])} />
-                            </Box>
-
-                            <label htmlFor="edit-ev-waiting-room-image-file">
-                                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
-                                    Upload Waiting Room
-                                </Button>
-                            </label>
-
-                        </Box>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={waitingRoomEnabled}
+                                    onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
+                                />
+                            }
+                            label="Enable Waiting Room"
+                            sx={{
+                                m: 0,
+                                width: "100%",
+                                justifyContent: "flex-start",
+                                gap: 1.5,
+                                "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                            }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={waitingRoomLoungeAllowed}
+                                    onChange={(e) => setWaitingRoomLoungeAllowed(e.target.checked)}
+                                    disabled={!waitingRoomEnabled}
+                                />
+                            }
+                            label="Allow Social Lounge while waiting"
+                            sx={{
+                                m: 0,
+                                width: "100%",
+                                justifyContent: "flex-start",
+                                gap: 1.5,
+                                "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                            }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={waitingRoomNetworkingAllowed}
+                                    onChange={(e) => setWaitingRoomNetworkingAllowed(e.target.checked)}
+                                    disabled={!waitingRoomEnabled}
+                                />
+                            }
+                            label="Allow Networking Tables while waiting"
+                            sx={{
+                                m: 0,
+                                width: "100%",
+                                justifyContent: "flex-start",
+                                gap: 1.5,
+                                "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                            }}
+                        />
+                        <TextField
+                            label="Auto-admit after (seconds)"
+                            size="small"
+                            type="number"
+                            value={waitingRoomAutoAdmitSeconds}
+                            onChange={(e) => setWaitingRoomAutoAdmitSeconds(e.target.value)}
+                            disabled={!waitingRoomEnabled}
+                            fullWidth
+                        />
                     </Box>
-                </Box>
 
-                <Box
-                    sx={{
-                        mt: 2,
-                        width: "100%",
-                        display: "grid",
-                        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                        gap: 1.5,
-                        alignItems: "center",
-                    }}
-                >
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={waitingRoomEnabled}
-                                onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
-                            />
-                        }
-                        label="Enable Waiting Room"
-                        sx={{
-                            m: 0,
-                            width: "100%",
-                            justifyContent: "flex-start",
-                            gap: 1.5,
-                            "& .MuiFormControlLabel-label": { marginLeft: 0 },
-                        }}
-                    />
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={waitingRoomLoungeAllowed}
-                                onChange={(e) => setWaitingRoomLoungeAllowed(e.target.checked)}
-                                disabled={!waitingRoomEnabled}
-                            />
-                        }
-                        label="Allow Social Lounge while waiting"
-                        sx={{
-                            m: 0,
-                            width: "100%",
-                            justifyContent: "flex-start",
-                            gap: 1.5,
-                            "& .MuiFormControlLabel-label": { marginLeft: 0 },
-                        }}
-                    />
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={waitingRoomNetworkingAllowed}
-                                onChange={(e) => setWaitingRoomNetworkingAllowed(e.target.checked)}
-                                disabled={!waitingRoomEnabled}
-                            />
-                        }
-                        label="Allow Networking Tables while waiting"
-                        sx={{
-                            m: 0,
-                            width: "100%",
-                            justifyContent: "flex-start",
-                            gap: 1.5,
-                            "& .MuiFormControlLabel-label": { marginLeft: 0 },
-                        }}
-                    />
                     <TextField
-                        label="Auto-admit after (seconds)"
-                        size="small"
+                        label="Grace Period (minutes)"
                         type="number"
-                        value={waitingRoomAutoAdmitSeconds}
-                        onChange={(e) => setWaitingRoomAutoAdmitSeconds(e.target.value)}
+                        inputProps={{ min: "0", max: "1440", step: "1" }}
+                        value={waitingRoomGracePeriodMinutes}
+                        onChange={(e) => setWaitingRoomGracePeriodMinutes(e.target.value)}
                         disabled={!waitingRoomEnabled}
                         fullWidth
+                        size="small"
+                        sx={{ mt: 3 }}
+                        helperText="Minutes after event start during which participants can join directly without waiting room approval"
+                        InputProps={{
+                            endAdornment: <InputAdornment position="end">minutes</InputAdornment>,
+                        }}
                     />
-                </Box>
-
-                <TextField
-                    label="Grace Period (minutes)"
-                    type="number"
-                    inputProps={{ min: "0", max: "1440", step: "1" }}
-                    value={waitingRoomGracePeriodMinutes}
-                    onChange={(e) => setWaitingRoomGracePeriodMinutes(e.target.value)}
-                    disabled={!waitingRoomEnabled}
-                    fullWidth
-                    size="small"
-                    sx={{ mt: 3 }}
-                    helperText="Minutes after event start during which participants can join directly without waiting room approval"
-                    InputProps={{
-                        endAdornment: <InputAdornment position="end">minutes</InputAdornment>,
-                    }}
-                />
-                {/* Dates */}
-                <Grid item xs={12}>
-                    <FormControlLabel
-                        control={<Switch checked={isMultiDay} disabled={sessionsLoading} onChange={(e) => {
-                            const v = e.target.checked;
-                            if (!v && sessions.length > 0) {
-                                // Cannot convert to single-day when sessions exist — show dialog
-                                setShowSingleDayConversionDialog(true);
-                                return; // Don't change toggle
-                            }
-                            setIsMultiDay(v);
-                            if (v) {
-                                // If switching to Multi-Day: Set Start Time to 00:00 and End Time to 23:59
-                                setSingleDayStartTime(startTime);
-                                setSingleDayEndTime(endTime);
-                                setStartTime("00:00");
-                                setEndTime("23:59");
-                                console.log("🕐 Multi-Day toggle ON (Edit): Set times to 00:00 - 23:59");
-                            } else {
-                                // If switching to Single Day, restore original single-day times and force end date to equal start date
-                                setStartTime(singleDayStartTime);
-                                setEndTime(singleDayEndTime);
-                                setEndDate(startDate);
-                            }
-                        }} />}
-                        label="Multi-day event?"
-                    />
-                </Grid>
-
-                <Grid item xs={12} md={isMultiDay ? 6 : 12}>
-                    <DatePicker
-                        label={isMultiDay ? "Start Date" : "Date"}
-                        value={startDateValue}
-                        onChange={(newValue) => {
-                            const v = newValue ? newValue.format("YYYY-MM-DD") : "";
-                            setStartDate(v);
-                            if (!isMultiDay) {
-                                setEndDate(v);
-                            } else {
-                                if (endDate && v && endDate < v) {
-                                    setEndDate(v);
-                                    setEndTime("23:59");
-                                    console.log("🕐 Auto-set End Date/Time to match Start Date for multi-day event (Edit)");
+                    {/* Dates */}
+                    <Grid item xs={12}>
+                        <FormControlLabel
+                            control={<Switch checked={isMultiDay} disabled={sessionsLoading} onChange={(e) => {
+                                const v = e.target.checked;
+                                if (!v && sessions.length > 0) {
+                                    // Cannot convert to single-day when sessions exist — show dialog
+                                    setShowSingleDayConversionDialog(true);
+                                    return; // Don't change toggle
                                 }
-                                // Multi-day: auto-set start time to 00:00
-                                setStartTime("00:00");
-                                console.log("🕐 Auto-set Start Time to 00:00 for multi-day event (Edit)");
-                            }
-                        }}
-                        format="DD/MM/YYYY"
-                        slotProps={{
-                            textField: {
-                                fullWidth: true,
-                                error: !!errors.startDate,
-                                helperText: errors.startDate,
-                                placeholder: "DD/MM/YYYY"
-                            }
-                        }}
-                    />
-                </Grid>
-                {isMultiDay && (
-                    <Grid item xs={12} md={6}>
+                                setIsMultiDay(v);
+                                if (v) {
+                                    // If switching to Multi-Day: Set Start Time to 00:00 and End Time to 23:59
+                                    setSingleDayStartTime(startTime);
+                                    setSingleDayEndTime(endTime);
+                                    setStartTime("00:00");
+                                    setEndTime("23:59");
+                                    console.log("🕐 Multi-Day toggle ON (Edit): Set times to 00:00 - 23:59");
+                                } else {
+                                    // If switching to Single Day, restore original single-day times and force end date to equal start date
+                                    setStartTime(singleDayStartTime);
+                                    setEndTime(singleDayEndTime);
+                                    setEndDate(startDate);
+                                }
+                            }} />}
+                            label="Multi-day event?"
+                        />
+                    </Grid>
+
+                    <Grid item xs={12} md={isMultiDay ? 6 : 12}>
                         <DatePicker
-                            label="End Date"
-                            value={endDateValue}
+                            label={isMultiDay ? "Start Date" : "Date"}
+                            value={startDateValue}
                             onChange={(newValue) => {
                                 const v = newValue ? newValue.format("YYYY-MM-DD") : "";
-                                setEndDate(v);
-                                // Auto-set end time to 23:59 for multi-day events
-                                if (isMultiDay) {
-                                    setEndTime("23:59");
-                                    console.log("🕐 Auto-set End Time to 23:59 for multi-day event (Edit)");
+                                setStartDate(v);
+                                if (!isMultiDay) {
+                                    setEndDate(v);
+                                } else {
+                                    if (endDate && v && endDate < v) {
+                                        setEndDate(v);
+                                        setEndTime("23:59");
+                                        console.log("🕐 Auto-set End Date/Time to match Start Date for multi-day event (Edit)");
+                                    }
+                                    // Multi-day: auto-set start time to 00:00
+                                    setStartTime("00:00");
+                                    console.log("🕐 Auto-set Start Time to 00:00 for multi-day event (Edit)");
                                 }
                             }}
                             format="DD/MM/YYYY"
                             slotProps={{
                                 textField: {
                                     fullWidth: true,
-                                    error: !!errors.endDate,
-                                    helperText: errors.endDate,
+                                    error: !!errors.startDate,
+                                    helperText: errors.startDate,
                                     placeholder: "DD/MM/YYYY"
                                 }
                             }}
                         />
                     </Grid>
-                )}
+                    {isMultiDay && (
+                        <Grid item xs={12} md={6}>
+                            <DatePicker
+                                label="End Date"
+                                value={endDateValue}
+                                onChange={(newValue) => {
+                                    const v = newValue ? newValue.format("YYYY-MM-DD") : "";
+                                    setEndDate(v);
+                                    // Auto-set end time to 23:59 for multi-day events
+                                    if (isMultiDay) {
+                                        setEndTime("23:59");
+                                        console.log("🕐 Auto-set End Time to 23:59 for multi-day event (Edit)");
+                                    }
+                                }}
+                                format="DD/MM/YYYY"
+                                slotProps={{
+                                    textField: {
+                                        fullWidth: true,
+                                        error: !!errors.endDate,
+                                        helperText: errors.endDate,
+                                        placeholder: "DD/MM/YYYY"
+                                    }
+                                }}
+                            />
+                        </Grid>
+                    )}
 
-                <Grid item xs={12}>
-                    <Grid container spacing={3}>
-                        {!isMultiDay && (
-                            <>
-                                <Grid item xs={12} md={4}>
+                    <Grid item xs={12}>
+                        <Grid container spacing={3}>
+                            {!isMultiDay && (
+                                <>
+                                    <Grid item xs={12} md={4}>
                                         <TimePicker
                                             label="Start time *" ampm minutesStep={1}
                                             disabled={isMultiDay}
@@ -2048,471 +2053,497 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                 </>
                             )}
 
-                        <Grid item xs={12} md={isMultiDay ? 12 : 4}>
-                            <Stack spacing={1}>
-                                <Autocomplete
-                                    fullWidth
-                                    options={timezoneOptions}
-                                    value={timezone}
-                                    onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Event Timezone"
-                                            helperText="Times are saved in this timezone."
-                                        />
+                            <Grid item xs={12} md={isMultiDay ? 12 : 4}>
+                                <Stack spacing={1}>
+                                    <Autocomplete
+                                        fullWidth
+                                        options={timezoneOptions}
+                                        value={timezone}
+                                        onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Event Timezone"
+                                                helperText="Times are saved in this timezone."
+                                            />
+                                        )}
+                                    />
+                                    {isMultiDay && (
+                                        <Box
+                                            sx={{
+                                                p: 1.5,
+                                                backgroundColor: "#f3f4f6",
+                                                borderRadius: 1,
+                                                border: "1px solid #e5e7eb"
+                                            }}
+                                        >
+                                            <Typography variant="caption" sx={{ fontWeight: 600, color: "#6b7280" }}>
+                                                User Time: {getBrowserTimezone()}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ display: "block", color: "#9ca3af", mt: 0.5 }}>
+                                                Sessions will also display in your local timezone
+                                            </Typography>
+                                        </Box>
                                     )}
-                                />
-                                {isMultiDay && (
-                                    <Box
-                                        sx={{
-                                            p: 1.5,
-                                            backgroundColor: "#f3f4f6",
-                                            borderRadius: 1,
-                                            border: "1px solid #e5e7eb"
-                                        }}
-                                    >
-                                        <Typography variant="caption" sx={{ fontWeight: 600, color: "#6b7280" }}>
-                                            User Time: {getBrowserTimezone()}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ display: "block", color: "#9ca3af", mt: 0.5 }}>
-                                            Sessions will also display in your local timezone
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Stack>
+                                </Stack>
+                            </Grid>
                         </Grid>
                     </Grid>
-                </Grid>
 
-                {/* ===== Sessions (Multi-day Events) ===== */}
-                {isMultiDay && (
-                    <Box sx={{ width: "100%", flexBasis: "100%" }}>
-                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-                            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-                                <Stack direction="row" alignItems="center" spacing={1}>
-                                    <CalendarMonthRoundedIcon color="action" />
-                                    <Typography variant="h6" className="font-semibold">
-                                        Sessions
-                                    </Typography>
-                                </Stack>
-                                <Button
-                                    size="small"
-                                    startIcon={<AddRoundedIcon />}
-                                    onClick={() => {
-                                        setEditingSessionIndex(null);
-                                        setSessionDialogOpen(true);
-                                    }}
-                                    disabled={sessionSubmitting}
-                                    sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                >
-                                    Add Session
-                                </Button>
-                            </Stack>
-
-                            <Typography variant="body2" color="text.secondary" mb={2}>
-                                Break your multi-day event into individual sessions
-                            </Typography>
-
-                            {sessionsLoading ? (
-                                <Box sx={{ py: 2, textAlign: "center" }}>
-                                    <CircularProgress size={20} />
-                                </Box>
-                            ) : sessionsError ? (
-                                <Typography variant="body2" color="error" mb={2}>
-                                    {sessionsError}
-                                </Typography>
-                            ) : sessions.length > 0 ? (
-                                <Box mb={2}>
-                                    <SessionList
-                                        sessions={sessions}
-                                        timezone={timezone}
-                                        onMoveUp={(idx) => moveSession(idx, idx - 1)}
-                                        onMoveDown={(idx) => moveSession(idx, idx + 1)}
-                                        onSortByStartTime={sortSessionsByStartTime}
-                                        disableReordering={sessionSubmitting}
-                                        onEdit={(session, idx) => {
-                                            setEditingSessionIndex(idx);
+                    {/* ===== Sessions (Multi-day Events) ===== */}
+                    {isMultiDay && (
+                        <Box sx={{ width: "100%", flexBasis: "100%" }}>
+                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+                                <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+                                    <Stack direction="row" alignItems="center" spacing={1}>
+                                        <CalendarMonthRoundedIcon color="action" />
+                                        <Typography variant="h6" className="font-semibold">
+                                            Sessions
+                                        </Typography>
+                                    </Stack>
+                                    <Button
+                                        size="small"
+                                        startIcon={<AddRoundedIcon />}
+                                        onClick={() => {
+                                            setEditingSessionIndex(null);
                                             setSessionDialogOpen(true);
                                         }}
-                                        onDelete={(session, idx) => {
-                                            deleteSession(session?.id, idx);
-                                        }}
-                                    />
-                                </Box>
-                            ) : null}
-                        </Paper>
-                    </Box>
-                )}
+                                        disabled={sessionSubmitting}
+                                        sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                    >
+                                        Add Session
+                                    </Button>
+                                </Stack>
 
-                {/* ===== Hours Calculation Settings (Platform Admin Only) ===== */}
-                {isMultiDay && currentUser?.is_superuser && (
+                                <Typography variant="body2" color="text.secondary" mb={2}>
+                                    Break your multi-day event into individual sessions
+                                </Typography>
+
+                                {sessionsLoading ? (
+                                    <Box sx={{ py: 2, textAlign: "center" }}>
+                                        <CircularProgress size={20} />
+                                    </Box>
+                                ) : sessionsError ? (
+                                    <Typography variant="body2" color="error" mb={2}>
+                                        {sessionsError}
+                                    </Typography>
+                                ) : sessions.length > 0 ? (
+                                    <Box mb={2}>
+                                        <SessionList
+                                            sessions={sessions}
+                                            timezone={timezone}
+                                            onMoveUp={(idx) => moveSession(idx, idx - 1)}
+                                            onMoveDown={(idx) => moveSession(idx, idx + 1)}
+                                            onSortByStartTime={sortSessionsByStartTime}
+                                            disableReordering={sessionSubmitting}
+                                            onEdit={(session, idx) => {
+                                                setEditingSessionIndex(idx);
+                                                setSessionDialogOpen(true);
+                                            }}
+                                            onDelete={(session, idx) => {
+                                                deleteSession(session?.id, idx);
+                                            }}
+                                        />
+                                    </Box>
+                                ) : null}
+                            </Paper>
+                        </Box>
+                    )}
+
+                    {/* ===== Hours Calculation Settings (Platform Admin Only) ===== */}
+                    {isMultiDay && currentUser?.is_superuser && (
+                        <Box sx={{ width: "100%", flexBasis: "100%" }}>
+                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+                                <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                                    <Typography variant="h6" className="font-semibold">
+                                        ⏱️ Hours Calculation
+                                    </Typography>
+                                    <Chip label="Admin Only" size="small" variant="outlined" color="info" />
+                                </Stack>
+
+                                <Typography variant="body2" color="text.secondary" mb={3}>
+                                    Select which session types should count toward the total hours displayed on the event card.
+                                </Typography>
+
+                                <Stack direction="column" spacing={1}>
+                                    {["main", "breakout", "workshop", "networking"].map((sessionType) => (
+                                        <FormControlLabel
+                                            key={sessionType}
+                                            control={
+                                                <Switch
+                                                    checked={hoursCalculationSessionTypes.includes(sessionType)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setHoursCalculationSessionTypes(prev => [...prev, sessionType]);
+                                                        } else {
+                                                            setHoursCalculationSessionTypes(prev => prev.filter(t => t !== sessionType));
+                                                        }
+                                                    }}
+                                                />
+                                            }
+                                            label={
+                                                <span>
+                                                    {sessionType === "main" && "📌 Main Sessions"}
+                                                    {sessionType === "breakout" && "🔀 Breakout Sessions"}
+                                                    {sessionType === "workshop" && "🛠️ Workshops"}
+                                                    {sessionType === "networking" && "🤝 Networking Sessions"}
+                                                </span>
+                                            }
+                                            sx={{ m: 0 }}
+                                        />
+                                    ))}
+                                </Stack>
+
+                                {hoursCalculationSessionTypes.length === 0 && (
+                                    <Typography variant="caption" color="error" sx={{ display: "block", mt: 2 }}>
+                                        ⚠️ Select at least one session type for hours calculation
+                                    </Typography>
+                                )}
+                            </Paper>
+                        </Box>
+                    )}
+
+                    {/* ===== Speakers & Hosts ===== */}
                     <Box sx={{ width: "100%", flexBasis: "100%" }}>
                         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
                             <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                                <RecordVoiceOverRoundedIcon color="action" />
                                 <Typography variant="h6" className="font-semibold">
-                                    ⏱️ Hours Calculation
+                                    Speakers & Hosts
                                 </Typography>
-                                <Chip label="Admin Only" size="small" variant="outlined" color="info" />
                             </Stack>
 
-                            <Typography variant="body2" color="text.secondary" mb={3}>
-                                Select which session types should count toward the total hours displayed on the event card.
+                            <Typography variant="body2" color="text.secondary" mb={2}>
+                                Add speakers, moderators, or hosts for this event
                             </Typography>
 
-                            <Stack direction="column" spacing={1}>
-                                {["main", "breakout", "workshop", "networking"].map((sessionType) => (
-                                    <FormControlLabel
-                                        key={sessionType}
-                                        control={
-                                            <Switch
-                                                checked={hoursCalculationSessionTypes.includes(sessionType)}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setHoursCalculationSessionTypes(prev => [...prev, sessionType]);
-                                                    } else {
-                                                        setHoursCalculationSessionTypes(prev => prev.filter(t => t !== sessionType));
-                                                    }
-                                                }}
-                                            />
-                                        }
-                                        label={
-                                            <span>
-                                                {sessionType === "main" && "📌 Main Sessions"}
-                                                {sessionType === "breakout" && "🔀 Breakout Sessions"}
-                                                {sessionType === "workshop" && "🛠️ Workshops"}
-                                                {sessionType === "networking" && "🤝 Networking Sessions"}
-                                            </span>
-                                        }
-                                        sx={{ m: 0 }}
+                            {participants.length > 0 && (
+                                <Box mb={2}>
+                                    <ParticipantList
+                                        participants={participants}
+                                        onEdit={(p, idx) => {
+                                            setEditingParticipantIndex(idx);
+                                            setParticipantDialogOpen(true);
+                                        }}
+                                        onRemove={(p, idx) => {
+                                            setParticipants(prev => prev.filter((_, i) => i !== idx));
+                                            setToast({ open: true, type: "success", msg: "Participant removed" });
+                                        }}
                                     />
-                                ))}
-                            </Stack>
-
-                            {hoursCalculationSessionTypes.length === 0 && (
-                                <Typography variant="caption" color="error" sx={{ display: "block", mt: 2 }}>
-                                    ⚠️ Select at least one session type for hours calculation
-                                </Typography>
+                                </Box>
                             )}
+
+                            <Button
+                                variant="outlined"
+                                startIcon={<AddRoundedIcon />}
+                                onClick={() => {
+                                    setEditingParticipantIndex(null);
+                                    setParticipantDialogOpen(true);
+                                }}
+                                fullWidth
+                            >
+                                Add Participant
+                            </Button>
+                        </Paper>
+                    </Box>
+                </Grid>
+
+
+                {/* ── Seed Questions Section ─────────────────────────────── */}
+                {event?.id && (
+                    <Box sx={{ mt: 4 }}>
+                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                                <QuizOutlinedIcon color="action" />
+                                <Typography variant="h6" className="font-semibold">
+                                    Seed Questions (Q&amp;A)
+                                </Typography>
+                            </Stack>
+                            <Typography variant="body2" color="text.secondary" mb={2}>
+                                Pre-arrange questions that appear in the Q&amp;A feed when the event goes live.
+                                Use an attribution label like <strong>Event Team</strong> or <strong>Dr. Smith</strong> instead of your name.
+                                Speaker notes are private — only you see them.
+                            </Typography>
+
+                            <Box sx={{ mb: 2, p: 1, bgcolor: "rgba(156,123,255,0.08)", borderRadius: 1, border: "1px dashed rgba(156,123,255,0.3)" }}>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            size="small"
+                                            checked={qnaAiPublicSuggestionsEnabled}
+                                            onChange={(e) => setQnaAiPublicSuggestionsEnabled(e.target.checked)}
+                                            sx={{
+                                                "& .MuiSwitch-switchBase.Mui-checked": { color: "#9c7bff" },
+                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#9c7bff" }
+                                            }}
+                                        />
+                                    }
+                                    label={
+                                        <Box>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#9c7bff" }}>
+                                                Enable AI Question Adoption
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Allow participants to adopt AI-generated questions.
+                                            </Typography>
+                                        </Box>
+                                    }
+                                />
+                            </Box>
+
+                            {/* Existing seed questions list */}
+                            {seedLoading ? (
+                                <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+                                    <CircularProgress size={22} />
+                                </Box>
+                            ) : seedQuestions.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: "italic" }}>
+                                    No seed questions yet.
+                                </Typography>
+                            ) : (
+                                <Stack spacing={1.5} mb={2}>
+                                    {seedQuestions.map((q) => (
+                                        <Paper key={q.id} variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, bgcolor: "rgba(16,184,166,0.04)", borderColor: "rgba(16,184,166,0.25)" }}>
+                                            {editingSeedId === q.id ? (
+                                                <Stack spacing={1}>
+                                                    <TextField
+                                                        label="Question"
+                                                        fullWidth size="small" multiline minRows={2}
+                                                        value={editSeedContent}
+                                                        onChange={(e) => setEditSeedContent(e.target.value)}
+                                                    />
+                                                    <TextField
+                                                        label="Attribution label"
+                                                        fullWidth size="small"
+                                                        placeholder="e.g. Event Team, Dr. Smith, Host"
+                                                        value={editSeedAttribution}
+                                                        onChange={(e) => setEditSeedAttribution(e.target.value)}
+                                                    />
+                                                    <TextField
+                                                        label="Speaker note (private)"
+                                                        fullWidth size="small" multiline minRows={1}
+                                                        placeholder="Reminder visible only to you"
+                                                        value={editSeedNote}
+                                                        onChange={(e) => setEditSeedNote(e.target.value)}
+                                                        InputProps={{
+                                                            startAdornment: (
+                                                                <InputAdornment position="start">
+                                                                    <Tooltip title="Only visible to you (the host)">
+                                                                        <LockOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                                                                    </Tooltip>
+                                                                </InputAdornment>
+                                                            ),
+                                                        }}
+                                                    />
+                                                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                                        <Button size="small" onClick={() => setEditingSeedId(null)}>Cancel</Button>
+                                                        <Button
+                                                            size="small" variant="contained"
+                                                            startIcon={<SaveRoundedIcon />}
+                                                            onClick={() => saveSeedEdit(q.id)}
+                                                            sx={{ bgcolor: "#10b8a6", "&:hover": { bgcolor: "#0ea5a4" } }}
+                                                        >
+                                                            Save
+                                                        </Button>
+                                                    </Stack>
+                                                </Stack>
+                                            ) : (
+                                                <Stack direction="row" alignItems="flex-start" spacing={1}>
+                                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" mb={0.5}>
+                                                            <Chip
+                                                                label={q.attribution_label || "Event Team"}
+                                                                size="small"
+                                                                sx={{ fontSize: 11, height: 20, bgcolor: "rgba(16,184,166,0.12)", color: "#10b8a6", border: "1px solid rgba(16,184,166,0.3)" }}
+                                                            />
+                                                            <Chip label="SEED" size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }} />
+                                                        </Stack>
+                                                        <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+                                                            {q.content}
+                                                        </Typography>
+                                                        {q.speaker_note && (
+                                                            <Stack direction="row" spacing={0.5} alignItems="center" mt={0.5}>
+                                                                <LockOutlinedIcon sx={{ fontSize: 12, color: "text.disabled" }} />
+                                                                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                                                                    {q.speaker_note}
+                                                                </Typography>
+                                                            </Stack>
+                                                        )}
+                                                    </Box>
+                                                    <Stack direction="row" spacing={0}>
+                                                        <Tooltip title="Edit">
+                                                            <IconButton size="small" onClick={() => {
+                                                                setEditingSeedId(q.id);
+                                                                setEditSeedContent(q.content);
+                                                                setEditSeedAttribution(q.attribution_label || "");
+                                                                setEditSeedNote(q.speaker_note || "");
+                                                            }}>
+                                                                <EditRoundedIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Delete">
+                                                            <IconButton size="small" color="error" onClick={() => deleteSeedQuestion(q.id)}>
+                                                                <DeleteOutlineRoundedIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                </Stack>
+                                            )}
+                                        </Paper>
+                                    ))}
+                                </Stack>
+                            )}
+
+                            {/* Add new seed question form */}
+                            <Stack spacing={1.5}>
+                                <TextField
+                                    label="Question text"
+                                    fullWidth size="small" multiline minRows={2}
+                                    placeholder="e.g. What's the biggest challenge AI faces in diagnostics today?"
+                                    value={newSeedContent}
+                                    onChange={(e) => setNewSeedContent(e.target.value)}
+                                />
+                                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                                    <TextField
+                                        label="Attribution label"
+                                        size="small" fullWidth
+                                        placeholder="e.g. Event Team, Host, Dr. Smith"
+                                        value={newSeedAttribution}
+                                        onChange={(e) => setNewSeedAttribution(e.target.value)}
+                                        helperText="Shown instead of your name"
+                                    />
+                                    <TextField
+                                        label="Speaker note (private)"
+                                        size="small" fullWidth
+                                        placeholder="Private reminder, not visible to attendees"
+                                        value={newSeedNote}
+                                        onChange={(e) => setNewSeedNote(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <Tooltip title="Only visible to you (the host)">
+                                                        <LockOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />
+                                                    </Tooltip>
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        helperText="Only you can see this"
+                                    />
+                                </Stack>
+                                <Box>
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        startIcon={addingSeed ? <CircularProgress size={14} /> : <AddRoundedIcon />}
+                                        disabled={addingSeed || !newSeedContent.trim()}
+                                        onClick={addSeedQuestion}
+                                        sx={{ borderColor: "#10b8a6", color: "#10b8a6", "&:hover": { borderColor: "#0ea5a4", bgcolor: "rgba(16,184,166,0.06)" } }}
+                                    >
+                                        Add Seed Question
+                                    </Button>
+                                </Box>
+                            </Stack>
                         </Paper>
                     </Box>
                 )}
 
-                {/* ===== Speakers & Hosts ===== */}
-                <Box sx={{ width: "100%", flexBasis: "100%" }}>
-                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-                        <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-                            <RecordVoiceOverRoundedIcon color="action" />
-                            <Typography variant="h6" className="font-semibold">
-                                Speakers & Hosts
-                            </Typography>
-                        </Stack>
-
-                        <Typography variant="body2" color="text.secondary" mb={2}>
-                            Add speakers, moderators, or hosts for this event
-                        </Typography>
-
-                        {participants.length > 0 && (
-                            <Box mb={2}>
-                                <ParticipantList
-                                    participants={participants}
-                                    onEdit={(p, idx) => {
-                                        setEditingParticipantIndex(idx);
-                                        setParticipantDialogOpen(true);
-                                    }}
-                                    onRemove={(p, idx) => {
-                                        setParticipants(prev => prev.filter((_, i) => i !== idx));
-                                        setToast({ open: true, type: "success", msg: "Participant removed" });
-                                    }}
-                                />
-                            </Box>
-                        )}
-
-                        <Button
-                            variant="outlined"
-                            startIcon={<AddRoundedIcon />}
-                            onClick={() => {
-                                setEditingParticipantIndex(null);
-                                setParticipantDialogOpen(true);
-                            }}
-                            fullWidth
-                        >
-                            Add Participant
-                        </Button>
-                    </Paper>
-                </Box>
-            </Grid>
-
-
-            {/* ── Seed Questions Section ─────────────────────────────── */}
-            {event?.id && (
-                <Box sx={{ mt: 4 }}>
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-                        <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                            <QuizOutlinedIcon color="action" />
-                            <Typography variant="h6" className="font-semibold">
-                                Seed Questions (Q&amp;A)
-                            </Typography>
-                        </Stack>
-                        <Typography variant="body2" color="text.secondary" mb={2}>
-                            Pre-arrange questions that appear in the Q&amp;A feed when the event goes live.
-                            Use an attribution label like <strong>Event Team</strong> or <strong>Dr. Smith</strong> instead of your name.
-                            Speaker notes are private — only you see them.
-                        </Typography>
-
-                        {/* Existing seed questions list */}
-                        {seedLoading ? (
-                            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
-                                <CircularProgress size={22} />
-                            </Box>
-                        ) : seedQuestions.length === 0 ? (
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: "italic" }}>
-                                No seed questions yet.
-                            </Typography>
-                        ) : (
-                            <Stack spacing={1.5} mb={2}>
-                                {seedQuestions.map((q) => (
-                                    <Paper key={q.id} variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, bgcolor: "rgba(16,184,166,0.04)", borderColor: "rgba(16,184,166,0.25)" }}>
-                                        {editingSeedId === q.id ? (
-                                            <Stack spacing={1}>
-                                                <TextField
-                                                    label="Question"
-                                                    fullWidth size="small" multiline minRows={2}
-                                                    value={editSeedContent}
-                                                    onChange={(e) => setEditSeedContent(e.target.value)}
-                                                />
-                                                <TextField
-                                                    label="Attribution label"
-                                                    fullWidth size="small"
-                                                    placeholder="e.g. Event Team, Dr. Smith, Host"
-                                                    value={editSeedAttribution}
-                                                    onChange={(e) => setEditSeedAttribution(e.target.value)}
-                                                />
-                                                <TextField
-                                                    label="Speaker note (private)"
-                                                    fullWidth size="small" multiline minRows={1}
-                                                    placeholder="Reminder visible only to you"
-                                                    value={editSeedNote}
-                                                    onChange={(e) => setEditSeedNote(e.target.value)}
-                                                    InputProps={{
-                                                        startAdornment: (
-                                                            <InputAdornment position="start">
-                                                                <Tooltip title="Only visible to you (the host)">
-                                                                    <LockOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />
-                                                                </Tooltip>
-                                                            </InputAdornment>
-                                                        ),
-                                                    }}
-                                                />
-                                                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                    <Button size="small" onClick={() => setEditingSeedId(null)}>Cancel</Button>
-                                                    <Button
-                                                        size="small" variant="contained"
-                                                        startIcon={<SaveRoundedIcon />}
-                                                        onClick={() => saveSeedEdit(q.id)}
-                                                        sx={{ bgcolor: "#10b8a6", "&:hover": { bgcolor: "#0ea5a4" } }}
-                                                    >
-                                                        Save
-                                                    </Button>
-                                                </Stack>
-                                            </Stack>
-                                        ) : (
-                                            <Stack direction="row" alignItems="flex-start" spacing={1}>
-                                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" mb={0.5}>
-                                                        <Chip
-                                                            label={q.attribution_label || "Event Team"}
-                                                            size="small"
-                                                            sx={{ fontSize: 11, height: 20, bgcolor: "rgba(16,184,166,0.12)", color: "#10b8a6", border: "1px solid rgba(16,184,166,0.3)" }}
-                                                        />
-                                                        <Chip label="SEED" size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }} />
-                                                    </Stack>
-                                                    <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-                                                        {q.content}
-                                                    </Typography>
-                                                    {q.speaker_note && (
-                                                        <Stack direction="row" spacing={0.5} alignItems="center" mt={0.5}>
-                                                            <LockOutlinedIcon sx={{ fontSize: 12, color: "text.disabled" }} />
-                                                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
-                                                                {q.speaker_note}
-                                                            </Typography>
-                                                        </Stack>
-                                                    )}
-                                                </Box>
-                                                <Stack direction="row" spacing={0}>
-                                                    <Tooltip title="Edit">
-                                                        <IconButton size="small" onClick={() => {
-                                                            setEditingSeedId(q.id);
-                                                            setEditSeedContent(q.content);
-                                                            setEditSeedAttribution(q.attribution_label || "");
-                                                            setEditSeedNote(q.speaker_note || "");
-                                                        }}>
-                                                            <EditRoundedIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Delete">
-                                                        <IconButton size="small" color="error" onClick={() => deleteSeedQuestion(q.id)}>
-                                                            <DeleteOutlineRoundedIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Stack>
-                                            </Stack>
-                                        )}
-                                    </Paper>
-                                ))}
-                            </Stack>
-                        )}
-
-                        {/* Add new seed question form */}
-                        <Stack spacing={1.5}>
-                            <TextField
-                                label="Question text"
-                                fullWidth size="small" multiline minRows={2}
-                                placeholder="e.g. What's the biggest challenge AI faces in diagnostics today?"
-                                value={newSeedContent}
-                                onChange={(e) => setNewSeedContent(e.target.value)}
-                            />
-                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                                <TextField
-                                    label="Attribution label"
-                                    size="small" fullWidth
-                                    placeholder="e.g. Event Team, Host, Dr. Smith"
-                                    value={newSeedAttribution}
-                                    onChange={(e) => setNewSeedAttribution(e.target.value)}
-                                    helperText="Shown instead of your name"
-                                />
-                                <TextField
-                                    label="Speaker note (private)"
-                                    size="small" fullWidth
-                                    placeholder="Private reminder, not visible to attendees"
-                                    value={newSeedNote}
-                                    onChange={(e) => setNewSeedNote(e.target.value)}
-                                    InputProps={{
-                                        startAdornment: (
-                                            <InputAdornment position="start">
-                                                <Tooltip title="Only visible to you (the host)">
-                                                    <LockOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />
-                                                </Tooltip>
-                                            </InputAdornment>
-                                        ),
-                                    }}
-                                    helperText="Only you can see this"
-                                />
-                            </Stack>
-                            <Box>
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    startIcon={addingSeed ? <CircularProgress size={14} /> : <AddRoundedIcon />}
-                                    disabled={addingSeed || !newSeedContent.trim()}
-                                    onClick={addSeedQuestion}
-                                    sx={{ borderColor: "#10b8a6", color: "#10b8a6", "&:hover": { borderColor: "#0ea5a4", bgcolor: "rgba(16,184,166,0.06)" } }}
-                                >
-                                    Add Seed Question
-                                </Button>
-                            </Box>
-                        </Stack>
-                    </Paper>
-                </Box>
-            )}
-
-            <Box className="mt-6 flex justify-end gap-2">
-                {onCancel && <Button onClick={onCancel} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>}
-                <Button
-                    onClick={submit}
-                    disabled={submitting}
-                    variant="contained"
-                    className="rounded-xl"
-                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                >
-                    Save Changes
-                </Button>
-            </Box>
-
-            {/* Participant Form Dialog */}
-            <ParticipantForm
-                open={participantDialogOpen}
-                onClose={() => {
-                    setParticipantDialogOpen(false);
-                    setEditingParticipantIndex(null);
-                }}
-                onSubmit={(participantData) => {
-                    if (editingParticipantIndex !== null) {
-                        // Edit existing
-                        setParticipants(prev => prev.map((p, i) =>
-                            i === editingParticipantIndex ? { ...p, ...participantData } : p
-                        ));
-                        setToast({ open: true, type: "success", msg: "Participant updated" });
-                    } else {
-                        // Add new
-                        setParticipants(prev => [...prev, participantData]);
-                        setToast({ open: true, type: "success", msg: "Participant added" });
-                    }
-                    setParticipantDialogOpen(false);
-                    setEditingParticipantIndex(null);
-                }}
-                initialData={
-                    editingParticipantIndex !== null
-                        ? participants[editingParticipantIndex]
-                        : null
-                }
-                existingParticipants={participants}
-            />
-
-            {/* Session Dialog */}
-            <SessionDialog
-                open={sessionDialogOpen}
-                onClose={() => {
-                    setSessionDialogOpen(false);
-                    setEditingSessionIndex(null);
-                }}
-                onSubmit={async (sessionData) => {
-                    await upsertSession(sessionData);
-                    setSessionDialogOpen(false);
-                    setEditingSessionIndex(null);
-                }}
-                initialData={
-                    editingSessionIndex !== null
-                        ? sessions[editingSessionIndex]
-                        : null
-                }
-                eventStartTime={toUTCISO(startDate, startTime, timezone)}
-                eventEndTime={toUTCISO(endDate, endTime, timezone)}
-                timezone={timezone}
-                eventStartDate={startDate}
-                eventEndDate={endDate}
-                isMultiDay={isMultiDay}
-            />
-
-            {/* Multi-day to Single-day Conversion Confirmation Dialog */}
-            <Dialog open={showSingleDayConversionDialog} onClose={() => setShowSingleDayConversionDialog(false)}>
-                <DialogTitle>Cannot Convert to Single-Day</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        To convert this event into a single-day event, you must first delete all existing sessions.
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setShowSingleDayConversionDialog(false)} variant="contained">
-                        OK
+                <Box className="mt-6 flex justify-end gap-2">
+                    {onCancel && <Button onClick={onCancel} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>}
+                    <Button
+                        onClick={submit}
+                        disabled={submitting}
+                        variant="contained"
+                        className="rounded-xl"
+                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                    >
+                        Save Changes
                     </Button>
-                </DialogActions>
-            </Dialog>
+                </Box>
 
-            <Snackbar
-                open={toast.open}
-                autoHideDuration={2800}
-                onClose={() => setToast((t) => ({ ...t, open: false }))}
-                anchorOrigin={{ vertical: "top", horizontal: "center" }}
-            >
-                <Alert
-                    severity={toast.type === "error" ? "error" : "success"}
-                    variant="filled"
+                {/* Participant Form Dialog */}
+                <ParticipantForm
+                    open={participantDialogOpen}
+                    onClose={() => {
+                        setParticipantDialogOpen(false);
+                        setEditingParticipantIndex(null);
+                    }}
+                    onSubmit={(participantData) => {
+                        if (editingParticipantIndex !== null) {
+                            // Edit existing
+                            setParticipants(prev => prev.map((p, i) =>
+                                i === editingParticipantIndex ? { ...p, ...participantData } : p
+                            ));
+                            setToast({ open: true, type: "success", msg: "Participant updated" });
+                        } else {
+                            // Add new
+                            setParticipants(prev => [...prev, participantData]);
+                            setToast({ open: true, type: "success", msg: "Participant added" });
+                        }
+                        setParticipantDialogOpen(false);
+                        setEditingParticipantIndex(null);
+                    }}
+                    initialData={
+                        editingParticipantIndex !== null
+                            ? participants[editingParticipantIndex]
+                            : null
+                    }
+                    existingParticipants={participants}
+                />
+
+                {/* Session Dialog */}
+                <SessionDialog
+                    open={sessionDialogOpen}
+                    onClose={() => {
+                        setSessionDialogOpen(false);
+                        setEditingSessionIndex(null);
+                    }}
+                    onSubmit={async (sessionData) => {
+                        await upsertSession(sessionData);
+                        setSessionDialogOpen(false);
+                        setEditingSessionIndex(null);
+                    }}
+                    initialData={
+                        editingSessionIndex !== null
+                            ? sessions[editingSessionIndex]
+                            : null
+                    }
+                    eventStartTime={toUTCISO(startDate, startTime, timezone)}
+                    eventEndTime={toUTCISO(endDate, endTime, timezone)}
+                    timezone={timezone}
+                    eventStartDate={startDate}
+                    eventEndDate={endDate}
+                    isMultiDay={isMultiDay}
+                />
+
+                {/* Multi-day to Single-day Conversion Confirmation Dialog */}
+                <Dialog open={showSingleDayConversionDialog} onClose={() => setShowSingleDayConversionDialog(false)}>
+                    <DialogTitle>Cannot Convert to Single-Day</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            To convert this event into a single-day event, you must first delete all existing sessions.
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setShowSingleDayConversionDialog(false)} variant="contained">
+                            OK
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                <Snackbar
+                    open={toast.open}
+                    autoHideDuration={2800}
                     onClose={() => setToast((t) => ({ ...t, open: false }))}
+                    anchorOrigin={{ vertical: "top", horizontal: "center" }}
                 >
-                    {toast.msg}
-                </Alert>
-            </Snackbar>
+                    <Alert
+                        severity={toast.type === "error" ? "error" : "success"}
+                        variant="filled"
+                        onClose={() => setToast((t) => ({ ...t, open: false }))}
+                    >
+                        {toast.msg}
+                    </Alert>
+                </Snackbar>
             </Box>
         </LocalizationProvider>
     );
