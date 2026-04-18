@@ -525,6 +525,23 @@ export default function LiveQnAPanel({
   const [polishDialog, setPolishDialog] = useState(null); // null | { original, improved }
   const [polishError, setPolishError] = useState("");
 
+  // ── A2: private AI question suggestions state ─────────────────────────────
+  const [aiQSugg, setAiQSugg] = useState([]);
+  const [aiQSuggLoading, setAiQSuggLoading] = useState(false);
+  const [aiQSuggError, setAiQSuggError] = useState("");
+  // Dismiss is persisted per event in localStorage so it survives panel re-opens
+  const [aiQSuggDismissed, setAiQSuggDismissed] = useState(
+    () => !!localStorage.getItem(`qna_ai_sugg_dismissed_${eventId}`)
+  );
+
+  // ── A2: host context modal state ──────────────────────────────────────────
+  const [contextModalOpen, setContextModalOpen] = useState(false);
+  const [contextText, setContextText] = useState("");
+  const [contextTitle, setContextTitle] = useState("");
+  const [contextSaving, setContextSaving] = useState(false);
+  const [contextSaveError, setContextSaveError] = useState("");
+  const [contextSaved, setContextSaved] = useState(false);
+
   // ── Typing indicator state ────────────────────────────────────────────────
   // Map keyed by user_id, value: { user_id, user_name, last_seen (ms) }
   const [typingUsers, setTypingUsers] = useState({});
@@ -589,7 +606,12 @@ export default function LiveQnAPanel({
     loadQuestions();
     loadGroups();
     if (isHost) loadAiSuggestions();
-  }, [open, loadQuestions, loadGroups, loadAiSuggestions, isHost]);
+    // Auto-fetch A2 suggestions on first open (not dismissed, not already loaded)
+    if (!aiQSuggDismissed && aiQSugg.length === 0) {
+      fetchAiQSuggestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // ── sendQnaTyping helper ─────────────────────────────────────────────────
   const sendQnaTyping = useCallback((isTyping) => {
@@ -860,6 +882,75 @@ export default function LiveQnAPanel({
     }
   };
 
+  // ── A2: fetch private AI question suggestions ─────────────────────────────
+  const fetchAiQSuggestions = async () => {
+    if (!eventId || aiQSuggDismissed) return;
+    setAiQSuggLoading(true);
+    setAiQSuggError("");
+    try {
+      const res = await fetch(
+        toApiUrl("interactions/questions/ai-suggestions/"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event_id: eventId, count: 3 }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 404) {
+        // No context available — silently hide the card for attendees
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(data.detail || "Could not load question suggestions.");
+      }
+      setAiQSugg(data.suggestions || []);
+    } catch (e) {
+      setAiQSuggError(e.message || "Could not load question suggestions. Please try again.");
+    } finally {
+      setAiQSuggLoading(false);
+    }
+  };
+
+  const handleDismissAiSuggestions = () => {
+    setAiQSuggDismissed(true);
+    localStorage.setItem(`qna_ai_sugg_dismissed_${eventId}`, "1");
+  };
+
+  const handleUseAiSuggestion = (question) => {
+    setNewQuestion(question);
+  };
+
+  // ── A2: host adds presentation context ───────────────────────────────────
+  const handleAddContext = async () => {
+    if (!contextText.trim() || !eventId) return;
+    setContextSaving(true);
+    setContextSaveError("");
+    setContextSaved(false);
+    try {
+      const res = await fetch(toApiUrl("interactions/qna-context/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({
+          event_id: eventId,
+          source_type: "host_notes",
+          source_title: contextTitle.trim() || "Session Notes",
+          content_text: contextText.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Could not save context.");
+      setContextSaved(true);
+      setContextText("");
+      setContextTitle("");
+      setTimeout(() => { setContextModalOpen(false); setContextSaved(false); }, 1200);
+    } catch (e) {
+      setContextSaveError(e.message || "Could not save context.");
+    } finally {
+      setContextSaving(false);
+    }
+  };
+
   // ── Submit question ───────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1047,9 +1138,25 @@ export default function LiveQnAPanel({
           <Typography variant="subtitle1" fontWeight={600}>
             Q&amp;A
           </Typography>
-          <IconButton size="small" onClick={onClose} sx={{ color: "#fff" }}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Tooltip title={aiQSuggDismissed ? "Show AI Suggestions" : "Hide AI Suggestions"} arrow>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  const newState = !aiQSuggDismissed;
+                  setAiQSuggDismissed(newState);
+                  if (!newState) localStorage.removeItem(`qna_ai_sugg_dismissed_${eventId}`);
+                  else localStorage.setItem(`qna_ai_sugg_dismissed_${eventId}`, "1");
+                }}
+                sx={{ color: aiQSuggDismissed ? "rgba(255,255,255,0.3)" : "#9c7bff" }}
+              >
+                <AutoAwesomeIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
+            <IconButton size="small" onClick={onClose} sx={{ color: "#fff" }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
         </Stack>
 
         {/* Content area */}
@@ -1117,6 +1224,19 @@ export default function LiveQnAPanel({
                   <Button size="small" variant="outlined" color="info" onClick={() => setAiModalOpen(true)} sx={{ textTransform: "none" }}>
                     AI Suggestions
                   </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => { setContextModalOpen(true); setContextSaved(false); setContextSaveError(""); }}
+                    sx={{
+                      textTransform: "none",
+                      borderColor: "rgba(156,123,255,0.5)",
+                      color: "#c4a8ff",
+                      "&:hover": { borderColor: "#c4a8ff", bgcolor: "rgba(124,77,255,0.12)" },
+                    }}
+                  >
+                    📋 Add Context
+                  </Button>
                 </Stack>
               )}
               <Stack direction="row" spacing={1} alignItems="center">
@@ -1166,6 +1286,129 @@ export default function LiveQnAPanel({
               </Typography>
             )}
           </Box>
+
+          {/* ── A2: AI Question Suggestion Card ──────────────────────────── */}
+          {!aiQSuggDismissed && (aiQSuggLoading || aiQSugg.length > 0) && (
+            <Box
+              sx={{
+                mt: 1,
+                mb: 0.5,
+                borderRadius: 2,
+                border: "1px solid rgba(124,77,255,0.25)",
+                bgcolor: "rgba(124,77,255,0.07)",
+                p: 1.25,
+              }}
+            >
+              {/* Card header */}
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.75 }}>
+                <Stack direction="row" alignItems="center" spacing={0.75}>
+                  <AutoAwesomeIcon sx={{ fontSize: 14, color: "#9c7bff" }} />
+                  <Typography variant="caption" sx={{ color: "#c4a8ff", fontWeight: 700, fontSize: "0.72rem", letterSpacing: 0.3 }}>
+                    Need help asking a question?
+                  </Typography>
+                </Stack>
+                <IconButton
+                  size="small"
+                  onClick={handleDismissAiSuggestions}
+                  sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
+                  title="Dismiss suggestions"
+                >
+                  <CloseIcon sx={{ fontSize: 13 }} />
+                </IconButton>
+              </Stack>
+
+              {/* Loading state */}
+              {aiQSuggLoading && (
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.5 }}>
+                  <CircularProgress size={12} sx={{ color: "#9c7bff" }} />
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", fontSize: "0.72rem" }}>
+                    Finding relevant questions…
+                  </Typography>
+                </Stack>
+              )}
+
+              {/* Error state */}
+              {!aiQSuggLoading && aiQSuggError && (
+                <Typography variant="caption" sx={{ color: "rgba(255,120,120,0.9)", display: "block", fontSize: "0.72rem" }}>
+                  {aiQSuggError}
+                </Typography>
+              )}
+
+              {/* Suggestion list */}
+              {!aiQSuggLoading && !aiQSuggError && aiQSugg.length > 0 && (
+                <Stack spacing={0.5}>
+                  {aiQSugg.map((s) => (
+                    <Stack
+                      key={s.id}
+                      direction="row"
+                      alignItems="flex-start"
+                      justifyContent="space-between"
+                      spacing={1}
+                      sx={{
+                        p: 0.75,
+                        borderRadius: 1.5,
+                        bgcolor: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.07)",
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: "rgba(255,255,255,0.85)",
+                          fontSize: "0.75rem",
+                          lineHeight: 1.45,
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                      >
+                        {s.question}
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => handleUseAiSuggestion(s.question)}
+                        sx={{
+                          flexShrink: 0,
+                          textTransform: "none",
+                          fontSize: "0.68rem",
+                          py: 0.3,
+                          px: 0.9,
+                          minWidth: 0,
+                          borderRadius: 1,
+                          bgcolor: "rgba(124,77,255,0.2)",
+                          color: "#c4a8ff",
+                          border: "1px solid rgba(124,77,255,0.3)",
+                          "&:hover": { bgcolor: "rgba(124,77,255,0.35)", borderColor: "rgba(124,77,255,0.5)" },
+                        }}
+                      >
+                        Use this
+                      </Button>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+
+              {/* Card footer: Suggest again */}
+              {!aiQSuggLoading && (
+                <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>
+                  <Button
+                    size="small"
+                    disabled={aiQSuggLoading}
+                    onClick={fetchAiQSuggestions}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.68rem",
+                      py: 0.2,
+                      px: 0.75,
+                      color: "rgba(196,168,255,0.65)",
+                      "&:hover": { color: "#c4a8ff", bgcolor: "rgba(124,77,255,0.12)" },
+                    }}
+                  >
+                    ↻ Suggest again
+                  </Button>
+                </Stack>
+              )}
+            </Box>
+          )}
 
           {/* Typing indicator */}
           {Object.keys(typingUsers).length > 0 && (
@@ -1287,6 +1530,122 @@ export default function LiveQnAPanel({
           </Box>
         </Box>
       </Box>
+
+      {/* ── Add Q&A Context Modal (host only) ─────────────────────────── */}
+      <Dialog
+        open={contextModalOpen}
+        onClose={() => setContextModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "#141414",
+            color: "#fff",
+            borderRadius: "16px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
+            overflow: "hidden",
+          },
+        }}
+      >
+        {/* Header */}
+        <Box sx={{ background: "linear-gradient(135deg, #1a0a3e 0%, #2d1b69 60%, #3d1f8a 100%)", px: 3, py: 2.5 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box sx={{ width: 36, height: 36, borderRadius: "10px", bgcolor: "rgba(156,123,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Typography sx={{ fontSize: 18 }}>📋</Typography>
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "0.95rem", color: "#fff", lineHeight: 1.2 }}>
+                Add Presentation Context
+              </Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: "0.72rem" }}>
+                This text grounds AI question suggestions for attendees
+              </Typography>
+            </Box>
+          </Stack>
+        </Box>
+
+        <DialogContent sx={{ px: 3, pt: 2.5, pb: 1, bgcolor: "#141414" }}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Title (optional)"
+            placeholder="e.g. Session Overview, Slide Deck"
+            value={contextTitle}
+            onChange={(e) => setContextTitle(e.target.value)}
+            sx={{
+              mb: 2,
+              "& .MuiInputBase-input": { color: "#fff", fontSize: "0.88rem" },
+              "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.45)" },
+              "& .MuiInputLabel-root.Mui-focused": { color: "#c4a8ff" },
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+                "& fieldset": { borderColor: "rgba(255,255,255,0.12)" },
+                "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                "&.Mui-focused fieldset": { borderColor: "#9c7bff" },
+              },
+            }}
+          />
+          <TextField
+            fullWidth
+            multiline
+            rows={6}
+            label="Presentation content"
+            placeholder={"Paste your session agenda, slide text, speaker notes, or event description here…\n\nAttendees will receive AI-generated questions grounded in this content."}
+            value={contextText}
+            onChange={(e) => setContextText(e.target.value)}
+            sx={{
+              "& .MuiInputBase-input": { color: "#fff", fontSize: "0.85rem", lineHeight: 1.55 },
+              "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.45)" },
+              "& .MuiInputLabel-root.Mui-focused": { color: "#c4a8ff" },
+              "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.3)", opacity: 1 },
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+                "& fieldset": { borderColor: "rgba(255,255,255,0.12)" },
+                "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                "&.Mui-focused fieldset": { borderColor: "#9c7bff" },
+              },
+            }}
+          />
+          {contextSaveError && (
+            <Typography variant="caption" sx={{ color: "#f88", display: "block", mt: 1 }}>
+              {contextSaveError}
+            </Typography>
+          )}
+          {contextSaved && (
+            <Typography variant="caption" sx={{ color: "#81c784", display: "block", mt: 1, fontWeight: 600 }}>
+              ✓ Context saved! Attendees will now receive AI suggestions.
+            </Typography>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2.5, bgcolor: "#141414", gap: 1 }}>
+          <Button
+            onClick={() => setContextModalOpen(false)}
+            sx={{ textTransform: "none", color: "rgba(255,255,255,0.45)", borderRadius: "8px", px: 2, "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!contextText.trim() || contextSaving}
+            onClick={handleAddContext}
+            startIcon={contextSaving ? <CircularProgress size={14} color="inherit" /> : null}
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              borderRadius: "8px",
+              px: 3,
+              background: "linear-gradient(135deg, #7c4dff, #651fff)",
+              boxShadow: "0 4px 14px rgba(124,77,255,0.4)",
+              "&:hover": { background: "linear-gradient(135deg, #651fff, #4527a0)" },
+              "&.Mui-disabled": { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)", boxShadow: "none" },
+            }}
+          >
+            {contextSaving ? "Saving…" : "Save Context"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Manual Group Modal */}
       <Dialog

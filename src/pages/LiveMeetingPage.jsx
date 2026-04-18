@@ -89,6 +89,8 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle"; // <--- ADDED for
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"; // <--- ADDED for answered toggle
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded"; // <--- ADDED for KYC verified badge
 import ShuffleIcon from "@mui/icons-material/Shuffle"; // Keep this if used elsewhere
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import Diversity3Icon from "@mui/icons-material/Diversity3"; // New icon for Networking
 import CoffeeIcon from "@mui/icons-material/Coffee"; // Break Mode icon
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
@@ -15089,6 +15091,11 @@ export default function NewLiveMeeting() {
   const [manualGroupSelectedQs, setManualGroupSelectedQs] = useState({});
   const [manualGroupLoading, setManualGroupLoading] = useState(false);
 
+  // QnA toolbar collapse state
+  const [qnaToolbarCollapsed, setQnaToolbarCollapsed] = useState(
+    () => localStorage.getItem("qna_toolbar_collapsed") === "true"
+  );
+
   const [groups, setGroups] = useState([]);
   const loadGroups = useCallback(async () => {
     if (!eventId) return;
@@ -15129,6 +15136,25 @@ export default function NewLiveMeeting() {
   const [qnaPolishLoading, setQnaPolishLoading] = useState(false);
   const [qnaPolishDialog, setQnaPolishDialog] = useState(null); // null | { original, improved }
   const [qnaPolishError, setQnaPolishError] = useState("");
+
+  // ── A2: private AI question suggestions state ─────────────────────────────
+  const [aiQSugg, setAiQSugg] = useState([]);
+  const [aiQSuggLoading, setAiQSuggLoading] = useState(false);
+  const [aiQSuggError, setAiQSuggError] = useState("");
+  // AI suggestions hidden by default; visibility is persisted per event in localStorage
+  const [aiQSuggDismissed, setAiQSuggDismissed] = useState(
+    () => localStorage.getItem(`qna_ai_sugg_dismissed_${eventId}`) !== "false"
+  );
+  // Incremented after context is saved to force a re-fetch of AI suggestions
+  const [aiSuggRefreshKey, setAiSuggRefreshKey] = useState(0);
+
+  // ── A2: host context modal state ──────────────────────────────────────────
+  const [contextModalOpen, setContextModalOpen] = useState(false);
+  const [contextText, setContextText] = useState("");
+  const [contextTitle, setContextTitle] = useState("");
+  const [contextSaving, setContextSaving] = useState(false);
+  const [contextSaveError, setContextSaveError] = useState("");
+  const [contextSaved, setContextSaved] = useState(false);
 
   // Typing indicator
   const [typingUsers, setTypingUsers] = useState({});
@@ -15724,11 +15750,14 @@ export default function NewLiveMeeting() {
     setQnaPolishLoading(true);
     setQnaPolishError("");
     try {
-      const res = await fetch(toApiUrl("interactions/questions/polish-draft/"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ event_id: eventId, content }),
-      });
+      const res = await fetch(
+        toApiUrl("interactions/questions/polish-draft/"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event_id: eventId, content }),
+        }
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.detail || "Could not polish the question right now.");
@@ -15740,6 +15769,79 @@ export default function NewLiveMeeting() {
       setQnaPolishLoading(false);
     }
   };
+
+  // ── A2: fetch private AI question suggestions ─────────────────────────────
+  const fetchAiQSuggestions = useCallback(async () => {
+    if (!eventId || aiQSuggDismissed) return;
+    setAiQSuggLoading(true);
+    setAiQSuggError("");
+    try {
+      const res = await fetch(
+        toApiUrl("interactions/questions/ai-suggestions/"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event_id: eventId, count: 3 }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 404) return; // Silently hide if no context
+      if (!res.ok) throw new Error(data.detail || "Could not load question suggestions.");
+      console.log("[AI-QSugg] Suggestions loaded:", data.suggestions?.length);
+      setAiQSugg(data.suggestions || []);
+    } catch (e) {
+      console.error("[AI-QSugg] Error:", e.message);
+      setAiQSuggError(e.message || "Could not load question suggestions. Please try again.");
+    } finally {
+      setAiQSuggLoading(false);
+    }
+  }, [eventId, aiQSuggDismissed, isHost]);
+
+  const handleDismissAiSuggestions = () => {
+    setAiQSuggDismissed(true);
+    localStorage.setItem(`qna_ai_sugg_dismissed_${eventId}`, "1");
+  };
+
+  // ── A2: host adds presentation context ───────────────────────────────────
+  const handleAddContext = async () => {
+    if (!contextText.trim() || !eventId) return;
+    setContextSaving(true);
+    setContextSaveError("");
+    setContextSaved(false);
+    try {
+      const res = await fetch(toApiUrl("interactions/qna-context/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({
+          event_id: eventId,
+          source_type: "host_notes",
+          source_title: contextTitle.trim() || "Session Notes",
+          content_text: contextText.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Could not save context.");
+      setContextSaved(true);
+      setContextText("");
+      setContextTitle("");
+      setTimeout(() => { setContextModalOpen(false); setContextSaved(false); }, 1200);
+      // Un-dismiss and trigger a fresh AI suggestion fetch now that context exists
+      setAiQSuggDismissed(false);
+      localStorage.removeItem(`qna_ai_sugg_dismissed_${eventId}`);
+      setAiQSugg([]);
+      setAiSuggRefreshKey((k) => k + 1);
+    } catch (e) {
+      setContextSaveError(e.message || "Could not save context.");
+    } finally {
+      setContextSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 1 && eventId && !aiQSuggDismissed && aiQSugg.length === 0) {
+      fetchAiQSuggestions();
+    }
+  }, [tab, aiQSuggDismissed, aiQSugg.length, fetchAiQSuggestions, aiSuggRefreshKey]);
 
   const handleQnaEditSubmit = async (qId) => {
     if (!qnaEditContent.trim()) return;
@@ -17149,9 +17251,27 @@ export default function NewLiveMeeting() {
               {tab === SUPPORT_TAB_INDEX && "Support"}
             </Typography>
 
-            <IconButton onClick={closeRightPanel} size="small" aria-label="Close panel">
-              <CloseIcon fontSize="small" />
-            </IconButton>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              {tab === 1 && (
+                <Tooltip title={aiQSuggDismissed ? "Show AI Suggestions" : "Hide AI Suggestions"} arrow>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      const newState = !aiQSuggDismissed;
+                      setAiQSuggDismissed(newState);
+                      if (!newState) localStorage.removeItem(`qna_ai_sugg_dismissed_${eventId}`);
+                      else localStorage.setItem(`qna_ai_sugg_dismissed_${eventId}`, "1");
+                    }}
+                    sx={{ color: aiQSuggDismissed ? "rgba(255,255,255,0.3)" : "#9c7bff" }}
+                  >
+                    <AutoAwesomeIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              <IconButton onClick={closeRightPanel} size="small" aria-label="Close panel">
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Stack>
           </Box>
           {/* Body */}
           <Box sx={{ flex: 1, minHeight: 0 }}>
@@ -17823,6 +17943,122 @@ export default function NewLiveMeeting() {
               </DialogActions>
             </Dialog>
 
+            {/* ── Add Q&A Context Modal (host only) ─────────────────────────── */}
+            <Dialog
+              open={contextModalOpen}
+              onClose={() => setContextModalOpen(false)}
+              maxWidth="sm"
+              fullWidth
+              PaperProps={{
+                sx: {
+                  bgcolor: "#141414",
+                  color: "#fff",
+                  borderRadius: "16px",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
+                  overflow: "hidden",
+                },
+              }}
+            >
+              {/* Header */}
+              <Box sx={{ background: "linear-gradient(135deg, #1a0a3e 0%, #2d1b69 60%, #3d1f8a 100%)", px: 3, py: 2.5 }}>
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <Box sx={{ width: 36, height: 36, borderRadius: "10px", bgcolor: "rgba(156,123,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Typography sx={{ fontSize: 18 }}>📋</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "0.95rem", color: "#fff", lineHeight: 1.2 }}>
+                      Add Presentation Context
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: "0.72rem" }}>
+                      This text grounds AI question suggestions for attendees
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+
+              <DialogContent sx={{ px: 3, pt: 2.5, pb: 1, bgcolor: "#141414" }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Title (optional)"
+                  placeholder="e.g. Session Overview, Slide Deck"
+                  value={contextTitle}
+                  onChange={(e) => setContextTitle(e.target.value)}
+                  sx={{
+                    mb: 2,
+                    "& .MuiInputBase-input": { color: "#fff", fontSize: "0.88rem" },
+                    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.45)" },
+                    "& .MuiInputLabel-root.Mui-focused": { color: "#c4a8ff" },
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "10px",
+                      "& fieldset": { borderColor: "rgba(255,255,255,0.12)" },
+                      "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                      "&.Mui-focused fieldset": { borderColor: "#9c7bff" },
+                    },
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={6}
+                  label="Presentation content"
+                  placeholder={"Paste your session agenda, slide text, speaker notes, or event description here…\n\nAttendees will receive AI-generated questions grounded in this content."}
+                  value={contextText}
+                  onChange={(e) => setContextText(e.target.value)}
+                  sx={{
+                    "& .MuiInputBase-input": { color: "#fff", fontSize: "0.85rem", lineHeight: 1.55 },
+                    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.45)" },
+                    "& .MuiInputLabel-root.Mui-focused": { color: "#c4a8ff" },
+                    "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.3)", opacity: 1 },
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "10px",
+                      "& fieldset": { borderColor: "rgba(255,255,255,0.12)" },
+                      "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                      "&.Mui-focused fieldset": { borderColor: "#9c7bff" },
+                    },
+                  }}
+                />
+                {contextSaveError && (
+                  <Typography variant="caption" sx={{ color: "#f88", display: "block", mt: 1 }}>
+                    {contextSaveError}
+                  </Typography>
+                )}
+                {contextSaved && (
+                  <Typography variant="caption" sx={{ color: "#81c784", display: "block", mt: 1, fontWeight: 600 }}>
+                    ✓ Context saved! Attendees will now receive AI suggestions.
+                  </Typography>
+                )}
+              </DialogContent>
+
+              <DialogActions sx={{ px: 3, py: 2.5, bgcolor: "#141414", gap: 1 }}>
+                <Button
+                  onClick={() => setContextModalOpen(false)}
+                  sx={{ textTransform: "none", color: "rgba(255,255,255,0.45)", borderRadius: "8px", px: 2, "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={!contextText.trim() || contextSaving}
+                  onClick={handleAddContext}
+                  startIcon={contextSaving ? <CircularProgress size={14} color="inherit" /> : null}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    borderRadius: "8px",
+                    px: 3,
+                    background: "linear-gradient(135deg, #7c4dff, #651fff)",
+                    boxShadow: "0 4px 14px rgba(124,77,255,0.4)",
+                    "&:hover": { background: "linear-gradient(135deg, #651fff, #4527a0)" },
+                    "&.Mui-disabled": { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)", boxShadow: "none" },
+                  }}
+                >
+                  {contextSaving ? "Saving…" : "Save Context"}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
             {/* AI Suggestion Modal */}
             <Dialog
               open={aiModalOpen}
@@ -17983,24 +18219,59 @@ export default function NewLiveMeeting() {
               <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                 {/* Moderation Control (Host Only) */}
                 {isHost && (
-                  <Box sx={{ px: 2, py: 1, borderBottom: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-                    <Typography variant="caption" color="text.secondary">Pre-approval</Typography>
-                    <Switch
-                      size="small"
-                      checked={qnaModerationEnabled}
-                      onChange={handleToggleQnaModeration}
-                      color="warning"
-                    />
-                    {qnaModerationEnabled && (
-                      <Chip label="Moderation ON" size="small" color="warning" variant="outlined" />
-                    )}
-                    {/* Q&A Engagement Prompt – host trigger buttons (banner + modal) */}
-                    <Box sx={{ ml: "auto", display: "flex", gap: 0.75 }}>
+                  <Box sx={{ px: 2.5, py: 1.25, borderBottom: "1px solid rgba(255,255,255,0.08)", bgcolor: "rgba(0,0,0,0.3)" }}>
+                    {/* Pre-approval Control + Collapse Button */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: qnaToolbarCollapsed ? 0 : 1.25 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: "rgba(255,255,255,0.85)", letterSpacing: "0.3px" }}>Pre-approval</Typography>
+                      <Switch
+                        size="small"
+                        checked={qnaModerationEnabled}
+                        onChange={handleToggleQnaModeration}
+                        color="warning"
+                        sx={{ ml: 0.5 }}
+                      />
+                      {qnaModerationEnabled && (
+                        <Chip
+                          icon={<CheckCircleIcon sx={{ fontSize: 14 }} />}
+                          label="Moderation ON"
+                          size="small"
+                          color="warning"
+                          variant="filled"
+                          sx={{ fontWeight: 600, fontSize: "0.7rem", height: 24 }}
+                        />
+                      )}
+                      {/* Collapse/Expand Button - positioned on the right */}
+                      <Box sx={{ ml: "auto" }}>
+                        <Tooltip title={qnaToolbarCollapsed ? "Expand tools" : "Collapse tools"} arrow>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              const newState = !qnaToolbarCollapsed;
+                              setQnaToolbarCollapsed(newState);
+                              localStorage.setItem("qna_toolbar_collapsed", newState ? "true" : "false");
+                            }}
+                            sx={{
+                              color: "rgba(255,255,255,0.6)",
+                              transition: "all 0.2s",
+                              "&:hover": {
+                                bgcolor: "rgba(255,255,255,0.08)",
+                                color: "rgba(255,255,255,0.9)"
+                              }
+                            }}
+                          >
+                            {qnaToolbarCollapsed ? <ExpandMoreIcon sx={{ fontSize: 20 }} /> : <ExpandLessIcon sx={{ fontSize: 20 }} />}
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+                    {/* Action Buttons Grid - Collapsible */}
+                    {!qnaToolbarCollapsed && (
+                    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 0.9 }}>
                       <Tooltip title="Send a bottom banner to all attendees prompting them to ask questions" arrow>
                         <Button
                           size="small"
                           variant="outlined"
-                          startIcon={<AnnouncementIcon sx={{ fontSize: 14 }} />}
+                          startIcon={<AnnouncementIcon sx={{ fontSize: 15 }} />}
                           onClick={async () => {
                             try {
                               const res = await fetch(
@@ -18024,12 +18295,20 @@ export default function NewLiveMeeting() {
                           }}
                           sx={{
                             color: "#63b3ed",
-                            borderColor: "rgba(99,179,237,0.4)",
-                            fontSize: "0.68rem",
-                            py: 0.3,
-                            px: 1,
+                            borderColor: "rgba(99,179,237,0.6)",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            py: 0.6,
+                            px: 1.5,
                             textTransform: "none",
-                            "&:hover": { borderColor: "#63b3ed", bgcolor: "rgba(99,179,237,0.08)" },
+                            borderWidth: "1.5px",
+                            transition: "all 0.2s",
+                            "&:hover": {
+                              borderColor: "#63b3ed",
+                              bgcolor: "rgba(99,179,237,0.12)",
+                              transform: "translateY(-1px)",
+                              boxShadow: "0 2px 8px rgba(99,179,237,0.2)"
+                            },
                           }}
                         >
                           Banner Prompt
@@ -18039,7 +18318,7 @@ export default function NewLiveMeeting() {
                         <Button
                           size="small"
                           variant="outlined"
-                          startIcon={<QuestionAnswerIcon sx={{ fontSize: 14 }} />}
+                          startIcon={<QuestionAnswerIcon sx={{ fontSize: 15 }} />}
                           onClick={async () => {
                             try {
                               const res = await fetch(
@@ -18063,12 +18342,20 @@ export default function NewLiveMeeting() {
                           }}
                           sx={{
                             color: "#9f7aea",
-                            borderColor: "rgba(159,122,234,0.4)",
-                            fontSize: "0.68rem",
-                            py: 0.3,
-                            px: 1,
+                            borderColor: "rgba(159,122,234,0.6)",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            py: 0.6,
+                            px: 1.5,
                             textTransform: "none",
-                            "&:hover": { borderColor: "#9f7aea", bgcolor: "rgba(159,122,234,0.08)" },
+                            borderWidth: "1.5px",
+                            transition: "all 0.2s",
+                            "&:hover": {
+                              borderColor: "#9f7aea",
+                              bgcolor: "rgba(159,122,234,0.12)",
+                              transform: "translateY(-1px)",
+                              boxShadow: "0 2px 8px rgba(159,122,234,0.2)"
+                            },
                           }}
                         >
                           Modal Prompt
@@ -18081,13 +18368,20 @@ export default function NewLiveMeeting() {
                           onClick={() => setManualGroupModalOpen(true)}
                           sx={{
                             color: "#4dabf5",
-                            borderColor: "rgba(77,171,245,0.4)",
-                            fontSize: "0.68rem",
-                            py: 0.3,
-                            px: 1,
-                            mr: 1,
+                            borderColor: "rgba(77,171,245,0.6)",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            py: 0.6,
+                            px: 1.5,
                             textTransform: "none",
-                            "&:hover": { borderColor: "#4dabf5", bgcolor: "rgba(77,171,245,0.08)" },
+                            borderWidth: "1.5px",
+                            transition: "all 0.2s",
+                            "&:hover": {
+                              borderColor: "#4dabf5",
+                              bgcolor: "rgba(77,171,245,0.12)",
+                              transform: "translateY(-1px)",
+                              boxShadow: "0 2px 8px rgba(77,171,245,0.2)"
+                            },
                           }}
                         >
                           Manual Grouping
@@ -18100,18 +18394,53 @@ export default function NewLiveMeeting() {
                           onClick={() => setAiModalOpen(true)}
                           sx={{
                             color: "#4dabf5",
-                            borderColor: "rgba(77,171,245,0.4)",
-                            fontSize: "0.68rem",
-                            py: 0.3,
-                            px: 1,
+                            borderColor: "rgba(77,171,245,0.6)",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            py: 0.6,
+                            px: 1.5,
                             textTransform: "none",
-                            "&:hover": { borderColor: "#4dabf5", bgcolor: "rgba(77,171,245,0.08)" },
+                            borderWidth: "1.5px",
+                            transition: "all 0.2s",
+                            "&:hover": {
+                              borderColor: "#4dabf5",
+                              bgcolor: "rgba(77,171,245,0.12)",
+                              transform: "translateY(-1px)",
+                              boxShadow: "0 2px 8px rgba(77,171,245,0.2)"
+                            },
                           }}
                         >
-                          AI Grouping Suggest
+                          AI Grouping
+                        </Button>
+                      </Tooltip>
+                      <Tooltip title="Add presentation text to ground AI suggestions" arrow>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => { setContextModalOpen(true); setContextSaved(false); setContextSaveError(""); }}
+                          sx={{
+                            color: "#c4a8ff",
+                            borderColor: "rgba(156,123,255,0.6)",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            py: 0.6,
+                            px: 1.5,
+                            textTransform: "none",
+                            borderWidth: "1.5px",
+                            transition: "all 0.2s",
+                            "&:hover": {
+                              borderColor: "#c4a8ff",
+                              bgcolor: "rgba(124,77,255,0.12)",
+                              transform: "translateY(-1px)",
+                              boxShadow: "0 2px 8px rgba(124,77,255,0.2)"
+                            },
+                          }}
+                        >
+                          📋 Add Context
                         </Button>
                       </Tooltip>
                     </Box>
+                    )}
                   </Box>
                 )}
 
@@ -19041,6 +19370,130 @@ export default function NewLiveMeeting() {
                   }}
                   sx={{ p: 2 }}
                 >
+                  {/* ── A2: AI Question Suggestion Card ──────────────────────────── */}
+                  {!aiQSuggDismissed && (aiQSuggLoading || aiQSugg.length > 0) && (
+                    <Box
+                      sx={{
+                        mt: 1,
+                        mb: 0.5,
+                        mx: 2,
+                        borderRadius: 2,
+                        border: "1px solid rgba(124,77,255,0.25)",
+                        bgcolor: "rgba(124,77,255,0.07)",
+                        p: 1.25,
+                      }}
+                    >
+                      {/* Card header */}
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.75 }}>
+                        <Stack direction="row" alignItems="center" spacing={0.75}>
+                          <AutoAwesomeIcon sx={{ fontSize: 14, color: "#9c7bff" }} />
+                          <Typography variant="caption" sx={{ color: "#c4a8ff", fontWeight: 700, fontSize: "0.72rem", letterSpacing: 0.3 }}>
+                            Need help asking a question?
+                          </Typography>
+                        </Stack>
+                        <IconButton
+                          size="small"
+                          onClick={handleDismissAiSuggestions}
+                          sx={{ color: "rgba(255,255,255,0.35)", p: 0.25 }}
+                          title="Dismiss suggestions"
+                        >
+                          <CloseIcon sx={{ fontSize: 13 }} />
+                        </IconButton>
+                      </Stack>
+
+                      {/* Loading state */}
+                      {aiQSuggLoading && (
+                        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.5 }}>
+                          <CircularProgress size={12} sx={{ color: "#9c7bff" }} />
+                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", fontSize: "0.72rem" }}>
+                            Finding relevant questions…
+                          </Typography>
+                        </Stack>
+                      )}
+
+                      {/* Error state */}
+                      {!aiQSuggLoading && aiQSuggError && (
+                        <Typography variant="caption" sx={{ color: "rgba(255,120,120,0.9)", display: "block", fontSize: "0.72rem" }}>
+                          {aiQSuggError}
+                        </Typography>
+                      )}
+
+                      {/* Suggestion list */}
+                      {!aiQSuggLoading && !aiQSuggError && aiQSugg.length > 0 && (
+                        <Stack spacing={0.5}>
+                          {aiQSugg.map((s) => (
+                            <Stack
+                              key={s.id}
+                              direction="row"
+                              alignItems="flex-start"
+                              justifyContent="space-between"
+                              spacing={1}
+                              sx={{
+                                p: 0.75,
+                                borderRadius: 1.5,
+                                bgcolor: "rgba(255,255,255,0.04)",
+                                border: "1px solid rgba(255,255,255,0.07)",
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: "rgba(255,255,255,0.85)",
+                                  fontSize: "0.75rem",
+                                  lineHeight: 1.45,
+                                  flex: 1,
+                                  minWidth: 0,
+                                }}
+                              >
+                                {s.question}
+                              </Typography>
+                              <Button
+                                size="small"
+                                onClick={() => setNewQuestion(s.question)}
+                                sx={{
+                                  flexShrink: 0,
+                                  textTransform: "none",
+                                  fontSize: "0.68rem",
+                                  py: 0.3,
+                                  px: 0.9,
+                                  minWidth: 0,
+                                  borderRadius: 1,
+                                  bgcolor: "rgba(124,77,255,0.2)",
+                                  color: "#c4a8ff",
+                                  border: "1px solid rgba(124,77,255,0.3)",
+                                  "&:hover": { bgcolor: "rgba(124,77,255,0.35)", borderColor: "rgba(124,77,255,0.5)" },
+                                }}
+                              >
+                                Use this
+                              </Button>
+                            </Stack>
+                          ))}
+                        </Stack>
+                      )}
+
+                      {/* Card footer: Suggest again */}
+                      {!aiQSuggLoading && (
+                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>
+                          <Button
+                            size="small"
+                            disabled={aiQSuggLoading}
+                            onClick={fetchAiQSuggestions}
+                            sx={{
+                              textTransform: "none",
+                              fontSize: "0.68rem",
+                              py: 0.2,
+                              px: 0.75,
+                              color: "rgba(196,168,255,0.65)",
+                              "&:hover": { color: "#c4a8ff", bgcolor: "rgba(124,77,255,0.12)" },
+                            }}
+                          >
+                            ↻ Suggest again
+                          </Button>
+                        </Stack>
+                      )}
+                    </Box>
+                  )}
+
                   {/* Typing indicator */}
                   {Object.keys(typingUsers).length > 0 && (
                     <Typography
