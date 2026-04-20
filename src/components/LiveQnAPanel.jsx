@@ -325,6 +325,22 @@ function QuestionItem({
                   sx: { color: "rgba(255,255,255,0.6)" },
                 }}
               />
+              {/* Pre-event chip */}
+              {isHost && q.submission_phase === "pre_event" && (
+                <Chip
+                  label="Pre-event"
+                  size="small"
+                  sx={{
+                    mt: 0.5,
+                    fontSize: "0.65rem",
+                    height: 18,
+                    color: "#10b8a6",
+                    borderColor: "rgba(16,184,166,0.5)",
+                    bgcolor: "rgba(16,184,166,0.06)",
+                  }}
+                  variant="outlined"
+                />
+              )}
               {/* Question actions */}
               <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
                 {/* Reply button */}
@@ -673,6 +689,7 @@ export default function LiveQnAPanel({
                 upvote_count: msg.upvote_count ?? 0,
                 user_upvoted: false,
                 created_at: msg.created_at,
+                submission_phase: msg.submission_phase ?? "live",
                 replies: [],
                 reply_count: 0,
               },

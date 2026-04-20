@@ -162,6 +162,7 @@ import WaitingRoomControls from "../components/live-meeting/WaitingRoomControls.
 import { AttendeeSupportDialog, HostSupportInbox } from "../components/live-meeting/SupportPanel.jsx";
 import LoungeSettingsDialog from "../components/live-meeting/LoungeSettingsDialog.jsx";
 import RoomLocationBadge from "../components/RoomLocationBadge.jsx";
+import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
@@ -1125,7 +1126,15 @@ function WaitingForHost({
   loungeAvailable = false,
   onOpenLounge,
   loungeStatusLabel = "",
+  preEventQnaEnabled = false,
+  onOpenPreEventQna = null,
 }) {
+  // DEBUG: Log the prop on mount
+  useEffect(() => {
+    console.log("[DEBUG WaitingForHost] onOpenPreEventQna prop:", onOpenPreEventQna);
+    console.log("[DEBUG WaitingForHost] preEventQnaEnabled:", preEventQnaEnabled);
+  }, [onOpenPreEventQna, preEventQnaEnabled]);
+
   return (
     <Box
       sx={{
@@ -1338,6 +1347,48 @@ function WaitingForHost({
             Open Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
           </Button>
         )}
+
+        {(() => {
+          const shouldShowQna = preEventQnaEnabled && onOpenPreEventQna;
+          console.log("[DEBUG WaitingForHost] Rendering buttons - preEventQnaEnabled:", preEventQnaEnabled, "onOpenPreEventQna:", Boolean(onOpenPreEventQna), "shouldShowQna:", shouldShowQna);
+          return shouldShowQna ? (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("[DEBUG] Submit question button clicked");
+                console.log("[DEBUG] onOpenPreEventQna type:", typeof onOpenPreEventQna);
+                try {
+                  onOpenPreEventQna();
+                  console.log("[DEBUG] onOpenPreEventQna executed successfully");
+                } catch (err) {
+                  console.error("[DEBUG] Error calling onOpenPreEventQna:", err);
+                }
+              }}
+              variant="outlined"
+              sx={{
+                mt: 1.5,
+                px: 3,
+                py: 1,
+                borderRadius: 999,
+                textTransform: "none",
+                fontWeight: 800,
+                letterSpacing: 0.4,
+                opacity: 1,
+                color: "#10b8a6",
+                borderColor: "rgba(16,184,166,0.5)",
+                bgcolor: "rgba(16,184,166,0.06)",
+                "&:hover": {
+                  bgcolor: "rgba(16,184,166,0.12)",
+                  borderColor: "#10b8a6",
+                },
+                pointerEvents: "auto",
+                cursor: "pointer",
+              }}
+            >
+              Submit a question before we start
+            </Button>
+          ) : null;
+        })()}
 
         {onBack && (
           <Button
@@ -1824,7 +1875,19 @@ function WaitingRoomScreen({
   waitingCount = 0,
   announcementsRef = null,
   isOnBreak = false,
+  preEventQnaEnabled = false,
+  onOpenPreEventQna = null,
 }) {
+  // DEBUG: Log the prop on mount
+  useEffect(() => {
+    console.log("[DEBUG WaitingRoomScreen] Props received:");
+    console.log("  - onOpenPreEventQna:", onOpenPreEventQna);
+    console.log("  - onOpenPreEventQna is function:", typeof onOpenPreEventQna === 'function');
+    console.log("  - preEventQnaEnabled:", preEventQnaEnabled);
+    console.log("  - Boolean condition:", Boolean(preEventQnaEnabled && onOpenPreEventQna));
+    console.log("  - Should show button:", preEventQnaEnabled && onOpenPreEventQna ? "YES" : "NO");
+  }, [onOpenPreEventQna, preEventQnaEnabled]);
+
   // ✅ NEW: Initialize announcements component
   const announcementHelper = WaitingRoomAnnouncements({});
 
@@ -2035,6 +2098,48 @@ function WaitingRoomScreen({
           </Typography>
         </Stack>
 
+        {(() => {
+          const shouldShowQna = preEventQnaEnabled && onOpenPreEventQna;
+          console.log("[DEBUG WaitingRoomScreen] Rendering buttons - preEventQnaEnabled:", preEventQnaEnabled, "onOpenPreEventQna:", Boolean(onOpenPreEventQna), "shouldShowQna:", shouldShowQna);
+          return shouldShowQna ? (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("[DEBUG] Submit question button clicked");
+                console.log("[DEBUG] onOpenPreEventQna type:", typeof onOpenPreEventQna);
+                try {
+                  onOpenPreEventQna();
+                  console.log("[DEBUG] onOpenPreEventQna executed successfully");
+                } catch (err) {
+                  console.error("[DEBUG] Error calling onOpenPreEventQna:", err);
+                }
+              }}
+              variant="outlined"
+              sx={{
+                mt: 1.5,
+                px: 3,
+                py: 1,
+                borderRadius: 999,
+                textTransform: "none",
+                fontWeight: 800,
+                letterSpacing: 0.4,
+                opacity: 1,
+                color: "#10b8a6",
+                borderColor: "rgba(16,184,166,0.5)",
+                bgcolor: "rgba(16,184,166,0.06)",
+                "&:hover": {
+                  bgcolor: "rgba(16,184,166,0.12)",
+                  borderColor: "#10b8a6",
+                },
+                pointerEvents: "auto",
+                cursor: "pointer",
+              }}
+            >
+              Submit a question before we start
+            </Button>
+          ) : null;
+        })()}
+
         {loungeAvailable && (
           <Button
             onClick={onOpenLounge}
@@ -2060,6 +2165,7 @@ function WaitingRoomScreen({
             Open Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
           </Button>
         )}
+
 
         {onBack && (
           <Button
@@ -6858,6 +6964,8 @@ export default function NewLiveMeeting() {
         const res = await fetch(toApiUrl(`events/${idFromQuery}/`), { headers: authHeader() });
         if (res.ok) {
           const data = await res.json();
+          console.log("[DEBUG] Event data fetched from API:", data);
+          console.log("[DEBUG] pre_event_qna_enabled value:", data?.pre_event_qna_enabled);
           setEventData(data); // ✅ Store full event data for access to images and timezone
           if (data?.qna_moderation_enabled !== undefined) {
             setQnaModerationEnabled(data.qna_moderation_enabled);
@@ -15156,6 +15264,12 @@ export default function NewLiveMeeting() {
 
   // ── A2: host context modal state ──────────────────────────────────────────
   const [contextModalOpen, setContextModalOpen] = useState(false);
+
+  // ── Pre-Event Q&A Modal ────────────────────────────────────────────────────
+  const [preEventQnaModalOpen, setPreEventQnaModalOpen] = useState(false);
+  useEffect(() => {
+    console.log("[DEBUG] preEventQnaModalOpen state changed to:", preEventQnaModalOpen);
+  }, [preEventQnaModalOpen]);
   const [contextText, setContextText] = useState("");
   const [contextTitle, setContextTitle] = useState("");
   const [contextSaving, setContextSaving] = useState(false);
@@ -19020,6 +19134,21 @@ export default function NewLiveMeeting() {
                                           />
                                         )}
 
+                                        {isHost && q.submission_phase === 'pre_event' && (
+                                          <Chip
+                                            size="small"
+                                            label="PRE-QUESTION"
+                                            sx={{
+                                              bgcolor: "rgba(168,85,247,0.12)",
+                                              border: "1px solid rgba(168,85,247,0.4)",
+                                              color: "#a855f7",
+                                              fontWeight: 700,
+                                              fontSize: 10,
+                                              height: 20
+                                            }}
+                                          />
+                                        )}
+
                                         <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
                                       </Stack>
                                     </Stack>
@@ -21386,6 +21515,8 @@ export default function NewLiveMeeting() {
           waitingCount={filteredWaitingRoomCount || 0}
           announcementsRef={waitingRoomAnnouncementsRef}
           isOnBreak={isOnBreak}
+          preEventQnaEnabled={Boolean(eventData?.pre_event_qna_enabled)}
+          onOpenPreEventQna={() => setPreEventQnaModalOpen(true)}
         />
         <LoungeOverlay
           open={loungeOpen}
@@ -21397,6 +21528,11 @@ export default function NewLiveMeeting() {
           rtkMeeting={rtkMeeting}
           onParticipantClick={openLoungeParticipantInfo}
           onJoinMain={forceRejoinMainFromLounge}
+        />
+        <PreEventQnAModal
+          open={preEventQnaModalOpen}
+          onClose={() => setPreEventQnaModalOpen(false)}
+          event={eventData}
         />
       </>
     );
@@ -21580,15 +21716,24 @@ export default function NewLiveMeeting() {
   // ✅ Check if should show "Waiting for host" (not in post-event lounge)
   if (!shouldShowMeeting) {
     return (
-      <WaitingForHost
-        onBack={handleBack}
-        eventTitle={eventTitle}
-        scheduled={scheduledLabel}
-        duration={durationLabel}
-        roleLabel={role === "publisher" ? "Host" : "Audience"}
-        waitingRoomImage={eventData?.waiting_room_image || null}
-        timezone={getBrowserTimezone()}
-      />
+      <>
+        <WaitingForHost
+          onBack={handleBack}
+          eventTitle={eventTitle}
+          scheduled={scheduledLabel}
+          duration={durationLabel}
+          roleLabel={role === "publisher" ? "Host" : "Audience"}
+          waitingRoomImage={eventData?.waiting_room_image || null}
+          timezone={getBrowserTimezone()}
+          preEventQnaEnabled={Boolean(eventData?.pre_event_qna_enabled)}
+          onOpenPreEventQna={() => setPreEventQnaModalOpen(true)}
+        />
+        <PreEventQnAModal
+          open={preEventQnaModalOpen}
+          onClose={() => setPreEventQnaModalOpen(false)}
+          event={eventData}
+        />
+      </>
     );
   }
 

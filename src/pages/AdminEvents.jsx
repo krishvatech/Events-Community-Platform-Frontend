@@ -467,6 +467,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [waitingRoomAutoAdmitSeconds, setWaitingRoomAutoAdmitSeconds] = React.useState("");
   const [waitingRoomGracePeriodMinutes, setWaitingRoomGracePeriodMinutes] = React.useState("0");
 
+  // Pre-Event Q&A
+  const [preEventQnaEnabled, setPreEventQnaEnabled] = React.useState(false);
+
   // Replay Options
   const [replayAvailable, setReplayAvailable] = React.useState(false);
   const [replayDuration, setReplayDuration] = React.useState("");
@@ -938,6 +941,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
     }
     fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
+    fd.append("pre_event_qna_enabled", String(preEventQnaEnabled));
     fd.append("publish_resources_immediately", resourcesPublishNow ? "true" : "false");
     if (!resourcesPublishNow) {
       const publishISO = iso(resPublishDate, resPublishTime);
@@ -2361,6 +2365,32 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Allow participants to adopt AI-generated questions.
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+
+            <Box sx={{ mb: 2, p: 1, bgcolor: "rgba(16,184,166,0.08)", borderRadius: 1, border: "1px dashed rgba(16,184,166,0.3)" }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    size="small"
+                    checked={preEventQnaEnabled}
+                    onChange={(e) => setPreEventQnaEnabled(e.target.checked)}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: "#10b8a6" },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#10b8a6" }
+                    }}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: "#10b8a6" }}>
+                      Enable Pre-Event Q&A
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Allow registered attendees to submit questions before the event starts.
                     </Typography>
                   </Box>
                 }

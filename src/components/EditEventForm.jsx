@@ -276,6 +276,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [qnaAiPublicSuggestionsEnabled, setQnaAiPublicSuggestionsEnabled] = useState(
         Boolean(event?.qna_ai_public_suggestions_enabled)
     );
+    const [preEventQnaEnabled, setPreEventQnaEnabled] = useState(
+        Boolean(event?.pre_event_qna_enabled)
+    );
 
 
     const [isMultiDay, setIsMultiDay] = useState(() => Boolean(event?.is_multi_day));
@@ -541,7 +544,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setMaxParticipants(event?.max_participants || "");
         setLoungeTableCapacity(event?.lounge_table_capacity || 4);
         setQnaAiPublicSuggestionsEnabled(Boolean(event?.qna_ai_public_suggestions_enabled));
-
+        setPreEventQnaEnabled(Boolean(event?.pre_event_qna_enabled));
 
         const start = event?.start_time ? dayjs(event.start_time).tz(tz) : dayjs();
         const end = event?.end_time ? dayjs(event.end_time).tz(tz) : start.add(2, "hour");
@@ -1215,6 +1218,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         }
         fd.append("lounge_table_capacity", String(loungeTableCapacity || 4));
         fd.append("qna_ai_public_suggestions_enabled", String(qnaAiPublicSuggestionsEnabled));
+        fd.append("pre_event_qna_enabled", String(preEventQnaEnabled));
         fd.append("timezone", timezone);
         fd.append("is_multi_day", String(isMultiDay));
         fd.append("start_time", combineToISO(startDate, startTime));
@@ -2288,6 +2292,33 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                             </Typography>
                                         </Box>
                                     }
+                                />
+                            </Box>
+
+                            <Box sx={{ mb: 2, p: 1, bgcolor: "rgba(16,184,166,0.06)", borderRadius: 1, border: "1px dashed rgba(16,184,166,0.3)" }}>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            size="small"
+                                            checked={preEventQnaEnabled}
+                                            onChange={(e) => setPreEventQnaEnabled(e.target.checked)}
+                                            sx={{
+                                                "& .MuiSwitch-switchBase.Mui-checked": { color: "#10b8a6" },
+                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#10b8a6" }
+                                            }}
+                                        />
+                                    }
+                                    label={
+                                        <Box>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#10b8a6" }}>
+                                                Enable Pre-Event Q&A
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Allow registered attendees to submit questions before the event starts.
+                                            </Typography>
+                                        </Box>
+                                    }
+                                    sx={{ m: 0, width: "100%", justifyContent: "flex-start", gap: 1.5, "& .MuiFormControlLabel-label": { marginLeft: 0 } }}
                                 />
                             </Box>
 

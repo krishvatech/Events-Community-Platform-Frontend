@@ -16,12 +16,14 @@ import {
   Avatar,
   AvatarGroup,
   Tooltip,
+  Alert,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
+import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
@@ -402,6 +404,9 @@ export default function EventDetailsPage() {
   // Apply Modal
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [myApplication, setMyApplication] = useState(null);
+
+  // Pre-Event Q&A Modal
+  const [preEventQnaModalOpen, setPreEventQnaModalOpen] = useState(false);
 
   // Participant Preview
   const [previewParticipants, setPreviewParticipants] = useState([]);
@@ -1019,6 +1024,24 @@ export default function EventDetailsPage() {
   const canWatch = isPast && !!event.recording_url;
   const desc = event?.description ?? "";
 
+  // Pre-event Q&A eligibility
+  const isBeforeEventStart = event?.start_time
+    ? Date.now() < new Date(event.start_time).getTime()
+    : false;
+  const hasActiveRegistration = registration?.status === "registered";
+  const showPreEventQnaPrompt =
+    isBeforeEventStart &&
+    Boolean(event?.pre_event_qna_enabled) &&
+    Boolean(token) &&
+    !isGuest &&
+    hasActiveRegistration;
+  const showPreEventQnaRegisterHint =
+    isBeforeEventStart &&
+    Boolean(event?.pre_event_qna_enabled) &&
+    Boolean(token) &&
+    !isGuest &&
+    !hasActiveRegistration;
+
   const searchParams = new URLSearchParams(location.search);
   const refParam = searchParams.get("ref");
   const backLabel = refParam === "my_events" ? "My Events" : "Explore Events";
@@ -1615,6 +1638,11 @@ export default function EventDetailsPage() {
                                 {isGuest ? "Continue as Guest" : "Join as Guest"}
                               </Button>
                             )}
+                            {showPreEventQnaRegisterHint && (
+                              <Alert severity="info" sx={{ mt: 2 }} variant="outlined">
+                                Register for this event to submit pre-event questions.
+                              </Alert>
+                            )}
                           </>
                         ) : canWatch ? (
                           <Button
@@ -1658,6 +1686,37 @@ export default function EventDetailsPage() {
                               onUnregistered={() => setRegistration(null)}
                               onCancelRequested={(_, updated) => setRegistration(updated)}
                             />
+                          </Box>
+                        )}
+
+                        {/* Pre-Event Q&A for Registered Users */}
+                        {showPreEventQnaPrompt && (
+                          <Box
+                            sx={{
+                              mt: 2,
+                              p: 2,
+                              borderRadius: 2,
+                              bgcolor: "rgba(16,184,166,0.06)",
+                              border: "1px solid rgba(16,184,166,0.2)",
+                            }}
+                          >
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                              Send your questions in advance so the host can review them before the session begins.
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              fullWidth
+                              onClick={() => setPreEventQnaModalOpen(true)}
+                              sx={{
+                                textTransform: "none",
+                                borderColor: "#10b8a6",
+                                color: "#10b8a6",
+                                "&:hover": { borderColor: "#0ea5a4", bgcolor: "rgba(16,184,166,0.04)" },
+                              }}
+                              className="rounded-xl"
+                            >
+                              Submit your questions prior to event
+                            </Button>
                           </Box>
                         )}
 
@@ -1820,6 +1879,14 @@ export default function EventDetailsPage() {
             event={event}
             token={token}
             onSuccess={(app) => setMyApplication(app)}
+          />
+
+          <PreEventQnAModal
+            open={preEventQnaModalOpen}
+            onClose={({ eventStarted }) => {
+              setPreEventQnaModalOpen(false);
+            }}
+            event={event}
           />
 
           <GuestApplyModal
