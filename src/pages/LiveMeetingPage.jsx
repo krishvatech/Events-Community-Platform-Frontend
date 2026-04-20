@@ -15306,6 +15306,13 @@ export default function NewLiveMeeting() {
   const [qnaReplyEditingId, setQnaReplyEditingId] = useState(null);
   const [qnaReplyEditContent, setQnaReplyEditContent] = useState("");
 
+  // Live answer dialog state
+  const [liveAnswerDialogOpen, setLiveAnswerDialogOpen] = useState(false);
+  const [answeringQuestionId, setAnsweringQuestionId] = useState(null);
+  const [liveAnswerText, setLiveAnswerText] = useState("");
+  const [expandedAnswerIds, setExpandedAnswerIds] = useState({}); // { [qId]: bool }
+
+
   const loadQuestions = useCallback(async (opts = {}) => {
     if (!eventId) return;
     const { silent = false } = opts;
@@ -15340,6 +15347,14 @@ export default function NewLiveMeeting() {
         replies: q.replies ?? [],
         reply_count: q.reply_count ?? 0,
       }));
+
+      console.log("[QNA] Loaded questions from API:", mapped.map(q => ({
+        id: q.id,
+        content: q.content,
+        is_answered: q.is_answered,
+        answer_text: q.answer_text,
+        answered_phase: q.answered_phase
+      })));
 
       setQuestions(mapped);
     } catch (e) {
@@ -15571,7 +15586,7 @@ export default function NewLiveMeeting() {
         }
 
         if (msg.type === "qna.answered") {
-          // Update question with answered status
+          // Update question with answered status and optional answer text
           setQuestions((prev) =>
             prev.map((q) =>
               q.id === msg.question_id
@@ -15579,6 +15594,9 @@ export default function NewLiveMeeting() {
                   ...q,
                   is_answered: msg.is_answered,
                   answered_at: msg.answered_at,
+                  answered_by: msg.answered_by,
+                  answer_text: msg.answer_text || q.answer_text,
+                  answered_phase: msg.answered_phase || q.answered_phase,
                   requires_followup: msg.requires_followup,
                 }
                 : q
@@ -16163,16 +16181,52 @@ export default function NewLiveMeeting() {
     return (q.upvote_count ?? 0) / Math.pow(ageHours + 2, QNA_HOT_GRAVITY);
   }, []);
 
-  const handleMarkAnswered = async (questionId, requiresFollowup = false) => {
+  const handleMarkAnswered = async (questionId, requiresFollowup = false, answerText = "") => {
     setQnaError("");
     try {
+      const body = { requires_followup: requiresFollowup };
+      if (answerText && answerText.trim()) {
+        body.answer_text = answerText.trim();
+      }
+
+      console.log("[QNA] Sending mark_answered request:", { questionId, body });
+
       const res = await fetch(toApiUrl(`interactions/questions/${questionId}/mark_answered/`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ requires_followup: requiresFollowup }),
+        body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to mark question as answered");
-      // State updates come via qna.answered WebSocket broadcast
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("[QNA] Error response:", errorText);
+        throw new Error("Failed to mark question as answered");
+      }
+
+      const updatedQuestion = await res.json();
+      console.log("[QNA] Mark answered successful, updated question:", updatedQuestion);
+
+      // Update question in state immediately (don't wait for WebSocket)
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === questionId
+            ? {
+              ...q,
+              is_answered: updatedQuestion.is_answered,
+              answered_at: updatedQuestion.answered_at,
+              answered_by: updatedQuestion.answered_by,
+              answer_text: updatedQuestion.answer_text,
+              answered_phase: updatedQuestion.answered_phase,
+              requires_followup: updatedQuestion.requires_followup,
+            }
+            : q
+        )
+      );
+
+      // Close dialog and reset
+      setLiveAnswerDialogOpen(false);
+      setAnsweringQuestionId(null);
+      setLiveAnswerText("");
     } catch (e) {
       setQnaError("Failed to mark answered: " + (e.message || "Unknown error"));
     }
@@ -19187,27 +19241,62 @@ export default function NewLiveMeeting() {
                                       <Box
                                         sx={{
                                           mt: 1.5,
-                                          p: 1.25,
                                           bgcolor: "rgba(34,197,94,0.08)",
                                           border: "1px solid rgba(34,197,94,0.3)",
                                           borderRadius: 1,
-                                          borderLeft: "3px solid #22c55e"
+                                          overflow: "hidden",
                                         }}
                                       >
-                                        <Typography variant="caption" sx={{ fontWeight: 600, color: "#22c55e" }}>
-                                          Answer:
-                                        </Typography>
-                                        <Typography
-                                          component="div"
+                                        <Box
+                                          onClick={() => setExpandedAnswerIds(prev => ({
+                                            ...prev,
+                                            [q.id]: !prev[q.id]
+                                          }))}
                                           sx={{
-                                            mt: 0.5,
-                                            fontSize: 13,
-                                            whiteSpace: "pre-wrap",
-                                            wordBreak: "break-word",
+                                            p: 1.25,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            cursor: "pointer",
+                                            borderLeft: "3px solid #22c55e",
+                                            "&:hover": {
+                                              bgcolor: "rgba(34,197,94,0.12)",
+                                            },
                                           }}
                                         >
-                                          {renderTextWithDetectedLinks(q.answer_text)}
-                                        </Typography>
+                                          <KeyboardArrowDownIcon
+                                            sx={{
+                                              fontSize: 18,
+                                              color: "#22c55e",
+                                              transform: expandedAnswerIds[q.id] === true ? "rotate(0deg)" : "rotate(-90deg)",
+                                              transition: "transform 0.15s ease-in-out",
+                                              flexShrink: 0,
+                                            }}
+                                          />
+                                          <Typography variant="caption" sx={{ fontWeight: 600, color: "#22c55e" }}>
+                                            Answer
+                                          </Typography>
+                                        </Box>
+                                        {expandedAnswerIds[q.id] === true && (
+                                          <Box
+                                            sx={{
+                                              p: 1.25,
+                                              pt: 0,
+                                              borderTop: "1px solid rgba(34,197,94,0.2)",
+                                            }}
+                                          >
+                                            <Typography
+                                              component="div"
+                                              sx={{
+                                                fontSize: 13,
+                                                whiteSpace: "pre-wrap",
+                                                wordBreak: "break-word",
+                                              }}
+                                            >
+                                              {renderTextWithDetectedLinks(q.answer_text)}
+                                            </Typography>
+                                          </Box>
+                                        )}
                                       </Box>
                                     )}
 
@@ -19446,7 +19535,17 @@ export default function NewLiveMeeting() {
                                             <Tooltip title={q.is_answered ? "Mark as unanswered" : "Mark as answered"}>
                                               <IconButton
                                                 size="small"
-                                                onClick={() => handleMarkAnswered(q.id, q.requires_followup)}
+                                                onClick={() => {
+                                                  if (q.is_answered) {
+                                                    // Quick unmark without dialog
+                                                    handleMarkAnswered(q.id, q.requires_followup, "");
+                                                  } else {
+                                                    // Open dialog to optionally add answer
+                                                    setAnsweringQuestionId(q.id);
+                                                    setLiveAnswerText("");
+                                                    setLiveAnswerDialogOpen(true);
+                                                  }
+                                                }}
                                                 sx={{
                                                   color: q.is_answered ? "#22c55e" : "rgba(255,255,255,0.4)",
                                                   p: 0.5,
@@ -21882,6 +21981,186 @@ export default function NewLiveMeeting() {
       >
         {!speedNetworkingMainIsolation && <RtkParticipantsAudio meeting={rtkMeeting} />}
       </div>
+
+      {/* Live Answer Dialog - Dark Theme */}
+      <Dialog
+        open={liveAnswerDialogOpen}
+        onClose={() => setLiveAnswerDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+            bgcolor: '#1a1f2e',
+            backgroundImage: 'linear-gradient(135deg, #1a1f2e 0%, #0f1419 100%)'
+          }
+        }}
+      >
+        <DialogTitle sx={{
+          fontWeight: 800,
+          fontSize: '1.3rem',
+          bgcolor: 'rgba(20, 184, 166, 0.08)',
+          color: '#14b8a6',
+          pb: 2.5,
+          pt: 3,
+          borderBottom: '1px solid rgba(20, 184, 166, 0.1)'
+        }}>
+          📝 Answer Question During Event
+        </DialogTitle>
+
+        <DialogContent dividers sx={{
+          pt: 2.5,
+          pb: 2.5,
+          bgcolor: 'transparent',
+          borderColor: 'rgba(255, 255, 255, 0.05)'
+        }}>
+          {/* Question Display */}
+          <Box sx={{
+            mb: 2,
+            p: 2,
+            bgcolor: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(20, 184, 166, 0.15)',
+            borderRadius: 1.5,
+            borderLeft: '4px solid #14b8a6'
+          }}>
+            <Typography variant="overline" sx={{
+              fontWeight: 700,
+              color: '#a0aec0',
+              fontSize: '0.75rem',
+              letterSpacing: '0.5px'
+            }}>
+              Question
+            </Typography>
+            <Typography variant="body2" sx={{
+              fontWeight: 600,
+              color: '#f1f5f9',
+              mt: 1,
+              lineHeight: 1.6
+            }}>
+              {questions?.find(q => q.id === answeringQuestionId)?.content || "Loading question..."}
+            </Typography>
+          </Box>
+
+          {/* Answer Input */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="overline" sx={{
+              fontWeight: 700,
+              color: '#a0aec0',
+              fontSize: '0.75rem',
+              letterSpacing: '0.5px',
+              display: 'block',
+              mb: 1
+            }}>
+              Your Answer (Optional)
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              placeholder="Type your answer here... or leave empty to just mark as addressed"
+              value={liveAnswerText}
+              onChange={(e) => setLiveAnswerText(e.target.value)}
+              variant="outlined"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: 1,
+                  fontSize: '0.95rem',
+                  color: '#f1f5f9',
+                  '&:hover fieldset': {
+                    borderColor: 'rgba(20, 184, 166, 0.4)'
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#14b8a6'
+                  }
+                },
+                '& .MuiOutlinedInput-input': {
+                  color: '#f1f5f9'
+                },
+                '& .MuiOutlinedInput-input::placeholder': {
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  opacity: 1
+                }
+              }}
+            />
+          </Box>
+
+          {/* Info Box */}
+          <Box sx={{
+            p: 2.5,
+            bgcolor: 'rgba(20, 184, 166, 0.08)',
+            border: '1px solid rgba(20, 184, 166, 0.2)',
+            borderRadius: 1,
+            display: 'flex',
+            gap: 1.5
+          }}>
+            <Typography sx={{ color: '#14b8a6', fontWeight: 700, flexShrink: 0 }}>💡</Typography>
+            <Box>
+              <Typography variant="caption" sx={{
+                color: '#14b8a6',
+                fontWeight: 700,
+                display: 'block',
+                mb: 0.5
+              }}>
+                Live Answer
+              </Typography>
+              <Typography variant="caption" sx={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                lineHeight: 1.6
+              }}>
+                If you provide an answer, it will be shown as "Answered During Event" and visible to all participants in real-time.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{
+          p: 2.5,
+          gap: 1.5,
+          bgcolor: 'rgba(255, 255, 255, 0.02)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+          justifyContent: 'flex-end'
+        }}>
+          <Button
+            onClick={() => setLiveAnswerDialogOpen(false)}
+            sx={{
+              px: 3,
+              py: 1.2,
+              textTransform: 'none',
+              fontWeight: 600,
+              color: 'rgba(255, 255, 255, 0.6)',
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.08)'
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              const question = questions?.find(q => q.id === answeringQuestionId);
+              handleMarkAnswered(answeringQuestionId, question?.requires_followup || false, liveAnswerText);
+            }}
+            variant="contained"
+            sx={{
+              px: 3,
+              py: 1.2,
+              textTransform: 'none',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              bgcolor: '#14b8a6',
+              color: '#0f1419',
+              '&:hover': {
+                bgcolor: '#0d9488'
+              }
+            }}
+          >
+            ✓ Mark as Answered
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Box
         ref={rootRef}
         sx={{
@@ -26121,6 +26400,7 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
           )}
         </Stack>
       </GuestRestrictionOverlay>
+
     </Box>
   );
 }

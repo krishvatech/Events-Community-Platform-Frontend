@@ -1971,6 +1971,26 @@ export default function EventDetailsPage() {
                                       />
                                     </Box>
                                   )}
+                                  {q.answered_phase === 'live' && (
+                                    <Box sx={{ pt: 1.5 }}>
+                                      <Chip
+                                        size="small"
+                                        label="Answered During Event"
+                                        sx={{
+                                          bgcolor: '#ecfdf5',
+                                          color: '#059669',
+                                          fontWeight: 600,
+                                          fontSize: '0.7rem',
+                                          height: 'auto',
+                                          padding: '4px 8px',
+                                          border: '1px solid #a7f3d0',
+                                          '& .MuiChip-label': {
+                                            padding: 0
+                                          }
+                                        }}
+                                      />
+                                    </Box>
+                                  )}
                                 </Box>
                               )}
                             </Box>
