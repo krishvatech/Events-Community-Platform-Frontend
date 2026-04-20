@@ -615,7 +615,7 @@ function GoDeeper({ eventData = {} }) {
               <p style={{ fontFamily: F.body, fontSize: 15, lineHeight: 1.7, color: C.lightBlue, margin: "0 0 24px" }}>
                 If this session resonates, there's a deeper programme. 12 hours. His models, real companies, your questions. Virtual from $990, in person in Vienna and Salzburg from $1,620.
               </p>
-              <a href="/events?id=402" style={{ display: "inline-block", fontSize: 13, fontWeight: 700, color: C.deepBlue, background: C.white, padding: "12px 24px", borderRadius: 3, fontFamily: F.body, textDecoration: "none" }}>View Training & Register →</a>
+              <a href="/events?search=damodaran" style={{ display: "inline-block", fontSize: 13, fontWeight: 700, color: C.deepBlue, background: C.white, padding: "12px 24px", borderRadius: 3, fontFamily: F.body, textDecoration: "none" }}>View Training & Register →</a>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[

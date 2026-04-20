@@ -1910,6 +1910,14 @@ export default function EventsPage() {
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
+
+  // Initialize search from URL params
+  useEffect(() => {
+    const searchParam = searchParams.get("search");
+    if (searchParam) {
+      setQ(searchParam);
+    }
+  }, [searchParams]);
   const [maxPrice, setMaxPrice] = useState(5000);
   const [priceRange, setPriceRange] = useState([0, maxPrice || 0]);
   const theme = useTheme();
