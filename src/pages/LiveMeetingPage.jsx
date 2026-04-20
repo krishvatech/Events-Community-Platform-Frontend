@@ -15335,6 +15335,8 @@ export default function NewLiveMeeting() {
         is_seed: q.is_seed || false,
         attribution_label: q.attribution_label || "",
         speaker_note: q.speaker_note || "",
+        answer_text: q.answer_text || null,
+        answered_phase: q.answered_phase || null,
         replies: q.replies ?? [],
         reply_count: q.reply_count ?? 0,
       }));
@@ -19134,6 +19136,21 @@ export default function NewLiveMeeting() {
                                           />
                                         )}
 
+                                        {q.answered_phase === 'post_event' && (
+                                          <Chip
+                                            size="small"
+                                            label="ANSWERED AFTER EVENT"
+                                            sx={{
+                                              bgcolor: "rgba(59,130,246,0.12)",
+                                              border: "1px solid rgba(59,130,246,0.4)",
+                                              color: "#3b82f6",
+                                              fontWeight: 600,
+                                              fontSize: 10,
+                                              height: 20
+                                            }}
+                                          />
+                                        )}
+
                                         {isHost && q.submission_phase === 'pre_event' && (
                                           <Chip
                                             size="small"
@@ -19165,6 +19182,34 @@ export default function NewLiveMeeting() {
                                     >
                                       {renderTextWithDetectedLinks(q.content)}
                                     </Typography>
+
+                                    {q.answer_text && (
+                                      <Box
+                                        sx={{
+                                          mt: 1.5,
+                                          p: 1.25,
+                                          bgcolor: "rgba(34,197,94,0.08)",
+                                          border: "1px solid rgba(34,197,94,0.3)",
+                                          borderRadius: 1,
+                                          borderLeft: "3px solid #22c55e"
+                                        }}
+                                      >
+                                        <Typography variant="caption" sx={{ fontWeight: 600, color: "#22c55e" }}>
+                                          Answer:
+                                        </Typography>
+                                        <Typography
+                                          component="div"
+                                          sx={{
+                                            mt: 0.5,
+                                            fontSize: 13,
+                                            whiteSpace: "pre-wrap",
+                                            wordBreak: "break-word",
+                                          }}
+                                        >
+                                          {renderTextWithDetectedLinks(q.answer_text)}
+                                        </Typography>
+                                      </Box>
+                                    )}
 
                                     {previewUrl && preview && (
                                       <Paper

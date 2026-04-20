@@ -412,6 +412,9 @@ export default function EventDetailsPage() {
   const [previewParticipants, setPreviewParticipants] = useState([]);
   const [previewParticipantsForbidden, setPreviewParticipantsForbidden] = useState(false);
 
+  // Q&A Expand/Collapse
+  const [expandedQaItems, setExpandedQaItems] = useState({});
+
   const handleImageLoad = useCallback((e) => {
     const img = e.currentTarget;
   }, []);
@@ -419,7 +422,7 @@ export default function EventDetailsPage() {
   const refreshEventFromServer = useCallback(async () => {
     if (!event?.id) return;
     try {
-      const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/`), {
+      const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/?include=questions`), {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -827,7 +830,7 @@ export default function EventDetailsPage() {
       try {
         // If we came from a list and have the ID, fetch by ID only (avoid slug 404 spam)
         if (fallbackId) {
-          const byIdUrl = urlJoin(API_BASE, `/events/${fallbackId}/`);
+          const byIdUrl = urlJoin(API_BASE, `/events/${fallbackId}/?include=questions`);
           const res = await fetch(byIdUrl, {
             headers: {
               "Content-Type": "application/json",
@@ -848,7 +851,7 @@ export default function EventDetailsPage() {
           return;
         }
         // No ID in state? User probably hit a direct link — try by slug.
-        const bySlugUrl = urlJoin(API_BASE, `/events/${encodeURIComponent(slug)}/`);
+        const bySlugUrl = urlJoin(API_BASE, `/events/${encodeURIComponent(slug)}/?include=questions`);
         const resSlug = await fetch(bySlugUrl, {
           headers: {
             "Content-Type": "application/json",
@@ -954,11 +957,14 @@ export default function EventDetailsPage() {
     [event?.sessions]
   );
 
+  // Show Q&A tab when event has ended and has answered questions
+  const showQaTab = event?.status === 'ended' && event?.questions && event.questions.some(q => q.is_answered);
+
   useEffect(() => {
-    if (!showSpeedNetworkingTab && !showSessionsTab && activeTab !== 0) {
+    if (!showSpeedNetworkingTab && !showSessionsTab && !showQaTab && activeTab !== 0) {
       setActiveTab(0);
     }
-  }, [showSpeedNetworkingTab, showSessionsTab, activeTab]);
+  }, [showSpeedNetworkingTab, showSessionsTab, showQaTab, activeTab]);
 
 
   if (loading) {
@@ -1089,13 +1095,14 @@ export default function EventDetailsPage() {
               )}
 
               {/* TABS HEADER - MOVED TO TOP */}
-              {(showSpeedNetworkingTab || showSessionsTab) && (
+              {(showSpeedNetworkingTab || showSessionsTab || showQaTab) && (
                 <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                   <Tabs value={activeTab} onChange={handleTabChange} aria-label="event details tabs">
                     <Tab label="Overview" {...a11yProps(0)} />
                     {showSessionsTab && <Tab label="Sessions" {...a11yProps(1)} />}
+                    {showQaTab && <Tab label="Q&A" {...a11yProps(showSessionsTab ? 2 : 1)} />}
                     {showSpeedNetworkingTab && (
-                      <Tab label="Speed Networking" {...a11yProps(showSessionsTab ? 2 : 1)} />
+                      <Tab label="Speed Networking" {...a11yProps(showSessionsTab && showQaTab ? 3 : (showSessionsTab || showQaTab ? 2 : 1))} />
                     )}
                   </Tabs>
                 </Box>
@@ -1103,7 +1110,7 @@ export default function EventDetailsPage() {
 
               {/* TAB CONTENT: OVERVIEW */}
               {/* Only show when activeTab === 0 (or when no tabs exist) */}
-              {((!showSpeedNetworkingTab && !showSessionsTab) || activeTab === 0) && (
+              {((!showSpeedNetworkingTab && !showSessionsTab && !showQaTab) || activeTab === 0) && (
                 <Box>
                   {/* EVENT HEADER CARD - NEW LAYOUT */}
                   <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
@@ -1720,6 +1727,7 @@ export default function EventDetailsPage() {
                           </Box>
                         )}
 
+
                         {token && (
                           <Button
                             component={Link}
@@ -1839,8 +1847,142 @@ export default function EventDetailsPage() {
                 </Paper>
               )}
 
+              {/* TAB CONTENT: Q&A */}
+              {showQaTab && activeTab === (showSessionsTab ? 2 : 1) && (
+                <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                  <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
+                    {/* Header */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="h6" fontWeight={800} sx={{ mb: 0.5 }}>
+                        Questions & Answers
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Answers to questions asked during this event.
+                      </Typography>
+                    </Box>
+
+                    {/* Q&A Items */}
+                    <Stack spacing={2}>
+                      {event.questions
+                        .filter(q => q.is_answered)
+                        .map((q) => {
+                          const isExpanded = expandedQaItems[q.id] === true; // Default to collapsed
+                          return (
+                            <Box
+                              key={q.id}
+                              sx={{
+                                bgcolor: '#f8fafb',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: 2,
+                                transition: 'all 0.2s ease',
+                                '&:hover': {
+                                  bgcolor: '#ffffff',
+                                  borderColor: '#d1d5db',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                }
+                              }}
+                            >
+                              {/* Question Header - Clickable */}
+                              <Box
+                                onClick={() => setExpandedQaItems(prev => ({ ...prev, [q.id]: !isExpanded }))}
+                                sx={{
+                                  p: { xs: 2, sm: 2.5 },
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'flex-start',
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
+                                  '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }
+                                }}
+                              >
+                                <Box sx={{ flex: 1, pr: 2 }}>
+                                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5, color: '#111827' }}>
+                                    Q: {q.content}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                                    Asked by {q.is_anonymous ? 'Anonymous' : (q.user_display || 'Unknown')}
+                                  </Typography>
+                                </Box>
+                                {/* Expand/Collapse Icon */}
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minWidth: 32,
+                                    height: 32,
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                      transition: 'transform 0.3s ease',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#6b7280',
+                                      fontSize: 14
+                                    }}
+                                  >
+                                    ▼
+                                  </Box>
+                                </Box>
+                              </Box>
+
+                              {/* Answer Section - Collapsible */}
+                              {isExpanded && q.answer_text && (
+                                <Box sx={{
+                                  p: { xs: 2, sm: 2.5 },
+                                  pt: 0,
+                                  borderTop: '1px solid #e5e7eb'
+                                }}>
+                                  <Box sx={{
+                                    p: 2,
+                                    bgcolor: '#ecfdf5',
+                                    border: '1px solid #a7f3d0',
+                                    borderRadius: 1.5
+                                  }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', display: 'block', mb: 0.75, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+                                      Answer
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#065f46', lineHeight: 1.6 }}>
+                                      {q.answer_text}
+                                    </Typography>
+                                  </Box>
+
+                                  {/* Answered Phase Badge */}
+                                  {q.answered_phase === 'post_event' && (
+                                    <Box sx={{ pt: 1.5 }}>
+                                      <Chip
+                                        size="small"
+                                        label="Answered After Event"
+                                        sx={{
+                                          bgcolor: '#dbeafe',
+                                          color: '#1e40af',
+                                          fontWeight: 600,
+                                          fontSize: '0.7rem',
+                                          height: 'auto',
+                                          padding: '4px 8px',
+                                          '& .MuiChip-label': {
+                                            padding: 0
+                                          }
+                                        }}
+                                      />
+                                    </Box>
+                                  )}
+                                </Box>
+                              )}
+                            </Box>
+                          );
+                        })}
+                    </Stack>
+                  </Box>
+                </Paper>
+              )}
+
               {/* TAB CONTENT: SPEED NETWORKING */}
-              {showSpeedNetworkingTab && activeTab === (showSessionsTab ? 2 : 1) && (
+              {showSpeedNetworkingTab && activeTab === (showSessionsTab && showQaTab ? 3 : (showSessionsTab || showQaTab ? 2 : 1)) && (
                 <Paper elevation={0} className="rounded-2xl border border-slate-200">
                   <Box className="p-5">
                     <SpeedNetworkingMatchHistory eventId={event.id} sessionId={speedNetworkingSessionId} />

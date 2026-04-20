@@ -46,6 +46,7 @@ import {
   DialogActions,
   Switch,
   FormControlLabel,
+  FormGroup,
   Autocomplete,
   Tooltip,
 } from "@mui/material";
@@ -178,14 +179,14 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Guest Audit", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Guest Audit", "Session", "Resources", "Post-Event Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
 const getTabLabels = (event, isOwner) => {
   if (!isOwner) return STAFF_EVENT_TAB_LABELS;
   if (event?.registration_type === 'apply') {
-    return ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+    return ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Post-Event Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
   }
   return EVENT_TAB_LABELS;
 };
@@ -406,6 +407,18 @@ export default function EventManagePage() {
   // Q&A Export State
   const [qnaExportLoading, setQnaExportLoading] = useState({ csv: false, pdf: false });
   const [qnaExportError, setQnaExportError] = useState("");
+
+  // Post-Event Q&A Answer State
+  const [postEventQnaQuestions, setPostEventQnaQuestions] = useState([]);
+  const [postEventQnaLoading, setPostEventQnaLoading] = useState(false);
+  const [postEventQnaError, setPostEventQnaError] = useState("");
+  const [answerModalOpen, setAnswerModalOpen] = useState(false);
+  const [answeringQuestion, setAnsweringQuestion] = useState(null);
+  const [answerText, setAnswerText] = useState("");
+  const [notifyAuthor, setNotifyAuthor] = useState(true);
+  const [notifyInterested, setNotifyInterested] = useState(true);
+  const [notifyAll, setNotifyAll] = useState(false);
+  const [answerSubmitting, setAnswerSubmitting] = useState(false);
 
   // Cancel Event State
   const [cancelEventOpen, setCancelEventOpen] = useState(false);
@@ -2276,6 +2289,7 @@ export default function EventManagePage() {
             </Paper>
           </Grid>
         )}
+
         {/* Cancellation Details (Visible to Owner/Staff if cancelled) */}
         {status === "cancelled" && (isOwner || isStaff) && (
           <Grid item xs={12}>
@@ -4132,6 +4146,100 @@ export default function EventManagePage() {
     </Paper >
   );
 
+  const renderPostEventQna = () => (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 3,
+        border: "1px solid",
+        borderColor: "divider",
+        p: { xs: 2, sm: 3 },
+        bgcolor: "background.paper",
+      }}
+    >
+      <Box mb={2}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          Post-Event Q&amp;A — Answer Unanswered Questions
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Write and publish answers to questions submitted during the event. Recipients will be notified.
+        </Typography>
+      </Box>
+
+      {!isPast ? (
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+          Post-event Q&A is available after the event ends.
+        </Typography>
+      ) : (
+        <>
+          {postEventQnaLoading ? (
+            <Box display="flex" justifyContent="center" py={3}>
+              <CircularProgress />
+            </Box>
+          ) : postEventQnaQuestions.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+              No unanswered questions. All questions have been answered!
+            </Typography>
+          ) : (
+            <Box>
+              <Box sx={{ overflowX: "auto", mb: 2 }}>
+                <table style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: "0.875rem"
+                }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
+                      <th style={{ textAlign: "left", padding: "8px", fontWeight: 600 }}>Question</th>
+                      <th style={{ textAlign: "center", padding: "8px", fontWeight: 600, width: 80 }}>Upvotes</th>
+                      <th style={{ textAlign: "center", padding: "8px", fontWeight: 600, width: 120 }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {postEventQnaQuestions.map((q) => (
+                      <tr key={q.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <td style={{ padding: "12px 8px" }}>
+                          <Typography variant="body2">{q.content}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            by {q.is_anonymous ? "Anonymous" : (q.user_display || "Unknown")}
+                          </Typography>
+                        </td>
+                        <td style={{ textAlign: "center", padding: "8px" }}>
+                          <Typography variant="body2">{q.upvote_count || 0}</Typography>
+                        </td>
+                        <td style={{ textAlign: "center", padding: "8px" }}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            sx={{
+                              bgcolor: "#22c55e",
+                              color: "white",
+                              textTransform: "none",
+                              "&:hover": { bgcolor: "#16a34a" }
+                            }}
+                            onClick={() => handleOpenAnswerModal(q)}
+                          >
+                            Answer
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Box>
+            </Box>
+          )}
+
+          {postEventQnaError && (
+            <Typography variant="caption" color="error" sx={{ display: "block", mt: 1 }}>
+              {postEventQnaError}
+            </Typography>
+          )}
+        </>
+      )}
+    </Paper>
+  );
+
   const renderSpeedNetworking = () => (
     <Paper
       elevation={0}
@@ -4933,6 +5041,92 @@ export default function EventManagePage() {
     }
   };
 
+  // Load unanswered questions when isPast changes
+  useEffect(() => {
+    if (!isPast || !event) return;
+    const loadUnanswered = async () => {
+      setPostEventQnaLoading(true);
+      setPostEventQnaError("");
+      try {
+        const token = getToken();
+        const res = await fetch(
+          `${API_ROOT}/interactions/questions/unanswered/?event_id=${event.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) {
+          throw new Error(`Failed to load unanswered questions (${res.status})`);
+        }
+        const data = await res.json();
+        // Calculate upvote count for each question
+        const withUpvotes = data.map(q => ({
+          ...q,
+          upvote_count: (q.upvoters?.length || 0) + (q.guest_upvotes?.length || 0)
+        }));
+        setPostEventQnaQuestions(withUpvotes);
+      } catch (err) {
+        setPostEventQnaError(err.message || "Failed to load questions");
+      } finally {
+        setPostEventQnaLoading(false);
+      }
+    };
+    loadUnanswered();
+  }, [isPast, event?.id]);
+
+  const handleOpenAnswerModal = (question) => {
+    setAnsweringQuestion(question);
+    setAnswerText("");
+    setNotifyAuthor(true);
+    setNotifyInterested(true);
+    setNotifyAll(false);
+    setAnswerModalOpen(true);
+  };
+
+  const handleCloseAnswerModal = () => {
+    setAnswerModalOpen(false);
+    setAnsweringQuestion(null);
+    setAnswerText("");
+    setAnswerSubmitting(false);
+  };
+
+  const handlePublishAnswer = async () => {
+    if (!answeringQuestion || !answerText.trim() || !event) return;
+    setAnswerSubmitting(true);
+    try {
+      const token = getToken();
+      const res = await fetch(
+        `${API_ROOT}/interactions/questions/${answeringQuestion.id}/post_event_answer/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            answer_text: answerText.trim(),
+            notify_author: notifyAuthor,
+            notify_interested_participants: notifyInterested,
+            notify_all_participants: notifyAll,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Failed to publish answer (${res.status})`);
+      }
+      // Success: remove from unanswered list and close modal
+      setPostEventQnaQuestions((prev) =>
+        prev.filter((q) => q.id !== answeringQuestion.id)
+      );
+      handleCloseAnswerModal();
+      // Optional: show success snackbar
+      console.log("Answer published successfully");
+    } catch (err) {
+      setPostEventQnaError(err.message || "Failed to publish answer");
+    } finally {
+      setAnswerSubmitting(false);
+    }
+  };
+
   // ---- render ----
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "grey.50" }}>
@@ -5176,11 +5370,12 @@ export default function EventManagePage() {
                       {tab === 3 && renderGuestAudit()}
                       {tab === 4 && renderSessions()}
                       {tab === 5 && renderResources()}
-                      {tab === 6 && renderSpeedNetworking()}
-                      {tab === 7 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                      {tab === 8 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                      {tab === 9 && renderLoungeSettings()}
-                      {tab === 10 && renderEdit()}
+                      {tab === 6 && renderPostEventQna()}
+                      {tab === 7 && renderSpeedNetworking()}
+                      {tab === 8 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                      {tab === 9 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                      {tab === 10 && renderLoungeSettings()}
+                      {tab === 11 && renderEdit()}
                     </>
                   ) : (
                     <>
@@ -5188,11 +5383,12 @@ export default function EventManagePage() {
                       {tab === 2 && renderGuestAudit()}
                       {tab === 3 && renderSessions()}
                       {tab === 4 && renderResources()}
-                      {tab === 5 && renderSpeedNetworking()}
-                      {tab === 6 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                      {tab === 7 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                      {tab === 8 && renderLoungeSettings()}
-                      {tab === 9 && renderEdit()}
+                      {tab === 5 && renderPostEventQna()}
+                      {tab === 6 && renderSpeedNetworking()}
+                      {tab === 7 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                      {tab === 8 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                      {tab === 9 && renderLoungeSettings()}
+                      {tab === 10 && renderEdit()}
                     </>
                   )}
                 </>
@@ -6146,6 +6342,91 @@ export default function EventManagePage() {
               ) : (
                 "Yes, Delete Permanently"
               )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Post-Event Q&A Answer Modal */}
+        <Dialog open={answerModalOpen} onClose={handleCloseAnswerModal} maxWidth="sm" fullWidth>
+          <DialogTitle>Answer Question</DialogTitle>
+          <DialogContent>
+            {answeringQuestion && (
+              <Box>
+                <Typography variant="body2" sx={{ mb: 2, p: 1.5, bgcolor: "#f9fafb", borderRadius: 1 }}>
+                  <strong>Q:</strong> {answeringQuestion.content}
+                </Typography>
+
+                <TextField
+                  autoFocus
+                  multiline
+                  rows={4}
+                  fullWidth
+                  label="Your Answer"
+                  placeholder="Type your answer here..."
+                  value={answerText}
+                  onChange={(e) => setAnswerText(e.target.value)}
+                  variant="outlined"
+                  sx={{ mb: 2 }}
+                />
+
+                <FormGroup>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={notifyAuthor}
+                        onChange={(e) => setNotifyAuthor(e.target.checked)}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" fontWeight={500}>Notify question author</Typography>
+                        <Typography variant="caption" color="text.secondary">Default: On</Typography>
+                      </Box>
+                    }
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={notifyInterested}
+                        onChange={(e) => setNotifyInterested(e.target.checked)}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" fontWeight={500}>Notify interested participants (upvoters)</Typography>
+                        <Typography variant="caption" color="text.secondary">Default: On</Typography>
+                      </Box>
+                    }
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={notifyAll}
+                        onChange={(e) => setNotifyAll(e.target.checked)}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" fontWeight={500}>Notify all event participants</Typography>
+                        <Typography variant="caption" color="text.secondary">Default: Off</Typography>
+                      </Box>
+                    }
+                  />
+                </FormGroup>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseAnswerModal} color="inherit">
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePublishAnswer}
+              variant="contained"
+              disabled={answerSubmitting || !answerText.trim()}
+              sx={{ bgcolor: "#22c55e", color: "white" }}
+            >
+              {answerSubmitting ? "Publishing..." : "Publish Answer"}
             </Button>
           </DialogActions>
         </Dialog>
