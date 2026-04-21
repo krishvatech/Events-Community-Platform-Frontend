@@ -1849,7 +1849,7 @@ export default function EventManagePage() {
               <Box sx={{ mb: 2 }}>
                 {isOwner ? (
                   <Stack spacing={1.5}>
-                    <Tooltip title={event?.is_hidden ? "Please unhide the event to host it" : ""} disableInteractive={false}>
+                    <Tooltip title={event?.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
                       <Button
                         onClick={onHost}
                         startIcon={<LiveTvRoundedIcon />}
@@ -1870,7 +1870,7 @@ export default function EventManagePage() {
                             }
                           })
                         }}
-                        disabled={!!hostingId || isPast || status === "cancelled" || event?.is_hidden}
+                        disabled={!!hostingId || isPast || status === "cancelled" || (event?.is_hidden && !isOwner)}
                       >
                         {hostingId ? (
                           <Stack direction="row" spacing={1} alignItems="center">
@@ -5209,7 +5209,7 @@ export default function EventManagePage() {
                   borderColor: "#fecaca !important",
                 }}
               >Cancelled
-                                </Button>) : (<Tooltip title={event?.is_hidden ? "Please unhide the event to host it" : ""} disableInteractive={false}>
+                                </Button>) : (<Tooltip title={event?.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
                 <Button
                   onClick={onHost}
                   startIcon={<LiveTvRoundedIcon />}
@@ -5221,7 +5221,7 @@ export default function EventManagePage() {
                     bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
                     "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
                   }}
-                  disabled={!!hostingId || isPast || event?.is_hidden}
+                  disabled={!!hostingId || isPast || (event?.is_hidden && !isOwner)}
                 >
                   {hostingId ? <CircularProgress size={18} color="inherit" /> : (isPast ? "Ended" : "Host")}
                 </Button>

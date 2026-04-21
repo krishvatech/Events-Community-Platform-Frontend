@@ -3095,7 +3095,7 @@ function AdminEventCard({
                       </Box>
                     </Button>
                   ) : (
-                    <Tooltip title={ev.is_hidden ? "Please unhide the event to host it" : ""} disableInteractive={false}>
+                    <Tooltip title={ev.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
                       <Button
                         onClick={() => onHost(ev)}
                         startIcon={<LiveTvRoundedIcon />}
@@ -3108,7 +3108,7 @@ function AdminEventCard({
                           minWidth: 0,
                           px: 1,
                         }}
-                        disabled={isHosting || ev.is_hidden}
+                        disabled={isHosting || (ev.is_hidden && !isOwner)}
                       >
                         {isHosting ? (
                           <span className="flex items-center gap-2">
