@@ -229,6 +229,10 @@ const SUPPORT_TAB_INDEX = 4;
 const QNA_HOT_GRAVITY = 1.5;        // time decay exponent for hot score
 const QNA_FLAME_THRESHOLD = 0.5;    // hot score above this → show 🔥 trending
 const QNA_DISPLAY_BROADCAST_TYPE = "qna-display-state";
+const flagEmojiFromISO2 = (code) => {
+  if (!code || code.length !== 2) return "";
+  return Array.from(code.toUpperCase()).map(c => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
+};
 const URL_REGEX = /(https?:\/\/[^\s<>"')\]]+)/gi;
 
 function getToken() {
@@ -11416,6 +11420,7 @@ export default function NewLiveMeeting() {
             asked_by: payload.asked_by || "Audience",
             user_id: payload.user_id ?? null,
             user_avatar_url: payload.user_avatar_url || "",
+            user_country_code: payload.user_country_code ?? null,
             is_anonymous: Boolean(payload.is_anonymous),
             upvote_count: payload.upvote_count ?? 0,
             created_at: payload.created_at || null,
@@ -16451,6 +16456,8 @@ export default function NewLiveMeeting() {
   }, [questions, isHost, qnaSortMode, qnaHotScore]);
 
   const [displayedQuestion, setDisplayedQuestion] = useState(null);
+  const [qnaDisplayConnStatus, setQnaDisplayConnStatus] = useState("none");
+  const [qnaDisplayConnLoading, setQnaDisplayConnLoading] = useState(false);
 
   const qnaStageQueue = useMemo(
     () => [...qaSorted.pinned, ...qaSorted.unpinned].filter((q) => q && !q.is_hidden),
@@ -16597,11 +16604,33 @@ export default function NewLiveMeeting() {
       ""
     );
 
+    let countryCode = null;
+    if (matchedParticipant?._raw) {
+      const raw = matchedParticipant._raw;
+      const customData = typeof raw?.customParticipantData === "string" ? (() => {
+        try {
+          return JSON.parse(raw.customParticipantData);
+        } catch {
+          return raw?.customParticipantData || {};
+        }
+      })() : (raw?.customParticipantData || {});
+
+      countryCode =
+        customData?.country_code ||
+        customData?.countryCode ||
+        customData?.profile?.country_code ||
+        customData?.profile?.countryCode ||
+        raw?.country_code ||
+        raw?.countryCode ||
+        null;
+    }
+
     return {
       askedBy,
       avatarUrl,
       userId: qUserId,
       isAnonymous: Boolean(question.is_anonymous && !isSelfQuestion),
+      countryCode,
     };
   }, [rtkMeeting?.self, participants]);
 
@@ -16615,6 +16644,7 @@ export default function NewLiveMeeting() {
       asked_by: meta.askedBy,
       user_id: meta.userId,
       user_avatar_url: meta.avatarUrl,
+      user_country_code: meta.countryCode ?? null,
       is_anonymous: meta.isAnonymous,
       upvote_count: question.upvote_count ?? 0,
       created_at: question.created_at || null,
@@ -16653,6 +16683,24 @@ export default function NewLiveMeeting() {
     }
   }, [broadcastDisplayedQuestionState, showSnackbar]);
 
+  const handleQnaDisplayConnect = useCallback(async () => {
+    const userId = displayedQuestion?.user_id;
+    if (!userId) return;
+    setQnaDisplayConnLoading(true);
+    try {
+      const res = await fetch(toApiUrl("friend-requests/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ to_user: Number(userId) }),
+      });
+      if (res.ok) setQnaDisplayConnStatus("pending_outgoing");
+    } catch (e) {
+      console.error("[Q&A Display] Connect error:", e);
+    } finally {
+      setQnaDisplayConnLoading(false);
+    }
+  }, [displayedQuestion?.user_id]);
+
   const handleShowNextDisplayedQuestion = useCallback(() => {
     if (qnaStageQueue.length === 0) {
       showSnackbar("There are no questions available to display.", "info");
@@ -16681,6 +16729,11 @@ export default function NewLiveMeeting() {
       return { ...prev, ...freshPayload, visible: true };
     });
   }, [buildDisplayedQuestionPayload, displayedQuestion?.question_id, questions]);
+
+  useEffect(() => {
+    setQnaDisplayConnStatus("none");
+    setQnaDisplayConnLoading(false);
+  }, [displayedQuestion?.question_id]);
 
   const polls = useMemo(
     () => [
@@ -22870,52 +22923,70 @@ export default function NewLiveMeeting() {
                       display: "flex",
                       justifyContent: "center",
                       pointerEvents: "none",
+                      "@keyframes slideUpFade": {
+                        "0%": { transform: "translateY(24px)", opacity: 0 },
+                        "100%": { transform: "translateY(0)", opacity: 1 },
+                      },
                     }}
                   >
                     <Paper
                       elevation={10}
                       sx={{
                         width: "100%",
-                        maxWidth: 920,
-                        borderRadius: 3,
+                        maxWidth: 650,
+                        borderRadius: 4,
                         px: { xs: 1.5, sm: 2 },
-                        py: { xs: 1.25, sm: 1.5 },
-                        background: "linear-gradient(135deg, rgba(2,6,23,0.92) 0%, rgba(15,23,42,0.94) 55%, rgba(8,47,73,0.92) 100%)",
-                        border: "1px solid rgba(125,211,252,0.26)",
-                        boxShadow: "0 24px 80px rgba(0,0,0,0.42)",
+                        py: { xs: 1.2, sm: 1.5 },
+                        background: "linear-gradient(135deg, rgba(2,6,23,0.94) 0%, rgba(15,23,42,0.96) 55%, rgba(8,47,73,0.94) 100%)",
+                        border: "1px solid rgba(125,211,252,0.28)",
+                        borderTop: "2px solid #0ea5e9",
+                        boxShadow: "0 24px 80px rgba(0,0,0,0.48), 0 0 40px rgba(56,189,248,0.12)",
                         backdropFilter: "blur(18px)",
                         pointerEvents: "auto",
+                        animation: "slideUpFade 0.35s ease-out",
                       }}
                     >
-                      <Stack spacing={1.2}>
+                      <Stack spacing={1.5}>
+                        {/* Header: Avatar + Badge + Name + Host Controls */}
                         <Stack
                           direction={{ xs: "column", sm: "row" }}
-                          spacing={1.25}
+                          spacing={1.5}
                           alignItems={{ xs: "flex-start", sm: "center" }}
                           justifyContent="space-between"
                         >
-                          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
-                            <Avatar
-                              src={displayedQuestion.user_avatar_url || ""}
-                              sx={{
-                                width: 48,
-                                height: 48,
-                                bgcolor: "rgba(255,255,255,0.12)",
-                                border: "1px solid rgba(255,255,255,0.18)",
-                              }}
-                            >
-                              {initialsFromName(displayedQuestion.asked_by || "Audience")}
-                            </Avatar>
-                            <Box sx={{ minWidth: 0 }}>
-                              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: "wrap" }}>
+                          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                            {/* Larger Avatar with Ring */}
+                            <Box sx={{ position: "relative", flexShrink: 0 }}>
+                              <Avatar
+                                src={displayedQuestion.user_avatar_url || ""}
+                                sx={{
+                                  width: 60,
+                                  height: 60,
+                                  bgcolor: "rgba(255,255,255,0.12)",
+                                  border: "2px solid rgba(255,255,255,0.18)",
+                                  outline: "3px solid rgba(56,189,248,0.5)",
+                                  outlineOffset: "1px",
+                                  fontSize: 24,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {initialsFromName(displayedQuestion.asked_by || "Audience")}
+                              </Avatar>
+                            </Box>
+
+                            {/* Badge + Name + Country Flag */}
+                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: "wrap", mb: 0.75 }}>
                                 <Chip
                                   size="small"
-                                  label="On Screen"
+                                  label="LIVE QUESTION"
                                   sx={{
-                                    bgcolor: "rgba(56,189,248,0.16)",
-                                    border: "1px solid rgba(56,189,248,0.34)",
+                                    bgcolor: "rgba(56,189,248,0.18)",
+                                    border: "1px solid rgba(56,189,248,0.4)",
                                     color: "#7dd3fc",
                                     fontWeight: 800,
+                                    fontSize: 11,
+                                    height: 24,
                                   }}
                                 />
                                 {displayedQuestion.is_answered && (
@@ -22923,25 +22994,46 @@ export default function NewLiveMeeting() {
                                     size="small"
                                     label="Answered"
                                     sx={{
-                                      bgcolor: "rgba(34,197,94,0.14)",
-                                      border: "1px solid rgba(34,197,94,0.32)",
+                                      bgcolor: "rgba(34,197,94,0.16)",
+                                      border: "1px solid rgba(34,197,94,0.36)",
                                       color: "#4ade80",
                                       fontWeight: 700,
+                                      fontSize: 11,
+                                      height: 24,
                                     }}
                                   />
                                 )}
                               </Stack>
-                              <Typography sx={{ mt: 0.75, fontWeight: 800, fontSize: { xs: 14, sm: 16 } }}>
-                                {displayedQuestion.asked_by || "Audience"}
-                              </Typography>
-                              <Typography sx={{ opacity: 0.68, fontSize: 12 }}>
-                                Question from the audience
-                              </Typography>
+
+                              {/* Name with Country Flag */}
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 800,
+                                    fontSize: { xs: 14, sm: 16 },
+                                    lineHeight: 1.2,
+                                    color: "#fff",
+                                  }}
+                                >
+                                  {displayedQuestion.asked_by || "Audience"}
+                                </Typography>
+                                {displayedQuestion.user_country_code && (
+                                  <Typography
+                                    sx={{
+                                      fontSize: 20,
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {flagEmojiFromISO2(displayedQuestion.user_country_code)}
+                                  </Typography>
+                                )}
+                              </Box>
                             </Box>
                           </Stack>
 
+                          {/* Host Controls: Dismiss + Next */}
                           {isHost && (
-                            <Stack direction="row" spacing={1} sx={{ pointerEvents: "auto" }}>
+                            <Stack direction="row" spacing={1} sx={{ pointerEvents: "auto", flexShrink: 0 }}>
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -22950,6 +23042,9 @@ export default function NewLiveMeeting() {
                                   textTransform: "none",
                                   borderColor: "rgba(255,255,255,0.2)",
                                   color: "#fff",
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  "&:hover": { borderColor: "rgba(255,255,255,0.4)" },
                                 }}
                               >
                                 Dismiss
@@ -22961,6 +23056,9 @@ export default function NewLiveMeeting() {
                                 sx={{
                                   textTransform: "none",
                                   bgcolor: "#0ea5e9",
+                                  color: "#fff",
+                                  fontSize: 13,
+                                  fontWeight: 600,
                                   "&:hover": { bgcolor: "#0284c7" },
                                 }}
                               >
@@ -22970,19 +23068,110 @@ export default function NewLiveMeeting() {
                           )}
                         </Stack>
 
+                        {/* Question Text */}
                         <Typography
                           sx={{
-                            fontSize: { xs: 17, sm: 24, md: 28 },
+                            fontSize: { xs: 15, sm: 18, md: 20 },
                             lineHeight: 1.35,
                             fontWeight: 800,
                             letterSpacing: "-0.01em",
                             whiteSpace: "pre-wrap",
                             wordBreak: "break-word",
                             textShadow: "0 10px 32px rgba(0,0,0,0.36)",
+                            color: "#fff",
                           }}
                         >
                           {displayedQuestion.content}
                         </Typography>
+
+                        {/* CTA Buttons: View Profile + Connect */}
+                        {!displayedQuestion.is_anonymous && displayedQuestion.user_id && !/^guest/i.test(String(displayedQuestion.user_id)) && String(displayedQuestion.user_id) !== String(myUserIdRef.current) && (
+                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ pointerEvents: "auto", pt: 0.5 }}>
+                            <Button
+                              fullWidth
+                              variant="outlined"
+                              startIcon={<Box component="span" sx={{ fontSize: 16, display: "flex" }}>👤</Box>}
+                              onClick={() => window.open(`/community/rich-profile/${displayedQuestion.user_id}`, "_blank")}
+                              sx={{
+                                py: 1,
+                                borderRadius: 2,
+                                borderColor: "rgba(255,255,255,0.2)",
+                                color: "#fff",
+                                textTransform: "none",
+                                fontWeight: 600,
+                                fontSize: 13,
+                                bgcolor: "rgba(255,255,255,0.02)",
+                                "&:hover": {
+                                  bgcolor: "rgba(255,255,255,0.08)",
+                                  borderColor: "#fff",
+                                },
+                              }}
+                            >
+                              View Profile
+                            </Button>
+
+                            {qnaDisplayConnStatus === "none" && (
+                              <Button
+                                fullWidth
+                                variant="contained"
+                                disabled={qnaDisplayConnLoading}
+                                onClick={handleQnaDisplayConnect}
+                                startIcon={<PersonAddAlt1RoundedIcon />}
+                                sx={{
+                                  py: 1,
+                                  borderRadius: 2,
+                                  bgcolor: "#14b8b1",
+                                  color: "#fff",
+                                  textTransform: "none",
+                                  fontWeight: 700,
+                                  fontSize: 13,
+                                  "&:hover": { bgcolor: "#0e8e88" },
+                                }}
+                              >
+                                {qnaDisplayConnLoading ? "Sending..." : "Connect"}
+                              </Button>
+                            )}
+
+                            {qnaDisplayConnStatus === "pending_outgoing" && (
+                              <Button
+                                fullWidth
+                                disabled
+                                variant="contained"
+                                sx={{
+                                  py: 1,
+                                  borderRadius: 2,
+                                  bgcolor: "rgba(255,255,255,0.1) !important",
+                                  color: "rgba(255,255,255,0.5) !important",
+                                  textTransform: "none",
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                }}
+                              >
+                                Request Sent
+                              </Button>
+                            )}
+
+                            {qnaDisplayConnStatus === "friends" && (
+                              <Button
+                                fullWidth
+                                disabled
+                                variant="outlined"
+                                startIcon={<CheckRoundedIcon />}
+                                sx={{
+                                  py: 1,
+                                  borderRadius: 2,
+                                  borderColor: "rgba(20,184,177,0.5) !important",
+                                  color: "#14b8b1 !important",
+                                  textTransform: "none",
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                }}
+                              >
+                                Connected
+                              </Button>
+                            )}
+                          </Stack>
+                        )}
                       </Stack>
                     </Paper>
                   </Box>
