@@ -486,6 +486,12 @@ export default function AdminStaffPage() {
             }
             await fetchData();
             handleDialogClose();
+
+            setSnack({
+                open: true,
+                severity: "success",
+                message: "✅ User created successfully!",
+            });
         } catch (err) {
             console.error("Failed to save user", err);
             const msg = err.response?.data?.detail || err.response?.data?.email?.[0] || "Failed to save user.";
@@ -504,7 +510,7 @@ export default function AdminStaffPage() {
             setSnack({
                 open: true,
                 severity: "success",
-                message: `User ${data.email} created successfully!`,
+                message: `✅ User ${data.email} created successfully!`,
             });
         } catch (err) {
             console.error("Failed to create user", err);
