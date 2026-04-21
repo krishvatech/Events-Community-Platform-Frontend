@@ -1517,7 +1517,7 @@ export default function ProfilePage() {
     skillsText: "", linksText: "", avatar: "", kyc_status: "not_started",
     legal_name_locked: false, kyc_decline_reason: "", directory_hidden: false,
     connections_hidden: false, hide_from_others_connections: false,
-    anonymous_profile_views: false,
+    anonymous_profile_views: false, default_qna_anonymous: false,
     pending_verification_request: false,
   });
 
@@ -1751,6 +1751,7 @@ export default function ProfilePage() {
     connections_hidden: false,
     hide_from_others_connections: false,
     anonymous_profile_views: false,
+    default_qna_anonymous: false,
   });
 
   // --- Email Verification State ---
@@ -1893,6 +1894,7 @@ export default function ProfilePage() {
           connections_hidden: prof.connections_hidden || false,
           hide_from_others_connections: prof.hide_from_others_connections || false,
           anonymous_profile_views: prof.anonymous_profile_views || false,
+          default_qna_anonymous: prof.default_qna_anonymous || false,
           pending_verification_request: prof.pending_verification_request || false,
         });
         setPostsCount(Number(data?.posts_count) || 0);
@@ -2627,6 +2629,7 @@ export default function ProfilePage() {
       connections_hidden: form.connections_hidden || false,
       hide_from_others_connections: form.hide_from_others_connections || false,
       anonymous_profile_views: form.anonymous_profile_views || false,
+      default_qna_anonymous: form.default_qna_anonymous || false,
     });
     setPrivacyOpen(true);
   }
@@ -2643,6 +2646,7 @@ export default function ProfilePage() {
           connections_hidden: privacySettings.connections_hidden,
           hide_from_others_connections: privacySettings.hide_from_others_connections,
           anonymous_profile_views: privacySettings.anonymous_profile_views,
+          default_qna_anonymous: privacySettings.default_qna_anonymous,
         },
       };
 
@@ -4206,6 +4210,21 @@ export default function ProfilePage() {
                               Hidden from others' lists: removes you from other members' visible connection lists.
                             </Typography>
                           </Box>
+                          <Box>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={form.default_qna_anonymous}
+                                  disabled
+                                  size="small"
+                                />
+                              }
+                              label="Anonymous Q&A by default"
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                              Anonymous by default: new Q&A questions will be anonymous unless you change this for individual questions.
+                            </Typography>
+                          </Box>
                         </Stack>
 
                         <Dialog
@@ -4274,6 +4293,20 @@ export default function ProfilePage() {
                                 />
                                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                                   Turn ON to hide your identity when viewing other profiles. You'll appear as "Someone" to profile owners instead of your name.
+                                </Typography>
+                              </Box>
+                              <Box>
+                                <FormControlLabel
+                                  control={
+                                    <Switch
+                                      checked={privacySettings.default_qna_anonymous}
+                                      onChange={(e) => setPrivacySettings((prev) => ({ ...prev, default_qna_anonymous: e.target.checked }))}
+                                    />
+                                  }
+                                  label="Submit questions anonymously by default"
+                                />
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                  Turn ON to automatically submit Q&A questions anonymously. You can still change this for individual questions.
                                 </Typography>
                               </Box>
                             </Stack>

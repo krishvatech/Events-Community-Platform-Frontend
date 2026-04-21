@@ -15298,6 +15298,7 @@ export default function NewLiveMeeting() {
   const [qnaModerationEnabled, setQnaModerationEnabled] = useState(false);
   const [qnaAnonymousModeEnabled, setQnaAnonymousModeEnabled] = useState(false);
   const [isAnonymousQuestion, setIsAnonymousQuestion] = useState(false);
+  const [userQnaAnonymousDefault, setUserQnaAnonymousDefault] = useState(false);
   const [qnaSortMode, setQnaSortMode] = useState("hot");
   const [qnaReordering, setQnaReordering] = useState(false);
   const [qnaLinkPreviewCache, setQnaLinkPreviewCache] = useState({});
@@ -15317,6 +15318,29 @@ export default function NewLiveMeeting() {
   const [liveAnswerText, setLiveAnswerText] = useState("");
   const [expandedAnswerIds, setExpandedAnswerIds] = useState({}); // { [qId]: bool }
 
+  // Load user Q&A anonymous default preference
+  useEffect(() => {
+    const accessToken = localStorage.getItem("access_token");
+    if (!accessToken) return;  // Only for authenticated users, not guests
+    (async () => {
+      try {
+        const r = await fetch(toApiUrl("users/me/"), { headers: authHeader() });
+        if (r.ok) {
+          const d = await r.json();
+          setUserQnaAnonymousDefault(d?.profile?.default_qna_anonymous || false);
+        }
+      } catch (e) {
+        console.warn("Failed to load user profile for Q&A default", e);
+      }
+    })();
+  }, []);
+
+  // Initialize Q&A anonymous toggle from user preference
+  useEffect(() => {
+    if (!qnaAnonymousModeEnabled) {
+      setIsAnonymousQuestion(userQnaAnonymousDefault);
+    }
+  }, [userQnaAnonymousDefault, qnaAnonymousModeEnabled]);
 
   const loadQuestions = useCallback(async (opts = {}) => {
     if (!eventId) return;
@@ -15886,7 +15910,7 @@ export default function NewLiveMeeting() {
       });
       if (!res.ok) throw new Error("Failed to create question.");
       setNewQuestion("");
-      setIsAnonymousQuestion(false);  // Reset toggle after submit
+      setIsAnonymousQuestion(qnaAnonymousModeEnabled ? true : userQnaAnonymousDefault);  // Reset to default after submit
       localStorage.removeItem(`adopted_suggestion_id_${eventId}`);
       await loadQuestions();
     } catch (e) {

@@ -55,18 +55,19 @@ export default function PreEventQnAModal({ open, onClose, event }) {
     // Schedule auto-close when the event starts
     const timer = setTimeout(() => {
       if (typeof onClose === 'function') {
-        onClose();
+        onClose({ eventStarted: false });
       }
     }, msUntilStart);
     return () => clearTimeout(timer);
   }, [open, event?.start_time, onClose]);
 
   const handleClose = () => {
+    console.log("[DEBUG PreEventQnAModal] handleClose called");
     setContent("");
     setError("");
     setSubmitted(false);
     if (typeof onClose === 'function') {
-      onClose();
+      onClose({ eventStarted: false });
     }
   };
 
@@ -106,6 +107,8 @@ export default function PreEventQnAModal({ open, onClose, event }) {
         onClose={handleClose}
         maxWidth="sm"
         fullWidth
+        disableEscapeKeyDown={false}
+        onBackdropClick={handleClose}
       >
       <DialogTitle>Submit a Pre-Event Question</DialogTitle>
       <DialogContent>
@@ -150,7 +153,12 @@ export default function PreEventQnAModal({ open, onClose, event }) {
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose} disabled={submitting}>
+        <Button
+          onClick={handleClose}
+          disabled={submitting}
+          variant="outlined"
+          sx={{ textTransform: 'uppercase', fontWeight: 600 }}
+        >
           Close
         </Button>
         {!submitted && (
@@ -159,6 +167,7 @@ export default function PreEventQnAModal({ open, onClose, event }) {
             variant="contained"
             disabled={submitting || !content.trim()}
             startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : null}
+            sx={{ textTransform: 'uppercase', fontWeight: 600 }}
           >
             {submitting ? "Submitting…" : "Submit Question"}
           </Button>
