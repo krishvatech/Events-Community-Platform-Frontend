@@ -945,9 +945,8 @@ function mapFeedItem(item) {
   }
 
   if (t === "event" || t === "event_update" || isEventVerb || hasEventFields) {
-    // Filter out event posts from hidden events
-    if (m.is_hidden || m.event_is_hidden) return null;
-
+    // Backend already filters hidden events for non-registered users,
+    // so if we receive a hidden event post, the user is registered for it or is admin
     const eventId = m.event_id ?? item.target_object_id ?? item.id ?? null;
     return {
       ...base,
