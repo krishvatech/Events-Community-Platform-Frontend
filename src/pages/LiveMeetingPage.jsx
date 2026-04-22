@@ -127,6 +127,7 @@ import NotificationsIcon from "@mui/icons-material/Notifications";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import UndoIcon from "@mui/icons-material/Undo";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -15196,6 +15197,15 @@ export default function NewLiveMeeting() {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [qnaGroupSuggestionPending, setQnaGroupSuggestionPending] = useState(false);
+  const [aiSuggestionsExpanded, setAiSuggestionsExpanded] = useState({}); // { [suggestionId]: bool }
+  const [aiSuggestionsRemovedQuestions, setAiSuggestionsRemovedQuestions] = useState({}); // { [suggestionId]: Set of removed question IDs }
+  const [aiSuggestionsAddQuestionsOpen, setAiSuggestionsAddQuestionsOpen] = useState({}); // { [suggestionId]: bool }
+  const [aiSuggestionsAddedQuestions, setAiSuggestionsAddedQuestions] = useState({}); // { [suggestionId]: Set of added question IDs }
+  const [editGroupId, setEditGroupId] = useState(null); // ID of group being edited
+  const [editGroupRemovedQuestions, setEditGroupRemovedQuestions] = useState(new Set()); // Questions to remove from group
+  const [editGroupAddedQuestions, setEditGroupAddedQuestions] = useState(new Set()); // Questions to add to group
+  const [editGroupAddQuestionsOpen, setEditGroupAddQuestionsOpen] = useState(false); // Toggle add questions panel
   const [groupCollapsed, setGroupCollapsed] = useState({});
 
   const [manualGroupModalOpen, setManualGroupModalOpen] = useState(false);
@@ -15229,7 +15239,13 @@ export default function NewLiveMeeting() {
       const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
       if (res.ok) {
         const data = await res.json();
-        setAiSuggestions(data.results || (Array.isArray(data) ? data : []));
+        const suggestions = data.results || (Array.isArray(data) ? data : []);
+        setAiSuggestions(suggestions);
+        // Show red badge if there are pending suggestions
+        const hasPending = suggestions.some(s => s.status === "pending");
+        if (hasPending) {
+          setQnaGroupSuggestionPending(true);
+        }
       }
     } catch (e) { console.error(e); }
   }, [eventId, isHost]);
@@ -15240,6 +15256,17 @@ export default function NewLiveMeeting() {
       if (isHost) loadAiSuggestions();
     }
   }, [eventId, isHost, loadAiSuggestions, loadGroups]);
+
+  // Poll for new AI suggestions every 5 seconds (host only) - more aggressive for faster feedback
+  useEffect(() => {
+    if (!isHost || !eventId) return;
+
+    const interval = setInterval(() => {
+      loadAiSuggestions();
+    }, 5000); // 5 seconds for faster detection
+
+    return () => clearInterval(interval);
+  }, [eventId, isHost, loadAiSuggestions]);
   const [qnaLoading, setQnaLoading] = useState(false);
   const [qnaSubmitting, setQnaSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
@@ -15479,6 +15506,15 @@ export default function NewLiveMeeting() {
         }
         if (msg.type === "qna.group_suggestion_reviewed") setAiSuggestions(prev => prev.filter(s => s.id !== msg.suggestion_id));
 
+        if (msg.type === "qna.group_suggestions_ready") {
+          console.log("🔴 [WS] Received qna.group_suggestions_ready - isHost:", isHostRef.current);
+          if (isHostRef.current) {
+            console.log("✅ Setting badge and loading suggestions...");
+            loadAiSuggestions();
+            setQnaGroupSuggestionPending(true);
+          }
+        }
+
         if (msg.type === "qna.upvote") {
           setQuestions((prev) =>
             prev.map((q) =>
@@ -15487,6 +15523,13 @@ export default function NewLiveMeeting() {
                 : q
             )
           );
+          // Also update aggregated vote count for any group containing this question
+          setGroups(prev => prev.map(g => {
+            const isMember = (g.memberships || []).some(m => m.question === msg.question_id);
+            if (!isMember) return g;
+            const delta = msg.upvoted ? 1 : -1;
+            return { ...g, aggregated_vote_count: (g.aggregated_vote_count ?? 0) + delta };
+          }));
         }
 
         if (msg.type === "qna.question") {
@@ -15550,6 +15593,14 @@ export default function NewLiveMeeting() {
               is_seed: Boolean(msg.is_seed),
               attribution_label: msg.attribution_label || "",
             };
+
+            // Auto-check for AI suggestions after question added (for host only)
+            if (isHostRef.current) {
+              setTimeout(() => {
+                loadAiSuggestions();
+              }, 1000); // Wait 1s for Celery task to potentially fire
+            }
+
             return [newQ, ...prev];
           });
         }
@@ -18483,6 +18534,10 @@ export default function NewLiveMeeting() {
                   <Stack spacing={2}>
                     {aiSuggestions.filter(s => s.status === "pending").map(s => {
                       const confidence = Math.round((s.confidence_score || 0) * 100);
+                      const removedIds = aiSuggestionsRemovedQuestions[s.id] || new Set();
+                      const remainingQids = s.suggested_question_ids.filter(qid => !removedIds.has(qid));
+                      const isExpanded = aiSuggestionsExpanded[s.id] || false;
+
                       return (
                         <Card key={s.id} sx={{ bgcolor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", transition: "border-color 0.2s", "&:hover": { borderColor: "rgba(124,77,255,0.35)" } }}>
                           <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
@@ -18501,22 +18556,222 @@ export default function NewLiveMeeting() {
                                 <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.55)", fontSize: "0.8rem", lineHeight: 1.5 }}>
                                   {s.suggested_summary}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: "rgba(124,77,255,0.7)", mt: 0.8, display: "block", fontWeight: 500 }}>
-                                  {s.suggested_question_ids.length} question{s.suggested_question_ids.length !== 1 ? "s" : ""} suggested
-                                </Typography>
+                                <Button
+                                  size="small"
+                                  onClick={() => setAiSuggestionsExpanded(prev => ({ ...prev, [s.id]: !isExpanded }))}
+                                  sx={{ textTransform: "none", fontWeight: 500, fontSize: "0.75rem", color: "rgba(124,77,255,0.8)", mt: 0.8, p: 0, "&:hover": { color: "#7c4dff", bgcolor: "transparent" } }}
+                                  startIcon={isExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
+                                >
+                                  {remainingQids.length} question{remainingQids.length !== 1 ? "s" : ""} included
+                                </Button>
+                                <Collapse in={isExpanded}>
+                                  <Box sx={{ mt: 1.5, pl: 1, borderLeft: "2px solid rgba(124,77,255,0.2)", display: "flex", flexDirection: "column", gap: 0.8 }}>
+                                    {/* Current grouped questions */}
+                                    <Typography variant="caption" sx={{ color: "rgba(124,77,255,0.7)", fontSize: "0.7rem", fontWeight: 600, mt: 0.5 }}>
+                                      Grouped Questions:
+                                    </Typography>
+                                    {s.suggested_question_ids.map(qid => {
+                                      const q = questions.find(x => x.id === qid);
+                                      const isRemoved = removedIds.has(qid);
+                                      return (
+                                        <Stack
+                                          key={qid}
+                                          direction="row"
+                                          alignItems="flex-start"
+                                          spacing={1}
+                                          sx={{
+                                            p: 1,
+                                            borderRadius: 1,
+                                            bgcolor: isRemoved ? "rgba(244,67,54,0.08)" : "rgba(255,255,255,0.02)",
+                                            border: `1px solid ${isRemoved ? "rgba(244,67,54,0.2)" : "rgba(255,255,255,0.05)"}`,
+                                            opacity: isRemoved ? 0.6 : 1
+                                          }}
+                                        >
+                                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.7rem", mt: 0.3, minWidth: 20 }}>
+                                            #{qid}
+                                          </Typography>
+                                          <Typography variant="body2" sx={{ color: isRemoved ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.5)", fontSize: "0.75rem", lineHeight: 1.4, flex: 1, textDecoration: isRemoved ? "line-through" : "none" }}>
+                                            {q?.content || `Question #${qid}`}
+                                          </Typography>
+                                          {!isRemoved && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => {
+                                                setAiSuggestionsRemovedQuestions(prev => ({
+                                                  ...prev,
+                                                  [s.id]: new Set([...(prev[s.id] || new Set()), qid])
+                                                }));
+                                              }}
+                                              sx={{ p: 0.3, color: "rgba(244,67,54,0.7)", "&:hover": { color: "#ef5350", bgcolor: "rgba(244,67,54,0.1)" } }}
+                                            >
+                                              <CloseIcon sx={{ fontSize: 14 }} />
+                                            </IconButton>
+                                          )}
+                                          {isRemoved && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => {
+                                                setAiSuggestionsRemovedQuestions(prev => {
+                                                  const newSet = new Set(prev[s.id] || new Set());
+                                                  newSet.delete(qid);
+                                                  return { ...prev, [s.id]: newSet };
+                                                });
+                                              }}
+                                              sx={{ p: 0.3, color: "rgba(76,175,80,0.7)", "&:hover": { color: "#81c784", bgcolor: "rgba(76,175,80,0.1)" } }}
+                                            >
+                                              <UndoIcon sx={{ fontSize: 14 }} />
+                                            </IconButton>
+                                          )}
+                                        </Stack>
+                                      );
+                                    })}
+
+                                    {/* Add ungrouped questions section */}
+                                    <Button
+                                      size="small"
+                                      onClick={() => setAiSuggestionsAddQuestionsOpen(prev => ({ ...prev, [s.id]: !prev[s.id] }))}
+                                      sx={{ textTransform: "none", fontWeight: 500, fontSize: "0.75rem", color: "rgba(124,77,255,0.8)", mt: 1, p: 0, justifyContent: "flex-start", "&:hover": { color: "#7c4dff", bgcolor: "transparent" } }}
+                                      startIcon={aiSuggestionsAddQuestionsOpen[s.id] ? <ExpandLess sx={{ fontSize: 16 }} /> : <AddIcon sx={{ fontSize: 14 }} />}
+                                    >
+                                      + Add Ungrouped Question
+                                    </Button>
+
+                                    <Collapse in={aiSuggestionsAddQuestionsOpen[s.id] || false}>
+                                      <Box sx={{ mt: 1, p: 1, borderRadius: 1, bgcolor: "rgba(124,77,255,0.08)", border: "1px solid rgba(124,77,255,0.2)", display: "flex", flexDirection: "column", gap: 0.6 }}>
+                                        {questions
+                                          .filter(q => {
+                                            const qid = q.id;
+                                            const inSuggestion = s.suggested_question_ids.includes(qid);
+                                            const isAdded = (aiSuggestionsAddedQuestions[s.id] || new Set()).has(qid);
+                                            const inAnyGroup = groups.some(g => (g.memberships || []).some(m => m.question === qid));
+                                            return !inSuggestion && !isAdded && !inAnyGroup;
+                                          })
+                                          .slice(0, 10)
+                                          .map(q => (
+                                            <Stack
+                                              key={q.id}
+                                              direction="row"
+                                              alignItems="flex-start"
+                                              spacing={1}
+                                              sx={{
+                                                p: 0.8,
+                                                borderRadius: 1,
+                                                bgcolor: "rgba(255,255,255,0.02)",
+                                                border: "1px solid rgba(255,255,255,0.05)",
+                                                "&:hover": { bgcolor: "rgba(124,77,255,0.1)", borderColor: "rgba(124,77,255,0.2)" }
+                                              }}
+                                            >
+                                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.7rem", mt: 0.3, minWidth: 20 }}>
+                                                #{q.id}
+                                              </Typography>
+                                              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.75rem", lineHeight: 1.4, flex: 1 }}>
+                                                {q.content}
+                                              </Typography>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                  setAiSuggestionsAddedQuestions(prev => ({
+                                                    ...prev,
+                                                    [s.id]: new Set([...(prev[s.id] || new Set()), q.id])
+                                                  }));
+                                                }}
+                                                sx={{ p: 0.3, color: "rgba(76,175,80,0.7)", "&:hover": { color: "#81c784", bgcolor: "rgba(76,175,80,0.1)" } }}
+                                              >
+                                                <AddIcon sx={{ fontSize: 14 }} />
+                                              </IconButton>
+                                            </Stack>
+                                          ))}
+                                        {questions.filter(q => {
+                                          const qid = q.id;
+                                          const inSuggestion = s.suggested_question_ids.includes(qid);
+                                          const isAdded = (aiSuggestionsAddedQuestions[s.id] || new Set()).has(qid);
+                                          const inAnyGroup = groups.some(g => (g.memberships || []).some(m => m.question === qid));
+                                          return !inSuggestion && !isAdded && !inAnyGroup;
+                                        }).length === 0 && (
+                                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", p: 1, textAlign: "center" }}>
+                                            No ungrouped questions available
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    </Collapse>
+
+                                    {/* Show added questions */}
+                                    {(aiSuggestionsAddedQuestions[s.id]?.size || 0) > 0 && (
+                                      <Box sx={{ mt: 1 }}>
+                                        <Typography variant="caption" sx={{ color: "rgba(76,175,80,0.7)", fontSize: "0.7rem", fontWeight: 600 }}>
+                                          Added Questions:
+                                        </Typography>
+                                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.6, mt: 0.5 }}>
+                                          {Array.from(aiSuggestionsAddedQuestions[s.id] || new Set()).map(qid => {
+                                            const q = questions.find(x => x.id === qid);
+                                            return (
+                                              <Stack
+                                                key={qid}
+                                                direction="row"
+                                                alignItems="flex-start"
+                                                spacing={1}
+                                                sx={{
+                                                  p: 1,
+                                                  borderRadius: 1,
+                                                  bgcolor: "rgba(76,175,80,0.08)",
+                                                  border: "1px solid rgba(76,175,80,0.2)"
+                                                }}
+                                              >
+                                                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.7rem", mt: 0.3, minWidth: 20 }}>
+                                                  #{qid}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.75rem", lineHeight: 1.4, flex: 1 }}>
+                                                  {q?.content || `Question #${qid}`}
+                                                </Typography>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={() => {
+                                                    setAiSuggestionsAddedQuestions(prev => {
+                                                      const newSet = new Set(prev[s.id] || new Set());
+                                                      newSet.delete(qid);
+                                                      return { ...prev, [s.id]: newSet };
+                                                    });
+                                                  }}
+                                                  sx={{ p: 0.3, color: "rgba(244,67,54,0.7)", "&:hover": { color: "#ef5350", bgcolor: "rgba(244,67,54,0.1)" } }}
+                                                >
+                                                  <CloseIcon sx={{ fontSize: 14 }} />
+                                                </IconButton>
+                                              </Stack>
+                                            );
+                                          })}
+                                        </Box>
+                                      </Box>
+                                    )}
+                                  </Box>
+                                </Collapse>
                               </Box>
                               <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
                                 <Button
                                   size="small"
+                                  disabled={remainingQids.length < 2}
                                   startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 15 }} />}
                                   onClick={async () => {
                                     try {
-                                      const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/approve/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() } });
+                                      const addedQids = Array.from(aiSuggestionsAddedQuestions[s.id] || new Set());
+                                      const finalQids = [...remainingQids, ...addedQids];
+                                      const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/approve/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ title: s.suggested_title, summary: s.suggested_summary, question_ids: finalQids }) });
                                       if (!res.ok) alert("Approve Failed: " + await res.text());
-                                      else loadAiSuggestions();
+                                      else {
+                                        setAiSuggestionsRemovedQuestions(prev => {
+                                          const newObj = { ...prev };
+                                          delete newObj[s.id];
+                                          return newObj;
+                                        });
+                                        setAiSuggestionsAddedQuestions(prev => {
+                                          const newObj = { ...prev };
+                                          delete newObj[s.id];
+                                          return newObj;
+                                        });
+                                        loadAiSuggestions();
+                                      }
                                     } catch (e) { alert("Network Error: " + e.message); }
                                   }}
-                                  sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.75rem", borderRadius: "7px", px: 1.5, py: 0.6, bgcolor: "rgba(76,175,80,0.12)", color: "#81c784", border: "1px solid rgba(76,175,80,0.25)", "&:hover": { bgcolor: "rgba(76,175,80,0.22)", borderColor: "rgba(76,175,80,0.5)" } }}
+                                  sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.75rem", borderRadius: "7px", px: 1.5, py: 0.6, bgcolor: remainingQids.length < 2 ? "rgba(76,175,80,0.08)" : "rgba(76,175,80,0.12)", color: remainingQids.length < 2 ? "rgba(129,199,132,0.5)" : "#81c784", border: `1px solid ${remainingQids.length < 2 ? "rgba(76,175,80,0.1)" : "rgba(76,175,80,0.25)"}`, cursor: remainingQids.length < 2 ? "not-allowed" : "pointer", "&:hover": { bgcolor: remainingQids.length < 2 ? "rgba(76,175,80,0.08)" : "rgba(76,175,80,0.22)", borderColor: remainingQids.length < 2 ? "rgba(76,175,80,0.1)" : "rgba(76,175,80,0.5)" } }}
                                 >
                                   Approve
                                 </Button>
@@ -18524,9 +18779,16 @@ export default function NewLiveMeeting() {
                                   size="small"
                                   onClick={async () => {
                                     try {
-                                      const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/reject/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() } });
+                                      const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/${s.id}/reject/`), { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({}) });
                                       if (!res.ok) alert("Reject Failed: " + await res.text());
-                                      else loadAiSuggestions();
+                                      else {
+                                        setAiSuggestionsRemovedQuestions(prev => {
+                                          const newObj = { ...prev };
+                                          delete newObj[s.id];
+                                          return newObj;
+                                        });
+                                        loadAiSuggestions();
+                                      }
                                     } catch (e) { alert("Network Error: " + e.message); }
                                   }}
                                   sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.75rem", borderRadius: "7px", px: 1.5, py: 0.6, bgcolor: "rgba(244,67,54,0.1)", color: "#ef9a9a", border: "1px solid rgba(244,67,54,0.2)", "&:hover": { bgcolor: "rgba(244,67,54,0.2)", borderColor: "rgba(244,67,54,0.45)" } }}
@@ -18551,6 +18813,248 @@ export default function NewLiveMeeting() {
                   Close
                 </Button>
               </DialogActions>
+            </Dialog>
+
+            {/* Edit Group Dialog */}
+            <Dialog
+              open={editGroupId !== null}
+              onClose={() => setEditGroupId(null)}
+              maxWidth="sm"
+              fullWidth
+              PaperProps={{
+                sx: { bgcolor: "#141414", color: "#fff", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 24px 80px rgba(0,0,0,0.7)", overflow: "hidden" }
+              }}
+            >
+              {editGroupId && (() => {
+                const g = groups.find(x => x.id === editGroupId);
+                if (!g) return null;
+                const currentQids = g.memberships?.map(m => m.question) || [];
+                const finalQids = currentQids.filter(qid => !editGroupRemovedQuestions.has(qid));
+                return (
+                  <>
+                    <DialogTitle sx={{ pb: 1.5, pt: 2.5, fontWeight: 700, fontSize: "1.1rem" }}>
+                      Edit Group: {g.title}
+                    </DialogTitle>
+                    <DialogContent sx={{ px: 3, py: 2, bgcolor: "#141414" }}>
+                      <Stack spacing={2}>
+                        {/* Current questions */}
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ color: "#fff", fontWeight: 600, mb: 1, fontSize: "0.85rem" }}>
+                            Current Questions ({finalQids.length})
+                          </Typography>
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.8 }}>
+                            {currentQids.map(qid => {
+                              const q = questions.find(x => x.id === qid);
+                              const isRemoved = editGroupRemovedQuestions.has(qid);
+                              return (
+                                <Stack
+                                  key={qid}
+                                  direction="row"
+                                  alignItems="flex-start"
+                                  spacing={1}
+                                  sx={{
+                                    p: 1,
+                                    borderRadius: 1,
+                                    bgcolor: isRemoved ? "rgba(244,67,54,0.08)" : "rgba(255,255,255,0.02)",
+                                    border: `1px solid ${isRemoved ? "rgba(244,67,54,0.2)" : "rgba(255,255,255,0.05)"}`,
+                                    opacity: isRemoved ? 0.6 : 1
+                                  }}
+                                >
+                                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.7rem", mt: 0.3, minWidth: 20 }}>
+                                    #{qid}
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: isRemoved ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.5)", fontSize: "0.75rem", lineHeight: 1.4, flex: 1, textDecoration: isRemoved ? "line-through" : "none" }}>
+                                    {q?.content || `Question #${qid}`}
+                                  </Typography>
+                                  {!isRemoved && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        setEditGroupRemovedQuestions(prev => new Set([...prev, qid]));
+                                      }}
+                                      sx={{ p: 0.3, color: "rgba(244,67,54,0.7)", "&:hover": { color: "#ef5350", bgcolor: "rgba(244,67,54,0.1)" } }}
+                                    >
+                                      <CloseIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                  )}
+                                  {isRemoved && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        setEditGroupRemovedQuestions(prev => {
+                                          const newSet = new Set(prev);
+                                          newSet.delete(qid);
+                                          return newSet;
+                                        });
+                                      }}
+                                      sx={{ p: 0.3, color: "rgba(76,175,80,0.7)", "&:hover": { color: "#81c784", bgcolor: "rgba(76,175,80,0.1)" } }}
+                                    >
+                                      <UndoIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                  )}
+                                </Stack>
+                              );
+                            })}
+                          </Box>
+                        </Box>
+
+                        {/* Add ungrouped questions */}
+                        <Box>
+                          <Button
+                            size="small"
+                            onClick={() => setEditGroupAddQuestionsOpen(!editGroupAddQuestionsOpen)}
+                            sx={{ textTransform: "none", fontWeight: 500, fontSize: "0.75rem", color: "rgba(124,77,255,0.8)", p: 0, justifyContent: "flex-start", "&:hover": { color: "#7c4dff", bgcolor: "transparent" } }}
+                            startIcon={editGroupAddQuestionsOpen ? <ExpandLess sx={{ fontSize: 16 }} /> : <AddIcon sx={{ fontSize: 14 }} />}
+                          >
+                            + Add Ungrouped Question ({questions.filter(q => {
+                              const qid = q.id;
+                              const inGroup = currentQids.includes(qid);
+                              const isAdded = editGroupAddedQuestions.has(qid);
+                              const inAnyGroup = groups.some(grp => grp.id !== editGroupId && (grp.memberships || []).some(m => m.question === qid));
+                              return !inGroup && !isAdded && !inAnyGroup;
+                            }).length})
+                          </Button>
+
+                          <Collapse in={editGroupAddQuestionsOpen}>
+                            <Box sx={{ mt: 1, p: 1, borderRadius: 1, bgcolor: "rgba(124,77,255,0.08)", border: "1px solid rgba(124,77,255,0.2)", display: "flex", flexDirection: "column", gap: 0.6 }}>
+                              {questions
+                                .filter(q => {
+                                  const qid = q.id;
+                                  const inGroup = currentQids.includes(qid);
+                                  const isAdded = editGroupAddedQuestions.has(qid);
+                                  const inAnyGroup = groups.some(grp => grp.id !== editGroupId && (grp.memberships || []).some(m => m.question === qid));
+                                  return !inGroup && !isAdded && !inAnyGroup;
+                                })
+                                .slice(0, 10)
+                                .map(q => (
+                                  <Stack
+                                    key={q.id}
+                                    direction="row"
+                                    alignItems="flex-start"
+                                    spacing={1}
+                                    sx={{
+                                      p: 0.8,
+                                      borderRadius: 1,
+                                      bgcolor: "rgba(255,255,255,0.02)",
+                                      border: "1px solid rgba(255,255,255,0.05)",
+                                      "&:hover": { bgcolor: "rgba(124,77,255,0.1)", borderColor: "rgba(124,77,255,0.2)" }
+                                    }}
+                                  >
+                                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.7rem", mt: 0.3, minWidth: 20 }}>
+                                      #{q.id}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.75rem", lineHeight: 1.4, flex: 1 }}>
+                                      {q.content}
+                                    </Typography>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        setEditGroupAddedQuestions(prev => new Set([...prev, q.id]));
+                                      }}
+                                      sx={{ p: 0.3, color: "rgba(76,175,80,0.7)", "&:hover": { color: "#81c784", bgcolor: "rgba(76,175,80,0.1)" } }}
+                                    >
+                                      <AddIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                  </Stack>
+                                ))}
+                              {questions.filter(q => {
+                                const qid = q.id;
+                                const inGroup = currentQids.includes(qid);
+                                const isAdded = editGroupAddedQuestions.has(qid);
+                                const inAnyGroup = groups.some(grp => grp.id !== editGroupId && (grp.memberships || []).some(m => m.question === qid));
+                                return !inGroup && !isAdded && !inAnyGroup;
+                              }).length === 0 && (
+                                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", p: 1, textAlign: "center" }}>
+                                  No ungrouped questions available
+                                </Typography>
+                              )}
+                            </Box>
+                          </Collapse>
+                        </Box>
+
+                        {/* Show added questions */}
+                        {editGroupAddedQuestions.size > 0 && (
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ color: "#81c784", fontWeight: 600, mb: 1, fontSize: "0.85rem" }}>
+                              Questions to Add ({editGroupAddedQuestions.size})
+                            </Typography>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.6 }}>
+                              {Array.from(editGroupAddedQuestions).map(qid => {
+                                const q = questions.find(x => x.id === qid);
+                                return (
+                                  <Stack
+                                    key={qid}
+                                    direction="row"
+                                    alignItems="flex-start"
+                                    spacing={1}
+                                    sx={{
+                                      p: 1,
+                                      borderRadius: 1,
+                                      bgcolor: "rgba(76,175,80,0.08)",
+                                      border: "1px solid rgba(76,175,80,0.2)"
+                                    }}
+                                  >
+                                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.7rem", mt: 0.3, minWidth: 20 }}>
+                                      #{qid}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.75rem", lineHeight: 1.4, flex: 1 }}>
+                                      {q?.content || `Question #${qid}`}
+                                    </Typography>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        setEditGroupAddedQuestions(prev => {
+                                          const newSet = new Set(prev);
+                                          newSet.delete(qid);
+                                          return newSet;
+                                        });
+                                      }}
+                                      sx={{ p: 0.3, color: "rgba(244,67,54,0.7)", "&:hover": { color: "#ef5350", bgcolor: "rgba(244,67,54,0.1)" } }}
+                                    >
+                                      <CloseIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                  </Stack>
+                                );
+                              })}
+                            </Box>
+                          </Box>
+                        )}
+                      </Stack>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, py: 2, bgcolor: "#141414", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                      <Button
+                        onClick={() => setEditGroupId(null)}
+                        sx={{ textTransform: "none", fontWeight: 500, borderRadius: "8px", px: 2.5, color: "rgba(255,255,255,0.5)", "&:hover": { bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)" } }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        disabled={finalQids.length < 2}
+                        onClick={async () => {
+                          try {
+                            const addedQids = Array.from(editGroupAddedQuestions);
+                            const newQids = [...finalQids, ...addedQids];
+                            const res = await fetch(toApiUrl(`interactions/qna-groups/${editGroupId}/`), {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json", ...authHeader() },
+                              body: JSON.stringify({ title: g.title, summary: g.summary, question_ids: newQids })
+                            });
+                            if (!res.ok) alert("Update Failed: " + await res.text());
+                            else {
+                              setEditGroupId(null);
+                              loadGroups();
+                            }
+                          } catch (e) { alert("Network Error: " + e.message); }
+                        }}
+                        variant="contained"
+                        sx={{ textTransform: "none", fontWeight: 600, borderRadius: "8px", px: 2.5, bgcolor: finalQids.length < 2 ? "rgba(76,175,80,0.2)" : "linear-gradient(135deg, #7c4dff, #651fff)", color: "#fff", cursor: finalQids.length < 2 ? "not-allowed" : "pointer", "&:hover": { bgcolor: finalQids.length < 2 ? "rgba(76,175,80,0.2)" : "linear-gradient(135deg, #651fff, #4527a0)" } }}
+                      >
+                        Save Changes
+                      </Button>
+                    </DialogActions>
+                  </>
+                );
+              })()}
             </Dialog>
 
             {/* A3: Public Suggestion Hub Modal (Mirror of LiveQnAPanel) */}
@@ -18809,30 +19313,32 @@ export default function NewLiveMeeting() {
                           </Button>
                         </Tooltip>
                         <Tooltip title="Suggest Q&A groups using AI" arrow>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => setAiModalOpen(true)}
-                            sx={{
-                              color: "#4dabf5",
-                              borderColor: "rgba(77,171,245,0.6)",
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                              py: 0.6,
-                              px: 1.5,
-                              textTransform: "none",
-                              borderWidth: "1.5px",
-                              transition: "all 0.2s",
-                              "&:hover": {
-                                borderColor: "#4dabf5",
-                                bgcolor: "rgba(77,171,245,0.12)",
-                                transform: "translateY(-1px)",
-                                boxShadow: "0 2px 8px rgba(77,171,245,0.2)"
-                              },
-                            }}
-                          >
-                            AI Grouping
-                          </Button>
+                          <Badge color="error" variant="dot" invisible={!qnaGroupSuggestionPending} sx={{ "& .MuiBadge-badge": { right: -8, top: 10 } }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => { setAiModalOpen(true); setQnaGroupSuggestionPending(false); }}
+                              sx={{
+                                color: "#4dabf5",
+                                borderColor: "rgba(77,171,245,0.6)",
+                                fontSize: "0.75rem",
+                                fontWeight: 600,
+                                py: 0.6,
+                                px: 1.5,
+                                textTransform: "none",
+                                borderWidth: "1.5px",
+                                transition: "all 0.2s",
+                                "&:hover": {
+                                  borderColor: "#4dabf5",
+                                  bgcolor: "rgba(77,171,245,0.12)",
+                                  transform: "translateY(-1px)",
+                                  boxShadow: "0 2px 8px rgba(77,171,245,0.2)"
+                                },
+                              }}
+                            >
+                              AI Grouping
+                            </Button>
+                          </Badge>
                         </Tooltip>
                         <Tooltip title="Add presentation text to ground AI suggestions" arrow>
                           <Button
@@ -19918,26 +20424,53 @@ export default function NewLiveMeeting() {
                         return (
                           <>
                             {Object.values(renderedGroups).map(rg => (
-                              <Paper key={rg.group.id} variant="outlined" sx={{ mb: 2, p: 1.5, backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                                <Stack
-                                  direction="row"
-                                  alignItems="center"
-                                  justifyContent="space-between"
-                                  spacing={1}
-                                  sx={{ mb: 1, cursor: 'pointer', "&:hover": { opacity: 0.8 } }}
-                                  onClick={() => setGroupCollapsed(prev => ({ ...prev, [rg.group.id]: !prev[rg.group.id] }))}
-                                >
-                                  <Stack direction="row" alignItems="center" spacing={1}>
-                                    <FolderIcon fontSize="small" sx={{ color: 'primary.main' }} />
-                                    <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 'bold' }}>{rg.group.title}</Typography>
+                              <Paper key={rg.group.id} variant="outlined" sx={{ mb: 2, p: 1.5, backgroundColor: 'rgba(124,77,255,0.05)', borderColor: 'rgba(124,77,255,0.25)', borderRadius: 2 }}>
+                                <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ cursor: "pointer" }}
+                                       onClick={() => setGroupCollapsed(prev => ({ ...prev, [rg.group.id]: !prev[rg.group.id] }))}>
+                                  {/* Left: summary text + metadata */}
+                                  <Box sx={{ flex: 1 }}>
+                                    {rg.group.source === "ai" && (
+                                      <Chip label="AI GROUPED" size="small" icon={<AutoAwesomeIcon sx={{ fontSize: "12px !important" }} />}
+                                            sx={{ mb: 0.75, bgcolor: "rgba(124,77,255,0.15)", color: "#a78bfa", fontSize: 10, height: 20, "& .MuiChip-label": { px: 1 } }} />
+                                    )}
+                                    <Typography sx={{ color: "#fff", fontSize: 14, fontWeight: 500, lineHeight: 1.5 }}>
+                                      {rg.group.summary || rg.group.title}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", mt: 0.5, display: "block" }}>
+                                      {rg.group.memberships?.length ?? 0} similar questions combined
+                                    </Typography>
+                                  </Box>
+                                  {/* Right: aggregated vote count + edit + expand chevron */}
+                                  <Stack alignItems="center" spacing={0.5} sx={{ minWidth: "auto" }}>
+                                    <Stack direction="row" alignItems="center" spacing={0.3}>
+                                      <ThumbUpAltIcon sx={{ fontSize: 12, color: "#7c4dff" }} />
+                                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#7c4dff" }}>
+                                        {rg.group.aggregated_vote_count ?? 0}
+                                      </Typography>
+                                    </Stack>
+                                    {isHost && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditGroupId(rg.group.id);
+                                          setEditGroupRemovedQuestions(new Set());
+                                          setEditGroupAddedQuestions(new Set());
+                                        }}
+                                        sx={{ p: 0.3, color: "rgba(255,255,255,0.5)", "&:hover": { color: "#7c4dff", bgcolor: "rgba(124,77,255,0.1)" } }}
+                                      >
+                                        <MoreVertIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    )}
+                                    {groupCollapsed[rg.group.id] ? <ExpandMore sx={{ fontSize: 16, color: "rgba(255,255,255,0.4)" }} /> : <ExpandLess sx={{ fontSize: 16, color: "rgba(255,255,255,0.4)" }} />}
                                   </Stack>
-                                  <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}>
-                                    {groupCollapsed[rg.group.id] ? <ExpandMore fontSize="small" /> : <ExpandLess fontSize="small" />}
-                                  </IconButton>
                                 </Stack>
+
                                 <Collapse in={!groupCollapsed[rg.group.id]}>
-                                  {rg.group.summary && <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', mb: 2, display: 'block' }}>{rg.group.summary}</Typography>}
-                                  <Box sx={{ pl: 1, pt: 1, borderLeft: '2px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", mt: 1.5, mb: 1, display: "block" }}>
+                                    Original questions:
+                                  </Typography>
+                                  <Box sx={{ pl: 1, borderLeft: "2px solid rgba(124,77,255,0.2)", display: "flex", flexDirection: "column", gap: 1 }}>
                                     {rg.nodes}
                                   </Box>
                                 </Collapse>
