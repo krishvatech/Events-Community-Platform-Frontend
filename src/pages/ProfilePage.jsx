@@ -496,6 +496,30 @@ const PROFICIENCY_LABELS = {
   5: "Expert",
 };
 
+// M&A Skills List (AI-generated for Mergers & Acquisitions)
+const MA_SKILLS_LIST = [
+  { label: "Financial Analysis", uri: "ma-financial-analysis" },
+  { label: "Due Diligence", uri: "ma-due-diligence" },
+  { label: "Valuation", uri: "ma-valuation" },
+  { label: "Deal Structuring", uri: "ma-deal-structuring" },
+  { label: "Negotiation", uri: "ma-negotiation" },
+  { label: "Risk Assessment", uri: "ma-risk-assessment" },
+  { label: "Legal Documentation", uri: "ma-legal-documentation" },
+  { label: "Tax Planning", uri: "ma-tax-planning" },
+  { label: "Integration Planning", uri: "ma-integration-planning" },
+  { label: "Market Analysis", uri: "ma-market-analysis" },
+  { label: "Accounting", uri: "ma-accounting" },
+  { label: "Strategic Planning", uri: "ma-strategic-planning" },
+  { label: "Business Valuation", uri: "ma-business-valuation" },
+  { label: "Regulatory Compliance", uri: "ma-regulatory-compliance" },
+  { label: "Project Management", uri: "ma-project-management" },
+  { label: "Data Analysis", uri: "ma-data-analysis" },
+  { label: "Financial Modeling", uri: "ma-financial-modeling" },
+  { label: "Industry Expertise", uri: "ma-industry-expertise" },
+  { label: "Communication", uri: "ma-communication" },
+  { label: "Leadership", uri: "ma-leadership" },
+];
+
 function formatSkillLabel(skill) {
   if (!skill) return "";
   const base = skill.label || "";
@@ -6259,7 +6283,7 @@ export default function ProfilePage() {
               <Autocomplete
                 multiple
                 freeSolo={true}
-                options={skillOptions}
+                options={MA_SKILLS_LIST}
                 value={aboutSkills}
                 onChange={(_, newValue) => {
                   setAboutSkills((prev) => {
@@ -6287,48 +6311,31 @@ export default function ProfilePage() {
                     return merged;
                   });
                 }}
-                inputValue={skillSearch}
-                onInputChange={(_, newInputValue) => {
-                  setSkillSearch(newInputValue);
-                }}
                 getOptionLabel={(option) => {
                   if (!option) return "";
                   // Handle string values (free text)
                   if (typeof option === "string") return option;
-                  // Handle ESCO object
-                  const lbl = option.label;
-                  if (typeof lbl === "string") return lbl;
-                  if (lbl && typeof lbl === "object") {
-                    return (
-                      lbl["en-us"] ||
-                      lbl["en"] ||
-                      Object.values(lbl)[0] || ""
-                    );
-                  }
-                  return "";
+                  // Handle M&A skill object
+                  return option.label || "";
                 }}
                 isOptionEqualToValue={(option, value) => {
-                  // Handle custom skills
+                  // Handle custom skills (string or object without URI)
                   if (typeof value === "string" || !value.uri) {
                     return typeof option === "string"
                       ? option === value
                       : option.label === (typeof value === "string" ? value : value.label);
                   }
-                  // Handle ESCO skills
+                  // Handle M&A skills
                   return option.uri === value.uri;
                 }}
                 filterSelectedOptions
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Search skills"
-                    placeholder="Search ESCO skills or type your own…"
+                    label="Skills"
+                    placeholder="Select from M&A skills or type your own…"
                     fullWidth
-                    helperText={
-                      skillSearch && skillSearch.trim().length > 0
-                        ? "Press Enter to add as custom skill"
-                        : ""
-                    }
+                    helperText="Select predefined M&A skills or press Enter to add custom skills"
                   />
                 )}
               />
