@@ -164,6 +164,7 @@ import { AttendeeSupportDialog, HostSupportInbox } from "../components/live-meet
 import LoungeSettingsDialog from "../components/live-meeting/LoungeSettingsDialog.jsx";
 import RoomLocationBadge from "../components/RoomLocationBadge.jsx";
 import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
+import WaitingRoomQnaPanel from "../components/WaitingRoomQnaPanel.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
@@ -1133,6 +1134,8 @@ function WaitingForHost({
   loungeStatusLabel = "",
   preEventQnaEnabled = false,
   onOpenPreEventQna = null,
+  event = null,
+  isBeforeEventStart = true,
 }) {
   // DEBUG: Log the prop on mount
   useEffect(() => {
@@ -1143,13 +1146,16 @@ function WaitingForHost({
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        height: "100vh",
+        overflow: "hidden",
         position: "relative",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "column",
         px: 2,
+        pt: "88px",
+        pb: 3,
         bgcolor: "#05070D",
         backgroundImage:
           "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%), radial-gradient(900px 520px at 0% 100%, rgba(20,184,177,0.10), transparent 60%)",
@@ -1203,6 +1209,8 @@ function WaitingForHost({
         sx={{
           width: "100%",
           maxWidth: 560,
+          maxHeight: "calc(100vh - 120px)",
+          overflowY: "auto",
           borderRadius: 4,
           p: { xs: 2.5, sm: 3 },
           bgcolor: "rgba(15, 23, 42, 0.60)",
@@ -1210,6 +1218,9 @@ function WaitingForHost({
           backdropFilter: "blur(12px)",
           textAlign: "center",
           boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          "&::-webkit-scrollbar": { width: 4 },
+          "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+          "&::-webkit-scrollbar-thumb": { bgcolor: "rgba(255,255,255,0.15)", borderRadius: 4 },
         }}
       >
         {/* Icon circle or waiting room image */}
@@ -1353,47 +1364,13 @@ function WaitingForHost({
           </Button>
         )}
 
-        {(() => {
-          const shouldShowQna = preEventQnaEnabled && onOpenPreEventQna;
-          console.log("[DEBUG WaitingForHost] Rendering buttons - preEventQnaEnabled:", preEventQnaEnabled, "onOpenPreEventQna:", Boolean(onOpenPreEventQna), "shouldShowQna:", shouldShowQna);
-          return shouldShowQna ? (
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                console.log("[DEBUG] Submit question button clicked");
-                console.log("[DEBUG] onOpenPreEventQna type:", typeof onOpenPreEventQna);
-                try {
-                  onOpenPreEventQna();
-                  console.log("[DEBUG] onOpenPreEventQna executed successfully");
-                } catch (err) {
-                  console.error("[DEBUG] Error calling onOpenPreEventQna:", err);
-                }
-              }}
-              variant="outlined"
-              sx={{
-                mt: 1.5,
-                px: 3,
-                py: 1,
-                borderRadius: 999,
-                textTransform: "none",
-                fontWeight: 800,
-                letterSpacing: 0.4,
-                opacity: 1,
-                color: "#10b8a6",
-                borderColor: "rgba(16,184,166,0.5)",
-                bgcolor: "rgba(16,184,166,0.06)",
-                "&:hover": {
-                  bgcolor: "rgba(16,184,166,0.12)",
-                  borderColor: "#10b8a6",
-                },
-                pointerEvents: "auto",
-                cursor: "pointer",
-              }}
-            >
-              Submit a question before we start
-            </Button>
-          ) : null;
-        })()}
+        {preEventQnaEnabled && (
+          <WaitingRoomQnaPanel
+            eventId={event?.id}
+            isBeforeEventStart={isBeforeEventStart}
+            qnaModerationEnabled={Boolean(event?.qna_moderation_enabled)}
+          />
+        )}
 
         {onBack && (
           <Button
@@ -1882,6 +1859,8 @@ function WaitingRoomScreen({
   isOnBreak = false,
   preEventQnaEnabled = false,
   onOpenPreEventQna = null,
+  event = null,
+  isBeforeEventStart = true,
 }) {
   // DEBUG: Log the prop on mount
   useEffect(() => {
@@ -1906,13 +1885,16 @@ function WaitingRoomScreen({
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        height: "100vh",
+        overflow: "hidden",
         position: "relative",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "column",
         px: 2,
+        pt: "88px",
+        pb: 3,
         bgcolor: "#05070D",
         backgroundImage:
           "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%), radial-gradient(900px 520px at 0% 100%, rgba(20,184,177,0.10), transparent 60%)",
@@ -1963,6 +1945,8 @@ function WaitingRoomScreen({
         sx={{
           width: "100%",
           maxWidth: 560,
+          maxHeight: "calc(100vh - 120px)",
+          overflowY: "auto",
           borderRadius: 4,
           p: { xs: 2.5, sm: 3 },
           bgcolor: "rgba(15, 23, 42, 0.60)",
@@ -1970,6 +1954,9 @@ function WaitingRoomScreen({
           backdropFilter: "blur(12px)",
           textAlign: "center",
           boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          "&::-webkit-scrollbar": { width: 4 },
+          "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+          "&::-webkit-scrollbar-thumb": { bgcolor: "rgba(255,255,255,0.15)", borderRadius: 4 },
         }}
       >
         {waitingRoomImage ? (
@@ -2103,47 +2090,13 @@ function WaitingRoomScreen({
           </Typography>
         </Stack>
 
-        {(() => {
-          const shouldShowQna = preEventQnaEnabled && onOpenPreEventQna;
-          console.log("[DEBUG WaitingRoomScreen] Rendering buttons - preEventQnaEnabled:", preEventQnaEnabled, "onOpenPreEventQna:", Boolean(onOpenPreEventQna), "shouldShowQna:", shouldShowQna);
-          return shouldShowQna ? (
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                console.log("[DEBUG] Submit question button clicked");
-                console.log("[DEBUG] onOpenPreEventQna type:", typeof onOpenPreEventQna);
-                try {
-                  onOpenPreEventQna();
-                  console.log("[DEBUG] onOpenPreEventQna executed successfully");
-                } catch (err) {
-                  console.error("[DEBUG] Error calling onOpenPreEventQna:", err);
-                }
-              }}
-              variant="outlined"
-              sx={{
-                mt: 1.5,
-                px: 3,
-                py: 1,
-                borderRadius: 999,
-                textTransform: "none",
-                fontWeight: 800,
-                letterSpacing: 0.4,
-                opacity: 1,
-                color: "#10b8a6",
-                borderColor: "rgba(16,184,166,0.5)",
-                bgcolor: "rgba(16,184,166,0.06)",
-                "&:hover": {
-                  bgcolor: "rgba(16,184,166,0.12)",
-                  borderColor: "#10b8a6",
-                },
-                pointerEvents: "auto",
-                cursor: "pointer",
-              }}
-            >
-              Submit a question before we start
-            </Button>
-          ) : null;
-        })()}
+        {preEventQnaEnabled && (
+          <WaitingRoomQnaPanel
+            eventId={event?.id}
+            isBeforeEventStart={isBeforeEventStart}
+            qnaModerationEnabled={Boolean(event?.qna_moderation_enabled)}
+          />
+        )}
 
         {loungeAvailable && (
           <Button
@@ -18688,10 +18641,10 @@ export default function NewLiveMeeting() {
                                           const inAnyGroup = groups.some(g => (g.memberships || []).some(m => m.question === qid));
                                           return !inSuggestion && !isAdded && !inAnyGroup;
                                         }).length === 0 && (
-                                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", p: 1, textAlign: "center" }}>
-                                            No ungrouped questions available
-                                          </Typography>
-                                        )}
+                                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", p: 1, textAlign: "center" }}>
+                                              No ungrouped questions available
+                                            </Typography>
+                                          )}
                                       </Box>
                                     </Collapse>
 
@@ -18964,10 +18917,10 @@ export default function NewLiveMeeting() {
                                 const inAnyGroup = groups.some(grp => grp.id !== editGroupId && (grp.memberships || []).some(m => m.question === qid));
                                 return !inGroup && !isAdded && !inAnyGroup;
                               }).length === 0 && (
-                                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", p: 1, textAlign: "center" }}>
-                                  No ungrouped questions available
-                                </Typography>
-                              )}
+                                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", p: 1, textAlign: "center" }}>
+                                    No ungrouped questions available
+                                  </Typography>
+                                )}
                             </Box>
                           </Collapse>
                         </Box>
@@ -20426,12 +20379,12 @@ export default function NewLiveMeeting() {
                             {Object.values(renderedGroups).map(rg => (
                               <Paper key={rg.group.id} variant="outlined" sx={{ mb: 2, p: 1.5, backgroundColor: 'rgba(124,77,255,0.05)', borderColor: 'rgba(124,77,255,0.25)', borderRadius: 2 }}>
                                 <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ cursor: "pointer" }}
-                                       onClick={() => setGroupCollapsed(prev => ({ ...prev, [rg.group.id]: !prev[rg.group.id] }))}>
+                                  onClick={() => setGroupCollapsed(prev => ({ ...prev, [rg.group.id]: !prev[rg.group.id] }))}>
                                   {/* Left: summary text + metadata */}
                                   <Box sx={{ flex: 1 }}>
                                     {rg.group.source === "ai" && (
                                       <Chip label="AI GROUPED" size="small" icon={<AutoAwesomeIcon sx={{ fontSize: "12px !important" }} />}
-                                            sx={{ mb: 0.75, bgcolor: "rgba(124,77,255,0.15)", color: "#a78bfa", fontSize: 10, height: 20, "& .MuiChip-label": { px: 1 } }} />
+                                        sx={{ mb: 0.75, bgcolor: "rgba(124,77,255,0.15)", color: "#a78bfa", fontSize: 10, height: 20, "& .MuiChip-label": { px: 1 } }} />
                                     )}
                                     <Typography sx={{ color: "#fff", fontSize: 14, fontWeight: 500, lineHeight: 1.5 }}>
                                       {rg.group.summary || rg.group.title}
@@ -22241,6 +22194,11 @@ export default function NewLiveMeeting() {
     );
   }
 
+  // Derived: true while event hasn't started yet (gates pre-event Q&A edit/delete)
+  const isBeforeEventStart = eventData?.start_time
+    ? new Date(eventData.start_time).getTime() > Date.now()
+    : true;
+
   if (waitingRoomActive && !isBreakout) {
     return (
       <>
@@ -22271,6 +22229,8 @@ export default function NewLiveMeeting() {
           isOnBreak={isOnBreak}
           preEventQnaEnabled={Boolean(eventData?.pre_event_qna_enabled)}
           onOpenPreEventQna={() => setPreEventQnaModalOpen(true)}
+          event={eventData}
+          isBeforeEventStart={isBeforeEventStart}
         />
         <LoungeOverlay
           open={loungeOpen}
@@ -22481,6 +22441,8 @@ export default function NewLiveMeeting() {
           timezone={getBrowserTimezone()}
           preEventQnaEnabled={Boolean(eventData?.pre_event_qna_enabled)}
           onOpenPreEventQna={() => setPreEventQnaModalOpen(true)}
+          event={eventData}
+          isBeforeEventStart={isBeforeEventStart}
         />
         <PreEventQnAModal
           open={preEventQnaModalOpen}
