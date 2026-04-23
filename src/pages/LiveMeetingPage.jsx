@@ -133,6 +133,7 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useRealtimeKitClient, RealtimeKitProvider } from '@cloudflare/realtimekit-react';
 import EmojiPicker from "emoji-picker-react";
+import { HatGlasses } from "lucide-react";
 
 import { RtkParticipantsAudio } from '@cloudflare/realtimekit-react-ui';
 import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
@@ -19950,7 +19951,7 @@ export default function NewLiveMeeting() {
                                           <Chip
                                             label="Anonymous"
                                             size="small"
-                                            icon={<VisibilityOffIcon />}
+                                            icon={<HatGlasses size={14} />}
                                             sx={{
                                               fontSize: 10,
                                               height: 18,
@@ -20124,7 +20125,7 @@ export default function NewLiveMeeting() {
                                                   }
                                                 }}
                                               >
-                                                <VisibilityOffIcon sx={{ fontSize: 16 }} />
+                                                <HatGlasses size={16} />
                                               </IconButton>
                                             </Tooltip>
                                           )}
