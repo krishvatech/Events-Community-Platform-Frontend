@@ -24,6 +24,7 @@ import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
+import PreEventQnaManager from "../components/PreEventQnaManager.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
@@ -1538,82 +1539,82 @@ export default function EventDetailsPage() {
                                 </>
                               )
                               : myApplication.status === 'approved'
-                              ? (() => {
-                                // After approval, check if user can join with guest token or is registered
-                                const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
-                                if (guestToken) {
-                                  // Guest has JWT token - can join only if event is live
-                                  if (isLive) {
-                                    return (
-                                      <Button
-                                        onClick={() => navigate(`/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=audience`)}
-                                        variant="contained"
-                                        sx={{
-                                          textTransform: "none",
-                                          backgroundColor: "#10b8a6",
-                                          "&:hover": { backgroundColor: "#0ea5a4" },
-                                        }}
-                                        className="rounded-xl"
-                                      >
-                                        Join Live
-                                      </Button>
-                                    );
-                                  } else {
-                                    // Event not live yet
+                                ? (() => {
+                                  // After approval, check if user can join with guest token or is registered
+                                  const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
+                                  if (guestToken) {
+                                    // Guest has JWT token - can join only if event is live
+                                    if (isLive) {
+                                      return (
+                                        <Button
+                                          onClick={() => navigate(`/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=audience`)}
+                                          variant="contained"
+                                          sx={{
+                                            textTransform: "none",
+                                            backgroundColor: "#10b8a6",
+                                            "&:hover": { backgroundColor: "#0ea5a4" },
+                                          }}
+                                          className="rounded-xl"
+                                        >
+                                          Join Live
+                                        </Button>
+                                      );
+                                    } else {
+                                      // Event not live yet
+                                      return (
+                                        <Chip
+                                          label="Waiting for Event to Go Live"
+                                          variant="outlined"
+                                          sx={{
+                                            py: 2.5,
+                                            borderColor: "#10b8a6",
+                                            color: "#10b8a6",
+                                            fontWeight: 500
+                                          }}
+                                        />
+                                      );
+                                    }
+                                  } else if (registration) {
+                                    // Registered user
                                     return (
                                       <Chip
-                                        label="Waiting for Event to Go Live"
+                                        label="Registered"
+                                        color="success"
                                         variant="outlined"
-                                        sx={{
-                                          py: 2.5,
-                                          borderColor: "#10b8a6",
-                                          color: "#10b8a6",
-                                          fontWeight: 500
-                                        }}
+                                        sx={{ py: 2.5 }}
+                                      />
+                                    );
+                                  } else {
+                                    // Not registered yet
+                                    return (
+                                      <Chip
+                                        label="Approved - Refresh to Register"
+                                        color="success"
+                                        variant="outlined"
+                                        sx={{ py: 2.5 }}
                                       />
                                     );
                                   }
-                                } else if (registration) {
-                                  // Registered user
-                                  return (
+                                })()
+                                : myApplication.status === 'pending'
+                                  ? (
                                     <Chip
-                                      label="Registered"
-                                      color="success"
+                                      label="Application Pending"
+                                      color="warning"
                                       variant="outlined"
                                       sx={{ py: 2.5 }}
                                     />
-                                  );
-                                } else {
-                                  // Not registered yet
-                                  return (
-                                    <Chip
-                                      label="Approved - Refresh to Register"
-                                      color="success"
-                                      variant="outlined"
-                                      sx={{ py: 2.5 }}
-                                    />
-                                  );
-                                }
-                              })()
-                              : myApplication.status === 'pending'
-                              ? (
-                                <Chip
-                                  label="Application Pending"
-                                  color="warning"
-                                  variant="outlined"
-                                  sx={{ py: 2.5 }}
-                                />
-                              )
-                              : myApplication.status === 'declined'
-                              ? (
-                                <Chip
-                                  label="Application Declined"
-                                  color="error"
-                                  variant="outlined"
-                                  sx={{ py: 2.5 }}
-                                />
-                              )
-                              : null
+                                  )
+                                  : myApplication.status === 'declined'
+                                    ? (
+                                      <Chip
+                                        label="Application Declined"
+                                        color="error"
+                                        variant="outlined"
+                                        sx={{ py: 2.5 }}
+                                      />
+                                    )
+                                    : null
                             }
                           </>)
                         ) : !canJoinEventNow && !isPast ? (
@@ -1724,6 +1725,14 @@ export default function EventDetailsPage() {
                             >
                               Submit your questions prior to event
                             </Button>
+
+                            {/* Pre-event Q&A Manager: view / edit / delete / AI advisor */}
+                            <PreEventQnaManager
+                              eventId={event.id}
+                              token={token}
+                              isBeforeEventStart={isBeforeEventStart}
+                              qnaModerationEnabled={Boolean(event?.qna_moderation_enabled)}
+                            />
                           </Box>
                         )}
 
