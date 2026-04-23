@@ -15486,6 +15486,14 @@ export default function NewLiveMeeting() {
           }));
         }
 
+        if (msg.type === "qna.group_upvote") {
+          setGroups(prev => prev.map(g =>
+            g.id === msg.group_id
+              ? { ...g, aggregated_vote_count: msg.group_vote_count }
+              : g
+          ));
+        }
+
         if (msg.type === "qna.question") {
           // Handle pending questions (when moderation is enabled)
           if (msg.moderation_status === "pending") {

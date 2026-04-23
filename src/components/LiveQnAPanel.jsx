@@ -839,6 +839,17 @@ export default function LiveQnAPanel({
           );
         }
 
+        // Update group vote count in real-time
+        if (msg.type === "qna.group_upvote") {
+          setGroups((prev) =>
+            prev.map((g) =>
+              g.id === msg.group_id
+                ? { ...g, aggregated_vote_count: msg.group_vote_count }
+                : g
+            )
+          );
+        }
+
         // Group events
         if (msg.type.startsWith("qna.group_")) {
           loadGroups();
