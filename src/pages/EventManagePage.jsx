@@ -73,7 +73,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import PeopleTwoToneIcon from "@mui/icons-material/PeopleTwoTone";
-import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 
@@ -179,14 +179,15 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Guest Audit", "Session", "Resources", "Post-Event Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+const EVENT_TAB_LABELS = ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Post-Event Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
 const getTabLabels = (event, isOwner) => {
   if (!isOwner) return STAFF_EVENT_TAB_LABELS;
-  if (event?.registration_type === 'apply') {
-    return ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Post-Event Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+  if (event?.registration_type !== 'apply') {
+    // Remove Applications tab if it's not an 'apply' type event
+    return EVENT_TAB_LABELS.filter(label => label !== "Applications");
   }
   return EVENT_TAB_LABELS;
 };
@@ -400,9 +401,9 @@ export default function EventManagePage() {
   const [tagCategory, setTagCategory] = useState("");
   const [tagType, setTagType] = useState("both");
 
-  const isOwner = isOwnerUser();
+  const isOwner = event?.created_by_id === currentUser?.id;
   const isStaff = isStaffUser();
-  const canManageLounge = isOwner || isStaff;
+  const canManageLounge = isOwner; // Only owner can manage lounge now
 
   // Q&A Export State
   const [qnaExportLoading, setQnaExportLoading] = useState({ csv: false, pdf: false });
@@ -1408,8 +1409,8 @@ export default function EventManagePage() {
     try {
       const isPreEventLounge = isPreEventLoungeOpen(event);
       const isPostEventLounge = isPostEventLoungeOpen(event);
-      // Use publisher role if this user is a host (assigned via EventParticipant)
-      const joinRole = myReg?.is_host ? "publisher" : "audience";
+      // Use publisher role if this user is a host (actual owner or assigned via EventParticipant)
+      const joinRole = (isOwner || myReg?.is_host) ? "publisher" : "audience";
       const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=${joinRole}`;
       navigate(livePath, {
         state: {
@@ -1454,10 +1455,10 @@ export default function EventManagePage() {
   const isLive = status === "live" && event?.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(event, 15);
   const isPreEventLounge = isPreEventLoungeOpen(event);
-  const isHost = Boolean(myReg?.is_host);
+  const isHost = isOwner || Boolean(myReg?.is_host);
   const canShowActiveJoin = (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge) && status !== "cancelled" && event?.status !== "ended";
 
-  const joinLabel = isHost ? "Join as Host" : getJoinButtonText(event, isLive, false, myReg);
+  const joinLabel = getResolvedJoinLabel(event, isLive, false, myReg, isOwner);
   const statusMeta = statusChip(status);
   const avatarLetter = (event?.title?.[0] || "E").toUpperCase();
 

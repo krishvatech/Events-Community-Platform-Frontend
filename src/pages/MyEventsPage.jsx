@@ -21,11 +21,12 @@ import {
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
-import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
+import { getBackendUserFromStorage } from "../utils/adminRole.js";
 
 // ---------------------- API base + helpers (kept) ----------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -184,7 +185,9 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
   console.log(`[EventCard] Rendering event ${ev.id} (${ev.title}), is_multi_day=${ev.is_multi_day}`);
 
   const [imgFailed, setImgFailed] = useState(false);
-  const isHost = Boolean(reg?.is_host);
+  const currentUser = getBackendUserFromStorage();
+  const isOwner = ev.created_by_id === currentUser?.id;
+  const isHost = isOwner || Boolean(reg?.is_host);
 
   // ✅ NEW: Use session-based join logic for multi-day events
   console.log(`[EventCard] Event ${ev.id} input data:`, {
@@ -478,9 +481,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                       borderRadius: 2,
                     }}
                   >
-                    {isHost && joinState.enabled
-                      ? (isJoining ? "Opening Host Access..." : "Join as Host")
-                      : (isJoining ? `${joinState.buttonText}...` : joinState.buttonText)}
+                    {getResolvedJoinLabel(ev, isLive, isJoining, reg, isOwner, joinState.buttonText)}
                   </Button>
                 );
               } else {
@@ -490,7 +491,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
             // 1) LIVE or within 15 min before start → active Join button (SINGLE-DAY EVENTS)
             if (canShowActiveJoin) {
-              const buttonText = isHost ? "Join as Host" : getJoinButtonText(ev, isLive, isJoining, reg);
+              const buttonText = getResolvedJoinLabel(ev, isLive, isJoining, reg, isOwner);
               const isNotLiveYet = buttonText === "Join (Not Live Yet)";
 
               if (isNotLiveYet) {
@@ -527,9 +528,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                     borderRadius: 2,
                   }}
                 >
-                  {isHost
-                    ? (isJoining ? "Opening Host Access..." : "Join as Host")
-                    : buttonText}
+                  {buttonText}
                 </Button>
               );
             }
@@ -879,16 +878,22 @@ export default function MyEventsPage() {
   //   1) history state: location.state?.agora
   //   2) sessionStorage key: live:EVENT_ID
   // -----------------------------------------------------------------------------
-  const handleJoinLive = async (ev, isHost = false) => {
-    if (!ev?.id) return;
+  const handleJoinLive = async (ev, isHost = false, sessionId = null) => {
+    const currentUser = getBackendUserFromStorage();
+    const isActualOwner = ev.created_by_id === currentUser?.id;
+    const effectiveIsHost = isActualOwner || isHost;
 
+    if (!ev?.id) return;
     setJoiningId(ev.id);
     try {
       const isPreEventLounge = isPreEventLoungeOpen(ev);
       const isPostEventLounge = isPostEventLoungeOpen(ev);
+
+      // Determine role: if the user is host, join as publisher
+      const joinRole = effectiveIsHost ? "publisher" : "audience";
       const shouldOpenLoungeOnEntry =
-        isPostEventLounge || (isPreEventLounge && (isHost || !willGoToWaitingRoom(ev)));
-      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${isHost ? "publisher" : "audience"}`;
+        isPostEventLounge || (isPreEventLounge && (effectiveIsHost || !willGoToWaitingRoom(ev)));
+      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${joinRole}`;
 
       navigate(livePath, {
         state: {

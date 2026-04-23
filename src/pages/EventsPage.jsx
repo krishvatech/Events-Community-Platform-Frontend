@@ -43,9 +43,11 @@ dayjs.extend(timezone);
 import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
-import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
+import { isStaffUser, isOwnerUser, getBackendUserFromStorage } from "../utils/adminRole.js";
 import { apiClient } from "../utils/api";
-import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen,  isPreEventLoungeOpen,
+  getResolvedJoinLabel
+} from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
@@ -323,6 +325,7 @@ function toCard(ev) {
     is_multi_day: ev.is_multi_day || false,  // ✅ NEW: Multi-day event flag
     sessions: Array.isArray(ev.sessions) ? ev.sessions.map(normalizeSession) : [], // ✅ NEW: Event sessions array
     show_registered_participant_count: ev.show_registered_participant_count,
+    created_by_id: ev.created_by_id, // ✅ Map ownership ID
   };
 }
 
@@ -426,9 +429,12 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 // ————————————————————————————————————————
 function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested }) {
   const navigate = useNavigate();
-  const owner = isOwnerUser();
+  const currentUser = getBackendUserFromStorage();
+  const currentUserId = currentUser?.id;
+  const isEventOwner = Number(ev.created_by_id) === Number(currentUserId);
+
   const reg = myRegistrations?.[ev.id];
-  const isHost = Boolean(reg?.is_host);
+  const isHost = isEventOwner || Boolean(reg?.is_host);
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
@@ -441,15 +447,13 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const canJoinNow = ev.is_multi_day
     ? (multiDayJoinState?.enabled || isPreEventLounge || isPostEventLounge)
     : canShowActiveJoin;
-  const joinButtonLabel = isHost
-    ? "Join as Host"
-    : ev.is_multi_day
-      ? (
-        isPreEventLounge || isPostEventLounge
-          ? getJoinButtonText(ev, isLive, false, reg)
-          : (multiDayJoinState?.buttonText || "Join (Not Live Yet)")
-      )
-      : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
+  const fallbackLabel = ev.is_multi_day
+    ? (isPreEventLounge || isPostEventLounge
+      ? getJoinButtonText(ev, isLive, false, reg)
+      : (multiDayJoinState?.buttonText || "Join (Not Live Yet)"))
+    : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
+
+  const joinButtonLabel = getResolvedJoinLabel(ev, isLive, false, reg, isEventOwner, fallbackLabel);
 
   // State for expandable "Read More" section
   const [expandSessions, setExpandSessions] = React.useState(false);
@@ -991,8 +995,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           )}
         </div>
 
-        {/* Hide register button for owner users */}
-        {!owner && (
+        {/* Hide register button only for the actual owner of THIS event */}
+        {!isEventOwner && (
           status === "cancelled" ? (
             <span className="text-red-600 font-medium bg-red-50 px-3 py-1.5 rounded-full text-sm">Event Cancelled</span>
           ) : ev.isRegistered ? (
@@ -1237,8 +1241,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 // ————————————————————————————————————————
 function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested }) {
   const navigate = useNavigate();
+  const currentUser = getBackendUserFromStorage();
+  const currentUserId = currentUser?.id;
+  const isEventOwner = Number(ev.created_by_id) === Number(currentUserId);
+
   const reg = myRegistrations?.[ev.id];
-  const isHost = Boolean(reg?.is_host);
+  const isHost = isEventOwner || Boolean(reg?.is_host);
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
@@ -1251,15 +1259,13 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const canJoinNow = ev.is_multi_day
     ? (multiDayJoinState?.enabled || isPreEventLounge || isPostEventLounge)
     : canShowActiveJoin;
-  const joinButtonLabel = isHost
-    ? "Join as Host"
-    : ev.is_multi_day
-      ? (
-        isPreEventLounge || isPostEventLounge
-          ? getJoinButtonText(ev, isLive, false, reg)
-          : (multiDayJoinState?.buttonText || "Join (Not Live Yet)")
-      )
-      : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
+  const fallbackLabel = ev.is_multi_day
+    ? (isPreEventLounge || isPostEventLounge
+      ? getJoinButtonText(ev, isLive, false, reg)
+      : (multiDayJoinState?.buttonText || "Join (Not Live Yet)"))
+    : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
+
+  const joinButtonLabel = getResolvedJoinLabel(ev, isLive, false, reg, isEventOwner, fallbackLabel);
 
   // Timezone logic
   // Timezone logic
@@ -1565,10 +1571,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
             </div>
 
             <div className="shrink-0">
-              {/* Hide register button for owner users (assuming generic 'owner' check logic same as Card) */}
-              {isOwnerUser() ? null : (
-                ev.isRegistered ? (
-                  <div className="flex flex-col items-end gap-2">
+              {/* Show Join button for owner OR registered user, but hide register/apply for owner */}
+              {isEventOwner || ev.isRegistered ?
+                <div className="flex flex-col items-end gap-2">
                     {/* Show Join button for virtual/hybrid events */}
                     {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
                       joinButtonLabel === "Join (Not Live Yet)" ? (
@@ -1645,7 +1650,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                       </Button>
                     )}
                   </div>
-                ) : ev.registration_type === 'apply' ? (
+                 : ev.registration_type === 'apply' ? (
                   <div className="flex items-center gap-2">
                     {!myApplication || myApplication.status === 'none' ? (
                       <Button
@@ -1733,7 +1738,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     )}
                   </div>
                 )
-              )}
+              }
             </div>
 
           </div>
@@ -2481,14 +2486,15 @@ export default function EventsPage() {
                     const url = String(btn?.url || "").trim() || "#";
                     const isExternal = /^https?:\/\//i.test(url);
 
+                    const btnKey = btn?.key || label;
                     const baseProps = {
-                      key: btn?.key || label,
                       size: "large",
                     };
 
                     if (btn?.key === "primary") {
                       return (
                         <Button
+                          key={btnKey}
                           {...baseProps}
                           component={isExternal ? "a" : Link}
                           href={isExternal ? url : undefined}
@@ -2506,6 +2512,7 @@ export default function EventsPage() {
                     if (btn?.key === "secondary") {
                       return (
                         <Button
+                          key={btnKey}
                           {...baseProps}
                           component={isExternal ? "a" : Link}
                           href={isExternal ? url : undefined}
@@ -2522,6 +2529,7 @@ export default function EventsPage() {
 
                     return (
                       <Button
+                        key={btnKey}
                         {...baseProps}
                         component={isExternal ? "a" : Link}
                         href={isExternal ? url : undefined}

@@ -25,13 +25,13 @@ import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import PreEventQnaManager from "../components/PreEventQnaManager.jsx";
-import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ParticipantListDialog from "../components/ParticipantListDialog";
 import SpeedNetworkingMatchHistory from "../components/speed-networking/SpeedNetworkingMatchHistory";
-import { isOwnerUser, isStaffUser } from "../utils/adminRole";
+import { isOwnerUser, isStaffUser, getBackendUserFromStorage } from "../utils/adminRole";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -1008,7 +1008,11 @@ export default function EventDetailsPage() {
         ? { label: "Cancelled", className: "bg-red-100 text-red-700" }
         : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
-  const isHost = Boolean(registration?.is_host);
+  const currentUser = getBackendUserFromStorage();
+  const currentUserId = currentUser?.id;
+  const isEventOwner = Number(event.created_by_id) === Number(currentUserId);
+
+  const isHost = isEventOwner || Boolean(registration?.is_host);
   const livePath = `/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
   const isPostEventLounge = isPostEventLoungeOpen(event);
   const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
@@ -1499,7 +1503,7 @@ export default function EventDetailsPage() {
                             className="rounded-xl"
                             variant="contained"
                           >
-                            {isHost ? "Join as Host" : (multiDayJoinLabel || getJoinButtonText(event, isLive, false, registration))}
+                            {getResolvedJoinLabel(event, isLive, false, registration, isEventOwner, multiDayJoinLabel)}
                           </Button>
                         ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" && (event.registration_type !== 'apply' || (myApplication && myApplication.status === 'approved')) ? (
                           <Button
@@ -1510,7 +1514,7 @@ export default function EventDetailsPage() {
                           >
                             {multiDayJoinLabel}
                           </Button>
-                        ) : event.registration_type === 'apply' && !canJoinEventNow && !isPast ? (
+                        ) : !isEventOwner && event.registration_type === 'apply' && !canJoinEventNow && !isPast ? (
                           // --- APPLY FLOW ---
                           (<>
                             {(!myApplication || myApplication.status === 'none') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
@@ -1617,7 +1621,7 @@ export default function EventDetailsPage() {
                                     : null
                             }
                           </>)
-                        ) : !canJoinEventNow && !isPast ? (
+                        ) : !isEventOwner && !canJoinEventNow && !isPast ? (
                           <>
                             <Button
                               onClick={handleRegister}

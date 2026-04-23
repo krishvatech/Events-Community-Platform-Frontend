@@ -1,6 +1,6 @@
 // src/pages/AdminEvents.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { isOwnerUser } from "../utils/adminRole.js";
+import { isOwnerUser, getBackendUserFromStorage } from "../utils/adminRole.js";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar,
@@ -54,7 +54,7 @@ import RegisteredActions from "../components/RegisteredActions.jsx";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
-import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import ParticipantForm from "../components/ParticipantForm";
 import ParticipantList from "../components/ParticipantList";
@@ -2724,21 +2724,20 @@ function AdminEventCard({
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
   const isPreEventLounge = isPreEventLoungeOpen(ev);
 
-  const isHost = Boolean(reg?.is_host);
+  const isHost = isOwner || Boolean(reg?.is_host);
   // If event is live OR within early-join window OR pre-event lounge OR user is host, show enabled Join button
   const canShowActiveJoin =
     isPostEventLounge ||
     (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
-  const rawJoinLabel = getJoinButtonText(ev, isLive, false, reg);
-  const joinLabel = isHost ? "Join as Host" : rawJoinLabel;
-  const joinLabelShort =
-    isHost
-      ? "Host"
-      : joinLabel === "Join Waiting Room"
-        ? "Waiting Room"
-        : joinLabel === "Join Social Lounge"
-          ? "Lounge"
-          : joinLabel.split(" ")[0];
+
+  const joinLabel = getResolvedJoinLabel(ev, isLive, false, reg, isOwner);
+  const joinLabelShort = (isOwner || reg?.is_host)
+    ? "Host"
+    : joinLabel === "Join Waiting Room"
+      ? "Waiting Room"
+      : joinLabel === "Join Social Lounge"
+        ? "Lounge"
+        : joinLabel.split(" ")[0];
 
   // Timezone logic
   const organizerTimezone = normalizeTimezoneName(ev.timezone);
@@ -3312,7 +3311,8 @@ function AdminEventCard({
 
 function EventsPage() {
   const token = getToken();
-  const isOwner = isOwnerUser();
+  const currentUser = getBackendUserFromStorage();
+  const isPlatformAdmin = isOwnerUser();
   const navigate = useNavigate();
   const user = useMemo(() => {
     try {
@@ -3369,11 +3369,9 @@ function EventsPage() {
         };
 
         // Determine endpoint
-        // Owner/Admin -> /events/ (sees all)
-        // Staff -> /events/mine/ (sees registered, with similar filters)
-        // Note: Staff using /mine/ might not see events they created but didn't register for,
-        // but this aligns with previous behavior of preferring /mine/ endpoint.
-        const baseUrl = isOwner ? `${API_ROOT}/events/` : `${API_ROOT}/events/mine/`;
+        // Force /events/mine/ for all users in the dashboard/admin view
+        // to show only owned or registered events.
+        const baseUrl = `${API_ROOT}/events/mine/`;
 
         const url = new URL(baseUrl);
         url.searchParams.set("limit", String(PAGE_SIZE));
@@ -3417,7 +3415,7 @@ function EventsPage() {
           // Build my registrations for staff users.
           // We need full registration payload (especially admission_status)
           // so Join button labels are consistent with other pages.
-          if (!isOwner && results.length > 0) {
+          if (results.length > 0) {
             const newRegs = {};
 
             await Promise.all(results.map(async (ev) => {
@@ -3471,7 +3469,7 @@ function EventsPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, tab, q, isOwner, token, refreshKey]);
+  }, [page, tab, q, isPlatformAdmin, token, refreshKey]);
 
   // Actions
   const onHost = async (ev) => {
@@ -3496,7 +3494,8 @@ function EventsPage() {
       const isPostEventLounge = isPostEventLoungeOpen(ev);
       // Determine role: if the user's registration marks them as host, join as publisher
       const myReg = myRegistrations?.[ev.id];
-      const joinRole = myReg?.is_host ? "publisher" : "audience";
+      const isOwner = ev.created_by_id === currentUser?.id;
+      const joinRole = (isOwner || myReg?.is_host) ? "publisher" : "audience";
       const livePath = `/live/${encodeURIComponent(ev.slug || ev.id)}?id=${ev.id}&role=${joinRole}`;
       navigate(livePath, {
         state: {
@@ -3596,7 +3595,7 @@ function EventsPage() {
           <Tab label="Live" />
           <Tab label="Past" />
           <Tab label="Cancelled" />
-          {isOwner && <Tab label="Hidden" />}
+          {isPlatformAdmin && <Tab label="Hidden" />}
         </Tabs>
       </Paper>
 
@@ -3640,8 +3639,8 @@ function EventsPage() {
         <Paper elevation={0} className="rounded-2xl border border-slate-200">
           <Box className="p-8 text-center">
             <Typography variant="h6" className="font-semibold text-slate-700">No events found</Typography>
-            <p className="text-slate-500 mt-1">Try a different search{isOwner ? " or create a new event." : "."}</p>
-            {isOwner && (
+            <p className="text-slate-500 mt-1">Try a different search{isPlatformAdmin ? " or create a new event." : "."}</p>
+            {isPlatformAdmin && (
               <Button
                 onClick={() => setCreateOpen(true)}
                 className="mt-4 rounded-xl"
@@ -3665,7 +3664,7 @@ function EventsPage() {
                     isHosting={hostingId === (ev.id ?? null)}
                     onJoinLive={handleJoinLive}
                     isJoining={joiningId === (ev.id ?? null)}
-                    isOwner={isOwner}
+                    isOwner={ev.created_by_id === currentUser?.id}
                     onEdit={handleEditEvent}
                     // ✅ Pass registration data & handlers
                     reg={myRegistrations[ev.id]}

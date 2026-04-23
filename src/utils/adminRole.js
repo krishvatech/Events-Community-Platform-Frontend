@@ -32,7 +32,7 @@ const decodeJwtPayload = (token) => {
   }
 };
 
-const getBackendUserFromStorage = () => {
+export const getBackendUserFromStorage = () => {
   // In your SignInPage.jsx you do: localStorage.setItem("user", JSON.stringify(userObj || {}));
   const raw =
     safeParse(window.localStorage.getItem("user")) ||

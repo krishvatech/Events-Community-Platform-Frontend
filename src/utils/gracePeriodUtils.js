@@ -140,6 +140,29 @@ export function getJoinButtonText(event, isLive, isJoining, userRegistration = n
 }
 
 /**
+ * Get the most appropriate join button label considering host roles
+ * @param {Object} event - Event object
+ * @param {Boolean} isLive - Is event currently live?
+ * @param {Boolean} isJoining - Is user currently joining?
+ * @param {Object} userRegistration - Optional: User's event registration with is_host flag
+ * @param {Boolean} isOwner - Is the current user the actual creator?
+ * @param {String} fallbackLabel - Optional: Fallback label for non-host states (e.g. multi-day button text)
+ * @returns {String} Resolved button text
+ */
+export function getResolvedJoinLabel(event, isLive, isJoining, userRegistration = null, isOwner = false, fallbackLabel = null) {
+  if (isJoining) return "Joining…";
+
+  // Rule 1: Actual event owner -> "Host"
+  if (isOwner) return "Host";
+
+  // Rule 2: Explicitly assigned host (not owner) -> "Join as Host"
+  if (userRegistration?.is_host) return "Join as Host";
+
+  // Rule 3: Standard attendee / Registered -> Fallback to standard join labels
+  return fallbackLabel || getJoinButtonText(event, isLive, isJoining, userRegistration);
+}
+
+/**
  * Get grace period end time for an event
  * @param {Object} event - Event object
  * @returns {Date|null} End time of grace period, or null if not applicable
