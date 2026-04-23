@@ -493,7 +493,7 @@ export async function createWagtailSession() {
 export async function getSaleorDashboardUrl() {
   const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
   const token = localStorage.getItem("access_token") || localStorage.getItem("access") || "";
-  const r = await fetch(`${API_BASE}/auth/saleor/sso/`, {
+  const r = await fetch(`${API_BASE}/auth/saleor/dashboard/`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
