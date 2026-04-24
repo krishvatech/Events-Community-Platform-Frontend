@@ -673,8 +673,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                         if (p.job_title && p.company) return `${p.job_title} – ${p.company}`;
                                         if (p.job_title) return p.job_title;
 
-                                        // 3. Fallback to username if nothing else
-                                        return user.username;
+                                        return "";
                                     })()}
                                 </Typography>
                             </Box>
