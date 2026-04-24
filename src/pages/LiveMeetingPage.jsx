@@ -1427,6 +1427,9 @@ function PreEventLoungeGate({
   pendingHostChoice = null,
   onConfirmHostChoice,
   onCancelHostChoice,
+  eventId = null,
+  isBeforeEventStart = true,
+  qnaModerationEnabled = false,
 }) {
   return (
     <Box
@@ -1582,6 +1585,7 @@ function PreEventLoungeGate({
             p: 2,
             bgcolor: "rgba(0,0,0,0.18)",
             border: "1px solid rgba(255,255,255,0.10)",
+            mb: 2,
           }}
         >
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
@@ -1613,6 +1617,15 @@ function PreEventLoungeGate({
             </Typography>
           </Stack>
         </Box>
+
+        {/* Pre-Event Questions Panel */}
+        {eventId && (
+          <WaitingRoomQnaPanel
+            eventId={eventId}
+            isBeforeEventStart={isBeforeEventStart}
+            qnaModerationEnabled={qnaModerationEnabled}
+          />
+        )}
 
         {/* Action Buttons - Conditional based on role */}
         {isHost ? (
@@ -3078,6 +3091,11 @@ export default function NewLiveMeeting() {
     () => loungeOpenStatus?.status === "OPEN" && loungeOpenStatus?.reason?.includes("Post-event"),
     [loungeOpenStatus?.status, loungeOpenStatus?.reason]
   );
+
+  // Derived: true while event hasn't started yet (gates pre-event Q&A edit/delete)
+  const isBeforeEventStart = eventData?.start_time
+    ? new Date(eventData.start_time).getTime() > Date.now()
+    : true;
 
   const loungeOnlyTables = useMemo(() =>
     loungeTables.filter(t => t.category === 'LOUNGE' || !t.category),
@@ -22351,6 +22369,9 @@ export default function NewLiveMeeting() {
         pendingHostChoice={pendingHostChoice}
         onConfirmHostChoice={handleConfirmHostChoice}
         onCancelHostChoice={handleCancelHostChoice}
+        eventId={eventId}
+        isBeforeEventStart={isBeforeEventStart}
+        qnaModerationEnabled={Boolean(eventData?.qna_moderation_enabled)}
       />
     );
   }
@@ -22522,11 +22543,6 @@ export default function NewLiveMeeting() {
       />
     );
   }
-
-  // Derived: true while event hasn't started yet (gates pre-event Q&A edit/delete)
-  const isBeforeEventStart = eventData?.start_time
-    ? new Date(eventData.start_time).getTime() > Date.now()
-    : true;
 
   if (waitingRoomActive && !isBreakout) {
     return (
