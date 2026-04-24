@@ -15272,6 +15272,16 @@ export default function NewLiveMeeting() {
   const [qnaEditingId, setQnaEditingId] = useState(null);
   const [qnaEditContent, setQnaEditContent] = useState("");
 
+  // AI Polish state for edit mode
+  const [qnaEditPolishing, setQnaEditPolishing] = useState(false);
+  const [qnaEditPolishResult, setQnaEditPolishResult] = useState(null);
+  const [qnaEditPolishError, setQnaEditPolishError] = useState("");
+
+  // Duplicate check state for edit mode
+  const [qnaEditChecking, setQnaEditChecking] = useState(false);
+  const [qnaEditDupResult, setQnaEditDupResult] = useState(null);
+  const [qnaEditDupError, setQnaEditDupError] = useState("");
+
   // Delete confirmation
   const [qnaDeleteId, setQnaDeleteId] = useState(null);
 
@@ -16127,6 +16137,64 @@ export default function NewLiveMeeting() {
       setQnaEditContent("");
     } catch (e) {
       setQnaError("Failed to edit question");
+    }
+  };
+
+  const handleQnaEditPolish = async () => {
+    const text = qnaEditContent.trim();
+    if (text.length < 5 || !eventId) return;
+    setQnaEditPolishing(true);
+    setQnaEditPolishError("");
+    setQnaEditPolishResult(null);
+    try {
+      const res = await fetch(
+        toApiUrl("interactions/questions/polish-draft/"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event_id: eventId, content: text }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Could not improve the question right now.");
+      }
+      if (data.changed) {
+        setQnaEditPolishResult({ original: data.original, improved: data.improved });
+      } else {
+        setQnaEditPolishError("Your question already looks great!");
+      }
+    } catch (e) {
+      setQnaEditPolishError(e.message || "Could not improve the question. Please try again.");
+    } finally {
+      setQnaEditPolishing(false);
+    }
+  };
+
+  const handleQnaEditDupCheck = async () => {
+    const text = qnaEditContent.trim();
+    if (text.length < 5 || !eventId) return;
+    setQnaEditChecking(true);
+    setQnaEditDupError("");
+    setQnaEditDupResult(null);
+    try {
+      const res = await fetch(
+        toApiUrl("interactions/questions/pre-event-duplicate-check/"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event_id: eventId, content: text }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Could not check duplicates right now.");
+      }
+      setQnaEditDupResult(data);
+    } catch (e) {
+      setQnaEditDupError(e.message || "Could not check duplicates. Please try again.");
+    } finally {
+      setQnaEditChecking(false);
     }
   };
 
@@ -19628,10 +19696,20 @@ export default function NewLiveMeeting() {
                                       size="small"
                                       autoFocus
                                       value={qnaEditContent}
-                                      onChange={(e) => setQnaEditContent(e.target.value)}
+                                      onChange={(e) => {
+                                        setQnaEditContent(e.target.value);
+                                        setQnaEditPolishResult(null);
+                                        setQnaEditPolishError("");
+                                        setQnaEditDupResult(null);
+                                        setQnaEditDupError("");
+                                      }}
                                       onKeyDown={(e) => {
                                         if (e.key === "Escape") {
                                           setQnaEditingId(null);
+                                          setQnaEditPolishResult(null);
+                                          setQnaEditPolishError("");
+                                          setQnaEditDupResult(null);
+                                          setQnaEditDupError("");
                                         }
                                       }}
                                       sx={{
@@ -19643,10 +19721,248 @@ export default function NewLiveMeeting() {
                                         }
                                       }}
                                     />
+
+                                    {/* AI Polish button */}
+                                    <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: "center" }}>
+                                      <Tooltip title="Improve your question">
+                                        <span>
+                                          <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={handleQnaEditPolish}
+                                            disabled={
+                                              qnaEditPolishing ||
+                                              qnaEditContent.trim().length < 5 ||
+                                              !eventId
+                                            }
+                                            startIcon={
+                                              qnaEditPolishing ? (
+                                                <CircularProgress size={13} color="inherit" />
+                                              ) : (
+                                                <AutoAwesomeIcon sx={{ fontSize: 14 }} />
+                                              )
+                                            }
+                                            sx={{
+                                              textTransform: "none",
+                                              borderColor: "rgba(255,255,255,0.6)",
+                                              color: "#ffffff !important",
+                                              "& .MuiButton-startIcon": { color: "#ffffff !important" },
+                                              "&:hover": { borderColor: "#fff", color: "#ffffff !important" },
+                                              "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.25) !important" },
+                                              fontSize: "0.75rem",
+                                              py: 0.4,
+                                            }}
+                                          >
+                                            {qnaEditPolishing ? "Improving…" : "Improve with AI"}
+                                          </Button>
+                                        </span>
+                                      </Tooltip>
+                                      <Tooltip title="Check for similar questions">
+                                        <span>
+                                          <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={handleQnaEditDupCheck}
+                                            disabled={
+                                              qnaEditChecking ||
+                                              qnaEditContent.trim().length < 5 ||
+                                              !eventId
+                                            }
+                                            startIcon={
+                                              qnaEditChecking ? (
+                                                <CircularProgress size={13} color="inherit" />
+                                              ) : null
+                                            }
+                                            sx={{
+                                              textTransform: "none",
+                                              borderColor: "rgba(255,255,255,0.6)",
+                                              color: "#ffffff !important",
+                                              "& .MuiButton-startIcon": { color: "#ffffff !important" },
+                                              "&:hover": { borderColor: "#fff", color: "#ffffff !important" },
+                                              "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.25) !important" },
+                                              fontSize: "0.75rem",
+                                              py: 0.4,
+                                            }}
+                                          >
+                                            {qnaEditChecking ? "Checking…" : "Check duplicates"}
+                                          </Button>
+                                        </span>
+                                      </Tooltip>
+                                    </Stack>
+
+                                    {/* Polish error */}
+                                    {qnaEditPolishError && (
+                                      <Typography variant="caption" sx={{ color: "#f88", display: "block", mb: 0.5 }}>
+                                        {qnaEditPolishError}
+                                      </Typography>
+                                    )}
+
+                                    {/* Duplicate check results */}
+                                    {qnaEditDupError && (
+                                      <Typography variant="caption" sx={{ color: "#f59e0b", display: "block", mb: 0.5 }}>
+                                        {qnaEditDupError}
+                                      </Typography>
+                                    )}
+                                    {qnaEditDupResult && !qnaEditDupResult.has_duplicates && (
+                                      <Typography variant="caption" sx={{ color: "#22c55e", display: "block", mb: 0.5 }}>
+                                        ✓ No duplicates found
+                                      </Typography>
+                                    )}
+                                    {qnaEditDupResult?.has_duplicates && (
+                                      <Box sx={{ mb: 1, p: 1, bgcolor: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 1 }}>
+                                        <Typography variant="caption" sx={{ color: "#f59e0b", fontWeight: 600, display: "block", mb: 0.5 }}>
+                                          Similar questions found:
+                                        </Typography>
+                                        {qnaEditDupResult.duplicates.filter(dup => dup.id !== qnaEditingId && dup.question_id !== qnaEditingId).map((dup, idx) => (
+                                          <Box key={idx} sx={{ mb: 0.5, p: 0.75, bgcolor: "rgba(255,255,255,0.05)", borderRadius: 1 }}>
+                                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", display: "block", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                              {dup.existing_text}
+                                            </Typography>
+                                            {dup.existing_text && (
+                                              <Button
+                                                size="small"
+                                                onClick={() => {
+                                                  setQnaEditContent(dup.existing_text);
+                                                  setQnaEditDupResult(null);
+                                                }}
+                                                sx={{ mt: 0.5, textTransform: "none", fontSize: 10, color: "#4dabf5", p: 0 }}
+                                              >
+                                                Use this version
+                                              </Button>
+                                            )}
+                                          </Box>
+                                        ))}
+                                        {qnaEditDupResult.duplicates.filter(dup => dup.id !== qnaEditingId && dup.question_id !== qnaEditingId).length === 0 && (
+                                          <Typography variant="caption" sx={{ color: "#22c55e", display: "block" }}>
+                                            ✓ No other similar questions found
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    )}
+
+                                    {/* Inline comparison panel */}
+                                    {qnaEditPolishResult && (
+                                      <Box sx={{ mb: 1 }}>
+                                        <Box
+                                          sx={{
+                                            display: "grid",
+                                            gridTemplateColumns: "1fr 1fr",
+                                            gap: 1,
+                                            mb: 1,
+                                          }}
+                                        >
+                                          {/* Original */}
+                                          <Box>
+                                            <Typography
+                                              variant="caption"
+                                              sx={{
+                                                color: "rgba(255,255,255,0.45)",
+                                                fontWeight: 600,
+                                                letterSpacing: 0.5,
+                                                textTransform: "uppercase",
+                                                mb: 0.5,
+                                                display: "block",
+                                              }}
+                                            >
+                                              Original
+                                            </Typography>
+                                            <Box
+                                              sx={{
+                                                bgcolor: "rgba(255,255,255,0.05)",
+                                                border: "1px solid rgba(255,255,255,0.1)",
+                                                borderRadius: "8px",
+                                                px: 1.5,
+                                                py: 1,
+                                                fontSize: "0.8rem",
+                                                lineHeight: 1.55,
+                                                color: "rgba(255,255,255,0.75)",
+                                                whiteSpace: "pre-wrap",
+                                                wordBreak: "break-word",
+                                              }}
+                                            >
+                                              {qnaEditPolishResult.original}
+                                            </Box>
+                                          </Box>
+
+                                          {/* Improved */}
+                                          <Box>
+                                            <Typography
+                                              variant="caption"
+                                              sx={{
+                                                color: "#9c7bff",
+                                                fontWeight: 600,
+                                                letterSpacing: 0.5,
+                                                textTransform: "uppercase",
+                                                mb: 0.5,
+                                                display: "block",
+                                              }}
+                                            >
+                                              Improved
+                                            </Typography>
+                                            <Box
+                                              sx={{
+                                                bgcolor: "rgba(156,123,255,0.08)",
+                                                border: "1px solid rgba(156,123,255,0.35)",
+                                                borderRadius: "8px",
+                                                px: 1.5,
+                                                py: 1,
+                                                fontSize: "0.8rem",
+                                                lineHeight: 1.55,
+                                                color: "#fff",
+                                                whiteSpace: "pre-wrap",
+                                                wordBreak: "break-word",
+                                              }}
+                                            >
+                                              {qnaEditPolishResult.improved}
+                                            </Box>
+                                          </Box>
+                                        </Box>
+
+                                        {/* Comparison actions */}
+                                        <Stack direction="row" spacing={1}>
+                                          <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => setQnaEditPolishResult(null)}
+                                            sx={{
+                                              textTransform: "none",
+                                              fontSize: 11,
+                                              color: "rgba(255,255,255,0.7)",
+                                              borderColor: "rgba(255,255,255,0.3)",
+                                            }}
+                                          >
+                                            Keep original
+                                          </Button>
+                                          <Button
+                                            size="small"
+                                            variant="contained"
+                                            onClick={() => {
+                                              setQnaEditContent(qnaEditPolishResult.improved);
+                                              setQnaEditPolishResult(null);
+                                            }}
+                                            sx={{
+                                              textTransform: "none",
+                                              fontSize: 11,
+                                              bgcolor: "#7c5cbf",
+                                              "&:hover": { bgcolor: "#6a4daa" },
+                                            }}
+                                          >
+                                            Use improved
+                                          </Button>
+                                        </Stack>
+                                      </Box>
+                                    )}
+
                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                                       <Button
                                         size="small"
-                                        onClick={() => setQnaEditingId(null)}
+                                        onClick={() => {
+                                          setQnaEditingId(null);
+                                          setQnaEditPolishResult(null);
+                                          setQnaEditPolishError("");
+                                          setQnaEditDupResult(null);
+                                          setQnaEditDupError("");
+                                        }}
                                         sx={{ color: "rgba(255,255,255,0.7)" }}
                                       >
                                         Cancel
@@ -20037,6 +20353,10 @@ export default function NewLiveMeeting() {
                                             onClick={() => {
                                               setQnaEditingId(q.id);
                                               setQnaEditContent(q.content);
+                                              setQnaEditPolishResult(null);
+                                              setQnaEditPolishError("");
+                                              setQnaEditDupResult(null);
+                                              setQnaEditDupError("");
                                             }}
                                             sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
                                           >

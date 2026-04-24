@@ -226,6 +226,7 @@ function QuestionItem({
   isHost,
   currentUserId,
   currentGuestId,
+  eventId,
   onUpvote,
   onReplyUpvote,
   onReplyCreate,
@@ -241,6 +242,14 @@ function QuestionItem({
 
   const [isEditingQuestion, setIsEditingQuestion] = useState(false);
   const [editQuestionContent, setEditQuestionContent] = useState(q.content);
+
+  const [polishing, setPolishing] = useState(false);
+  const [polishResult, setPolishResult] = useState(null);
+  const [polishError, setPolishError] = useState("");
+
+  const [checking, setChecking] = useState(false);
+  const [dupResult, setDupResult] = useState(null);
+  const [dupError, setDupError] = useState("");
 
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -264,6 +273,64 @@ function QuestionItem({
     setReplySubmitting(false);
   };
 
+  const handlePolishEdit = async () => {
+    const text = editQuestionContent.trim();
+    if (text.length < 5 || !eventId) return;
+    setPolishing(true);
+    setPolishError("");
+    setPolishResult(null);
+    try {
+      const res = await fetch(
+        toApiUrl("interactions/questions/polish-draft/"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event_id: eventId, content: text }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Could not improve the question right now.");
+      }
+      if (data.changed) {
+        setPolishResult({ original: data.original, improved: data.improved });
+      } else {
+        setPolishError("Your question already looks great!");
+      }
+    } catch (e) {
+      setPolishError(e.message || "Could not improve the question. Please try again.");
+    } finally {
+      setPolishing(false);
+    }
+  };
+
+  const handleDupCheckEdit = async () => {
+    const text = editQuestionContent.trim();
+    if (text.length < 5 || !eventId) return;
+    setChecking(true);
+    setDupError("");
+    setDupResult(null);
+    try {
+      const res = await fetch(
+        toApiUrl("interactions/questions/pre-event-duplicate-check/"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ event_id: eventId, content: text }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || "Could not check duplicates right now.");
+      }
+      setDupResult(data);
+    } catch (e) {
+      setDupError(e.message || "Could not check duplicates. Please try again.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
   return (
     <ListItem disableGutters sx={{ mb: 0.5 }}>
       <Paper
@@ -284,7 +351,13 @@ function QuestionItem({
               size="small"
               autoFocus
               value={editQuestionContent}
-              onChange={(e) => setEditQuestionContent(e.target.value)}
+              onChange={(e) => {
+                setEditQuestionContent(e.target.value);
+                setPolishResult(null);
+                setPolishError("");
+                setDupResult(null);
+                setDupError("");
+              }}
               onKeyDown={(e) => { if (e.key === "Escape") setIsEditingQuestion(false); }}
               sx={{
                 mb: 1,
@@ -295,6 +368,238 @@ function QuestionItem({
                 },
               }}
             />
+
+            {/* AI Polish button */}
+            <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: "center" }}>
+              <Tooltip title="Improve your question">
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handlePolishEdit}
+                    disabled={
+                      polishing ||
+                      editQuestionContent.trim().length < 5 ||
+                      !eventId
+                    }
+                    startIcon={
+                      polishing ? (
+                        <CircularProgress size={13} color="inherit" />
+                      ) : (
+                        <AutoAwesomeIcon sx={{ fontSize: 14 }} />
+                      )
+                    }
+                    sx={{
+                      textTransform: "none",
+                      borderColor: "rgba(255,255,255,0.6)",
+                      color: "#ffffff !important",
+                      "& .MuiButton-startIcon": { color: "#ffffff !important" },
+                      "&:hover": { borderColor: "#fff", color: "#ffffff !important" },
+                      "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.25) !important" },
+                      fontSize: "0.75rem",
+                      py: 0.4,
+                    }}
+                  >
+                    {polishing ? "Improving…" : "Improve with AI"}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title="Check for similar questions">
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleDupCheckEdit}
+                    disabled={
+                      checking ||
+                      editQuestionContent.trim().length < 5 ||
+                      !eventId
+                    }
+                    startIcon={
+                      checking ? (
+                        <CircularProgress size={13} color="inherit" />
+                      ) : null
+                    }
+                    sx={{
+                      textTransform: "none",
+                      borderColor: "rgba(255,255,255,0.6)",
+                      color: "#ffffff !important",
+                      "& .MuiButton-startIcon": { color: "#ffffff !important" },
+                      "&:hover": { borderColor: "#fff", color: "#ffffff !important" },
+                      "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.25) !important" },
+                      fontSize: "0.75rem",
+                      py: 0.4,
+                    }}
+                  >
+                    {checking ? "Checking…" : "Check duplicates"}
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
+
+            {/* Polish error */}
+            {polishError && (
+              <Typography variant="caption" sx={{ color: "#f88", display: "block", mb: 0.5 }}>
+                {polishError}
+              </Typography>
+            )}
+
+            {/* Duplicate check results */}
+            {dupError && (
+              <Typography variant="caption" sx={{ color: "#f59e0b", display: "block", mb: 0.5 }}>
+                {dupError}
+              </Typography>
+            )}
+            {dupResult && !dupResult.has_duplicates && (
+              <Typography variant="caption" sx={{ color: "#22c55e", display: "block", mb: 0.5 }}>
+                ✓ No duplicates found
+              </Typography>
+            )}
+            {dupResult?.has_duplicates && (
+              <Box sx={{ mb: 1, p: 1, bgcolor: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 1 }}>
+                <Typography variant="caption" sx={{ color: "#f59e0b", fontWeight: 600, display: "block", mb: 0.5 }}>
+                  Similar questions found:
+                </Typography>
+                {dupResult.duplicates.filter(dup => dup.id !== q.id && dup.question_id !== q.id).map((dup, idx) => (
+                  <Box key={idx} sx={{ mb: 0.5, p: 0.75, bgcolor: "rgba(255,255,255,0.05)", borderRadius: 1 }}>
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", display: "block", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      {dup.existing_text}
+                    </Typography>
+                    {dup.existing_text && (
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          setEditQuestionContent(dup.existing_text);
+                          setDupResult(null);
+                        }}
+                        sx={{ mt: 0.5, textTransform: "none", fontSize: 10, color: "#4dabf5", p: 0 }}
+                      >
+                        Use this version
+                      </Button>
+                    )}
+                  </Box>
+                ))}
+                {dupResult.duplicates.filter(dup => dup.id !== q.id && dup.question_id !== q.id).length === 0 && (
+                  <Typography variant="caption" sx={{ color: "#22c55e", display: "block" }}>
+                    ✓ No other similar questions found
+                  </Typography>
+                )}
+              </Box>
+            )}
+
+            {/* Inline comparison panel */}
+            {polishResult && (
+              <Box sx={{ mb: 1 }}>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 1,
+                    mb: 1,
+                  }}
+                >
+                  {/* Original */}
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "rgba(255,255,255,0.45)",
+                        fontWeight: 600,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
+                        mb: 0.5,
+                        display: "block",
+                      }}
+                    >
+                      Original
+                    </Typography>
+                    <Box
+                      sx={{
+                        bgcolor: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "8px",
+                        px: 1.5,
+                        py: 1,
+                        fontSize: "0.8rem",
+                        lineHeight: 1.55,
+                        color: "rgba(255,255,255,0.75)",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {polishResult.original}
+                    </Box>
+                  </Box>
+
+                  {/* Improved */}
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#9c7bff",
+                        fontWeight: 600,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
+                        mb: 0.5,
+                        display: "block",
+                      }}
+                    >
+                      Improved
+                    </Typography>
+                    <Box
+                      sx={{
+                        bgcolor: "rgba(156,123,255,0.08)",
+                        border: "1px solid rgba(156,123,255,0.35)",
+                        borderRadius: "8px",
+                        px: 1.5,
+                        py: 1,
+                        fontSize: "0.8rem",
+                        lineHeight: 1.55,
+                        color: "#fff",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {polishResult.improved}
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Comparison actions */}
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setPolishResult(null)}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.7)",
+                      borderColor: "rgba(255,255,255,0.3)",
+                    }}
+                  >
+                    Keep original
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => {
+                      setEditQuestionContent(polishResult.improved);
+                      setPolishResult(null);
+                    }}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: 11,
+                      bgcolor: "#7c5cbf",
+                      "&:hover": { bgcolor: "#6a4daa" },
+                    }}
+                  >
+                    Use improved
+                  </Button>
+                </Stack>
+              </Box>
+            )}
+
             <Stack direction="row" spacing={1} justifyContent="flex-end">
               <Button size="small" onClick={() => setIsEditingQuestion(false)} sx={{ color: "rgba(255,255,255,0.7)" }}>
                 Cancel
@@ -1754,7 +2059,7 @@ export default function LiveQnAPanel({
                           <List dense disablePadding>
                             {groupedQuestions[g.id].map(q => (
                               <QuestionItem
-                                key={q.id} q={q} isHost={isHost} currentUserId={currentUserId} currentGuestId={currentGuestId}
+                                key={q.id} q={q} isHost={isHost} currentUserId={currentUserId} currentGuestId={currentGuestId} eventId={eventId}
                                 onUpvote={handleUpvote} onReplyUpvote={handleReplyUpvote} onReplyCreate={handleReplyCreate}
                                 onReplyEdit={handleReplyEdit} onReplyDelete={handleReplyDelete} onEditQuestion={handleEditQuestion}
                                 onDeleteQuestion={handleDeleteQuestion}
@@ -1767,7 +2072,7 @@ export default function LiveQnAPanel({
                       {visibleGroups.length > 0 && ungroupedQuestions.length > 0 && <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 1, mt: 1, pl: 1 }}>Ungrouped Questions</Typography>}
                       {ungroupedQuestions.map((q) => (
                         <QuestionItem
-                          key={q.id} q={q} isHost={isHost} currentUserId={currentUserId} currentGuestId={currentGuestId}
+                          key={q.id} q={q} isHost={isHost} currentUserId={currentUserId} currentGuestId={currentGuestId} eventId={eventId}
                           onUpvote={handleUpvote} onReplyUpvote={handleReplyUpvote} onReplyCreate={handleReplyCreate}
                           onReplyEdit={handleReplyEdit} onReplyDelete={handleReplyDelete} onEditQuestion={handleEditQuestion}
                           onDeleteQuestion={handleDeleteQuestion}
