@@ -48,7 +48,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 
 dayjs.extend(relativeTime);
 
-const API_BASE = import.meta.env.VITE_API_URL || "";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -251,7 +251,7 @@ function EditDialog({
         setPolishError(null);
         setPolishResult(null);
         try {
-            const res = await fetch(`${API_BASE}/api/interactions/questions/polish-draft/`, {
+            const res = await fetch(`${API_BASE}/interactions/questions/polish-draft/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ event_id: eventId, content: content.trim() }),
@@ -276,7 +276,7 @@ function EditDialog({
         setDupError(null);
         setDupResult(null);
         try {
-            const res = await fetch(`${API_BASE}/api/interactions/questions/pre-event-duplicate-check/`, {
+            const res = await fetch(`${API_BASE}/interactions/questions/pre-event-duplicate-check/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ event_id: eventId, content: content.trim() }),
@@ -297,7 +297,7 @@ function EditDialog({
         setSaveError(null);
         try {
             const res = await fetch(
-                `${API_BASE}/api/interactions/questions/${question.id}/pre-event-edit/`,
+                `${API_BASE}/interactions/questions/${question.id}/pre-event-edit/`,
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -450,7 +450,7 @@ function DeleteDialog({ open, question, token, onClose, onDeleted }) {
         setError(null);
         try {
             const res = await fetch(
-                `${API_BASE}/api/interactions/questions/${question.id}/pre-event-delete/`,
+                `${API_BASE}/interactions/questions/${question.id}/pre-event-delete/`,
                 {
                     method: "DELETE",
                     headers: { Authorization: `Bearer ${token}` },
@@ -540,7 +540,7 @@ export default function PreEventQnaManager({
         setFetchError(null);
         try {
             const res = await fetch(
-                `${API_BASE}/api/interactions/questions/my-pre-event/?event_id=${eventId}`,
+                `${API_BASE}/interactions/questions/my-pre-event/?event_id=${eventId}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             if (!res.ok) {

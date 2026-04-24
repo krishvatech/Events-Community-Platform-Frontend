@@ -74,7 +74,7 @@ export default function MagicLinkPage() {
 
           try {
             // Call guest-join API to create guest attendee session
-            const guestUrl = urlJoin(API_BASE, `/api/events/${event.id}/guest-join/`);
+            const guestUrl = urlJoin(API_BASE, `/events/${event.id}/guest-join/`);
             console.log("[MagicLink] Guest join URL:", guestUrl);
 
             const guestResponse = await fetch(guestUrl, {
