@@ -212,7 +212,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
             { label: "Identity Verification", to: "/admin/name-requests", icon: BadgeRoundedIcon },
             { label: "Users", to: "/admin/users", icon: AdminPanelSettingsRoundedIcon },
-            { label: "Saleor Dashboard", action: "saleor", icon: ShoppingCartRoundedIcon },
+            { label: "Saleor Manager", to: "/admin/saleor", icon: ShoppingCartRoundedIcon },
             { label: "CMS", action: "cms", icon: ArticleRoundedIcon },
         ];
     } else if (isStaffOnly) {
