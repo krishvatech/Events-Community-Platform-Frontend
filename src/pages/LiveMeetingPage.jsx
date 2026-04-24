@@ -23441,8 +23441,25 @@ export default function NewLiveMeeting() {
                 )}
 
                 {displayedQuestion?.visible !== false && displayedQuestion?.question_id && (
-                  <Box
-                    sx={{
+                  <>
+                    {/* Guard: only allow profile opening for registered non-self non-guest users */}
+                    {(() => {
+                      const canOpenQnaProfile = !displayedQuestion.is_anonymous && displayedQuestion.user_id && !/^guest/i.test(String(displayedQuestion.user_id)) && String(displayedQuestion.user_id) !== String(myUserIdRef.current);
+                      const qnaDisplayerMemberPayload = canOpenQnaProfile ? {
+                        id: displayedQuestion.user_id,
+                        name: displayedQuestion.asked_by || "Audience",
+                        picture: displayedQuestion.user_avatar_url || "",
+                        role: "Audience",
+                        job_title: "",
+                        company: "",
+                        location: displayedQuestion.user_country_code || "",
+                        username: "",
+                        _raw: { customParticipantId: displayedQuestion.user_id, isKycVerified: false },
+                      } : null;
+
+                      return (
+                        <Box
+                          sx={{
                       position: "absolute",
                       left: { xs: 12, sm: 20 },
                       right: { xs: 12, sm: 20 },
@@ -23455,254 +23472,283 @@ export default function NewLiveMeeting() {
                         "0%": { transform: "translateY(24px)", opacity: 0 },
                         "100%": { transform: "translateY(0)", opacity: 1 },
                       },
-                    }}
-                  >
-                    <Paper
-                      elevation={10}
-                      sx={{
-                        width: "100%",
-                        maxWidth: 650,
-                        borderRadius: 4,
-                        px: { xs: 1.5, sm: 2 },
-                        py: { xs: 1.2, sm: 1.5 },
-                        background: "linear-gradient(135deg, rgba(2,6,23,0.94) 0%, rgba(15,23,42,0.96) 55%, rgba(8,47,73,0.94) 100%)",
-                        border: "1px solid rgba(125,211,252,0.28)",
-                        borderTop: "2px solid #0ea5e9",
-                        boxShadow: "0 24px 80px rgba(0,0,0,0.48), 0 0 40px rgba(56,189,248,0.12)",
-                        backdropFilter: "blur(18px)",
-                        pointerEvents: "auto",
-                        animation: "slideUpFade 0.35s ease-out",
-                      }}
-                    >
-                      <Stack spacing={1.5}>
-                        {/* Header: Avatar + Badge + Name + Host Controls */}
-                        <Stack
-                          direction={{ xs: "column", sm: "row" }}
-                          spacing={1.5}
-                          alignItems={{ xs: "flex-start", sm: "center" }}
-                          justifyContent="space-between"
-                        >
-                          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
-                            {/* Larger Avatar with Ring */}
-                            <Box sx={{ position: "relative", flexShrink: 0 }}>
-                              <Avatar
-                                src={displayedQuestion.user_avatar_url || ""}
-                                sx={{
-                                  width: 60,
-                                  height: 60,
-                                  bgcolor: "rgba(255,255,255,0.12)",
-                                  border: "2px solid rgba(255,255,255,0.18)",
-                                  outline: "3px solid rgba(56,189,248,0.5)",
-                                  outlineOffset: "1px",
-                                  fontSize: 24,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {initialsFromName(displayedQuestion.asked_by || "Audience")}
-                              </Avatar>
-                            </Box>
-
-                            {/* Badge + Name + Country Flag */}
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: "wrap", mb: 0.75 }}>
-                                <Chip
-                                  size="small"
-                                  label="LIVE QUESTION"
-                                  sx={{
-                                    bgcolor: "rgba(56,189,248,0.18)",
-                                    border: "1px solid rgba(56,189,248,0.4)",
-                                    color: "#7dd3fc",
-                                    fontWeight: 800,
-                                    fontSize: 11,
-                                    height: 24,
-                                  }}
-                                />
-                                {displayedQuestion.is_answered && (
-                                  <Chip
-                                    size="small"
-                                    label="Answered"
-                                    sx={{
-                                      bgcolor: "rgba(34,197,94,0.16)",
-                                      border: "1px solid rgba(34,197,94,0.36)",
-                                      color: "#4ade80",
-                                      fontWeight: 700,
-                                      fontSize: 11,
-                                      height: 24,
-                                    }}
-                                  />
-                                )}
-                              </Stack>
-
-                              {/* Name with Country Flag */}
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
-                                <Typography
-                                  sx={{
-                                    fontWeight: 800,
-                                    fontSize: { xs: 14, sm: 16 },
-                                    lineHeight: 1.2,
-                                    color: "#fff",
-                                  }}
-                                >
-                                  {displayedQuestion.asked_by || "Audience"}
-                                </Typography>
-                                {displayedQuestion.user_country_code && (
-                                  <Typography
-                                    sx={{
-                                      fontSize: 20,
-                                      lineHeight: 1,
-                                    }}
-                                  >
-                                    {flagEmojiFromISO2(displayedQuestion.user_country_code)}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Box>
-                          </Stack>
-
-                          {/* Host Controls: Dismiss + Next */}
-                          {isHost && (
-                            <Stack direction="row" spacing={1} sx={{ pointerEvents: "auto", flexShrink: 0 }}>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => handleDismissDisplayedQuestion()}
-                                sx={{
-                                  textTransform: "none",
-                                  borderColor: "rgba(255,255,255,0.2)",
-                                  color: "#fff",
-                                  fontSize: 13,
-                                  fontWeight: 600,
-                                  "&:hover": { borderColor: "rgba(255,255,255,0.4)" },
-                                }}
-                              >
-                                Dismiss
-                              </Button>
-                              <Button
-                                size="small"
-                                variant="contained"
-                                onClick={handleShowNextDisplayedQuestion}
-                                sx={{
-                                  textTransform: "none",
-                                  bgcolor: "#0ea5e9",
-                                  color: "#fff",
-                                  fontSize: 13,
-                                  fontWeight: 600,
-                                  "&:hover": { bgcolor: "#0284c7" },
-                                }}
-                              >
-                                Next
-                              </Button>
-                            </Stack>
-                          )}
-                        </Stack>
-
-                        {/* Question Text */}
-                        <Typography
-                          sx={{
-                            fontSize: { xs: 15, sm: 18, md: 20 },
-                            lineHeight: 1.35,
-                            fontWeight: 800,
-                            letterSpacing: "-0.01em",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                            textShadow: "0 10px 32px rgba(0,0,0,0.36)",
-                            color: "#fff",
                           }}
                         >
-                          {displayedQuestion.content}
-                        </Typography>
+                          <Paper
+                            elevation={10}
+                            sx={{
+                              width: "100%",
+                              maxWidth: 650,
+                              borderRadius: 4,
+                              px: { xs: 1.5, sm: 2 },
+                              py: { xs: 1.2, sm: 1.5 },
+                              background: "linear-gradient(135deg, rgba(2,6,23,0.94) 0%, rgba(15,23,42,0.96) 55%, rgba(8,47,73,0.94) 100%)",
+                              border: "1px solid rgba(125,211,252,0.28)",
+                              borderTop: "2px solid #0ea5e9",
+                              boxShadow: "0 24px 80px rgba(0,0,0,0.48), 0 0 40px rgba(56,189,248,0.12)",
+                              backdropFilter: "blur(18px)",
+                              pointerEvents: "auto",
+                              animation: "slideUpFade 0.35s ease-out",
+                            }}
+                          >
+                            <Stack spacing={1.5}>
+                              {/* Header: Avatar + Badge + Name + Host Controls */}
+                              <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                spacing={1.5}
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                justifyContent="space--between"
+                              >
+                                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                                  {/* Larger Avatar with Ring - CLICKABLE */}
+                                  <Box sx={{ position: "relative", flexShrink: 0 }}>
+                                    <Tooltip title={canOpenQnaProfile ? "Open Profile" : ""}>
+                                      <Avatar
+                                        src={displayedQuestion.user_avatar_url || ""}
+                                        onClick={canOpenQnaProfile ? () => openMemberInfo(qnaDisplayerMemberPayload) : undefined}
+                                        sx={{
+                                          width: 60,
+                                          height: 60,
+                                          bgcolor: "rgba(255,255,255,0.12)",
+                                          border: "2px solid rgba(255,255,255,0.18)",
+                                          outline: "3px solid rgba(56,189,248,0.5)",
+                                          outlineOffset: "1px",
+                                          fontSize: 24,
+                                          fontWeight: 700,
+                                          cursor: canOpenQnaProfile ? "pointer" : "default",
+                                          "&:hover": canOpenQnaProfile ? { outline: "3px solid rgba(56,189,248,0.85)" } : {},
+                                        }}
+                                      >
+                                        {initialsFromName(displayedQuestion.asked_by || "Audience")}
+                                      </Avatar>
+                                    </Tooltip>
+                                  </Box>
 
-                        {/* CTA Buttons: View Profile + Connect */}
-                        {!displayedQuestion.is_anonymous && displayedQuestion.user_id && !/^guest/i.test(String(displayedQuestion.user_id)) && String(displayedQuestion.user_id) !== String(myUserIdRef.current) && (
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ pointerEvents: "auto", pt: 0.5 }}>
-                            <Button
-                              fullWidth
-                              variant="outlined"
-                              startIcon={<Box component="span" sx={{ fontSize: 16, display: "flex" }}>👤</Box>}
-                              onClick={() => window.open(`/community/rich-profile/${displayedQuestion.user_id}`, "_blank")}
-                              sx={{
-                                py: 1,
-                                borderRadius: 2,
-                                borderColor: "rgba(255,255,255,0.2)",
-                                color: "#fff",
-                                textTransform: "none",
-                                fontWeight: 600,
-                                fontSize: 13,
-                                bgcolor: "rgba(255,255,255,0.02)",
-                                "&:hover": {
-                                  bgcolor: "rgba(255,255,255,0.08)",
-                                  borderColor: "#fff",
-                                },
-                              }}
-                            >
-                              View Profile
-                            </Button>
+                                  {/* Badge + Name + Country Flag */}
+                                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: "wrap", mb: 0.75 }}>
+                                      <Chip
+                                        size="small"
+                                        label="LIVE QUESTION"
+                                        sx={{
+                                          bgcolor: "rgba(56,189,248,0.18)",
+                                          border: "1px solid rgba(56,189,248,0.4)",
+                                          color: "#7dd3fc",
+                                          fontWeight: 800,
+                                          fontSize: 11,
+                                          height: 24,
+                                        }}
+                                      />
+                                      {displayedQuestion.is_answered && (
+                                        <Chip
+                                          size="small"
+                                          label="Answered"
+                                          sx={{
+                                            bgcolor: "rgba(34,197,94,0.16)",
+                                            border: "1px solid rgba(34,197,94,0.36)",
+                                            color: "#4ade80",
+                                            fontWeight: 700,
+                                            fontSize: 11,
+                                            height: 24,
+                                          }}
+                                        />
+                                      )}
+                                    </Stack>
 
-                            {qnaDisplayConnStatus === "none" && (
-                              <Button
-                                fullWidth
-                                variant="contained"
-                                disabled={qnaDisplayConnLoading}
-                                onClick={handleQnaDisplayConnect}
-                                startIcon={<PersonAddAlt1RoundedIcon />}
+                                    {/* Name with Country Flag - CLICKABLE + INFO ICON */}
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+                                      <Typography
+                                        sx={{
+                                          fontWeight: 800,
+                                          fontSize: { xs: 14, sm: 16 },
+                                          lineHeight: 1.2,
+                                          color: "#fff",
+                                          cursor: canOpenQnaProfile ? "pointer" : "default",
+                                          "&:hover": canOpenQnaProfile ? { textDecoration: "underline" } : {},
+                                        }}
+                                        onClick={canOpenQnaProfile ? () => openMemberInfo(qnaDisplayerMemberPayload) : undefined}
+                                      >
+                                        {displayedQuestion.asked_by || "Audience"}
+                                      </Typography>
+
+                                      {/* Info Icon - only for registered non-self users */}
+                                      {canOpenQnaProfile && (
+                                        <Tooltip title="Open Profile">
+                                          <IconButton
+                                            size="small"
+                                            sx={{ color: "rgba(255,255,255,0.75)", p: 0.25 }}
+                                            onClick={(e) => { e.stopPropagation(); openMemberInfo(qnaDisplayerMemberPayload); }}
+                                          >
+                                            <InfoOutlinedIcon sx={{ fontSize: 15 }} />
+                                          </IconButton>
+                                        </Tooltip>
+                                      )}
+
+                                      {displayedQuestion.user_country_code && (
+                                        <Typography
+                                          sx={{
+                                            fontSize: 20,
+                                            lineHeight: 1,
+                                          }}
+                                        >
+                                          {flagEmojiFromISO2(displayedQuestion.user_country_code)}
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  </Box>
+                                </Stack>
+
+                                {/* Action Buttons: View Profile + Connect + Host Controls (Dismiss + Next) */}
+                                <Stack direction="row" spacing={1} sx={{ pointerEvents: "auto", flexShrink: 0, alignItems: "center" }}>
+                                  {/* View Profile Button */}
+                                  {canOpenQnaProfile && (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      startIcon={<Box component="span" sx={{ fontSize: 14, display: "flex" }}>👤</Box>}
+                                      onClick={() => window.open(`/community/rich-profile/${displayedQuestion.user_id}`, "_blank")}
+                                      sx={{
+                                        py: 0.40,
+                                        px: 1.3,
+                                        borderRadius: 2,
+                                        borderColor: "#0ea5e9",
+                                        color: "#0ea5e9",
+                                        textTransform: "none",
+                                        fontWeight: 600,
+                                        fontSize: 13,
+                                        bgcolor: "transparent",
+                                        "&:hover": {
+                                          bgcolor: "rgba(14,165,233,0.1)",
+                                          borderColor: "#0284c7",
+                                          color: "#0284c7",
+                                        },
+                                      }}
+                                    >
+                                      View Profile
+                                    </Button>
+                                  )}
+
+                                  {/* Connect Button */}
+                                  {canOpenQnaProfile && qnaDisplayConnStatus === "none" && (
+                                    <Button
+                                      variant="contained"
+                                      disabled={qnaDisplayConnLoading}
+                                      onClick={handleQnaDisplayConnect}
+                                      startIcon={<PersonAddAlt1RoundedIcon />}
+                                      sx={{
+                                        py: 0.75,
+                                        px: 1.5,
+                                        borderRadius: 2,
+                                        bgcolor: "#14b8b1",
+                                        color: "#fff",
+                                        textTransform: "none",
+                                        fontWeight: 700,
+                                        fontSize: 12,
+                                        "&:hover": { bgcolor: "#0e8e88" },
+                                      }}
+                                    >
+                                      {qnaDisplayConnLoading ? "Sending..." : "Connect"}
+                                    </Button>
+                                  )}
+
+                                  {canOpenQnaProfile && qnaDisplayConnStatus === "pending_outgoing" && (
+                                    <Button
+                                      disabled
+                                      variant="contained"
+                                      sx={{
+                                        py: 0.75,
+                                        px: 1.5,
+                                        borderRadius: 2,
+                                        bgcolor: "rgba(255,255,255,0.1) !important",
+                                        color: "rgba(255,255,255,0.5) !important",
+                                        textTransform: "none",
+                                        fontWeight: 600,
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      Request Sent
+                                    </Button>
+                                  )}
+
+                                  {canOpenQnaProfile && qnaDisplayConnStatus === "friends" && (
+                                    <Button
+                                      disabled
+                                      variant="outlined"
+                                      startIcon={<CheckRoundedIcon />}
+                                      sx={{
+                                        py: 0.75,
+                                        px: 1.5,
+                                        borderRadius: 2,
+                                        borderColor: "rgba(20,184,177,0.5) !important",
+                                        color: "#14b8b1 !important",
+                                        textTransform: "none",
+                                        fontWeight: 600,
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      Connected
+                                    </Button>
+                                  )}
+
+                                  {/* Host Controls: Dismiss + Next */}
+                                  {isHost && (
+                                    <>
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => handleDismissDisplayedQuestion()}
+                                        sx={{
+                                          textTransform: "none",
+                                          borderColor: "rgba(255,255,255,0.2)",
+                                          color: "#fff",
+                                          fontSize: 13,
+                                          fontWeight: 600,
+                                          "&:hover": { borderColor: "rgba(255,255,255,0.4)" },
+                                        }}
+                                      >
+                                        Dismiss
+                                      </Button>
+                                      <Button
+                                        size="small"
+                                        variant="contained"
+                                        onClick={handleShowNextDisplayedQuestion}
+                                        sx={{
+                                          textTransform: "none",
+                                          bgcolor: "#0ea5e9",
+                                          color: "#fff",
+                                          fontSize: 13,
+                                          fontWeight: 600,
+                                          "&:hover": { bgcolor: "#0284c7" },
+                                        }}
+                                      >
+                                        Next
+                                      </Button>
+                                    </>
+                                  )}
+                                </Stack>
+                              </Stack>
+
+                              {/* Question Text */}
+                              <Typography
                                 sx={{
-                                  py: 1,
-                                  borderRadius: 2,
-                                  bgcolor: "#14b8b1",
+                                  fontSize: { xs: 15, sm: 18, md: 20 },
+                                  lineHeight: 1.35,
+                                  fontWeight: 800,
+                                  letterSpacing: "-0.01em",
+                                  whiteSpace: "pre-wrap",
+                                  wordBreak: "break-word",
+                                  textShadow: "0 10px 32px rgba(0,0,0,0.36)",
                                   color: "#fff",
-                                  textTransform: "none",
-                                  fontWeight: 700,
-                                  fontSize: 13,
-                                  "&:hover": { bgcolor: "#0e8e88" },
                                 }}
                               >
-                                {qnaDisplayConnLoading ? "Sending..." : "Connect"}
-                              </Button>
-                            )}
-
-                            {qnaDisplayConnStatus === "pending_outgoing" && (
-                              <Button
-                                fullWidth
-                                disabled
-                                variant="contained"
-                                sx={{
-                                  py: 1,
-                                  borderRadius: 2,
-                                  bgcolor: "rgba(255,255,255,0.1) !important",
-                                  color: "rgba(255,255,255,0.5) !important",
-                                  textTransform: "none",
-                                  fontWeight: 600,
-                                  fontSize: 13,
-                                }}
-                              >
-                                Request Sent
-                              </Button>
-                            )}
-
-                            {qnaDisplayConnStatus === "friends" && (
-                              <Button
-                                fullWidth
-                                disabled
-                                variant="outlined"
-                                startIcon={<CheckRoundedIcon />}
-                                sx={{
-                                  py: 1,
-                                  borderRadius: 2,
-                                  borderColor: "rgba(20,184,177,0.5) !important",
-                                  color: "#14b8b1 !important",
-                                  textTransform: "none",
-                                  fontWeight: 600,
-                                  fontSize: 13,
-                                }}
-                              >
-                                Connected
-                              </Button>
-                            )}
-                          </Stack>
-                        )}
-                      </Stack>
-                    </Paper>
-                  </Box>
+                                {displayedQuestion.content}
+                              </Typography>
+                            </Stack>
+                          </Paper>
+                        </Box>
+                      );
+                    })()}
+                  </>
                 )}
 
                 {/* Main participant */}
