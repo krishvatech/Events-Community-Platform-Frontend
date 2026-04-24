@@ -21154,7 +21154,16 @@ export default function NewLiveMeeting() {
                           >
                             <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                               <ListItemAvatar>
-                                {renderMemberAvatar(m)}
+                                <Tooltip title={isSelfMember(m) ? "" : "Open Profile"} disableHoverListener={isSelfMember(m)}>
+                                  <span style={{ display: "flex", cursor: !isSelfMember(m) ? "pointer" : "default" }} onClick={(e) => {
+                                    if (!isSelfMember(m)) {
+                                      e.stopPropagation();
+                                      openMemberInfo(m);
+                                    }
+                                  }}>
+                                    {renderMemberAvatar(m)}
+                                  </span>
+                                </Tooltip>
                               </ListItemAvatar>
                               <ListItemText
                                 primary={
@@ -21587,7 +21596,16 @@ export default function NewLiveMeeting() {
                           >
                             <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                               <ListItemAvatar>
-                                {renderMemberAvatar(m)}
+                                <Tooltip title={isSelfMember(m) ? "" : "Open Profile"} disableHoverListener={isSelfMember(m)}>
+                                  <span style={{ display: "flex", cursor: !isSelfMember(m) ? "pointer" : "default" }} onClick={(e) => {
+                                    if (!isSelfMember(m)) {
+                                      e.stopPropagation();
+                                      openMemberInfo(m);
+                                    }
+                                  }}>
+                                    {renderMemberAvatar(m)}
+                                  </span>
+                                </Tooltip>
                               </ListItemAvatar>
                               <ListItemText
                                 primary={
@@ -21865,13 +21883,22 @@ export default function NewLiveMeeting() {
                         >
                           <ListItemButton disableRipple sx={{ px: 1.25, py: 1, width: "100%", cursor: "default" }}>
                             <ListItemAvatar>
-                              {renderMemberAvatar(m)}
+                              <Tooltip title={isSelfMember(m) ? "" : "Open Profile"} disableHoverListener={isSelfMember(m) || m.isVirtual}>
+                                <span style={{ display: "flex", cursor: (!isSelfMember(m) && !m.isVirtual) ? "pointer" : "default" }} onClick={(e) => {
+                                  if (!isSelfMember(m) && !m.isVirtual) {
+                                    e.stopPropagation();
+                                    openMemberInfo(m);
+                                  }
+                                }}>
+                                  {renderMemberAvatar(m)}
+                                </span>
+                              </Tooltip>
                             </ListItemAvatar>
                             <ListItemText
                               primary={
                                 <Stack spacing={1}>
                                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                                    <Tooltip title={isSelfMember(m) && isGuest ? "Edit your profile" : ""} disableHoverListener={!isSelfMember(m) || !isGuest}>
+                                    <Tooltip title={isSelfMember(m) && isGuest ? "Edit your profile" : !isSelfMember(m) && !m.isVirtual ? "Open Profile" : ""} disableHoverListener={isSelfMember(m) || m.isVirtual}>
                                       <span>
                                         <Typography
                                           noWrap
