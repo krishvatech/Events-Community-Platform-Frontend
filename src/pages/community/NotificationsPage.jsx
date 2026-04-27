@@ -721,6 +721,22 @@ function NotificationRow({
       );
     }
     if (item.kind === "event") {
+      // Handle registration confirmation notifications
+      if (item.data?.action === "registered") {
+        const eventTitle = item.context?.eventTitle || item.title;
+        return (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography variant="body2">You have successfully registered for</Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <EventRoundedIcon sx={{ fontSize: 16, color: "primary.main" }} />
+              <Typography variant="body2" sx={{ fontWeight: 600, color: "primary.main" }}>
+                {eventTitle}
+              </Typography>
+            </Stack>
+          </Stack>
+        );
+      }
+      // Handle event invitation notifications
       const sourceName = item.context?.inviteSourceName || item.actor?.name || "System";
       const eventTitle = item.context?.eventTitle || item.title.replace(/^Invitation:\s*/i, "");
       const sourceIsPerson = item.context?.inviteSourceType !== "group";
@@ -1226,6 +1242,19 @@ export default function NotificationsPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
+  // --- Real-time refresh on new notifications ---
+  React.useEffect(() => {
+    const handleNotifyUnread = () => {
+      // Reload notifications immediately when a new one is created
+      setVisibleCount(10);
+      setHasMore(true);
+      setNextUrl(`${API_BASE}/notifications/?page_size=10`);
+      loadNotifications(`${API_BASE}/notifications/?page_size=10`, false);
+    };
+
+    window.addEventListener("notify:unread", handleNotifyUnread);
+    return () => window.removeEventListener("notify:unread", handleNotifyUnread);
+  }, [loadNotifications]);
 
   // --- Infinite Scroll ---
   React.useEffect(() => {

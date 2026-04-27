@@ -868,6 +868,15 @@ export default function EventDetailsPage() {
         const results = Array.isArray(data) ? data : (data.results || []);
         const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
         setRegistration(mineForEvent || null);
+
+        // Show success toast and dispatch unread notification event
+        toast.success(`You have successfully registered for "${event?.title || "this event"}"!`);
+        try {
+          const prev = Number(localStorage.getItem("unread_notifications") || "0");
+          const next = prev + 1;
+          localStorage.setItem("unread_notifications", String(next));
+          window.dispatchEvent(new CustomEvent("notify:unread", { detail: { count: next } }));
+        } catch (_) {}
       }
     } catch (_) { }
   };
