@@ -55,6 +55,12 @@ export default function SaleorManager() {
   const [error, setError] = useState(null);
   const [saleorDashboardUrl, setSaleorDashboardUrl] = useState(null);
 
+  // Warehouse options
+  const [warehouseOptions, setWarehouseOptions] = useState({
+    countries: [],
+    shipping_zones: [],
+  });
+
   // Channel options
   const [channelOptions, setChannelOptions] = useState({
     countries: [],
@@ -92,8 +98,22 @@ export default function SaleorManager() {
       .catch(() => {});
 
     fetchChannelOptions();
+    fetchWarehouseOptions();
     fetchData(0);
   }, []);
+
+  useEffect(() => {
+    handleSync(tab); // Combined fetch and sync for smoother UX
+  }, [tab]);
+
+  const fetchWarehouseOptions = async () => {
+    try {
+      const res = await apiClient.get("/events/saleor/warehouse-options/");
+      setWarehouseOptions(res.data);
+    } catch (err) {
+      console.error("Failed to fetch warehouse options:", err);
+    }
+  };
 
   const fetchChannelOptions = async () => {
     try {
@@ -127,32 +147,33 @@ export default function SaleorManager() {
 
   const handleTabChange = (event, newValue) => {
     setTab(newValue);
-    fetchData(newValue);
   };
 
-  const handleSync = async () => {
-    setSyncing(true);
+  const handleSync = async (tabIndex = null) => {
+    const activeTab = tabIndex !== null ? tabIndex : tab;
+    setLoading(true); // Use main loading state for initial sync
     setError(null);
     let endpoint = "";
-    if (tab === 0) endpoint = "/events/saleor/channels/sync/";
-    else if (tab === 1) endpoint = "/events/saleor/warehouses/sync/";
-    else if (tab === 2) endpoint = "/events/saleor/shipping-zones/sync/";
+    if (activeTab === 0) endpoint = "/events/saleor/channels/sync/";
+    else if (activeTab === 1) endpoint = "/events/saleor/warehouses/sync/";
+    else if (activeTab === 2) endpoint = "/events/saleor/shipping-zones/sync/";
 
     try {
-      const response = await apiClient.post(endpoint);
-      if (tab === 0) setChannels(response.data.channels || []);
-      else if (tab === 1) setWarehouses(response.data.warehouses || []);
-      else if (tab === 2) setShippingZones(response.data.shipping_zones || []);
+      await apiClient.post(endpoint);
+      await fetchData(activeTab); // Re-fetch ensures local state matches sync result
     } catch (err) {
       setError(`Sync failed: ${err.message}`);
+      // Fallback: if sync fails, still try to show local data
+      fetchData(activeTab);
     } finally {
-      setSyncing(false);
+      setLoading(false);
     }
   };
 
   const handleOpenDialog = (type, item = null) => {
     setDialogType(type);
     setEditItem(item);
+    setDialogError("");
 
     if (type === "channel") {
       if (item) {
@@ -177,6 +198,45 @@ export default function SaleorManager() {
           is_active: true,
           allocation_strategy: "PRIORITIZE_SORTING_ORDER",
           warehouse_ids: [],
+          shipping_zone_ids: [],
+        });
+      }
+    } else if (type === "warehouse") {
+      if (item) {
+        const szIds = item.shipping_zone_ids || [];
+        setOriginalShippingZoneIds([...szIds]);
+        setFormData({
+          name: item.name || "",
+          slug: item.slug || "",
+          email: item.email || "",
+          company_name: item.company_name || "",
+          street_address_1: item.street_address_1 || "",
+          street_address_2: item.street_address_2 || "",
+          city: item.city || "",
+          postal_code: item.postal_code || "",
+          country_area: item.country_area || "",
+          country_code: item.country_code || "",
+          phone: item.phone || "",
+          is_private: !!item.is_private,
+          click_and_collect: (item.click_and_collect || "disabled").toUpperCase(),
+          shipping_zone_ids: [...szIds],
+        });
+      } else {
+        setOriginalShippingZoneIds([]);
+        setFormData({
+          name: "",
+          slug: "",
+          email: "",
+          company_name: "",
+          street_address_1: "",
+          street_address_2: "",
+          city: "",
+          postal_code: "",
+          country_area: "",
+          country_code: "IN",
+          phone: "",
+          is_private: false,
+          click_and_collect: "DISABLED",
           shipping_zone_ids: [],
         });
       }
@@ -233,11 +293,44 @@ export default function SaleorManager() {
     return true;
   };
 
-  const handleSave = async () => {
-    // Validation for channels
-    if (dialogType === "channel" && !validateChannelForm()) {
-      return;
+  const validateWarehouseForm = () => {
+    if (!formData.name?.trim()) {
+      setDialogError("Warehouse name is required");
+      return false;
     }
+    if (!formData.country_code?.trim()) {
+      setDialogError("Country is required");
+      return false;
+    }
+    if (!formData.city?.trim()) {
+      setDialogError("City is required");
+      return false;
+    }
+    if (!formData.street_address_1?.trim()) {
+      setDialogError("Street address line 1 is required");
+      return false;
+    }
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setDialogError("Please enter a valid email address");
+      return false;
+    }
+    if (formData.slug && !/^[a-z0-9-]+$/.test(formData.slug)) {
+      setDialogError("Slug must contain only lowercase letters, numbers, and hyphens");
+      return false;
+    }
+    // Basic phone validation (at least 10 digits for most countries that require state)
+    if (formData.phone && formData.phone.replace(/\D/g, '').length < 10) {
+      setDialogError("Phone number must be at least 10 digits");
+      return false;
+    }
+    setDialogError("");
+    return true;
+  };
+
+  const handleSave = async () => {
+    // Validation
+    if (dialogType === "channel" && !validateChannelForm()) return;
+    if (dialogType === "warehouse" && !validateWarehouseForm()) return;
 
     setSyncing(true);
     setError(null);
@@ -275,6 +368,20 @@ export default function SaleorManager() {
           allocation_strategy: formData.allocation_strategy || "PRIORITIZE_SORTING_ORDER",
         };
       }
+    } else if (dialogType === "warehouse") {
+      if (editItem) {
+        endpoint = `/events/saleor/warehouses/${editItem.id}/`;
+        const currentShippingZoneIds = formData.shipping_zone_ids || [];
+        payload = {
+          ...formData,
+          add_shipping_zone_ids: currentShippingZoneIds.filter(id => !originalShippingZoneIds.includes(id)),
+          remove_shipping_zone_ids: originalShippingZoneIds.filter(id => !currentShippingZoneIds.includes(id)),
+        };
+        delete payload.shipping_zone_ids;
+      } else {
+        endpoint = `/events/saleor/warehouses/create/`;
+        payload = formData;
+      }
     } else {
       const typeKey = dialogType === "shippingZone" ? "shipping-zones" : dialogType + "s";
       if (editItem) {
@@ -310,19 +417,20 @@ export default function SaleorManager() {
       }
     } catch (err) {
       const responseData = err.response?.data;
+      let finalError = "";
       if (responseData?.errors && Array.isArray(responseData.errors)) {
-        const errorMsgs = responseData.errors
+        finalError = responseData.errors
           .map(e => {
             const field = e.field ? `${e.field}: ` : "";
             return `${field}${e.message || e.code || "Unknown error"}`;
           })
           .join(" | ");
-        setError(`Validation Error: ${errorMsgs}`);
       } else if (responseData?.error) {
-        setError(`Error: ${responseData.error}`);
+        finalError = responseData.error;
       } else {
-        setError(`Request failed: ${err.message}`);
+        finalError = err.message || "Request failed";
       }
+      setDialogError(finalError);
     } finally {
       setSyncing(false);
     }
@@ -550,41 +658,112 @@ export default function SaleorManager() {
   );
 
   const renderWarehouseForm = () => (
-    <Grid container spacing={2} sx={{ mt: 1 }}>
-      <Grid item xs={12} sm={6}>
-        <TextField fullWidth label="Name" name="name" value={formData.name || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField fullWidth label="Slug" name="slug" value={formData.slug || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12}>
-        <TextField fullWidth label="Email" name="email" value={formData.email || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField fullWidth label="City" name="city" value={formData.city || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField fullWidth label="Country Code" name="country_code" value={formData.country_code || ""} onChange={handleFormChange} placeholder="e.g. US" />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField fullWidth label="Postal Code" name="postal_code" value={formData.postal_code || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField fullWidth label="Country Area" name="country_area" value={formData.country_area || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12}>
-        <TextField fullWidth label="Street Address 1" name="street_address_1" value={formData.street_address_1 || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12}>
-        <TextField fullWidth label="Street Address 2" name="street_address_2" value={formData.street_address_2 || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12}>
-        <FormControlLabel
-          control={<Switch checked={!!formData.is_private} onChange={handleFormChange} name="is_private" />}
-          label="Private"
-        />
-      </Grid>
-    </Grid>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mt: 0.5 }}>
+      {/* General Information */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          General Information
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6}>
+            <TextField fullWidth label="Warehouse Name *" name="name" value={formData.name || ""} onChange={handleFormChange} required />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField fullWidth label="Slug" name="slug" value={formData.slug || ""} onChange={handleFormChange} placeholder="e.g. main-warehouse" />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField fullWidth label="Email" name="email" type="email" value={formData.email || ""} onChange={handleFormChange} />
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Address Information */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          Address Information
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6}>
+            <TextField fullWidth label="Company" name="company_name" value={formData.company_name || ""} onChange={handleFormChange} />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField fullWidth label="Phone" name="phone" value={formData.phone || ""} onChange={handleFormChange} />
+          </Grid>
+          <Grid item xs={12} sm={8}>
+            <TextField fullWidth label="Address Line 1 *" name="street_address_1" value={formData.street_address_1 || ""} onChange={handleFormChange} required />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField fullWidth label="Address Line 2" name="street_address_2" value={formData.street_address_2 || ""} onChange={handleFormChange} />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField fullWidth label="City *" name="city" value={formData.city || ""} onChange={handleFormChange} required />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField fullWidth label="ZIP / Postal Code" name="postal_code" value={formData.postal_code || ""} onChange={handleFormChange} />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <Autocomplete
+              options={warehouseOptions.countries}
+              getOptionLabel={(option) => `${option.country} (${option.code})`}
+              value={warehouseOptions.countries.find(c => c.code === formData.country_code) || null}
+              onChange={(_, newValue) => {
+                setFormData(prev => ({ ...prev, country_code: newValue ? newValue.code : "" }));
+              }}
+              renderInput={(params) => <TextField {...params} label="Country *" required />}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField fullWidth label="Country Area / State" name="country_area" value={formData.country_area || ""} onChange={handleFormChange} />
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Settings */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          Settings
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              select
+              fullWidth
+              label="Click and Collect"
+              name="click_and_collect"
+              value={formData.click_and_collect || "DISABLED"}
+              onChange={handleFormChange}
+            >
+              <MenuItem value="DISABLED">Disabled</MenuItem>
+              <MenuItem value="LOCAL">Local stock only</MenuItem>
+              <MenuItem value="ALL">All warehouses</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6} sx={{ display: 'flex', alignItems: 'center' }}>
+            <FormControlLabel
+              control={<Switch checked={!!formData.is_private} onChange={handleFormChange} name="is_private" />}
+              label="Private Warehouse"
+              sx={{ ml: 1 }}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Autocomplete
+              multiple
+              options={warehouseOptions.shipping_zones}
+              getOptionLabel={(option) => option.name || ""}
+              value={warehouseOptions.shipping_zones.filter(sz => (formData.shipping_zone_ids || []).includes(sz.saleor_id)) || []}
+              onChange={(_, newValue) => {
+                setFormData(prev => ({ ...prev, shipping_zone_ids: newValue.map(sz => sz.saleor_id) }));
+              }}
+              renderInput={(params) => <TextField {...params} label="Shipping Zones" placeholder="Select shipping zones" />}
+              disableCloseOnSelect
+            />
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
   );
 
   const renderShippingZoneForm = () => (
@@ -733,11 +912,15 @@ export default function SaleorManager() {
               <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
                 {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : "Shipping Policy Zones"}
               </Typography>
-              {(tab === 0 || tab === 2) && (
+              {(tab === 0 || tab === 1 || tab === 2) && (
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
-                  onClick={() => handleOpenDialog(tab === 0 ? "channel" : "shippingZone")}
+                  onClick={() => {
+                    if (tab === 0) handleOpenDialog("channel");
+                    if (tab === 1) handleOpenDialog("warehouse");
+                    if (tab === 2) handleOpenDialog("shippingZone");
+                  }}
                   sx={{
                     bgcolor: ORANGE,
                     borderRadius: "10px",
@@ -778,9 +961,7 @@ export default function SaleorManager() {
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: TEXT }}>
                           {item.name}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "#9ca3af" }}>
-                          ID: {item.saleor_id.split(":").pop()}
-                        </Typography>
+
                       </TableCell>
                       <TableCell>
                         {tab === 0 ? (
@@ -792,7 +973,7 @@ export default function SaleorManager() {
                           </Box>
                         ) : tab === 1 ? (
                           <Typography variant="body2">
-                            {item.city}, {item.country_code}
+                            {[item.city, item.country_code].filter(Boolean).join(", ")}
                           </Typography>
                         ) : (
                           <Typography
@@ -837,11 +1018,15 @@ export default function SaleorManager() {
                         </Box>
                       </TableCell>
                       <TableCell align="right">
-                        {(tab === 0 || tab === 2) && (
+                        {(tab === 0 || tab === 1 || tab === 2) && (
                           <>
                             <IconButton
                               size="small"
-                              onClick={() => handleOpenDialog(tab === 0 ? "channel" : "shippingZone", item)}
+                              onClick={() => {
+                                if (tab === 0) handleOpenDialog("channel", item);
+                                if (tab === 1) handleOpenDialog("warehouse", item);
+                                if (tab === 2) handleOpenDialog("shippingZone", item);
+                              }}
                               sx={{ color: TEXT }}
                             >
                               <EditIcon fontSize="small" />
@@ -854,11 +1039,6 @@ export default function SaleorManager() {
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </>
-                        )}
-                        {tab === 1 && (
-                          <Typography variant="caption" sx={{ color: "#9ca3af" }}>
-                            Managed in Saleor
-                          </Typography>
                         )}
                       </TableCell>
                     </TableRow>
@@ -889,13 +1069,13 @@ export default function SaleorManager() {
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
         PaperProps={{
           sx: {
-            minWidth: "550px",
+            borderRadius: 3,
             "& .MuiDialogContent-root": {
-              padding: "24px",
+              padding: "32px",
             }
           }
         }}
@@ -918,26 +1098,40 @@ export default function SaleorManager() {
               <Typography variant="caption" sx={{ display: "block", color: "#6b7280", mb: 1 }}>
                 System Information
               </Typography>
-              <Typography variant="caption" sx={{ display: "block" }}>
-                Saleor ID: {editItem.saleor_id}
-              </Typography>
+
               <Typography variant="caption" sx={{ display: "block" }}>
                 Last Synced: {new Date(editItem.synced_at).toLocaleString()}
               </Typography>
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleCloseDialog} sx={{ color: "#6b7280" }}>
+        <DialogActions sx={{ p: 3, px: 4, borderTop: "1px solid #e5e7eb", gap: 2 }}>
+          <Button 
+            onClick={handleCloseDialog} 
+            sx={{ 
+              color: "#6b7280", 
+              textTransform: "none", 
+              fontWeight: 600,
+              px: 3 
+            }}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleSave}
             variant="contained"
             disabled={syncing}
-            sx={{ bgcolor: TEXT, px: 4, borderRadius: "10px" }}
+            sx={{ 
+              bgcolor: TEXT, 
+              px: 4, 
+              py: 1,
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 600,
+              "&:hover": { bgcolor: "#1a253a" }
+            }}
           >
-            {syncing ? <CircularProgress size={20} /> : "Save Changes"}
+            {syncing ? <CircularProgress size={20} color="inherit" /> : "Save Changes"}
           </Button>
         </DialogActions>
       </Dialog>
