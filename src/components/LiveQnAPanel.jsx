@@ -34,6 +34,12 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import BoltIcon from "@mui/icons-material/Bolt";
 import Divider from "@mui/material/Divider";
 import Chip from "@mui/material/Chip";
@@ -807,6 +813,360 @@ function QuestionItem({
         )}
       </Paper>
     </ListItem>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grouped Question Card — shows a synthesized summary as the primary question,
+// with collapsible original sub-questions, aggregated authors, and host toolbar.
+// Does NOT disclose whether grouping was manual or AI-assisted.
+// ─────────────────────────────────────────────────────────────────────────────
+function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAction }) {
+  const [subOpen, setSubOpen] = useState(false);
+  const [onStage, setOnStage] = useState(false);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null); // null | 'stage' | 'answered' | 'archive'
+
+  // Collect unique, non-anonymous author names from sub-questions
+  const authorNames = [
+    ...new Set(
+      memberedQuestions
+        .filter((q) => !q.is_anonymous && q.user_display)
+        .map((q) => q.user_display)
+    ),
+  ];
+
+  const summaryText = g.summary?.trim() || g.title?.trim() || "Grouped question";
+  const subCount = memberedQuestions.length;
+
+  const handleMarkOnStage = async () => {
+    setActionLoading("stage");
+    try {
+      // Toggle a visual "on stage" state — broadcast via WS or local state
+      setOnStage((v) => !v);
+      if (onGroupAction) onGroupAction(g.id, onStage ? "unstage" : "stage");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMarkAnswered = async () => {
+    setActionLoading("answered");
+    try {
+      setIsAnswered((v) => !v);
+      if (onGroupAction) onGroupAction(g.id, isAnswered ? "unanswered" : "answered");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleArchive = async () => {
+    if (onDelete) onDelete(g.id);
+  };
+
+  return (
+    <Box
+      sx={{
+        mb: 1.5,
+        borderRadius: 2,
+        border: onStage
+          ? "1.5px solid rgba(77,171,245,0.6)"
+          : isAnswered
+            ? "1.5px solid rgba(34,197,94,0.45)"
+            : "1.5px solid rgba(77,171,245,0.22)",
+        bgcolor: onStage
+          ? "rgba(77,171,245,0.06)"
+          : isAnswered
+            ? "rgba(34,197,94,0.04)"
+            : "rgba(77,171,245,0.04)",
+        overflow: "hidden",
+        transition: "border-color 0.25s, background-color 0.25s",
+      }}
+    >
+      {/* ── Group header / summary question ── */}
+      <Box sx={{ px: 1.5, pt: 1.2, pb: 0.8 }}>
+        {/* Status pill row */}
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.75 }}>
+          {onStage && (
+            <Chip
+              label="On Stage"
+              size="small"
+              icon={<PlayCircleOutlineIcon sx={{ fontSize: 13, color: "#4dabf5 !important" }} />}
+              sx={{
+                height: 20,
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                bgcolor: "rgba(77,171,245,0.12)",
+                color: "#4dabf5",
+                border: "1px solid rgba(77,171,245,0.35)",
+                "& .MuiChip-icon": { ml: 0.5 },
+              }}
+            />
+          )}
+          {isAnswered && (
+            <Chip
+              label="Answered"
+              size="small"
+              icon={<CheckCircleIcon sx={{ fontSize: 13, color: "#22c55e !important" }} />}
+              sx={{
+                height: 20,
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                bgcolor: "rgba(34,197,94,0.10)",
+                color: "#22c55e",
+                border: "1px solid rgba(34,197,94,0.3)",
+                "& .MuiChip-icon": { ml: 0.5 },
+              }}
+            />
+          )}
+          <Chip
+            label={`${subCount} combined`}
+            size="small"
+            sx={{
+              height: 18,
+              fontSize: "0.62rem",
+              fontWeight: 600,
+              bgcolor: "rgba(77,171,245,0.08)",
+              color: "rgba(77,171,245,0.8)",
+              border: "1px solid rgba(77,171,245,0.18)",
+            }}
+          />
+        </Stack>
+
+        {/* Summary question text */}
+        <Typography
+          variant="body2"
+          sx={{
+            color: "#fff",
+            fontWeight: 600,
+            fontSize: "0.88rem",
+            lineHeight: 1.5,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            mb: authorNames.length > 0 ? 0.7 : 0,
+          }}
+        >
+          {summaryText}
+        </Typography>
+
+        {/* Authors row */}
+        {authorNames.length > 0 && (
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+            <PeopleOutlineIcon sx={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }} />
+            <Typography
+              variant="caption"
+              sx={{ color: "rgba(255,255,255,0.45)", fontSize: "0.7rem", lineHeight: 1.3 }}
+            >
+              {authorNames.slice(0, 4).join(" · ")}
+              {authorNames.length > 4 ? ` · +${authorNames.length - 4} more` : ""}
+            </Typography>
+          </Stack>
+        )}
+      </Box>
+
+      {/* ── Host toolbar ── */}
+      {isHost && (
+        <Box
+          sx={{
+            px: 1.2,
+            py: 0.6,
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            bgcolor: "rgba(0,0,0,0.18)",
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Show on Stage */}
+          <Tooltip title={onStage ? "Remove from stage" : "Show this question on stage"}>
+            <Button
+              size="small"
+              onClick={handleMarkOnStage}
+              disabled={actionLoading === "stage"}
+              startIcon={
+                actionLoading === "stage" ? (
+                  <CircularProgress size={11} sx={{ color: "#4dabf5" }} />
+                ) : (
+                  <PlayCircleOutlineIcon sx={{ fontSize: 14 }} />
+                )
+              }
+              sx={{
+                textTransform: "none",
+                fontSize: "0.72rem",
+                py: 0.3,
+                px: 1,
+                minWidth: 0,
+                borderRadius: "6px",
+                color: onStage ? "#4dabf5" : "rgba(255,255,255,0.55)",
+                bgcolor: onStage ? "rgba(77,171,245,0.12)" : "transparent",
+                border: onStage ? "1px solid rgba(77,171,245,0.3)" : "1px solid transparent",
+                "&:hover": {
+                  bgcolor: "rgba(77,171,245,0.12)",
+                  color: "#4dabf5",
+                  borderColor: "rgba(77,171,245,0.3)",
+                },
+              }}
+            >
+              {onStage ? "On Stage" : "Show on Stage"}
+            </Button>
+          </Tooltip>
+
+          {/* Mark as Answered */}
+          <Tooltip title={isAnswered ? "Mark as unanswered" : "Mark as answered"}>
+            <Button
+              size="small"
+              onClick={handleMarkAnswered}
+              disabled={actionLoading === "answered"}
+              startIcon={
+                actionLoading === "answered" ? (
+                  <CircularProgress size={11} sx={{ color: "#22c55e" }} />
+                ) : isAnswered ? (
+                  <CheckCircleIcon sx={{ fontSize: 14 }} />
+                ) : (
+                  <CheckCircleOutlineIcon sx={{ fontSize: 14 }} />
+                )
+              }
+              sx={{
+                textTransform: "none",
+                fontSize: "0.72rem",
+                py: 0.3,
+                px: 1,
+                minWidth: 0,
+                borderRadius: "6px",
+                color: isAnswered ? "#22c55e" : "rgba(255,255,255,0.55)",
+                bgcolor: isAnswered ? "rgba(34,197,94,0.1)" : "transparent",
+                border: isAnswered ? "1px solid rgba(34,197,94,0.3)" : "1px solid transparent",
+                "&:hover": {
+                  bgcolor: "rgba(34,197,94,0.1)",
+                  color: "#22c55e",
+                  borderColor: "rgba(34,197,94,0.3)",
+                },
+              }}
+            >
+              {isAnswered ? "Answered" : "Mark Answered"}
+            </Button>
+          </Tooltip>
+
+          {/* Spacer */}
+          <Box sx={{ flex: 1 }} />
+
+          {/* Unfold sub-questions toggle */}
+          <Tooltip title={subOpen ? "Collapse original questions" : "Show original questions"}>
+            <Button
+              size="small"
+              onClick={() => setSubOpen((v) => !v)}
+              startIcon={
+                subOpen ? (
+                  <UnfoldLessIcon sx={{ fontSize: 14 }} />
+                ) : (
+                  <UnfoldMoreIcon sx={{ fontSize: 14 }} />
+                )
+              }
+              sx={{
+                textTransform: "none",
+                fontSize: "0.72rem",
+                py: 0.3,
+                px: 1,
+                minWidth: 0,
+                borderRadius: "6px",
+                color: "rgba(255,255,255,0.45)",
+                "&:hover": { color: "rgba(255,255,255,0.8)", bgcolor: "rgba(255,255,255,0.06)" },
+              }}
+            >
+              {subOpen ? "Collapse" : `${subCount} originals`}
+            </Button>
+          </Tooltip>
+
+          {/* Delete / archive group */}
+          <Tooltip title="Delete this group" placement="top">
+            <IconButton
+              size="small"
+              onClick={handleArchive}
+              sx={{ color: "rgba(255,255,255,0.3)", p: 0.4, "&:hover": { color: "#ef4444", bgcolor: "rgba(239,68,68,0.1)" } }}
+            >
+              <DeleteOutlineRoundedIcon sx={{ fontSize: 15 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
+
+      {/* ── Attendee unfold toggle (non-host) ── */}
+      {!isHost && subCount > 0 && (
+        <Box
+          sx={{
+            px: 1.5,
+            py: 0.5,
+            borderTop: "1px solid rgba(255,255,255,0.05)",
+            display: "flex",
+            alignItems: "center",
+            cursor: "pointer",
+            userSelect: "none",
+            "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
+          }}
+          onClick={() => setSubOpen((v) => !v)}
+        >
+          {subOpen ? (
+            <UnfoldLessIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.35)", mr: 0.6 }} />
+          ) : (
+            <UnfoldMoreIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.35)", mr: 0.6 }} />
+          )}
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.68rem" }}>
+            {subOpen ? "Collapse original questions" : `See ${subCount} original question${subCount !== 1 ? "s" : ""}`}
+          </Typography>
+        </Box>
+      )}
+
+      {/* ── Collapsible original sub-questions ── */}
+      <Collapse in={subOpen}>
+        <Box
+          sx={{
+            mx: 1.2,
+            mb: 1.2,
+            mt: 0,
+            borderRadius: 1.5,
+            bgcolor: "rgba(0,0,0,0.18)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            overflow: "hidden",
+          }}
+        >
+          {memberedQuestions.map((q, idx) => (
+            <Box
+              key={q.id}
+              sx={{
+                px: 1.2,
+                py: 0.8,
+                borderBottom:
+                  idx < memberedQuestions.length - 1
+                    ? "1px solid rgba(255,255,255,0.05)"
+                    : "none",
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "rgba(255,255,255,0.75)",
+                  fontSize: "0.8rem",
+                  lineHeight: 1.45,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                }}
+              >
+                {q.content}
+              </Typography>
+              {!q.is_anonymous && q.user_display && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: "rgba(255,255,255,0.35)", fontSize: "0.68rem", display: "block", mt: 0.3 }}
+                >
+                  — {q.user_display}
+                </Typography>
+              )}
+            </Box>
+          ))}
+        </Box>
+      </Collapse>
+    </Box>
   );
 }
 
@@ -2041,33 +2401,22 @@ export default function LiveQnAPanel({
                   return (
                     <React.Fragment>
                       {visibleGroups.map(g => (
-                        <Box key={g.id} sx={{ mb: 1.5, pl: 1, borderLeft: '2px solid #4dabf5', bgcolor: 'rgba(77, 171, 245, 0.05)' }}>
-                          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1, pt: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ color: '#4dabf5', fontWeight: 'bold' }}>{g.title}</Typography>
-                            {isHost && (
-                              <IconButton size="small" onClick={async () => {
-                                if (window.confirm('Delete group?')) {
-                                  await fetch(toApiUrl(`interactions/qna-groups/${g.id}/`), { method: "DELETE", headers: authHeader() });
-                                  loadGroups();
-                                }
-                              }} sx={{ color: "rgba(255,255,255,0.4)" }}>
-                                <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            )}
-                          </Stack>
-                          {g.summary && <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', px: 1, mb: 1 }}>{g.summary}</Typography>}
-                          <List dense disablePadding>
-                            {groupedQuestions[g.id].map(q => (
-                              <QuestionItem
-                                key={q.id} q={q} isHost={isHost} currentUserId={currentUserId} currentGuestId={currentGuestId} eventId={eventId}
-                                onUpvote={handleUpvote} onReplyUpvote={handleReplyUpvote} onReplyCreate={handleReplyCreate}
-                                onReplyEdit={handleReplyEdit} onReplyDelete={handleReplyDelete} onEditQuestion={handleEditQuestion}
-                                onDeleteQuestion={handleDeleteQuestion}
-                                selectable={groupingMode} selected={selectedQs.includes(q.id)} onSelect={toggleSelect}
-                              />
-                            ))}
-                          </List>
-                        </Box>
+                        <GroupedQuestionCard
+                          key={g.id}
+                          g={g}
+                          memberedQuestions={groupedQuestions[g.id]}
+                          isHost={isHost}
+                          onDelete={async (gId) => {
+                            if (window.confirm('Delete this group?')) {
+                              await fetch(toApiUrl(`interactions/qna-groups/${gId}/`), { method: "DELETE", headers: authHeader() });
+                              loadGroups();
+                            }
+                          }}
+                          onGroupAction={(gId, action) => {
+                            // Future: broadcast via WebSocket or PATCH the group
+                            console.log(`Group ${gId}: action=${action}`);
+                          }}
+                        />
                       ))}
                       {visibleGroups.length > 0 && ungroupedQuestions.length > 0 && <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 1, mt: 1, pl: 1 }}>Ungrouped Questions</Typography>}
                       {ungroupedQuestions.map((q) => (

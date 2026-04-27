@@ -19624,6 +19624,31 @@ export default function NewLiveMeeting() {
                       {(() => {
                         const allQs = [...qaSorted.pinned, ...qaSorted.unpinned];
                         const qToGroup = {};
+                        const questionById = new Map(allQs.map((question) => [question.id, question]));
+                        const normalizeSummaryText = (value) => String(value || "").replace(/\s+/g, " ").trim();
+                        const truncateSummaryPart = (value, max = 90) => {
+                          const txt = normalizeSummaryText(value).replace(/\?+$/, "");
+                          if (!txt) return "";
+                          return txt.length <= max ? txt : `${txt.slice(0, max - 1).trimEnd()}…`;
+                        };
+                        const buildGroupSummaryQuestion = (group, groupQuestions) => {
+                          const explicitSummary = normalizeSummaryText(group?.summary);
+                          if (explicitSummary.length >= 18) {
+                            return explicitSummary.endsWith("?") ? explicitSummary : `${explicitSummary}?`;
+                          }
+                          const explicitTitle = normalizeSummaryText(group?.title);
+                          if (explicitTitle.length >= 18) {
+                            return explicitTitle.endsWith("?") ? explicitTitle : `${explicitTitle}?`;
+                          }
+                          const parts = (groupQuestions || [])
+                            .map((question) => truncateSummaryPart(question?.content))
+                            .filter(Boolean)
+                            .slice(0, 3);
+                          if (parts.length === 0) return "What are the key points from these related audience questions?";
+                          if (parts.length === 1) return parts[0].endsWith("?") ? parts[0] : `${parts[0]}?`;
+                          const firstTwo = parts.slice(0, 2).join(" and ");
+                          return `How should we address both ${firstTwo}?`;
+                        };
                         groups.forEach(g => {
                           if (!Array.isArray(g.memberships)) return;
                           g.memberships.forEach(m => {
@@ -20714,8 +20739,9 @@ export default function NewLiveMeeting() {
 
                           if (qToGroup[q.id]) {
                             const gId = qToGroup[q.id].id;
-                            if (!renderedGroups[gId]) renderedGroups[gId] = { group: qToGroup[q.id], nodes: [] };
+                            if (!renderedGroups[gId]) renderedGroups[gId] = { group: qToGroup[q.id], nodes: [], questions: [] };
                             renderedGroups[gId].nodes.push(node);
+                            renderedGroups[gId].questions.push(q);
                           } else {
                             ungroupedNodes.push(node);
                           }
@@ -20724,57 +20750,157 @@ export default function NewLiveMeeting() {
                         return (
                           <>
                             {Object.values(renderedGroups).map(rg => (
-                              <Paper key={rg.group.id} variant="outlined" sx={{ mb: 2, p: 1.5, backgroundColor: 'rgba(124,77,255,0.05)', borderColor: 'rgba(124,77,255,0.25)', borderRadius: 2 }}>
-                                <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ cursor: "pointer" }}
-                                  onClick={() => setGroupCollapsed(prev => ({ ...prev, [rg.group.id]: !prev[rg.group.id] }))}>
-                                  {/* Left: summary text + metadata */}
-                                  <Box sx={{ flex: 1 }}>
-                                    {rg.group.source === "ai" && (
-                                      <Chip label="AI GROUPED" size="small" icon={<AutoAwesomeIcon sx={{ fontSize: "12px !important" }} />}
-                                        sx={{ mb: 0.75, bgcolor: "rgba(124,77,255,0.15)", color: "#a78bfa", fontSize: 10, height: 20, "& .MuiChip-label": { px: 1 } }} />
-                                    )}
-                                    <Typography sx={{ color: "#fff", fontSize: 14, fontWeight: 500, lineHeight: 1.5 }}>
-                                      {rg.group.summary || rg.group.title}
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", mt: 0.5, display: "block" }}>
-                                      {rg.group.memberships?.length ?? 0} similar questions combined
-                                    </Typography>
-                                  </Box>
-                                  {/* Right: aggregated vote count + edit + expand chevron */}
-                                  <Stack alignItems="center" spacing={0.5} sx={{ minWidth: "auto" }}>
-                                    <Stack direction="row" alignItems="center" spacing={0.3}>
-                                      <ThumbUpAltIcon sx={{ fontSize: 12, color: "#7c4dff" }} />
-                                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#7c4dff" }}>
-                                        {rg.group.aggregated_vote_count ?? 0}
-                                      </Typography>
-                                    </Stack>
-                                    {isHost && (
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditGroupId(rg.group.id);
-                                          setEditGroupRemovedQuestions(new Set());
-                                          setEditGroupAddedQuestions(new Set());
-                                        }}
-                                        sx={{ p: 0.3, color: "rgba(255,255,255,0.5)", "&:hover": { color: "#7c4dff", bgcolor: "rgba(124,77,255,0.1)" } }}
-                                      >
-                                        <MoreVertIcon sx={{ fontSize: 16 }} />
-                                      </IconButton>
-                                    )}
-                                    {groupCollapsed[rg.group.id] ? <ExpandMore sx={{ fontSize: 16, color: "rgba(255,255,255,0.4)" }} /> : <ExpandLess sx={{ fontSize: 16, color: "rgba(255,255,255,0.4)" }} />}
-                                  </Stack>
-                                </Stack>
+                              (() => {
+                                const groupedQuestions = (rg.group.memberships || [])
+                                  .map((membership) => questionById.get(membership.question))
+                                  .filter(Boolean);
+                                const fallbackGroupedQuestions = groupedQuestions.length > 0 ? groupedQuestions : (rg.questions || []);
+                                const sortedGroupedQuestions = [...fallbackGroupedQuestions].sort((a, b) => {
+                                  if (Boolean(a?.is_answered) !== Boolean(b?.is_answered)) return a?.is_answered ? 1 : -1;
+                                  return (b?.upvote_count ?? 0) - (a?.upvote_count ?? 0) || new Date(b?.created_at || 0) - new Date(a?.created_at || 0);
+                                });
+                                const primaryQuestion = sortedGroupedQuestions[0] || null;
+                                const groupSummaryQuestion = buildGroupSummaryQuestion(rg.group, sortedGroupedQuestions);
+                                const aggregatedAuthors = Array.from(
+                                  new Set(
+                                    sortedGroupedQuestions
+                                      .map((question) => resolveQuestionDisplayMeta(question).askedBy)
+                                      .filter(Boolean)
+                                  )
+                                );
+                                const groupedAuthorLabel = aggregatedAuthors.length > 0 ? aggregatedAuthors.join(", ") : "Audience";
+                                const groupedQuestionForStage = primaryQuestion
+                                  ? {
+                                    ...primaryQuestion,
+                                    content: groupSummaryQuestion,
+                                    user_name: groupedAuthorLabel,
+                                    is_anonymous: false,
+                                  }
+                                  : null;
+                                const groupExpanded = !(groupCollapsed[rg.group.id] ?? true);
+                                const primaryDisplayedOnScreen = primaryQuestion && displayedQuestion?.question_id === primaryQuestion.id && displayedQuestion?.visible !== false;
 
-                                <Collapse in={!groupCollapsed[rg.group.id]}>
-                                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", mt: 1.5, mb: 1, display: "block" }}>
-                                    Original questions:
-                                  </Typography>
-                                  <Box sx={{ pl: 1, borderLeft: "2px solid rgba(124,77,255,0.2)", display: "flex", flexDirection: "column", gap: 1 }}>
-                                    {rg.nodes}
-                                  </Box>
-                                </Collapse>
-                              </Paper>
+                                return (
+                                  <Paper
+                                    key={rg.group.id}
+                                    variant="outlined"
+                                    sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(124,77,255,0.05)", borderColor: "rgba(124,77,255,0.25)", borderRadius: 2 }}
+                                  >
+                                    <Stack direction="row" alignItems="flex-start" spacing={1.5}>
+                                      {/* Left: summary text + metadata */}
+                                      <Box sx={{ flex: 1 }}>
+                                        <Chip
+                                          label="Grouped Question"
+                                          size="small"
+                                          sx={{ mb: 0.75, bgcolor: "rgba(124,77,255,0.15)", color: "#a78bfa", fontSize: 10, height: 20, "& .MuiChip-label": { px: 1 } }}
+                                        />
+                                        <Typography sx={{ color: "#fff", fontSize: 14, fontWeight: 500, lineHeight: 1.5 }}>
+                                          {groupSummaryQuestion}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", mt: 0.5, display: "block" }}>
+                                          {sortedGroupedQuestions.length} original questions folded
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", mt: 0.2, display: "block" }}>
+                                          Authors: {groupedAuthorLabel}
+                                        </Typography>
+
+                                        {isHost && primaryQuestion && (
+                                          <Stack direction="row" spacing={0} justifyContent="flex-start" sx={{ mt: 0.7 }}>
+                                            <Tooltip title={primaryDisplayedOnScreen ? "Question is live on the main screen" : "Show on the main screen"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handleDisplayQuestionOnScreen(groupedQuestionForStage)}
+                                                sx={{
+                                                  color: primaryDisplayedOnScreen ? "#38bdf8" : "rgba(255,255,255,0.45)",
+                                                  p: 0.5,
+                                                  "&:hover": { color: "#7dd3fc" }
+                                                }}
+                                              >
+                                                <AnnouncementIcon sx={{ fontSize: 16 }} />
+                                              </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title={primaryQuestion.is_pinned ? "Unpin question" : "Pin question"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => handlePinQuestion(primaryQuestion.id)}
+                                                sx={{
+                                                  color: primaryQuestion.is_pinned ? "#facc15" : "rgba(255,255,255,0.4)",
+                                                  p: 0.5,
+                                                  "&:hover": { color: primaryQuestion.is_pinned ? "#facc15" : "rgba(255,255,255,0.9)" }
+                                                }}
+                                              >
+                                                {primaryQuestion.is_pinned ? <PushPinIcon sx={{ fontSize: 16 }} /> : <PushPinOutlinedIcon sx={{ fontSize: 16 }} />}
+                                              </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title={primaryQuestion.is_answered ? "Mark as unanswered" : "Mark as answered"}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                  if (primaryQuestion.is_answered) {
+                                                    handleMarkAnswered(primaryQuestion.id, primaryQuestion.requires_followup, "");
+                                                  } else {
+                                                    setAnsweringQuestionId(primaryQuestion.id);
+                                                    setLiveAnswerText("");
+                                                    setLiveAnswerDialogOpen(true);
+                                                  }
+                                                }}
+                                                sx={{
+                                                  color: primaryQuestion.is_answered ? "#22c55e" : "rgba(255,255,255,0.4)",
+                                                  p: 0.5,
+                                                  "&:hover": { color: primaryQuestion.is_answered ? "#22c55e" : "rgba(255,255,255,0.9)" }
+                                                }}
+                                              >
+                                                {primaryQuestion.is_answered ? <CheckCircleIcon sx={{ fontSize: 16 }} /> : <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />}
+                                              </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Edit grouped questions">
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                  setEditGroupId(rg.group.id);
+                                                  setEditGroupRemovedQuestions(new Set());
+                                                  setEditGroupAddedQuestions(new Set());
+                                                }}
+                                                sx={{ p: 0.5, color: "rgba(255,255,255,0.5)", "&:hover": { color: "#7c4dff", bgcolor: "rgba(124,77,255,0.1)" } }}
+                                              >
+                                                <MoreVertIcon sx={{ fontSize: 16 }} />
+                                              </IconButton>
+                                            </Tooltip>
+                                          </Stack>
+                                        )}
+                                      </Box>
+
+                                      {/* Right: votes + unfold control */}
+                                      <Stack alignItems="center" spacing={0.5} sx={{ minWidth: "auto" }}>
+                                        <Stack direction="row" alignItems="center" spacing={0.3}>
+                                          <ThumbUpAltIcon sx={{ fontSize: 12, color: "#7c4dff" }} />
+                                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#7c4dff" }}>
+                                            {rg.group.aggregated_vote_count ?? 0}
+                                          </Typography>
+                                        </Stack>
+                                        <Tooltip title={groupExpanded ? "Fold originals" : "Unfold originals"}>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => setGroupCollapsed((prev) => ({ ...prev, [rg.group.id]: !(prev[rg.group.id] ?? true) }))}
+                                            sx={{ p: 0.3, color: "rgba(255,255,255,0.5)" }}
+                                          >
+                                            {groupExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
+                                          </IconButton>
+                                        </Tooltip>
+                                      </Stack>
+                                    </Stack>
+
+                                    <Collapse in={groupExpanded}>
+                                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", mt: 1.5, mb: 1, display: "block" }}>
+                                        Original questions:
+                                      </Typography>
+                                      <Box sx={{ pl: 1, borderLeft: "2px solid rgba(124,77,255,0.2)", display: "flex", flexDirection: "column", gap: 1 }}>
+                                        {rg.nodes}
+                                      </Box>
+                                    </Collapse>
+                                  </Paper>
+                                );
+                              })()
                             ))}
 
                             {ungroupedNodes.length > 0 && Object.values(renderedGroups).length > 0 && (
