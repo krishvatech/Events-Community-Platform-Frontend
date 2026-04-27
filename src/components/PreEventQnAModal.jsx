@@ -150,7 +150,7 @@ function DuplicatePanel({ duplicates, onDismiss, onUseExisting }) {
       }}
     >
       <Typography variant="caption" fontWeight={700} color="warning.dark" sx={{ mb: 1.5, display: "block" }}>
-        ⚠️ Similar Question Detected
+        ⚠️ Similar Question by Another Participant Detected
       </Typography>
       {duplicates.map((dup) => (
         <Box key={dup.question_id} sx={{ mb: 1 }}>
@@ -169,7 +169,7 @@ function DuplicatePanel({ duplicates, onDismiss, onUseExisting }) {
           )}
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap", gap: 0.5 }}>
             <Button size="small" variant="outlined" onClick={onDismiss} sx={{ textTransform: "none" }}>
-              Keep both
+              Still post mine
             </Button>
             <Button
               size="small"
@@ -178,10 +178,10 @@ function DuplicatePanel({ duplicates, onDismiss, onUseExisting }) {
               onClick={() => onUseExisting(dup.existing_text)}
               sx={{ textTransform: "none" }}
             >
-              Edit existing instead
+              Let me edit my question
             </Button>
             <Button size="small" variant="outlined" color="error" onClick={onDismiss} sx={{ textTransform: "none" }}>
-              Cancel
+              Delete my question
             </Button>
           </Stack>
         </Box>

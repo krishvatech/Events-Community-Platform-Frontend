@@ -157,7 +157,7 @@ function DuplicatePanel({ duplicates, onDismiss, onUseExisting }) {
             }}
         >
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#f59e0b", mb: 1 }}>
-                ⚠️ Similar Question Detected
+                ⚠️ Similar Question by Another Participant Detected
             </Typography>
             {duplicates.map((dup) => (
                 <Box key={dup.question_id} sx={{ mb: 1 }}>
@@ -173,9 +173,9 @@ function DuplicatePanel({ duplicates, onDismiss, onUseExisting }) {
                         </Box>
                     )}
                     <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: "wrap", gap: 0.5 }}>
-                        <Button size="small" onClick={onDismiss} sx={{ fontSize: 11, textTransform: "none", color: dark.subtext }}>Keep both</Button>
-                        <Button size="small" color="warning" onClick={() => onUseExisting(dup.existing_text)} sx={{ fontSize: 11, textTransform: "none" }}>Edit existing</Button>
-                        <Button size="small" color="error" onClick={onDismiss} sx={{ fontSize: 11, textTransform: "none" }}>Cancel</Button>
+                        <Button size="small" onClick={onDismiss} sx={{ fontSize: 11, textTransform: "none", color: dark.subtext }}>Still post mine</Button>
+                        <Button size="small" color="warning" onClick={() => onUseExisting(dup.existing_text)} sx={{ fontSize: 11, textTransform: "none" }}>Let me edit my question</Button>
+                        <Button size="small" color="error" onClick={onDismiss} sx={{ fontSize: 11, textTransform: "none" }}>Delete my question</Button>
                     </Stack>
                 </Box>
             ))}

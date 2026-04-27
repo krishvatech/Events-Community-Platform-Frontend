@@ -166,7 +166,7 @@ function DuplicatePanel({ duplicates, onClose, onEditExisting }) {
             }}
         >
             <Typography variant="caption" fontWeight={700} color="warning.dark" sx={{ mb: 1.5, display: "block" }}>
-                ⚠️ Similar Question Detected
+                ⚠️ Similar Question by Another Participant Detected
             </Typography>
             {duplicates.map((dup) => (
                 <Box key={dup.question_id} sx={{ mb: 1.5 }}>
@@ -185,7 +185,7 @@ function DuplicatePanel({ duplicates, onClose, onEditExisting }) {
                     )}
                     <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap", gap: 0.5 }}>
                         <Button size="small" variant="outlined" onClick={onClose} sx={{ textTransform: "none" }}>
-                            Keep both
+                            Still post mine
                         </Button>
                         <Button
                             size="small"
@@ -194,10 +194,10 @@ function DuplicatePanel({ duplicates, onClose, onEditExisting }) {
                             onClick={() => onEditExisting(dup)}
                             sx={{ textTransform: "none" }}
                         >
-                            Edit existing
+                            Let me edit my question
                         </Button>
                         <Button size="small" variant="outlined" color="error" onClick={onClose} sx={{ textTransform: "none" }}>
-                            Cancel
+                            Delete my question
                         </Button>
                     </Stack>
                 </Box>
