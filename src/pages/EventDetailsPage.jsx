@@ -17,6 +17,7 @@ import {
   AvatarGroup,
   Tooltip,
   Alert,
+  Divider,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
@@ -415,6 +416,12 @@ export default function EventDetailsPage() {
 
   // Q&A Expand/Collapse
   const [expandedQaItems, setExpandedQaItems] = useState({});
+
+  // Local questions state for real-time updates
+  const [localQuestions, setLocalQuestions] = useState([]);
+
+  // Q&A Status Filter
+  const [qaStatusFilter, setQaStatusFilter] = useState('all'); // 'all', 'answered_live', 'answered_post_event', 'pending'
 
   const handleImageLoad = useCallback((e) => {
     const img = e.currentTarget;
@@ -944,6 +951,53 @@ export default function EventDetailsPage() {
     };
   }, [event?.id, refreshEventFromServer]);
 
+  // Sync local questions from event (polling keeps this fresh; WebSocket patches inline)
+  useEffect(() => {
+    if (event?.questions) setLocalQuestions(event.questions);
+  }, [event?.questions]);
+
+  // Q&A WebSocket connection for real-time answer updates (during and after event)
+  useEffect(() => {
+    if (!event?.id || !['live', 'ended'].includes(event?.status)) return;
+
+    const token = localStorage.getItem("access_token") || localStorage.getItem("access") || "";
+    const WS_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api")
+      .replace(/^http/, "ws")
+      .replace(/\/api\/?$/, "");
+    const wsUrl = `${WS_ROOT}/ws/events/${event.id}/qna/${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "qna.answered") {
+          const cUser = getBackendUserFromStorage();
+          setLocalQuestions(prev =>
+            prev.map(q => {
+              if (q.id !== msg.question_id) return q;
+              const updated = {
+                ...q,
+                is_answered: msg.is_answered,
+                answered_at: msg.answered_at,
+                answered_by: msg.answered_by,
+                answer_text: msg.answer_text ?? q.answer_text,
+                answered_phase: msg.answered_phase ?? q.answered_phase,
+                requires_followup: msg.requires_followup ?? q.requires_followup,
+              };
+              // Toast only if it was the logged-in user's own question
+              if (cUser?.id && q.user === cUser.id) {
+                toast.success("Your question has been answered!");
+              }
+              return updated;
+            })
+          );
+        }
+      } catch (_) {}
+    };
+
+    return () => ws.close();
+  }, [event?.id, event?.status]);
+
   const isPrivilegedUser = isOwnerUser() || isStaffUser();
   const canParticipantViewSpeedNetworkingMatchHistory =
     event?.show_speed_networking_match_history !== false;
@@ -958,8 +1012,24 @@ export default function EventDetailsPage() {
     [event?.sessions]
   );
 
-  // Show Q&A tab when event has ended and has answered questions
-  const showQaTab = event?.status === 'ended' && event?.questions && event.questions.some(q => q.is_answered);
+  // Show Q&A tab when event has ended and (has answered questions OR user has asked questions)
+  const currentUserId = getBackendUserFromStorage()?.id;
+
+  // Filter questions based on selected status
+  const filterQuestionsByStatus = (questions) => {
+    return questions.filter(q => {
+      if (qaStatusFilter === 'all') return true;
+      if (qaStatusFilter === 'answered_live') return q.is_answered && q.answered_phase === 'live';
+      if (qaStatusFilter === 'answered_post_event') return q.is_answered && q.answered_phase === 'post_event';
+      if (qaStatusFilter === 'pending') return !q.is_answered;
+      return true;
+    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  };
+
+  const showQaTab = event?.status === 'ended' && localQuestions.length > 0 && (
+    localQuestions.some(q => q.is_answered) ||
+    (currentUserId && localQuestions.some(q => q.user === currentUserId && !q.is_deleted))
+  );
 
   useEffect(() => {
     if (!showSpeedNetworkingTab && !showSessionsTab && !showQaTab && activeTab !== 0) {
@@ -1009,7 +1079,6 @@ export default function EventDetailsPage() {
         : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
   const currentUser = getBackendUserFromStorage();
-  const currentUserId = currentUser?.id;
   const isEventOwner = Number(event.created_by_id) === Number(currentUserId);
 
   const isHost = isEventOwner || Boolean(registration?.is_host);
@@ -1864,59 +1933,132 @@ export default function EventDetailsPage() {
               {showQaTab && activeTab === (showSessionsTab ? 2 : 1) && (
                 <Paper elevation={0} className="rounded-2xl border border-slate-200">
                   <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
-                    {/* Header */}
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="h6" fontWeight={800} sx={{ mb: 0.5 }}>
-                        Questions & Answers
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Answers to questions asked during this event.
-                      </Typography>
+                    {/* Header with Sort Option */}
+                    <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="h6" fontWeight={800} sx={{ mb: 0.5 }}>
+                          Questions & Answers
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Answers to questions asked during this event.
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
+                        <Typography variant="caption" sx={{ color: '#6b7280', whiteSpace: 'nowrap' }}>
+                          Filter by:
+                        </Typography>
+                        <Box
+                          component="select"
+                          value={qaStatusFilter}
+                          onChange={(e) => setQaStatusFilter(e.target.value)}
+                          sx={{
+                            px: 1.5,
+                            py: 0.75,
+                            borderRadius: 1,
+                            border: '1px solid #e5e7eb',
+                            bgcolor: '#ffffff',
+                            color: '#111827',
+                            fontSize: '0.875rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            '&:hover': { borderColor: '#d1d5db' },
+                            '&:focus': { outline: 'none', borderColor: '#3b82f6', boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)' }
+                          }}
+                        >
+                          <option value="all">All Questions</option>
+                          <option value="answered_live">Answered Live</option>
+                          <option value="answered_post_event">Answered Post-Event</option>
+                          <option value="pending">Pending</option>
+                        </Box>
+                      </Box>
                     </Box>
 
-                    {/* Q&A Items */}
+                    {/* Filtered Questions by Status */}
+                    {(() => {
+                      const filteredQs = filterQuestionsByStatus(localQuestions);
+                      const statusLabel = qaStatusFilter === 'all' ? 'All Questions'
+                        : qaStatusFilter === 'answered_live' ? 'Answered Live'
+                        : qaStatusFilter === 'answered_post_event' ? 'Answered Post-Event'
+                        : 'Pending';
+
+                      if (filteredQs.length === 0) {
+                        return (
+                          <Box sx={{ py: 4, textAlign: 'center' }}>
+                            <Typography variant="body2" color="text.secondary">
+                              No {statusLabel.toLowerCase()} questions.
+                            </Typography>
+                          </Box>
+                        );
+                      }
+
+                      return null;
+                    })()}
+
+                    {/* Filtered Q&A Items */}
                     <Stack spacing={2}>
-                      {event.questions
-                        .filter(q => q.is_answered)
-                        .map((q) => {
-                          const isExpanded = expandedQaItems[q.id] === true; // Default to collapsed
-                          return (
+                      {filterQuestionsByStatus(localQuestions).map((q) => {
+                        const isExpanded = expandedQaItems[q.id] === true;
+                        const statusChip = !q.is_answered
+                          ? { label: 'Pending', bgcolor: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }
+                          : q.answered_phase === 'live'
+                          ? { label: 'Answered Live', bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
+                          : { label: 'Answered Post-Event', bgcolor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
+
+                        return (
+                          <Box
+                            key={q.id}
+                            sx={{
+                              bgcolor: '#f8fafb',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: 2,
+                              transition: 'all 0.2s ease',
+                              '&:hover': {
+                                bgcolor: '#ffffff',
+                                borderColor: '#d1d5db',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                              }
+                            }}
+                          >
+                            {/* Question Header - Clickable */}
                             <Box
-                              key={q.id}
+                              onClick={() => setExpandedQaItems(prev => ({ ...prev, [q.id]: !isExpanded }))}
                               sx={{
-                                bgcolor: '#f8fafb',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: 2,
-                                transition: 'all 0.2s ease',
-                                '&:hover': {
-                                  bgcolor: '#ffffff',
-                                  borderColor: '#d1d5db',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                                }
+                                p: { xs: 2, sm: 2.5 },
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                gap: 2,
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }
                               }}
                             >
-                              {/* Question Header - Clickable */}
-                              <Box
-                                onClick={() => setExpandedQaItems(prev => ({ ...prev, [q.id]: !isExpanded }))}
+                              <Box sx={{ flex: 1, pr: 1 }}>
+                                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5, color: '#111827' }}>
+                                  Q: {q.content}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                                  Asked by {q.is_anonymous ? 'Anonymous' : (q.user_display || 'Unknown')}
+                                </Typography>
+                              </Box>
+                              {/* Status Chip */}
+                              <Chip
+                                size="small"
+                                label={statusChip.label}
                                 sx={{
-                                  p: { xs: 2, sm: 2.5 },
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'flex-start',
-                                  cursor: 'pointer',
-                                  userSelect: 'none',
-                                  '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }
+                                  bgcolor: statusChip.bgcolor,
+                                  color: statusChip.color,
+                                  border: statusChip.border,
+                                  fontWeight: 600,
+                                  fontSize: '0.7rem',
+                                  flexShrink: 0,
+                                  height: 'auto',
+                                  padding: '4px 8px',
+                                  '& .MuiChip-label': { padding: 0 }
                                 }}
-                              >
-                                <Box sx={{ flex: 1, pr: 2 }}>
-                                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5, color: '#111827' }}>
-                                    Q: {q.content}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                                    Asked by {q.is_anonymous ? 'Anonymous' : (q.user_display || 'Unknown')}
-                                  </Typography>
-                                </Box>
-                                {/* Expand/Collapse Icon */}
+                              />
+                              {/* Expand/Collapse Icon - only if has answer */}
+                              {q.is_answered && q.answer_text && (
                                 <Box
                                   sx={{
                                     display: 'flex',
@@ -1941,74 +2083,47 @@ export default function EventDetailsPage() {
                                     ▼
                                   </Box>
                                 </Box>
-                              </Box>
-
-                              {/* Answer Section - Collapsible */}
-                              {isExpanded && q.answer_text && (
-                                <Box sx={{
-                                  p: { xs: 2, sm: 2.5 },
-                                  pt: 0,
-                                  borderTop: '1px solid #e5e7eb'
-                                }}>
-                                  <Box sx={{
-                                    p: 2,
-                                    bgcolor: '#ecfdf5',
-                                    border: '1px solid #a7f3d0',
-                                    borderRadius: 1.5
-                                  }}>
-                                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', display: 'block', mb: 0.75, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                                      Answer
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#065f46', lineHeight: 1.6 }}>
-                                      {q.answer_text}
-                                    </Typography>
-                                  </Box>
-
-                                  {/* Answered Phase Badge */}
-                                  {q.answered_phase === 'post_event' && (
-                                    <Box sx={{ pt: 1.5 }}>
-                                      <Chip
-                                        size="small"
-                                        label="Answered After Event"
-                                        sx={{
-                                          bgcolor: '#dbeafe',
-                                          color: '#1e40af',
-                                          fontWeight: 600,
-                                          fontSize: '0.7rem',
-                                          height: 'auto',
-                                          padding: '4px 8px',
-                                          '& .MuiChip-label': {
-                                            padding: 0
-                                          }
-                                        }}
-                                      />
-                                    </Box>
-                                  )}
-                                  {q.answered_phase === 'live' && (
-                                    <Box sx={{ pt: 1.5 }}>
-                                      <Chip
-                                        size="small"
-                                        label="Answered During Event"
-                                        sx={{
-                                          bgcolor: '#ecfdf5',
-                                          color: '#059669',
-                                          fontWeight: 600,
-                                          fontSize: '0.7rem',
-                                          height: 'auto',
-                                          padding: '4px 8px',
-                                          border: '1px solid #a7f3d0',
-                                          '& .MuiChip-label': {
-                                            padding: 0
-                                          }
-                                        }}
-                                      />
-                                    </Box>
-                                  )}
-                                </Box>
                               )}
                             </Box>
-                          );
-                        })}
+
+                            {/* Answer Section - Collapsible, only if answered */}
+                            {isExpanded && q.is_answered && q.answer_text && (
+                              <Box sx={{
+                                p: { xs: 2, sm: 2.5 },
+                                pt: 0,
+                                borderTop: '1px solid #e5e7eb'
+                              }}>
+                                <Box sx={{
+                                  p: 2,
+                                  bgcolor: q.answered_phase === 'live' ? '#ecfdf5' : '#eff6ff',
+                                  border: q.answered_phase === 'live' ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
+                                  borderRadius: 1.5
+                                }}>
+                                  <Typography variant="caption" sx={{
+                                    fontWeight: 700,
+                                    color: q.answered_phase === 'live' ? '#059669' : '#1d4ed8',
+                                    display: 'block',
+                                    mb: 0.75,
+                                    textTransform: 'uppercase',
+                                    fontSize: '0.7rem',
+                                    letterSpacing: '0.5px'
+                                  }}>
+                                    Answer
+                                  </Typography>
+                                  <Typography variant="body2" sx={{
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-word',
+                                    color: q.answered_phase === 'live' ? '#065f46' : '#1e3a5f',
+                                    lineHeight: 1.6
+                                  }}>
+                                    {q.answer_text}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            )}
+                          </Box>
+                        );
+                      })}
                     </Stack>
                   </Box>
                 </Paper>

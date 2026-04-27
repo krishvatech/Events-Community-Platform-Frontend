@@ -411,6 +411,7 @@ export default function EventManagePage() {
 
   // Post-Event Q&A Answer State
   const [postEventQnaQuestions, setPostEventQnaQuestions] = useState([]);
+  const [postEventAnsweredQuestions, setPostEventAnsweredQuestions] = useState([]);
   const [postEventQnaLoading, setPostEventQnaLoading] = useState(false);
   const [postEventQnaError, setPostEventQnaError] = useState("");
   const [answerModalOpen, setAnswerModalOpen] = useState(false);
@@ -4231,6 +4232,32 @@ export default function EventManagePage() {
             </Box>
           )}
 
+          {/* Already answered post-event questions */}
+          {postEventAnsweredQuestions.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: "text.secondary" }}>
+                Already Answered ({postEventAnsweredQuestions.length})
+              </Typography>
+              <Stack spacing={1.5}>
+                {postEventAnsweredQuestions.map(q => (
+                  <Box key={q.id} sx={{ p: 2, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 2 }}>
+                    <Typography variant="body2" fontWeight={500} sx={{ mb: 0.5 }}>
+                      {q.content}
+                    </Typography>
+                    <Box sx={{ p: 1.5, bgcolor: '#dcfce7', borderRadius: 1, mt: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#15803d', display: 'block', mb: 0.5 }}>
+                        Your Answer:
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#166534', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {q.answer_text}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          )}
+
           {postEventQnaError && (
             <Typography variant="caption" color="error" sx={{ display: "block", mt: 1 }}>
               {postEventQnaError}
@@ -5064,6 +5091,16 @@ export default function EventManagePage() {
           upvote_count: (q.upvoters?.length || 0) + (q.guest_upvotes?.length || 0)
         }));
         setPostEventQnaQuestions(withUpvotes);
+
+        // Also fetch already-answered post-event questions
+        const resAnswered = await fetch(
+          `${API_ROOT}/interactions/questions/post_event_answered/?event_id=${event.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (resAnswered.ok) {
+          const answeredData = await resAnswered.json();
+          setPostEventAnsweredQuestions(answeredData);
+        }
       } catch (err) {
         setPostEventQnaError(err.message || "Failed to load questions");
       } finally {
@@ -5114,15 +5151,19 @@ export default function EventManagePage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Failed to publish answer (${res.status})`);
       }
-      // Success: remove from unanswered list and close modal
+      // Success: remove from unanswered list and add to answered list
       setPostEventQnaQuestions((prev) =>
         prev.filter((q) => q.id !== answeringQuestion.id)
       );
+      // Add to answered questions list
+      setPostEventAnsweredQuestions((prev) => [
+        { ...answeringQuestion, answer_text: answerText.trim(), answered_phase: 'post_event', is_answered: true },
+        ...prev,
+      ]);
       handleCloseAnswerModal();
-      // Optional: show success snackbar
-      console.log("Answer published successfully");
+      toast.success("Answer published and participants notified!");
     } catch (err) {
-      setPostEventQnaError(err.message || "Failed to publish answer");
+      toast.error(err.message || "Failed to publish answer");
     } finally {
       setAnswerSubmitting(false);
     }
