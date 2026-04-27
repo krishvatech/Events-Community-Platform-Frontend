@@ -50,6 +50,7 @@ export default function SaleorManager() {
   const [channels, setChannels] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [shippingZones, setShippingZones] = useState([]);
+  const [productTypes, setProductTypes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
@@ -74,6 +75,15 @@ export default function SaleorManager() {
     countries: [],
     channels: [],
     warehouses: [],
+  });
+
+  // Product Type options (tax classes and kinds)
+  const [productTypeOptions, setProductTypeOptions] = useState({
+    tax_classes: [],
+    product_type_kinds: [
+      { value: "NORMAL", label: "Regular product type" },
+      { value: "GIFT_CARD", label: "Gift card product type" }
+    ]
   });
 
   // Snackbar for success messages
@@ -107,6 +117,7 @@ export default function SaleorManager() {
     fetchChannelOptions();
     fetchWarehouseOptions();
     fetchShippingZoneOptions();
+    fetchProductTypeOptions();
     fetchData(0);
   }, []);
 
@@ -141,6 +152,15 @@ export default function SaleorManager() {
     }
   };
 
+  const fetchProductTypeOptions = async () => {
+    try {
+      const res = await apiClient.get("/events/saleor/product-type-options/");
+      setProductTypeOptions(res.data);
+    } catch (err) {
+      console.error("Failed to fetch product type options:", err);
+    }
+  };
+
   const fetchData = async (tabIndex) => {
     setLoading(true);
     setError(null);
@@ -148,6 +168,7 @@ export default function SaleorManager() {
     if (tabIndex === 0) endpoint = "/events/saleor/channels/";
     else if (tabIndex === 1) endpoint = "/events/saleor/warehouses/";
     else if (tabIndex === 2) endpoint = "/events/saleor/shipping-zones/";
+    else if (tabIndex === 3) endpoint = "/events/saleor/product-types/";
 
     try {
       const response = await apiClient.get(endpoint);
@@ -155,6 +176,7 @@ export default function SaleorManager() {
       if (tabIndex === 0) setChannels(data);
       else if (tabIndex === 1) setWarehouses(data);
       else if (tabIndex === 2) setShippingZones(data);
+      else if (tabIndex === 3) setProductTypes(data);
     } catch (err) {
       setError(`Failed to fetch data: ${err.message}`);
     } finally {
@@ -174,6 +196,7 @@ export default function SaleorManager() {
     if (activeTab === 0) endpoint = "/events/saleor/channels/sync/";
     else if (activeTab === 1) endpoint = "/events/saleor/warehouses/sync/";
     else if (activeTab === 2) endpoint = "/events/saleor/shipping-zones/sync/";
+    else if (activeTab === 3) endpoint = "/events/saleor/product-types/sync/";
 
     try {
       await apiClient.post(endpoint);
@@ -284,6 +307,24 @@ export default function SaleorManager() {
           original_warehouse_ids: [],
         });
       }
+    } else if (type === "productType") {
+      if (item) {
+        setFormData({
+          name: item.name || "",
+          slug: item.slug || "",
+          kind: item.kind || "NORMAL",
+          is_shipping_required: !!item.is_shipping_required,
+          tax_class_id: item.tax_class_id || "",
+        });
+      } else {
+        setFormData({
+          name: "",
+          slug: "",
+          kind: "NORMAL",
+          is_shipping_required: false,
+          tax_class_id: "",
+        });
+      }
     } else {
       if (item) {
         setFormData({ ...item });
@@ -306,10 +347,26 @@ export default function SaleorManager() {
 
   const handleFormChange = (e) => {
     const { name, value, checked, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    const newValue = type === "checkbox" ? checked : value;
+
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        [name]: newValue,
+      };
+
+      // Auto-generate slug from name for product types in create mode
+      if (dialogType === "productType" && name === "name" && !editItem) {
+        const slug = newValue
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "");
+        updated.slug = slug;
+      }
+
+      return updated;
+    });
   };
 
   const validateChannelForm = () => {
@@ -390,11 +447,33 @@ export default function SaleorManager() {
     return true;
   };
 
+  const validateProductTypeForm = () => {
+    if (!formData.name?.trim()) {
+      setDialogError("Product type name is required");
+      return false;
+    }
+    if (!formData.slug?.trim()) {
+      setDialogError("Slug is required");
+      return false;
+    }
+    if (!/^[a-z0-9-]+$/.test(formData.slug)) {
+      setDialogError("Slug must contain only lowercase letters, numbers, and hyphens");
+      return false;
+    }
+    if (!["NORMAL", "GIFT_CARD"].includes(formData.kind)) {
+      setDialogError("Kind must be either NORMAL or GIFT_CARD");
+      return false;
+    }
+    setDialogError("");
+    return true;
+  };
+
   const handleSave = async () => {
     // Validation
     if (dialogType === "channel" && !validateChannelForm()) return;
     if (dialogType === "warehouse" && !validateWarehouseForm()) return;
     if (dialogType === "shippingZone" && !validateShippingZoneForm()) return;
+    if (dialogType === "productType" && !validateProductTypeForm()) return;
 
     setSyncing(true);
     setError(null);
@@ -475,6 +554,19 @@ export default function SaleorManager() {
           warehouse_ids: selectedWarehouseIds,
         };
       }
+    } else if (dialogType === "productType") {
+      if (editItem) {
+        endpoint = `/events/saleor/product-types/${editItem.id}/`;
+      } else {
+        endpoint = `/events/saleor/product-types/create/`;
+      }
+      payload = {
+        name: formData.name,
+        slug: formData.slug,
+        kind: formData.kind,
+        is_shipping_required: formData.is_shipping_required,
+        tax_class_id: formData.tax_class_id || null,
+      };
     } else {
       const typeKey = dialogType + "s";
       if (editItem) {
@@ -497,6 +589,7 @@ export default function SaleorManager() {
       const syncEndpoint =
         dialogType === "channel" ? "/events/saleor/channels/sync/"
         : dialogType === "warehouse" ? "/events/saleor/warehouses/sync/"
+        : dialogType === "productType" ? "/events/saleor/product-types/sync/"
         : "/events/saleor/shipping-zones/sync/";
       try {
         await apiClient.post(syncEndpoint);
@@ -507,7 +600,7 @@ export default function SaleorManager() {
 
       setSnackbar({
         open: true,
-        message: `${dialogType === "channel" ? "Channel" : dialogType === "shippingZone" ? "Shipping Zone" : "Warehouse"} ${editItem ? "updated" : "created"} successfully!`,
+        message: `${dialogType === "channel" ? "Channel" : dialogType === "shippingZone" ? "Shipping Zone" : dialogType === "productType" ? "Product Type" : "Warehouse"} ${editItem ? "updated" : "created"} successfully!`,
         severity: "success",
       });
     } catch (err) {
@@ -541,7 +634,7 @@ export default function SaleorManager() {
 
     setSyncing(true);
     setError(null);
-    const typeKey = tab === 0 ? "channels" : tab === 1 ? "warehouses" : "shipping-zones";
+    const typeKey = tab === 0 ? "channels" : tab === 1 ? "warehouses" : tab === 2 ? "shipping-zones" : "product-types";
 
     try {
       const payload = {};
@@ -1015,6 +1108,106 @@ export default function SaleorManager() {
     </Box>
   );
 
+  const renderProductTypeForm = () => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 4, mt: 0.5 }}>
+      {/* General Information */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          General Information
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Product Type Name *"
+              name="name"
+              value={formData.name || ""}
+              onChange={handleFormChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Slug *"
+              name="slug"
+              value={formData.slug || ""}
+              onChange={handleFormChange}
+              helperText="Lowercase letters, numbers, and hyphens only"
+              required
+            />
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Type */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          Type
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={2}>
+          {productTypeOptions.product_type_kinds.map((kind) => (
+            <Grid item xs={12} key={kind.value}>
+              <FormControlLabel
+                control={
+                  <input
+                    type="radio"
+                    name="kind"
+                    value={kind.value}
+                    checked={formData.kind === kind.value}
+                    onChange={handleFormChange}
+                  />
+                }
+                label={kind.label}
+              />
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
+
+      {/* Shipping */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          Shipping
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <FormControlLabel
+          control={<Switch checked={!!formData.is_shipping_required} onChange={handleFormChange} name="is_shipping_required" />}
+          label="Is this product type shippable?"
+        />
+      </Box>
+
+      {/* Taxes */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          Taxes
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <TextField
+              select
+              fullWidth
+              label="Tax Class"
+              name="tax_class_id"
+              value={formData.tax_class_id || ""}
+              onChange={handleFormChange}
+            >
+              <MenuItem value="">No tax class</MenuItem>
+              {productTypeOptions.tax_classes.map((taxClass) => (
+                <MenuItem key={taxClass.id} value={taxClass.id}>
+                  {taxClass.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
+  );
+
   if (!isOwnerUser()) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -1083,7 +1276,7 @@ export default function SaleorManager() {
                 "&:hover": { bgcolor: "#1a253a" },
               }}
             >
-              Sync {tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : "Shipping Zones"}
+              Sync {tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : tab === 2 ? "Shipping Zones" : "Product Types"}
             </Button>
             <Button
               variant="outlined"
@@ -1137,14 +1330,15 @@ export default function SaleorManager() {
             <Tab label="Channels" />
             <Tab label="Warehouses" />
             <Tab label="Shipping Zones" />
+            <Tab label="Product Types" />
           </Tabs>
 
           <Box sx={{ p: 4 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
-                {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : "Shipping Policy Zones"}
+                {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : tab === 2 ? "Shipping Policy Zones" : "Product Types"}
               </Typography>
-              {(tab === 0 || tab === 1 || tab === 2) && (
+              {(tab === 0 || tab === 1 || tab === 2 || tab === 3) && (
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
@@ -1152,6 +1346,7 @@ export default function SaleorManager() {
                     if (tab === 0) handleOpenDialog("channel");
                     if (tab === 1) handleOpenDialog("warehouse");
                     if (tab === 2) handleOpenDialog("shippingZone");
+                    if (tab === 3) handleOpenDialog("productType");
                   }}
                   sx={{
                     bgcolor: ORANGE,
@@ -1175,19 +1370,26 @@ export default function SaleorManager() {
               <Table>
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#f9fafb" }}>
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Name</TableCell>
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      {tab === 0 ? "Slug / Currency" : tab === 1 ? "Location" : "Info"}
+                      {tab === 3 ? "Type Name" : "Name"}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Linked Entities</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                      {tab === 0 ? "Slug / Currency" : tab === 1 ? "Location" : tab === 2 ? "Info" : "Slug"}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                      {tab === 3 ? "Kind" : "Status"}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                      {tab === 3 ? "Shippable" : "Linked Entities"}
+                    </TableCell>
+                    {tab === 3 && <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Tax Class</TableCell>}
                     <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>
                       Actions
                     </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {(tab === 0 ? channels : tab === 1 ? warehouses : shippingZones).map(item => (
+                  {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : productTypes).map(item => (
                     <TableRow key={item.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
                       <TableCell>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: TEXT }}>
@@ -1207,64 +1409,97 @@ export default function SaleorManager() {
                           <Typography variant="body2">
                             {[item.city, item.country_code].filter(Boolean).join(", ")}
                           </Typography>
-                        ) : (
+                        ) : tab === 2 ? (
                           <Typography
                             variant="body2"
                             sx={{ maxWidth: 200, noWrap: true, textOverflow: "ellipsis", overflow: "hidden" }}
                           >
                             {item.description || "No description"}
                           </Typography>
+                        ) : (
+                          <Chip label={item.slug} size="small" variant="outlined" />
                         )}
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={item.is_active ? "Active" : "Inactive"}
-                          size="small"
-                          sx={{
-                            fontWeight: 600,
-                            bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                            color: item.is_active ? "#059669" : "#4b5563",
-                          }}
-                        />
+                        {tab === 3 ? (
+                          <Chip
+                            label={item.kind || "NORMAL"}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              bgcolor: item.kind === "GIFT_CARD" ? "rgba(139, 92, 246, 0.1)" : "rgba(59, 130, 246, 0.1)",
+                              color: item.kind === "GIFT_CARD" ? "#8b5cf6" : "#3b82f6",
+                            }}
+                          />
+                        ) : (
+                          <Chip
+                            label={item.is_active ? "Active" : "Inactive"}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
+                              color: item.is_active ? "#059669" : "#4b5563",
+                            }}
+                          />
+                        )}
                         {item.is_default && (
                           <Chip label="Default" size="small" color="primary" sx={{ ml: 1, height: 20, fontSize: "0.65rem" }} />
                         )}
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                          {tab === 0 && (item.warehouse_ids || []).length > 0 && (
-                            <Tooltip title="Linked Warehouses">
-                              <Chip icon={<InfoIcon style={{ fontSize: 14 }} />} label={`${item.warehouse_ids.length} WH`} size="small" />
-                            </Tooltip>
-                          )}
-                          {tab === 2 && (
-                            <>
-                              {(item.countries || []).length > 0 && (
-                                <Tooltip title="Countries">
-                                  <Chip label={`${item.countries.length} Countries`} size="small" variant="outlined" sx={{ bgcolor: "#eff6ff", color: "#2563eb", borderColor: "#bfdbfe" }} />
-                                </Tooltip>
-                              )}
-                              {(item.channel_ids || []).length > 0 && (
-                                <Tooltip title="Linked Channels">
-                                  <Chip label={`${item.channel_ids.length} Channel${item.channel_ids.length > 1 ? "s" : ""}`} size="small" color="secondary" variant="outlined" />
-                                </Tooltip>
-                              )}
-                              {(item.warehouse_ids || []).length > 0 && (
-                                <Tooltip title="Linked Warehouses">
-                                  <Chip label={`${item.warehouse_ids.length} Warehouse${item.warehouse_ids.length > 1 ? "s" : ""}`} size="small" variant="outlined" sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }} />
-                                </Tooltip>
-                              )}
-                              {(item.shipping_methods || []).length > 0 && (
-                                <Tooltip title="Shipping Methods">
-                                  <Chip label={`${item.shipping_methods.length} Method${item.shipping_methods.length > 1 ? "s" : ""}`} size="small" variant="outlined" />
-                                </Tooltip>
-                              )}
-                            </>
-                          )}
-                        </Box>
+                        {tab === 3 ? (
+                          <Chip
+                            label={item.is_shipping_required ? "Shippable" : "Not shippable"}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              bgcolor: item.is_shipping_required ? "rgba(34, 197, 94, 0.1)" : "rgba(107, 114, 128, 0.1)",
+                              color: item.is_shipping_required ? "#22c55e" : "#4b5563",
+                            }}
+                          />
+                        ) : (
+                          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                            {tab === 0 && (item.warehouse_ids || []).length > 0 && (
+                              <Tooltip title="Linked Warehouses">
+                                <Chip icon={<InfoIcon style={{ fontSize: 14 }} />} label={`${item.warehouse_ids.length} WH`} size="small" />
+                              </Tooltip>
+                            )}
+                            {tab === 2 && (
+                              <>
+                                {(item.countries || []).length > 0 && (
+                                  <Tooltip title="Countries">
+                                    <Chip label={`${item.countries.length} Countries`} size="small" variant="outlined" sx={{ bgcolor: "#eff6ff", color: "#2563eb", borderColor: "#bfdbfe" }} />
+                                  </Tooltip>
+                                )}
+                                {(item.channel_ids || []).length > 0 && (
+                                  <Tooltip title="Linked Channels">
+                                    <Chip label={`${item.channel_ids.length} Channel${item.channel_ids.length > 1 ? "s" : ""}`} size="small" color="secondary" variant="outlined" />
+                                  </Tooltip>
+                                )}
+                                {(item.warehouse_ids || []).length > 0 && (
+                                  <Tooltip title="Linked Warehouses">
+                                    <Chip label={`${item.warehouse_ids.length} Warehouse${item.warehouse_ids.length > 1 ? "s" : ""}`} size="small" variant="outlined" sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }} />
+                                  </Tooltip>
+                                )}
+                                {(item.shipping_methods || []).length > 0 && (
+                                  <Tooltip title="Shipping Methods">
+                                    <Chip label={`${item.shipping_methods.length} Method${item.shipping_methods.length > 1 ? "s" : ""}`} size="small" variant="outlined" />
+                                  </Tooltip>
+                                )}
+                              </>
+                            )}
+                          </Box>
+                        )}
                       </TableCell>
+                      {tab === 3 && (
+                        <TableCell>
+                          <Typography variant="body2">
+                            {item.tax_class_name || "—"}
+                          </Typography>
+                        </TableCell>
+                      )}
                       <TableCell align="right">
-                        {(tab === 0 || tab === 1 || tab === 2) && (
+                        {(tab === 0 || tab === 1 || tab === 2 || tab === 3) && (
                           <>
                             <IconButton
                               size="small"
@@ -1272,6 +1507,7 @@ export default function SaleorManager() {
                                 if (tab === 0) handleOpenDialog("channel", item);
                                 if (tab === 1) handleOpenDialog("warehouse", item);
                                 if (tab === 2) handleOpenDialog("shippingZone", item);
+                                if (tab === 3) handleOpenDialog("productType", item);
                               }}
                               sx={{ color: TEXT }}
                             >
@@ -1289,9 +1525,9 @@ export default function SaleorManager() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {(tab === 0 ? channels : tab === 1 ? warehouses : shippingZones).length === 0 && (
+                  {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : productTypes).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={tab === 3 ? 6 : 5} align="center" sx={{ py: 6 }}>
                         <Typography variant="body1" sx={{ color: "#9ca3af" }}>
                           No records found. Try syncing from Saleor.
                         </Typography>
@@ -1327,7 +1563,7 @@ export default function SaleorManager() {
         }}
       >
         <DialogTitle sx={{ fontWeight: 700, fontSize: "1.3rem", pb: 2 }}>
-          {editItem ? "Edit" : "Create"} {dialogType === "channel" ? "Channel" : dialogType === "shippingZone" ? "Shipping Zone" : "Warehouse"}
+          {editItem ? "Edit" : "Create"} {dialogType === "channel" ? "Channel" : dialogType === "shippingZone" ? "Shipping Zone" : dialogType === "productType" ? "Product Type" : "Warehouse"}
         </DialogTitle>
         <DialogContent dividers sx={{ minHeight: "450px", padding: "24px" }}>
           {dialogError && (
@@ -1338,6 +1574,7 @@ export default function SaleorManager() {
           {dialogType === "channel" && renderChannelForm()}
           {dialogType === "warehouse" && renderWarehouseForm()}
           {dialogType === "shippingZone" && renderShippingZoneForm()}
+          {dialogType === "productType" && renderProductTypeForm()}
 
           {editItem && (
             <Box sx={{ mt: 3, p: 2, bgcolor: "#f9fafb", borderRadius: 2 }}>
@@ -1403,7 +1640,7 @@ export default function SaleorManager() {
             Are you sure you want to delete <strong>{deleteConfirmDialog.itemName}</strong> from Saleor?
           </Typography>
           <Typography variant="body2" sx={{ mt: 2, color: "#6b7280" }}>
-            This action cannot be undone. The {tab === 0 ? "channel" : tab === 1 ? "warehouse" : "shipping zone"} will be permanently removed.
+            This action cannot be undone. The {tab === 0 ? "channel" : tab === 1 ? "warehouse" : tab === 2 ? "shipping zone" : "product type"} will be permanently removed.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
