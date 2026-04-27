@@ -31,7 +31,7 @@ import {
   Autocomplete,
   Snackbar,
 } from "@mui/material";
-import PublicIcon from "@mui/icons-material/Public";
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import AddIcon from "@mui/icons-material/Add";
@@ -1225,37 +1225,37 @@ export default function SaleorManager() {
         <Paper
           elevation={0}
           sx={{
-            p: 4,
-            mb: 4,
-            borderRadius: 4,
+            p: 2,
+            mb: 3,
+            borderRadius: 3,
             background: "white",
             border: "1px solid #e5e7eb",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: 2,
+            gap: 1.5,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Box
               sx={{
-                width: 56,
-                height: 56,
-                borderRadius: "16px",
+                width: 40,
+                height: 40,
+                borderRadius: "12px",
                 bgcolor: "rgba(232, 83, 47, 0.1)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <PublicIcon sx={{ fontSize: 32, color: ORANGE }} />
+              <ShoppingCartIcon sx={{ fontSize: 24, color: ORANGE }} />
             </Box>
             <Box>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: TEXT, letterSpacing: "-0.5px" }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: TEXT, letterSpacing: "-0.5px" }}>
                 Saleor Manager
               </Typography>
-              <Typography variant="body1" sx={{ color: "#6b7280" }}>
+              <Typography variant="caption" sx={{ color: "#6b7280", display: "block" }}>
                 Configuration & Synchronization Control Center
               </Typography>
             </Box>
