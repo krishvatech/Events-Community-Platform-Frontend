@@ -664,13 +664,15 @@ export default function PreEventQnaManager({
                                         {q.content}
                                     </Typography>
                                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, flexWrap: "wrap" }}>
-                                        <Chip
-                                            label={chip.label}
-                                            color={chip.color}
-                                            size="small"
-                                            variant="outlined"
-                                            sx={{ height: 20, fontSize: "0.7rem" }}
-                                        />
+                                        {q.moderation_status !== "approved" && (
+                                            <Chip
+                                                label={chip.label}
+                                                color={chip.color}
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{ height: 20, fontSize: "0.7rem" }}
+                                            />
+                                        )}
                                         {q.is_anonymous && (
                                             <Chip
                                                 label="Anonymous"

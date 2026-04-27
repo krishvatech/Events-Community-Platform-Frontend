@@ -433,19 +433,21 @@ function QuestionRow({ q, isBeforeEventStart, token, eventId, onUpdated, onDelet
                             {q.content}
                         </Typography>
                         <Stack direction="row" spacing={0.8} alignItems="center" sx={{ mt: 0.8, flexWrap: "wrap" }}>
-                            <Box
-                                sx={{
-                                    px: 0.8,
-                                    py: 0.2,
-                                    borderRadius: 999,
-                                    border: `1px solid ${chip.color}44`,
-                                    bgcolor: `${chip.color}18`,
-                                }}
-                            >
-                                <Typography sx={{ fontSize: 10, fontWeight: 700, color: chip.color }}>
-                                    {chip.label}
-                                </Typography>
-                            </Box>
+                            {q.moderation_status !== "approved" && (
+                                <Box
+                                    sx={{
+                                        px: 0.8,
+                                        py: 0.2,
+                                        borderRadius: 999,
+                                        border: `1px solid ${chip.color}44`,
+                                        bgcolor: `${chip.color}18`,
+                                    }}
+                                >
+                                    <Typography sx={{ fontSize: 10, fontWeight: 700, color: chip.color }}>
+                                        {chip.label}
+                                    </Typography>
+                                </Box>
+                            )}
                             {q.is_anonymous && (
                                 <Box sx={{ px: 0.8, py: 0.2, borderRadius: 999, border: `1px solid ${dark.border}`, bgcolor: "rgba(255,255,255,0.04)" }}>
                                     <Typography sx={{ fontSize: 10, color: dark.subtext }}>Anonymous</Typography>
