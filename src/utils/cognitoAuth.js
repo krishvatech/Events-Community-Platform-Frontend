@@ -40,6 +40,16 @@ export function cognitoConfirmSignUp({ username, code }) {
   });
 }
 
+export function cognitoResendSignUp({ username }) {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: username, Pool: pool });
+    user.resendConfirmationCode((err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+  });
+}
+
 function cognitoAuthenticateSingle({ usernameOrEmail, password }) {
   return new Promise((resolve, reject) => {
     const user = new CognitoUser({ Username: usernameOrEmail, Pool: pool });

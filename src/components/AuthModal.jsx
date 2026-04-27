@@ -18,24 +18,24 @@ import {
 import { Visibility, VisibilityOff, Close as CloseIcon } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { cognitoSignIn, cognitoSignUp, cognitoConfirmSignUp } from "../utils/cognitoAuth";
+import { cognitoSignIn, cognitoSignUp, cognitoConfirmSignUp, cognitoResendSignUp } from "../utils/cognitoAuth";
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
 import { API_BASE } from "../utils/api";
 
 const GOOGLE_ICON = (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M17.64 9.2045C17.64 8.5663 17.5827 7.9527 17.4764 7.3636H9V10.845H13.8436C13.635 11.97 13.0009 12.9231 12.0477 13.5613V15.8195H14.9564C16.6582 14.2527 17.64 11.9454 17.64 9.2045Z" fill="#4285F4"/>
-    <path d="M9 18C11.43 18 13.4673 17.1941 14.9564 15.8195L12.0477 13.5613C11.2418 14.1013 10.2109 14.4204 9 14.4204C6.65591 14.4204 4.67182 12.8372 3.96409 10.71H0.957275V13.0418C2.43818 15.9831 5.48182 18 9 18Z" fill="#34A853"/>
-    <path d="M3.96409 10.71C3.78409 10.17 3.68182 9.5931 3.68182 9C3.68182 8.4069 3.78409 7.83 3.96409 7.29V4.9582H0.957275C0.347727 6.1731 0 7.5477 0 9C0 10.4523 0.347727 11.8268 0.957275 13.0418L3.96409 10.71Z" fill="#FBBC05"/>
-    <path d="M9 3.5795C10.3214 3.5795 11.5077 4.0336 12.4405 4.9254L15.0218 2.344C13.4632 0.891818 11.4259 0 9 0C5.48182 0 2.43818 2.01682 0.957275 4.9582L3.96409 7.29C4.67182 5.1627 6.65591 3.5795 9 3.5795Z" fill="#EA4335"/>
+    <path d="M17.64 9.2045C17.64 8.5663 17.5827 7.9527 17.4764 7.3636H9V10.845H13.8436C13.635 11.97 13.0009 12.9231 12.0477 13.5613V15.8195H14.9564C16.6582 14.2527 17.64 11.9454 17.64 9.2045Z" fill="#4285F4" />
+    <path d="M9 18C11.43 18 13.4673 17.1941 14.9564 15.8195L12.0477 13.5613C11.2418 14.1013 10.2109 14.4204 9 14.4204C6.65591 14.4204 4.67182 12.8372 3.96409 10.71H0.957275V13.0418C2.43818 15.9831 5.48182 18 9 18Z" fill="#34A853" />
+    <path d="M3.96409 10.71C3.78409 10.17 3.68182 9.5931 3.68182 9C3.68182 8.4069 3.78409 7.83 3.96409 7.29V4.9582H0.957275C0.347727 6.1731 0 7.5477 0 9C0 10.4523 0.347727 11.8268 0.957275 13.0418L3.96409 10.71Z" fill="#FBBC05" />
+    <path d="M9 3.5795C10.3214 3.5795 11.5077 4.0336 12.4405 4.9254L15.0218 2.344C13.4632 0.891818 11.4259 0 9 0C5.48182 0 2.43818 2.01682 0.957275 4.9582L3.96409 7.29C4.67182 5.1627 6.65591 3.5795 9 3.5795Z" fill="#EA4335" />
   </svg>
 );
 
 const LINKEDIN_ICON = (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M0 1.2891C0 0.5771 0.5927 0 1.3232 0H16.6768C17.4073 0 18 0.5771 18 1.2891V16.7109C18 17.4229 17.4073 18 16.6768 18H1.3232C0.5927 18 0 17.4229 0 16.7109V1.2891Z" fill="#0A66C2"/>
-    <path d="M5.4521 15.0938V6.9375H2.7207V15.0938H5.4521ZM4.0869 5.8008C5.0039 5.8008 5.5713 5.1973 5.5713 4.4414C5.5547 3.668 5.0039 3.082 4.1035 3.082C3.2031 3.082 2.6191 3.668 2.6191 4.4414C2.6191 5.1973 3.1865 5.8008 4.0693 5.8008H4.0869ZM9.9707 15.0938V10.6055C9.9707 10.3594 9.9883 10.1133 10.0605 9.9375C10.2559 9.4453 10.7012 8.9355 11.4551 8.9355C12.4414 8.9355 12.832 9.6914 12.832 10.7871V15.0938H15.5635V10.4824C15.5635 7.9512 14.2148 6.7793 12.4238 6.7793C10.9629 6.7793 10.3438 7.5879 10.0078 8.1504H10.0254V6.9375H7.2939C7.3281 7.6758 7.2939 15.0938 7.2939 15.0938H9.9707Z" fill="white"/>
+    <path d="M0 1.2891C0 0.5771 0.5927 0 1.3232 0H16.6768C17.4073 0 18 0.5771 18 1.2891V16.7109C18 17.4229 17.4073 18 16.6768 18H1.3232C0.5927 18 0 17.4229 0 16.7109V1.2891Z" fill="#0A66C2" />
+    <path d="M5.4521 15.0938V6.9375H2.7207V15.0938H5.4521ZM4.0869 5.8008C5.0039 5.8008 5.5713 5.1973 5.5713 4.4414C5.5547 3.668 5.0039 3.082 4.1035 3.082C3.2031 3.082 2.6191 3.668 2.6191 4.4414C2.6191 5.1973 3.1865 5.8008 4.0693 5.8008H4.0869ZM9.9707 15.0938V10.6055C9.9707 10.3594 9.9883 10.1133 10.0605 9.9375C10.2559 9.4453 10.7012 8.9355 11.4551 8.9355C12.4414 8.9355 12.832 9.6914 12.832 10.7871V15.0938H15.5635V10.4824C15.5635 7.9512 14.2148 6.7793 12.4238 6.7793C10.9629 6.7793 10.3438 7.5879 10.0078 8.1504H10.0254V6.9375H7.2939C7.3281 7.6758 7.2939 15.0938 7.2939 15.0938H9.9707Z" fill="white" />
   </svg>
 );
 
@@ -69,6 +69,27 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
   const [signupErrors, setSignupErrors] = useState({});
   const [pendingUsername, setPendingUsername] = useState("");
   const [verifyCode, setVerifyCode] = useState("");
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // Timer Effect
+  React.useEffect(() => {
+    let interval = null;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  // Start timer when entering confirm mode
+  React.useEffect(() => {
+    if (mode === "confirm" && resendTimer === 0) {
+      setResendTimer(60);
+    }
+  }, [mode]);
 
   const truthy = (v) => {
     if (v === true || v === 1) return true;
@@ -287,6 +308,21 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
     }
   };
 
+  const handleResendCode = async () => {
+    if (resendTimer > 0 || loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      await cognitoResendSignUp({ username: pendingUsername || signupData.email.trim() });
+      toast.info("📩 A new verification code has been sent to your email.");
+      setResendTimer(60); // Reset timer
+    } catch (err) {
+      setError(err?.message || "Failed to resend code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSocialLogin = (provider) => {
     const base = import.meta.env.VITE_COGNITO_DOMAIN || "";
     const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
@@ -486,9 +522,43 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
               <TextField
                 label="Verification code" fullWidth value={verifyCode}
                 onChange={e => setVerifyCode(e.target.value.replace(/\D/g, ""))}
-                sx={{ ...inputSx, mb: 2.5 }}
+                sx={{ ...inputSx, mb: 1.5 }}
                 autoFocus inputProps={{ maxLength: 8 }}
+                error={error.includes("expired") || error.includes("Invalid")}
               />
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2.5, px: 0.5 }}>
+                <MuiLink
+                  component="button"
+                  type="button"
+                  variant="body2"
+                  onClick={() => {
+                    setMode("signup");
+                    setError("");
+                    setResendTimer(0);
+                  }}
+                  sx={{ color: "#64748B", textDecoration: "none", fontSize: 13, "&:hover": { textDecoration: "underline" } }}
+                >
+                  Change email address
+                </MuiLink>
+
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={handleResendCode}
+                  disabled={resendTimer > 0 || loading}
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: resendTimer > 0 ? "#94A3B8" : "#0F2040",
+                    textTransform: "none",
+                    "&:hover": { bgcolor: "transparent", textDecoration: "underline" }
+                  }}
+                >
+                  {resendTimer > 0 ? `Resend code in ${resendTimer}s` : "Resend code"}
+                </Button>
+              </Box>
+
               <Button
                 type="submit"
                 fullWidth
