@@ -69,6 +69,13 @@ export default function SaleorManager() {
     shipping_zones: [],
   });
 
+  // Shipping Zone options (countries from Saleor, channels + warehouses from local DB)
+  const [shippingZoneOptions, setShippingZoneOptions] = useState({
+    countries: [],
+    channels: [],
+    warehouses: [],
+  });
+
   // Snackbar for success messages
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
@@ -99,6 +106,7 @@ export default function SaleorManager() {
 
     fetchChannelOptions();
     fetchWarehouseOptions();
+    fetchShippingZoneOptions();
     fetchData(0);
   }, []);
 
@@ -121,6 +129,15 @@ export default function SaleorManager() {
       setChannelOptions(res.data);
     } catch (err) {
       console.error("Failed to fetch channel options:", err);
+    }
+  };
+
+  const fetchShippingZoneOptions = async () => {
+    try {
+      const res = await apiClient.get("/events/saleor/shipping-zone-options/");
+      setShippingZoneOptions(res.data);
+    } catch (err) {
+      console.error("Failed to fetch shipping zone options:", err);
     }
   };
 
@@ -240,6 +257,33 @@ export default function SaleorManager() {
           shipping_zone_ids: [],
         });
       }
+    } else if (type === "shippingZone") {
+      // Fetch fresh options before opening the dialog
+      fetchShippingZoneOptions();
+      if (item) {
+        setFormData({
+          name: item.name || "",
+          description: item.description || "",
+          countries: item.countries || [],
+          is_default: !!item.is_default,
+          channel_ids: item.channel_ids || [],
+          warehouse_ids: item.warehouse_ids || [],
+          // Track originals for diff
+          original_channel_ids: item.channel_ids || [],
+          original_warehouse_ids: item.warehouse_ids || [],
+        });
+      } else {
+        setFormData({
+          name: "",
+          description: "",
+          countries: [],
+          is_default: false,
+          channel_ids: [],
+          warehouse_ids: [],
+          original_channel_ids: [],
+          original_warehouse_ids: [],
+        });
+      }
     } else {
       if (item) {
         setFormData({ ...item });
@@ -327,10 +371,30 @@ export default function SaleorManager() {
     return true;
   };
 
+  const validateShippingZoneForm = () => {
+    if (!formData.name?.trim()) {
+      setDialogError("Shipping zone name is required");
+      return false;
+    }
+    if (!formData.is_default && (formData.countries || []).length === 0) {
+      setDialogError("Please select at least one country, or enable Default / Rest of World.");
+      return false;
+    }
+    const selectedWarehouseIds = formData.warehouse_ids || [];
+    const selectedChannelIds = formData.channel_ids || [];
+    if (selectedWarehouseIds.length > 0 && selectedChannelIds.length === 0) {
+      setDialogError("Warning: Selected warehouses must share a channel with this shipping zone. Please assign at least one channel.");
+      return false;
+    }
+    setDialogError("");
+    return true;
+  };
+
   const handleSave = async () => {
     // Validation
     if (dialogType === "channel" && !validateChannelForm()) return;
     if (dialogType === "warehouse" && !validateWarehouseForm()) return;
+    if (dialogType === "shippingZone" && !validateShippingZoneForm()) return;
 
     setSyncing(true);
     setError(null);
@@ -382,8 +446,37 @@ export default function SaleorManager() {
         endpoint = `/events/saleor/warehouses/create/`;
         payload = formData;
       }
+    } else if (dialogType === "shippingZone") {
+      const selectedChannelIds = formData.channel_ids || [];
+      const selectedWarehouseIds = formData.warehouse_ids || [];
+      const origChannelIds = formData.original_channel_ids || [];
+      const origWarehouseIds = formData.original_warehouse_ids || [];
+
+      if (editItem) {
+        endpoint = `/events/saleor/shipping-zones/${editItem.id}/`;
+        payload = {
+          name: formData.name,
+          description: formData.description,
+          countries: formData.is_default ? [] : formData.countries,
+          is_default: formData.is_default,
+          add_channel_ids: selectedChannelIds.filter(id => !origChannelIds.includes(id)),
+          remove_channel_ids: origChannelIds.filter(id => !selectedChannelIds.includes(id)),
+          add_warehouse_ids: selectedWarehouseIds.filter(id => !origWarehouseIds.includes(id)),
+          remove_warehouse_ids: origWarehouseIds.filter(id => !selectedWarehouseIds.includes(id)),
+        };
+      } else {
+        endpoint = `/events/saleor/shipping-zones/create/`;
+        payload = {
+          name: formData.name,
+          description: formData.description,
+          countries: formData.is_default ? [] : formData.countries,
+          is_default: formData.is_default,
+          channel_ids: selectedChannelIds,
+          warehouse_ids: selectedWarehouseIds,
+        };
+      }
     } else {
-      const typeKey = dialogType === "shippingZone" ? "shipping-zones" : dialogType + "s";
+      const typeKey = dialogType + "s";
       if (editItem) {
         endpoint = `/events/saleor/${typeKey}/${editItem.id}/`;
       } else {
@@ -399,22 +492,24 @@ export default function SaleorManager() {
         await apiClient.post(endpoint, payload);
       }
       handleCloseDialog();
+
+      // Sync after successful create/edit for all types
+      const syncEndpoint =
+        dialogType === "channel" ? "/events/saleor/channels/sync/"
+        : dialogType === "warehouse" ? "/events/saleor/warehouses/sync/"
+        : "/events/saleor/shipping-zones/sync/";
+      try {
+        await apiClient.post(syncEndpoint);
+      } catch (_) {
+        // Sync failure is non-blocking
+      }
       fetchData(tab);
+
       setSnackbar({
         open: true,
         message: `${dialogType === "channel" ? "Channel" : dialogType === "shippingZone" ? "Shipping Zone" : "Warehouse"} ${editItem ? "updated" : "created"} successfully!`,
         severity: "success",
       });
-
-      // Try sync after successful create/edit
-      if (dialogType === "channel") {
-        try {
-          await apiClient.post("/events/saleor/channels/sync/");
-          fetchData(0);
-        } catch (syncErr) {
-          // Sync failure is non-blocking
-        }
-      }
     } catch (err) {
       const responseData = err.response?.data;
       let finalError = "";
@@ -767,20 +862,157 @@ export default function SaleorManager() {
   );
 
   const renderShippingZoneForm = () => (
-    <Grid container spacing={2} sx={{ mt: 1 }}>
-      <Grid item xs={12}>
-        <TextField fullWidth label="Name" name="name" value={formData.name || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12}>
-        <TextField multiline rows={3} fullWidth label="Description" name="description" value={formData.description || ""} onChange={handleFormChange} />
-      </Grid>
-      <Grid item xs={12}>
-        <FormControlLabel
-          control={<Switch checked={!!formData.is_default} onChange={handleFormChange} name="is_default" />}
-          label="Default Zone"
-        />
-      </Grid>
-    </Grid>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 4, mt: 0.5 }}>
+      {/* General Information */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          General Information
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Shipping Zone Name *"
+              name="name"
+              value={formData.name || ""}
+              onChange={handleFormChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              label="Description"
+              name="description"
+              value={formData.description || ""}
+              onChange={handleFormChange}
+            />
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Countries */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          Countries
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={!!formData.is_default}
+                  onChange={(e) =>
+                    setFormData(prev => ({ ...prev, is_default: e.target.checked, countries: [] }))
+                  }
+                  name="is_default"
+                />
+              }
+              label="Default / Rest of World"
+            />
+            {formData.is_default && (
+              <Typography variant="caption" sx={{ display: "block", color: "#6b7280", mt: 0.5 }}>
+                Default / Rest of World zone covers countries not assigned to another shipping zone.
+              </Typography>
+            )}
+          </Grid>
+          {!formData.is_default && (
+            <Grid item xs={12}>
+              <Autocomplete
+                multiple
+                fullWidth
+                options={shippingZoneOptions.countries}
+                getOptionLabel={(option) => `${option.country} (${option.code})`}
+                value={shippingZoneOptions.countries.filter(c => (formData.countries || []).includes(c.code))}
+                onChange={(_, newValue) =>
+                  setFormData(prev => ({ ...prev, countries: newValue.map(c => c.code) }))
+                }
+                filterSelectedOptions
+                disableCloseOnSelect
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Assign Countries *"
+                    placeholder="Search countries…"
+                    helperText={`${(formData.countries || []).length} country(ies) selected`}
+                  />
+                )}
+              />
+            </Grid>
+          )}
+        </Grid>
+      </Box>
+
+      {/* Assignments */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+          Assignments
+        </Typography>
+        <Divider sx={{ mb: 3 }} />
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Autocomplete
+              multiple
+              fullWidth
+              options={shippingZoneOptions.channels}
+              getOptionLabel={(option) => `${option.name} (${option.slug})`}
+              value={shippingZoneOptions.channels.filter(c => (formData.channel_ids || []).includes(c.saleor_id))}
+              onChange={(_, newValue) =>
+                setFormData(prev => ({ ...prev, channel_ids: newValue.map(c => c.saleor_id) }))
+              }
+              filterSelectedOptions
+              disableCloseOnSelect
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Assign Channels"
+                  placeholder="Select channels"
+                  helperText={`${(formData.channel_ids || []).length} channel(s) selected`}
+                />
+              )}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Autocomplete
+              multiple
+              fullWidth
+              options={shippingZoneOptions.warehouses}
+              getOptionLabel={(option) => `${option.name} (${option.slug || option.saleor_id})`}
+              value={shippingZoneOptions.warehouses.filter(w => (formData.warehouse_ids || []).includes(w.saleor_id))}
+              onChange={(_, newValue) =>
+                setFormData(prev => ({ ...prev, warehouse_ids: newValue.map(w => w.saleor_id) }))
+              }
+              filterSelectedOptions
+              disableCloseOnSelect
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Assign Warehouses"
+                  placeholder="Select warehouses"
+                  helperText={
+                    (formData.warehouse_ids || []).length > 0 && (formData.channel_ids || []).length === 0
+                      ? "⚠ Selected warehouses must share a channel with this shipping zone."
+                      : `${(formData.warehouse_ids || []).length} warehouse(s) selected`
+                  }
+                  FormHelperTextProps={{
+                    sx: {
+                      color:
+                        (formData.warehouse_ids || []).length > 0 && (formData.channel_ids || []).length === 0
+                          ? "#d97706"
+                          : undefined,
+                    },
+                  }}
+                />
+              )}
+            />
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
   );
 
   if (!isOwnerUser()) {
@@ -1005,15 +1237,29 @@ export default function SaleorManager() {
                               <Chip icon={<InfoIcon style={{ fontSize: 14 }} />} label={`${item.warehouse_ids.length} WH`} size="small" />
                             </Tooltip>
                           )}
-                          {tab === 2 && (item.channel_ids || []).length > 0 && (
-                            <Tooltip title="Linked Channels">
-                              <Chip label={`${item.channel_ids.length} Channels`} size="small" color="secondary" variant="outlined" />
-                            </Tooltip>
-                          )}
-                          {tab === 2 && (item.shipping_methods || []).length > 0 && (
-                            <Tooltip title="Shipping Methods">
-                              <Chip label={`${item.shipping_methods.length} Methods`} size="small" variant="outlined" />
-                            </Tooltip>
+                          {tab === 2 && (
+                            <>
+                              {(item.countries || []).length > 0 && (
+                                <Tooltip title="Countries">
+                                  <Chip label={`${item.countries.length} Countries`} size="small" variant="outlined" sx={{ bgcolor: "#eff6ff", color: "#2563eb", borderColor: "#bfdbfe" }} />
+                                </Tooltip>
+                              )}
+                              {(item.channel_ids || []).length > 0 && (
+                                <Tooltip title="Linked Channels">
+                                  <Chip label={`${item.channel_ids.length} Channel${item.channel_ids.length > 1 ? "s" : ""}`} size="small" color="secondary" variant="outlined" />
+                                </Tooltip>
+                              )}
+                              {(item.warehouse_ids || []).length > 0 && (
+                                <Tooltip title="Linked Warehouses">
+                                  <Chip label={`${item.warehouse_ids.length} Warehouse${item.warehouse_ids.length > 1 ? "s" : ""}`} size="small" variant="outlined" sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }} />
+                                </Tooltip>
+                              )}
+                              {(item.shipping_methods || []).length > 0 && (
+                                <Tooltip title="Shipping Methods">
+                                  <Chip label={`${item.shipping_methods.length} Method${item.shipping_methods.length > 1 ? "s" : ""}`} size="small" variant="outlined" />
+                                </Tooltip>
+                              )}
+                            </>
                           )}
                         </Box>
                       </TableCell>
