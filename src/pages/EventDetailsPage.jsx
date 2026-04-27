@@ -18,6 +18,7 @@ import {
   Tooltip,
   Alert,
   Divider,
+  Collapse,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
@@ -38,6 +39,10 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { normalizeTimezoneName, getBrowserTimezone } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { toast } from "react-toastify";
@@ -423,6 +428,25 @@ export default function EventDetailsPage() {
   // Q&A Status Filter
   const [qaStatusFilter, setQaStatusFilter] = useState('all'); // 'all', 'answered_live', 'answered_post_event', 'pending'
 
+  // Q&A Groups state
+  const [qaGroups, setQaGroups] = useState([]);
+
+  // Component for clickable user names
+  const ClickableAsker = ({ userId, name, isAnonymous }) => {
+    if (isAnonymous) return "Anonymous";
+    if (!userId) return name || "Unknown";
+    return (
+      <Link
+        to={`/community/rich-profile/${userId}`}
+        style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}
+        className="hover:underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {name}
+      </Link>
+    );
+  };
+
   const handleImageLoad = useCallback((e) => {
     const img = e.currentTarget;
   }, []);
@@ -439,10 +463,29 @@ export default function EventDetailsPage() {
       if (!res.ok) return;
       const latest = await res.json();
       setEvent(latest);
+      // Also refresh groups since they might have changed
+      fetchQaGroups(event.id);
     } catch (_) {
       // no-op: keep existing event state on transient network errors
     }
   }, [event?.id, token]);
+
+  const fetchQaGroups = useCallback(async (eventId) => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(urlJoin(API_BASE, `/interactions/qna-groups/?event_id=${eventId}`), {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setQaGroups(Array.isArray(data) ? data : (data.results || []));
+    } catch (e) {
+      console.error("Error fetching Q&A groups:", e);
+    }
+  }, [token]);
 
   // Handle invite_token from URL
   useEffect(() => {
@@ -847,7 +890,9 @@ export default function EventDetailsPage() {
           });
           if (cancelled) return;
           if (res.ok) {
-            setEvent(await res.json());
+            const data = await res.json();
+            setEvent(data);
+            fetchQaGroups(data.id);
             setLoading(false);
             return;
           }
@@ -868,7 +913,9 @@ export default function EventDetailsPage() {
         });
         if (cancelled) return;
         if (resSlug.ok) {
-          setEvent(await resSlug.json());
+          const data = await resSlug.json();
+          setEvent(data);
+          fetchQaGroups(data.id);
           setLoading(false);
           return;
         }
@@ -992,7 +1039,7 @@ export default function EventDetailsPage() {
             })
           );
         }
-      } catch (_) {}
+      } catch (_) { }
     };
 
     return () => ws.close();
@@ -1978,8 +2025,8 @@ export default function EventDetailsPage() {
                       const filteredQs = filterQuestionsByStatus(localQuestions);
                       const statusLabel = qaStatusFilter === 'all' ? 'All Questions'
                         : qaStatusFilter === 'answered_live' ? 'Answered Live'
-                        : qaStatusFilter === 'answered_post_event' ? 'Answered Post-Event'
-                        : 'Pending';
+                          : qaStatusFilter === 'answered_post_event' ? 'Answered Post-Event'
+                            : 'Pending';
 
                       if (filteredQs.length === 0) {
                         return (
@@ -1996,134 +2043,299 @@ export default function EventDetailsPage() {
 
                     {/* Filtered Q&A Items */}
                     <Stack spacing={2}>
-                      {filterQuestionsByStatus(localQuestions).map((q) => {
-                        const isExpanded = expandedQaItems[q.id] === true;
-                        const statusChip = !q.is_answered
-                          ? { label: 'Pending', bgcolor: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }
-                          : q.answered_phase === 'live'
-                          ? { label: 'Answered Live', bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
-                          : { label: 'Answered Post-Event', bgcolor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
+                      {(() => {
+                        const filteredQs = filterQuestionsByStatus(localQuestions);
+                        const groupedQuestions = {};
+                        const ungroupedQuestions = [];
+                        const visibleGroups = qaGroups;
 
-                        return (
-                          <Box
-                            key={q.id}
-                            sx={{
-                              bgcolor: '#f8fafb',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: 2,
-                              transition: 'all 0.2s ease',
-                              '&:hover': {
-                                bgcolor: '#ffffff',
-                                borderColor: '#d1d5db',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                              }
-                            }}
-                          >
-                            {/* Question Header - Clickable */}
+                        visibleGroups.forEach(g => { groupedQuestions[g.id] = []; });
+
+                        filteredQs.forEach(q => {
+                          let assigned = false;
+                          for (const g of visibleGroups) {
+                            if (g.memberships && g.memberships.some(m => Number(m.question) === Number(q.id))) {
+                              groupedQuestions[g.id].push(q);
+                              assigned = true;
+                              break;
+                            }
+                          }
+                          if (!assigned) ungroupedQuestions.push(q);
+                        });
+
+                        const renderQuestion = (q, isSubQuestion = false) => {
+                          const isExpanded = expandedQaItems[q.id] === true;
+                          const statusChip = !q.is_answered
+                            ? { label: 'Pending', bgcolor: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }
+                            : q.answered_phase === 'live'
+                              ? { label: 'Answered Live', bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
+                              : { label: 'Answered Post-Event', bgcolor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
+
+                          return (
                             <Box
-                              onClick={() => setExpandedQaItems(prev => ({ ...prev, [q.id]: !isExpanded }))}
+                              key={q.id}
                               sx={{
-                                p: { xs: 2, sm: 2.5 },
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                gap: 2,
-                                cursor: 'pointer',
-                                userSelect: 'none',
-                                '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }
+                                bgcolor: isSubQuestion ? 'transparent' : '#f8fafb',
+                                border: isSubQuestion ? 'none' : '1px solid #e5e7eb',
+                                borderTop: isSubQuestion ? '1px solid rgba(0,0,0,0.05)' : '1px solid #e5e7eb',
+                                borderRadius: isSubQuestion ? 0 : 2,
+                                transition: 'all 0.2s ease',
+                                '&:hover': {
+                                  bgcolor: isSubQuestion ? 'rgba(0,0,0,0.01)' : '#ffffff',
+                                  borderColor: isSubQuestion ? 'none' : '#d1d5db',
+                                  boxShadow: isSubQuestion ? 'none' : '0 1px 3px rgba(0,0,0,0.1)'
+                                }
                               }}
                             >
-                              <Box sx={{ flex: 1, pr: 1 }}>
-                                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5, color: '#111827' }}>
-                                  Q: {q.content}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                                  Asked by {q.is_anonymous ? 'Anonymous' : (q.user_display || 'Unknown')}
-                                </Typography>
-                              </Box>
-                              {/* Status Chip */}
-                              <Chip
-                                size="small"
-                                label={statusChip.label}
+                              {/* Question Header - Clickable */}
+                              <Box
+                                onClick={() => setExpandedQaItems(prev => ({ ...prev, [q.id]: !isExpanded }))}
                                 sx={{
-                                  bgcolor: statusChip.bgcolor,
-                                  color: statusChip.color,
-                                  border: statusChip.border,
-                                  fontWeight: 600,
-                                  fontSize: '0.7rem',
-                                  flexShrink: 0,
-                                  height: 'auto',
-                                  padding: '4px 8px',
-                                  '& .MuiChip-label': { padding: 0 }
+                                  p: isSubQuestion ? { xs: 1.5, sm: 2 } : { xs: 2, sm: 2.5 },
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'flex-start',
+                                  gap: 2,
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
+                                  '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }
                                 }}
-                              />
-                              {/* Expand/Collapse Icon - only if has answer */}
-                              {q.is_answered && q.answer_text && (
-                                <Box
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    minWidth: 32,
-                                    height: 32,
-                                    flexShrink: 0
-                                  }}
-                                >
+                              >
+                                <Box sx={{ flex: 1, pr: 1 }}>
+                                  <Typography variant={isSubQuestion ? "body2" : "subtitle2"} fontWeight={isSubQuestion ? 500 : 700} sx={{ mb: 0.5, color: '#111827' }}>
+                                    {isSubQuestion ? "" : "Q: "}{q.content}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                                    Asked by <ClickableAsker userId={q.user} name={q.user_display} isAnonymous={q.is_anonymous} />
+                                  </Typography>
+                                </Box>
+                                {/* Status Chip - hide for subquestions unless they differ from group? Actually let's show them */}
+                                {!isSubQuestion && (
+                                  <Chip
+                                    size="small"
+                                    label={statusChip.label}
+                                    sx={{
+                                      bgcolor: statusChip.bgcolor,
+                                      color: statusChip.color,
+                                      border: statusChip.border,
+                                      fontWeight: 600,
+                                      fontSize: '0.7rem',
+                                      flexShrink: 0,
+                                      height: 'auto',
+                                      padding: '4px 8px',
+                                      '& .MuiChip-label': { padding: 0 }
+                                    }}
+                                  />
+                                )}
+                                {/* Expand/Collapse Icon - only if has answer */}
+                                {q.is_answered && q.answer_text && (
                                   <Box
                                     sx={{
-                                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                                      transition: 'transform 0.3s ease',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      color: '#6b7280',
-                                      fontSize: 14
+                                      minWidth: 32,
+                                      height: 32,
+                                      flexShrink: 0
                                     }}
                                   >
-                                    ▼
+                                    <Box
+                                      sx={{
+                                        transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        transition: 'transform 0.3s ease',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#6b7280',
+                                        fontSize: 14
+                                      }}
+                                    >
+                                      ▼
+                                    </Box>
                                   </Box>
-                                </Box>
-                              )}
-                            </Box>
-
-                            {/* Answer Section - Collapsible, only if answered */}
-                            {isExpanded && q.is_answered && q.answer_text && (
-                              <Box sx={{
-                                p: { xs: 2, sm: 2.5 },
-                                pt: 0,
-                                borderTop: '1px solid #e5e7eb'
-                              }}>
-                                <Box sx={{
-                                  p: 2,
-                                  bgcolor: q.answered_phase === 'live' ? '#ecfdf5' : '#eff6ff',
-                                  border: q.answered_phase === 'live' ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
-                                  borderRadius: 1.5
-                                }}>
-                                  <Typography variant="caption" sx={{
-                                    fontWeight: 700,
-                                    color: q.answered_phase === 'live' ? '#059669' : '#1d4ed8',
-                                    display: 'block',
-                                    mb: 0.75,
-                                    textTransform: 'uppercase',
-                                    fontSize: '0.7rem',
-                                    letterSpacing: '0.5px'
-                                  }}>
-                                    Answer
-                                  </Typography>
-                                  <Typography variant="body2" sx={{
-                                    whiteSpace: 'pre-wrap',
-                                    wordBreak: 'break-word',
-                                    color: q.answered_phase === 'live' ? '#065f46' : '#1e3a5f',
-                                    lineHeight: 1.6
-                                  }}>
-                                    {q.answer_text}
-                                  </Typography>
-                                </Box>
+                                )}
                               </Box>
-                            )}
-                          </Box>
+
+                              {/* Answer Section - Collapsible, only if answered */}
+                              <Collapse in={isExpanded}>
+                                {q.is_answered && q.answer_text && (
+                                  <Box sx={{
+                                    p: { xs: 2, sm: 2.5 },
+                                    pt: 0,
+                                    borderTop: isSubQuestion ? 'none' : '1px solid #e5e7eb'
+                                  }}>
+                                    <Box sx={{
+                                      p: 2,
+                                      bgcolor: q.answered_phase === 'live' ? '#ecfdf5' : '#eff6ff',
+                                      border: q.answered_phase === 'live' ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
+                                      borderRadius: 1.5
+                                    }}>
+                                      <Typography variant="caption" sx={{
+                                        fontWeight: 700,
+                                        color: q.answered_phase === 'live' ? '#059669' : '#1d4ed8',
+                                        display: 'block',
+                                        mb: 0.75,
+                                        textTransform: 'uppercase',
+                                        fontSize: '0.7rem',
+                                        letterSpacing: '0.5px'
+                                      }}>
+                                        Answer
+                                      </Typography>
+                                      <Typography variant="body2" sx={{
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        color: q.answered_phase === 'live' ? '#065f46' : '#1e3a5f',
+                                        lineHeight: 1.6
+                                      }}>
+                                        {q.answer_text}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                )}
+                              </Collapse>
+                            </Box>
+                          );
+                        };
+
+                        const renderGroup = (g, members) => {
+                          const isExpanded = expandedQaItems[`group_${g.id}`] === true;
+                          const summaryText = g.summary?.trim() || g.title?.trim() || "Grouped question";
+                          const authorNames = Array.from(
+                            members
+                              .filter((q) => !q.is_anonymous && q.user_display)
+                              .reduce((acc, q) => {
+                                acc.set(q.user, { id: q.user, name: q.user_display });
+                                return acc;
+                              }, new Map())
+                              .values()
+                          );
+                          const voteCount = g.aggregated_vote_count ?? 0;
+
+                          // Consider group answered if ANY question in it is answered
+                          const anyAnswered = members.some(q => q.is_answered);
+                          const answeredPhase = members.find(q => q.is_answered)?.answered_phase || 'post_event';
+
+                          const statusChip = !anyAnswered
+                            ? { label: 'Pending', bgcolor: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }
+                            : answeredPhase === 'live'
+                              ? { label: 'Answered Live', bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
+                              : { label: 'Answered Post-Event', bgcolor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
+
+                          return (
+                            <Box
+                              key={`group_${g.id}`}
+                              sx={{
+                                bgcolor: '#f0f4ff',
+                                border: '1.5px solid #dbeafe',
+                                borderRadius: 3,
+                                overflow: 'hidden',
+                                transition: 'all 0.2s ease',
+                                '&:hover': {
+                                  borderColor: '#bfdbfe',
+                                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.08)'
+                                }
+                              }}
+                            >
+                              {/* Group Header */}
+                              <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+                                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                                  <Chip
+                                    size="small"
+                                    label={`${members.length} combined`}
+                                    sx={{
+                                      bgcolor: 'rgba(59, 130, 246, 0.1)',
+                                      color: '#1d4ed8',
+                                      fontWeight: 600,
+                                      fontSize: '0.65rem',
+                                      height: 20
+                                    }}
+                                  />
+                                  {voteCount > 0 && (
+                                    <Chip
+                                      size="small"
+                                      label={`▲ ${voteCount}`}
+                                      sx={{
+                                        bgcolor: 'rgba(245, 158, 11, 0.1)',
+                                        color: '#d97706',
+                                        fontWeight: 700,
+                                        fontSize: '0.65rem',
+                                        height: 20
+                                      }}
+                                    />
+                                  )}
+                                  <Box sx={{ flex: 1 }} />
+                                  <Chip
+                                    size="small"
+                                    label={statusChip.label}
+                                    sx={{
+                                      bgcolor: statusChip.bgcolor,
+                                      color: statusChip.color,
+                                      border: statusChip.border,
+                                      fontWeight: 600,
+                                      fontSize: '0.65rem',
+                                      height: 20
+                                    }}
+                                  />
+                                </Stack>
+
+                                <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1, color: '#1e3a8a', lineHeight: 1.4 }}>
+                                  {summaryText}
+                                </Typography>
+
+                                {authorNames.length > 0 && (
+                                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                                    <PeopleOutlineIcon sx={{ fontSize: 16, color: '#64748b' }} />
+                                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                      Asked by {authorNames.map((auth, idx) => (
+                                        <React.Fragment key={auth.id || idx}>
+                                          <ClickableAsker userId={auth.id} name={auth.name} />
+                                          {idx < authorNames.length - 1 ? " • " : ""}
+                                        </React.Fragment>
+                                      ))}
+                                    </Typography>
+                                  </Stack>
+                                )}
+
+                                {/* Group Actions / Unfold */}
+                                <Button
+                                  variant="text"
+                                  size="small"
+                                  onClick={() => setExpandedQaItems(prev => ({ ...prev, [`group_${g.id}`]: !isExpanded }))}
+                                  startIcon={isExpanded ? <UnfoldLessIcon /> : <UnfoldMoreIcon />}
+                                  sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    color: '#3b82f6',
+                                    p: 0,
+                                    '&:hover': { bgcolor: 'transparent', color: '#2563eb' }
+                                  }}
+                                >
+                                  {isExpanded ? "Hide original questions" : `View ${members.length} original questions`}
+                                </Button>
+                              </Box>
+
+                              {/* Collapsible Sub-questions */}
+                              <Collapse in={isExpanded}>
+                                <Box sx={{ bgcolor: 'rgba(255,255,255,0.5)', borderTop: '1px solid #dbeafe' }}>
+                                  {members.map(member => renderQuestion(member, true))}
+                                </Box>
+                              </Collapse>
+                            </Box>
+                          );
+                        };
+
+                        return (
+                          <React.Fragment>
+                            {visibleGroups.map(g => {
+                              const members = groupedQuestions[g.id];
+                              if (members.length === 0) return null;
+                              return renderGroup(g, members);
+                            })}
+                            {ungroupedQuestions.map(q => renderQuestion(q))}
+                          </React.Fragment>
                         );
-                      })}
+                      })()}
                     </Stack>
                   </Box>
                 </Paper>
