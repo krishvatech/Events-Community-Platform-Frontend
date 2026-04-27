@@ -1376,9 +1376,11 @@ export default function SaleorManager() {
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
                       {tab === 0 ? "Slug / Currency" : tab === 1 ? "Location" : tab === 2 ? "Info" : "Slug"}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      {tab === 3 ? "Kind" : "Status"}
-                    </TableCell>
+                    {tab !== 3 && (
+                      <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                        Status
+                      </TableCell>
+                    )}
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
                       {tab === 3 ? "Shippable" : "Linked Entities"}
                     </TableCell>
@@ -1420,18 +1422,8 @@ export default function SaleorManager() {
                           <Chip label={item.slug} size="small" variant="outlined" />
                         )}
                       </TableCell>
-                      <TableCell>
-                        {tab === 3 ? (
-                          <Chip
-                            label={item.kind || "NORMAL"}
-                            size="small"
-                            sx={{
-                              fontWeight: 600,
-                              bgcolor: item.kind === "GIFT_CARD" ? "rgba(139, 92, 246, 0.1)" : "rgba(59, 130, 246, 0.1)",
-                              color: item.kind === "GIFT_CARD" ? "#8b5cf6" : "#3b82f6",
-                            }}
-                          />
-                        ) : (
+                      {tab !== 3 && (
+                        <TableCell>
                           <Chip
                             label={item.is_active ? "Active" : "Inactive"}
                             size="small"
@@ -1441,11 +1433,11 @@ export default function SaleorManager() {
                               color: item.is_active ? "#059669" : "#4b5563",
                             }}
                           />
-                        )}
-                        {item.is_default && (
-                          <Chip label="Default" size="small" color="primary" sx={{ ml: 1, height: 20, fontSize: "0.65rem" }} />
-                        )}
-                      </TableCell>
+                          {item.is_default && (
+                            <Chip label="Default" size="small" color="primary" sx={{ ml: 1, height: 20, fontSize: "0.65rem" }} />
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell>
                         {tab === 3 ? (
                           <Chip
@@ -1527,7 +1519,7 @@ export default function SaleorManager() {
                   ))}
                   {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : productTypes).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={tab === 3 ? 6 : 5} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={tab === 3 ? 5 : 5} align="center" sx={{ py: 6 }}>
                         <Typography variant="body1" sx={{ color: "#9ca3af" }}>
                           No records found. Try syncing from Saleor.
                         </Typography>
