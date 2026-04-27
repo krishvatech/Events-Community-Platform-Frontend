@@ -27,6 +27,9 @@ import {
   Tooltip,
   Divider,
   CircularProgress,
+  MenuItem,
+  Autocomplete,
+  Snackbar,
 } from "@mui/material";
 import PublicIcon from "@mui/icons-material/Public";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -52,20 +55,54 @@ export default function SaleorManager() {
   const [error, setError] = useState(null);
   const [saleorDashboardUrl, setSaleorDashboardUrl] = useState(null);
 
+  // Channel options
+  const [channelOptions, setChannelOptions] = useState({
+    countries: [],
+    currencies: [],
+    warehouses: [],
+    shipping_zones: [],
+  });
+
+  // Snackbar for success messages
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
   // Dialog states
   const [openDialog, setOpenDialog] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [dialogType, setDialogType] = useState(""); // "channel", "warehouse", "shippingZone"
+  const [dialogType, setDialogType] = useState("");
   const [formData, setFormData] = useState({});
+  const [dialogError, setDialogError] = useState("");
+
+  // Track original warehouse/shipping zone IDs for channel edit
+  const [originalWarehouseIds, setOriginalWarehouseIds] = useState([]);
+  const [originalShippingZoneIds, setOriginalShippingZoneIds] = useState([]);
+
+  // Destination channel dialog for delete
+  const [deleteDestDialog, setDeleteDestDialog] = useState({ open: false, channelId: null });
+  const [destChannelId, setDestChannelId] = useState("");
+
+  // Delete confirmation dialog
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ open: false, itemId: null, itemName: "" });
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     if (!isOwnerUser()) return;
     getSaleorDashboardUrl()
       .then((data) => setSaleorDashboardUrl(data.url))
       .catch(() => {});
-    
+
+    fetchChannelOptions();
     fetchData(0);
   }, []);
+
+  const fetchChannelOptions = async () => {
+    try {
+      const res = await apiClient.get("/events/saleor/channel-options/");
+      setChannelOptions(res.data);
+    } catch (err) {
+      console.error("Failed to fetch channel options:", err);
+    }
+  };
 
   const fetchData = async (tabIndex) => {
     setLoading(true);
@@ -116,11 +153,41 @@ export default function SaleorManager() {
   const handleOpenDialog = (type, item = null) => {
     setDialogType(type);
     setEditItem(item);
-    if (item) {
-      setFormData({ ...item });
+
+    if (type === "channel") {
+      if (item) {
+        const wIds = item.warehouse_ids || [];
+        setOriginalWarehouseIds([...wIds]);
+        // Find shipping zones that reference this channel
+        const szIds = shippingZones
+          .filter(sz => (sz.channel_ids || []).includes(item.saleor_id))
+          .map(sz => sz.saleor_id);
+        setOriginalShippingZoneIds([...szIds]);
+        setFormData({
+          ...item,
+          warehouse_ids: [...wIds],
+          shipping_zone_ids: [...szIds],
+        });
+      } else {
+        setOriginalWarehouseIds([]);
+        setOriginalShippingZoneIds([]);
+        setFormData({
+          currency: "USD",
+          default_country: "US",
+          is_active: true,
+          allocation_strategy: "PRIORITIZE_SORTING_ORDER",
+          warehouse_ids: [],
+          shipping_zone_ids: [],
+        });
+      }
     } else {
-      setFormData({});
+      if (item) {
+        setFormData({ ...item });
+      } else {
+        setFormData({});
+      }
     }
+
     setOpenDialog(true);
   };
 
@@ -128,6 +195,9 @@ export default function SaleorManager() {
     setOpenDialog(false);
     setEditItem(null);
     setFormData({});
+    setOriginalWarehouseIds([]);
+    setOriginalShippingZoneIds([]);
+    setDialogError("");
   };
 
   const handleFormChange = (e) => {
@@ -138,33 +208,115 @@ export default function SaleorManager() {
     }));
   };
 
+  const validateChannelForm = () => {
+    if (!formData.name?.trim()) {
+      setDialogError("Channel name is required");
+      return false;
+    }
+    if (!formData.slug?.trim()) {
+      setDialogError("Slug is required");
+      return false;
+    }
+    if (!editItem && !formData.currency?.trim()) {
+      setDialogError("Currency is required for new channels");
+      return false;
+    }
+    if (!formData.default_country?.trim()) {
+      setDialogError("Default country is required");
+      return false;
+    }
+    if (!/^[a-z0-9-]+$/.test(formData.slug)) {
+      setDialogError("Slug must contain only lowercase letters, numbers, and hyphens");
+      return false;
+    }
+    setDialogError("");
+    return true;
+  };
+
   const handleSave = async () => {
+    // Validation for channels
+    if (dialogType === "channel" && !validateChannelForm()) {
+      return;
+    }
+
     setSyncing(true);
     setError(null);
+
     let endpoint = "";
-    const typeKey = dialogType === "shippingZone" ? "shipping-zones" : dialogType + "s";
-    
-    if (editItem) {
-      endpoint = `/events/saleor/${typeKey}/${editItem.id}/`;
+    let payload = {};
+
+    if (dialogType === "channel") {
+      if (editItem) {
+        endpoint = `/events/saleor/channels/${editItem.id}/`;
+        const currentWarehouseIds = formData.warehouse_ids || [];
+        const currentShippingZoneIds = formData.shipping_zone_ids || [];
+
+        payload = {
+          name: formData.name,
+          slug: formData.slug,
+          default_country: formData.default_country,
+          is_active: formData.is_active,
+          add_warehouse_ids: currentWarehouseIds.filter(id => !originalWarehouseIds.includes(id)),
+          remove_warehouse_ids: originalWarehouseIds.filter(id => !currentWarehouseIds.includes(id)),
+          add_shipping_zone_ids: currentShippingZoneIds.filter(id => !originalShippingZoneIds.includes(id)),
+          remove_shipping_zone_ids: originalShippingZoneIds.filter(id => !currentShippingZoneIds.includes(id)),
+          allocation_strategy: formData.allocation_strategy,
+        };
+      } else {
+        endpoint = `/events/saleor/channels/create/`;
+        payload = {
+          name: formData.name,
+          slug: formData.slug,
+          currency: formData.currency,
+          default_country: formData.default_country,
+          is_active: formData.is_active,
+          warehouse_ids: formData.warehouse_ids || [],
+          shipping_zone_ids: formData.shipping_zone_ids || [],
+          allocation_strategy: formData.allocation_strategy || "PRIORITIZE_SORTING_ORDER",
+        };
+      }
     } else {
-      endpoint = `/events/saleor/${typeKey}/create/`;
+      const typeKey = dialogType === "shippingZone" ? "shipping-zones" : dialogType + "s";
+      if (editItem) {
+        endpoint = `/events/saleor/${typeKey}/${editItem.id}/`;
+      } else {
+        endpoint = `/events/saleor/${typeKey}/create/`;
+      }
+      payload = formData;
     }
 
     try {
       if (editItem) {
-        await apiClient.patch(endpoint, formData);
+        await apiClient.patch(endpoint, payload);
       } else {
-        await apiClient.post(endpoint, formData);
+        await apiClient.post(endpoint, payload);
       }
       handleCloseDialog();
       fetchData(tab);
+      setSnackbar({
+        open: true,
+        message: `${dialogType === "channel" ? "Channel" : dialogType === "shippingZone" ? "Shipping Zone" : "Warehouse"} ${editItem ? "updated" : "created"} successfully!`,
+        severity: "success",
+      });
+
+      // Try sync after successful create/edit
+      if (dialogType === "channel") {
+        try {
+          await apiClient.post("/events/saleor/channels/sync/");
+          fetchData(0);
+        } catch (syncErr) {
+          // Sync failure is non-blocking
+        }
+      }
     } catch (err) {
       const responseData = err.response?.data;
       if (responseData?.errors && Array.isArray(responseData.errors)) {
-        const errorMsgs = responseData.errors.map(e => {
-          const field = e.field ? `${e.field}: ` : "";
-          return `${field}${e.message || e.code || "Unknown error"}`;
-        }).join(" | ");
+        const errorMsgs = responseData.errors
+          .map(e => {
+            const field = e.field ? `${e.field}: ` : "";
+            return `${field}${e.message || e.code || "Unknown error"}`;
+          })
+          .join(" | ");
         setError(`Validation Error: ${errorMsgs}`);
       } else if (responseData?.error) {
         setError(`Error: ${responseData.error}`);
@@ -176,18 +328,62 @@ export default function SaleorManager() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this from Saleor?")) return;
-    
+  const handleDeleteClick = (id, itemName) => {
+    setDeleteConfirmDialog({ open: true, itemId: id, itemName });
+  };
+
+  const handleConfirmDelete = async (destinationChannelId = null) => {
+    const { itemId } = deleteConfirmDialog;
+    setDeleteConfirmDialog({ open: false, itemId: null, itemName: "" });
+
     setSyncing(true);
     setError(null);
     const typeKey = tab === 0 ? "channels" : tab === 1 ? "warehouses" : "shipping-zones";
-    
+
     try {
-      await apiClient.delete(`/events/saleor/${typeKey}/${id}/delete/`);
+      const payload = {};
+      if (tab === 0 && destinationChannelId) {
+        payload.destination_channel_id = destinationChannelId;
+      }
+
+      await apiClient.delete(`/events/saleor/${typeKey}/${itemId}/delete/`, { data: payload });
       fetchData(tab);
+      setSnackbar({
+        open: true,
+        message: "Deleted successfully!",
+        severity: "success",
+      });
+      if (deleteDestDialog.open) {
+        setDeleteDestDialog({ open: false, channelId: null });
+        setDestChannelId("");
+      }
     } catch (err) {
-      setError(`Delete failed: ${err.message}`);
+      const responseData = err.response?.data;
+      const errors = responseData?.errors || [];
+
+      // Check if Saleor says destination channel is required
+      const needsDestination = errors.some(
+        e =>
+          e.code === "CHANNEL_TARGET_ID_REQUIRED" ||
+          e.field === "channelId" ||
+          (e.message && e.message.toLowerCase().includes("destination"))
+      );
+
+      if (tab === 0 && needsDestination) {
+        setDeleteDestDialog({ open: true, channelId: itemId });
+      } else if (responseData?.errors && Array.isArray(responseData.errors)) {
+        const errorMsgs = errors
+          .map(e => {
+            const field = e.field ? `${e.field}: ` : "";
+            return `${field}${e.message || e.code || "Unknown error"}`;
+          })
+          .join(" | ");
+        setError(`Validation Error: ${errorMsgs}`);
+      } else if (responseData?.error) {
+        setError(`Error: ${responseData.error}`);
+      } else {
+        setError(`Delete failed: ${err.message}`);
+      }
     } finally {
       setSyncing(false);
     }
@@ -200,25 +396,154 @@ export default function SaleorManager() {
   };
 
   const renderChannelForm = () => (
-    <Grid container spacing={2} sx={{ mt: 1 }}>
+    <Grid container spacing={3} sx={{ mt: 0.5 }}>
       <Grid item xs={12}>
-        <TextField fullWidth label="Name" name="name" value={formData.name || ""} onChange={handleFormChange} />
+        <TextField
+          fullWidth
+          label="Channel Name *"
+          name="name"
+          value={formData.name || ""}
+          onChange={handleFormChange}
+          required
+          size="medium"
+          variant="outlined"
+        />
       </Grid>
       <Grid item xs={12}>
-        <TextField fullWidth label="Slug" name="slug" value={formData.slug || ""} onChange={handleFormChange} />
+        <TextField
+          fullWidth
+          label="Slug *"
+          name="slug"
+          value={formData.slug || ""}
+          onChange={handleFormChange}
+          helperText="Lowercase letters, numbers, and hyphens only"
+          required
+          size="medium"
+          variant="outlined"
+        />
       </Grid>
-      {!editItem && (
-        <Grid item xs={12}>
-          <TextField fullWidth label="Currency Code" name="currency" value={formData.currency || ""} onChange={handleFormChange} />
-        </Grid>
-      )}
       <Grid item xs={12}>
-        <TextField fullWidth label="Default Country Code" name="default_country" value={formData.default_country || ""} onChange={handleFormChange} placeholder="e.g. US" />
+        <TextField
+          select
+          fullWidth
+          label={`Currency${editItem ? " (read-only)" : " *"}`}
+          name="currency"
+          value={formData.currency || ""}
+          onChange={handleFormChange}
+          disabled={!!editItem}
+          required={!editItem}
+          size="medium"
+          variant="outlined"
+          sx={{ minWidth: "100%" }}
+        >
+          {channelOptions.currencies.map(c => (
+            <MenuItem key={c.code} value={c.code}>
+              {c.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Grid>
+      <Grid item xs={12}>
+        <TextField
+          select
+          fullWidth
+          label="Default Country *"
+          name="default_country"
+          value={formData.default_country || ""}
+          onChange={handleFormChange}
+          required
+          size="medium"
+          variant="outlined"
+          sx={{ minWidth: "100%" }}
+        >
+          {channelOptions.countries.map(c => (
+            <MenuItem key={c.code} value={c.code}>
+              {c.country} ({c.code})
+            </MenuItem>
+          ))}
+        </TextField>
+      </Grid>
+      <Grid item xs={12}>
+        <TextField
+          select
+          fullWidth
+          label="Allocation Strategy"
+          name="allocation_strategy"
+          value={formData.allocation_strategy || "PRIORITIZE_SORTING_ORDER"}
+          onChange={handleFormChange}
+          size="medium"
+        >
+          <MenuItem value="PRIORITIZE_SORTING_ORDER">Prioritize Sorting Order</MenuItem>
+          <MenuItem value="PRIORITIZE_HIGH_STOCK">Prioritize High Stock</MenuItem>
+        </TextField>
+      </Grid>
+      <Grid item xs={12}>
+        <Autocomplete
+          multiple
+          fullWidth
+          options={channelOptions.warehouses}
+          getOptionLabel={option => option.name || ""}
+          value={channelOptions.warehouses.filter(w => (formData.warehouse_ids || []).includes(w.saleor_id)) || []}
+          onChange={(_, newValue) => {
+            setFormData(prev => ({
+              ...prev,
+              warehouse_ids: newValue.map(w => w.saleor_id),
+            }));
+          }}
+          filterSelectedOptions
+          disableCloseOnSelect
+          renderInput={params => (
+            <TextField
+              {...params}
+              label="Warehouses"
+              placeholder="Select warehouses"
+              size="medium"
+              variant="outlined"
+            />
+          )}
+          slotProps={{
+            paper: {
+              sx: { minWidth: "100%" }
+            }
+          }}
+        />
+      </Grid>
+      <Grid item xs={12}>
+        <Autocomplete
+          multiple
+          fullWidth
+          options={channelOptions.shipping_zones}
+          getOptionLabel={option => option.name || ""}
+          value={channelOptions.shipping_zones.filter(sz => (formData.shipping_zone_ids || []).includes(sz.saleor_id)) || []}
+          onChange={(_, newValue) => {
+            setFormData(prev => ({
+              ...prev,
+              shipping_zone_ids: newValue.map(sz => sz.saleor_id),
+            }));
+          }}
+          filterSelectedOptions
+          disableCloseOnSelect
+          renderInput={params => (
+            <TextField
+              {...params}
+              label="Shipping Zones"
+              placeholder="Select shipping zones"
+              size="medium"
+              variant="outlined"
+            />
+          )}
+          slotProps={{
+            paper: {
+              sx: { minWidth: "100%" }
+            }
+          }}
+        />
       </Grid>
       <Grid item xs={12}>
         <FormControlLabel
           control={<Switch checked={!!formData.is_active} onChange={handleFormChange} name="is_active" />}
           label="Active"
+          sx={{ mt: 1 }}
         />
       </Grid>
     </Grid>
@@ -268,7 +593,7 @@ export default function SaleorManager() {
         <TextField fullWidth label="Name" name="name" value={formData.name || ""} onChange={handleFormChange} />
       </Grid>
       <Grid item xs={12}>
-        <TextField fullWidth multiline rows={3} label="Description" name="description" value={formData.description || ""} onChange={handleFormChange} />
+        <TextField multiline rows={3} fullWidth label="Description" name="description" value={formData.description || ""} onChange={handleFormChange} />
       </Grid>
       <Grid item xs={12}>
         <FormControlLabel
@@ -293,31 +618,31 @@ export default function SaleorManager() {
     <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
       <Container maxWidth="lg">
         {/* Header Section */}
-        <Paper 
+        <Paper
           elevation={0}
-          sx={{ 
-            p: 4, 
-            mb: 4, 
-            borderRadius: 4, 
+          sx={{
+            p: 4,
+            mb: 4,
+            borderRadius: 4,
             background: "white",
             border: "1px solid #e5e7eb",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: 2
+            gap: 2,
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box 
-              sx={{ 
-                width: 56, 
-                height: 56, 
-                borderRadius: "16px", 
-                bgcolor: "rgba(232, 83, 47, 0.1)", 
-                display: "flex", 
-                alignItems: "center", 
-                justifyContent: "center" 
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: "16px",
+                bgcolor: "rgba(232, 83, 47, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               <PublicIcon sx={{ fontSize: 32, color: ORANGE }} />
@@ -337,14 +662,14 @@ export default function SaleorManager() {
               startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
               onClick={handleSync}
               disabled={syncing}
-              sx={{ 
-                bgcolor: TEXT, 
-                color: "white", 
+              sx={{
+                bgcolor: TEXT,
+                color: "white",
                 borderRadius: "12px",
                 px: 3,
                 textTransform: "none",
                 fontWeight: 600,
-                "&:hover": { bgcolor: "#1a253a" }
+                "&:hover": { bgcolor: "#1a253a" },
               }}
             >
               Sync {tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : "Shipping Zones"}
@@ -354,12 +679,12 @@ export default function SaleorManager() {
               startIcon={<OpenInNewIcon />}
               onClick={handleOpenSaleorDashboard}
               disabled={!saleorDashboardUrl}
-              sx={{ 
-                borderRadius: "12px", 
+              sx={{
+                borderRadius: "12px",
                 textTransform: "none",
                 borderColor: "#e5e7eb",
                 color: TEXT,
-                fontWeight: 600
+                fontWeight: 600,
               }}
             >
               Saleor Dashboard
@@ -368,11 +693,7 @@ export default function SaleorManager() {
         </Paper>
 
         {error && (
-          <Alert 
-            severity="error" 
-            sx={{ mb: 3, borderRadius: "12px" }} 
-            onClose={() => setError(null)}
-          >
+          <Alert severity="error" sx={{ mb: 3, borderRadius: "12px" }} onClose={() => setError(null)}>
             {error}
           </Alert>
         )}
@@ -382,7 +703,7 @@ export default function SaleorManager() {
           <Tabs
             value={tab}
             onChange={handleTabChange}
-            sx={{ 
+            sx={{
               px: 2,
               pt: 2,
               borderBottom: `1px solid #e5e7eb`,
@@ -390,16 +711,16 @@ export default function SaleorManager() {
                 fontWeight: 600,
                 textTransform: "none",
                 fontSize: "1rem",
-                pb: 2
+                pb: 2,
               },
               "& .Mui-selected": {
-                color: ORANGE
+                color: ORANGE,
               },
               "& .MuiTabs-indicator": {
                 backgroundColor: ORANGE,
                 height: 3,
-                borderRadius: "3px 3px 0 0"
-              }
+                borderRadius: "3px 3px 0 0",
+              },
             }}
           >
             <Tab label="Channels" />
@@ -412,16 +733,16 @@ export default function SaleorManager() {
               <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
                 {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : "Shipping Policy Zones"}
               </Typography>
-              {tab === 2 && (
+              {(tab === 0 || tab === 2) && (
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
-                  onClick={() => handleOpenDialog("shippingZone")}
-                  sx={{ 
-                    bgcolor: ORANGE, 
+                  onClick={() => handleOpenDialog(tab === 0 ? "channel" : "shippingZone")}
+                  sx={{
+                    bgcolor: ORANGE,
                     borderRadius: "10px",
                     textTransform: "none",
-                    "&:hover": { bgcolor: "#d44a2a" }
+                    "&:hover": { bgcolor: "#d44a2a" },
                   }}
                 >
                   Create New
@@ -431,7 +752,7 @@ export default function SaleorManager() {
 
             {loading ? (
               <Box sx={{ py: 2 }}>
-                {[1, 2, 3, 4].map((i) => (
+                {[1, 2, 3, 4].map(i => (
                   <Skeleton key={i} variant="rectangular" height={70} sx={{ mb: 2, borderRadius: 2 }} />
                 ))}
               </Box>
@@ -445,11 +766,13 @@ export default function SaleorManager() {
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Linked Entities</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>Actions</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>
+                      Actions
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {(tab === 0 ? channels : tab === 1 ? warehouses : shippingZones).map((item) => (
+                  {(tab === 0 ? channels : tab === 1 ? warehouses : shippingZones).map(item => (
                     <TableRow key={item.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
                       <TableCell>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: TEXT }}>
@@ -463,12 +786,19 @@ export default function SaleorManager() {
                         {tab === 0 ? (
                           <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                             <Chip label={item.slug} size="small" variant="outlined" />
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.currency}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {item.currency}
+                            </Typography>
                           </Box>
                         ) : tab === 1 ? (
-                          <Typography variant="body2">{item.city}, {item.country_code}</Typography>
+                          <Typography variant="body2">
+                            {item.city}, {item.country_code}
+                          </Typography>
                         ) : (
-                          <Typography variant="body2" sx={{ maxWidth: 200, noWrap: true, textOverflow: "ellipsis", overflow: "hidden" }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ maxWidth: 200, noWrap: true, textOverflow: "ellipsis", overflow: "hidden" }}
+                          >
                             {item.description || "No description"}
                           </Typography>
                         )}
@@ -477,10 +807,10 @@ export default function SaleorManager() {
                         <Chip
                           label={item.is_active ? "Active" : "Inactive"}
                           size="small"
-                          sx={{ 
+                          sx={{
                             fontWeight: 600,
                             bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                            color: item.is_active ? "#059669" : "#4b5563"
+                            color: item.is_active ? "#059669" : "#4b5563",
                           }}
                         />
                         {item.is_default && (
@@ -507,18 +837,28 @@ export default function SaleorManager() {
                         </Box>
                       </TableCell>
                       <TableCell align="right">
-                        {tab === 2 && (
+                        {(tab === 0 || tab === 2) && (
                           <>
-                            <IconButton size="small" onClick={() => handleOpenDialog("shippingZone", item)} sx={{ color: TEXT }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenDialog(tab === 0 ? "channel" : "shippingZone", item)}
+                              sx={{ color: TEXT }}
+                            >
                               <EditIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" onClick={() => handleDelete(item.id)} sx={{ color: "#ef4444" }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteClick(item.id, item.name)}
+                              sx={{ color: "#ef4444" }}
+                            >
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </>
                         )}
-                        {tab !== 2 && (
-                          <Typography variant="caption" sx={{ color: "#9ca3af" }}>Managed in Saleor</Typography>
+                        {tab === 1 && (
+                          <Typography variant="caption" sx={{ color: "#9ca3af" }}>
+                            Managed in Saleor
+                          </Typography>
                         )}
                       </TableCell>
                     </TableRow>
@@ -546,15 +886,33 @@ export default function SaleorManager() {
       </Container>
 
       {/* CRUD Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>
-          {editItem ? "Edit" : "Create"} {dialogType.charAt(0).toUpperCase() + dialogType.slice(1)}
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            minWidth: "550px",
+            "& .MuiDialogContent-root": {
+              padding: "24px",
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: "1.3rem", pb: 2 }}>
+          {editItem ? "Edit" : "Create"} {dialogType === "channel" ? "Channel" : dialogType === "shippingZone" ? "Shipping Zone" : "Warehouse"}
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={{ minHeight: "450px", padding: "24px" }}>
+          {dialogError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError("")}>
+              {dialogError}
+            </Alert>
+          )}
           {dialogType === "channel" && renderChannelForm()}
           {dialogType === "warehouse" && renderWarehouseForm()}
           {dialogType === "shippingZone" && renderShippingZoneForm()}
-          
+
           {editItem && (
             <Box sx={{ mt: 3, p: 2, bgcolor: "#f9fafb", borderRadius: 2 }}>
               <Typography variant="caption" sx={{ display: "block", color: "#6b7280", mb: 1 }}>
@@ -570,10 +928,12 @@ export default function SaleorManager() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleCloseDialog} sx={{ color: "#6b7280" }}>Cancel</Button>
-          <Button 
-            onClick={handleSave} 
-            variant="contained" 
+          <Button onClick={handleCloseDialog} sx={{ color: "#6b7280" }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            variant="contained"
             disabled={syncing}
             sx={{ bgcolor: TEXT, px: 4, borderRadius: "10px" }}
           >
@@ -581,6 +941,101 @@ export default function SaleorManager() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmDialog.open}
+        onClose={() => setDeleteConfirmDialog({ open: false, itemId: null, itemName: "" })}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: "1.2rem", pb: 1 }}>
+          Confirm Delete
+        </DialogTitle>
+        <DialogContent sx={{ py: 3 }}>
+          <Typography variant="body1" sx={{ color: "#4b5563" }}>
+            Are you sure you want to delete <strong>{deleteConfirmDialog.itemName}</strong> from Saleor?
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 2, color: "#6b7280" }}>
+            This action cannot be undone. The {tab === 0 ? "channel" : tab === 1 ? "warehouse" : "shipping zone"} will be permanently removed.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button
+            onClick={() => setDeleteConfirmDialog({ open: false, itemId: null, itemName: "" })}
+            sx={{ color: TEXT, borderRadius: "10px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => handleConfirmDelete()}
+            variant="contained"
+            disabled={syncing}
+            sx={{
+              bgcolor: "#ef4444",
+              color: "white",
+              borderRadius: "10px",
+              px: 3,
+              "&:hover": { bgcolor: "#dc2626" }
+            }}
+          >
+            {syncing ? <CircularProgress size={20} color="inherit" /> : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Destination Channel Dialog for Delete */}
+      <Dialog open={deleteDestDialog.open} onClose={() => setDeleteDestDialog({ open: false, channelId: null })} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Select Destination Channel</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ mb: 2, color: "#6b7280" }}>
+            This channel has orders. Select a destination channel to move them to.
+          </Typography>
+          <TextField
+            select
+            fullWidth
+            label="Destination Channel"
+            value={destChannelId}
+            onChange={(e) => setDestChannelId(e.target.value)}
+          >
+            {channels
+              .filter(c => c.id !== deleteDestDialog.channelId && c.currency === channels.find(ch => ch.id === deleteDestDialog.channelId)?.currency)
+              .map(c => (
+                <MenuItem key={c.saleor_id} value={c.saleor_id}>
+                  {c.name} ({c.currency})
+                </MenuItem>
+              ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setDeleteDestDialog({ open: false, channelId: null })} sx={{ color: "#6b7280" }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => handleConfirmDelete(destChannelId)}
+            variant="contained"
+            disabled={!destChannelId || syncing}
+            sx={{ bgcolor: "#ef4444", px: 4, borderRadius: "10px" }}
+          >
+            {syncing ? <CircularProgress size={20} /> : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+      >
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+      </Snackbar>
     </Box>
   );
 }
