@@ -821,7 +821,7 @@ function QuestionItem({
 // with collapsible original sub-questions, aggregated authors, and host toolbar.
 // Does NOT disclose whether grouping was manual or AI-assisted.
 // ─────────────────────────────────────────────────────────────────────────────
-function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAction }) {
+function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAction, currentUserId, currentGuestId }) {
   const [subOpen, setSubOpen] = useState(false);
   const [onStage, setOnStage] = useState(false);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -838,6 +838,10 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
 
   const summaryText = g.summary?.trim() || g.title?.trim() || "Grouped question";
   const subCount = memberedQuestions.length;
+  // Deduplicated vote count from the backend-computed field
+  const voteCount = g.aggregated_vote_count ?? 0;
+  // Whether the current user has already voted on any sub-question in this group
+  const userHasVoted = !!g.user_has_voted_in_group;
 
   const handleMarkOnStage = async () => {
     setActionLoading("stage");
@@ -919,6 +923,7 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
               }}
             />
           )}
+          {/* Combined count pill */}
           <Chip
             label={`${subCount} combined`}
             size="small"
@@ -931,6 +936,42 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
               border: "1px solid rgba(77,171,245,0.18)",
             }}
           />
+          {/* Vote count badge — deduplicated distinct voters */}
+          {voteCount > 0 && (
+            <Chip
+              label={`▲ ${voteCount}`}
+              size="small"
+              sx={{
+                height: 18,
+                fontSize: "0.62rem",
+                fontWeight: 700,
+                bgcolor: userHasVoted
+                  ? "rgba(255,167,38,0.18)"
+                  : "rgba(255,167,38,0.08)",
+                color: userHasVoted
+                  ? "rgba(255,167,38,1)"
+                  : "rgba(255,167,38,0.7)",
+                border: userHasVoted
+                  ? "1px solid rgba(255,167,38,0.5)"
+                  : "1px solid rgba(255,167,38,0.22)",
+              }}
+            />
+          )}
+          {/* 'Voted' badge shown when user has already voted in this group */}
+          {userHasVoted && (
+            <Chip
+              label="Voted"
+              size="small"
+              sx={{
+                height: 18,
+                fontSize: "0.62rem",
+                fontWeight: 600,
+                bgcolor: "rgba(255,167,38,0.10)",
+                color: "rgba(255,167,38,0.85)",
+                border: "1px solid rgba(255,167,38,0.3)",
+              }}
+            />
+          )}
         </Stack>
 
         {/* Summary question text */}
@@ -1504,12 +1545,25 @@ export default function LiveQnAPanel({
           );
         }
 
-        // Update group vote count in real-time
+        // Update group vote count in real-time (deduplicated)
         if (msg.type === "qna.group_upvote") {
+          const myActorId = currentUserId != null
+            ? String(currentUserId)
+            : currentGuestId != null
+              ? `guest_${currentGuestId}`
+              : null;
           setGroups((prev) =>
             prev.map((g) =>
               g.id === msg.group_id
-                ? { ...g, aggregated_vote_count: msg.group_vote_count }
+                ? {
+                  ...g,
+                  aggregated_vote_count: msg.group_vote_count,
+                  // Only update the current user's voted status if they are the actor
+                  user_has_voted_in_group:
+                    myActorId && String(msg.actor_id) === myActorId
+                      ? msg.user_has_voted_in_group
+                      : g.user_has_voted_in_group,
+                }
                 : g
             )
           );
@@ -1767,6 +1821,7 @@ export default function LiveQnAPanel({
       });
       if (!res.ok) return;
       const data = await res.json();
+      // Update the individual question's vote state
       setQuestions((prev) =>
         prev.map((q) =>
           q.id === data.question_id
@@ -1774,6 +1829,21 @@ export default function LiveQnAPanel({
             : q
         )
       );
+      // If the question belongs to a group, update that group's aggregated count
+      // and mark whether the current user has now voted in the group.
+      if (data.group_id != null && data.group_vote_count != null) {
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === data.group_id
+              ? {
+                ...g,
+                aggregated_vote_count: data.group_vote_count,
+                user_has_voted_in_group: data.user_has_voted_in_group,
+              }
+              : g
+          )
+        );
+      }
     } catch (e) {
       console.error(e);
     }
