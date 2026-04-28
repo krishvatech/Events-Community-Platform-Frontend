@@ -26,6 +26,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
     const [loading, setLoading] = useState(false);
 
     const authHeaders = () => authConfig().headers;
+    const token = localStorage.getItem("access_token") || localStorage.getItem("access");
 
     // Check if event has started or ended
     const eventStatus = computeEventStatus(ev);
@@ -57,10 +58,31 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
         setLoading(true);
 
         try {
-            if (actionType === 'unregister') {
-                if (!reg?.id) throw new Error("Registration ID missing");
+            const resolveRegistrationId = async () => {
+                if (reg?.id) return reg.id;
+                // Ensure a registration exists for this event for current user
+                const registerRes = await fetch(`${API_BASE}/events/${ev.id}/register/`, {
+                    method: "POST",
+                    headers: authHeaders(),
+                });
+                if (!registerRes.ok) {
+                    throw new Error("Unable to create/find registration for this event.");
+                }
+                const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : authHeaders(),
+                });
+                if (!mineRes.ok) throw new Error("Unable to refresh your registration details.");
+                const mineData = await mineRes.json();
+                const rows = Array.isArray(mineData) ? mineData : (mineData.results || []);
+                const mineForEvent = rows.find((r) => Number(r?.event?.id) === Number(ev.id));
+                if (!mineForEvent?.id) throw new Error("Registration not found for this event.");
+                return mineForEvent.id;
+            };
 
-                const res = await fetch(`${API_BASE}/event-registrations/${reg.id}/`, {
+            if (actionType === 'unregister') {
+                const regId = await resolveRegistrationId();
+
+                const res = await fetch(`${API_BASE}/event-registrations/${regId}/`, {
                     method: "DELETE",
                     headers: authHeaders(),
                 });
@@ -70,9 +92,9 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                 if (onUnregistered) onUnregistered(ev.id);
 
             } else if (actionType === 'cancel_request') {
-                if (!reg?.id) throw new Error("Registration ID missing");
+                const regId = await resolveRegistrationId();
 
-                const res = await fetch(`${API_BASE}/event-registrations/${reg.id}/cancel_request/`, {
+                const res = await fetch(`${API_BASE}/event-registrations/${regId}/cancel_request/`, {
                     method: "POST",
                     headers: authHeaders(),
                 });

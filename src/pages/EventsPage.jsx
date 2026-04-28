@@ -431,7 +431,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const navigate = useNavigate();
   const currentUser = getBackendUserFromStorage();
   const currentUserId = currentUser?.id;
-  const isEventOwner = Number(ev.created_by_id) === Number(currentUserId);
+  const isSuperUser = isOwnerUser();
+  const isEventOwner = isSuperUser || Number(ev.created_by_id) === Number(currentUserId);
 
   const reg = myRegistrations?.[ev.id];
   const isHost = isEventOwner || Boolean(reg?.is_host);
@@ -454,6 +455,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
 
   const joinButtonLabel = getResolvedJoinLabel(ev, isLive, false, reg, isEventOwner, fallbackLabel);
+  const effectiveJoinLabel = isEventOwner ? "Host Now" : joinButtonLabel;
 
   // State for expandable "Read More" section
   const [expandSessions, setExpandSessions] = React.useState(false);
@@ -988,7 +990,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       {/* Footer */}
       <div className="flex items-center justify-between border-t p-6">
         <div className="text-base font-semibold text-neutral-900">
-          {ev.isRegistered ? (
+          {(isEventOwner || ev.isRegistered) ? (
             <span className="text-teal-600">You are registered for this event.</span>
           ) : (
             displayPrice(ev)
@@ -1003,7 +1005,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             <div className="flex items-center gap-2">
               {/* Show Join button for virtual/hybrid events */}
               {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
-                joinButtonLabel === "Join (Not Live Yet)" ? (
+                !isEventOwner && joinButtonLabel === "Join (Not Live Yet)" ? (
                   <Button
                     size="small"
                     disabled
@@ -1016,7 +1018,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       backgroundColor: "#CBD5E1",
                     }}
                   >
-                    {joinButtonLabel}
+                    {effectiveJoinLabel}
                   </Button>
                 ) : (
                   <Button
@@ -1026,7 +1028,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     disabled={!canJoinNow}
                     className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                   >
-                    {joinButtonLabel}
+                    {effectiveJoinLabel}
                   </Button>
                 )
               )}
@@ -1243,7 +1245,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const navigate = useNavigate();
   const currentUser = getBackendUserFromStorage();
   const currentUserId = currentUser?.id;
-  const isEventOwner = Number(ev.created_by_id) === Number(currentUserId);
+  const isSuperUser = isOwnerUser();
+  const isEventOwner = isSuperUser || Number(ev.created_by_id) === Number(currentUserId);
 
   const reg = myRegistrations?.[ev.id];
   const isHost = isEventOwner || Boolean(reg?.is_host);
@@ -1266,6 +1269,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
     : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
 
   const joinButtonLabel = getResolvedJoinLabel(ev, isLive, false, reg, isEventOwner, fallbackLabel);
+  const effectiveJoinLabel = isEventOwner ? "Host Now" : joinButtonLabel;
 
   // Timezone logic
   // Timezone logic
@@ -1562,7 +1566,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               </div>
 
               <div className="mt-3 text-base font-semibold text-neutral-900">
-                {ev.isRegistered ? (
+                {(isEventOwner || ev.isRegistered) ? (
                   <span className="text-teal-600">You are registered for this event.</span>
                 ) : (
                   displayPrice(ev)
@@ -1576,7 +1580,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                 <div className="flex flex-col items-end gap-2">
                     {/* Show Join button for virtual/hybrid events */}
                     {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
-                      joinButtonLabel === "Join (Not Live Yet)" ? (
+                      !isEventOwner && joinButtonLabel === "Join (Not Live Yet)" ? (
                         <Button
                           size="small"
                           disabled
@@ -1589,7 +1593,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             backgroundColor: "#CBD5E1",
                           }}
                         >
-                          {joinButtonLabel}
+                          {effectiveJoinLabel}
                         </Button>
                       ) : (
                         <Button
@@ -1599,7 +1603,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           disabled={!canJoinNow}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
-                          {joinButtonLabel}
+                          {effectiveJoinLabel}
                         </Button>
                       )
                     )}

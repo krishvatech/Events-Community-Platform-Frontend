@@ -1135,10 +1135,11 @@ export default function EventDetailsPage() {
         : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
   const currentUser = getBackendUserFromStorage();
-  const isEventOwner = Number(event.created_by_id) === Number(currentUserId);
+  const isEventOwner = isOwnerUser() || Number(event.created_by_id) === Number(currentUserId);
 
   const isHost = isEventOwner || Boolean(registration?.is_host);
   const livePath = `/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
+  const primaryActionLabel = isEventOwner ? "Host Now" : getResolvedJoinLabel(event, isLive, false, registration, isEventOwner, multiDayJoinLabel);
   const isPostEventLounge = isPostEventLoungeOpen(event);
   const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
   const isLive = status === "live" && event.status !== "ended";
@@ -1578,7 +1579,7 @@ export default function EventDetailsPage() {
                     <Box className="p-5">
                       <Typography variant="h6" className="font-extrabold">Attend</Typography>
                       <Typography variant="h5" className="font-bold text-teal-600 mt-1 mb-2">
-                        {displayPrice(event)}
+                        {isEventOwner || registration ? "You are registered for this event." : displayPrice(event)}
                       </Typography>
                       <div className="mt-3 flex flex-col gap-2">
                         {/* Replay Info Badge */}
@@ -1628,7 +1629,7 @@ export default function EventDetailsPage() {
                             className="rounded-xl"
                             variant="contained"
                           >
-                            {getResolvedJoinLabel(event, isLive, false, registration, isEventOwner, multiDayJoinLabel)}
+                            {primaryActionLabel}
                           </Button>
                         ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" && (event.registration_type !== 'apply' || (myApplication && myApplication.status === 'approved')) ? (
                           <Button
@@ -1815,7 +1816,7 @@ export default function EventDetailsPage() {
 
                         )}
 
-                        {registration && status !== "cancelled" && (
+                        {(isEventOwner || registration) && status !== "cancelled" && (
                           <Box className="flex justify-center py-2">
                             <RegisteredActions
                               ev={event}

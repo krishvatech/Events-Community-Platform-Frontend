@@ -3369,9 +3369,11 @@ function EventsPage() {
         };
 
         // Determine endpoint
-        // Force /events/mine/ for all users in the dashboard/admin view
-        // to show only owned or registered events.
-        const baseUrl = `${API_ROOT}/events/mine/`;
+        // Super users can manage all events in admin view.
+        // Non-super users stay scoped to their own/registered events.
+        const baseUrl = isPlatformAdmin
+          ? `${API_ROOT}/events/`
+          : `${API_ROOT}/events/mine/`;
 
         const url = new URL(baseUrl);
         url.searchParams.set("limit", String(PAGE_SIZE));
@@ -3494,7 +3496,7 @@ function EventsPage() {
       const isPostEventLounge = isPostEventLoungeOpen(ev);
       // Determine role: if the user's registration marks them as host, join as publisher
       const myReg = myRegistrations?.[ev.id];
-      const isOwner = ev.created_by_id === currentUser?.id;
+      const isOwner = (ev.created_by_id === currentUser?.id) || isOwnerUser();
       const joinRole = (isOwner || myReg?.is_host) ? "publisher" : "audience";
       const livePath = `/live/${encodeURIComponent(ev.slug || ev.id)}?id=${ev.id}&role=${joinRole}`;
       navigate(livePath, {
@@ -3664,7 +3666,7 @@ function EventsPage() {
                     isHosting={hostingId === (ev.id ?? null)}
                     onJoinLive={handleJoinLive}
                     isJoining={joiningId === (ev.id ?? null)}
-                    isOwner={ev.created_by_id === currentUser?.id}
+                    isOwner={(ev.created_by_id === currentUser?.id) || isOwnerUser()}
                     onEdit={handleEditEvent}
                     // ✅ Pass registration data & handlers
                     reg={myRegistrations[ev.id]}

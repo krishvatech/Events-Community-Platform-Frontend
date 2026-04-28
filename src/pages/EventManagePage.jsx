@@ -401,7 +401,7 @@ export default function EventManagePage() {
   const [tagCategory, setTagCategory] = useState("");
   const [tagType, setTagType] = useState("both");
 
-  const isOwner = event?.created_by_id === currentUser?.id;
+  const isOwner = (event?.created_by_id === currentUser?.id) || isOwnerUser();
   const isStaff = isStaffUser();
   const canManageLounge = isOwner; // Only owner can manage lounge now
 
