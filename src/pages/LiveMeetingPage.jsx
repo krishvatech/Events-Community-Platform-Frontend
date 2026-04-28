@@ -16579,13 +16579,31 @@ export default function NewLiveMeeting() {
   }, [questions, isHost, qnaSortMode, qnaHotScore]);
 
   const [displayedQuestion, setDisplayedQuestion] = useState(null);
+  const [displayedQuestionSubOpen, setDisplayedQuestionSubOpen] = useState(false);
   const [qnaDisplayConnStatus, setQnaDisplayConnStatus] = useState("none");
   const [qnaDisplayConnLoading, setQnaDisplayConnLoading] = useState(false);
 
-  const qnaStageQueue = useMemo(
-    () => [...qaSorted.pinned, ...qaSorted.unpinned].filter((q) => q && !q.is_hidden),
-    [qaSorted]
-  );
+  // Unified stage queue: groups appear as single entries; their sub-questions are excluded.
+  const qnaUnifiedStageQueue = useMemo(() => {
+    const groupedQuestionIds = new Set(
+      groups.flatMap((g) => (g.memberships || []).map((m) => m.question))
+    );
+    const allItems = [...qaSorted.pinned, ...qaSorted.unpinned].filter((q) => q && !q.is_hidden);
+    const renderedGroupIds = new Set();
+    const result = [];
+    for (const q of allItems) {
+      if (groupedQuestionIds.has(q.id)) {
+        const g = groups.find((gr) => gr.memberships?.some((m) => m.question === q.id));
+        if (g && !renderedGroupIds.has(g.id)) {
+          renderedGroupIds.add(g.id);
+          result.push({ _type: "group", id: `group_${g.id}`, group: g });
+        }
+      } else {
+        result.push({ _type: "question", id: q.id, question: q });
+      }
+    }
+    return result;
+  }, [qaSorted, groups]);
 
   const qnaQuestionUrls = useMemo(() => {
     const map = {};
@@ -16788,14 +16806,69 @@ export default function NewLiveMeeting() {
     const payload = buildDisplayedQuestionPayload(question);
     if (!payload) return;
 
-    const nextState = { ...payload, visible: true };
+    const nextState = { ...payload, stage_queue_id: question.id, visible: true };
     setDisplayedQuestion(nextState);
     broadcastDisplayedQuestionState(nextState);
+    setDisplayedQuestionSubOpen(false);
 
     if (!options.silent) {
       showSnackbar(`Showing question from ${payload.asked_by} on the main screen.`, "success");
     }
   }, [broadcastDisplayedQuestionState, buildDisplayedQuestionPayload, showSnackbar]);
+
+  // Helper: build a summary text for a group (mirrors render-block logic).
+  const buildGroupSummaryText = useCallback((group, subQuestions) => {
+    const normalize = (v) => String(v || "").replace(/\s+/g, " ").trim();
+    const truncate = (v, max = 120) => {
+      const txt = normalize(v).replace(/\?+$/, "");
+      if (!txt) return "";
+      return txt.length <= max ? txt : `${txt.slice(0, max - 1).trimEnd()}\u2026`;
+    };
+    const explicitSummary = normalize(group?.summary);
+    if (explicitSummary.length >= 18)
+      return explicitSummary.endsWith("?") ? explicitSummary : `${explicitSummary}?`;
+    const explicitTitle = normalize(group?.title);
+    if (explicitTitle.length >= 18)
+      return explicitTitle.endsWith("?") ? explicitTitle : `${explicitTitle}?`;
+    const parts = (subQuestions || [])
+      .map((q) => truncate(q?.content))
+      .filter(Boolean)
+      .slice(0, 3);
+    if (parts.length === 0) return "What are the key points from these related audience questions?";
+    if (parts.length === 1) return parts[0].endsWith("?") ? parts[0] : `${parts[0]}?`;
+    const firstTwo = parts.slice(0, 2).join(" and ");
+    return `How should we address both ${firstTwo}?`;
+  }, []);
+
+  // Puts a grouped (AI-summarized) question on the stage overlay as a single unit.
+  const handleDisplayGroupOnScreen = useCallback(
+    (group, subQuestions, summaryText, authorLabel, options = {}) => {
+      const payload = {
+        stage_queue_id: `group_${group.id}`,
+        question_id: `group_${group.id}`,
+        content: summaryText,
+        asked_by: authorLabel,
+        user_id: null,
+        user_avatar_url: "",
+        user_country_code: null,
+        is_anonymous: false,
+        is_group: true,
+        sub_questions: (subQuestions || []).map((sq) => ({
+          id: sq.id,
+          content: sq.content,
+          user_display: resolveQuestionDisplayMeta(sq).askedBy,
+        })),
+        upvote_count: group.aggregated_vote_count ?? 0,
+        is_answered: false,
+        visible: true,
+      };
+      setDisplayedQuestion(payload);
+      broadcastDisplayedQuestionState(payload);
+      setDisplayedQuestionSubOpen(false);
+      if (!options.silent) showSnackbar("Showing grouped question on stage.", "success");
+    },
+    [broadcastDisplayedQuestionState, resolveQuestionDisplayMeta, showSnackbar]
+  );
 
   const handleDismissDisplayedQuestion = useCallback((options = {}) => {
     setDisplayedQuestion(null);
@@ -16825,20 +16898,51 @@ export default function NewLiveMeeting() {
   }, [displayedQuestion?.user_id]);
 
   const handleShowNextDisplayedQuestion = useCallback(() => {
-    if (qnaStageQueue.length === 0) {
+    if (qnaUnifiedStageQueue.length === 0) {
       showSnackbar("There are no questions available to display.", "info");
       return;
     }
 
-    const currentQuestionId = displayedQuestion?.question_id;
-    const currentIdx = qnaStageQueue.findIndex((q) => q.id === currentQuestionId);
-    const nextQuestion = currentIdx >= 0
-      ? qnaStageQueue[(currentIdx + 1) % qnaStageQueue.length]
-      : qnaStageQueue[0];
+    // Match by stage_queue_id (could be "group_<id>" or a numeric question id)
+    const currentId = displayedQuestion?.stage_queue_id ?? displayedQuestion?.question_id;
+    const currentIdx = qnaUnifiedStageQueue.findIndex(
+      (item) => String(item.id) === String(currentId)
+    );
+    const nextItem =
+      currentIdx >= 0
+        ? qnaUnifiedStageQueue[(currentIdx + 1) % qnaUnifiedStageQueue.length]
+        : qnaUnifiedStageQueue[0];
 
-    handleDisplayQuestionOnScreen(nextQuestion, { silent: true });
-    showSnackbar(`Now showing the next question from ${resolveQuestionDisplayMeta(nextQuestion).askedBy}.`, "success");
-  }, [displayedQuestion?.question_id, handleDisplayQuestionOnScreen, qnaStageQueue, resolveQuestionDisplayMeta, showSnackbar]);
+    if (nextItem._type === "group") {
+      const g = nextItem.group;
+      const subQs = (g.memberships || [])
+        .map((m) => questions.find((q) => q.id === m.question))
+        .filter(Boolean)
+        .sort((a, b) => (b.upvote_count ?? 0) - (a.upvote_count ?? 0));
+      const summaryText = buildGroupSummaryText(g, subQs);
+      const authors = Array.from(
+        new Set(subQs.map((q) => resolveQuestionDisplayMeta(q).askedBy).filter(Boolean))
+      );
+      const authorLabel = authors.length > 0 ? authors.join(", ") : "Audience";
+      handleDisplayGroupOnScreen(g, subQs, summaryText, authorLabel, { silent: true });
+      showSnackbar("Now showing the next grouped question on stage.", "success");
+    } else {
+      handleDisplayQuestionOnScreen(nextItem.question, { silent: true });
+      showSnackbar(
+        `Now showing the next question from ${resolveQuestionDisplayMeta(nextItem.question).askedBy}.`,
+        "success"
+      );
+    }
+  }, [
+    displayedQuestion,
+    qnaUnifiedStageQueue,
+    questions,
+    buildGroupSummaryText,
+    resolveQuestionDisplayMeta,
+    handleDisplayGroupOnScreen,
+    handleDisplayQuestionOnScreen,
+    showSnackbar,
+  ]);
 
   useEffect(() => {
     if (!displayedQuestion?.question_id) return;
@@ -20778,7 +20882,7 @@ export default function NewLiveMeeting() {
                                   }
                                   : null;
                                 const groupExpanded = !(groupCollapsed[rg.group.id] ?? true);
-                                const primaryDisplayedOnScreen = primaryQuestion && displayedQuestion?.question_id === primaryQuestion.id && displayedQuestion?.visible !== false;
+                                const primaryDisplayedOnScreen = displayedQuestion?.question_id === `group_${rg.group.id}` && displayedQuestion?.visible !== false;
 
                                 return (
                                   <Paper
@@ -20809,7 +20913,7 @@ export default function NewLiveMeeting() {
                                             <Tooltip title={primaryDisplayedOnScreen ? "Question is live on the main screen" : "Show on the main screen"}>
                                               <IconButton
                                                 size="small"
-                                                onClick={() => handleDisplayQuestionOnScreen(groupedQuestionForStage)}
+                                                onClick={() => handleDisplayGroupOnScreen(rg.group, sortedGroupedQuestions, groupSummaryQuestion, groupedAuthorLabel)}
                                                 sx={{
                                                   color: primaryDisplayedOnScreen ? "#38bdf8" : "rgba(255,255,255,0.45)",
                                                   p: 0.5,
@@ -22239,8 +22343,9 @@ export default function NewLiveMeeting() {
             </TabPanel>
           </Box>
         </>)
-      )}
-    </Box>
+      )
+      }
+    </Box >
   );
 
   // 2. Vertical Icon Rail (Right side)
@@ -23949,18 +24054,18 @@ export default function NewLiveMeeting() {
                       return (
                         <Box
                           sx={{
-                      position: "absolute",
-                      left: { xs: 12, sm: 20 },
-                      right: { xs: 12, sm: 20 },
-                      bottom: { xs: 12, sm: 20 },
-                      zIndex: 4,
-                      display: "flex",
-                      justifyContent: "center",
-                      pointerEvents: "none",
-                      "@keyframes slideUpFade": {
-                        "0%": { transform: "translateY(24px)", opacity: 0 },
-                        "100%": { transform: "translateY(0)", opacity: 1 },
-                      },
+                            position: "absolute",
+                            left: { xs: 12, sm: 20 },
+                            right: { xs: 12, sm: 20 },
+                            bottom: { xs: 12, sm: 20 },
+                            zIndex: 4,
+                            display: "flex",
+                            justifyContent: "center",
+                            pointerEvents: "none",
+                            "@keyframes slideUpFade": {
+                              "0%": { transform: "translateY(24px)", opacity: 0 },
+                              "100%": { transform: "translateY(0)", opacity: 1 },
+                            },
                           }}
                         >
                           <Paper
@@ -24018,7 +24123,7 @@ export default function NewLiveMeeting() {
                                     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: "wrap", mb: 0.75 }}>
                                       <Chip
                                         size="small"
-                                        label="LIVE QUESTION"
+                                        label={displayedQuestion.is_group ? "GROUPED QUESTION" : "LIVE QUESTION"}
                                         sx={{
                                           bgcolor: "rgba(56,189,248,0.18)",
                                           border: "1px solid rgba(56,189,248,0.4)",
@@ -24232,6 +24337,56 @@ export default function NewLiveMeeting() {
                               >
                                 {displayedQuestion.content}
                               </Typography>
+
+                              {/* Sub-questions accordion – only for grouped questions */}
+                              {displayedQuestion.is_group && (displayedQuestion.sub_questions || []).length > 0 && (
+                                <Box sx={{ mt: 1.5 }}>
+                                  <Button
+                                    size="small"
+                                    onClick={() => setDisplayedQuestionSubOpen((v) => !v)}
+                                    endIcon={
+                                      <KeyboardArrowDownIcon
+                                        sx={{
+                                          transform: displayedQuestionSubOpen ? "rotate(180deg)" : "rotate(0deg)",
+                                          transition: "transform 0.2s",
+                                        }}
+                                      />
+                                    }
+                                    sx={{ color: "rgba(125,211,252,0.8)", textTransform: "none", fontSize: 12, p: 0 }}
+                                  >
+                                    {displayedQuestionSubOpen ? "Hide" : "View"}{" "}
+                                    {displayedQuestion.sub_questions.length} original question
+                                    {displayedQuestion.sub_questions.length !== 1 ? "s" : ""}
+                                  </Button>
+                                  <Collapse in={displayedQuestionSubOpen}>
+                                    <Box
+                                      sx={{
+                                        mt: 1,
+                                        borderLeft: "2px solid rgba(125,211,252,0.25)",
+                                        pl: 1.5,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 0.75,
+                                      }}
+                                    >
+                                      {displayedQuestion.sub_questions.map((sq, i) => (
+                                        <Box key={sq.id ?? i}>
+                                          <Typography
+                                            sx={{ fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}
+                                          >
+                                            {sq.content}
+                                          </Typography>
+                                          {sq.user_display && (
+                                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                                              — {sq.user_display}
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                      ))}
+                                    </Box>
+                                  </Collapse>
+                                </Box>
+                              )}
                             </Stack>
                           </Paper>
                         </Box>
