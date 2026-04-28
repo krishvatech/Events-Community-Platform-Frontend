@@ -2511,8 +2511,15 @@ export default function LiveQnAPanel({
                             }
                           }}
                           onGroupAction={(gId, action) => {
-                            // Future: broadcast via WebSocket or PATCH the group
-                            console.log(`Group ${gId}: action=${action}`);
+                            if (action === "answered") {
+                              console.log(`Group ${gId} marked as answered`);
+                            } else if (action === "unanswered") {
+                              console.log(`Group ${gId} marked as unanswered`);
+                            } else if (action === "stage") {
+                              console.log(`Group ${gId} put on stage`);
+                            } else if (action === "unstage") {
+                              console.log(`Group ${gId} removed from stage`);
+                            }
                           }}
                         />
                       ))}

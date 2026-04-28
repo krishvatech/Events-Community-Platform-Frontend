@@ -15672,6 +15672,11 @@ export default function NewLiveMeeting() {
                 : q
             )
           );
+
+          // Auto-remove from stage if this question is currently displayed and being marked as answered
+          if (msg.is_answered === true && displayedQuestion?.question_id === msg.question_id && !displayedQuestion?.is_group) {
+            handleDismissDisplayedQuestion({ silent: false });
+          }
         }
 
         if (msg.type === "qna.pinned") {
@@ -16908,10 +16913,36 @@ export default function NewLiveMeeting() {
     const currentIdx = qnaUnifiedStageQueue.findIndex(
       (item) => String(item.id) === String(currentId)
     );
-    const nextItem =
-      currentIdx >= 0
-        ? qnaUnifiedStageQueue[(currentIdx + 1) % qnaUnifiedStageQueue.length]
-        : qnaUnifiedStageQueue[0];
+
+    // Find next unanswered question/group by skipping answered ones
+    let nextItem = null;
+    let searchIdx = currentIdx >= 0 ? currentIdx + 1 : 0;
+    let searched = 0;
+
+    while (searched < qnaUnifiedStageQueue.length) {
+      const itemIdx = searchIdx % qnaUnifiedStageQueue.length;
+      const item = qnaUnifiedStageQueue[itemIdx];
+
+      // For groups, always show them (don't check if answered)
+      if (item._type === "group") {
+        nextItem = item;
+        break;
+      }
+
+      // For individual questions, skip if answered
+      if (item._type === "question" && !item.question?.is_answered) {
+        nextItem = item;
+        break;
+      }
+
+      searchIdx++;
+      searched++;
+    }
+
+    if (!nextItem) {
+      showSnackbar("No more unanswered questions available.", "info");
+      return;
+    }
 
     if (nextItem._type === "group") {
       const g = nextItem.group;
