@@ -37,6 +37,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import MapRoundedIcon from "@mui/icons-material/MapRounded";
+import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { geoCentroid } from "d3-geo";
@@ -1658,27 +1659,79 @@ export default function MembersPage() {
                 <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#0A9396", textTransform: "uppercase", letterSpacing: "0.12em", mb: "4px" }}>
                   MEMBER DIRECTORY
                 </Typography>
-                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
-                  <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: "#1B2A4A", lineHeight: 1.2, mb: "4px" }}>
-                      Explore Members
-                    </Typography>
-                    <Typography sx={{ fontSize: 12.5, color: "#aaa" }}>
-                      Connect with M&A professionals across the globe.
-                    </Typography>
-                  </Box>
+	                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
+	                  <Box>
+	                    <Typography variant="h5" sx={{ fontWeight: 800, color: "#1B2A4A", lineHeight: 1.2, mb: "4px" }}>
+	                      Explore Members
+	                    </Typography>
+	                    <Typography sx={{ fontSize: 12.5, color: "#aaa" }}>
+	                      Connect with M&A professionals across the globe.
+	                    </Typography>
+	                  </Box>
                   {isCompact && (
                     <Tooltip title="View map">
                       <IconButton size="small" onClick={() => setMapOverlayOpen(true)} sx={{ flexShrink: 0, mt: "4px" }}>
                         <MapRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  )}
-                </Box>
-              </Box>
+	                  )}
+	                </Box>
+	                <Box
+	                  sx={{
+	                    mt: 1.5,
+	                    p: 1.5,
+	                    borderRadius: 2,
+	                    border: "1px solid #bfe8e8",
+	                    borderLeft: "4px solid #0A9396",
+	                    bgcolor: "#f2fbfb",
+	                  }}
+	                >
+	                  <Stack direction="row" spacing={1.25} alignItems="flex-start">
+	                    <Box
+	                      sx={{
+	                        width: 36,
+	                        height: 36,
+	                        borderRadius: "50%",
+	                        bgcolor: "#0A9396",
+	                        color: "#fff",
+	                        display: "flex",
+	                        alignItems: "center",
+	                        justifyContent: "center",
+	                        flexShrink: 0,
+	                        mt: "2px",
+	                      }}
+	                    >
+	                      <AutoAwesomeRoundedIcon sx={{ fontSize: 20 }} />
+	                    </Box>
+	                    <Box>
+	                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+	                        <Chip
+	                          size="small"
+	                          label="BETA"
+	                          sx={{
+	                            height: 20,
+	                            fontSize: 10,
+	                            fontWeight: 800,
+	                            bgcolor: "#0A9396",
+	                            color: "#fff",
+	                          }}
+	                        />
+	                        <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#1B2A4A", lineHeight: 1.2 }}>
+	                          Member migration in progress
+	                        </Typography>
+	                      </Stack>
+	                      <Typography sx={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
+	                        Over the coming weeks, more than 40,000+ M&A professionals will be onboarded as we complete the
+	                        transition from our previous platform. The directory will grow significantly as members verify their
+	                        accounts. Thank you for being among the first to explore IMAA Connect.
+	                      </Typography>
+	                    </Box>
+	                  </Stack>
+	                </Box>
+	              </Box>
 
-              {/* Tab pills */}
-              <Box sx={{ display: "flex", gap: "4px", mb: 1.5, pb: 1.5, borderBottom: "1px solid #EEECEA" }}>
+	              {/* Tab pills */}
+	              <Box sx={{ display: "flex", gap: "4px", mb: 1.5, pb: 1.5, borderBottom: "1px solid #EEECEA" }}>
                 {[
                   { label: "All Members", count: users.length },
                   { label: "My Contacts", count: Object.values(friendStatusByUser).filter((s) => s === "friends").length },
