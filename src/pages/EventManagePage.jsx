@@ -417,6 +417,7 @@ export default function EventManagePage() {
   const [answerModalOpen, setAnswerModalOpen] = useState(false);
   const [answeringQuestion, setAnsweringQuestion] = useState(null);
   const [answerText, setAnswerText] = useState("");
+  const [isEditingAnswer, setIsEditingAnswer] = useState(false);
   const [notifyAuthor, setNotifyAuthor] = useState(true);
   const [notifyInterested, setNotifyInterested] = useState(true);
   const [notifyAll, setNotifyAll] = useState(false);
@@ -4183,53 +4184,41 @@ export default function EventManagePage() {
               No unanswered questions. All questions have been answered!
             </Typography>
           ) : (
-            <Box>
-              <Box sx={{ overflowX: "auto", mb: 2 }}>
-                <table style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: "0.875rem"
-                }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
-                      <th style={{ textAlign: "left", padding: "8px", fontWeight: 600 }}>Question</th>
-                      <th style={{ textAlign: "center", padding: "8px", fontWeight: 600, width: 80 }}>Upvotes</th>
-                      <th style={{ textAlign: "center", padding: "8px", fontWeight: 600, width: 120 }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {postEventQnaQuestions.map((q) => (
-                      <tr key={q.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "12px 8px" }}>
-                          <Typography variant="body2">{q.content}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            by {q.is_anonymous ? "Anonymous" : (q.user_display || "Unknown")}
-                          </Typography>
-                        </td>
-                        <td style={{ textAlign: "center", padding: "8px" }}>
-                          <Typography variant="body2">{q.upvote_count || 0}</Typography>
-                        </td>
-                        <td style={{ textAlign: "center", padding: "8px" }}>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            sx={{
-                              bgcolor: "#22c55e",
-                              color: "white",
-                              textTransform: "none",
-                              "&:hover": { bgcolor: "#16a34a" }
-                            }}
-                            onClick={() => handleOpenAnswerModal(q)}
-                          >
-                            Answer
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Box>
-            </Box>
+            <Stack spacing={1.5} sx={{ mb: 2 }}>
+              {postEventQnaQuestions.map((q) => (
+                <Box key={q.id} sx={{ p: 2, border: "1px solid #e5e7eb", borderRadius: 2, bgcolor: "#fff" }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
+                    <Chip
+                      label="Pending"
+                      size="small"
+                      sx={{ bgcolor: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa", fontWeight: 600 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      Upvotes: {q.upvote_count || 0}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>{q.content}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    by {q.is_anonymous ? "Anonymous" : (q.user_display || "Unknown")}
+                  </Typography>
+                  <Box sx={{ mt: 1.25 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      sx={{
+                        bgcolor: "#22c55e",
+                        color: "white",
+                        textTransform: "none",
+                        "&:hover": { bgcolor: "#16a34a" }
+                      }}
+                      onClick={() => handleOpenAnswerModal(q)}
+                    >
+                      Answer
+                    </Button>
+                  </Box>
+                </Box>
+              ))}
+            </Stack>
           )}
 
           {/* Already answered post-event questions */}
@@ -4241,12 +4230,39 @@ export default function EventManagePage() {
               <Stack spacing={1.5}>
                 {postEventAnsweredQuestions.map(q => (
                   <Box key={q.id} sx={{ p: 2, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 2 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          size="small"
+                          label="Answered"
+                          sx={{ bgcolor: '#dcfce7', color: '#166534', border: '1px solid #86efac', fontWeight: 700 }}
+                        />
+                        <Chip
+                          size="small"
+                          label={q.answered_phase === "live" ? "Live Answer" : "Post-Event Answer"}
+                          sx={{
+                            bgcolor: q.answered_phase === "live" ? "#ecfeff" : "#eff6ff",
+                            color: q.answered_phase === "live" ? "#0e7490" : "#1d4ed8",
+                            border: q.answered_phase === "live" ? "1px solid #67e8f9" : "1px solid #bfdbfe",
+                            fontWeight: 600
+                          }}
+                        />
+                      </Stack>
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => handleOpenEditAnswerModal(q)}
+                        sx={{ textTransform: "none" }}
+                      >
+                        Edit Answer
+                      </Button>
+                    </Stack>
                     <Typography variant="body2" fontWeight={500} sx={{ mb: 0.5 }}>
                       {q.content}
                     </Typography>
                     <Box sx={{ p: 1.5, bgcolor: '#dcfce7', borderRadius: 1, mt: 1 }}>
                       <Typography variant="caption" sx={{ fontWeight: 700, color: '#15803d', display: 'block', mb: 0.5 }}>
-                        Your Answer:
+                        {q.answered_phase === "live" ? "Live Answer:" : "Post-Event Answer:"}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#166534', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                         {q.answer_text}
@@ -5069,50 +5085,71 @@ export default function EventManagePage() {
     }
   };
 
-  // Load unanswered questions when isPast changes
+  const loadPostEventQna = useCallback(async ({ silent = false } = {}) => {
+    if (!isPast || !event) return;
+    if (!silent) setPostEventQnaLoading(true);
+    setPostEventQnaError("");
+    try {
+      const token = getToken();
+      const res = await fetch(
+        `${API_ROOT}/interactions/questions/unanswered/?event_id=${event.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        throw new Error(`Failed to load unanswered questions (${res.status})`);
+      }
+      const data = await res.json();
+      const withUpvotes = data.map((q) => ({
+        ...q,
+        upvote_count: (q.upvoters?.length || 0) + (q.guest_upvotes?.length || 0),
+      }));
+      setPostEventQnaQuestions(withUpvotes);
+
+      const resAll = await fetch(
+        `${API_ROOT}/interactions/questions/?event_id=${event.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (resAll.ok) {
+        const allQuestions = await resAll.json();
+        const answeredWithText = (Array.isArray(allQuestions) ? allQuestions : [])
+          .filter((q) => q.is_answered && (q.answer_text || "").trim().length > 0)
+          .sort((a, b) => {
+            const at = a.answered_at ? new Date(a.answered_at).getTime() : 0;
+            const bt = b.answered_at ? new Date(b.answered_at).getTime() : 0;
+            return bt - at;
+          });
+        setPostEventAnsweredQuestions(answeredWithText);
+      }
+    } catch (err) {
+      setPostEventQnaError(err.message || "Failed to load questions");
+    } finally {
+      if (!silent) setPostEventQnaLoading(false);
+    }
+  }, [isPast, event]);
+
   useEffect(() => {
     if (!isPast || !event) return;
-    const loadUnanswered = async () => {
-      setPostEventQnaLoading(true);
-      setPostEventQnaError("");
-      try {
-        const token = getToken();
-        const res = await fetch(
-          `${API_ROOT}/interactions/questions/unanswered/?event_id=${event.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!res.ok) {
-          throw new Error(`Failed to load unanswered questions (${res.status})`);
-        }
-        const data = await res.json();
-        // Calculate upvote count for each question
-        const withUpvotes = data.map(q => ({
-          ...q,
-          upvote_count: (q.upvoters?.length || 0) + (q.guest_upvotes?.length || 0)
-        }));
-        setPostEventQnaQuestions(withUpvotes);
-
-        // Also fetch already-answered post-event questions
-        const resAnswered = await fetch(
-          `${API_ROOT}/interactions/questions/post_event_answered/?event_id=${event.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (resAnswered.ok) {
-          const answeredData = await resAnswered.json();
-          setPostEventAnsweredQuestions(answeredData);
-        }
-      } catch (err) {
-        setPostEventQnaError(err.message || "Failed to load questions");
-      } finally {
-        setPostEventQnaLoading(false);
-      }
-    };
-    loadUnanswered();
-  }, [isPast, event?.id]);
+    loadPostEventQna();
+    const pollId = window.setInterval(() => {
+      loadPostEventQna({ silent: true });
+    }, 15000);
+    return () => window.clearInterval(pollId);
+  }, [isPast, event?.id, loadPostEventQna]);
 
   const handleOpenAnswerModal = (question) => {
     setAnsweringQuestion(question);
     setAnswerText("");
+    setIsEditingAnswer(false);
+    setNotifyAuthor(true);
+    setNotifyInterested(true);
+    setNotifyAll(false);
+    setAnswerModalOpen(true);
+  };
+
+  const handleOpenEditAnswerModal = (question) => {
+    setAnsweringQuestion(question);
+    setAnswerText(question.answer_text || "");
+    setIsEditingAnswer(true);
     setNotifyAuthor(true);
     setNotifyInterested(true);
     setNotifyAll(false);
@@ -5123,6 +5160,7 @@ export default function EventManagePage() {
     setAnswerModalOpen(false);
     setAnsweringQuestion(null);
     setAnswerText("");
+    setIsEditingAnswer(false);
     setAnswerSubmitting(false);
   };
 
@@ -5151,17 +5189,16 @@ export default function EventManagePage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Failed to publish answer (${res.status})`);
       }
-      // Success: remove from unanswered list and add to answered list
+      const savedQuestion = await res.json();
       setPostEventQnaQuestions((prev) =>
         prev.filter((q) => q.id !== answeringQuestion.id)
       );
-      // Add to answered questions list
-      setPostEventAnsweredQuestions((prev) => [
-        { ...answeringQuestion, answer_text: answerText.trim(), answered_phase: 'post_event', is_answered: true },
-        ...prev,
-      ]);
+      setPostEventAnsweredQuestions((prev) => {
+        const remaining = prev.filter((q) => q.id !== savedQuestion.id);
+        return [savedQuestion, ...remaining];
+      });
       handleCloseAnswerModal();
-      toast.success("Answer published and participants notified!");
+      toast.success(isEditingAnswer ? "Answer updated successfully!" : "Answer published and participants notified!");
     } catch (err) {
       toast.error(err.message || "Failed to publish answer");
     } finally {
@@ -6390,7 +6427,7 @@ export default function EventManagePage() {
 
         {/* Post-Event Q&A Answer Modal */}
         <Dialog open={answerModalOpen} onClose={handleCloseAnswerModal} maxWidth="sm" fullWidth>
-          <DialogTitle>Answer Question</DialogTitle>
+          <DialogTitle>{isEditingAnswer ? "Edit Answer" : "Answer Question"}</DialogTitle>
           <DialogContent>
             {answeringQuestion && (
               <Box>
@@ -6468,7 +6505,7 @@ export default function EventManagePage() {
               disabled={answerSubmitting || !answerText.trim()}
               sx={{ bgcolor: "#22c55e", color: "white" }}
             >
-              {answerSubmitting ? "Publishing..." : "Publish Answer"}
+              {answerSubmitting ? (isEditingAnswer ? "Updating..." : "Publishing...") : (isEditingAnswer ? "Update Answer" : "Publish Answer")}
             </Button>
           </DialogActions>
         </Dialog>
