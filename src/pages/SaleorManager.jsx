@@ -51,6 +51,8 @@ export default function SaleorManager() {
   const [warehouses, setWarehouses] = useState([]);
   const [shippingZones, setShippingZones] = useState([]);
   const [productTypes, setProductTypes] = useState([]);
+  const [staffUsers, setStaffUsers] = useState([]);
+  const [permissionGroups, setPermissionGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
@@ -169,6 +171,8 @@ export default function SaleorManager() {
     else if (tabIndex === 1) endpoint = "/events/saleor/warehouses/";
     else if (tabIndex === 2) endpoint = "/events/saleor/shipping-zones/";
     else if (tabIndex === 3) endpoint = "/events/saleor/product-types/";
+    else if (tabIndex === 4) endpoint = "/events/saleor/staff-users/";
+    else if (tabIndex === 5) endpoint = "/events/saleor/permission-groups/";
 
     try {
       const response = await apiClient.get(endpoint);
@@ -177,6 +181,8 @@ export default function SaleorManager() {
       else if (tabIndex === 1) setWarehouses(data);
       else if (tabIndex === 2) setShippingZones(data);
       else if (tabIndex === 3) setProductTypes(data);
+      else if (tabIndex === 4) setStaffUsers(data);
+      else if (tabIndex === 5) setPermissionGroups(data);
     } catch (err) {
       setError(`Failed to fetch data: ${err.message}`);
     } finally {
@@ -197,9 +203,11 @@ export default function SaleorManager() {
     else if (activeTab === 1) endpoint = "/events/saleor/warehouses/sync/";
     else if (activeTab === 2) endpoint = "/events/saleor/shipping-zones/sync/";
     else if (activeTab === 3) endpoint = "/events/saleor/product-types/sync/";
+    else if (activeTab === 4) endpoint = "/events/saleor/staff-users/sync/";
+    else if (activeTab === 5) endpoint = "/events/saleor/permission-groups/sync/";
 
     try {
-      await apiClient.post(endpoint);
+      if (endpoint) await apiClient.post(endpoint);
       await fetchData(activeTab); // Re-fetch ensures local state matches sync result
     } catch (err) {
       setError(`Sync failed: ${err.message}`);
@@ -1276,7 +1284,7 @@ export default function SaleorManager() {
                 "&:hover": { bgcolor: "#1a253a" },
               }}
             >
-              Sync {tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : tab === 2 ? "Shipping Zones" : "Product Types"}
+              Sync {tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : tab === 2 ? "Shipping Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
             </Button>
             <Button
               variant="outlined"
@@ -1331,12 +1339,14 @@ export default function SaleorManager() {
             <Tab label="Warehouses" />
             <Tab label="Shipping Zones" />
             <Tab label="Product Types" />
+            <Tab label="Staff Users" />
+            <Tab label="Permission Groups" />
           </Tabs>
 
           <Box sx={{ p: 4 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
-                {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : tab === 2 ? "Shipping Policy Zones" : "Product Types"}
+                {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : tab === 2 ? "Shipping Policy Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
               </Typography>
               {(tab === 0 || tab === 1 || tab === 2 || tab === 3) && (
                 <Button
@@ -1371,33 +1381,37 @@ export default function SaleorManager() {
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#f9fafb" }}>
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      {tab === 3 ? "Type Name" : "Name"}
+                      {tab === 3 ? "Type Name" : tab === 4 ? "First Name" : tab === 5 ? "Group Name" : "Name"}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      {tab === 0 ? "Slug / Currency" : tab === 1 ? "Location" : tab === 2 ? "Info" : "Slug"}
+                      {tab === 0 ? "Slug / Currency" : tab === 1 ? "Location" : tab === 2 ? "Info" : tab === 3 ? "Slug" : tab === 4 ? "Last Name" : "Permissions"}
                     </TableCell>
-                    {tab !== 3 && (
+                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                      {tab === 4 ? "Email" : tab === 5 ? "Users" : tab === 0 ? "Status" : tab === 1 ? "Status" : tab === 2 ? "Status" : ""}
+                    </TableCell>
+                    {tab !== 3 && tab !== 4 && tab !== 5 && (
                       <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
                         Status
                       </TableCell>
                     )}
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      {tab === 3 ? "Shippable" : "Linked Entities"}
+                      {tab === 3 ? "Shippable" : tab === 4 ? "Role" : tab === 5 ? "" : "Linked Entities"}
                     </TableCell>
                     {tab === 3 && <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Tax Class</TableCell>}
-                    <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      Actions
-                    </TableCell>
+                    {tab !== 4 && tab !== 5 && (
+                      <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>
+                        Actions
+                      </TableCell>
+                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : productTypes).map(item => (
+                  {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : tab === 3 ? productTypes : tab === 4 ? staffUsers : permissionGroups).map(item => (
                     <TableRow key={item.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
                       <TableCell>
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: TEXT }}>
-                          {item.name}
+                          {tab === 5 ? item.name : tab === 4 ? item.first_name : item.name}
                         </Typography>
-
                       </TableCell>
                       <TableCell>
                         {tab === 0 ? (
@@ -1418,11 +1432,42 @@ export default function SaleorManager() {
                           >
                             {item.description || "No description"}
                           </Typography>
-                        ) : (
+                        ) : tab === 3 ? (
                           <Chip label={item.slug} size="small" variant="outlined" />
+                        ) : tab === 4 ? (
+                          <Typography variant="body2">{item.last_name}</Typography>
+                        ) : (
+                          <Chip
+                            label={`${(item.permissions || []).length} Permission${(item.permissions || []).length !== 1 ? "s" : ""}`}
+                            size="small"
+                            variant="outlined"
+                            sx={{ bgcolor: "#eff6ff", color: "#2563eb", borderColor: "#bfdbfe" }}
+                          />
                         )}
                       </TableCell>
-                      {tab !== 3 && (
+                      <TableCell>
+                        {tab === 4 ? (
+                          <Typography variant="body2">{item.email}</Typography>
+                        ) : tab === 5 ? (
+                          <Chip
+                            label={`${item.user_count || 0} User${item.user_count !== 1 ? "s" : ""}`}
+                            size="small"
+                            variant="outlined"
+                            sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }}
+                          />
+                        ) : tab !== 3 ? (
+                          <Chip
+                            label={item.is_active ? "Active" : "Inactive"}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
+                              color: item.is_active ? "#059669" : "#4b5563",
+                            }}
+                          />
+                        ) : null}
+                      </TableCell>
+                      {tab !== 3 && tab !== 4 && tab !== 5 && (
                         <TableCell>
                           <Chip
                             label={item.is_active ? "Active" : "Inactive"}
@@ -1447,6 +1492,16 @@ export default function SaleorManager() {
                               fontWeight: 600,
                               bgcolor: item.is_shipping_required ? "rgba(34, 197, 94, 0.1)" : "rgba(107, 114, 128, 0.1)",
                               color: item.is_shipping_required ? "#22c55e" : "#4b5563",
+                            }}
+                          />
+                        ) : tab === 4 ? (
+                          <Chip
+                            label={item.is_staff ? "Staff" : "User"}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              bgcolor: item.is_staff ? "rgba(59, 130, 246, 0.1)" : "rgba(107, 114, 128, 0.1)",
+                              color: item.is_staff ? "#3b82f6" : "#4b5563",
                             }}
                           />
                         ) : (
@@ -1490,36 +1545,38 @@ export default function SaleorManager() {
                           </Typography>
                         </TableCell>
                       )}
-                      <TableCell align="right">
-                        {(tab === 0 || tab === 1 || tab === 2 || tab === 3) && (
-                          <>
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                if (tab === 0) handleOpenDialog("channel", item);
-                                if (tab === 1) handleOpenDialog("warehouse", item);
-                                if (tab === 2) handleOpenDialog("shippingZone", item);
-                                if (tab === 3) handleOpenDialog("productType", item);
-                              }}
-                              sx={{ color: TEXT }}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteClick(item.id, item.name)}
-                              sx={{ color: "#ef4444" }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </>
-                        )}
-                      </TableCell>
+                      {tab !== 4 && tab !== 5 && (
+                        <TableCell align="right">
+                          {(tab === 0 || tab === 1 || tab === 2 || tab === 3) && (
+                            <>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  if (tab === 0) handleOpenDialog("channel", item);
+                                  if (tab === 1) handleOpenDialog("warehouse", item);
+                                  if (tab === 2) handleOpenDialog("shippingZone", item);
+                                  if (tab === 3) handleOpenDialog("productType", item);
+                                }}
+                                sx={{ color: TEXT }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteClick(item.id, item.name)}
+                                sx={{ color: "#ef4444" }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </>
+                          )}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
-                  {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : productTypes).length === 0 && (
+                  {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : tab === 3 ? productTypes : tab === 4 ? staffUsers : permissionGroups).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={tab === 3 ? 5 : 5} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={tab === 3 ? 5 : tab === 4 ? 4 : tab === 5 ? 3 : 5} align="center" sx={{ py: 6 }}>
                         <Typography variant="body1" sx={{ color: "#9ca3af" }}>
                           No records found. Try syncing from Saleor.
                         </Typography>
