@@ -36,6 +36,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
@@ -925,8 +926,9 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
           )}
           {/* Combined count pill */}
           <Chip
-            label={`${subCount} combined`}
+            label={`${subCount} questions grouped`}
             size="small"
+            icon={<AutoAwesomeIcon sx={{ fontSize: 11, color: "rgba(77,171,245,0.7) !important" }} />}
             sx={{
               height: 18,
               fontSize: "0.62rem",
@@ -934,6 +936,7 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
               bgcolor: "rgba(77,171,245,0.08)",
               color: "rgba(77,171,245,0.8)",
               border: "1px solid rgba(77,171,245,0.18)",
+              "& .MuiChip-icon": { ml: 0.5 },
             }}
           />
           {/* Vote count badge — deduplicated distinct voters */}
@@ -974,21 +977,38 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
           )}
         </Stack>
 
-        {/* Summary question text */}
-        <Typography
-          variant="body2"
+        {/* Summary question text — AI-generated indicator + expandability cue */}
+        <Box
           sx={{
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: "0.88rem",
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            mb: authorNames.length > 0 ? 0.7 : 0,
+            pb: 0.8,
+            mb: authorNames.length > 0 ? 0.4 : 0.2,
+            borderBottom: subOpen ? "none" : "1px dashed rgba(77,171,245,0.18)",
           }}
         >
-          {summaryText}
-        </Typography>
+          <Stack direction="row" alignItems="flex-start" spacing={0.6}>
+            <AutoAwesomeIcon
+              sx={{
+                fontSize: 13,
+                color: "rgba(77,171,245,0.6)",
+                mt: "3px",
+                flexShrink: 0,
+              }}
+            />
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#fff",
+                fontWeight: 600,
+                fontSize: "0.88rem",
+                lineHeight: 1.5,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {summaryText}
+            </Typography>
+          </Stack>
+        </Box>
 
         {/* Authors row */}
         {authorNames.length > 0 && (
@@ -1098,11 +1118,13 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
               size="small"
               onClick={() => setSubOpen((v) => !v)}
               startIcon={
-                subOpen ? (
-                  <UnfoldLessIcon sx={{ fontSize: 14 }} />
-                ) : (
-                  <UnfoldMoreIcon sx={{ fontSize: 14 }} />
-                )
+                <KeyboardArrowDownIcon
+                  sx={{
+                    fontSize: 15,
+                    transition: "transform 0.2s ease",
+                    transform: subOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
+                />
               }
               sx={{
                 textTransform: "none",
@@ -1137,24 +1159,30 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
         <Box
           sx={{
             px: 1.5,
-            py: 0.5,
-            borderTop: "1px solid rgba(255,255,255,0.05)",
+            py: 0.65,
+            borderTop: "1px solid rgba(77,171,245,0.12)",
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             cursor: "pointer",
             userSelect: "none",
-            "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
+            bgcolor: "rgba(77,171,245,0.03)",
+            "&:hover": { bgcolor: "rgba(77,171,245,0.07)" },
+            transition: "background-color 0.15s ease",
           }}
           onClick={() => setSubOpen((v) => !v)}
         >
-          {subOpen ? (
-            <UnfoldLessIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.35)", mr: 0.6 }} />
-          ) : (
-            <UnfoldMoreIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.35)", mr: 0.6 }} />
-          )}
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: "0.68rem" }}>
+          <Typography variant="caption" sx={{ color: "rgba(77,171,245,0.7)", fontSize: "0.68rem", fontWeight: 500 }}>
             {subOpen ? "Collapse original questions" : `See ${subCount} original question${subCount !== 1 ? "s" : ""}`}
           </Typography>
+          <KeyboardArrowDownIcon
+            sx={{
+              fontSize: 15,
+              color: "rgba(77,171,245,0.6)",
+              transition: "transform 0.2s ease",
+              transform: subOpen ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          />
         </Box>
       )}
 
