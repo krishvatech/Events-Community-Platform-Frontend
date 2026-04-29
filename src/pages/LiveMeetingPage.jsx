@@ -16780,6 +16780,20 @@ export default function NewLiveMeeting() {
     };
   }, [rtkMeeting?.self, participants]);
 
+  const getQnaProfilePath = useCallback((userId) => {
+    if (userId == null) return null;
+    const rawId = String(userId).trim();
+    if (!rawId || rawId.toLowerCase().startsWith("guest_")) return null;
+    return `/community/rich-profile/${encodeURIComponent(rawId)}`;
+  }, []);
+
+  const openQnaProfile = useCallback((userId, e) => {
+    const profilePath = getQnaProfilePath(userId);
+    if (!profilePath) return;
+    if (e?.preventDefault) e.preventDefault();
+    window.open(profilePath, "_blank", "noopener,noreferrer");
+  }, [getQnaProfilePath]);
+
   const buildDisplayedQuestionPayload = useCallback((question) => {
     if (!question) return null;
 
@@ -20433,7 +20447,45 @@ export default function NewLiveMeeting() {
                                             />
                                           </>
                                         ) : (
-                                          <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                          (() => {
+                                            const canOpenAskedByProfile =
+                                              !questionDisplayMeta.isAnonymous &&
+                                              !isSelfQuestion &&
+                                              Boolean(getQnaProfilePath(questionDisplayMeta.userId));
+
+                                            const chipNode = (
+                                              <Chip
+                                                size="small"
+                                                clickable={canOpenAskedByProfile}
+                                                onClick={canOpenAskedByProfile ? (e) => openQnaProfile(questionDisplayMeta.userId, e) : undefined}
+                                                label={(
+                                                  <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                                                    <Box component="span">Asked by {askedBy}</Box>
+                                                    {canOpenAskedByProfile && (
+                                                      <InfoOutlinedIcon sx={{ fontSize: 13, opacity: 0.9 }} />
+                                                    )}
+                                                  </Box>
+                                                )}
+                                                sx={{
+                                                  bgcolor: "rgba(255,255,255,0.06)",
+                                                  border: "1px solid rgba(255,255,255,0.10)",
+                                                  "& .MuiChip-label": { display: "inline-flex", alignItems: "center", px: 1 },
+                                                  ...(canOpenAskedByProfile ? {
+                                                    cursor: "pointer",
+                                                    "&:hover": { bgcolor: "rgba(125,211,252,0.16)", borderColor: "rgba(125,211,252,0.45)" },
+                                                    "&:active": { bgcolor: "rgba(125,211,252,0.22)" },
+                                                    transition: "background-color 140ms ease, border-color 140ms ease",
+                                                  } : {}),
+                                                }}
+                                              />
+                                            );
+                                            if (!canOpenAskedByProfile) return chipNode;
+                                            return (
+                                              <Tooltip title="Open Profile" arrow>
+                                                {chipNode}
+                                              </Tooltip>
+                                            );
+                                          })()
                                         )}
                                         {q.requires_followup && (
                                           <Chip
