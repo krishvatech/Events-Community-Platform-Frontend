@@ -21,6 +21,7 @@ import {
   Paper,
   Snackbar,
   Alert,
+  AlertTitle,
   Stack,
   Typography,
   Tabs,
@@ -422,6 +423,9 @@ export default function EventManagePage() {
   const [notifyInterested, setNotifyInterested] = useState(true);
   const [notifyAll, setNotifyAll] = useState(false);
   const [answerSubmitting, setAnswerSubmitting] = useState(false);
+
+  // Seconds remaining in the post-event lounge (null when lounge is inactive)
+  const [loungeTimeRemaining, setLoungeTimeRemaining] = useState(null);
 
   // Cancel Event State
   const [cancelEventOpen, setCancelEventOpen] = useState(false);
@@ -1463,6 +1467,36 @@ export default function EventManagePage() {
   const joinLabel = getResolvedJoinLabel(event, isLive, false, myReg, isOwner);
   const statusMeta = statusChip(status);
   const avatarLetter = (event?.title?.[0] || "E").toUpperCase();
+
+  // Maintain a live second-by-second countdown while the post-event lounge is active.
+  // The setInterval forces a React re-render each second, which also re-evaluates
+  // isPostEventLounge and isPast — so Q&A appears automatically when the lounge closes.
+  useEffect(() => {
+    if (!isPostEventLounge) {
+      setLoungeTimeRemaining(null);
+      return;
+    }
+    const computeRemaining = () => {
+      if (!event?.live_ended_at || !event?.lounge_after_buffer) return 0;
+      const closing =
+        new Date(event.live_ended_at).getTime() +
+        Number(event.lounge_after_buffer) * 60 * 1000;
+      return Math.max(0, Math.floor((closing - Date.now()) / 1000));
+    };
+    setLoungeTimeRemaining(computeRemaining());
+    const timerId = setInterval(() => setLoungeTimeRemaining(computeRemaining()), 1000);
+    return () => clearInterval(timerId);
+  }, [isPostEventLounge, event?.live_ended_at, event?.lounge_after_buffer]);
+
+  const formatLoungeTimeRemaining = (totalSeconds) => {
+    if (!totalSeconds || totalSeconds <= 0) return "closing soon";
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    if (h > 0) return `${h}h ${m}m ${String(s).padStart(2, "0")}s`;
+    if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+    return `${s}s`;
+  };
 
   // ---- members filtering / paging ----
   useEffect(() => {
@@ -4170,9 +4204,24 @@ export default function EventManagePage() {
       </Box>
 
       {!isPast ? (
-        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
-          Post-event Q&A is available after the event ends.
-        </Typography>
+        isPostEventLounge ? (
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            <AlertTitle sx={{ fontWeight: 700 }}>Social Lounge In Progress</AlertTitle>
+            Post-Event Q&amp;A will become available once the Social Lounge ends.
+            {loungeTimeRemaining !== null && (
+              <Box component="span" sx={{ display: "block", mt: 0.5 }}>
+                <strong>Time remaining:</strong> {formatLoungeTimeRemaining(loungeTimeRemaining)}
+              </Box>
+            )}
+            <Box component="span" sx={{ display: "block", mt: 0.5, color: "text.secondary", fontSize: "0.75rem" }}>
+              This section will update automatically — no refresh needed.
+            </Box>
+          </Alert>
+        ) : (
+          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+            Post-event Q&amp;A is available after the event ends.
+          </Typography>
+        )
       ) : (
         <>
           {postEventQnaLoading ? (
