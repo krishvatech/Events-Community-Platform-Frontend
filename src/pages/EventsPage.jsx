@@ -309,6 +309,10 @@ function toCard(ev) {
     is_live: ev.is_live,
     event_format: ev.event_format || ev.format, // virtual, hybrid, in_person
     registration_type: ev.registration_type || 'open', // ✅ NEW: 'open' or 'apply'
+    preapproval_code_enabled: !!ev.preapproval_code_enabled,
+    preapproval_allowlist_enabled: !!ev.preapproval_allowlist_enabled,
+    attendee_marker_enabled: !!ev.attendee_marker_enabled,
+    attendee_marker_label: ev.attendee_marker_label || "",
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
     waiting_room_enabled: ev.waiting_room_enabled,
     waiting_room_grace_period_minutes: ev.waiting_room_grace_period_minutes,

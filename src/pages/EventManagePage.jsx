@@ -53,6 +53,7 @@ import {
 } from "@mui/material";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import EditEventForm from "../components/EditEventForm.jsx";
+import EventPreApprovalManager from "../components/admin/EventPreApprovalManager.jsx";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
@@ -2782,13 +2783,22 @@ export default function EventManagePage() {
   const [declineDialogOpen, setDeclineDialogOpen] = React.useState(false);
   const [selectedApp, setSelectedApp] = React.useState(null);
   const [declineMessage, setDeclineMessage] = React.useState('');
+  const [appPreapprovedFilter, setAppPreapprovedFilter] = React.useState("all");
+  const [appSourceFilter, setAppSourceFilter] = React.useState("all");
+  const [appCommentsFilter, setAppCommentsFilter] = React.useState("all");
 
   React.useEffect(() => {
     if (event?.registration_type !== 'apply' || !event?.id) return;
     const fetchApps = async () => {
       setAppLoading(true);
       try {
-        const url = `${API_ROOT}/events/${event.id}/applications/?status=${appFilter === 'all' ? '' : appFilter}&search=${appSearch}`;
+        const query = new URLSearchParams();
+        if (appFilter !== "all") query.set("status", appFilter);
+        if (appSearch) query.set("search", appSearch);
+        if (appPreapprovedFilter !== "all") query.set("preapproved", appPreapprovedFilter);
+        if (appSourceFilter !== "all") query.set("preapproval_source", appSourceFilter);
+        if (appCommentsFilter !== "all") query.set("has_comments", appCommentsFilter);
+        const url = `${API_ROOT}/events/${event.id}/applications/?${query.toString()}`;
         const res = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -2803,7 +2813,7 @@ export default function EventManagePage() {
       }
     };
     fetchApps();
-  }, [event?.id, event?.registration_type, appFilter, appSearch, token]);
+  }, [event?.id, event?.registration_type, appFilter, appSearch, appPreapprovedFilter, appSourceFilter, appCommentsFilter, token]);
 
   const handleApproveApp = async (appId) => {
     try {
@@ -2880,6 +2890,22 @@ export default function EventManagePage() {
               <MenuItem value="approved">Approved</MenuItem>
               <MenuItem value="declined">Declined</MenuItem>
             </Select>
+            <Select value={appPreapprovedFilter} onChange={(e) => setAppPreapprovedFilter(e.target.value)} size="small" sx={{ minWidth: 140 }}>
+              <MenuItem value="all">Preapproved: All</MenuItem>
+              <MenuItem value="true">Preapproved</MenuItem>
+              <MenuItem value="false">Not Preapproved</MenuItem>
+            </Select>
+            <Select value={appSourceFilter} onChange={(e) => setAppSourceFilter(e.target.value)} size="small" sx={{ minWidth: 140 }}>
+              <MenuItem value="all">Source: All</MenuItem>
+              <MenuItem value="code">Code</MenuItem>
+              <MenuItem value="email">Email</MenuItem>
+              <MenuItem value="none">None</MenuItem>
+            </Select>
+            <Select value={appCommentsFilter} onChange={(e) => setAppCommentsFilter(e.target.value)} size="small" sx={{ minWidth: 140 }}>
+              <MenuItem value="all">Comments: All</MenuItem>
+              <MenuItem value="true">Has Comments</MenuItem>
+              <MenuItem value="false">No Comments</MenuItem>
+            </Select>
           </Stack>
 
           {appLoading ? (
@@ -2896,6 +2922,9 @@ export default function EventManagePage() {
                     <TableCell sx={{ fontWeight: 600 }}>Job Title</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Pre-Approval</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Marker</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Comments</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Applied At</TableCell>
                     <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>Actions</TableCell>
                   </TableRow>
@@ -2915,6 +2944,15 @@ export default function EventManagePage() {
                           variant="outlined"
                         />
                       </TableCell>
+                      <TableCell>
+                        {app.is_preapproved ? (
+                          <Chip size="small" color="info" label={`Yes (${app.preapproval_source || "unknown"})`} />
+                        ) : (
+                          <Chip size="small" variant="outlined" label="No" />
+                        )}
+                      </TableCell>
+                      <TableCell>{app.attendee_marker_value ? "Yes" : "No"}</TableCell>
+                      <TableCell sx={{ maxWidth: 220, whiteSpace: "normal" }}>{app.comments || "-"}</TableCell>
                       <TableCell>{new Date(app.applied_at).toLocaleDateString()}</TableCell>
                       <TableCell sx={{ textAlign: 'center' }}>
                         {app.status === 'pending' && (
@@ -2945,6 +2983,9 @@ export default function EventManagePage() {
             </Box>
           )}
         </Stack>
+        <Box sx={{ mt: 3 }}>
+          <EventPreApprovalManager event={event} token={token} onEventUpdated={(updated) => setEvent(updated)} />
+        </Box>
 
         <Dialog open={declineDialogOpen} onClose={() => setDeclineDialogOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>Decline Application</DialogTitle>

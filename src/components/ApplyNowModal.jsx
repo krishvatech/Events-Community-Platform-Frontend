@@ -11,6 +11,8 @@ import {
   CircularProgress,
   Alert,
   Box,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +36,9 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
     job_title: "",
     company_name: "",
     linkedin_url: "",
+    attendee_marker_value: false,
+    comments: "",
+    preapproved_code: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +46,10 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [guestToken, setGuestToken] = useState(null); // Guest JWT from application response
   const [canJoinNow, setCanJoinNow] = useState(false); // Whether to show "Join Now" button
+  const [codePreapproved, setCodePreapproved] = useState(false);
+  const [emailPreapproved, setEmailPreapproved] = useState(false);
+  const [codeError, setCodeError] = useState("");
+  const preApproved = codePreapproved || emailPreapproved;
 
   // Pre-fill form for authenticated users on modal open
   useEffect(() => {
@@ -89,8 +98,67 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
     }
   }, [open, event?.id, token]);
 
+  useEffect(() => {
+    if (open && form.email) {
+      checkPreapprovalEmail(form.email);
+    }
+  }, [open, form.email]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleInputChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+  const handleCheckboxChange = (field) => (e) => {
+    setForm((prev) => ({ ...prev, [field]: !!e.target.checked }));
+  };
+
+  const checkPreapprovalEmail = async (emailInput) => {
+    const email = (emailInput || "").trim().toLowerCase();
+    if (!event?.preapproval_allowlist_enabled || !email) return;
+    try {
+      const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/preapproval/check-email/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.preapproved && data?.source === "email") {
+        setEmailPreapproved(true);
+        setForm((prev) => ({
+          ...prev,
+          first_name: prev.first_name || data.first_name || "",
+          last_name: prev.last_name || data.last_name || "",
+        }));
+      } else {
+        setEmailPreapproved(false);
+      }
+    } catch {
+      setEmailPreapproved(false);
+    }
+  };
+
+  const checkPreapprovalCode = async (codeInput) => {
+    const code = (codeInput || "").trim();
+    setCodeError("");
+    if (!event?.preapproval_code_enabled || !code) {
+      setCodePreapproved(false);
+      return;
+    }
+    try {
+      const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/preapproval/check-code/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.preapproved && data?.source === "code") {
+        setCodePreapproved(true);
+      } else {
+        setCodePreapproved(false);
+        if (data?.message) setCodeError(data.message);
+      }
+    } catch {
+      setCodePreapproved(false);
+    }
   };
 
   const validateForm = () => {
@@ -148,6 +216,9 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
           job_title: form.job_title.trim(),
           company_name: form.company_name.trim(),
           linkedin_url: form.linkedin_url.trim(),
+          attendee_marker_value: !!form.attendee_marker_value,
+          comments: form.comments?.trim() || "",
+          preapproved_code: form.preapproved_code?.trim() || "",
         }),
       });
 
@@ -178,6 +249,9 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
         job_title: form.job_title.trim(),
         company_name: form.company_name.trim(),
         linkedin_url: form.linkedin_url.trim(),
+        attendee_marker_value: !!form.attendee_marker_value,
+        comments: form.comments?.trim() || "",
+        preapproved_code: form.preapproved_code?.trim() || "",
       };
       localStorage.setItem("application_cache", JSON.stringify(cacheData));
 
@@ -220,6 +294,9 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
     setShowAuthOptions(false);
     setGuestToken(null);
     setCanJoinNow(false);
+    setCodePreapproved(false);
+    setEmailPreapproved(false);
+    setCodeError("");
     setForm({
       first_name: "",
       last_name: "",
@@ -227,6 +304,9 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
       job_title: "",
       company_name: "",
       linkedin_url: "",
+      attendee_marker_value: false,
+      comments: "",
+      preapproved_code: "",
     });
     onClose();
   };
@@ -353,9 +433,24 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
                   size="small"
                   value={form.email}
                   onChange={handleInputChange("email")}
+                  onBlur={() => checkPreapprovalEmail(form.email)}
                   disabled={loading}
                 />
               </>
+            )}
+
+            {event?.preapproval_code_enabled && (
+              <TextField
+                label="Pre-approved code"
+                fullWidth
+                size="small"
+                value={form.preapproved_code}
+                onChange={handleInputChange("preapproved_code")}
+                onBlur={() => checkPreapprovalCode(form.preapproved_code)}
+                disabled={loading}
+                helperText={codeError || ""}
+                error={!!codeError}
+              />
             )}
 
             <TextField
@@ -389,6 +484,33 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
               onChange={handleInputChange("linkedin_url")}
               disabled={loading}
             />
+            {event?.attendee_marker_enabled && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={!!form.attendee_marker_value}
+                    onChange={handleCheckboxChange("attendee_marker_value")}
+                    disabled={loading}
+                  />
+                }
+                label={event?.attendee_marker_label || "Attendee marker"}
+              />
+            )}
+            <TextField
+              label="Comments"
+              fullWidth
+              size="small"
+              multiline
+              minRows={3}
+              value={form.comments}
+              onChange={handleInputChange("comments")}
+              disabled={loading}
+            />
+            {preApproved && (
+              <Alert severity="success" sx={{ backgroundColor: "#e0f2f1" }}>
+                You are pre-approved.
+              </Alert>
+            )}
 
             <Button
               variant="contained"
@@ -404,7 +526,7 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
               }
               sx={{ py: 1 }}
             >
-              {loading ? <CircularProgress size={20} color="inherit" /> : "Submit Application"}
+              {loading ? <CircularProgress size={20} color="inherit" /> : (preApproved ? "Register" : "Submit Application")}
             </Button>
 
             {!token && (

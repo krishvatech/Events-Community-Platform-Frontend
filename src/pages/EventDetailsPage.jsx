@@ -1671,7 +1671,7 @@ export default function EventDetailsPage() {
                                   </Button>
                                 </>
                               )
-                              : myApplication.status === 'approved'
+                              : myApplication?.status === 'approved'
                                 ? (() => {
                                   // After approval, check if user can join with guest token or is registered
                                   const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
@@ -1729,7 +1729,7 @@ export default function EventDetailsPage() {
                                     );
                                   }
                                 })()
-                                : myApplication.status === 'pending'
+                                : myApplication?.status === 'pending'
                                   ? (
                                     <Chip
                                       label="Application Pending"
@@ -1738,7 +1738,7 @@ export default function EventDetailsPage() {
                                       sx={{ py: 2.5 }}
                                     />
                                   )
-                                  : myApplication.status === 'declined'
+                                  : myApplication?.status === 'declined'
                                     ? (
                                       <Chip
                                         label="Application Declined"
