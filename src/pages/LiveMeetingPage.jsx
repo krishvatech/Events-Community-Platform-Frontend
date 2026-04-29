@@ -20510,15 +20510,17 @@ export default function NewLiveMeeting() {
                                             </>
                                           )}
                                           {isHost && (
-                                            <Tooltip title={isDisplayedOnScreen ? "Question is live on the main screen" : "Show on the main screen"}>
+                                            <Tooltip title={isDisplayedOnScreen ? "Remove from screen" : "Show on the main screen"}>
                                               <IconButton
                                                 size="small"
-                                                onClick={() => handleDisplayQuestionOnScreen(q)}
+                                                onClick={() => isDisplayedOnScreen ? handleDismissDisplayedQuestion() : handleDisplayQuestionOnScreen(q)}
                                                 sx={{
                                                   color: isDisplayedOnScreen ? "#38bdf8" : "rgba(255,255,255,0.45)",
+                                                  bgcolor: isDisplayedOnScreen ? "rgba(56,189,248,0.12)" : "transparent",
                                                   p: 0.5,
                                                   "&:hover": {
-                                                    color: "#7dd3fc",
+                                                    color: isDisplayedOnScreen ? "#f87171" : "#7dd3fc",
+                                                    bgcolor: isDisplayedOnScreen ? "rgba(248,113,113,0.10)" : undefined,
                                                   }
                                                 }}
                                               >
@@ -20941,14 +20943,18 @@ export default function NewLiveMeeting() {
 
                                         {isHost && primaryQuestion && (
                                           <Stack direction="row" spacing={0} justifyContent="flex-start" sx={{ mt: 0.7 }}>
-                                            <Tooltip title={primaryDisplayedOnScreen ? "Question is live on the main screen" : "Show on the main screen"}>
+                                            <Tooltip title={primaryDisplayedOnScreen ? "Remove from screen" : "Show on the main screen"}>
                                               <IconButton
                                                 size="small"
-                                                onClick={() => handleDisplayGroupOnScreen(rg.group, sortedGroupedQuestions, groupSummaryQuestion, groupedAuthorLabel)}
+                                                onClick={() => primaryDisplayedOnScreen ? handleDismissDisplayedQuestion() : handleDisplayGroupOnScreen(rg.group, sortedGroupedQuestions, groupSummaryQuestion, groupedAuthorLabel)}
                                                 sx={{
                                                   color: primaryDisplayedOnScreen ? "#38bdf8" : "rgba(255,255,255,0.45)",
+                                                  bgcolor: primaryDisplayedOnScreen ? "rgba(56,189,248,0.12)" : "transparent",
                                                   p: 0.5,
-                                                  "&:hover": { color: "#7dd3fc" }
+                                                  "&:hover": {
+                                                    color: primaryDisplayedOnScreen ? "#f87171" : "#7dd3fc",
+                                                    bgcolor: primaryDisplayedOnScreen ? "rgba(248,113,113,0.10)" : undefined,
+                                                  }
                                                 }}
                                               >
                                                 <AnnouncementIcon sx={{ fontSize: 16 }} />
