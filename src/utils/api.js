@@ -508,6 +508,21 @@ export async function getSaleorDashboardUrl() {
   return r.json(); // { url }
 }
 
+export async function getSaleorConnectionStatus() {
+  const r = await apiClient.get("/auth/saleor/status/");
+  return r.data;
+}
+
+export async function connectSaleorSso() {
+  const r = await apiClient.get("/auth/saleor/connect/");
+  return r.data;
+}
+
+export async function disconnectSaleorSso() {
+  const r = await apiClient.post("/auth/saleor/disconnect/");
+  return r.data;
+}
+
 // ===================== Event Participants =====================
 // Note: Participants are managed via event endpoints, not standalone
 

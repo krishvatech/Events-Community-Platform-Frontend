@@ -38,7 +38,13 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
-import { apiClient, getSaleorDashboardUrl } from "../utils/api";
+import {
+  apiClient,
+  getSaleorDashboardUrl,
+  getSaleorConnectionStatus,
+  connectSaleorSso,
+  disconnectSaleorSso,
+} from "../utils/api";
 import { isOwnerUser } from "../utils/adminRole";
 
 const ORANGE = "#E8532F";
@@ -57,6 +63,9 @@ export default function SaleorManager() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [saleorDashboardUrl, setSaleorDashboardUrl] = useState(null);
+  const [saleorStatus, setSaleorStatus] = useState(null);
+  const [checkingSaleorStatus, setCheckingSaleorStatus] = useState(true);
+  const [connectingSaleor, setConnectingSaleor] = useState(false);
 
   // Warehouse options
   const [warehouseOptions, setWarehouseOptions] = useState({
@@ -111,21 +120,69 @@ export default function SaleorManager() {
   const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
-    if (!isOwnerUser()) return;
-    getSaleorDashboardUrl()
-      .then((data) => setSaleorDashboardUrl(data.url))
-      .catch(() => {});
+    if (!isOwnerUser()) {
+      setCheckingSaleorStatus(false);
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const saleorError = params.get("saleor_error");
+    if (saleorError) setError(decodeURIComponent(saleorError));
+    loadSaleorStatus();
+  }, []);
 
+  useEffect(() => {
+    if (!saleorStatus?.connected || !saleorStatus?.can_manage_staff) return;
     fetchChannelOptions();
     fetchWarehouseOptions();
     fetchShippingZoneOptions();
     fetchProductTypeOptions();
     fetchData(0);
-  }, []);
+  }, [saleorStatus]);
 
   useEffect(() => {
+    if (!saleorStatus?.connected || !saleorStatus?.can_manage_staff) return;
     handleSync(tab); // Combined fetch and sync for smoother UX
-  }, [tab]);
+  }, [tab, saleorStatus]);
+
+  const loadSaleorStatus = async () => {
+    setCheckingSaleorStatus(true);
+    setError(null);
+    try {
+      const status = await getSaleorConnectionStatus();
+      setSaleorStatus(status);
+      if (status.connected && status.can_manage_staff) {
+        getSaleorDashboardUrl()
+          .then((data) => setSaleorDashboardUrl(data.url))
+          .catch(() => {});
+      } else {
+        setSaleorDashboardUrl(null);
+      }
+    } catch (err) {
+      setError(`Failed to check Saleor SSO status: ${err.message}`);
+      setSaleorStatus({ connected: false });
+    } finally {
+      setCheckingSaleorStatus(false);
+    }
+  };
+
+  const handleConnectSaleor = async () => {
+    setConnectingSaleor(true);
+    setError(null);
+    try {
+      const data = await connectSaleorSso();
+      if (data?.url) window.location.href = data.url;
+    } catch (err) {
+      setError(`Failed to start Saleor SSO: ${err.message}`);
+      setConnectingSaleor(false);
+    }
+  };
+
+  const handleDisconnectSaleor = async () => {
+    await disconnectSaleorSso();
+    setSaleorStatus({ connected: false });
+    setSaleorDashboardUrl(null);
+    loadSaleorStatus();
+  };
 
   const fetchWarehouseOptions = async () => {
     try {
@@ -164,6 +221,7 @@ export default function SaleorManager() {
   };
 
   const fetchData = async (tabIndex) => {
+    if (!saleorStatus?.connected || !saleorStatus?.can_manage_staff) return;
     setLoading(true);
     setError(null);
     let endpoint = "";
@@ -195,6 +253,7 @@ export default function SaleorManager() {
   };
 
   const handleSync = async (tabIndex = null) => {
+    if (!saleorStatus?.connected || !saleorStatus?.can_manage_staff) return;
     const activeTab = tabIndex !== null ? tabIndex : tab;
     setLoading(true); // Use main loading state for initial sync
     setError(null);
@@ -1226,6 +1285,73 @@ export default function SaleorManager() {
     );
   }
 
+  if (checkingSaleorStatus) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
+        <Container maxWidth="sm">
+          <Paper sx={{ p: 4, textAlign: "center", borderRadius: 3 }}>
+            <CircularProgress sx={{ color: ORANGE, mb: 2 }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
+              Checking Saleor SSO status
+            </Typography>
+          </Paper>
+        </Container>
+      </Box>
+    );
+  }
+
+  if (!saleorStatus?.connected) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
+        <Container maxWidth="sm">
+          <Paper sx={{ p: 4, textAlign: "center", borderRadius: 3, border: "1px solid #e5e7eb" }}>
+            <ShoppingCartIcon sx={{ fontSize: 42, color: ORANGE, mb: 2 }} />
+            <Typography variant="h5" sx={{ fontWeight: 800, color: TEXT, mb: 1 }}>
+              Saleor SSO connection required
+            </Typography>
+            <Typography sx={{ color: "#6b7280", mb: 3 }}>
+              Connect your Saleor staff account before managing channels, warehouses, shipping zones, product types, staff users, and permission groups.
+            </Typography>
+            {error && (
+              <Alert severity="error" sx={{ mb: 3, textAlign: "left" }} onClose={() => setError(null)}>
+                {error}
+              </Alert>
+            )}
+            <Button
+              variant="contained"
+              onClick={handleConnectSaleor}
+              disabled={connectingSaleor}
+              startIcon={connectingSaleor ? <CircularProgress size={18} color="inherit" /> : <OpenInNewIcon />}
+              sx={{
+                bgcolor: ORANGE,
+                color: "white",
+                borderRadius: "12px",
+                px: 3,
+                textTransform: "none",
+                fontWeight: 700,
+                "&:hover": { bgcolor: "#c94324" },
+              }}
+            >
+              Connect Saleor SSO
+            </Button>
+          </Paper>
+        </Container>
+      </Box>
+    );
+  }
+
+  if (!saleorStatus?.can_manage_staff) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
+        <Container maxWidth="sm">
+          <Alert severity="error" sx={{ borderRadius: 3 }}>
+            Connected Saleor account does not have MANAGE_STAFF permission.
+          </Alert>
+        </Container>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
       <Container maxWidth="lg">
@@ -1268,7 +1394,10 @@ export default function SaleorManager() {
               </Typography>
             </Box>
           </Box>
-          <Box sx={{ display: "flex", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Typography variant="caption" sx={{ color: "#6b7280" }}>
+              Connected as: {saleorStatus.saleor_email}
+            </Typography>
             <Button
               variant="contained"
               startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
@@ -1300,6 +1429,18 @@ export default function SaleorManager() {
               }}
             >
               Saleor Dashboard
+            </Button>
+            <Button
+              variant="text"
+              onClick={handleDisconnectSaleor}
+              sx={{
+                borderRadius: "12px",
+                textTransform: "none",
+                color: "#b91c1c",
+                fontWeight: 600,
+              }}
+            >
+              Disconnect
             </Button>
           </Box>
         </Paper>
@@ -1395,7 +1536,7 @@ export default function SaleorManager() {
                       </TableCell>
                     )}
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      {tab === 3 ? "Shippable" : tab === 4 ? "Role" : tab === 5 ? "" : "Linked Entities"}
+                      {tab === 3 ? "Shippable" : tab === 4 ? "Status" : tab === 5 ? "" : "Linked Entities"}
                     </TableCell>
                     {tab === 3 && <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Tax Class</TableCell>}
                     {tab !== 4 && tab !== 5 && (
@@ -1496,12 +1637,12 @@ export default function SaleorManager() {
                           />
                         ) : tab === 4 ? (
                           <Chip
-                            label={item.is_staff ? "Staff" : "User"}
+                            label={item.is_active ? "Active" : "Inactive"}
                             size="small"
                             sx={{
                               fontWeight: 600,
-                              bgcolor: item.is_staff ? "rgba(59, 130, 246, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                              color: item.is_staff ? "#3b82f6" : "#4b5563",
+                              bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
+                              color: item.is_active ? "#059669" : "#4b5563",
                             }}
                           />
                         ) : (
