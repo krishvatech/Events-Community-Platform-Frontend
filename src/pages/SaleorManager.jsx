@@ -277,6 +277,27 @@ export default function SaleorManager() {
     }
   };
 
+  const handleStaffActiveChange = async (staffUser, isActive) => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const res = await apiClient.patch(`/events/saleor/staff-users/${staffUser.id}/active/`, {
+        is_active: isActive,
+      });
+      setStaffUsers(prev => prev.map(item => item.id === staffUser.id ? res.data : item));
+      setSnackbar({
+        open: true,
+        message: `${res.data.email} is now ${res.data.is_active ? "active" : "inactive"}.`,
+        severity: "success",
+      });
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.response?.data?.error || err.message;
+      setError(`Failed to update staff status: ${detail}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleOpenDialog = (type, item = null) => {
     setDialogType(type);
     setEditItem(item);
@@ -1636,15 +1657,24 @@ export default function SaleorManager() {
                             }}
                           />
                         ) : tab === 4 ? (
-                          <Chip
-                            label={item.is_active ? "Active" : "Inactive"}
-                            size="small"
-                            sx={{
-                              fontWeight: 600,
-                              bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                              color: item.is_active ? "#059669" : "#4b5563",
-                            }}
-                          />
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Switch
+                              size="small"
+                              checked={Boolean(item.is_active)}
+                              disabled={syncing}
+                              onChange={(event) => handleStaffActiveChange(item, event.target.checked)}
+                              inputProps={{ "aria-label": `Set ${item.email} active status` }}
+                            />
+                            <Chip
+                              label={item.is_active ? "Active" : "Inactive"}
+                              size="small"
+                              sx={{
+                                fontWeight: 600,
+                                bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
+                                color: item.is_active ? "#059669" : "#4b5563",
+                              }}
+                            />
+                          </Box>
                         ) : (
                           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                             {tab === 0 && (item.warehouse_ids || []).length > 0 && (
