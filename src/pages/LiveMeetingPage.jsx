@@ -15227,7 +15227,7 @@ export default function NewLiveMeeting() {
       loadGroups();
       if (isHost) loadAiSuggestions();
     }
-  }, [eventId, isHost, loadAiSuggestions, loadGroups]);
+  }, [eventId, isHost, activeTableId, loadAiSuggestions, loadGroups]);
 
   // Poll for new AI suggestions every 5 seconds (host only) - more aggressive for faster feedback
   useEffect(() => {
