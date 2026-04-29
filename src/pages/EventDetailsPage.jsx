@@ -1139,10 +1139,14 @@ export default function EventDetailsPage() {
 
   const isHost = isEventOwner || Boolean(registration?.is_host);
   const livePath = `/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
+
+  // Declare isLive and multiDayJoinLabel before they're used in primaryActionLabel
+  const isLive = status === "live" && event.status !== "ended";
+  const multiDayJoinLabel = event.is_multi_day ? joinState?.buttonText : null;
+
   const primaryActionLabel = isEventOwner ? "Host Now" : getResolvedJoinLabel(event, isLive, false, registration, isEventOwner, multiDayJoinLabel);
   const isPostEventLounge = isPostEventLoungeOpen(event);
   const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
-  const isLive = status === "live" && event.status !== "ended";
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
   const isPreEventLounge = isPreEventLoungeOpen(event);
   const shouldOpenLoungeOnEntry =
@@ -1150,7 +1154,6 @@ export default function EventDetailsPage() {
 
   // For multi-day events, check session-based join state
   const multiDayCanJoin = event.is_multi_day ? joinState?.enabled : null;
-  const multiDayJoinLabel = event.is_multi_day ? joinState?.buttonText : null;
 
   const canShowActiveJoin = event.is_multi_day
     ? (joinState?.enabled || isPreEventLounge || isPostEventLounge)
