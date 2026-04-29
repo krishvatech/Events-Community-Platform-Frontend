@@ -50,6 +50,32 @@ import { isOwnerUser } from "../utils/adminRole";
 const ORANGE = "#E8532F";
 const TEXT = "#2C3E5A";
 const BG_GRADIENT = "linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)";
+const SALEOR_PERMISSION_OPTIONS = [
+  "MANAGE_USERS",
+  "MANAGE_STAFF",
+  "IMPERSONATE_USER",
+  "MANAGE_APPS",
+  "MANAGE_OBSERVABILITY",
+  "MANAGE_CHECKOUTS",
+  "HANDLE_CHECKOUTS",
+  "HANDLE_TAXES",
+  "MANAGE_TAXES",
+  "MANAGE_CHANNELS",
+  "MANAGE_DISCOUNTS",
+  "MANAGE_GIFT_CARD",
+  "MANAGE_MENUS",
+  "MANAGE_ORDERS",
+  "MANAGE_ORDERS_IMPORT",
+  "MANAGE_PAGES",
+  "MANAGE_PAGE_TYPES_AND_ATTRIBUTES",
+  "HANDLE_PAYMENTS",
+  "MANAGE_PLUGINS",
+  "MANAGE_PRODUCTS",
+  "MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES",
+  "MANAGE_SHIPPING",
+  "MANAGE_SETTINGS",
+  "MANAGE_TRANSLATIONS",
+];
 
 export default function SaleorManager() {
   const [tab, setTab] = useState(0);
@@ -106,6 +132,13 @@ export default function SaleorManager() {
   const [dialogType, setDialogType] = useState("");
   const [formData, setFormData] = useState({});
   const [dialogError, setDialogError] = useState("");
+  const [permissionDialog, setPermissionDialog] = useState({ open: false, staffUser: null });
+  const [permissionGroupOptions, setPermissionGroupOptions] = useState([]);
+  const [selectedPermissionGroups, setSelectedPermissionGroups] = useState([]);
+  const [permissionDialogError, setPermissionDialogError] = useState("");
+  const [permissionGroupDialog, setPermissionGroupDialog] = useState({ open: false, item: null });
+  const [permissionGroupForm, setPermissionGroupForm] = useState({ name: "", permissions: [] });
+  const [permissionGroupError, setPermissionGroupError] = useState("");
 
   // Track original warehouse/shipping zone IDs for channel edit
   const [originalWarehouseIds, setOriginalWarehouseIds] = useState([]);
@@ -117,7 +150,7 @@ export default function SaleorManager() {
 
   // Delete confirmation dialog
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ open: false, itemId: null, itemName: "" });
-  const [pendingDelete, setPendingDelete] = useState(null);
+  const [permissionGroupDeleteDialog, setPermissionGroupDeleteDialog] = useState({ open: false, item: null });
 
   useEffect(() => {
     if (!isOwnerUser()) {
@@ -293,6 +326,129 @@ export default function SaleorManager() {
     } catch (err) {
       const detail = err.response?.data?.detail || err.response?.data?.error || err.message;
       setError(`Failed to update staff status: ${detail}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleOpenPermissionDialog = async (staffUser) => {
+    setPermissionDialog({ open: true, staffUser });
+    setPermissionDialogError("");
+    setSyncing(true);
+    try {
+      const res = await apiClient.get(`/events/saleor/staff-users/${staffUser.id}/permission-groups/`);
+      const available = res.data.available_groups || [];
+      const selectedIds = new Set(res.data.selected_saleor_group_ids || []);
+      setPermissionGroupOptions(available);
+      setSelectedPermissionGroups(available.filter(group => selectedIds.has(group.saleor_id)));
+      if (res.data.staff_user) {
+        setStaffUsers(prev => prev.map(item => item.id === staffUser.id ? res.data.staff_user : item));
+      }
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.response?.data?.error || err.message;
+      setPermissionDialogError(`Failed to load permission groups: ${detail}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleSavePermissionGroups = async () => {
+    const staffUser = permissionDialog.staffUser;
+    if (!staffUser) return;
+    setSyncing(true);
+    setPermissionDialogError("");
+    try {
+      const res = await apiClient.patch(`/events/saleor/staff-users/${staffUser.id}/permission-groups/`, {
+        saleor_group_ids: selectedPermissionGroups.map(group => group.saleor_id),
+      });
+      if (res.data.staff_user) {
+        setStaffUsers(prev => prev.map(item => item.id === staffUser.id ? res.data.staff_user : item));
+      }
+      setPermissionDialog({ open: false, staffUser: null });
+      setSnackbar({
+        open: true,
+        message: `Updated permissions for ${staffUser.email}.`,
+        severity: "success",
+      });
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.response?.data?.error || err.message;
+      setPermissionDialogError(`Failed to update permission groups: ${detail}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleOpenPermissionGroupDialog = (item = null) => {
+    setPermissionGroupDialog({ open: true, item });
+    setPermissionGroupError("");
+    setPermissionGroupForm({
+      name: item?.name || "",
+      permissions: item?.permissions || [],
+    });
+  };
+
+  const handleClosePermissionGroupDialog = () => {
+    setPermissionGroupDialog({ open: false, item: null });
+    setPermissionGroupError("");
+    setPermissionGroupForm({ name: "", permissions: [] });
+  };
+
+  const handleSavePermissionGroup = async () => {
+    if (!permissionGroupForm.name.trim()) {
+      setPermissionGroupError("Group name is required.");
+      return;
+    }
+    setSyncing(true);
+    setPermissionGroupError("");
+    try {
+      const payload = {
+        name: permissionGroupForm.name.trim(),
+        permissions: permissionGroupForm.permissions,
+      };
+      const item = permissionGroupDialog.item;
+      const res = item
+        ? await apiClient.patch(`/events/saleor/permission-groups/${item.id}/`, payload)
+        : await apiClient.post("/events/saleor/permission-groups/create/", payload);
+      setPermissionGroups(prev => item
+        ? prev.map(group => group.id === item.id ? res.data : group)
+        : [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)));
+      handleClosePermissionGroupDialog();
+      setSnackbar({
+        open: true,
+        message: `Permission group ${item ? "updated" : "created"}.`,
+        severity: "success",
+      });
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.response?.data?.error || JSON.stringify(err.response?.data?.errors || err.message);
+      setPermissionGroupError(`Failed to save permission group: ${detail}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleDeletePermissionGroup = (item) => {
+    setPermissionGroupDeleteDialog({ open: true, item });
+  };
+
+  const handleClosePermissionGroupDeleteDialog = () => {
+    if (syncing) return;
+    setPermissionGroupDeleteDialog({ open: false, item: null });
+  };
+
+  const handleConfirmPermissionGroupDelete = async () => {
+    const item = permissionGroupDeleteDialog.item;
+    if (!item) return;
+
+    setSyncing(true);
+    setError(null);
+    try {
+      await apiClient.delete(`/events/saleor/permission-groups/${item.id}/delete/`);
+      setPermissionGroups(prev => prev.filter(group => group.id !== item.id));
+      setPermissionGroupDeleteDialog({ open: false, item: null });
+      setSnackbar({ open: true, message: "Permission group deleted.", severity: "success" });
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.response?.data?.error || JSON.stringify(err.response?.data?.errors || err.message);
+      setError(`Failed to delete permission group: ${detail}`);
     } finally {
       setSyncing(false);
     }
@@ -1510,7 +1666,7 @@ export default function SaleorManager() {
               <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
                 {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : tab === 2 ? "Shipping Policy Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
               </Typography>
-              {(tab === 0 || tab === 1 || tab === 2 || tab === 3) && (
+              {(tab === 0 || tab === 1 || tab === 2 || tab === 3 || tab === 5) && (
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
@@ -1519,6 +1675,7 @@ export default function SaleorManager() {
                     if (tab === 1) handleOpenDialog("warehouse");
                     if (tab === 2) handleOpenDialog("shippingZone");
                     if (tab === 3) handleOpenDialog("productType");
+                    if (tab === 5) handleOpenPermissionGroupDialog();
                   }}
                   sx={{
                     bgcolor: ORANGE,
@@ -1556,15 +1713,15 @@ export default function SaleorManager() {
                         Status
                       </TableCell>
                     )}
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      {tab === 3 ? "Shippable" : tab === 4 ? "Status" : tab === 5 ? "" : "Linked Entities"}
-                    </TableCell>
-                    {tab === 3 && <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Tax Class</TableCell>}
-                    {tab !== 4 && tab !== 5 && (
-                      <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>
-                        Actions
+                    {tab !== 5 && (
+                      <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                        {tab === 3 ? "Shippable" : tab === 4 ? "Status" : "Linked Entities"}
                       </TableCell>
                     )}
+                    {tab === 3 && <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Tax Class</TableCell>}
+                    <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>
+                      Actions
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1645,8 +1802,9 @@ export default function SaleorManager() {
                           )}
                         </TableCell>
                       )}
-                      <TableCell>
-                        {tab === 3 ? (
+                      {tab !== 5 && (
+                        <TableCell>
+                          {tab === 3 ? (
                           <Chip
                             label={item.is_shipping_required ? "Shippable" : "Not shippable"}
                             size="small"
@@ -1708,7 +1866,8 @@ export default function SaleorManager() {
                             )}
                           </Box>
                         )}
-                      </TableCell>
+                        </TableCell>
+                      )}
                       {tab === 3 && (
                         <TableCell>
                           <Typography variant="body2">
@@ -1716,8 +1875,7 @@ export default function SaleorManager() {
                           </Typography>
                         </TableCell>
                       )}
-                      {tab !== 4 && tab !== 5 && (
-                        <TableCell align="right">
+                      <TableCell align="right">
                           {(tab === 0 || tab === 1 || tab === 2 || tab === 3) && (
                             <>
                               <IconButton
@@ -1741,13 +1899,49 @@ export default function SaleorManager() {
                               </IconButton>
                             </>
                           )}
-                        </TableCell>
-                      )}
+                          {tab === 4 && (
+                            <Tooltip title={item.is_active ? "Manage permission groups" : "Activate staff user before managing permissions"}>
+                              <span>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  disabled={!item.is_active || syncing}
+                                  onClick={() => handleOpenPermissionDialog(item)}
+                                  sx={{
+                                    borderRadius: "10px",
+                                    textTransform: "none",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Permissions
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          )}
+                          {tab === 5 && (
+                            <>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleOpenPermissionGroupDialog(item)}
+                                sx={{ color: TEXT }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeletePermissionGroup(item)}
+                                sx={{ color: "#ef4444" }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </>
+                          )}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : tab === 3 ? productTypes : tab === 4 ? staffUsers : permissionGroups).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={tab === 3 ? 5 : tab === 4 ? 4 : tab === 5 ? 3 : 5} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={tab === 3 ? 5 : tab === 4 ? 5 : tab === 5 ? 4 : 5} align="center" sx={{ py: 6 }}>
                         <Typography variant="body1" sx={{ color: "#9ca3af" }}>
                           No records found. Try syncing from Saleor.
                         </Typography>
@@ -1921,6 +2115,241 @@ export default function SaleorManager() {
             sx={{ bgcolor: "#ef4444", px: 4, borderRadius: "10px" }}
           >
             {syncing ? <CircularProgress size={20} /> : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Permission Group CRUD Dialog */}
+      <Dialog
+        open={permissionGroupDialog.open}
+        onClose={handleClosePermissionGroupDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {permissionGroupDialog.item ? "Edit Permission Group" : "Create Permission Group"}
+        </DialogTitle>
+        <DialogContent dividers>
+          {permissionGroupError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPermissionGroupError("")}>
+              {permissionGroupError}
+            </Alert>
+          )}
+          <TextField
+            fullWidth
+            label="Group Name"
+            value={permissionGroupForm.name}
+            onChange={(event) => setPermissionGroupForm(prev => ({ ...prev, name: event.target.value }))}
+            sx={{ mb: 3 }}
+          />
+          <Autocomplete
+            multiple
+            options={SALEOR_PERMISSION_OPTIONS}
+            value={permissionGroupForm.permissions}
+            disableCloseOnSelect
+            onChange={(event, newValue) => setPermissionGroupForm(prev => ({ ...prev, permissions: newValue }))}
+            renderInput={(params) => (
+              <TextField {...params} label="Permissions" placeholder="Select permissions" />
+            )}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip
+                  {...getTagProps({ index })}
+                  key={option}
+                  label={option}
+                  size="small"
+                  variant="outlined"
+                />
+              ))
+            }
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button
+            onClick={handleClosePermissionGroupDialog}
+            sx={{ color: "#6b7280", textTransform: "none", fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSavePermissionGroup}
+            variant="contained"
+            disabled={syncing}
+            sx={{ bgcolor: TEXT, borderRadius: "10px", textTransform: "none", fontWeight: 600 }}
+          >
+            {syncing ? <CircularProgress size={20} color="inherit" /> : "Save Group"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Permission Group Delete Dialog */}
+      <Dialog
+        open={permissionGroupDeleteDialog.open}
+        onClose={handleClosePermissionGroupDeleteDialog}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "18px",
+            overflow: "hidden",
+            boxShadow: "0 24px 70px rgba(15, 23, 42, 0.28)",
+          },
+        }}
+        BackdropProps={{
+          sx: {
+            bgcolor: "rgba(15, 23, 42, 0.42)",
+            backdropFilter: "blur(4px)",
+          },
+        }}
+      >
+        <DialogContent sx={{ p: 0 }}>
+          <Box
+            sx={{
+              px: 3,
+              pt: 3,
+              pb: 2.5,
+              background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 72%)",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+              <Box
+                sx={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: "14px",
+                  display: "grid",
+                  placeItems: "center",
+                  bgcolor: "rgba(239, 68, 68, 0.1)",
+                  color: "#dc2626",
+                  flexShrink: 0,
+                }}
+              >
+                <DeleteIcon />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ color: TEXT, fontWeight: 800, lineHeight: 1.2 }}>
+                  Delete permission group?
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1, color: "#64748b", lineHeight: 1.65 }}>
+                  <strong>{permissionGroupDeleteDialog.item?.name}</strong> will be removed from Saleor.
+                  Staff assigned to this group may lose those permissions immediately.
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+          <Box
+            sx={{
+              mx: 3,
+              mb: 2,
+              p: 1.5,
+              borderRadius: "12px",
+              bgcolor: "#f8fafc",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+              This action cannot be undone.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 0, gap: 1.25 }}>
+          <Button
+            onClick={handleClosePermissionGroupDeleteDialog}
+            disabled={syncing}
+            sx={{
+              color: "#475569",
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 700,
+              px: 2.5,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmPermissionGroupDelete}
+            variant="contained"
+            disabled={syncing}
+            startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon fontSize="small" />}
+            sx={{
+              bgcolor: "#dc2626",
+              color: "white",
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 800,
+              px: 2.75,
+              boxShadow: "0 10px 22px rgba(220, 38, 38, 0.24)",
+              "&:hover": { bgcolor: "#b91c1c", boxShadow: "0 12px 26px rgba(185, 28, 28, 0.28)" },
+            }}
+          >
+            {syncing ? "Deleting..." : "Delete Group"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Staff Permission Groups Dialog */}
+      <Dialog
+        open={permissionDialog.open}
+        onClose={() => setPermissionDialog({ open: false, staffUser: null })}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Manage Permission Groups</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ mb: 2, color: "#6b7280" }}>
+            {permissionDialog.staffUser?.email}
+          </Typography>
+          {permissionDialogError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPermissionDialogError("")}>
+              {permissionDialogError}
+            </Alert>
+          )}
+          <Autocomplete
+            multiple
+            options={permissionGroupOptions}
+            value={selectedPermissionGroups}
+            loading={syncing}
+            disableCloseOnSelect
+            getOptionLabel={(option) => option.name || ""}
+            isOptionEqualToValue={(option, value) => option.saleor_id === value.saleor_id}
+            onChange={(event, newValue) => setSelectedPermissionGroups(newValue)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Permission Groups"
+                placeholder="Select groups"
+              />
+            )}
+            renderOption={(props, option) => (
+              <li {...props} key={option.saleor_id}>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {option.name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                    {(option.permissions || []).length} permissions
+                  </Typography>
+                </Box>
+              </li>
+            )}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button
+            onClick={() => setPermissionDialog({ open: false, staffUser: null })}
+            sx={{ color: "#6b7280", textTransform: "none", fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSavePermissionGroups}
+            variant="contained"
+            disabled={syncing || !permissionDialog.staffUser?.is_active}
+            sx={{ bgcolor: TEXT, borderRadius: "10px", textTransform: "none", fontWeight: 600 }}
+          >
+            {syncing ? <CircularProgress size={20} color="inherit" /> : "Save Permissions"}
           </Button>
         </DialogActions>
       </Dialog>
