@@ -435,6 +435,8 @@ export default function EventDetailsPage() {
   const ClickableAsker = ({ userId, name, isAnonymous }) => {
     if (isAnonymous) return "Anonymous";
     if (!userId) return name || "Unknown";
+    const isCurrentUser = userId === currentUserId;
+    if (isCurrentUser) return "Me";
     return (
       <Link
         to={`/community/rich-profile/${userId}`}
