@@ -2233,6 +2233,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                             setParticipants(prev => prev.filter((_, i) => i !== idx));
                                             setToast({ open: true, type: "success", msg: "Participant removed" });
                                         }}
+                                        onReorder={(reorderedParticipants) => {
+                                            setParticipants(reorderedParticipants);
+                                        }}
                                     />
                                 </Box>
                             )}

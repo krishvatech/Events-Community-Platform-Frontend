@@ -2142,6 +2142,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     setParticipants(prev => prev.filter((_, i) => i !== idx));
                     toast.success("Participant removed");
                   }}
+                  onReorder={(reorderedParticipants) => {
+                    setParticipants(reorderedParticipants);
+                  }}
                 />
               </Box>
             )}
