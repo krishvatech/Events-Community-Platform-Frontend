@@ -42,6 +42,9 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import BoltIcon from "@mui/icons-material/Bolt";
+import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna";
+import SensorsIcon from "@mui/icons-material/Sensors";
+import SensorsOffIcon from "@mui/icons-material/SensorsOff";
 import Divider from "@mui/material/Divider";
 import Chip from "@mui/material/Chip";
 import LinearProgress from "@mui/material/LinearProgress";
@@ -1048,8 +1051,10 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
               startIcon={
                 actionLoading === "stage" ? (
                   <CircularProgress size={11} sx={{ color: "#4dabf5" }} />
+                ) : onStage ? (
+                  <SensorsIcon sx={{ fontSize: 14 }} />
                 ) : (
-                  <PlayCircleOutlineIcon sx={{ fontSize: 14 }} />
+                  <SensorsOffIcon sx={{ fontSize: 14 }} />
                 )
               }
               sx={{

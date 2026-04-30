@@ -69,6 +69,8 @@ import VideocamOffIcon from "@mui/icons-material/VideocamOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
+import SensorsIcon from "@mui/icons-material/Sensors";
+import SensorsOffIcon from "@mui/icons-material/SensorsOff";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import LogoutIcon from "@mui/icons-material/Logout"; // <--- ADDED for Leave Table
 import ExpandMore from "@mui/icons-material/ExpandMore"; // ✅ For timer collapse/expand
@@ -82,6 +84,7 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import AnnouncementIcon from "@mui/icons-material/Announcement"; // ✅ NEW for waiting room announcements
+import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna"; // Radio icon for Q&A broadcast
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 import CheckIcon from "@mui/icons-material/Check"; // <--- ADDED for moderation approve button
@@ -20576,7 +20579,11 @@ export default function NewLiveMeeting() {
                                                   }
                                                 }}
                                               >
-                                                <AnnouncementIcon sx={{ fontSize: 16 }} />
+                                                {isDisplayedOnScreen ? (
+                                                  <SensorsIcon sx={{ fontSize: 16 }} />
+                                                ) : (
+                                                  <SensorsOffIcon sx={{ fontSize: 16 }} />
+                                                )}
                                               </IconButton>
                                             </Tooltip>
                                           )}
@@ -21009,7 +21016,11 @@ export default function NewLiveMeeting() {
                                                   }
                                                 }}
                                               >
-                                                <AnnouncementIcon sx={{ fontSize: 16 }} />
+                                                {primaryDisplayedOnScreen ? (
+                                                  <SensorsIcon sx={{ fontSize: 16 }} />
+                                                ) : (
+                                                  <SensorsOffIcon sx={{ fontSize: 16 }} />
+                                                )}
                                               </IconButton>
                                             </Tooltip>
                                             <Tooltip title={primaryQuestion.is_pinned ? "Unpin question" : "Pin question"}>

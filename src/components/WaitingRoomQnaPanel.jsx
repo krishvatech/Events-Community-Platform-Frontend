@@ -515,6 +515,9 @@ export default function WaitingRoomQnaPanel({
     // Advisor info toggle
     const [advisorOpen, setAdvisorOpen] = useState(false);
 
+    // Question form visibility toggle
+    const [formOpen, setFormOpen] = useState(false);
+
     // Load user's existing questions
     const loadQuestions = useCallback(async () => {
         if (!eventId) return;
@@ -685,106 +688,149 @@ export default function WaitingRoomQnaPanel({
             {/* ── Submit form ─────────────────────────────────────────────────────── */}
             {isBeforeEventStart ? (
                 <Box sx={{ mb: 0.5 }}>
-                    <TextField
-                        fullWidth
-                        multiline
-                        minRows={1}
-                        maxRows={6}
-                        placeholder="What would you like to ask before the session starts?"
-                        value={draft}
-                        onChange={(e) => {
-                            setDraft(e.target.value);
-                            setPolishResult(null);
-                            setDupResult(null);
-                        }}
-                        disabled={submitting}
-                        inputProps={{ maxLength: 1000 }}
-                        sx={{
-                            "& .MuiInputBase-root": { bgcolor: dark.inputBg, color: dark.text, borderRadius: 2, fontSize: 13 },
-                            "& .MuiOutlinedInput-notchedOutline": { borderColor: dark.border },
-                            "& .MuiInputBase-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: dark.teal },
-                            "& .MuiInputBase-input::placeholder": { color: dark.subtext, opacity: 1 },
-                        }}
-                    />
+                    {!formOpen ? (
+                        /* ── CTA Button (closed state) ── */
+                        <Button
+                            fullWidth
+                            onClick={() => setFormOpen(true)}
+                            sx={{
+                                textTransform: "none",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                py: 1.5,
+                                color: dark.text,
+                                borderColor: dark.border,
+                                border: "1px dashed",
+                                bgcolor: "rgba(255,255,255,0.03)",
+                                "&:hover": {
+                                    bgcolor: "rgba(255,255,255,0.08)",
+                                    borderColor: dark.border,
+                                },
+                            }}
+                        >
+                            + Ask a question
+                        </Button>
+                    ) : (
+                        /* ── Form (open state) ── */
+                        <Box>
+                            <TextField
+                                fullWidth
+                                autoFocus
+                                multiline
+                                minRows={2}
+                                maxRows={6}
+                                placeholder="What would you like to ask before the session starts?"
+                                value={draft}
+                                onChange={(e) => {
+                                    setDraft(e.target.value);
+                                    setPolishResult(null);
+                                    setDupResult(null);
+                                }}
+                                disabled={submitting}
+                                inputProps={{ maxLength: 1000 }}
+                                sx={{
+                                    "& .MuiInputBase-root": { bgcolor: dark.inputBg, color: dark.text, borderRadius: 2, fontSize: 13 },
+                                    "& .MuiOutlinedInput-notchedOutline": { borderColor: dark.border },
+                                    "& .MuiInputBase-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: dark.teal },
+                                    "& .MuiInputBase-input::placeholder": { color: dark.subtext, opacity: 1 },
+                                }}
+                            />
 
-                    {/* AI + Submit rows — only visible when user has typed something */}
-                    <Collapse in={draft.trim().length > 0}>
-                        {/* AI buttons row */}
-                        <Stack direction="row" spacing={0.8} sx={{ mt: 0.8 }}>
-                            <Button
-                                size="small"
-                                startIcon={polishing ? <CircularProgress size={12} sx={{ color: dark.purple }} /> : <AutoFixHighIcon sx={{ fontSize: 14 }} />}
-                                onClick={handlePolish}
-                                disabled={polishing || submitting}
-                                sx={{ textTransform: "none", fontSize: 11, color: dark.purple, borderColor: "rgba(129,140,248,0.35)", border: "1px solid", "&:hover": { bgcolor: "rgba(129,140,248,0.08)" } }}
-                            >
-                                {polishing ? "Improving…" : "Improve with AI"}
-                            </Button>
-                            <Button
-                                size="small"
-                                startIcon={checking ? <CircularProgress size={12} sx={{ color: dark.subtext }} /> : <CompareArrowsIcon sx={{ fontSize: 14 }} />}
-                                onClick={handleDupCheck}
-                                disabled={checking || submitting}
-                                sx={{ textTransform: "none", fontSize: 11, color: dark.subtext, borderColor: dark.border, border: "1px solid", "&:hover": { bgcolor: "rgba(255,255,255,0.04)" } }}
-                            >
-                                {checking ? "Checking…" : "Check duplicates"}
-                            </Button>
-                        </Stack>
+                            {/* AI + Submit rows */}
+                            <Collapse in={draft.trim().length > 0}>
+                                {/* AI buttons row */}
+                                <Stack direction="row" spacing={0.8} sx={{ mt: 0.8 }}>
+                                    <Button
+                                        size="small"
+                                        startIcon={polishing ? <CircularProgress size={12} sx={{ color: dark.purple }} /> : <AutoFixHighIcon sx={{ fontSize: 14 }} />}
+                                        onClick={handlePolish}
+                                        disabled={polishing || submitting}
+                                        sx={{ textTransform: "none", fontSize: 11, color: dark.purple, borderColor: "rgba(129,140,248,0.35)", border: "1px solid", "&:hover": { bgcolor: "rgba(129,140,248,0.08)" } }}
+                                    >
+                                        {polishing ? "Improving…" : "Improve with AI"}
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        startIcon={checking ? <CircularProgress size={12} sx={{ color: dark.subtext }} /> : <CompareArrowsIcon sx={{ fontSize: 14 }} />}
+                                        onClick={handleDupCheck}
+                                        disabled={checking || submitting}
+                                        sx={{ textTransform: "none", fontSize: 11, color: dark.subtext, borderColor: dark.border, border: "1px solid", "&:hover": { bgcolor: "rgba(255,255,255,0.04)" } }}
+                                    >
+                                        {checking ? "Checking…" : "Check duplicates"}
+                                    </Button>
+                                </Stack>
 
-                        {/* Submit row */}
-                        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.8 }}>
-                            <Button
-                                size="small"
-                                variant="contained"
-                                endIcon={submitting ? <CircularProgress size={12} color="inherit" /> : <SendRoundedIcon sx={{ fontSize: 14 }} />}
-                                onClick={handleSubmit}
-                                disabled={!canSubmit}
-                                sx={{ textTransform: "none", fontSize: 12, fontWeight: 700, bgcolor: dark.teal, "&:hover": { bgcolor: "#0ea5a4" }, px: 2 }}
-                            >
-                                {submitting ? "Submitting…" : "Submit"}
-                            </Button>
-                        </Stack>
-                    </Collapse>
-                    {/* AI polish feedback */}
-                    {polishMsg && (
-                        <Typography sx={{ fontSize: 11, color: dark.subtext, mt: 0.8 }}>{polishMsg}</Typography>
-                    )}
-                    {polishResult && (
-                        <AiComparePanel
-                            original={polishResult.original}
-                            improved={polishResult.improved}
-                            onKeep={() => setPolishResult(null)}
-                            onUse={() => { setDraft(polishResult.improved); setPolishResult(null); }}
-                        />
-                    )}
+                                {/* Submit + Cancel row */}
+                                <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.8 }}>
+                                    <Button
+                                        size="small"
+                                        onClick={() => {
+                                            setFormOpen(false);
+                                            setDraft("");
+                                            setPolishResult(null);
+                                            setDupResult(null);
+                                            setSubmitError(null);
+                                        }}
+                                        disabled={submitting}
+                                        sx={{ textTransform: "none", fontSize: 11, color: dark.subtext }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        endIcon={submitting ? <CircularProgress size={12} color="inherit" /> : <SendRoundedIcon sx={{ fontSize: 14 }} />}
+                                        onClick={handleSubmit}
+                                        disabled={!canSubmit}
+                                        sx={{ textTransform: "none", fontSize: 12, fontWeight: 700, bgcolor: dark.teal, "&:hover": { bgcolor: "#0ea5a4" }, px: 2 }}
+                                    >
+                                        {submitting ? "Submitting…" : "Submit"}
+                                    </Button>
+                                </Stack>
+                            </Collapse>
 
-                    {/* Dup check feedback */}
-                    {dupError && (
-                        <Typography sx={{ fontSize: 11, color: "#f59e0b", mt: 0.8 }}>{dupError}</Typography>
-                    )}
-                    {dupResult && !dupResult.has_duplicates && (
-                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.8 }}>
-                            <CheckCircleOutlineIcon sx={{ fontSize: 13, color: "#22c55e" }} />
-                            <Typography sx={{ fontSize: 11, color: "#22c55e" }}>No duplicates found</Typography>
-                        </Stack>
-                    )}
-                    {dupResult?.has_duplicates && (
-                        <DuplicatePanel
-                            duplicates={dupResult.duplicates}
-                            onDismiss={() => setDupResult(null)}
-                            onUseExisting={(t) => { setDraft(t); setDupResult(null); }}
-                        />
-                    )}
+                            {/* AI polish feedback */}
+                            {polishMsg && (
+                                <Typography sx={{ fontSize: 11, color: dark.subtext, mt: 0.8 }}>{polishMsg}</Typography>
+                            )}
+                            {polishResult && (
+                                <AiComparePanel
+                                    original={polishResult.original}
+                                    improved={polishResult.improved}
+                                    onKeep={() => setPolishResult(null)}
+                                    onUse={() => { setDraft(polishResult.improved); setPolishResult(null); }}
+                                />
+                            )}
 
-                    {/* Submit error / success */}
-                    {submitError && (
-                        <Typography sx={{ fontSize: 11, color: "#ef4444", mt: 0.8 }}>{submitError}</Typography>
-                    )}
-                    {submitSuccess && (
-                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.8 }}>
-                            <CheckCircleOutlineIcon sx={{ fontSize: 13, color: "#22c55e" }} />
-                            <Typography sx={{ fontSize: 11, color: "#22c55e" }}>Question submitted!</Typography>
-                        </Stack>
+                            {/* Dup check feedback */}
+                            {dupError && (
+                                <Typography sx={{ fontSize: 11, color: "#f59e0b", mt: 0.8 }}>{dupError}</Typography>
+                            )}
+                            {dupResult && !dupResult.has_duplicates && (
+                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.8 }}>
+                                    <CheckCircleOutlineIcon sx={{ fontSize: 13, color: "#22c55e" }} />
+                                    <Typography sx={{ fontSize: 11, color: "#22c55e" }}>No duplicates found</Typography>
+                                </Stack>
+                            )}
+                            {dupResult?.has_duplicates && (
+                                <DuplicatePanel
+                                    duplicates={dupResult.duplicates}
+                                    onDismiss={() => setDupResult(null)}
+                                    onUseExisting={(t) => { setDraft(t); setDupResult(null); }}
+                                />
+                            )}
+
+                            {/* Submit error / success */}
+                            {submitError && (
+                                <Typography sx={{ fontSize: 11, color: "#ef4444", mt: 0.8 }}>{submitError}</Typography>
+                            )}
+                            {submitSuccess && (
+                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.8 }}>
+                                    <CheckCircleOutlineIcon sx={{ fontSize: 13, color: "#22c55e" }} />
+                                    <Typography sx={{ fontSize: 11, color: "#22c55e" }}>Question submitted!</Typography>
+                                </Stack>
+                            )}
+                        </Box>
                     )}
                 </Box>
             ) : (
