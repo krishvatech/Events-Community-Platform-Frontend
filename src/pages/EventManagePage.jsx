@@ -2825,6 +2825,7 @@ export default function EventManagePage() {
       if (res.ok) {
         toast.success('Application approved');
         setApplications(prev => prev.map(a => a.id === appId ? { ...a, status: 'approved' } : a));
+        setRegsRefresh(prev => prev + 1);
       }
     } catch (err) {
       toast.error('Failed to approve application');
