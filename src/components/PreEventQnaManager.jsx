@@ -663,6 +663,13 @@ export default function PreEventQnaManager({
                                     <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: "break-word" }}>
                                         {q.content}
                                     </Typography>
+                                    {!!q.feedback_message && (
+                                        <Alert severity="info" sx={{ mt: 1, py: 0 }}>
+                                            <Typography variant="caption">
+                                                Host feedback: {q.feedback_message}
+                                            </Typography>
+                                        </Alert>
+                                    )}
                                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, flexWrap: "wrap" }}>
                                         {q.moderation_status !== "approved" && (
                                             <Chip

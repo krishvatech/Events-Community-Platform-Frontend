@@ -432,6 +432,25 @@ function QuestionRow({ q, isBeforeEventStart, token, eventId, onUpdated, onDelet
                         <Typography sx={{ fontSize: 13, color: dark.text, wordBreak: "break-word", fontWeight: 500 }}>
                             {q.content}
                         </Typography>
+                        {!!q.feedback_message && (
+                            <Box
+                                sx={{
+                                    mt: 0.8,
+                                    px: 0.9,
+                                    py: 0.7,
+                                    borderRadius: 1.2,
+                                    border: "1px solid rgba(59,130,246,0.35)",
+                                    bgcolor: "rgba(59,130,246,0.12)",
+                                }}
+                            >
+                                <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#93c5fd", mb: 0.2 }}>
+                                    Host feedback
+                                </Typography>
+                                <Typography sx={{ fontSize: 11, color: "#dbeafe", wordBreak: "break-word" }}>
+                                    {q.feedback_message}
+                                </Typography>
+                            </Box>
+                        )}
                         <Stack direction="row" spacing={0.8} alignItems="center" sx={{ mt: 0.8, flexWrap: "wrap" }}>
                             {q.moderation_status !== "approved" && (
                                 <Box

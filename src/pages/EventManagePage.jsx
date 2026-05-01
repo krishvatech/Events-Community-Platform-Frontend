@@ -54,6 +54,7 @@ import {
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import EditEventForm from "../components/EditEventForm.jsx";
 import EventPreApprovalManager from "../components/admin/EventPreApprovalManager.jsx";
+import EventQnAManager from "../components/admin/EventQnAManager.jsx";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
@@ -189,7 +190,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Post-Event Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+const EVENT_TAB_LABELS = ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
@@ -5548,7 +5549,7 @@ export default function EventManagePage() {
                       {tab === 3 && renderGuestAudit()}
                       {tab === 4 && renderSessions()}
                       {tab === 5 && renderResources()}
-                      {tab === 6 && renderPostEventQna()}
+                      {tab === 6 && <EventQnAManager event={event} onEventUpdated={setEvent} />}
                       {tab === 7 && renderSpeedNetworking()}
                       {tab === 8 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
                       {tab === 9 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
@@ -5561,7 +5562,7 @@ export default function EventManagePage() {
                       {tab === 2 && renderGuestAudit()}
                       {tab === 3 && renderSessions()}
                       {tab === 4 && renderResources()}
-                      {tab === 5 && renderPostEventQna()}
+                      {tab === 5 && <EventQnAManager event={event} onEventUpdated={setEvent} />}
                       {tab === 6 && renderSpeedNetworking()}
                       {tab === 7 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
                       {tab === 8 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
