@@ -190,17 +190,22 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
 const getTabLabels = (event, isOwner) => {
   if (!isOwner) return STAFF_EVENT_TAB_LABELS;
+  let labels = [...EVENT_TAB_LABELS];
+  // Remove Applications tab if it's not an 'apply' type event
   if (event?.registration_type !== 'apply') {
-    // Remove Applications tab if it's not an 'apply' type event
-    return EVENT_TAB_LABELS.filter(label => label !== "Applications");
+    labels = labels.filter(label => label !== "Applications");
   }
-  return EVENT_TAB_LABELS;
+  // Only show Product Management tab for paid events (is_free === false strictly)
+  if (event?.is_free !== false) {
+    labels = labels.filter(label => label !== "Product Management");
+  }
+  return labels;
 };
 const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
@@ -5126,6 +5131,64 @@ export default function EventManagePage() {
     </Paper>
   );
 
+  const renderProductManagement = () => {
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          overflow: 'hidden',
+          p: 4,
+          textAlign: 'center',
+        }}
+      >
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ fontSize: 64, mb: 2 }}>🛍️</Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+            Product Management
+          </Typography>
+          <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3 }}>
+            Manage pricing, price labels, stock capacity and Saleor product details for this paid event.
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 1.5,
+            px: 4,
+            py: 2,
+            bgcolor: 'rgba(99,102,241,0.08)',
+            border: '2px dashed rgba(99,102,241,0.3)',
+            borderRadius: 3,
+          }}
+        >
+          <Box sx={{ fontSize: 28 }}>🚧</Box>
+          <Box sx={{ textAlign: 'left' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#4f46e5' }}>
+              Coming Soon
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Full product management features — price, stock, and Saleor sync controls — are coming in the next release.
+            </Typography>
+          </Box>
+        </Box>
+
+        {event?.saleor_product_id && (
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+              Saleor Product ID: {event.saleor_product_id}
+            </Typography>
+          </Box>
+        )}
+      </Paper>
+    );
+  };
+
   const renderEdit = () => {
     return (
       <Paper
@@ -5541,33 +5604,35 @@ export default function EventManagePage() {
             <Box sx={{ mb: 4 }}>
               {isOwner ? (
                 <>
-                  {tab === 0 && renderOverview()}
+                  {tab === tabLabels.indexOf("Overview") && renderOverview()}
                   {event?.registration_type === 'apply' ? (
                     <>
-                      {tab === 1 && renderApplications()}
-                      {tab === 2 && renderMembers()}
-                      {tab === 3 && renderGuestAudit()}
-                      {tab === 4 && renderSessions()}
-                      {tab === 5 && renderResources()}
-                      {tab === 6 && <EventQnAManager event={event} onEventUpdated={setEvent} />}
-                      {tab === 7 && renderSpeedNetworking()}
-                      {tab === 8 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                      {tab === 9 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                      {tab === 10 && renderLoungeSettings()}
-                      {tab === 11 && renderEdit()}
+                      {tab === tabLabels.indexOf("Applications") && renderApplications()}
+                      {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
+                      {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
+                      {tab === tabLabels.indexOf("Session") && renderSessions()}
+                      {tab === tabLabels.indexOf("Resources") && renderResources()}
+                      {tab === tabLabels.indexOf("Q&A") && <EventQnAManager event={event} onEventUpdated={setEvent} />}
+                      {tab === tabLabels.indexOf("Speed Networking") && renderSpeedNetworking()}
+                      {tab === tabLabels.indexOf("Breakout Rooms Tables") && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                      {tab === tabLabels.indexOf("Social Lounge") && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                      {tab === tabLabels.indexOf("Lounge Settings") && renderLoungeSettings()}
+                      {tabLabels.indexOf("Product Management") !== -1 && tab === tabLabels.indexOf("Product Management") && renderProductManagement()}
+                      {tab === tabLabels.indexOf("Edit") && renderEdit()}
                     </>
                   ) : (
                     <>
-                      {tab === 1 && renderMembers()}
-                      {tab === 2 && renderGuestAudit()}
-                      {tab === 3 && renderSessions()}
-                      {tab === 4 && renderResources()}
-                      {tab === 5 && <EventQnAManager event={event} onEventUpdated={setEvent} />}
-                      {tab === 6 && renderSpeedNetworking()}
-                      {tab === 7 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                      {tab === 8 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                      {tab === 9 && renderLoungeSettings()}
-                      {tab === 10 && renderEdit()}
+                      {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
+                      {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
+                      {tab === tabLabels.indexOf("Session") && renderSessions()}
+                      {tab === tabLabels.indexOf("Resources") && renderResources()}
+                      {tab === tabLabels.indexOf("Q&A") && <EventQnAManager event={event} onEventUpdated={setEvent} />}
+                      {tab === tabLabels.indexOf("Speed Networking") && renderSpeedNetworking()}
+                      {tab === tabLabels.indexOf("Breakout Rooms Tables") && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                      {tab === tabLabels.indexOf("Social Lounge") && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                      {tab === tabLabels.indexOf("Lounge Settings") && renderLoungeSettings()}
+                      {tabLabels.indexOf("Product Management") !== -1 && tab === tabLabels.indexOf("Product Management") && renderProductManagement()}
+                      {tab === tabLabels.indexOf("Edit") && renderEdit()}
                     </>
                   )}
                 </>

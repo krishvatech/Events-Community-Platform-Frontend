@@ -904,8 +904,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
     fd.append("category", category);
     fd.append("format", format);
-    fd.append("price", String(isFree ? 0 : (price ?? 0)));
-    fd.append("price_label", priceLabel.trim());
+    // Paid events: price/label/max_participants managed via Product Management tab
+    if (isFree) {
+      fd.append("price", "0");
+      fd.append("price_label", priceLabel.trim());
+    } else {
+      fd.append("price", "");         // null in DB — managed in Product Management
+      fd.append("price_label", "");
+    }
     fd.append("is_free", String(isFree));
     fd.append("registration_type", registrationType);
     if (cpdCpeMinutes === "") {
@@ -918,10 +924,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     } else {
       fd.append("cpd_cpe_minutes_per_credit", String(Number(cpdCpeMinutesPerCredit)));
     }
-    if (maxParticipants) {
+    // Paid events: max_participants managed in Product Management tab
+    if (!isFree) {
+      fd.append("max_participants", ""); // null in DB — managed in Product Management
+    } else if (maxParticipants) {
       fd.append("max_participants", String(maxParticipants));
     } else {
-      fd.append("max_participants", ""); // Send empty string to clear/set null
+      fd.append("max_participants", "");
     }
     fd.append("is_multi_day", String(isMultiDay));
     fd.append("timezone", safeTimezone);
@@ -1578,72 +1587,31 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               sx={{ mb: 2 }}
             />
 
-            {/* Pricing Section - Only show when NOT free */}
-            {!isFree && (
+            {/* Paid Event: show helper message instead of price fields */}
+            {!isFree ? (
               <Box sx={{
                 p: 2.5,
-                border: "1px solid #e0e0e0",
+                border: "1px solid #e3f2fd",
                 borderRadius: 2,
-                bgcolor: "#fafafa",
-                mb: 3
+                bgcolor: "#f0f7ff",
+                mb: 3,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 1.5,
               }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: "#333" }}>
-                  Pricing Options
-                </Typography>
-
-                <Grid container spacing={2}>
-                  {/* Price Field */}
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Price"
-                      placeholder="e.g., 500"
-                      InputLabelProps={{ shrink: true }}
-                      type="number"
-                      value={price || ""}
-                      onChange={(e) => setPrice(e.target.value === "" ? "" : e.target.value)}
-                      inputProps={{ min: 0, step: "0.01" }}
-                      fullWidth
-                      error={!!errors.price}
-                      helperText={errors.price}
-                      size="small"
-                    />
-                  </Grid>
-
-                  {/* Price Label Field */}
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Price Label"
-                      placeholder='e.g., "By application only"'
-                      InputLabelProps={{ shrink: true }}
-                      value={priceLabel}
-                      onChange={(e) => setPriceLabel(e.target.value)}
-                      inputProps={{ maxLength: 100 }}
-                      fullWidth
-                      size="small"
-                    />
-                  </Grid>
-                </Grid>
+                <Box sx={{ fontSize: 20, mt: 0.1 }}>💳</Box>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1565c0", mb: 0.5 }}>
+                    Paid Event
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#1565c0" }}>
+                    Price, price label, and max participants can be configured in the
+                    <strong> Product Management tab</strong> after the event is created.
+                  </Typography>
+                </Box>
               </Box>
-            )}
+            ) : null}
           </Box>
-
-          {/* Row 3: Max Participants */}
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            {/* Max Participants Field */}
-            <Grid item xs={12} sm={4}>
-              <TextField
-                label="Max Participants"
-                placeholder="e.g., 100"
-                InputLabelProps={{ shrink: true }}
-                type="number"
-                value={maxParticipants}
-                onChange={(e) => setMaxParticipants(e.target.value)}
-                inputProps={{ min: 1, step: 1 }}
-                fullWidth
-                helperText="Leave empty for unlimited"
-              />
-            </Grid>
-          </Grid>
 
           <Box sx={{ mb: 3, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fafafa" }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
