@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button, Alert } from "@mui/material";
+import { Helmet } from "react-helmet-async";
 import ApplyNowModal from "../components/ApplyNowModal";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import GuestApplyModal from "../components/GuestApplyModal.jsx";
@@ -359,7 +360,21 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
   };
 
   return (
-    <section style={{ background: C.deepBlue }}>
+    <>
+      {eventData && (
+        <Helmet>
+          <title>{eventData.title}</title>
+          <meta property="og:title" content={eventData.title} />
+          <meta property="og:description" content={(eventData.description || '').slice(0, 160)} />
+          <meta property="og:image" content={hero_image} />
+          <meta property="og:url" content={window.location.href} />
+          <meta property="og:type" content="website" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={eventData.title} />
+          <meta name="twitter:image" content={hero_image} />
+        </Helmet>
+      )}
+      <section style={{ background: C.deepBlue }}>
       <div
         style={{
           maxWidth: 1100,
@@ -847,6 +862,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
         </div>
       </div>
     </section>
+    </>
   );
 }
 
