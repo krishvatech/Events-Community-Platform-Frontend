@@ -5167,13 +5167,12 @@ export default function EventManagePage() {
             borderRadius: 3,
           }}
         >
-          <Box sx={{ fontSize: 28 }}>🚧</Box>
           <Box sx={{ textAlign: 'left' }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#4f46e5' }}>
               Coming Soon
             </Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Full product management features — price, stock, and Saleor sync controls — are coming in the next release.
+              Full product management features — price, stock, and Saleor sync controls — are coming soon.
             </Typography>
           </Box>
         </Box>
@@ -5451,7 +5450,7 @@ export default function EventManagePage() {
                   borderColor: "#fecaca !important",
                 }}
               >Cancelled
-                                </Button>) : (<Tooltip title={event?.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
+              </Button>) : (<Tooltip title={event?.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
                 <Button
                   onClick={onHost}
                   startIcon={<LiveTvRoundedIcon />}
