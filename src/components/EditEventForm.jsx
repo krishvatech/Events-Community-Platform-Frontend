@@ -324,6 +324,14 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         return event?.hours_calculation_session_types || defaultTypes;
     });
 
+    // Total hours override (host can override calculated hours)
+    const [hasTotalHoursOverride, setHasTotalHoursOverride] = useState(
+        event?.has_total_hours_override || false
+    );
+    const [totalHoursOverrideMinutes, setTotalHoursOverrideMinutes] = useState(
+        event?.total_hours_override_minutes || ""
+    );
+
     // Current user info for platform_admin check
     const [currentUser, setCurrentUser] = useState(null);
     const [userLoading, setUserLoading] = useState(true);
@@ -906,6 +914,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 formData.append("end_time", sessionData.endTime);
                 formData.append("session_date", dayjs(sessionData.startTime).format("YYYY-MM-DD"));
                 formData.append("display_order", displayOrder);
+                formData.append("has_duration_override", String(sessionData.has_duration_override || false));
+                if (sessionData.duration_minutes_override) {
+                    formData.append("duration_minutes_override", String(sessionData.duration_minutes_override));
+                }
                 formData.append("session_image", sessionData.imageFile);
                 requestBody = formData;
                 // Don't set Content-Type header; browser will set it with boundary
@@ -918,7 +930,11 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                     end_time: sessionData.endTime,
                     session_date: dayjs(sessionData.startTime).format("YYYY-MM-DD"),
                     display_order: displayOrder,
+                    has_duration_override: sessionData.has_duration_override || false,
                 };
+                if (sessionData.duration_minutes_override) {
+                    payload.duration_minutes_override = sessionData.duration_minutes_override;
+                }
                 requestBody = JSON.stringify(payload);
                 headers = { "Content-Type": "application/json", ...headers };
             }
@@ -953,6 +969,12 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 }
                 return withSequentialSessionOrder([...prev, savedSession]);
             });
+
+            // Persist breaks if any
+            if (sessionData.breaks && sessionData.breaks.length > 0) {
+                await persistSessionBreaks(savedSession.id, sessionData.breaks);
+            }
+
             setToast({ open: true, type: "success", msg: isEditing ? "Session updated" : "Session added" });
         } catch (err) {
             setSessionsError(err?.message || "Unable to save session");
@@ -960,6 +982,42 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             throw err;
         } finally {
             setSessionSubmitting(false);
+        }
+    };
+
+    const persistSessionBreaks = async (sessionId, breaksData) => {
+        if (!event?.id || !sessionId || !breaksData || breaksData.length === 0) return;
+
+        try {
+            const headers = token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+
+            for (const brk of breaksData) {
+                if (brk.id) {
+                    // Update existing break
+                    await fetch(`${API_ROOT}/events/${event.id}/sessions/${sessionId}/breaks/${brk.id}/`, {
+                        method: "PATCH",
+                        headers,
+                        body: JSON.stringify({
+                            label: brk.label || "",
+                            break_type: brk.break_type || "other",
+                            duration_minutes: brk.duration_minutes,
+                        }),
+                    });
+                } else {
+                    // Create new break
+                    await fetch(`${API_ROOT}/events/${event.id}/sessions/${sessionId}/breaks/`, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({
+                            label: brk.label || "",
+                            break_type: brk.break_type || "other",
+                            duration_minutes: brk.duration_minutes,
+                        }),
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Error persisting breaks:", err);
         }
     };
 
@@ -1299,6 +1357,12 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
         // Send hours calculation session types (platform_admin only, will be validated on backend)
         fd.append("hours_calculation_session_types", JSON.stringify(hoursCalculationSessionTypes));
+
+        // Send total hours override
+        fd.append("has_total_hours_override", String(hasTotalHoursOverride));
+        if (hasTotalHoursOverride && totalHoursOverrideMinutes) {
+            fd.append("total_hours_override_minutes", String(totalHoursOverrideMinutes));
+        }
 
         // Always send participants so backend can replace existing list (including clearing with []).
         const participantsData = participants.map((p, idx) => {
@@ -2286,6 +2350,49 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                         ⚠️ Select at least one session type for hours calculation
                                     </Typography>
                                 )}
+
+                                <Box sx={{ mt: 3, pt: 3, borderTop: "1px solid #e5e7eb" }}>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={hasTotalHoursOverride}
+                                                onChange={(e) => setHasTotalHoursOverride(e.target.checked)}
+                                            />
+                                        }
+                                        label="Manually override total hours"
+                                        sx={{ mb: 2 }}
+                                    />
+                                    {hasTotalHoursOverride && (
+                                        <TextField
+                                            fullWidth
+                                            label="Total hours (minutes)"
+                                            type="number"
+                                            value={totalHoursOverrideMinutes}
+                                            onChange={(e) => setTotalHoursOverrideMinutes(e.target.value)}
+                                            inputProps={{ min: 0 }}
+                                            helperText={
+                                                totalHoursOverrideMinutes
+                                                    ? `= ${(parseInt(totalHoursOverrideMinutes) / 60).toFixed(1)}h displayed`
+                                                    : ""
+                                            }
+                                            sx={{ mb: 2 }}
+                                        />
+                                    )}
+                                    <Typography variant="caption" color="text.secondary">
+                                        {event?.calculated_hours_display ? (
+                                            <>
+                                                Calculated: <strong>{event.calculated_hours_display}</strong>
+                                                {hasTotalHoursOverride && totalHoursOverrideMinutes ? (
+                                                    <> → Override: <strong>{(parseInt(totalHoursOverrideMinutes) / 60).toFixed(1)}h</strong></>
+                                                ) : (
+                                                    ""
+                                                )}
+                                            </>
+                                        ) : (
+                                            "Add sessions to calculate total hours"
+                                        )}
+                                    </Typography>
+                                </Box>
                             </Paper>
                         </Box>
                     )}

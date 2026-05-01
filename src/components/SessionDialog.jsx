@@ -10,8 +10,15 @@ import {
   MenuItem,
   Stack,
   Typography,
+  FormControlLabel,
+  Switch,
+  Select,
+  IconButton,
+  Divider,
 } from "@mui/material";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
 import { LocalizationProvider, TimePicker, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
@@ -78,6 +85,13 @@ function SessionDialog({
   const [sessionType, setSessionType] = useState("main");
   const [errors, setErrors] = useState({});
 
+  // Duration override fields
+  const [hasDurationOverride, setHasDurationOverride] = useState(false);
+  const [durationMinutesOverride, setDurationMinutesOverride] = useState("");
+
+  // Breaks management
+  const [breaks, setBreaks] = useState([]);
+
   // Image handling
   const [sessionImageFile, setSessionImageFile] = useState(null);
   const [localSessionImagePreview, setLocalSessionImagePreview] = useState("");
@@ -114,11 +128,17 @@ function SessionDialog({
       setSessionImageFile(null);
       setLocalSessionImagePreview("");
       setExistingSessionImage("");
+      setHasDurationOverride(false);
+      setDurationMinutesOverride("");
+      setBreaks([]);
     } else if (initialData) {
       // Load existing session data
       setTitle(initialData.title || "");
       setDescription(initialData.description || "");
       setSessionType(initialData.sessionType || "main");
+      setHasDurationOverride(initialData.has_duration_override || false);
+      setDurationMinutesOverride(initialData.duration_minutes_override || "");
+      setBreaks(initialData.session_breaks || []);
 
       if (initialData.startTime) {
         // Convert ISO time to event's timezone
@@ -275,6 +295,11 @@ function SessionDialog({
       sessionType,
       startTime: startISO,
       endTime: endISO,
+      // Duration override
+      has_duration_override: hasDurationOverride,
+      duration_minutes_override: hasDurationOverride ? parseInt(durationMinutesOverride) || null : null,
+      // Breaks
+      breaks: breaks.filter(b => b.duration_minutes),
       // Used for display/editing
       _startDate: startDate.format("YYYY-MM-DD"),
       _startTime: startTime.format("HH:mm"),
@@ -566,6 +591,140 @@ function SessionDialog({
                 ) : null;
               }
               return null;
+            })()}
+          </Box>
+
+          <Divider sx={{ my: 1 }} />
+
+          {/* Duration Override Section */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={hasDurationOverride}
+                onChange={(e) => setHasDurationOverride(e.target.checked)}
+              />
+            }
+            label="Override session duration manually"
+          />
+          {hasDurationOverride && (
+            <TextField
+              fullWidth
+              label="Duration (minutes)"
+              type="number"
+              value={durationMinutesOverride}
+              onChange={(e) => setDurationMinutesOverride(e.target.value)}
+              inputProps={{ min: 1 }}
+              size="small"
+            />
+          )}
+
+          {/* Scheduled Breaks Section */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
+              Scheduled Breaks
+            </Typography>
+
+            {breaks.length > 0 && (
+              <Box sx={{ mb: 2, p: 2, backgroundColor: "#f9fafb", borderRadius: 1 }}>
+                {breaks.map((brk, idx) => (
+                  <Box key={idx} sx={{ display: "flex", gap: 1, alignItems: "center", mb: idx < breaks.length - 1 ? 1.5 : 0 }}>
+                    <TextField
+                      label="Label"
+                      value={brk.label || ""}
+                      onChange={(e) => {
+                        const newBreaks = [...breaks];
+                        newBreaks[idx].label = e.target.value;
+                        setBreaks(newBreaks);
+                      }}
+                      size="small"
+                      sx={{ flex: 1.5, minWidth: 120 }}
+                    />
+                    <Select
+                      value={brk.break_type || "other"}
+                      onChange={(e) => {
+                        const newBreaks = [...breaks];
+                        newBreaks[idx].break_type = e.target.value;
+                        setBreaks(newBreaks);
+                      }}
+                      size="small"
+                      sx={{ flex: 1, minWidth: 100 }}
+                    >
+                      <MenuItem value="lunch">Lunch</MenuItem>
+                      <MenuItem value="coffee">Coffee</MenuItem>
+                      <MenuItem value="networking">Networking</MenuItem>
+                      <MenuItem value="other">Other</MenuItem>
+                    </Select>
+                    <TextField
+                      label="Minutes"
+                      type="number"
+                      value={brk.duration_minutes || ""}
+                      onChange={(e) => {
+                        const newBreaks = [...breaks];
+                        newBreaks[idx].duration_minutes = parseInt(e.target.value) || 0;
+                        setBreaks(newBreaks);
+                      }}
+                      size="small"
+                      inputProps={{ min: 1 }}
+                      sx={{ width: 100 }}
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={() => setBreaks(breaks.filter((_, i) => i !== idx))}
+                      sx={{ color: "#ef4444" }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            <Button
+              startIcon={<AddIcon />}
+              onClick={() => setBreaks([...breaks, { label: "", break_type: "other", duration_minutes: 0 }])}
+              size="small"
+              variant="outlined"
+            >
+              Add Break
+            </Button>
+          </Box>
+
+          {/* Live Duration Preview */}
+          <Box sx={{ p: 2, backgroundColor: "#f0f9ff", borderRadius: 1, borderLeft: "4px solid #0284c7" }}>
+            {(() => {
+              const start = startDate.hour(startTime.hour()).minute(startTime.minute());
+              const end = endDate.hour(endTime.hour()).minute(endTime.minute());
+
+              if (!start.isValid() || !end.isValid()) return null;
+
+              const computedMinutes = Math.max(0, end.diff(start, "minute"));
+              const effectiveMinutes = hasDurationOverride && durationMinutesOverride ? parseInt(durationMinutesOverride) : computedMinutes;
+              const totalBreakMinutes = breaks.reduce((sum, b) => sum + (b.duration_minutes || 0), 0);
+              const netMinutes = Math.max(0, effectiveMinutes - totalBreakMinutes);
+
+              const formatTime = (mins) => {
+                const h = Math.floor(mins / 60);
+                const m = mins % 60;
+                return h > 0 ? `${h}h ${m}m` : `${m}m`;
+              };
+
+              return (
+                <Stack spacing={1}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: "#1e40af" }}>
+                    Duration Summary
+                  </Typography>
+                  <Box sx={{ fontSize: 13, color: "#1e293b" }}>
+                    <div>Session: {formatTime(computedMinutes)}</div>
+                    {hasDurationOverride && durationMinutesOverride && computedMinutes !== effectiveMinutes && (
+                      <div sx={{ textDecoration: "line-through" }}>→ Override: {formatTime(effectiveMinutes)}</div>
+                    )}
+                    {totalBreakMinutes > 0 && <div>Breaks: -{formatTime(totalBreakMinutes)}</div>}
+                    <div sx={{ fontWeight: 600, color: "#065f46" }}>
+                      Net: {formatTime(netMinutes)}
+                    </div>
+                  </Box>
+                </Stack>
+              );
             })()}
           </Box>
         </Stack>

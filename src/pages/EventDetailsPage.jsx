@@ -1903,13 +1903,44 @@ export default function EventDetailsPage() {
                       Event Sessions ({normalizedSessions.length})
                     </Typography>
                     <Stack spacing={2}>
-                      {normalizedSessions.map((session, idx) => {
+                      {(() => {
+                        // Group sessions by date
+                        const sessionsByDate = {};
+                        const dateOrder = [];
+                        normalizedSessions.forEach((session) => {
+                          const dateKey = session.session_date || new Date(session.start_time).toISOString().split("T")[0];
+                          if (!sessionsByDate[dateKey]) {
+                            sessionsByDate[dateKey] = [];
+                            dateOrder.push(dateKey);
+                          }
+                          sessionsByDate[dateKey].push(session);
+                        });
+
+                        return dateOrder.map((dateKey, dateIdx) => (
+                          <Box key={dateKey}>
+                            {/* Day Header */}
+                            <Typography
+                              variant="subtitle2"
+                              sx={{
+                                fontWeight: 700,
+                                color: "#0284c7",
+                                mb: 1.5,
+                                mt: dateIdx > 0 ? 2 : 0,
+                                pb: 1,
+                                borderBottom: "2px solid #f0f9ff",
+                              }}
+                            >
+                              Day {dateIdx + 1} — {new Date(dateKey).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            </Typography>
+
+                            {/* Sessions for this day */}
+                            {sessionsByDate[dateKey].map((session, sessionIdx) => {
                         const sessionDescription = getSessionDescription(session);
-                        const sessionKey = session.id || idx;
+                        const sessionKey = session.id || sessionIdx;
                         const isExpanded = Boolean(expandedSessionDescriptions[sessionKey]);
                         const isLongDescription = sessionDescription.length > 180;
                         return (
-                          <Paper key={session.id || idx} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                          <Paper key={session.id || sessionIdx} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
                             <Stack spacing={1.5}>
                               <Stack direction="row" justifyContent="space-between" alignItems="start">
                                 <Box>
@@ -1923,6 +1954,25 @@ export default function EventDetailsPage() {
                                   />
                                 </Box>
                               </Stack>
+
+                              {/* Duration and Breaks */}
+                              {session.effective_duration_minutes && (
+                                <Stack direction="row" spacing={1} sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    <strong>Duration:</strong> {(() => {
+                                      const m = session.effective_duration_minutes;
+                                      const h = Math.floor(m / 60);
+                                      const min = m % 60;
+                                      return h > 0 ? `${h}h ${min}m` : `${min}m`;
+                                    })()}
+                                  </Typography>
+                                  {session.session_breaks && session.session_breaks.length > 0 && (
+                                    <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                                      (includes {session.session_breaks.map(b => b.label || b.break_type).join(", ")} – {session.session_breaks.reduce((sum, b) => sum + b.duration_minutes, 0)}m break)
+                                    </Typography>
+                                  )}
+                                </Stack>
+                              )}
 
                               <Stack direction="row" spacing={2} sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
                                 <Stack direction="row" spacing={0.5} alignItems="center">
@@ -1990,8 +2040,11 @@ export default function EventDetailsPage() {
                               )}
                             </Stack>
                           </Paper>
-                        )
-                      })}
+                        );
+                            })}
+                          </Box>
+                        ));
+                      })()}
                     </Stack>
                   </Box>
                 </Paper>
