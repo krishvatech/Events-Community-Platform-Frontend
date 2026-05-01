@@ -431,6 +431,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [priceLabel, setPriceLabel] = React.useState("");
   const [registrationType, setRegistrationType] = React.useState("open");
   const [maxParticipants, setMaxParticipants] = React.useState(""); // New state
+  const [cpdCpeMinutes, setCpdCpeMinutes] = React.useState("");
+  const [cpdCpeMinutesPerCredit, setCpdCpeMinutesPerCredit] = React.useState("60");
 
   const today = dayjs().format("YYYY-MM-DD");
   const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
@@ -697,6 +699,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setIsFree(true);
     setPriceLabel("");
     setMaxParticipants(""); // Reset max participants
+    setCpdCpeMinutes("");
+    setCpdCpeMinutesPerCredit("60");
 
     setIsMultiDay(false);
     setStartDate(sch.startDate);
@@ -774,6 +778,18 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         } else if (priceValue < 0) {
           e.price = "Price cannot be negative";
         }
+      }
+    }
+    if (cpdCpeMinutes !== "") {
+      const minutesValue = Number(cpdCpeMinutes);
+      if (!Number.isInteger(minutesValue) || minutesValue <= 0) {
+        e.cpdCpeMinutes = "Total eligible minutes must be a positive whole number";
+      }
+    }
+    if (cpdCpeMinutesPerCredit !== "") {
+      const perCreditValue = Number(cpdCpeMinutesPerCredit);
+      if (!Number.isInteger(perCreditValue) || perCreditValue <= 0) {
+        e.cpdCpeMinutesPerCredit = "Minutes per credit must be a positive whole number";
       }
     }
 
@@ -892,6 +908,16 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("price_label", priceLabel.trim());
     fd.append("is_free", String(isFree));
     fd.append("registration_type", registrationType);
+    if (cpdCpeMinutes === "") {
+      fd.append("cpd_cpe_minutes", "");
+    } else {
+      fd.append("cpd_cpe_minutes", String(Number(cpdCpeMinutes)));
+    }
+    if (cpdCpeMinutesPerCredit === "") {
+      fd.append("cpd_cpe_minutes_per_credit", "60");
+    } else {
+      fd.append("cpd_cpe_minutes_per_credit", String(Number(cpdCpeMinutesPerCredit)));
+    }
     if (maxParticipants) {
       fd.append("max_participants", String(maxParticipants));
     } else {
@@ -1618,6 +1644,54 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               />
             </Grid>
           </Grid>
+
+          <Box sx={{ mb: 3, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fafafa" }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+              CPD/CPE Credits
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+              Credits are calculated as total eligible minutes divided by minutes per credit.
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Total eligible minutes"
+                  type="number"
+                  value={cpdCpeMinutes}
+                  onChange={(e) => {
+                    setCpdCpeMinutes(e.target.value);
+                    setErrors((prev) => ({ ...prev, cpdCpeMinutes: "" }));
+                  }}
+                  inputProps={{ min: 1, step: 1 }}
+                  fullWidth
+                  error={!!errors.cpdCpeMinutes}
+                  helperText={errors.cpdCpeMinutes || "Leave empty to hide CPD/CPE credits publicly"}
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Minutes per credit"
+                  type="number"
+                  value={cpdCpeMinutesPerCredit}
+                  onChange={(e) => {
+                    setCpdCpeMinutesPerCredit(e.target.value);
+                    setErrors((prev) => ({ ...prev, cpdCpeMinutesPerCredit: "" }));
+                  }}
+                  inputProps={{ min: 1, step: 1 }}
+                  fullWidth
+                  error={!!errors.cpdCpeMinutesPerCredit}
+                  helperText={errors.cpdCpeMinutesPerCredit || "Default is 60"}
+                  size="small"
+                />
+              </Grid>
+            </Grid>
+            {cpdCpeMinutes !== "" && Number(cpdCpeMinutes) > 0 && Number(cpdCpeMinutesPerCredit || 60) > 0 && (
+              <Typography variant="body2" sx={{ mt: 2, fontWeight: 600, color: "text.primary" }}>
+                CPD/CPE Credits Preview: {(Number(cpdCpeMinutes) / Number(cpdCpeMinutesPerCredit || 60)).toFixed(2).replace(/\.?0+$/, "")} (calculated at {Number(cpdCpeMinutesPerCredit || 60)} minutes per credit)
+              </Typography>
+            )}
+          </Box>
 
           {/* Images Row - Three Equal Columns */}
           <Box

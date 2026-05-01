@@ -1499,6 +1499,12 @@ export default function EventDetailsPage() {
                           }
                         })()}
 
+                        {event?.cpd_cpe_minutes ? (
+                          <Typography variant="body2" color="text.secondary">
+                            CPD/CPE Credits: {Number(event.cpd_cpe_credits ?? (event.cpd_cpe_minutes / (event.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (calculated at {event.cpd_cpe_minutes_per_credit || 60} minutes per credit)
+                          </Typography>
+                        ) : null}
+
                         {/* Session Counts and Hours Breakdown (Multi-day events only) */}
                         {event?.is_multi_day && (event?.main_sessions_count > 0 || event?.breakout_sessions_count > 0 || event?.workshops_count > 0 || event?.networking_count > 0 || event?.calculated_hours_display) && (
                           <Stack spacing={1.5} sx={{

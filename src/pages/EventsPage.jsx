@@ -790,6 +790,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     {ev.calculated_hours_display && (
                       <div className="font-medium text-slate-700">⏱️ {ev.calculated_hours_display}</div>
                     )}
+                    {ev.cpd_cpe_minutes ? (
+                      <div className="font-medium text-slate-700">
+                        CPD/CPE Credits: {Number(ev.cpd_cpe_credits ?? (ev.cpd_cpe_minutes / (ev.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (at {ev.cpd_cpe_minutes_per_credit || 60} min/credit)
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Date range (no time for multi-day events) */}
@@ -836,6 +841,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       )}
                     </span>
                   </span>
+                  {ev.cpd_cpe_minutes ? (
+                    <span className="text-xs font-medium text-slate-700">
+                      CPD/CPE Credits: {Number(ev.cpd_cpe_credits ?? (ev.cpd_cpe_minutes / (ev.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (at {ev.cpd_cpe_minutes_per_credit || 60} min/credit)
+                    </span>
+                  ) : null}
                 </div>
               </div>
             );

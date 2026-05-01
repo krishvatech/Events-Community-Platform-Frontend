@@ -271,6 +271,14 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [isFree, setIsFree] = useState(event?.is_free || false);
     const [priceLabel, setPriceLabel] = useState(event?.price_label || "");
     const [registrationType, setRegistrationType] = useState(event?.registration_type || "open");
+    const [cpdCpeMinutes, setCpdCpeMinutes] = useState(
+        event?.cpd_cpe_minutes === null || typeof event?.cpd_cpe_minutes === "undefined"
+            ? ""
+            : String(event.cpd_cpe_minutes)
+    );
+    const [cpdCpeMinutesPerCredit, setCpdCpeMinutesPerCredit] = useState(
+        event?.cpd_cpe_minutes_per_credit ? String(event.cpd_cpe_minutes_per_credit) : "60"
+    );
     const [maxParticipants, setMaxParticipants] = useState(event?.max_participants || "");
     const [loungeTableCapacity, setLoungeTableCapacity] = useState(event?.lounge_table_capacity || 4);
     const [qnaAiPublicSuggestionsEnabled, setQnaAiPublicSuggestionsEnabled] = useState(
@@ -542,6 +550,14 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setPrice(typeof event?.price === "number" ? event.price : Number(event?.price || 0));
         setIsFree(event?.is_free || false);
         setMaxParticipants(event?.max_participants || "");
+        setCpdCpeMinutes(
+            event?.cpd_cpe_minutes === null || typeof event?.cpd_cpe_minutes === "undefined"
+                ? ""
+                : String(event.cpd_cpe_minutes)
+        );
+        setCpdCpeMinutesPerCredit(
+            event?.cpd_cpe_minutes_per_credit ? String(event.cpd_cpe_minutes_per_credit) : "60"
+        );
         setLoungeTableCapacity(event?.lounge_table_capacity || 4);
         setQnaAiPublicSuggestionsEnabled(Boolean(event?.qna_ai_public_suggestions_enabled));
         setPreEventQnaEnabled(Boolean(event?.pre_event_qna_enabled));
@@ -1097,6 +1113,19 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 }
             }
         }
+        if (cpdCpeMinutes !== "") {
+            const minutesValue = Number(cpdCpeMinutes);
+            if (!Number.isInteger(minutesValue) || minutesValue <= 0) {
+                e.cpdCpeMinutes = "Total eligible minutes must be a positive whole number";
+            }
+        }
+
+        if (cpdCpeMinutesPerCredit !== "") {
+            const perCreditValue = Number(cpdCpeMinutesPerCredit);
+            if (!Number.isInteger(perCreditValue) || perCreditValue <= 0) {
+                e.cpdCpeMinutesPerCredit = "Minutes per credit must be a positive whole number";
+            }
+        }
 
         // Validate time fields before comparing — never call dayjs.tz on invalid strings
         if (!isValidHHmm(startTime)) {
@@ -1211,6 +1240,16 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("price_label", priceLabel.trim());
         fd.append("is_free", String(isFree));
         fd.append("registration_type", registrationType);
+        if (cpdCpeMinutes === "") {
+            fd.append("cpd_cpe_minutes", "");
+        } else {
+            fd.append("cpd_cpe_minutes", String(Number(cpdCpeMinutes)));
+        }
+        if (cpdCpeMinutesPerCredit === "") {
+            fd.append("cpd_cpe_minutes_per_credit", "60");
+        } else {
+            fd.append("cpd_cpe_minutes_per_credit", String(Number(cpdCpeMinutesPerCredit)));
+        }
         if (maxParticipants) {
             fd.append("max_participants", String(maxParticipants));
         } else {
@@ -1707,6 +1746,54 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                 <MenuItem value="open">Open Registration</MenuItem>
                                 <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
                             </TextField>
+                        </Box>
+
+                        <Box sx={{ mt: 3, mb: 2, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fafafa" }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                                CPD/CPE Credits
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                                Credits are calculated as total eligible minutes divided by minutes per credit.
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="Total eligible minutes"
+                                        type="number"
+                                        fullWidth
+                                        value={cpdCpeMinutes}
+                                        onChange={(e) => {
+                                            setCpdCpeMinutes(e.target.value);
+                                            setErrors((prev) => ({ ...prev, cpdCpeMinutes: "" }));
+                                        }}
+                                        inputProps={{ min: 1, step: 1 }}
+                                        error={!!errors.cpdCpeMinutes}
+                                        helperText={errors.cpdCpeMinutes || "Leave empty to hide CPD/CPE credits publicly"}
+                                        size="small"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        label="Minutes per credit"
+                                        type="number"
+                                        fullWidth
+                                        value={cpdCpeMinutesPerCredit}
+                                        onChange={(e) => {
+                                            setCpdCpeMinutesPerCredit(e.target.value);
+                                            setErrors((prev) => ({ ...prev, cpdCpeMinutesPerCredit: "" }));
+                                        }}
+                                        inputProps={{ min: 1, step: 1 }}
+                                        error={!!errors.cpdCpeMinutesPerCredit}
+                                        helperText={errors.cpdCpeMinutesPerCredit || "Default is 60"}
+                                        size="small"
+                                    />
+                                </Grid>
+                            </Grid>
+                            {cpdCpeMinutes !== "" && Number(cpdCpeMinutes) > 0 && Number(cpdCpeMinutesPerCredit || 60) > 0 && (
+                                <Typography variant="body2" sx={{ mt: 2, fontWeight: 600, color: "text.primary" }}>
+                                    CPD/CPE Credits Preview: {(Number(cpdCpeMinutes) / Number(cpdCpeMinutesPerCredit || 60)).toFixed(2).replace(/\.?0+$/, "")} (calculated at {Number(cpdCpeMinutesPerCredit || 60)} minutes per credit)
+                                </Typography>
+                            )}
                         </Box>
 
                     </Grid>
