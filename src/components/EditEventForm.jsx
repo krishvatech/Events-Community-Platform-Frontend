@@ -1699,11 +1699,12 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     <Box sx={{ fontSize: 20, mt: 0.1 }}>💳</Box>
                                     <Box>
                                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1565c0", mb: 0.5 }}>
-                                            Paid Event
+                                            💳 Paid Event
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: "#1565c0" }}>
-                                            Price, price label, and max participants can be configured in the
-                                            <strong> Product Management tab</strong> on the event management page.
+                                            Price, price label, and max participants are managed in the
+                                            <strong> Product Management tab</strong>.
+                                            The event must be <strong>published manually</strong> after price is configured.
                                         </Typography>
                                     </Box>
                                 </Box>

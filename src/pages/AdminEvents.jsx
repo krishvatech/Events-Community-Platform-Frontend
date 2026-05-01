@@ -876,7 +876,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
     const fd = new FormData();
     fd.append("community_id", String(communityId));
-    fd.append("status", "published");
+// Status is handled by the backend based on is_free (Free -> Published, Paid -> Draft)
     fd.append("is_live", "false");
 
     fd.append("title", title.trim());
@@ -1602,11 +1602,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <Box sx={{ fontSize: 20, mt: 0.1 }}>💳</Box>
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1565c0", mb: 0.5 }}>
-                    Paid Event
+                    💳 Paid Event — Will be saved as Draft
                   </Typography>
                   <Typography variant="body2" sx={{ color: "#1565c0" }}>
-                    Price, price label, and max participants can be configured in the
-                    <strong> Product Management tab</strong> after the event is created.
+                    This event will be created as a <strong>Draft</strong> (not publicly visible).
+                    Once you set the price in the <strong>Product Management tab</strong>, you can publish it.
                   </Typography>
                 </Box>
               </Box>
