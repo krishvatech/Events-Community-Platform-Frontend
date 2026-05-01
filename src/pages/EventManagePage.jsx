@@ -76,6 +76,14 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import PeopleTwoToneIcon from "@mui/icons-material/PeopleTwoTone";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
+import AttachMoneyRoundedIcon from "@mui/icons-material/AttachMoneyRounded";
+import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
+import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
@@ -458,6 +466,32 @@ export default function EventManagePage() {
   const [deleteEventOpen, setDeleteEventOpen] = useState(false);
   const [deleteEventLoading, setDeleteEventLoading] = useState(false);
 
+  // Saleor Product Management State
+  const [saleorProduct, setSaleorProduct] = useState(null);
+  const [saleorLoading, setSaleorLoading] = useState(false);
+  const [saleorError, setSaleorError] = useState("");
+  const [saleorSaving, setSaleorSaving] = useState(false);
+  const [saleorChannels, setSaleorChannels] = useState([]);
+  const [saleorWarehouses, setSaleorWarehouses] = useState([]);
+  const [saleorPriceChanges, setSaleorPriceChanges] = useState({}); // { channelId: price }
+  const [saleorStockChanges, setSaleorStockChanges] = useState({}); // { warehouseId: quantity }
+  const [saleorName, setSaleorName] = useState("");
+  const [saleorDescription, setSaleorDescription] = useState("");
+
+  const extractTextFromSaleorDescription = useCallback((desc) => {
+    if (!desc) return "";
+    try {
+      const data = typeof desc === "string" ? JSON.parse(desc) : desc;
+      return (data.blocks || [])
+        .filter(b => b.type === "paragraph")
+        .map(b => b.data?.text || "")
+        .join("\n");
+    } catch (e) {
+      console.warn("Failed to parse Saleor description", e);
+      return typeof desc === "string" ? desc : "";
+    }
+  }, []);
+
   // Fetch hosted events for recommendation dropdown
   useEffect(() => {
     if (!cancelEventOpen || !isOwner) return;
@@ -480,6 +514,64 @@ export default function EventManagePage() {
     };
     fetchHosted();
   }, [cancelEventOpen, isOwner, eventId]);
+
+  const tabLabels = getTabLabels(event, isOwner);
+  const guestAuditTabIndex = tabLabels.indexOf("Guest Audit");
+  const speedNetworkingTabIndex = tabLabels.indexOf("Speed Networking");
+  const productManagementTabIndex = tabLabels.indexOf("Product Management");
+
+  const fetchSaleorProduct = useCallback(async () => {
+    if (!eventId || !isOwner) return;
+    setSaleorLoading(true);
+    setSaleorError("");
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-product/`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      const data = json.data || {};
+      setSaleorProduct(data.product || null);
+      setSaleorChannels(data.channels || []);
+      setSaleorWarehouses(data.warehouses?.edges?.map(e => e.node) || []);
+      
+      // Initialize changes
+      const prices = {};
+      const stocks = {};
+      
+      const variant = data.product?.variants?.[0];
+      if (variant) {
+        variant.channelListings?.forEach(cl => {
+          prices[cl.channel.id] = cl.price?.amount || 0;
+        });
+        variant.stocks?.forEach(s => {
+          stocks[s.warehouse.id] = s.quantity || 0;
+        });
+      }
+      setSaleorPriceChanges(prices);
+      setSaleorStockChanges(stocks);
+      setSaleorName(data.product?.name || "");
+      setSaleorDescription(extractTextFromSaleorDescription(data.product?.description));
+    } catch (err) {
+      console.error("Failed to fetch Saleor product:", err);
+      setSaleorError(err.message || "Failed to load Saleor product details");
+    } finally {
+      setSaleorLoading(false);
+    }
+  }, [eventId, isOwner]);
+
+  useEffect(() => {
+    if (productManagementTabIndex !== -1 && tab === productManagementTabIndex) {
+      fetchSaleorProduct();
+    }
+  }, [tab, productManagementTabIndex, fetchSaleorProduct]);
 
   const handleCancelEvent = async () => {
     if (!eventId || cancelEventLoading) return;
@@ -564,9 +656,6 @@ export default function EventManagePage() {
 
   const [myReg, setMyReg] = useState(null); // New state for my registration
   const resources = event?.resources || [];
-  const tabLabels = getTabLabels(event, isOwner);
-  const guestAuditTabIndex = tabLabels.indexOf("Guest Audit");
-  const speedNetworkingTabIndex = tabLabels.indexOf("Speed Networking");
 
   // ---- load event ----
   useEffect(() => {
@@ -5131,60 +5220,288 @@ export default function EventManagePage() {
     </Paper>
   );
 
+  const handleSaveSaleorProduct = async () => {
+    if (!eventId || saleorSaving) return;
+    setSaleorSaving(true);
+    try {
+      const token = getToken();
+      const payload = {
+        name: saleorName,
+        description: saleorDescription,
+        channel_listings: Object.entries(saleorPriceChanges).map(([id, price]) => ({
+          channel_id: id,
+          price: parseFloat(price) || 0
+        })),
+        stocks: Object.entries(saleorStockChanges).map(([id, quantity]) => ({
+          warehouse_id: id,
+          quantity: parseInt(quantity) || 0
+        }))
+      };
+
+      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-product/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to update Saleor product");
+
+      toast.success("Saleor product updated successfully!");
+      fetchSaleorProduct();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaleorSaving(false);
+    }
+  };
+
   const renderProductManagement = () => {
+    if (saleorLoading && !saleorProduct) {
+      return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
+          <CircularProgress size={40} sx={{ mb: 2 }} />
+          <Typography variant="body2" color="text.secondary">Fetching Saleor product data...</Typography>
+        </Box>
+      );
+    }
+
+    if (saleorError && !saleorProduct) {
+      return (
+        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+          <WarningRoundedIcon sx={{ fontSize: 48, color: 'warning.main', mb: 2 }} />
+          <Typography variant="h6" gutterBottom>Unable to Load Product Data</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{saleorError}</Typography>
+          <Button variant="contained" onClick={fetchSaleorProduct} startIcon={<RefreshRoundedIcon />}>Retry</Button>
+        </Paper>
+      );
+    }
+
+    if (!saleorProduct) {
+      return (
+        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+          <InfoRoundedIcon sx={{ fontSize: 48, color: 'info.main', mb: 2 }} />
+          <Typography variant="h6" gutterBottom>No Product Linked</Typography>
+          <Typography variant="body2" color="text.secondary">This event does not have a linked Saleor product.</Typography>
+        </Paper>
+      );
+    }
+
     return (
-      <Paper
-        elevation={0}
-        sx={{
-          borderRadius: 3,
-          border: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-          overflow: 'hidden',
-          p: 4,
-          textAlign: 'center',
-        }}
-      >
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ fontSize: 64, mb: 2 }}>🛍️</Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-            Product Management
-          </Typography>
-          <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3 }}>
-            Manage pricing, price labels, stock capacity and Saleor product details for this paid event.
-          </Typography>
+      <Box sx={{ pb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800 }}>Product Management</Typography>
+            <Typography variant="body2" color="text.secondary">Sync pricing and inventory with Saleor</Typography>
+          </Box>
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshRoundedIcon />}
+              onClick={fetchSaleorProduct}
+              disabled={saleorLoading || saleorSaving}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={saleorSaving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />}
+              onClick={handleSaveSaleorProduct}
+              disabled={saleorLoading || saleorSaving}
+              sx={{ px: 4 }}
+            >
+              Save Changes
+            </Button>
+          </Stack>
         </Box>
 
-        <Box
-          sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 1.5,
-            px: 4,
-            py: 2,
-            bgcolor: 'rgba(99,102,241,0.08)',
-            border: '2px dashed rgba(99,102,241,0.3)',
-            borderRadius: 3,
-          }}
-        >
-          <Box sx={{ textAlign: 'left' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#4f46e5' }}>
-              Coming Soon
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Full product management features — price, stock, and Saleor sync controls — are coming soon.
-            </Typography>
-          </Box>
-        </Box>
+        <Stack spacing={5}>
+          {/* Section 1: Basic Details */}
+          <Box>
+            <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
+              <InfoRoundedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Basic Details</Typography>
+            </Box>
+            <Paper sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ maxWidth: 800 }}>
+                <TextField
+                  label="Product Name"
+                  value={saleorName}
+                  onChange={(e) => setSaleorName(e.target.value)}
+                  size="small"
+                  sx={{ mb: 3, width: 300, display: 'block' }}
+                />
+                
+                <TextField
+                  multiline
+                  rows={3}
+                  label="Description"
+                  value={saleorDescription}
+                  onChange={(e) => setSaleorDescription(e.target.value)}
+                  placeholder="Enter product description..."
+                  sx={{ mb: 4, width: 400, display: 'block' }}
+                />
 
-        {event?.saleor_product_id && (
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
-              Saleor Product ID: {event.saleor_product_id}
-            </Typography>
+                <Box sx={{ 
+                  p: 1.5, 
+                  bgcolor: 'grey.50', 
+                  borderRadius: 3, 
+                  border: '1px solid', 
+                  borderColor: 'divider', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: 3 
+                }}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 600 }}>SKU</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800 }}>{saleorProduct.variants?.[0]?.sku || 'N/A'}</Typography>
+                  </Box>
+                  <Divider orientation="vertical" flexItem />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 600 }}>Type</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800 }}>{saleorProduct.productType?.name}</Typography>
+                  </Box>
+                  <Divider orientation="vertical" flexItem />
+                  <Chip
+                    label="Synced"
+                    color="success"
+                    size="small"
+                    icon={<CheckCircleRoundedIcon />}
+                    sx={{ borderRadius: 1.5, fontWeight: 700, px: 1 }}
+                  />
+                </Box>
+              </Box>
+            </Paper>
           </Box>
-        )}
-      </Paper>
+
+          {/* Section 2: Channel Settings */}
+          <Box>
+            <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
+              <StorefrontRoundedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Channel Settings & Pricing</Typography>
+            </Box>
+            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: 'grey.50' }}>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Channel Name</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Slug</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Currency</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }} align="right">Listing Price</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {saleorChannels.map((channel) => (
+                      <TableRow key={channel.id} hover>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{channel.name}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 1, py: 0.5, borderRadius: 1 }}>
+                            {channel.slug}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>{channel.currencyCode}</TableCell>
+                        <TableCell align="right" sx={{ py: 2 }}>
+                          <TextField
+                            size="small"
+                            type="number"
+                            value={saleorPriceChanges[channel.id] ?? 0}
+                            onChange={(e) => setSaleorPriceChanges({
+                              ...saleorPriceChanges,
+                              [channel.id]: e.target.value
+                            })}
+                            InputProps={{
+                              startAdornment: <InputAdornment position="start">{channel.currencyCode === 'USD' ? '$' : channel.currencyCode}</InputAdornment>,
+                            }}
+                            sx={{ width: 140 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {saleorChannels.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
+                          <Typography variant="body2" color="text.secondary">No active channels found in Saleor.</Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Box>
+
+          {/* Section 3: Inventory */}
+          <Box>
+            <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
+              <Inventory2RoundedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Inventory (Warehouses)</Typography>
+            </Box>
+            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: 'grey.50' }}>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Warehouse Name</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Slug</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }} align="right">Available Stock</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {saleorWarehouses.map((warehouse) => (
+                      <TableRow key={warehouse.id} hover>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{warehouse.name}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 1, py: 0.5, borderRadius: 1 }}>
+                            {warehouse.slug}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={{ py: 2 }}>
+                          <TextField
+                            size="small"
+                            type="number"
+                            value={saleorStockChanges[warehouse.id] ?? 0}
+                            onChange={(e) => setSaleorStockChanges({
+                              ...saleorStockChanges,
+                              [warehouse.id]: e.target.value
+                            })}
+                            sx={{ width: 120 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {saleorWarehouses.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
+                          <Typography variant="body2" color="text.secondary">No warehouses available in Saleor.</Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Box>
+        </Stack>
+        <Box sx={{ mt: 5, display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid', borderColor: 'divider', pt: 3 }}>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={saleorSaving ? <CircularProgress size={20} color="inherit" /> : <SaveRoundedIcon />}
+            onClick={handleSaveSaleorProduct}
+            disabled={saleorLoading || saleorSaving}
+            sx={{ px: 6, py: 1.5, borderRadius: 2, fontWeight: 700 }}
+          >
+            Save All Changes
+          </Button>
+        </Box>
+      </Box>
     );
   };
 
