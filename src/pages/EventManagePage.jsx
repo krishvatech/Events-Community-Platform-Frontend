@@ -189,7 +189,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Applications", "Registered Members", "Speakers & Hosts", "Guest Audit", "Session", "Resources", "Post-Event Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+const EVENT_TAB_LABELS = ["Overview", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Post-Event Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
@@ -299,12 +299,6 @@ export default function EventManagePage() {
     session_type: "main",
   });
   const [addSessionLoading, setAddSessionLoading] = useState(false);
-
-  // Speakers & Hosts State
-  const [speakersList, setSpeakersList] = useState([]);
-  const [speakersLoading, setSpeakersLoading] = useState(false);
-  const [speakersSaving, setSpeakersSaving] = useState(false);
-  const [speakersError, setSpeakersError] = useState("");
 
   const [tab, setTab] = useState(0);
   const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
@@ -566,7 +560,6 @@ export default function EventManagePage() {
   const resources = event?.resources || [];
   const tabLabels = getTabLabels(event, isOwner);
   const guestAuditTabIndex = tabLabels.indexOf("Guest Audit");
-  const speakersTabIndex = tabLabels.indexOf("Speakers & Hosts");
   const speedNetworkingTabIndex = tabLabels.indexOf("Speed Networking");
 
   // ---- load event ----
@@ -901,43 +894,6 @@ export default function EventManagePage() {
 
     fetchSpeedNetworkingSessions();
   }, [tab, eventId, isOwner, speedNetworkingTabIndex]);
-
-  // Fetch speakers when Speakers & Hosts tab is selected
-  useEffect(() => {
-    if (speakersTabIndex === -1 || tab !== speakersTabIndex || !eventId || !isOwner) return;
-
-    const fetchSpeakers = async () => {
-      setSpeakersLoading(true);
-      setSpeakersError("");
-      try {
-        const token = getToken();
-        const res = await fetch(
-          `${API_ROOT}/events/${eventId}/participants/`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-          }
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const all = json.participants || [];
-        const speakerRoles = ["host", "speaker", "moderator"];
-        const filtered = all
-          .filter(p => speakerRoles.includes(p.primary_role))
-          .sort((a, b) => (a.display_order ?? 9999) - (b.display_order ?? 9999));
-        setSpeakersList(filtered);
-      } catch (err) {
-        console.error("Failed to fetch speakers:", err);
-        setSpeakersError(err.message || "Failed to load speakers");
-      } finally {
-        setSpeakersLoading(false);
-      }
-    };
-
-    fetchSpeakers();
-  }, [tab, eventId, isOwner, speakersTabIndex]);
 
   // Initialize form when editing
   useEffect(() => {
@@ -3452,188 +3408,6 @@ export default function EventManagePage() {
     );
   };
 
-  const saveSpeakerOrder = async (newList) => {
-    setSpeakersSaving(true);
-    try {
-      const token = getToken();
-      const payload = newList.map((s, i) => ({ id: s.participant_id, display_order: i }));
-      const res = await fetch(`${API_ROOT}/events/${eventId}/reorder-speakers/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.detail || `HTTP ${res.status}`);
-      }
-      toast.success("Speakers reordered successfully");
-    } catch (e) {
-      setSpeakersError(e?.message || "Failed to save speaker order");
-      toast.error("Failed to save speaker order");
-    } finally {
-      setSpeakersSaving(false);
-    }
-  };
-
-  // Sortable row component for drag-and-drop
-  const SpeakerRow = ({ speaker, index, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) => {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-      id: speaker.participant_id,
-    });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    };
-
-    const getRoleColor = (role) => {
-      switch (role?.toLowerCase()) {
-        case "host":
-          return "primary";
-        case "speaker":
-          return "success";
-        case "moderator":
-          return "warning";
-        default:
-          return "default";
-      }
-    };
-
-    return (
-      <TableRow ref={setNodeRef} style={style} hover sx={{ bgcolor: "background.paper" }}>
-        <TableCell align="center" sx={{ width: "40px", cursor: "grab", "&:active": { cursor: "grabbing" } }} {...attributes} {...listeners}>
-          <DragIndicatorIcon fontSize="small" sx={{ color: "text.secondary" }} />
-        </TableCell>
-        <TableCell>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Avatar src={speaker.avatar_url || ""} sx={{ width: 36, height: 36, bgcolor: "grey.100" }}>
-              {speaker.display_name ? speaker.display_name.charAt(0).toUpperCase() : "?"}
-            </Avatar>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {speaker.display_name}
-            </Typography>
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <Chip
-            label={speaker.role_labels?.[0] || speaker.primary_role || "Speaker"}
-            size="small"
-            color={getRoleColor(speaker.primary_role)}
-            variant="outlined"
-          />
-        </TableCell>
-        <TableCell align="right">
-          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-            <IconButton size="small" disabled={!canMoveUp} onClick={onMoveUp} title="Move up">
-              <ArrowUpwardIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small" disabled={!canMoveDown} onClick={onMoveDown} title="Move down">
-              <ArrowDownwardIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-        </TableCell>
-      </TableRow>
-    );
-  };
-
-  const handleMoveSpeaker = (fromIndex, toIndex) => {
-    const newList = [...speakersList];
-    [newList[fromIndex], newList[toIndex]] = [newList[toIndex], newList[fromIndex]];
-    setSpeakersList(newList);
-    saveSpeakerOrder(newList);
-  };
-
-  const renderSpeakers = () => {
-    const sensors = useSensors(
-      useSensor(PointerSensor),
-      useSensor(KeyboardSensor)
-    );
-
-    const handleDragEnd = (event) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
-
-      const oldIndex = speakersList.findIndex(s => s.participant_id === active.id);
-      const newIndex = speakersList.findIndex(s => s.participant_id === over.id);
-
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newList = [...speakersList];
-        [newList[oldIndex], newList[newIndex]] = [newList[newIndex], newList[oldIndex]];
-        setSpeakersList(newList);
-        saveSpeakerOrder(newList);
-      }
-    };
-
-    return (
-      <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 } }}>
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5} sx={{ mb: 2 }}>
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.25 }}>
-              Speakers & Hosts
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Drag to reorder. First speaker appears at top of event page.
-            </Typography>
-          </Box>
-          <Button variant="outlined" onClick={() => window.location.reload()} sx={{ textTransform: "none", borderRadius: 2 }}>
-            Refresh
-          </Button>
-        </Stack>
-
-        {speakersError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {speakersError}
-          </Alert>
-        )}
-
-        {speakersLoading ? (
-          <LinearProgress />
-        ) : speakersList.length === 0 ? (
-          <Typography variant="body2" sx={{ color: "text.secondary", py: 2, textAlign: "center" }}>
-            No speakers, hosts, or moderators found.
-          </Typography>
-        ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <TableContainer sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ bgcolor: "grey.50" }}>
-                    <TableCell align="center" sx={{ width: "40px" }}>
-                      ≡
-                    </TableCell>
-                    <TableCell>Speaker</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <SortableContext items={speakersList.map(s => s.participant_id)} strategy={verticalListSortingStrategy}>
-                    {speakersList.map((speaker, index) => (
-                      <SpeakerRow
-                        key={speaker.participant_id}
-                        speaker={speaker}
-                        index={index}
-                        onMoveUp={() => handleMoveSpeaker(index, index - 1)}
-                        onMoveDown={() => handleMoveSpeaker(index, index + 1)}
-                        canMoveUp={index > 0 && !speakersSaving}
-                        canMoveDown={index < speakersList.length - 1 && !speakersSaving}
-                      />
-                    ))}
-                  </SortableContext>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </DndContext>
-        )}
-
-        {speakersSaving && <LinearProgress sx={{ mt: 2 }} />}
-      </Paper>
-    );
-  };
-
   const renderGuestAudit = () => {
     const viewerTz = currentUser?.profile?.timezone || dayjs.tz.guess();
     const fmtAuditDate = (value) =>
@@ -5771,21 +5545,6 @@ export default function EventManagePage() {
                     <>
                       {tab === 1 && renderApplications()}
                       {tab === 2 && renderMembers()}
-                      {tab === 3 && renderSpeakers()}
-                      {tab === 4 && renderGuestAudit()}
-                      {tab === 5 && renderSessions()}
-                      {tab === 6 && renderResources()}
-                      {tab === 7 && renderPostEventQna()}
-                      {tab === 8 && renderSpeedNetworking()}
-                      {tab === 9 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                      {tab === 10 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                      {tab === 11 && renderLoungeSettings()}
-                      {tab === 12 && renderEdit()}
-                    </>
-                  ) : (
-                    <>
-                      {tab === 1 && renderMembers()}
-                      {tab === 2 && renderSpeakers()}
                       {tab === 3 && renderGuestAudit()}
                       {tab === 4 && renderSessions()}
                       {tab === 5 && renderResources()}
@@ -5795,6 +5554,19 @@ export default function EventManagePage() {
                       {tab === 9 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                       {tab === 10 && renderLoungeSettings()}
                       {tab === 11 && renderEdit()}
+                    </>
+                  ) : (
+                    <>
+                      {tab === 1 && renderMembers()}
+                      {tab === 2 && renderGuestAudit()}
+                      {tab === 3 && renderSessions()}
+                      {tab === 4 && renderResources()}
+                      {tab === 5 && renderPostEventQna()}
+                      {tab === 6 && renderSpeedNetworking()}
+                      {tab === 7 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                      {tab === 8 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                      {tab === 9 && renderLoungeSettings()}
+                      {tab === 10 && renderEdit()}
                     </>
                   )}
                 </>
