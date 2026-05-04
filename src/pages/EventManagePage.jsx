@@ -29,6 +29,7 @@ import {
   Drawer,
   TextField,
   InputAdornment,
+  InputLabel,
   FormControl,
   Select,
   MenuItem,
@@ -72,6 +73,7 @@ import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import AddIcon from "@mui/icons-material/Add";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
@@ -82,7 +84,6 @@ import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
-import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
@@ -478,6 +479,27 @@ export default function EventManagePage() {
   const [saleorName, setSaleorName] = useState("");
   const [saleorDescription, setSaleorDescription] = useState("");
 
+  // Discount Management State
+  const [saleorDiscounts, setSaleorDiscounts] = useState([]);
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [discountSaving, setDiscountSaving] = useState(false);
+  const [discountError, setDiscountError] = useState("");
+  const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
+  const [editingDiscount, setEditingDiscount] = useState(null);
+  const [deletingDiscountId, setDeletingDiscountId] = useState(null);
+  const [syncingDiscountId, setSyncingDiscountId] = useState(null);
+  const [productDirty, setProductDirty] = useState(false);
+  const [discountForm, setDiscountForm] = useState({
+    name: "",
+    description: "",
+    channel_id: "",
+    reward_value_type: "PERCENTAGE",
+    reward_value: "",
+    start_date: "",
+    end_date: "",
+    badge_label: "early_bird"
+  });
+
   const extractTextFromSaleorDescription = useCallback((desc) => {
     if (!desc) return "";
     try {
@@ -567,11 +589,250 @@ export default function EventManagePage() {
     }
   }, [eventId, isOwner]);
 
+  const fetchSaleorDiscounts = useCallback(async () => {
+    if (!eventId || !isOwner) return;
+    setDiscountLoading(true);
+    setDiscountError("");
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-discounts/`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      const discounts = json.discounts || [];
+      setSaleorDiscounts(discounts);
+
+      // Auto-sync all discounts from Saleor in background (don't block UI)
+      if (discounts.length > 0) {
+        discounts.forEach((discount) => {
+          fetch(`${API_ROOT}/events/${eventId}/saleor-discounts/${discount.id}/sync/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }).catch((err) => {
+            // Silently fail - sync is non-critical
+            console.debug(`Auto-sync failed for discount ${discount.id}:`, err);
+          });
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch Saleor discounts:", err);
+      setDiscountError(err.message || "Failed to load discounts");
+    } finally {
+      setDiscountLoading(false);
+    }
+  }, [eventId, isOwner]);
+
   useEffect(() => {
     if (productManagementTabIndex !== -1 && tab === productManagementTabIndex) {
       fetchSaleorProduct();
+      fetchSaleorDiscounts();
     }
-  }, [tab, productManagementTabIndex, fetchSaleorProduct]);
+  }, [tab, productManagementTabIndex, fetchSaleorProduct, fetchSaleorDiscounts]);
+
+  const openCreateDiscount = () => {
+    setEditingDiscount(null);
+    setDiscountForm({
+      name: "",
+      description: "",
+      channel_id: "",
+      reward_value_type: "PERCENTAGE",
+      reward_value: "",
+      start_date: "",
+      end_date: "",
+      badge_label: "early_bird"
+    });
+    setDiscountDialogOpen(true);
+  };
+
+  const extractTextFromDescription = (desc) => {
+    if (!desc) return "";
+
+    // Handle object
+    if (typeof desc === "object" && !Array.isArray(desc)) {
+      if (desc.blocks && Array.isArray(desc.blocks)) {
+        return desc.blocks.map((b) => b.data?.text || "").join("\n").trim();
+      }
+      return "";
+    }
+
+    // Handle string
+    if (typeof desc === "string") {
+      // Try JSON parse first
+      try {
+        const parsed = JSON.parse(desc);
+        if (parsed.blocks && Array.isArray(parsed.blocks)) {
+          return parsed.blocks.map((b) => b.data?.text || "").join("\n").trim();
+        }
+      } catch (e) {
+        // Not valid JSON
+      }
+
+      // Try to extract from Python dict string format {'blocks': [...]}
+      try {
+        const blockMatch = desc.match(/'blocks':\s*\[(.*?)\]/);
+        if (blockMatch) {
+          // Extract text values between 'text': '...'
+          const textMatches = desc.matchAll(/'text':\s*'([^']*)'/g);
+          const texts = Array.from(textMatches).map((m) => m[1]);
+          return texts.join("\n").trim();
+        }
+      } catch (e) {
+        // Fallback
+      }
+
+      // Return as-is if no extraction worked
+      return desc;
+    }
+
+    return "";
+  };
+
+  const openEditDiscount = (discount) => {
+    setEditingDiscount(discount);
+    setDiscountForm({
+      name: discount.name,
+      description: extractTextFromDescription(discount.description),
+      channel_id: discount.channel_id,
+      reward_value_type: discount.reward_value_type,
+      reward_value: String(discount.reward_value),
+      start_date: discount.start_date || "",
+      end_date: discount.end_date || "",
+      badge_label: discount.badge_label
+    });
+    setDiscountDialogOpen(true);
+  };
+
+  const closeDiscountDialog = () => {
+    setDiscountDialogOpen(false);
+    setEditingDiscount(null);
+    setDiscountForm({
+      name: "",
+      description: "",
+      channel_id: "",
+      reward_value_type: "PERCENTAGE",
+      reward_value: "",
+      start_date: "",
+      end_date: "",
+      badge_label: "early_bird"
+    });
+  };
+
+  const saveDiscount = async () => {
+    if (!eventId || discountSaving) return;
+    setDiscountSaving(true);
+    try {
+      const token = getToken();
+      const method = editingDiscount ? "PATCH" : "POST";
+      const url = editingDiscount
+        ? `${API_ROOT}/events/${eventId}/saleor-discounts/${editingDiscount.id}/`
+        : `${API_ROOT}/events/${eventId}/saleor-discounts/`;
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(discountForm),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        let errorMsg = body.error || body.detail;
+
+        // Handle validation errors (nested errors object)
+        if (body.errors && typeof body.errors === 'object') {
+          const errorLines = [];
+          for (const [field, messages] of Object.entries(body.errors)) {
+            if (Array.isArray(messages)) {
+              errorLines.push(`${field}: ${messages.join(', ')}`);
+            } else {
+              errorLines.push(`${field}: ${messages}`);
+            }
+          }
+          errorMsg = errorLines.join('\n');
+        }
+
+        throw new Error(errorMsg || `HTTP ${res.status}`);
+      }
+
+      await fetchSaleorDiscounts();
+      toast.success(editingDiscount ? "Discount updated successfully" : "Discount created successfully");
+      closeDiscountDialog();
+    } catch (err) {
+      console.error("Failed to save discount:", err);
+      toast.error(err.message || "Failed to save discount");
+    } finally {
+      setDiscountSaving(false);
+    }
+  };
+
+  const deleteDiscount = async (discount) => {
+    if (!eventId) return;
+    setDeletingDiscountId(discount.id);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-discounts/${discount.id}/`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || body.detail || `HTTP ${res.status}`);
+      }
+
+      await fetchSaleorDiscounts();
+      toast.success("Discount deleted successfully");
+    } catch (err) {
+      console.error("Failed to delete discount:", err);
+      toast.error(err.message || "Failed to delete discount");
+    } finally {
+      setDeletingDiscountId(null);
+    }
+  };
+
+  const syncDiscount = async (discount) => {
+    if (!eventId) return;
+    setSyncingDiscountId(discount.id);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-discounts/${discount.id}/sync/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || body.detail || `HTTP ${res.status}`);
+      }
+
+      await fetchSaleorDiscounts();
+      toast.success("Discount synced with Saleor");
+    } catch (err) {
+      console.error("Failed to sync discount:", err);
+      toast.error(err.message || "Failed to sync discount");
+    } finally {
+      setSyncingDiscountId(null);
+    }
+  };
+
+  const isDiscountDisabled = !saleorProduct || productDirty || saleorSaving;
 
   const handleCancelEvent = async () => {
     if (!eventId || cancelEventLoading) return;
@@ -5250,7 +5511,9 @@ export default function EventManagePage() {
       if (!res.ok) throw new Error(json.error || "Failed to update Saleor product");
 
       toast.success("Saleor product updated successfully!");
+      setProductDirty(false);
       fetchSaleorProduct();
+      fetchSaleorDiscounts();
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -5329,17 +5592,23 @@ export default function EventManagePage() {
                 <TextField
                   label="Product Name"
                   value={saleorName}
-                  onChange={(e) => setSaleorName(e.target.value)}
+                  onChange={(e) => {
+                    setSaleorName(e.target.value);
+                    setProductDirty(true);
+                  }}
                   size="small"
                   sx={{ mb: 3, width: 300, display: 'block' }}
                 />
-                
+
                 <TextField
                   multiline
                   rows={3}
                   label="Description"
                   value={saleorDescription}
-                  onChange={(e) => setSaleorDescription(e.target.value)}
+                  onChange={(e) => {
+                    setSaleorDescription(e.target.value);
+                    setProductDirty(true);
+                  }}
                   placeholder="Enter product description..."
                   sx={{ mb: 4, width: 400, display: 'block' }}
                 />
@@ -5413,10 +5682,13 @@ export default function EventManagePage() {
                             type="number"
                             disabled={isDisabled}
                             value={saleorPriceChanges[channel.id] ?? 0}
-                            onChange={(e) => setSaleorPriceChanges({
-                              ...saleorPriceChanges,
-                              [channel.id]: e.target.value
-                            })}
+                            onChange={(e) => {
+                              setSaleorPriceChanges({
+                                ...saleorPriceChanges,
+                                [channel.id]: e.target.value
+                              });
+                              setProductDirty(true);
+                            }}
                             InputProps={{
                               startAdornment: <InputAdornment position="start">{channel.currencyCode === 'USD' ? '$' : channel.currencyCode}</InputAdornment>,
                             }}
@@ -5471,10 +5743,13 @@ export default function EventManagePage() {
                             size="small"
                             type="number"
                             value={saleorStockChanges[warehouse.id] ?? 0}
-                            onChange={(e) => setSaleorStockChanges({
-                              ...saleorStockChanges,
-                              [warehouse.id]: e.target.value
-                            })}
+                            onChange={(e) => {
+                              setSaleorStockChanges({
+                                ...saleorStockChanges,
+                                [warehouse.id]: e.target.value
+                              });
+                              setProductDirty(true);
+                            }}
                             sx={{ width: 120 }}
                           />
                         </TableCell>
@@ -5484,6 +5759,131 @@ export default function EventManagePage() {
                       <TableRow>
                         <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
                           <Typography variant="body2" color="text.secondary">No warehouses available in Saleor.</Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Box>
+
+          {/* Section 4: Discount Management */}
+          <Box sx={{ opacity: isDiscountDisabled ? 0.55 : 1, pointerEvents: isDiscountDisabled ? 'none' : 'auto' }}>
+            <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
+              <AttachMoneyRoundedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Discount Management</Typography>
+            </Box>
+
+            {isDiscountDisabled && (
+              <Alert severity={saleorProduct ? "warning" : "info"} sx={{ mb: 2 }}>
+                {!saleorProduct
+                  ? "Save/sync the Saleor product before creating discounts."
+                  : "Save product changes before creating discounts."}
+              </Alert>
+            )}
+
+            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+              {/* Add Discount Button */}
+              <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Active Discounts</Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={openCreateDiscount}
+                  disabled={isDiscountDisabled}
+                  sx={{ backgroundColor: '#10b8a6' }}
+                >
+                  Add Discount
+                </Button>
+              </Box>
+
+              {/* Discounts Table */}
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: 'grey.50' }}>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Name</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Badge</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Channel</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Reward</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }}>Dates</TableCell>
+                      <TableCell sx={{ py: 2, fontWeight: 700 }} align="center">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {saleorDiscounts.map((discount) => (
+                      <TableRow key={discount.id} hover>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{discount.name}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Chip
+                            label={discount.badge_label === 'early_bird' ? 'Early Bird' : 'Bundle Price'}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="body2">{discount.channel_name}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="body2">
+                            {discount.reward_value_type === 'PERCENTAGE'
+                              ? `${discount.reward_value}%`
+                              : `${discount.currency || 'USD'} ${discount.reward_value}`}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {discount.start_date && discount.end_date
+                              ? `${discount.start_date} to ${discount.end_date}`
+                              : discount.start_date
+                              ? `From ${discount.start_date}`
+                              : 'Ongoing'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center" sx={{ py: 2 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => openEditDiscount(discount)}
+                            disabled={isDiscountDisabled}
+                            title="Edit discount"
+                          >
+                            <EditRoundedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => syncDiscount(discount)}
+                            disabled={isDiscountDisabled || syncingDiscountId === discount.id}
+                            title="Sync with Saleor"
+                          >
+                            {syncingDiscountId === discount.id ? (
+                              <CircularProgress size={18} />
+                            ) : (
+                              <RefreshRoundedIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => deleteDiscount(discount)}
+                            disabled={isDiscountDisabled || deletingDiscountId === discount.id}
+                            title="Delete discount"
+                          >
+                            {deletingDiscountId === discount.id ? (
+                              <CircularProgress size={18} />
+                            ) : (
+                              <DeleteOutlineRoundedIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {saleorDiscounts.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                          <Typography variant="body2" color="text.secondary">No discounts yet. Create one to get started.</Typography>
                         </TableCell>
                       </TableRow>
                     )}
@@ -5505,6 +5905,148 @@ export default function EventManagePage() {
             Save All Changes
           </Button>
         </Box>
+
+        {/* Discount Dialog */}
+        <Dialog open={discountDialogOpen} onClose={closeDiscountDialog} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            {editingDiscount ? 'Edit Discount' : 'Create Discount'}
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <TextField
+              fullWidth
+              label="Discount Type"
+              value="Catalogue"
+              disabled
+              size="small"
+              sx={{ mb: 2 }}
+            />
+
+            <TextField
+              fullWidth
+              label="Name"
+              value={discountForm.name}
+              onChange={(e) => setDiscountForm({ ...discountForm, name: e.target.value })}
+              size="small"
+              sx={{ mb: 2 }}
+              required
+            />
+
+            <TextField
+              fullWidth
+              label="Description"
+              value={discountForm.description}
+              onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
+              size="small"
+              multiline
+              rows={3}
+              sx={{ mb: 2 }}
+            />
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel id="channel-label" size="small">Channel</InputLabel>
+              <Select
+                labelId="channel-label"
+                label="Channel"
+                value={discountForm.channel_id}
+                onChange={(e) => setDiscountForm({ ...discountForm, channel_id: e.target.value })}
+                size="small"
+              >
+                {saleorChannels.map((channel) => (
+                  <MenuItem key={channel.id} value={channel.id}>
+                    {channel.name} ({channel.currencyCode})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel id="discount-type-label" size="small">Discount Type</InputLabel>
+              <Select
+                labelId="discount-type-label"
+                label="Discount Type"
+                value={discountForm.reward_value_type}
+                onChange={(e) => setDiscountForm({ ...discountForm, reward_value_type: e.target.value })}
+                size="small"
+              >
+                <MenuItem value="PERCENTAGE">Percentage</MenuItem>
+                <MenuItem value="FIXED">Currency / Fixed amount</MenuItem>
+              </Select>
+            </FormControl>
+
+            <TextField
+              fullWidth
+              label="Reward Value"
+              type="number"
+              value={discountForm.reward_value}
+              onChange={(e) => setDiscountForm({ ...discountForm, reward_value: e.target.value })}
+              size="small"
+              sx={{ mb: 2 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {discountForm.reward_value_type === 'PERCENTAGE' ? '%' : (saleorChannels.find(c => c.id === discountForm.channel_id)?.currencyCode || 'USD')}
+                  </InputAdornment>
+                ),
+              }}
+              required
+            />
+
+            <TextField
+              fullWidth
+              label="Start Date"
+              type="date"
+              value={discountForm.start_date}
+              onChange={(e) => setDiscountForm({ ...discountForm, start_date: e.target.value })}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              sx={{ mb: 2 }}
+            />
+
+            <TextField
+              fullWidth
+              label="End Date"
+              type="date"
+              value={discountForm.end_date}
+              onChange={(e) => setDiscountForm({ ...discountForm, end_date: e.target.value })}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              sx={{ mb: 2 }}
+            />
+
+            <TextField
+              fullWidth
+              label="Condition"
+              value={saleorProduct ? `Product is ${saleorProduct.name}` : "No product selected"}
+              disabled
+              size="small"
+              sx={{ mb: 2 }}
+            />
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <Select
+                label="Badge Label"
+                value={discountForm.badge_label}
+                onChange={(e) => setDiscountForm({ ...discountForm, badge_label: e.target.value })}
+                size="small"
+              >
+                <MenuItem value="early_bird">Early Bird</MenuItem>
+                <MenuItem value="bundle_price">Bundle Price</MenuItem>
+              </Select>
+            </FormControl>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeDiscountDialog} disabled={discountSaving}>Cancel</Button>
+            <Button
+              onClick={saveDiscount}
+              variant="contained"
+              disabled={discountSaving || !discountForm.name || !discountForm.channel_id || !discountForm.reward_value}
+              sx={{ backgroundColor: '#10b8a6' }}
+            >
+              {discountSaving ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+              {editingDiscount ? 'Update Discount' : 'Save Discount'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     );
   };
