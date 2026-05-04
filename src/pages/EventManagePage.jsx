@@ -5394,8 +5394,10 @@ export default function EventManagePage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {saleorChannels.map((channel) => (
-                      <TableRow key={channel.id} hover>
+                    {saleorChannels.map((channel) => {
+                      const isDisabled = channel.slug !== 'default-channel';
+                      return (
+                      <TableRow key={channel.id} hover sx={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
                         <TableCell sx={{ py: 2 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>{channel.name}</Typography>
                         </TableCell>
@@ -5409,6 +5411,7 @@ export default function EventManagePage() {
                           <TextField
                             size="small"
                             type="number"
+                            disabled={isDisabled}
                             value={saleorPriceChanges[channel.id] ?? 0}
                             onChange={(e) => setSaleorPriceChanges({
                               ...saleorPriceChanges,
@@ -5421,7 +5424,8 @@ export default function EventManagePage() {
                           />
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                     {saleorChannels.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
