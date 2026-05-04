@@ -45,6 +45,9 @@ import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
 import AdminModerationPage from "./pages/AdminModerationPage.jsx";
 import AdminProfileModerationPage from "./pages/AdminProfileModerationPage.jsx";
 import EventManagePage from "./pages/EventManagePage.jsx";
+import SeriesList from "./pages/SeriesList.jsx";
+import SeriesManagePage from "./pages/SeriesManagePage.jsx";
+import PublicSeriesLanding from "./pages/PublicSeriesLanding.jsx";
 import AdminCarts from "./pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
 import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
@@ -237,6 +240,8 @@ const AppShell = () => {
 
             {/* main admin pages */}
             <Route path="events" element={<AdminEvents />} />
+            <Route path="series" element={<SeriesList />} />
+            <Route path="series/:seriesId" element={<SeriesManagePage />} />
             <Route path="resources" element={<AdminResources />} />
             <Route path="posts" element={<AdminPostsPage />} />
             <Route path="groups" element={<AdminGroups />} />
@@ -261,6 +266,7 @@ const AppShell = () => {
           <Route path="/events" element={<EventsPage />} />
           <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
           <Route path="/landing/:slug" element={<SingleEventMarketingPage />} />
+          <Route path="/series/:slug" element={<PublicSeriesLanding />} />
           <Route path="/events/:slug" element={<EventDetailsPage />} />
           <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />

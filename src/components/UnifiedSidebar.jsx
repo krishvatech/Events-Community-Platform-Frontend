@@ -199,6 +199,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         manageItems = [
             { label: "My Posts", to: "/admin/posts", icon: ArticleRoundedIcon },
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
+            { label: "My Series", to: "/admin/series", icon: ArticleRoundedIcon },
             { label: "Virtual Speakers", to: "/admin/virtual-speakers", icon: MicRoundedIcon },
             { label: "My Resources", to: "/admin/resources", icon: LibraryBooksRoundedIcon },
             { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },

@@ -211,6 +211,8 @@ export default function EventQnAManager({ event, onEventUpdated }) {
     boxShadow: "0 2px 6px rgba(15,23,42,0.06)",
   };
 
+  const isEventStartedOrEnded = event?.is_live || event?.status === "ended";
+
   return (
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
@@ -225,78 +227,90 @@ export default function EventQnAManager({ event, onEventUpdated }) {
         </Stack>
       </Paper>
 
-      <Paper sx={sectionSx}>
-        <Typography variant="h4" sx={{ fontSize: 40 }}></Typography>
-        <Typography variant="h5" sx={{ fontWeight: 500 }}>Pre-event Q&A</Typography>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} mt={1.5} alignItems={{ xs: "stretch", md: "center" }}>
-          <TextField size="small" label="Search" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: { md: 260 } }} />
-          <FormControl size="small" sx={{ minWidth: { md: 160 } }}><InputLabel>Status</InputLabel><Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}><MenuItem value="all">All</MenuItem><MenuItem value="pending">Pending</MenuItem><MenuItem value="approved">Approved</MenuItem><MenuItem value="rejected">Rejected</MenuItem></Select></FormControl>
-          <FormControl size="small" sx={{ minWidth: { md: 160 } }}><InputLabel>Visibility</InputLabel><Select value={visibilityFilter} label="Visibility" onChange={(e) => setVisibilityFilter(e.target.value)}><MenuItem value="all">All</MenuItem><MenuItem value="visible">Visible</MenuItem><MenuItem value="hidden">Hidden</MenuItem></Select></FormControl>
-          <FormControl size="small" sx={{ minWidth: { md: 160 } }}><InputLabel>Feedback</InputLabel><Select value={feedbackFilter} label="Feedback" onChange={(e) => setFeedbackFilter(e.target.value)}><MenuItem value="all">All</MenuItem><MenuItem value="has_feedback">Has feedback</MenuItem><MenuItem value="no_feedback">No feedback</MenuItem></Select></FormControl>
-        </Stack>
-        <Divider sx={{ my: 2 }} />
-        {loading ? <CircularProgress size={22} /> : (
-          <Stack spacing={1.5}>
-            {filteredQuestions.length === 0 && (
-              <Typography variant="body2" color="text.secondary">No pre-event questions for current filters.</Typography>
-            )}
-            {filteredQuestions.map((q) => (
-              <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "#ffffff" }}>
-                <Stack direction="row" spacing={1} alignItems="center" mb={1} flexWrap="wrap">
-                  <Chip
-                    size="small"
-                    color={q.moderation_status === "approved" ? "success" : q.moderation_status === "rejected" ? "error" : "warning"}
-                    variant={q.moderation_status === "approved" ? "filled" : "outlined"}
-                    label={(q.moderation_status || "approved").toUpperCase()}
-                  />
-                  <Chip
-                    size="small"
-                    icon={q.is_hidden ? <VisibilityOffRoundedIcon /> : <VisibilityRoundedIcon />}
-                    label={q.is_hidden ? "HIDDEN" : "VISIBLE"}
-                    variant="outlined"
-                  />
-                  {q.feedback_message ? <Chip size="small" color="info" label="Feedback added" /> : null}
-                </Stack>
-                <Typography variant="body2" sx={{ mb: 0.6 }}>{q.content}</Typography>
-                {q.feedback_message ? (
-                  <Alert severity="info" sx={{ mt: 0.5, py: 0 }}>
-                    <Typography variant="caption">Feedback: {q.feedback_message}</Typography>
-                  </Alert>
-                ) : null}
-                <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
-                  <Button size="small" variant="outlined" onClick={() => { setEditing(q); setEditText(q.content || ""); }}>Edit</Button>
-                  <Tooltip title={q.is_hidden ? "Make question visible to attendees" : "Hide question from attendee view"}>
-                    <Button size="small" variant="outlined" onClick={async () => {
-                      setActionLoadingId(q.id);
-                      try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/set-visibility/`, "POST", { is_hidden: !q.is_hidden }); await load(); }
-                      finally { setActionLoadingId(null); }
-                    }}>
-                      {q.is_hidden ? "Unhide" : "Hide"}
-                    </Button>
-                  </Tooltip>
-                  <Button size="small" color="error" variant="outlined" onClick={async () => {
-                    setActionLoadingId(q.id);
-                    try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/admin-soft-delete/`, "POST"); await load(); }
-                    finally { setActionLoadingId(null); }
-                  }}>Delete</Button>
-                  <Button size="small" color="success" variant="outlined" onClick={async () => {
-                    setActionLoadingId(q.id);
-                    try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/approve/`, "POST"); await load(); }
-                    finally { setActionLoadingId(null); }
-                  }}>Approve</Button>
-                  <Button size="small" color="warning" variant="outlined" onClick={async () => {
-                    setActionLoadingId(q.id);
-                    try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/reject/`, "POST", { reason: "Rejected by moderator" }); await load(); }
-                    finally { setActionLoadingId(null); }
-                  }}>Reject</Button>
-                  <Button size="small" variant="contained" onClick={() => { setFeedbackFor(q); setFeedbackText(q.feedback_message || ""); }}>Feedback</Button>
-                  {actionLoadingId === q.id ? <CircularProgress size={16} /> : null}
-                </Stack>
-              </Paper>
-            ))}
+      {!isEventStartedOrEnded ? (
+        <Paper sx={sectionSx}>
+          <Typography variant="h4" sx={{ fontSize: 40 }}></Typography>
+          <Typography variant="h5" sx={{ fontWeight: 500 }}>Pre-event Q&A</Typography>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} mt={1.5} alignItems={{ xs: "stretch", md: "center" }}>
+            <TextField size="small" label="Search" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: { md: 260 } }} />
+            <FormControl size="small" sx={{ minWidth: { md: 160 } }}><InputLabel>Status</InputLabel><Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}><MenuItem value="all">All</MenuItem><MenuItem value="pending">Pending</MenuItem><MenuItem value="approved">Approved</MenuItem><MenuItem value="rejected">Rejected</MenuItem></Select></FormControl>
+            <FormControl size="small" sx={{ minWidth: { md: 160 } }}><InputLabel>Visibility</InputLabel><Select value={visibilityFilter} label="Visibility" onChange={(e) => setVisibilityFilter(e.target.value)}><MenuItem value="all">All</MenuItem><MenuItem value="visible">Visible</MenuItem><MenuItem value="hidden">Hidden</MenuItem></Select></FormControl>
+            <FormControl size="small" sx={{ minWidth: { md: 160 } }}><InputLabel>Feedback</InputLabel><Select value={feedbackFilter} label="Feedback" onChange={(e) => setFeedbackFilter(e.target.value)}><MenuItem value="all">All</MenuItem><MenuItem value="has_feedback">Has feedback</MenuItem><MenuItem value="no_feedback">No feedback</MenuItem></Select></FormControl>
           </Stack>
-        )}
-      </Paper>
+          <Divider sx={{ my: 2 }} />
+          {loading ? <CircularProgress size={22} /> : (
+            <Stack spacing={1.5}>
+              {filteredQuestions.length === 0 && (
+                <Typography variant="body2" color="text.secondary">No pre-event questions for current filters.</Typography>
+              )}
+              {filteredQuestions.map((q) => (
+                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "#ffffff" }}>
+                  <Stack direction="row" spacing={1} alignItems="center" mb={1} flexWrap="wrap">
+                    <Chip
+                      size="small"
+                      color={q.moderation_status === "approved" ? "success" : q.moderation_status === "rejected" ? "error" : "warning"}
+                      variant={q.moderation_status === "approved" ? "filled" : "outlined"}
+                      label={(q.moderation_status || "approved").toUpperCase()}
+                    />
+                    <Chip
+                      size="small"
+                      icon={q.is_hidden ? <VisibilityOffRoundedIcon /> : <VisibilityRoundedIcon />}
+                      label={q.is_hidden ? "HIDDEN" : "VISIBLE"}
+                      variant="outlined"
+                    />
+                    {q.feedback_message ? <Chip size="small" color="info" label="Feedback added" /> : null}
+                  </Stack>
+                  <Typography variant="body2" sx={{ mb: 0.6 }}>{q.content}</Typography>
+                  {q.feedback_message ? (
+                    <Alert severity="info" sx={{ mt: 0.5, py: 0 }}>
+                      <Typography variant="caption">Feedback: {q.feedback_message}</Typography>
+                    </Alert>
+                  ) : null}
+                  <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
+                    <Button size="small" variant="outlined" onClick={() => { setEditing(q); setEditText(q.content || ""); }}>Edit</Button>
+                    <Tooltip title={q.is_hidden ? "Make question visible to attendees" : "Hide question from attendee view"}>
+                      <Button size="small" variant="outlined" onClick={async () => {
+                        setActionLoadingId(q.id);
+                        try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/set-visibility/`, "POST", { is_hidden: !q.is_hidden }); await load(); }
+                        finally { setActionLoadingId(null); }
+                      }}>
+                        {q.is_hidden ? "Unhide" : "Hide"}
+                      </Button>
+                    </Tooltip>
+                    <Button size="small" color="error" variant="outlined" onClick={async () => {
+                      setActionLoadingId(q.id);
+                      try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/admin-soft-delete/`, "POST"); await load(); }
+                      finally { setActionLoadingId(null); }
+                    }}>Delete</Button>
+                    <Button size="small" color="success" variant="outlined" onClick={async () => {
+                      setActionLoadingId(q.id);
+                      try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/approve/`, "POST"); await load(); }
+                      finally { setActionLoadingId(null); }
+                    }}>Approve</Button>
+                    <Button size="small" color="warning" variant="outlined" onClick={async () => {
+                      setActionLoadingId(q.id);
+                      try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/reject/`, "POST", { reason: "Rejected by moderator" }); await load(); }
+                      finally { setActionLoadingId(null); }
+                    }}>Reject</Button>
+                    <Button size="small" variant="contained" onClick={() => { setFeedbackFor(q); setFeedbackText(q.feedback_message || ""); }}>Feedback</Button>
+                    {actionLoadingId === q.id ? <CircularProgress size={16} /> : null}
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+      ) : (
+        <Paper sx={sectionSx}>
+          <Typography variant="h5" sx={{ fontWeight: 500 }}>Pre-event Q&A</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Pre-event questions are now part of the Q&A discussion. View them in the Q&A Tab.
+          </Typography>
+          <Button sx={{ mt: 2, textTransform: "uppercase", color: "#14b8a6" }} href="#qna">
+            View Q&A Tab
+          </Button>
+        </Paper>
+      )}
 
       <Paper sx={sectionSx}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">

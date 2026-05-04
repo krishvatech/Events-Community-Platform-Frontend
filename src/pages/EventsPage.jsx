@@ -44,10 +44,11 @@ import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import { isStaffUser, isOwnerUser, getBackendUserFromStorage } from "../utils/adminRole.js";
-import { apiClient } from "../utils/api";
+import { apiClient, authConfig, getToken } from "../utils/api";
 import { getJoinButtonText, isPostEventLoungeOpen,  isPreEventLoungeOpen,
   getResolvedJoinLabel
 } from "../utils/gracePeriodUtils";
+import { getUniqueSeries } from "../utils/seriesEventUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
@@ -330,6 +331,9 @@ function toCard(ev) {
     sessions: Array.isArray(ev.sessions) ? ev.sessions.map(normalizeSession) : [], // ✅ NEW: Event sessions array
     show_registered_participant_count: ev.show_registered_participant_count,
     created_by_id: ev.created_by_id, // ✅ Map ownership ID
+    series: ev.series || null, // ✅ Series ID for series-aware filtering
+    series_order: ev.series_order || null,
+    series_session_label: ev.series_session_label || null,
   };
 }
 
@@ -1873,6 +1877,7 @@ export default function EventsPage() {
   const [participantTotalRegisteredCount, setParticipantTotalRegisteredCount] = useState(0);
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestJoinEvent, setGuestJoinEvent] = useState(null);
+  const [seriesData, setSeriesData] = useState(new Map()); // Map of seriesId -> series data
 
   const handleGuestJoinRequested = React.useCallback((eventData) => {
     console.debug("[EventsPage] handleGuestJoinRequested called with event:", eventData);
@@ -1929,6 +1934,35 @@ export default function EventsPage() {
       setParticipantListLoading(false);
     }
   }, []);
+
+  // Handler for series registration
+  const handleSeriesRegister = async (seriesId) => {
+    if (!getToken()) {
+      navigate('/signin');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/series/${seriesId}/register/`,
+        {
+          method: 'POST',
+          headers: { ...authConfig().headers, 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (response.ok) {
+        toast.success('Successfully registered for series!');
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || 'Failed to register for series');
+      }
+    } catch (error) {
+      console.error('Error registering for series:', error);
+      toast.error('Failed to register for series');
+    }
+  };
+
   const [q, setQ] = useState("");
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState("");
@@ -2291,6 +2325,41 @@ export default function EventsPage() {
 
   useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, filterEventId]);
 
+  // Fetch series data for events that belong to series
+  useEffect(() => {
+    const seriesIds = getUniqueSeries(rawEvents);
+    if (seriesIds.length === 0) {
+      setSeriesData(new Map());
+      return;
+    }
+
+    const fetchSeriesData = async () => {
+      try {
+        const responses = await Promise.all(
+          seriesIds.map(seriesId =>
+            fetch(`${API_BASE}/series/${seriesId}/`, {
+              headers: authConfig().headers,
+            })
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null)
+          )
+        );
+
+        const seriesMap = new Map();
+        responses.forEach((series, idx) => {
+          if (series) {
+            seriesMap.set(seriesIds[idx], series);
+          }
+        });
+        setSeriesData(seriesMap);
+      } catch (error) {
+        console.error('Error fetching series data:', error);
+      }
+    };
+
+    fetchSeriesData();
+  }, [rawEvents]);
+
   useEffect(() => {
     const ctrl = new AbortController();
     (async () => {
@@ -2474,6 +2543,23 @@ export default function EventsPage() {
     Array.isArray(cmsPage?.cta_buttons) && cmsPage.cta_buttons.length
       ? cmsPage.cta_buttons
       : defaultButtons;
+
+  // Compute which series and events to display
+  const seriesToDisplay = new Map(); // seriesId -> series object
+  const eventsToDisplay = [];
+
+  events.forEach((ev) => {
+    // If event has a series with "full_series_only" mode, add series to display
+    if (ev.series && seriesData.has(ev.series)) {
+      const series = seriesData.get(ev.series);
+      if (series.registration_mode === 'full_series_only') {
+        seriesToDisplay.set(ev.series, series);
+        return; // Don't add this event individually
+      }
+    }
+    // Otherwise, add event individually
+    eventsToDisplay.push(ev);
+  });
 
   return (
     <>
@@ -3046,18 +3132,109 @@ export default function EventsPage() {
                       <EventCardSkeleton />
                     </Box>
                   ))
-                  : events.map((ev) => (
-                    <Box key={ev.id}>
-                      <EventCard
-                        ev={ev}
-                        myRegistrations={myRegistrations}
-                        setMyRegistrations={setMyRegistrations}
-                        setRawEvents={setRawEvents}
-                        onShowParticipants={handleShowParticipants}
-                        onGuestJoinRequested={handleGuestJoinRequested}
-                      />
-                    </Box>
-                  ))}
+                  : <>
+                    {/* Display Series Cards (full_series_only) */}
+                    {Array.from(seriesToDisplay.values()).map((series) => (
+                      <div
+                        key={`series-${series.id}`}
+                        className="rounded-lg border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full"
+                      >
+                        {/* Cover Image */}
+                        {series.cover_image && (
+                          <div className="relative w-full h-64 overflow-hidden bg-neutral-100">
+                            <img
+                              src={series.cover_image}
+                              alt={series.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+
+                        {/* Content */}
+                        <div className="p-4 flex flex-col flex-grow">
+                          {/* Badges */}
+                          <div className="flex gap-2 mb-3">
+                            <Chip
+                              label="SERIES"
+                              size="small"
+                              color="primary"
+                              sx={{ fontWeight: 600, height: 24 }}
+                            />
+                            <Chip
+                              label={series.status?.toUpperCase() || 'DRAFT'}
+                              size="small"
+                              color={series.status === 'published' ? 'success' : 'default'}
+                              sx={{ fontWeight: 600, height: 24 }}
+                            />
+                          </div>
+
+                          {/* Title */}
+                          <h3 className="text-lg font-bold text-neutral-900 mb-2 leading-tight">
+                            {series.title}
+                          </h3>
+
+                          {/* Description */}
+                          <p className="text-sm text-neutral-600 mb-4 line-clamp-2">
+                            {series.description || 'No description available'}
+                          </p>
+
+                          {/* Events Count */}
+                          <div className="flex items-center gap-4 mb-4 pb-4 border-b border-neutral-100">
+                            <div className="flex items-center gap-2">
+                              <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                              <span className="text-xs font-medium text-neutral-700">
+                                {series.events_count || 0} {series.events_count === 1 ? 'Event' : 'Events'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <GroupsIcon fontSize="small" className="text-teal-700" />
+                              <span className="text-xs font-medium text-neutral-700">
+                                {series.registrations_count || 0} Registered
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Price */}
+                          <div className="mb-4">
+                            <p className="text-sm font-semibold text-teal-700">
+                              {series.is_free ? 'Free to Join' : `$${series.price}`}
+                            </p>
+                          </div>
+
+                          {/* Buttons */}
+                          <div className="flex gap-2 mt-auto pt-2">
+                            <button
+                              onClick={() => navigate(`/series/${series.slug}`)}
+                              className="flex-1 rounded-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 text-sm transition-colors"
+                            >
+                              View Series
+                            </button>
+                            <button
+                              onClick={() => handleSeriesRegister(series.id)}
+                              className="flex-1 rounded-full border-2 border-teal-600 text-teal-600 hover:bg-teal-50 font-semibold py-2 px-4 text-sm transition-colors"
+                            >
+                              Register
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Display Individual Event Cards */}
+                    {eventsToDisplay.map((ev) => (
+                      <Box key={ev.id}>
+                        <EventCard
+                          ev={ev}
+                          myRegistrations={myRegistrations}
+                          setMyRegistrations={setMyRegistrations}
+                          setRawEvents={setRawEvents}
+                          onShowParticipants={handleShowParticipants}
+                          onGuestJoinRequested={handleGuestJoinRequested}
+                        />
+                      </Box>
+                    ))}
+                  </>
+                }
               </Box>
             ) : (
               <Grid container spacing={3} direction="column">
@@ -3067,18 +3244,94 @@ export default function EventsPage() {
                       <EventRowSkeleton />
                     </Grid>
                   ))
-                  : events.map((ev) => (
-                    <Grid item key={ev.id} xs={12}>
-                      <EventRow
-                        ev={ev}
-                        myRegistrations={myRegistrations}
-                        setMyRegistrations={setMyRegistrations}
-                        setRawEvents={setRawEvents}
-                        onShowParticipants={handleShowParticipants}
-                        onGuestJoinRequested={handleGuestJoinRequested}
-                      />
-                    </Grid>
-                  ))}
+                  : <>
+                    {/* Display Series Cards (list view) */}
+                    {Array.from(seriesToDisplay.values()).map((series) => (
+                      <Grid item key={`series-${series.id}`} xs={12}>
+                        <div className="rounded-lg border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex gap-4 p-4">
+                          {/* Cover Image */}
+                          {series.cover_image && (
+                            <div className="w-32 h-32 flex-shrink-0">
+                              <img
+                                src={series.cover_image}
+                                alt={series.title}
+                                className="w-full h-full object-cover rounded-lg"
+                              />
+                            </div>
+                          )}
+
+                          {/* Content */}
+                          <div className="flex-1 flex flex-col justify-between">
+                            <div>
+                              {/* Badges */}
+                              <div className="flex gap-2 mb-2">
+                                <Chip
+                                  label="SERIES"
+                                  size="small"
+                                  color="primary"
+                                  sx={{ fontWeight: 600, height: 24 }}
+                                />
+                                <Chip
+                                  label={series.status?.toUpperCase() || 'DRAFT'}
+                                  size="small"
+                                  color={series.status === 'published' ? 'success' : 'default'}
+                                  sx={{ fontWeight: 600, height: 24 }}
+                                />
+                              </div>
+
+                              {/* Title */}
+                              <h3 className="text-base font-bold text-neutral-900 mb-1">
+                                {series.title}
+                              </h3>
+
+                              {/* Metadata */}
+                              <div className="flex gap-4 text-sm text-neutral-600">
+                                <span className="flex items-center gap-1">
+                                  <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                                  {series.events_count || 0} {series.events_count === 1 ? 'Event' : 'Events'}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <GroupsIcon fontSize="small" className="text-teal-700" />
+                                  {series.registrations_count || 0} Registered
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex gap-2 mt-3 pt-3 border-t border-neutral-100">
+                              <button
+                                onClick={() => navigate(`/series/${series.slug}`)}
+                                className="flex-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 text-sm transition-colors"
+                              >
+                                View Series
+                              </button>
+                              <button
+                                onClick={() => handleSeriesRegister(series.id)}
+                                className="flex-1 rounded-lg border-2 border-teal-600 text-teal-600 hover:bg-teal-50 font-semibold py-2 px-4 text-sm transition-colors"
+                              >
+                                Register
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </Grid>
+                    ))}
+
+                    {/* Display Individual Event Cards (list view) */}
+                    {eventsToDisplay.map((ev) => (
+                      <Grid item key={ev.id} xs={12}>
+                        <EventRow
+                          ev={ev}
+                          myRegistrations={myRegistrations}
+                          setMyRegistrations={setMyRegistrations}
+                          setRawEvents={setRawEvents}
+                          onShowParticipants={handleShowParticipants}
+                          onGuestJoinRequested={handleGuestJoinRequested}
+                        />
+                      </Grid>
+                    ))}
+                  </>
+                }
               </Grid>
             )}
           </Grid>
