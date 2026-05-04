@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -52,6 +53,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
   const [groups, setGroups] = useState([]);
   const [setupSaving, setSetupSaving] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [suggestionActionLoading, setSuggestionActionLoading] = useState(null);
 
   const authHeaders = useMemo(() => ({
     "Content-Type": "application/json",
@@ -82,9 +84,32 @@ export default function EventQnAManager({ event, onEventUpdated }) {
     }
   }, [event?.id, authHeaders]);
 
+  const loadAiSuggestions = useCallback(async () => {
+    if (!event?.id) return;
+    try {
+      const res = await fetch(`${API_ROOT}/interactions/qna-groups/ai-suggestions/?event_id=${event.id}`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        const suggestions = data.results || (Array.isArray(data) ? data : []);
+        const allSuggestions = suggestions.map((d) => ({
+          id: d.id,
+          title: d.suggested_title || "Group",
+          summary: d.suggested_summary || "",
+          question_ids: d.suggested_question_ids || [],
+          confidence: Math.round((d.confidence_score || 0) * 100),
+          status: d.status || "pending",
+        }));
+        setGroups(allSuggestions);
+      }
+    } catch (e) {
+      console.error("Failed to load AI suggestions:", e);
+    }
+  }, [event?.id, authHeaders]);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadAiSuggestions();
+  }, [load, loadAiSuggestions]);
 
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
@@ -127,17 +152,48 @@ export default function EventQnAManager({ event, onEventUpdated }) {
     if (!event?.id) return;
     setGroupLoading(true);
     try {
-      const data = await doAction(`${API_ROOT}/interactions/qna-groups/ai-suggest/`, "POST", { event_id: event.id });
-      const rows = (Array.isArray(data) ? data : []).map((d) => ({
-        title: d.suggested_title || "Group",
-        summary: d.suggested_summary || "",
-        question_ids: d.suggested_question_ids || [],
-      }));
-      setGroups(rows);
+      await doAction(`${API_ROOT}/interactions/qna-groups/ai-suggest/`, "POST", { event_id: event.id });
+      loadAiSuggestions();
     } catch (e) {
       setError(e.message || "Failed to generate groups.");
     } finally {
       setGroupLoading(false);
+    }
+  };
+
+  const handleApproveGroup = async (group) => {
+    setSuggestionActionLoading(group.id);
+    try {
+      await doAction(
+        `${API_ROOT}/interactions/qna-groups/ai-suggestions/${group.id}/approve/`,
+        "POST",
+        {
+          title: group.title,
+          summary: group.summary,
+          question_ids: group.question_ids,
+        }
+      );
+      loadAiSuggestions();
+    } catch (e) {
+      setError(e.message || "Failed to approve group.");
+    } finally {
+      setSuggestionActionLoading(null);
+    }
+  };
+
+  const handleRejectGroup = async (groupId) => {
+    setSuggestionActionLoading(groupId);
+    try {
+      await doAction(
+        `${API_ROOT}/interactions/qna-groups/ai-suggestions/${groupId}/reject/`,
+        "POST",
+        {}
+      );
+      loadAiSuggestions();
+    } catch (e) {
+      setError(e.message || "Failed to reject group.");
+    } finally {
+      setSuggestionActionLoading(null);
     }
   };
 
@@ -261,10 +317,82 @@ export default function EventQnAManager({ event, onEventUpdated }) {
         </Stack>
         <Typography variant="body2" color="text.secondary">Groups are suggestions only. Questions are not permanently changed until you approve suggestions.</Typography>
         <Stack spacing={1} mt={1}>
-          {groups.map((g, i) => (
-            <Paper key={`${g.title}-${i}`} variant="outlined" sx={{ p: 1.25 }}>
-              <Typography variant="subtitle2">{g.title}</Typography>
-              <Typography variant="body2">{g.summary}</Typography>
+          {groups.map((g) => (
+            <Paper
+              key={g.id}
+              variant="outlined"
+              sx={{
+                p: 1.5,
+                opacity: g.status === "approved" ? 0.75 : 1,
+                bgcolor: g.status === "approved" ? "rgba(76, 175, 80, 0.04)" : "transparent",
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} mb={0.5}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography variant="subtitle2">{g.title}</Typography>
+                  <Chip
+                    label={`${g.confidence}%`}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      bgcolor: g.confidence >= 70 ? "rgba(76, 175, 80, 0.15)" : "rgba(255, 167, 38, 0.15)",
+                      color: g.confidence >= 70 ? "#81c784" : "#ffb74d",
+                      border: `1px solid ${g.confidence >= 70 ? "rgba(76, 175, 80, 0.3)" : "rgba(255, 167, 38, 0.3)"}`,
+                    }}
+                  />
+                  <Chip
+                    label={g.status === "approved" ? "✓ Approved" : g.status === "rejected" ? "✕ Rejected" : "Pending"}
+                    size="small"
+                    color={g.status === "approved" ? "success" : g.status === "rejected" ? "error" : "warning"}
+                    variant={g.status === "pending" ? "outlined" : "filled"}
+                    sx={{
+                      height: 20,
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                    }}
+                  />
+                </Stack>
+                {g.status === "pending" && (
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="success"
+                      onClick={() => handleApproveGroup(g)}
+                      disabled={suggestionActionLoading === g.id}
+                      startIcon={suggestionActionLoading === g.id ? <CircularProgress size={14} /> : <CheckCircleOutlineIcon sx={{ fontSize: 14 }} />}
+                      sx={{
+                        textTransform: "none",
+                        fontWeight: 600,
+                        fontSize: "0.75rem",
+                        px: 1.5,
+                        py: 0.6,
+                      }}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      onClick={() => handleRejectGroup(g.id)}
+                      disabled={suggestionActionLoading === g.id}
+                      sx={{
+                        textTransform: "none",
+                        fontWeight: 600,
+                        fontSize: "0.75rem",
+                        px: 1.5,
+                        py: 0.6,
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  </Stack>
+                )}
+              </Stack>
+              <Typography variant="body2" sx={{ mb: 0.5 }}>{g.summary}</Typography>
               <Typography variant="caption">Question IDs: {(g.question_ids || []).join(", ") || "—"}</Typography>
             </Paper>
           ))}

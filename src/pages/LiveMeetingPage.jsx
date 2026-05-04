@@ -11394,10 +11394,13 @@ export default function NewLiveMeeting() {
             question_id: payload.question_id,
             content: payload.content || "",
             asked_by: payload.asked_by || "Audience",
+            author_objects: payload.author_objects || [],
             user_id: payload.user_id ?? null,
             user_avatar_url: payload.user_avatar_url || "",
             user_country_code: payload.user_country_code ?? null,
             is_anonymous: Boolean(payload.is_anonymous),
+            is_group: Boolean(payload.is_group),
+            sub_questions: payload.sub_questions || [],
             upvote_count: payload.upvote_count ?? 0,
             created_at: payload.created_at || null,
             lounge_table_id: payload.lounge_table_id ?? null,
@@ -16864,12 +16867,13 @@ export default function NewLiveMeeting() {
 
   // Puts a grouped (AI-summarized) question on the stage overlay as a single unit.
   const handleDisplayGroupOnScreen = useCallback(
-    (group, subQuestions, summaryText, authorLabel, options = {}) => {
+    (group, subQuestions, summaryText, authorLabel, authorObjects = [], options = {}) => {
       const payload = {
         stage_queue_id: `group_${group.id}`,
         question_id: `group_${group.id}`,
         content: summaryText,
         asked_by: authorLabel,
+        author_objects: authorObjects,
         user_id: null,
         user_avatar_url: "",
         user_country_code: null,
@@ -16968,11 +16972,26 @@ export default function NewLiveMeeting() {
         .filter(Boolean)
         .sort((a, b) => (b.upvote_count ?? 0) - (a.upvote_count ?? 0));
       const summaryText = buildGroupSummaryText(g, subQs);
-      const authors = Array.from(
-        new Set(subQs.map((q) => resolveQuestionDisplayMeta(q).askedBy).filter(Boolean))
-      );
-      const authorLabel = authors.length > 0 ? authors.join(", ") : "Audience";
-      handleDisplayGroupOnScreen(g, subQs, summaryText, authorLabel, { silent: true });
+      // Collect unique author objects (keyed by user_id, not name)
+      const authorMap = new Map();
+      subQs.forEach((question) => {
+        const meta = resolveQuestionDisplayMeta(question);
+        const key = meta.userId ? `user_${meta.userId}` : `guest_${question.guest_asker || 'unknown'}`;
+        if (!authorMap.has(key)) {
+          authorMap.set(key, {
+            name: meta.askedBy,
+            userId: meta.userId || null,
+            guestId: question.guest_asker || null,
+            isGuest: !meta.userId && question.guest_asker,
+            isAnonymous: meta.isAnonymous,
+          });
+        }
+      });
+      const authorObjects = Array.from(authorMap.values()).filter(a => !a.isAnonymous);
+      const authorLabel = authorObjects.length > 0
+        ? authorObjects.slice(0, 4).map(a => a.name).join(", ") + (authorObjects.length > 4 ? ` and ${authorObjects.length - 4} more` : "")
+        : "Audience";
+      handleDisplayGroupOnScreen(g, subQs, summaryText, authorLabel, authorObjects, { silent: true });
       showSnackbar("Now showing the next grouped question on stage.", "success");
     } else {
       handleDisplayQuestionOnScreen(nextItem.question, { silent: true });
@@ -20957,14 +20976,25 @@ export default function NewLiveMeeting() {
                                 });
                                 const primaryQuestion = sortedGroupedQuestions[0] || null;
                                 const groupSummaryQuestion = buildGroupSummaryQuestion(rg.group, sortedGroupedQuestions);
-                                const aggregatedAuthors = Array.from(
-                                  new Set(
-                                    sortedGroupedQuestions
-                                      .map((question) => resolveQuestionDisplayMeta(question).askedBy)
-                                      .filter(Boolean)
-                                  )
-                                );
-                                const groupedAuthorLabel = aggregatedAuthors.length > 0 ? aggregatedAuthors.join(", ") : "Audience";
+                                // Collect unique author objects (keyed by user_id, not name) to preserve all distinct authors
+                                const authorMap = new Map();
+                                sortedGroupedQuestions.forEach((question) => {
+                                  const meta = resolveQuestionDisplayMeta(question);
+                                  const key = meta.userId ? `user_${meta.userId}` : `guest_${question.guest_asker || 'unknown'}`;
+                                  if (!authorMap.has(key)) {
+                                    authorMap.set(key, {
+                                      name: meta.askedBy,
+                                      userId: meta.userId || null,
+                                      guestId: question.guest_asker || null,
+                                      isGuest: !meta.userId && question.guest_asker,
+                                      isAnonymous: meta.isAnonymous,
+                                    });
+                                  }
+                                });
+                                const groupedAuthors = Array.from(authorMap.values()).filter(a => !a.isAnonymous);
+                                const groupedAuthorLabel = groupedAuthors.length > 0
+                                  ? groupedAuthors.slice(0, 4).map(a => a.name).join(", ") + (groupedAuthors.length > 4 ? ` and ${groupedAuthors.length - 4} more` : "")
+                                  : "Audience";
                                 const groupedQuestionForStage = primaryQuestion
                                   ? {
                                     ...primaryQuestion,
@@ -21005,7 +21035,7 @@ export default function NewLiveMeeting() {
                                             <Tooltip title={primaryDisplayedOnScreen ? "Remove from screen" : "Show on the main screen"}>
                                               <IconButton
                                                 size="small"
-                                                onClick={() => primaryDisplayedOnScreen ? handleDismissDisplayedQuestion() : handleDisplayGroupOnScreen(rg.group, sortedGroupedQuestions, groupSummaryQuestion, groupedAuthorLabel)}
+                                                onClick={() => primaryDisplayedOnScreen ? handleDismissDisplayedQuestion() : handleDisplayGroupOnScreen(rg.group, sortedGroupedQuestions, groupSummaryQuestion, groupedAuthorLabel, groupedAuthors)}
                                                 sx={{
                                                   color: primaryDisplayedOnScreen ? "#38bdf8" : "rgba(255,255,255,0.45)",
                                                   bgcolor: primaryDisplayedOnScreen ? "rgba(56,189,248,0.12)" : "transparent",
@@ -24249,21 +24279,70 @@ export default function NewLiveMeeting() {
                                       )}
                                     </Stack>
 
-                                    {/* Name with Country Flag - CLICKABLE + INFO ICON */}
+                                    {/* Authors with Country Flag - CLICKABLE + INFO ICON */}
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
-                                      <Typography
-                                        sx={{
-                                          fontWeight: 800,
-                                          fontSize: { xs: 14, sm: 16 },
-                                          lineHeight: 1.2,
-                                          color: "#fff",
-                                          cursor: canOpenQnaProfile ? "pointer" : "default",
-                                          "&:hover": canOpenQnaProfile ? { textDecoration: "underline" } : {},
-                                        }}
-                                        onClick={canOpenQnaProfile ? () => openMemberInfo(qnaDisplayerMemberPayload) : undefined}
-                                      >
-                                        {displayedQuestion.asked_by || "Audience"}
-                                      </Typography>
+                                      {displayedQuestion.author_objects && displayedQuestion.author_objects.length > 0 ? (
+                                        <Stack direction="row" spacing={0.3} sx={{ flexWrap: "wrap" }}>
+                                          {displayedQuestion.author_objects.slice(0, 3).map((author) => (
+                                            <Chip
+                                              key={`${author.isGuest ? 'guest' : 'user'}_${author.isGuest ? author.guestId : author.userId}`}
+                                              label={author.name}
+                                              size="small"
+                                              onClick={() => {
+                                                if (!author.isGuest && author.userId) {
+                                                  navigate(`/community/rich-profile/${author.userId}`);
+                                                }
+                                              }}
+                                              sx={{
+                                                height: 24,
+                                                fontSize: "0.75rem",
+                                                fontWeight: 600,
+                                                bgcolor: author.isGuest
+                                                  ? "rgba(255,255,255,0.08)"
+                                                  : "rgba(77,171,245,0.18)",
+                                                color: author.isGuest
+                                                  ? "rgba(255,255,255,0.6)"
+                                                  : "#7dd3fc",
+                                                border: author.isGuest
+                                                  ? "1px solid rgba(255,255,255,0.15)"
+                                                  : "1px solid rgba(77,171,245,0.4)",
+                                                cursor: !author.isGuest ? "pointer" : "default",
+                                                "&:hover": !author.isGuest
+                                                  ? { bgcolor: "rgba(77,171,245,0.28)" }
+                                                  : {},
+                                              }}
+                                            />
+                                          ))}
+                                          {displayedQuestion.author_objects.length > 3 && (
+                                            <Chip
+                                              label={`+${displayedQuestion.author_objects.length - 3}`}
+                                              size="small"
+                                              sx={{
+                                                height: 24,
+                                                fontSize: "0.75rem",
+                                                fontWeight: 600,
+                                                bgcolor: "rgba(255,255,255,0.08)",
+                                                color: "rgba(255,255,255,0.6)",
+                                                border: "1px solid rgba(255,255,255,0.15)",
+                                              }}
+                                            />
+                                          )}
+                                        </Stack>
+                                      ) : (
+                                        <Typography
+                                          sx={{
+                                            fontWeight: 800,
+                                            fontSize: { xs: 14, sm: 16 },
+                                            lineHeight: 1.2,
+                                            color: "#fff",
+                                            cursor: canOpenQnaProfile ? "pointer" : "default",
+                                            "&:hover": canOpenQnaProfile ? { textDecoration: "underline" } : {},
+                                          }}
+                                          onClick={canOpenQnaProfile ? () => openMemberInfo(qnaDisplayerMemberPayload) : undefined}
+                                        >
+                                          {displayedQuestion.asked_by || "Audience"}
+                                        </Typography>
+                                      )}
 
                                       {/* Info Icon - only for registered non-self users */}
                                       {canOpenQnaProfile && (

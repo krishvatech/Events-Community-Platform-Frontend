@@ -1,5 +1,6 @@
 // src/components/LiveQnAPanel.jsx
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -826,19 +827,33 @@ function QuestionItem({
 // Does NOT disclose whether grouping was manual or AI-assisted.
 // ─────────────────────────────────────────────────────────────────────────────
 function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAction, currentUserId, currentGuestId }) {
+  const navigate = useNavigate();
   const [subOpen, setSubOpen] = useState(false);
   const [onStage, setOnStage] = useState(false);
   const [isAnswered, setIsAnswered] = useState(false);
   const [actionLoading, setActionLoading] = useState(null); // null | 'stage' | 'answered' | 'archive'
+  const [authorsExpanded, setAuthorsExpanded] = useState(false);
 
-  // Collect unique, non-anonymous author names from sub-questions
-  const authorNames = [
-    ...new Set(
-      memberedQuestions
-        .filter((q) => !q.is_anonymous && q.user_display)
-        .map((q) => q.user_display)
-    ),
-  ];
+  // Collect unique author objects (keyed by user_id or guest_id, not name)
+  const authors = useMemo(() => {
+    const authorMap = new Map();
+    memberedQuestions.forEach((q) => {
+      if (q.is_anonymous) return;
+      const key = q.user ? `user_${q.user}` : q.guest_asker ? `guest_${q.guest_asker}` : null;
+      if (key && !authorMap.has(key)) {
+        authorMap.set(key, {
+          name: q.user_display || "User",
+          userId: q.user || null,
+          guestId: q.guest_asker || null,
+          isGuest: !q.user,
+        });
+      }
+    });
+    return Array.from(authorMap.values());
+  }, [memberedQuestions]);
+
+  const VISIBLE_AUTHOR_COUNT = 3;
+  const visibleAuthors = authorsExpanded ? authors : authors.slice(0, VISIBLE_AUTHOR_COUNT);
 
   const summaryText = g.summary?.trim() || g.title?.trim() || "Grouped question";
   const subCount = memberedQuestions.length;
@@ -1014,16 +1029,57 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
         </Box>
 
         {/* Authors row */}
-        {authorNames.length > 0 && (
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
-            <PeopleOutlineIcon sx={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }} />
-            <Typography
-              variant="caption"
-              sx={{ color: "rgba(255,255,255,0.45)", fontSize: "0.7rem", lineHeight: 1.3 }}
-            >
-              {authorNames.slice(0, 4).join(" · ")}
-              {authorNames.length > 4 ? ` · +${authorNames.length - 4} more` : ""}
-            </Typography>
+        {authors.length > 0 && (
+          <Stack spacing={0.5}>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5, flexWrap: "wrap" }}>
+              <PeopleOutlineIcon sx={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }} />
+              <Stack direction="row" spacing={0.3} sx={{ flexWrap: "wrap" }}>
+                {visibleAuthors.map((author) => (
+                  <Chip
+                    key={`${author.isGuest ? 'guest' : 'user'}_${author.isGuest ? author.guestId : author.userId}`}
+                    label={author.name}
+                    size="small"
+                    onClick={() => {
+                      if (!author.isGuest) navigate(`/community/rich-profile/${author.userId}`);
+                    }}
+                    sx={{
+                      height: 20,
+                      fontSize: "0.7rem",
+                      bgcolor: author.isGuest
+                        ? "rgba(255,255,255,0.08)"
+                        : "rgba(77,171,245,0.12)",
+                      color: author.isGuest
+                        ? "rgba(255,255,255,0.5)"
+                        : "#4dabf5",
+                      border: author.isGuest
+                        ? "1px solid rgba(255,255,255,0.15)"
+                        : "1px solid rgba(77,171,245,0.35)",
+                      cursor: !author.isGuest ? "pointer" : "default",
+                      "&:hover": !author.isGuest
+                        ? { bgcolor: "rgba(77,171,245,0.25)" }
+                        : {},
+                    }}
+                  />
+                ))}
+              </Stack>
+            </Stack>
+            {authors.length > VISIBLE_AUTHOR_COUNT && (
+              <Button
+                size="small"
+                onClick={() => setAuthorsExpanded(!authorsExpanded)}
+                startIcon={authorsExpanded ? <ExpandLessIcon sx={{ fontSize: 12 }} /> : <ExpandMoreIcon sx={{ fontSize: 12 }} />}
+                sx={{
+                  textTransform: "none",
+                  fontSize: "0.65rem",
+                  color: "rgba(255,255,255,0.4)",
+                  p: 0,
+                  height: 16,
+                  "&:hover": { color: "rgba(255,255,255,0.6)" }
+                }}
+              >
+                {authorsExpanded ? "Hide" : `Show all ${authors.length} authors`}
+              </Button>
+            )}
           </Stack>
         )}
       </Box>
@@ -1229,12 +1285,32 @@ function GroupedQuestionCard({ g, memberedQuestions, isHost, onDelete, onGroupAc
                 {q.content}
               </Typography>
               {!q.is_anonymous && q.user_display && (
-                <Typography
-                  variant="caption"
-                  sx={{ color: "rgba(255,255,255,0.35)", fontSize: "0.68rem", display: "block", mt: 0.3 }}
-                >
-                  — {q.user_display}
-                </Typography>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.3 }}>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.35)", fontSize: "0.68rem" }}>
+                    —
+                  </Typography>
+                  {q.user && !q.is_anonymous ? (
+                    <Button
+                      size="small"
+                      onClick={() => navigate(`/community/rich-profile/${q.user}`)}
+                      sx={{
+                        textTransform: "none",
+                        fontSize: "0.68rem",
+                        color: "rgba(255,255,255,0.6)",
+                        p: 0,
+                        height: 16,
+                        minWidth: 0,
+                        "&:hover": { color: "#4dabf5", textDecoration: "underline" }
+                      }}
+                    >
+                      {q.user_display}
+                    </Button>
+                  ) : (
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.35)", fontSize: "0.68rem" }}>
+                      {q.user_display}
+                    </Typography>
+                  )}
+                </Stack>
               )}
             </Box>
           ))}
