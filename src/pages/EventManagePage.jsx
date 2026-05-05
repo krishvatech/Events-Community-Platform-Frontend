@@ -85,6 +85,7 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
@@ -490,6 +491,8 @@ export default function EventManagePage() {
   const [deletingDiscountId, setDeletingDiscountId] = useState(null);
   const [syncingDiscountId, setSyncingDiscountId] = useState(null);
   const [productDirty, setProductDirty] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState("");
   const [discountForm, setDiscountForm] = useState({
     name: "",
     description: "",
@@ -3723,7 +3726,7 @@ export default function EventManagePage() {
                                 </Button>
                               )}
 
-                              {!(Number(event?.price) === 0 || event?.is_free) && (
+                              {event?.is_free === false && (
                                 <>
                                   {r.status === "cancellation_requested" && (
                                     <>
@@ -5537,6 +5540,52 @@ export default function EventManagePage() {
     }
   };
 
+  const handlePublishEvent = async () => {
+    if (!eventId || publishing) return;
+    setPublishing(true);
+    setPublishError("");
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/publish/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to publish event');
+      toast.success("Event published successfully!");
+      if (json.event) setEvent(json.event);
+      fetchSaleorProduct();
+    } catch (err) {
+      setPublishError(err.message);
+      toast.error(err.message);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleUnpublishEvent = async () => {
+    if (!eventId || publishing) return;
+    setPublishing(true);
+    setPublishError("");
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/unpublish/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to unpublish event');
+      toast.success("Event unpublished. You can now make changes.");
+      if (json.event) setEvent(json.event);
+      fetchSaleorProduct();
+    } catch (err) {
+      setPublishError(err.message);
+      toast.error(err.message);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const renderProductManagement = () => {
     if (saleorLoading && !saleorProduct) {
       return (
@@ -5567,6 +5616,14 @@ export default function EventManagePage() {
         </Paper>
       );
     }
+
+    // Derived checks for publish section
+    const targetChannelSlug = 'default-channel';
+    const defaultChannel = saleorChannels.find(c => c.slug === targetChannelSlug);
+    const defaultChannelPrice = defaultChannel ? parseFloat(saleorPriceChanges[defaultChannel.id] ?? 0) : 0;
+    const hasValidPrice = defaultChannelPrice > 0;
+    const hasValidStock = Object.values(saleorStockChanges).some(q => parseInt(q || 0) > 0);
+    const canPublish = event?.status === 'draft' && !productDirty && hasValidPrice && hasValidStock && !!saleorProduct;
 
     return (
       <Box sx={{ pb: 4 }}>
@@ -5906,6 +5963,87 @@ export default function EventManagePage() {
                   </TableBody>
                 </Table>
               </TableContainer>
+            </Paper>
+          </Box>
+
+          {/* Section 5: Publish Event */}
+          <Box>
+            <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center' }}>
+              <PublishRoundedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Publish Event</Typography>
+            </Box>
+            <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Status:</Typography>
+                <Chip
+                  label={event?.status === 'published' ? 'Published' : 'Draft'}
+                  color={event?.status === 'published' ? 'success' : 'warning'}
+                  size="small"
+                  sx={{ fontWeight: 700, borderRadius: 1.5 }}
+                />
+              </Box>
+
+              {/* Checklist */}
+              <Stack spacing={1} sx={{ mb: 3 }}>
+                {[
+                  { label: 'Product linked to event', ok: !!saleorProduct },
+                  { label: `Price configured (${targetChannelSlug})`, ok: hasValidPrice },
+                  { label: 'Warehouse stock configured', ok: hasValidStock },
+                  { label: 'Product changes saved', ok: !productDirty },
+                  { label: 'Discounts (optional)', ok: true, optional: true },
+                ].map(({ label, ok, optional }) => (
+                  <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {ok
+                      ? <CheckCircleRoundedIcon sx={{ color: 'success.main', fontSize: '1rem' }} />
+                      : optional
+                        ? <InfoRoundedIcon sx={{ color: 'info.main', fontSize: '1rem' }} />
+                        : <WarningRoundedIcon sx={{ color: 'warning.main', fontSize: '1rem' }} />}
+                    <Typography variant="body2" color={ok || optional ? 'text.primary' : 'warning.main'}>
+                      {label}{optional ? ' — optional' : ''}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+
+              {productDirty && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  Save product changes before publishing.
+                </Alert>
+              )}
+              {publishError && (
+                <Alert severity="error" sx={{ mb: 2 }}>{publishError}</Alert>
+              )}
+              {event?.status === 'published' ? (
+                <>
+                  <Alert severity="success" sx={{ mb: 2 }}>This event is live and accepting registrations.</Alert>
+                  <Stack direction="row" spacing={2}>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={publishing ? <CircularProgress size={18} color="inherit" /> : <PublishRoundedIcon />}
+                      onClick={handleUnpublishEvent}
+                      disabled={publishing}
+                      sx={{ fontWeight: 700 }}
+                    >
+                      {publishing ? 'Unpublishing...' : 'Unpublish Event'}
+                    </Button>
+                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                      Unpublish to make changes to pricing or inventory.
+                    </Typography>
+                  </Stack>
+                </>
+              ) : (
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={publishing ? <CircularProgress size={18} color="inherit" /> : <PublishRoundedIcon />}
+                  onClick={handlePublishEvent}
+                  disabled={!canPublish || publishing}
+                  sx={{ fontWeight: 700 }}
+                >
+                  {publishing ? 'Publishing...' : 'Publish Event'}
+                </Button>
+              )}
             </Paper>
           </Box>
         </Stack>

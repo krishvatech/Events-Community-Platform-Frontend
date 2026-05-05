@@ -506,7 +506,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const isGuest = localStorage.getItem("is_guest") === "true";
   // Authenticated regular user (not guest) - guests can still rejoin
   const isAuthenticatedUser = Boolean(token) && !isGuest;
-  const isFreeEvent = Boolean(ev.is_free) || Number(ev.price) === 0;
+  const isFreeEvent = ev.is_free === true;
 
   // Fetch application status for apply-type events
   React.useEffect(() => {
@@ -618,7 +618,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     }
 
     // FREE: create EventRegistration immediately
-    if (Number(ev.price) === 0) {
+    if (ev.is_free === true) {
       const res = await fetch(`${EVENTS_URL}${ev.id}/register/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -1339,7 +1339,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const isGuest = localStorage.getItem("is_guest") === "true";
   // Authenticated regular user (not guest) - guests can still rejoin
   const isAuthenticatedUser = Boolean(token) && !isGuest;
-  const isFreeEvent = Boolean(ev.is_free) || Number(ev.price) === 0;
+  const isFreeEvent = ev.is_free === true;
 
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
@@ -1393,7 +1393,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
       return;
     }
 
-    if (Number(ev.price) === 0) {
+    if (ev.is_free === true) {
       const res = await fetch(`${EVENTS_URL}${ev.id}/register/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
