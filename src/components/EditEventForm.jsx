@@ -13,6 +13,7 @@ import {
     MenuItem,
     FormControlLabel,
     Switch,
+    Checkbox,
     IconButton,
     InputAdornment,
     Tooltip,
@@ -278,6 +279,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     );
     const [cpdCpeMinutesPerCredit, setCpdCpeMinutesPerCredit] = useState(
         event?.cpd_cpe_minutes_per_credit ? String(event.cpd_cpe_minutes_per_credit) : "60"
+    );
+    const [showCpdCpe, setShowCpdCpe] = useState(
+        event?.show_cpd_cpe !== undefined ? event.show_cpd_cpe : true
     );
     const [maxParticipants, setMaxParticipants] = useState(event?.max_participants || "");
     const [loungeTableCapacity, setLoungeTableCapacity] = useState(event?.lounge_table_capacity || 4);
@@ -566,6 +570,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setCpdCpeMinutesPerCredit(
             event?.cpd_cpe_minutes_per_credit ? String(event.cpd_cpe_minutes_per_credit) : "60"
         );
+        setShowCpdCpe(event?.show_cpd_cpe !== undefined ? event.show_cpd_cpe : true);
         setLoungeTableCapacity(event?.lounge_table_capacity || 4);
         setQnaAiPublicSuggestionsEnabled(Boolean(event?.qna_ai_public_suggestions_enabled));
         setPreEventQnaEnabled(Boolean(event?.pre_event_qna_enabled));
@@ -1314,6 +1319,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         } else {
             fd.append("cpd_cpe_minutes_per_credit", String(Number(cpdCpeMinutesPerCredit)));
         }
+        fd.append("show_cpd_cpe", String(showCpdCpe));
         // Paid events: max_participants managed in Product Management tab
         if (!isFree) {
             fd.append("max_participants", ""); // null in DB — managed in Product Management
@@ -1854,6 +1860,17 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     CPD/CPE Credits Preview: {(Number(cpdCpeMinutes) / Number(cpdCpeMinutesPerCredit || 60)).toFixed(2).replace(/\.?0+$/, "")} (calculated at {Number(cpdCpeMinutesPerCredit || 60)} minutes per credit)
                                 </Typography>
                             )}
+                            <Box sx={{ mt: 2, display: "flex", alignItems: "center" }}>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={showCpdCpe}
+                                            onChange={(e) => setShowCpdCpe(e.target.checked)}
+                                        />
+                                    }
+                                    label="Show CPD/CPE credits on event details and cards"
+                                />
+                            </Box>
                         </Box>
 
                     </Grid>

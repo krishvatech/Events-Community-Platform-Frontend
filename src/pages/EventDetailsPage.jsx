@@ -1523,7 +1523,7 @@ export default function EventDetailsPage() {
                           );
                         })()}
 
-                        {event?.cpd_cpe_minutes ? (
+                        {event?.cpd_cpe_minutes && event?.show_cpd_cpe !== false ? (
                           <Typography variant="body2" color="text.secondary">
                             CPD/CPE Credits: {Number(event.cpd_cpe_credits ?? (event.cpd_cpe_minutes / (event.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (calculated at {event.cpd_cpe_minutes_per_credit || 60} minutes per credit)
                           </Typography>

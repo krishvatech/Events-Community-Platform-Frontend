@@ -21,7 +21,9 @@ import {
   DialogContent,
   DialogActions,
   MenuItem,
-  FormControlLabel, Switch,
+  FormControlLabel,
+  Switch,
+  Checkbox,
   Tab,
   Tabs,
   Skeleton,             // ✅ NEW: skeletons
@@ -433,6 +435,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [maxParticipants, setMaxParticipants] = React.useState(""); // New state
   const [cpdCpeMinutes, setCpdCpeMinutes] = React.useState("");
   const [cpdCpeMinutesPerCredit, setCpdCpeMinutesPerCredit] = React.useState("60");
+  const [showCpdCpe, setShowCpdCpe] = React.useState(true);
 
   const today = dayjs().format("YYYY-MM-DD");
   const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
@@ -924,6 +927,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     } else {
       fd.append("cpd_cpe_minutes_per_credit", String(Number(cpdCpeMinutesPerCredit)));
     }
+    fd.append("show_cpd_cpe", String(showCpdCpe));
     // Paid events: max_participants managed in Product Management tab
     if (!isFree) {
       fd.append("max_participants", ""); // null in DB — managed in Product Management
@@ -1659,6 +1663,17 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 CPD/CPE Credits Preview: {(Number(cpdCpeMinutes) / Number(cpdCpeMinutesPerCredit || 60)).toFixed(2).replace(/\.?0+$/, "")} (calculated at {Number(cpdCpeMinutesPerCredit || 60)} minutes per credit)
               </Typography>
             )}
+            <Box sx={{ mt: 2, display: "flex", alignItems: "center" }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showCpdCpe}
+                    onChange={(e) => setShowCpdCpe(e.target.checked)}
+                  />
+                }
+                label="Show CPD/CPE credits on event details and cards"
+              />
+            </Box>
           </Box>
 
           {/* Images Row - Three Equal Columns */}

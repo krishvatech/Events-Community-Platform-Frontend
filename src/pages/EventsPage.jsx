@@ -337,6 +337,10 @@ function toCard(ev) {
     series: ev.series || null, // ✅ Series ID for series-aware filtering
     series_order: ev.series_order || null,
     series_session_label: ev.series_session_label || null,
+    cpd_cpe_minutes: ev.cpd_cpe_minutes || null,
+    cpd_cpe_minutes_per_credit: ev.cpd_cpe_minutes_per_credit || 60,
+    cpd_cpe_credits: ev.cpd_cpe_credits || null,
+    show_cpd_cpe: ev.show_cpd_cpe !== false,
   };
 }
 
@@ -797,11 +801,14 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     {ev.calculated_hours_display && (
                       <div className="font-medium text-slate-700">⏱️ {ev.calculated_hours_display}</div>
                     )}
-                    {ev.cpd_cpe_minutes ? (
-                      <div className="font-medium text-slate-700">
-                        CPD/CPE Credits: {Number(ev.cpd_cpe_credits ?? (ev.cpd_cpe_minutes / (ev.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (at {ev.cpd_cpe_minutes_per_credit || 60} min/credit)
-                      </div>
-                    ) : null}
+                    {(() => {
+                      console.log(`Event ${ev.title}: cpd_cpe_minutes=${ev.cpd_cpe_minutes}, show_cpd_cpe=${ev.show_cpd_cpe}`);
+                      return ev.cpd_cpe_minutes && ev.show_cpd_cpe !== false ? (
+                        <div className="font-medium text-slate-700">
+                          CPD/CPE Credits: {Number(ev.cpd_cpe_credits ?? (ev.cpd_cpe_minutes / (ev.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (at {ev.cpd_cpe_minutes_per_credit || 60} min/credit)
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
 
                   {/* Date range (no time for multi-day events) */}
@@ -848,7 +855,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       )}
                     </span>
                   </span>
-                  {ev.cpd_cpe_minutes ? (
+                  {ev.cpd_cpe_minutes && ev.show_cpd_cpe !== false ? (
                     <span className="text-xs font-medium text-slate-700">
                       CPD/CPE Credits: {Number(ev.cpd_cpe_credits ?? (ev.cpd_cpe_minutes / (ev.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (at {ev.cpd_cpe_minutes_per_credit || 60} min/credit)
                     </span>
