@@ -414,6 +414,7 @@ export default function EventDetailsPage() {
 
   // Pre-Event Q&A Modal
   const [preEventQnaModalOpen, setPreEventQnaModalOpen] = useState(false);
+  const [preEventQnaRefreshTrigger, setPreEventQnaRefreshTrigger] = useState(0);
 
   // Participant Preview
   const [previewParticipants, setPreviewParticipants] = useState([]);
@@ -1173,6 +1174,8 @@ export default function EventDetailsPage() {
   const hasActiveRegistration = registration?.status === "registered";
   const showPreEventQnaPrompt =
     isBeforeEventStart &&
+    !isLive &&
+    !isPast &&
     Boolean(event?.pre_event_qna_enabled) &&
     Boolean(token) &&
     !isGuest &&
@@ -1873,6 +1876,7 @@ export default function EventDetailsPage() {
                               token={token}
                               isBeforeEventStart={isBeforeEventStart}
                               qnaModerationEnabled={Boolean(event?.qna_moderation_enabled)}
+                              refreshTrigger={preEventQnaRefreshTrigger}
                             />
                           </Box>
                         )}
@@ -2463,6 +2467,9 @@ export default function EventDetailsPage() {
               setPreEventQnaModalOpen(false);
             }}
             event={event}
+            onSuccess={() => {
+              setPreEventQnaRefreshTrigger((prev) => prev + 1);
+            }}
           />
 
           <GuestApplyModal

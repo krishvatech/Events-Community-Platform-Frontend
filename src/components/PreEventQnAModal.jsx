@@ -192,7 +192,7 @@ function DuplicatePanel({ duplicates, onDismiss, onUseExisting }) {
 
 // ─── Main Modal ──────────────────────────────────────────────────────────────
 
-export default function PreEventQnAModal({ open, onClose, event }) {
+export default function PreEventQnAModal({ open, onClose, event, onSuccess }) {
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -317,6 +317,9 @@ export default function PreEventQnAModal({ open, onClose, event }) {
       setContent("");
       setPolishResult(null);
       setDupResult(null);
+      if (typeof onSuccess === "function") {
+        onSuccess();
+      }
     } catch (err) {
       setError(err.message || "Failed to submit question.");
     } finally {

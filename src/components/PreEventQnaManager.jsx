@@ -518,12 +518,14 @@ function DeleteDialog({ open, question, token, onClose, onDeleted }) {
  * @param {string}  props.token             JWT access token
  * @param {boolean} props.isBeforeEventStart True when event has not yet started
  * @param {boolean} props.qnaModerationEnabled
+ * @param {number}  props.refreshTrigger    Counter to trigger question list refresh
  */
 export default function PreEventQnaManager({
     eventId,
     token,
     isBeforeEventStart,
     qnaModerationEnabled,
+    refreshTrigger,
 }) {
     const [questions, setQuestions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -557,7 +559,7 @@ export default function PreEventQnaManager({
 
     useEffect(() => {
         loadQuestions();
-    }, [loadQuestions]);
+    }, [loadQuestions, refreshTrigger]);
 
     const handleSaved = (updated) => {
         setQuestions((prev) =>
