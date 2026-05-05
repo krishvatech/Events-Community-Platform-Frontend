@@ -612,22 +612,6 @@ export default function EventManagePage() {
       const json = await res.json();
       const discounts = json.discounts || [];
       setSaleorDiscounts(discounts);
-
-      // Auto-sync all discounts from Saleor in background (don't block UI)
-      if (discounts.length > 0) {
-        discounts.forEach((discount) => {
-          fetch(`${API_ROOT}/events/${eventId}/saleor-discounts/${discount.id}/sync/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-          }).catch((err) => {
-            // Silently fail - sync is non-critical
-            console.debug(`Auto-sync failed for discount ${discount.id}:`, err);
-          });
-        });
-      }
     } catch (err) {
       console.error("Failed to fetch Saleor discounts:", err);
       setDiscountError(err.message || "Failed to load discounts");
@@ -5890,6 +5874,11 @@ export default function EventManagePage() {
                       <TableRow key={discount.id} hover>
                         <TableCell sx={{ py: 2 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>{discount.name}</Typography>
+                          {discount.last_sync_error && (
+                            <Typography variant="caption" color="error" display="block">
+                              {discount.last_sync_error}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell sx={{ py: 2 }}>
                           <Chip
