@@ -3,19 +3,19 @@ import {
   Paper, Button, TextField, Box, Typography, CircularProgress,
   Table, TableContainer, TableHead, TableRow, TableCell, TableBody,
   Chip, Select, MenuItem, FormControl, InputLabel, Pagination, Stack, Grid,
-  Card, CardContent, CardMedia, IconButton, Menu
+  Card, CardContent, CardMedia, IconButton, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  MoreVert as MoreVertIcon,
   Search as SearchIcon,
   GridView as GridIcon,
   ViewList as ListIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE, getToken, authConfig } from '../utils/api';
+import { toast } from 'react-toastify';
 import SeriesDialog from '../components/dialogs/SeriesDialog';
 
 const SeriesList = () => {
@@ -28,7 +28,8 @@ const SeriesList = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [seriestoDelete, setSeriesToDelete] = useState(null);
   const [selectedSeries, setSelectedSeries] = useState(null);
 
   const itemsPerPage = 10;
@@ -70,30 +71,33 @@ const SeriesList = () => {
     navigate(`/admin/series/${s.id}`);
   };
 
-  const handleDeleteClick = async (s) => {
-    if (window.confirm(`Delete series "${s.title}"?`)) {
-      try {
-        const response = await fetch(`${API_ROOT}/series/${s.id}/`, {
-          method: 'DELETE',
-          headers: authConfig().headers,
-        });
-        if (response.ok) {
-          fetchSeries();
-        }
-      } catch (error) {
-        console.error('Error deleting series:', error);
+  const handleDeleteClick = (s) => {
+    setSeriesToDelete(s);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!seriestoDelete) return;
+    try {
+      const response = await fetch(`${API_BASE}/series/${seriestoDelete.id}/`, {
+        method: 'DELETE',
+        headers: authConfig().headers,
+      });
+      if (response.ok) {
+        toast.success(`Series "${seriestoDelete.title}" deleted successfully`);
+        fetchSeries();
+      } else {
+        toast.error(`Failed to delete series (${response.status})`);
       }
+    } catch (error) {
+      console.error('Error deleting series:', error);
+      toast.error('Error deleting series');
+    } finally {
+      setDeleteDialogOpen(false);
+      setSeriesToDelete(null);
     }
   };
 
-  const handleMenuOpen = (e, s) => {
-    setMenuAnchorEl(e.currentTarget);
-    setSelectedSeries(s);
-  };
-
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-  };
 
   const statusColor = (status) => {
     const colors = {
@@ -126,11 +130,11 @@ const SeriesList = () => {
                 <Chip label={s.status} color={statusColor(s.status)} size="small" />
               </TableCell>
               <TableCell align="right">
-                <IconButton size="small" onClick={() => handleEditClick(s)}>
+                <IconButton size="small" onClick={() => handleEditClick(s)} title="Edit">
                   <EditIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" onClick={(e) => handleMenuOpen(e, s)}>
-                  <MoreVertIcon fontSize="small" />
+                <IconButton size="small" onClick={() => handleDeleteClick(s)} color="error" title="Delete">
+                  <DeleteIcon fontSize="small" />
                 </IconButton>
               </TableCell>
             </TableRow>
@@ -171,8 +175,8 @@ const SeriesList = () => {
               >
                 Edit
               </Button>
-              <IconButton size="small" onClick={(e) => handleMenuOpen(e, s)}>
-                <MoreVertIcon />
+              <IconButton size="small" onClick={() => handleDeleteClick(s)} color="error" title="Delete">
+                <DeleteIcon />
               </IconButton>
             </Box>
           </Card>
@@ -267,16 +271,24 @@ const SeriesList = () => {
         </Stack>
       )}
 
-      {/* Menu */}
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={() => { handleDeleteClick(selectedSeries); handleMenuClose(); }}>
-          <DeleteIcon sx={{ mr: 1 }} /> Delete
-        </MenuItem>
-      </Menu>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Series?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mt: 2 }}>
+            Are you sure you want to delete <strong>"{seriestoDelete?.title}"</strong>?
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Create/Edit Dialog */}
       <SeriesDialog

@@ -46,6 +46,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { normalizeTimezoneName, getBrowserTimezone } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { toast } from "react-toastify";
+import { Helmet } from "react-helmet-async";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -1196,8 +1197,28 @@ export default function EventDetailsPage() {
     setActiveTab(newValue);
   };
 
+  // Build cover image URL
+  let coverImageUrl = event?.cover_image || event?.preview_image || '';
+  if (coverImageUrl && !coverImageUrl.startsWith('http')) {
+    const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '');
+    coverImageUrl = `${apiBase}${coverImageUrl}`;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
+      {event && (
+        <Helmet>
+          <title>{event.title}</title>
+          <meta property="og:title" content={event.title} />
+          <meta property="og:description" content={(event.description || '').slice(0, 160)} />
+          {coverImageUrl && <meta property="og:image" content={coverImageUrl} />}
+          <meta property="og:url" content={window.location.href} />
+          <meta property="og:type" content="website" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={event.title} />
+          {coverImageUrl && <meta name="twitter:image" content={coverImageUrl} />}
+        </Helmet>
+      )}
       {/* BODY with LEFT NAV + MAIN */}
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
