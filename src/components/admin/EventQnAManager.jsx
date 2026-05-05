@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -25,6 +26,7 @@ import {
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -54,6 +56,9 @@ export default function EventQnAManager({ event, onEventUpdated }) {
   const [setupSaving, setSetupSaving] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [suggestionActionLoading, setSuggestionActionLoading] = useState(null);
+  const [expandedGroupId, setExpandedGroupId] = useState(null);
+
+  const pollIntervalRef = useRef(null);
 
   const authHeaders = useMemo(() => ({
     "Content-Type": "application/json",
@@ -110,6 +115,21 @@ export default function EventQnAManager({ event, onEventUpdated }) {
     load();
     loadAiSuggestions();
   }, [load, loadAiSuggestions]);
+
+  // Auto-refresh questions every 5 seconds to show new pre-event submissions
+  useEffect(() => {
+    if (!event?.id) return;
+
+    pollIntervalRef.current = setInterval(() => {
+      load();
+    }, 5000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, [event?.id, load]);
 
   const filteredQuestions = useMemo(() => {
     return questions.filter((q) => {
@@ -229,8 +249,23 @@ export default function EventQnAManager({ event, onEventUpdated }) {
 
       {!isEventStartedOrEnded ? (
         <Paper sx={sectionSx}>
-          <Typography variant="h4" sx={{ fontSize: 40 }}></Typography>
-          <Typography variant="h5" sx={{ fontWeight: 500 }}>Pre-event Q&A</Typography>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+            <Typography variant="h5" sx={{ fontWeight: 500 }}>Pre-event Q&A</Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => load()}
+              disabled={loading}
+              sx={{
+                textTransform: "uppercase",
+                borderRadius: 1,
+                fontSize: "0.7rem",
+                px: 1.5,
+              }}
+            >
+              {loading ? "Refreshing..." : "Refresh"}
+            </Button>
+          </Stack>
           <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} mt={1.5} alignItems={{ xs: "stretch", md: "center" }}>
             <TextField size="small" label="Search" value={search} onChange={(e) => setSearch(e.target.value)} sx={{ minWidth: { md: 260 } }} />
             <FormControl size="small" sx={{ minWidth: { md: 160 } }}><InputLabel>Status</InputLabel><Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}><MenuItem value="all">All</MenuItem><MenuItem value="pending">Pending</MenuItem><MenuItem value="approved">Approved</MenuItem><MenuItem value="rejected">Rejected</MenuItem></Select></FormControl>
@@ -407,7 +442,52 @@ export default function EventQnAManager({ event, onEventUpdated }) {
                 )}
               </Stack>
               <Typography variant="body2" sx={{ mb: 0.5 }}>{g.summary}</Typography>
-              <Typography variant="caption">Question IDs: {(g.question_ids || []).join(", ") || "—"}</Typography>
+
+              {/* Sub-questions accordion */}
+              {g.question_ids && g.question_ids.length > 0 && (
+                <Box>
+                  <Button
+                    size="small"
+                    onClick={() => setExpandedGroupId(expandedGroupId === g.id ? null : g.id)}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 500,
+                      fontSize: "0.75rem",
+                      color: "#14b8a6",
+                      p: 0,
+                      mt: 0.5,
+                      mb: 0.5,
+                      "&:hover": { bgcolor: "transparent" },
+                    }}
+                    endIcon={
+                      <ExpandMoreIcon
+                        sx={{
+                          fontSize: "1rem",
+                          transform: expandedGroupId === g.id ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform 0.2s",
+                        }}
+                      />
+                    }
+                  >
+                    {expandedGroupId === g.id
+                      ? `Hide ${g.question_ids.length} question${g.question_ids.length !== 1 ? "s" : ""}`
+                      : `View ${g.question_ids.length} question${g.question_ids.length !== 1 ? "s" : ""}`}
+                  </Button>
+
+                  <Collapse in={expandedGroupId === g.id}>
+                    <Stack spacing={0.8} sx={{ mt: 1, mb: 1, pl: 1, borderLeft: "2px solid rgba(20, 184, 166, 0.2)" }}>
+                      {g.question_ids.map((qId) => {
+                        const q = allQuestions.find((aq) => aq.id === qId);
+                        return (
+                          <Typography key={qId} variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
+                            {q?.content || `Question #${qId} (not found)`}
+                          </Typography>
+                        );
+                      })}
+                    </Stack>
+                  </Collapse>
+                </Box>
+              )}
             </Paper>
           ))}
         </Stack>

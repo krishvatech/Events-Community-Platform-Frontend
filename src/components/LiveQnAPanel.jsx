@@ -1345,6 +1345,7 @@ export default function LiveQnAPanel({
   const [newGroupSummary, setNewGroupSummary] = useState("");
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [expandedSuggestionId, setExpandedSuggestionId] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2965,9 +2966,50 @@ export default function LiveQnAPanel({
                           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.55)", fontSize: "0.8rem", lineHeight: 1.5 }}>
                             {s.suggested_summary}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: "rgba(124,77,255,0.7)", mt: 0.8, display: "block", fontWeight: 500 }}>
-                            {s.suggested_question_ids.length} question{s.suggested_question_ids.length !== 1 ? "s" : ""} suggested
-                          </Typography>
+
+                          {/* Sub-questions accordion */}
+                          {s.suggested_question_ids && s.suggested_question_ids.length > 0 && (
+                            <Box sx={{ mt: 0.8 }}>
+                              <Button
+                                size="small"
+                                onClick={() => setExpandedSuggestionId(expandedSuggestionId === s.id ? null : s.id)}
+                                sx={{
+                                  textTransform: "none",
+                                  fontWeight: 500,
+                                  fontSize: "0.7rem",
+                                  color: "rgba(124,77,255,0.9)",
+                                  p: 0,
+                                  "&:hover": { bgcolor: "transparent", color: "rgba(124,77,255,1)" },
+                                }}
+                                endIcon={
+                                  <ExpandMoreIcon
+                                    sx={{
+                                      fontSize: "0.9rem",
+                                      transform: expandedSuggestionId === s.id ? "rotate(180deg)" : "rotate(0deg)",
+                                      transition: "transform 0.2s",
+                                    }}
+                                  />
+                                }
+                              >
+                                {expandedSuggestionId === s.id
+                                  ? `Hide ${s.suggested_question_ids.length} question${s.suggested_question_ids.length !== 1 ? "s" : ""}`
+                                  : `View ${s.suggested_question_ids.length} question${s.suggested_question_ids.length !== 1 ? "s" : ""}`}
+                              </Button>
+
+                              <Collapse in={expandedSuggestionId === s.id}>
+                                <Stack spacing={0.6} sx={{ mt: 0.6, mb: 0.4, pl: 1, borderLeft: "2px solid rgba(124,77,255,0.3)" }}>
+                                  {s.suggested_question_ids.map((qId) => {
+                                    const q = questions.find((aq) => aq.id === qId);
+                                    return (
+                                      <Typography key={qId} variant="body2" sx={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.6)" }}>
+                                        {q?.content || `Question #${qId} (not found)`}
+                                      </Typography>
+                                    );
+                                  })}
+                                </Stack>
+                              </Collapse>
+                            </Box>
+                          )}
                         </Box>
                         <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
                           <Button
