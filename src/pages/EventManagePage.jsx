@@ -396,6 +396,7 @@ export default function EventManagePage() {
     show_participants_before_event: true,
     show_participants_after_event: false,
     show_registered_participant_count: true,
+    show_guest_participant_count: true,
     show_public_hosts: true,
     show_public_speakers: true,
     show_public_moderators: false,
@@ -1004,6 +1005,7 @@ export default function EventManagePage() {
         show_participants_before_event: visibilityUpdated ? (event.show_participants_before_event ?? true) : true,
         show_participants_after_event: event.show_participants_after_event ?? false,
         show_registered_participant_count: event.show_registered_participant_count ?? true,
+        show_guest_participant_count: event.show_guest_participant_count ?? true,
         show_public_hosts: event.show_public_hosts ?? true,
         show_public_speakers: event.show_public_speakers ?? true,
         show_public_moderators: event.show_public_moderators ?? false,
@@ -2538,6 +2540,20 @@ export default function EventManagePage() {
                   label={
                     <Box>
                       <Typography variant="body2" fontWeight={500}>Show number of registered participants</Typography>
+                      <Typography variant="caption" color="text.secondary">Default: On</Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={participantVisibility.show_guest_participant_count}
+                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_guest_participant_count: e.target.checked }))}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>Show number of registered guest participants</Typography>
                       <Typography variant="caption" color="text.secondary">Default: On</Typography>
                     </Box>
                   }

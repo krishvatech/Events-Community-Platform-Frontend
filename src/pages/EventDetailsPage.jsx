@@ -1502,6 +1502,27 @@ export default function EventDetailsPage() {
                           }
                         })()}
 
+                        {(() => {
+                          const showGuestParticipantCount = event.show_guest_participant_count !== false;
+                          if (!showGuestParticipantCount) return null;
+
+                          const visibleGuestCount = Number(event.public_guest_count ?? 0);
+                          if (!Number.isFinite(visibleGuestCount)) return null;
+
+                          const label = visibleGuestCount > 0
+                            ? `${visibleGuestCount} guest registered`
+                            : "No guest registrations yet";
+
+                          return (
+                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default', opacity: 0.8 }}>
+                              <GroupsIcon fontSize="small" className="text-teal-700" />
+                              <Typography variant="body2" color="text.secondary">
+                                {label}
+                              </Typography>
+                            </Stack>
+                          );
+                        })()}
+
                         {event?.cpd_cpe_minutes ? (
                           <Typography variant="body2" color="text.secondary">
                             CPD/CPE Credits: {Number(event.cpd_cpe_credits ?? (event.cpd_cpe_minutes / (event.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (calculated at {event.cpd_cpe_minutes_per_credit || 60} minutes per credit)

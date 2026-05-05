@@ -287,6 +287,7 @@ function toCard(ev) {
   const visibleRegisteredCount = Number(
     ev.public_registered_count ?? ev.registrations_count ?? ev.attending_count ?? 0
   );
+  const visibleGuestCount = Number(ev.public_guest_count ?? 0);
 
   // map backend fields to the fields your UI already uses
   return {
@@ -303,6 +304,7 @@ function toCard(ev) {
     location: ev.location,
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
     attendees: Math.max(0, visibleRegisteredCount),
+    guest_attendees: Math.max(0, Number.isFinite(visibleGuestCount) ? visibleGuestCount : 0),
     price: ev.price,
     price_label: ev.price_label,
     is_free: ev.is_free || false,
@@ -330,6 +332,7 @@ function toCard(ev) {
     is_multi_day: ev.is_multi_day || false,  // ✅ NEW: Multi-day event flag
     sessions: Array.isArray(ev.sessions) ? ev.sessions.map(normalizeSession) : [], // ✅ NEW: Event sessions array
     show_registered_participant_count: ev.show_registered_participant_count,
+    show_guest_participant_count: ev.show_guest_participant_count,
     created_by_id: ev.created_by_id, // ✅ Map ownership ID
     series: ev.series || null, // ✅ Series ID for series-aware filtering
     series_order: ev.series_order || null,
@@ -917,6 +920,20 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                 </div>
               );
             }
+          })()}
+
+          {(() => {
+            const showGuestParticipantCount = ev.show_guest_participant_count !== false;
+            if (!showGuestParticipantCount) return null;
+            const guestCount = Number(ev.guest_attendees ?? 0);
+            if (!Number.isFinite(guestCount)) return null;
+            const guestLabel = guestCount > 0 ? `${guestCount} guest registered` : "No guest registrations yet";
+            return (
+              <div className="flex items-center gap-2 cursor-default">
+                <GroupsIcon fontSize="small" className="text-teal-700" />
+                <span>{guestLabel}</span>
+              </div>
+            );
           })()}
 
           {ev.is_multi_day && ev.sessions?.length >= 1 && (
@@ -1580,6 +1597,20 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                       </span>
                     );
                   }
+                })()}
+
+                {(() => {
+                  const showGuestParticipantCount = ev.show_guest_participant_count !== false;
+                  if (!showGuestParticipantCount) return null;
+                  const guestCount = Number(ev.guest_attendees ?? 0);
+                  if (!Number.isFinite(guestCount)) return null;
+                  const guestLabel = guestCount > 0 ? `${guestCount} guest registered` : "No guest registrations yet";
+                  return (
+                    <span className="inline-flex items-center gap-2 cursor-default">
+                      <GroupsIcon fontSize="small" className="text-teal-700" />
+                      {guestLabel}
+                    </span>
+                  );
                 })()}
               </div>
 
