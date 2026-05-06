@@ -672,7 +672,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     const item = await addToCart(ev.id);
     if (item) {
       // addToCart() already tries to refresh /cart/count/ and dispatches "cart:update"
-      // Fallback: only bump if count didn’t change (e.g., /cart/count failed)
+      // Fallback: only bump if count didn't change (e.g., /cart/count failed)
       const after = Number(localStorage.getItem("cart_count") || "0");
       if (after === before) bumpCartCount(1);
 
@@ -1916,6 +1916,8 @@ export default function EventsPage() {
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestJoinEvent, setGuestJoinEvent] = useState(null);
   const [seriesData, setSeriesData] = useState(new Map()); // Map of seriesId -> series data
+  const seriesFetchTimeoutRef = React.useRef(null);
+  const seriesCacheRef = React.useRef(new Map());
 
   const handleGuestJoinRequested = React.useCallback((eventData) => {
     console.debug("[EventsPage] handleGuestJoinRequested called with event:", eventData);
@@ -2013,8 +2015,9 @@ export default function EventsPage() {
       setQ(searchParam);
     }
   }, [searchParams]);
-  const [maxPrice, setMaxPrice] = useState(5000);
-  const [priceRange, setPriceRange] = useState([0, maxPrice || 0]);
+  const [maxPrice, setMaxPrice] = useState(999999);
+  const [priceRange, setPriceRange] = useState([0, 999999]);
+  const priceRangeInitializedRef = React.useRef(false);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
   const [openSelect, setOpenSelect] = useState(null);
@@ -2278,7 +2281,7 @@ export default function EventsPage() {
         if (selectedLocation) url.searchParams.set("location", selectedLocation);
         const preset = presetRangeISO(dateRange);
         const startISO = dmyToISO(startDMY) || preset.start || todayISO();
-        const endISO = dmyToISO(endDMY) || preset.end || "";
+        const endISO = dmyToISO(endDMY) || preset.end || '';
         url.searchParams.set("exclude_ended", "1");
 
         if (startISO) url.searchParams.set("start_date", startISO);
@@ -2321,7 +2324,7 @@ export default function EventsPage() {
 
         const preset = presetRangeISO(dateRange);
         const startISO = dmyToISO(startDMY) || preset.start || todayISO();
-        const endISO = dmyToISO(endDMY) || preset.end || "";
+        const endISO = dmyToISO(endDMY) || preset.end || '';
         if (startISO) url.searchParams.set("start_date", startISO);
         if (endISO) url.searchParams.set("end_date", endISO);
         url.searchParams.set("exclude_ended", "1");
@@ -2363,7 +2366,7 @@ export default function EventsPage() {
 
   useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, filterEventId]);
 
-  // Fetch series data for events that belong to series
+  // Fetch series data for events that belong to series (debounced to not block initial render)
   useEffect(() => {
     const seriesIds = getUniqueSeries(rawEvents);
     if (seriesIds.length === 0) {
@@ -2371,10 +2374,30 @@ export default function EventsPage() {
       return;
     }
 
-    const fetchSeriesData = async () => {
+    // Clear previous timeout
+    if (seriesFetchTimeoutRef.current) {
+      clearTimeout(seriesFetchTimeoutRef.current);
+    }
+
+    // Debounce series fetching so page renders first
+    seriesFetchTimeoutRef.current = setTimeout(async () => {
       try {
+        // Only fetch series we haven't cached yet
+        const seriesToFetch = seriesIds.filter(id => !seriesCacheRef.current.has(id));
+
+        if (seriesToFetch.length === 0) {
+          // All cached, just update from cache
+          const seriesMap = new Map();
+          seriesIds.forEach(id => {
+            const cached = seriesCacheRef.current.get(id);
+            if (cached) seriesMap.set(id, cached);
+          });
+          setSeriesData(seriesMap);
+          return;
+        }
+
         const responses = await Promise.all(
-          seriesIds.map(seriesId =>
+          seriesToFetch.map(seriesId =>
             fetch(`${API_BASE}/series/${seriesId}/`, {
               headers: authConfig().headers,
             })
@@ -2383,39 +2406,46 @@ export default function EventsPage() {
           )
         );
 
-        const seriesMap = new Map();
+        // Update cache and state
         responses.forEach((series, idx) => {
           if (series) {
-            seriesMap.set(seriesIds[idx], series);
+            seriesCacheRef.current.set(seriesToFetch[idx], series);
           }
+        });
+
+        // Build map from all series (cached + newly fetched)
+        const seriesMap = new Map();
+        seriesIds.forEach(id => {
+          const series = seriesCacheRef.current.get(id);
+          if (series) seriesMap.set(id, series);
         });
         setSeriesData(seriesMap);
       } catch (error) {
         console.error('Error fetching series data:', error);
       }
-    };
+    }, 300); // 300ms delay to let page render
 
-    fetchSeriesData();
+    return () => {
+      if (seriesFetchTimeoutRef.current) {
+        clearTimeout(seriesFetchTimeoutRef.current);
+      }
+    };
   }, [rawEvents]);
 
   useEffect(() => {
     const ctrl = new AbortController();
     (async () => {
       try {
-        // Build a categories URL that only returns topics having future/ongoing events
         const url = new URL(CATEGORIES_URL);
         const preset = presetRangeISO(dateRange);
         const startISO = dmyToISO(startDMY) || preset.start || todayISO();
         const endISO = dmyToISO(endDMY) || preset.end || "";
 
-        // mirror the list filters so “past-only” topics drop out
-        url.searchParams.set("exclude_ended", "1"); // hide topics with only ended events
+        url.searchParams.set("exclude_ended", "1");
         if (startISO) url.searchParams.set("start_date", startISO);
         if (endISO) url.searchParams.set("end_date", endISO);
         if (dateRange) url.searchParams.set("date_range", dateRange);
         if (selectedLocation) url.searchParams.set("location", selectedLocation);
-
-
         if (q) url.searchParams.set("search", q);
 
         const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
@@ -2446,7 +2476,6 @@ export default function EventsPage() {
         const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
         const payload = await res.json();
 
-        // Accept many payload shapes then normalize to slugs
         const arr =
           Array.isArray(payload?.results) ? payload.results :
             Array.isArray(payload?.formats) ? payload.formats :
@@ -2463,8 +2492,6 @@ export default function EventsPage() {
         const distinct = Array.from(new Set(values));
         setFormats(distinct.length ? distinct : ["in_person", "online", "hybrid"]);
       } catch {
-        // optionally keep a fallback
-        // setFormats(["in_person", "online", "hybrid"]);
       }
     })();
     return () => ctrl.abort();
@@ -2486,7 +2513,7 @@ export default function EventsPage() {
   };
 
   const selectMenuProps = {
-    // render in a portal so it won’t be clipped by parent containers
+    // render in a portal so it won't be clipped by parent containers
     disablePortal: false,
     container: () => document.body,
 
@@ -2524,7 +2551,7 @@ export default function EventsPage() {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   useEffect(() => {
-    // if the total dropped (e.g., 4 items total), don’t stay on page 2
+    // if the total dropped (e.g., 4 items total), don't stay on page 2
     const pc = Math.max(1, Math.ceil(total / PAGE_SIZE));
     if (page > pc) setPage(pc);
   }, [total]);
@@ -2534,6 +2561,12 @@ export default function EventsPage() {
   }, [topic, format, q]);
 
   useEffect(() => {
+    // Skip the very first maxPrice API response to prevent initial cascading fetch
+    if (!priceRangeInitializedRef.current) {
+      priceRangeInitializedRef.current = true;
+      return;
+    }
+
     setPriceRange((prev) => {
       const newMax = Number(maxPrice) || 0;
       const nextMin = Math.min(prev[0], newMax);
