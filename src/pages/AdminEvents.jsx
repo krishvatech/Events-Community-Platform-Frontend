@@ -435,7 +435,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [maxParticipants, setMaxParticipants] = React.useState(""); // New state
   const [cpdCpeMinutes, setCpdCpeMinutes] = React.useState("");
   const [cpdCpeMinutesPerCredit, setCpdCpeMinutesPerCredit] = React.useState("60");
-  const [showCpdCpe, setShowCpdCpe] = React.useState(true);
+  const [showCpdCpe, setShowCpdCpe] = React.useState(false);
 
   const today = dayjs().format("YYYY-MM-DD");
   const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);

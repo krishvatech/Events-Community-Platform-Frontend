@@ -281,7 +281,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         event?.cpd_cpe_minutes_per_credit ? String(event.cpd_cpe_minutes_per_credit) : "60"
     );
     const [showCpdCpe, setShowCpdCpe] = useState(
-        event?.show_cpd_cpe !== undefined ? event.show_cpd_cpe : true
+        event?.show_cpd_cpe !== undefined ? event.show_cpd_cpe : false
     );
     const [maxParticipants, setMaxParticipants] = useState(event?.max_participants || "");
     const [loungeTableCapacity, setLoungeTableCapacity] = useState(event?.lounge_table_capacity || 4);
@@ -570,7 +570,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setCpdCpeMinutesPerCredit(
             event?.cpd_cpe_minutes_per_credit ? String(event.cpd_cpe_minutes_per_credit) : "60"
         );
-        setShowCpdCpe(event?.show_cpd_cpe !== undefined ? event.show_cpd_cpe : true);
+        setShowCpdCpe(event?.show_cpd_cpe !== undefined ? event.show_cpd_cpe : false);
         setLoungeTableCapacity(event?.lounge_table_capacity || 4);
         setQnaAiPublicSuggestionsEnabled(Boolean(event?.qna_ai_public_suggestions_enabled));
         setPreEventQnaEnabled(Boolean(event?.pre_event_qna_enabled));
