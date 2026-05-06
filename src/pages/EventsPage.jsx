@@ -283,11 +283,18 @@ function normalizeSession(session = {}) {
   };
 }
 
-function toCard(ev) {
-  const visibleRegisteredCount = Number(
-    ev.public_registered_count ?? ev.registrations_count ?? ev.attending_count ?? 0
+function getTotalRegisteredCount(ev = {}) {
+  return Number(
+    ev.total_registered ??
+    (
+      Number(ev.public_registered_count ?? ev.registrations_count ?? ev.total_registered_count ?? ev.attending_count ?? 0) +
+      Number(ev.public_guest_count ?? 0)
+    )
   );
-  const visibleGuestCount = Number(ev.public_guest_count ?? 0);
+}
+
+function toCard(ev) {
+  const totalRegisteredCount = getTotalRegisteredCount(ev);
 
   // map backend fields to the fields your UI already uses
   return {
@@ -303,8 +310,7 @@ function toCard(ev) {
     end_time: ev.end_time,
     location: ev.location,
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
-    attendees: Math.max(0, visibleRegisteredCount),
-    guest_attendees: Math.max(0, Number.isFinite(visibleGuestCount) ? visibleGuestCount : 0),
+    attendees: Math.max(0, Number.isFinite(totalRegisteredCount) ? totalRegisteredCount : 0),
     price: ev.price,
     price_label: ev.price_label,
     is_free: ev.is_free || false,
@@ -660,6 +666,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               // bump whichever field is present so toCard() shows the new number
               registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
               public_registered_count: Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) + 1,
+              total_registered: getTotalRegisteredCount(e) + 1,
             }
             : e
         )
@@ -895,14 +902,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   const isGuest = localStorage.getItem("is_guest") === "true";
                   const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
-                  // Check if participant count should be displayed
-                  const showParticipantCount = ev.show_registered_participant_count !== false;
-                  console.log('Event:', ev.slug, 'showParticipantCount:', showParticipantCount, 'field value:', ev.show_registered_participant_count);
-
-                  // Hide entire section if toggle is OFF
-                  if (!showParticipantCount) return null;
-
-                  const label = ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet";
+                  const label = `${Math.max(0, Number(ev.attendees) || 0)} registered`;
 
                   if (canOpenParticipants) {
                     return (
@@ -927,20 +927,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                 </div>
               );
             }
-          })()}
-
-          {(() => {
-            const showGuestParticipantCount = ev.show_guest_participant_count !== false;
-            if (!showGuestParticipantCount) return null;
-            const guestCount = Number(ev.guest_attendees ?? 0);
-            if (!Number.isFinite(guestCount)) return null;
-            const guestLabel = guestCount > 0 ? `${guestCount} guest registered` : "No guest registrations yet";
-            return (
-              <div className="flex items-center gap-2 cursor-default">
-                <GroupsIcon fontSize="small" className="text-teal-700" />
-                <span>{guestLabel}</span>
-              </div>
-            );
           })()}
 
           {ev.is_multi_day && ev.sessions?.length >= 1 && (
@@ -1106,6 +1092,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                               public_registered_count: Math.max(
                                 0,
                                 Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) - 1
+                              ),
+                              total_registered: Math.max(
+                                0,
+                                getTotalRegisteredCount(e) - 1
                               ),
                             }
                             : e
@@ -1432,6 +1422,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               ...e,
               registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
               public_registered_count: Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) + 1,
+              total_registered: getTotalRegisteredCount(e) + 1,
             }
             : e
         )
@@ -1575,11 +1566,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                   const isGuest = localStorage.getItem("is_guest") === "true";
                   const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
-                  // Check if participant count should be displayed
-                  const showParticipantCount = ev.show_registered_participant_count !== false;
-                  const label = showParticipantCount
-                    ? (ev.attendees > 0 ? `${ev.attendees} registered` : "No registrations yet")
-                    : "Registrations";
+                  const label = `${Math.max(0, Number(ev.attendees) || 0)} registered`;
 
                   if (canOpenParticipants) {
                     return (
@@ -1606,19 +1593,6 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                   }
                 })()}
 
-                {(() => {
-                  const showGuestParticipantCount = ev.show_guest_participant_count !== false;
-                  if (!showGuestParticipantCount) return null;
-                  const guestCount = Number(ev.guest_attendees ?? 0);
-                  if (!Number.isFinite(guestCount)) return null;
-                  const guestLabel = guestCount > 0 ? `${guestCount} guest registered` : "No guest registrations yet";
-                  return (
-                    <span className="inline-flex items-center gap-2 cursor-default">
-                      <GroupsIcon fontSize="small" className="text-teal-700" />
-                      {guestLabel}
-                    </span>
-                  );
-                })()}
               </div>
 
               <div className="mt-3 text-base font-semibold text-neutral-900">
@@ -1695,6 +1669,10 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                                     public_registered_count: Math.max(
                                       0,
                                       Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) - 1
+                                    ),
+                                    total_registered: Math.max(
+                                      0,
+                                      getTotalRegisteredCount(e) - 1
                                     ),
                                   }
                                   : e
@@ -1966,7 +1944,7 @@ export default function EventsPage() {
       setParticipantList(Array.isArray(data) ? data : (data.participants || []));
       setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
       setParticipantTotalRegisteredCount(
-        Number(data?.public_registered_count ?? data?.total_registered_count ?? 0)
+        getTotalRegisteredCount(data)
       );
     } catch (err) {
       setParticipantListError(err.message);

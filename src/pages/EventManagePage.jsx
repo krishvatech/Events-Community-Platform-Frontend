@@ -397,7 +397,6 @@ export default function EventManagePage() {
     show_participants_before_event: true,
     show_participants_after_event: false,
     show_registered_participant_count: true,
-    show_guest_participant_count: true,
     show_public_hosts: true,
     show_public_speakers: true,
     show_public_moderators: false,
@@ -992,7 +991,6 @@ export default function EventManagePage() {
         show_participants_before_event: visibilityUpdated ? (event.show_participants_before_event ?? true) : true,
         show_participants_after_event: event.show_participants_after_event ?? false,
         show_registered_participant_count: event.show_registered_participant_count ?? true,
-        show_guest_participant_count: event.show_guest_participant_count ?? true,
         show_public_hosts: event.show_public_hosts ?? true,
         show_public_speakers: event.show_public_speakers ?? true,
         show_public_moderators: event.show_public_moderators ?? false,
@@ -2439,9 +2437,17 @@ export default function EventManagePage() {
                     sx={{ color: "text.disabled" }}
                   />
                   <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Registered Members:{" "}
                     <strong>
-                      {Math.max(1, event.attending_count != null ? event.attending_count : 0)}
+                      {`${Math.max(
+                        0,
+                        Number(
+                          event.total_registered ??
+                          (
+                            Number(event.public_registered_count ?? event.registrations_count ?? event.attending_count ?? 0) +
+                            Number(event.public_guest_count ?? 0)
+                          )
+                        )
+                      )} registered`}
                     </strong>
                   </Typography>
                 </Stack>
@@ -2514,34 +2520,6 @@ export default function EventManagePage() {
                     <Box>
                       <Typography variant="body2" fontWeight={500}>Show participants after event ends</Typography>
                       <Typography variant="caption" color="text.secondary">Default: Off</Typography>
-                    </Box>
-                  }
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={participantVisibility.show_registered_participant_count}
-                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_registered_participant_count: e.target.checked }))}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body2" fontWeight={500}>Show number of registered participants</Typography>
-                      <Typography variant="caption" color="text.secondary">Default: On</Typography>
-                    </Box>
-                  }
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={participantVisibility.show_guest_participant_count}
-                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_guest_participant_count: e.target.checked }))}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body2" fontWeight={500}>Show number of registered guest participants</Typography>
-                      <Typography variant="caption" color="text.secondary">Default: On</Typography>
                     </Box>
                   }
                 />
@@ -7098,15 +7076,8 @@ export default function EventManagePage() {
                         />
                       </Grid>
                       <Grid item sx={{ width: 'calc(100% - 44px)', wordWrap: 'break-word' }}>
-                        <Box component="span" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box component="span" sx={{ fontWeight: 'bold' }}>
                           {option.first_name} {option.last_name}
-                          {isAlreadyRegistered && (
-                            <Chip
-                              label="Already Registered"
-                              size="small"
-                              sx={{ ml: 1, height: 20, fontSize: 10, bgcolor: '#fed7aa', color: '#92400e' }}
-                            />
-                          )}
                         </Box>
                         <Typography variant="body2" color="text.secondary">
                           {option.email}

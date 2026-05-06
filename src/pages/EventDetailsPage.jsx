@@ -624,7 +624,13 @@ export default function EventDetailsPage() {
       setParticipantList(Array.isArray(data) ? data : (data.participants || []));
       setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
       setParticipantTotalRegisteredCount(
-        Number(data?.public_registered_count ?? data?.total_registered_count ?? 0)
+        Number(
+          data?.total_registered ??
+          (
+            Number(data?.public_registered_count ?? data?.total_registered_count ?? 0) +
+            Number(data?.public_guest_count ?? 0)
+          )
+        )
       );
     } catch (err) {
       setParticipantError(err.message);
@@ -1434,34 +1440,31 @@ export default function EventDetailsPage() {
 
                         {/* Participant Count */}
                         {(() => {
-                          const visibleRegisteredCount = Number(
-                            event.public_registered_count ?? event.registrations_count ?? event.attending_count
+                          const totalRegisteredCount = Number(
+                            event.total_registered ??
+                            (
+                              Number(event.public_registered_count ?? event.registrations_count ?? event.attending_count ?? 0) +
+                              Number(event.public_guest_count ?? 0)
+                            )
                           );
-                          if (!Number.isFinite(visibleRegisteredCount)) return null;
+                          if (!Number.isFinite(totalRegisteredCount)) return null;
                           const owner = isOwnerUser();
                           const staff = isStaffUser();
                           const canView = canViewParticipants(event, owner, staff);
-
-                          // Check if participant count should be displayed - hide entire section if OFF
-                          const showParticipantCount = event.show_registered_participant_count !== false;
-                          if (!showParticipantCount) return null;
-
-                          const label = visibleRegisteredCount > 0
-                            ? `${visibleRegisteredCount} people registered`
-                            : "No registrations yet";
+                          const label = `${Math.max(0, totalRegisteredCount)} registered`;
 
                           if (canView) {
                             return (
                               <Box
-                                onClick={visibleRegisteredCount > 0 ? handleShowParticipants : undefined}
+                                onClick={totalRegisteredCount > 0 ? handleShowParticipants : undefined}
                                 sx={{
                                   p: 1.5,
                                   border: '1px solid',
                                   borderColor: 'grey.200',
                                   borderRadius: 2,
-                                  cursor: visibleRegisteredCount > 0 ? 'pointer' : 'default',
+                                  cursor: totalRegisteredCount > 0 ? 'pointer' : 'default',
                                   transition: 'all 0.2s',
-                                  '&:hover': visibleRegisteredCount > 0 ? {
+                                  '&:hover': totalRegisteredCount > 0 ? {
                                     bgcolor: 'grey.50',
                                     borderColor: 'primary.main',
                                   } : {}
@@ -1469,7 +1472,7 @@ export default function EventDetailsPage() {
                               >
                                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                                   <Stack direction="row" spacing={1.5} alignItems="center">
-                                    {visibleRegisteredCount > 0 && (
+                                    {totalRegisteredCount > 0 && (
                                       <AvatarGroup
                                         max={5}
                                         sx={{
@@ -1500,7 +1503,7 @@ export default function EventDetailsPage() {
                                       <Typography variant="body2" fontWeight={600} color="text.primary">
                                         {label}
                                       </Typography>
-                                      {visibleRegisteredCount > 0 && (
+                                      {totalRegisteredCount > 0 && (
                                         <Typography variant="caption" color="text.secondary">
                                           Click to view list
                                         </Typography>
@@ -1521,27 +1524,6 @@ export default function EventDetailsPage() {
                               </Stack>
                             );
                           }
-                        })()}
-
-                        {(() => {
-                          const showGuestParticipantCount = event.show_guest_participant_count !== false;
-                          if (!showGuestParticipantCount) return null;
-
-                          const visibleGuestCount = Number(event.public_guest_count ?? 0);
-                          if (!Number.isFinite(visibleGuestCount)) return null;
-
-                          const label = visibleGuestCount > 0
-                            ? `${visibleGuestCount} guest registered`
-                            : "No guest registrations yet";
-
-                          return (
-                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default', opacity: 0.8 }}>
-                              <GroupsIcon fontSize="small" className="text-teal-700" />
-                              <Typography variant="body2" color="text.secondary">
-                                {label}
-                              </Typography>
-                            </Stack>
-                          );
                         })()}
 
                         {event?.cpd_cpe_minutes && event?.show_cpd_cpe !== false ? (
