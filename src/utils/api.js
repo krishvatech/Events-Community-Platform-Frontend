@@ -286,6 +286,16 @@ export const mergeAdminUsers = (primaryUserId, secondaryUserId, dryRun = false) 
     dry_run: dryRun,
   }).then((r) => r.data);
 
+// Saleor Staff Management
+export const getSaleorStaffList = () =>
+  apiClient.get(`${ADMIN_USERS_BASE}/saleor-staff/`).then((r) => r.data);
+
+export const addUserToSaleorStaff = (userId) =>
+  apiClient.post(`${ADMIN_USERS_BASE}/${userId}/add-to-saleor-staff/`).then((r) => r.data);
+
+export const removeUserFromSaleorStaff = (userId) =>
+  apiClient.post(`${ADMIN_USERS_BASE}/${userId}/remove-from-saleor-staff/`).then((r) => r.data);
+
 const adminUserBase = (userId) => `${ADMIN_USERS_BASE}/${userId}`;
 
 const adminSub = (userId, resource) => {

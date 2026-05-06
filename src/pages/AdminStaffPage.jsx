@@ -20,7 +20,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
-import { listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deleteAdminUser, mergeAdminUsers } from "../utils/api";
+import { listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deleteAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff } from "../utils/api";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
@@ -322,6 +322,302 @@ function ManualUserDialog({ open, onClose, onSave, loading }) {
     );
 }
 
+// Saleor Staff Management Tab
+function SaleorStaffTab({ currentUserId }) {
+    const navigate = useNavigate();
+    const [superusers, setSuperusers] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const [saleorConnected, setSaleorConnected] = React.useState(false);
+    const [error, setError] = React.useState(null);
+    const [actionLoading, setActionLoading] = React.useState(null); // user ID being updated
+    const [snack, setSnack] = React.useState({ open: false, message: "", severity: "success" });
+    const [addDialog, setAddDialog] = React.useState({ open: false, user: null });
+    const [removeDialog, setRemoveDialog] = React.useState({ open: false, user: null });
+
+    const fetchSaleorStaffList = React.useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await getSaleorStaffList();
+            setSuperusers(data.results || []);
+            setSaleorConnected(data.saleor_connected || false);
+        } catch (err) {
+            const msg = err.response?.data?.detail || err.message || "Failed to load Saleor staff list";
+            setError(msg);
+            setSaleorConnected(false);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        fetchSaleorStaffList();
+    }, [fetchSaleorStaffList]);
+
+    const handleAddToSaleor = async (user) => {
+        setActionLoading(user.id);
+        try {
+            await addUserToSaleorStaff(user.id);
+            setSnack({
+                open: true,
+                severity: "success",
+                message: `✅ ${user.email} added to Saleor staff with Full Access!`
+            });
+            setAddDialog({ open: false, user: null });
+            await fetchSaleorStaffList();
+        } catch (err) {
+            const msg = err.response?.data?.detail || err.message || "Failed to add to Saleor";
+            setSnack({
+                open: true,
+                severity: "error",
+                message: `❌ ${msg}`
+            });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleRemoveFromSaleor = async (user) => {
+        setActionLoading(user.id);
+        try {
+            await removeUserFromSaleorStaff(user.id);
+            setSnack({
+                open: true,
+                severity: "success",
+                message: `✅ ${user.email} removed from Saleor staff!`
+            });
+            setRemoveDialog({ open: false, user: null });
+            await fetchSaleorStaffList();
+        } catch (err) {
+            const msg = err.response?.data?.detail || err.message || "Failed to remove from Saleor";
+            setSnack({
+                open: true,
+                severity: "error",
+                message: `❌ ${msg}`
+            });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    if (!saleorConnected) {
+        return (
+            <Box sx={{ py: 4, textAlign: "center" }}>
+                <Alert severity="warning" sx={{ maxWidth: 500, mx: "auto" }}>
+                    <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+                        ⚠️ Saleor Connection Required
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        You need to connect your Saleor account first to manage Saleor staff members.
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => navigate("/admin/saleor")}
+                        sx={{ textTransform: "none" }}
+                    >
+                        Go to Saleor Settings
+                    </Button>
+                </Alert>
+            </Box>
+        );
+    }
+
+    return (
+        <Box>
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                </Alert>
+            )}
+
+            {/* Header with count and refresh */}
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                        Saleor Staff Members
+                    </Typography>
+                    <Chip
+                        label={`${superusers.length} Superuser${superusers.length !== 1 ? "s" : ""}`}
+                        size="small"
+                        variant="outlined"
+                        sx={{ borderColor: "#0ea5a4", color: "#0ea5a4", fontWeight: 600 }}
+                    />
+                </Box>
+                <Button
+                    size="small"
+                    onClick={fetchSaleorStaffList}
+                    disabled={loading}
+                    sx={{ textTransform: "none" }}
+                >
+                    {loading ? "Refreshing..." : "🔄 Refresh"}
+                </Button>
+            </Box>
+
+            <TableContainer component={Paper} variant="outlined">
+                <Table>
+                    <TableHead>
+                        <TableRow sx={{ backgroundColor: "#f3f4f6" }}>
+                            <TableCell>Superuser</TableCell>
+                            <TableCell>Email</TableCell>
+                            <TableCell align="center">Saleor Status</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {loading ? (
+                            Array.from({ length: 5 }).map((_, idx) => (
+                                <TableRow key={idx}>
+                                    <TableCell colSpan={4}>
+                                        <Skeleton height={40} />
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : superusers.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={4} align="center">
+                                    <Typography variant="body2" color="textSecondary" sx={{ py: 3 }}>
+                                        No superusers found
+                                    </Typography>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            superusers.map((user) => (
+                                <TableRow key={user.id} hover>
+                                    <TableCell>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Avatar
+                                                sx={{ width: 32, height: 32, bgcolor: "#0ea5a4" }}
+                                            >
+                                                {user.username?.[0]?.toUpperCase()}
+                                            </Avatar>
+                                            <Box>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                                    {user.first_name && user.last_name
+                                                        ? `${user.first_name} ${user.last_name}`
+                                                        : user.username}
+                                                </Typography>
+                                            </Box>
+                                        </Stack>
+                                    </TableCell>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell align="center">
+                                        {user.in_saleor ? (
+                                            <Chip
+                                                label="✅ In Saleor"
+                                                size="small"
+                                                color="success"
+                                                sx={{ fontWeight: 600 }}
+                                            />
+                                        ) : (
+                                            <Chip
+                                                label="⊘ Not Added"
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{ fontWeight: 600 }}
+                                            />
+                                        )}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                            {user.id === currentUserId ? (
+                                                <Tooltip title="You cannot manage your own Saleor staff status">
+                                                    <span>
+                                                        <Button
+                                                            size="small"
+                                                            disabled
+                                                            sx={{ textTransform: "none" }}
+                                                        >
+                                                            {user.in_saleor ? "Remove" : "+ Add to Saleor"}
+                                                        </Button>
+                                                    </span>
+                                                </Tooltip>
+                                            ) : user.in_saleor ? (
+                                                <Button
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => setRemoveDialog({ open: true, user })}
+                                                    disabled={actionLoading === user.id}
+                                                    sx={{ textTransform: "none" }}
+                                                >
+                                                    {actionLoading === user.id ? "Removing..." : "Remove"}
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    size="small"
+                                                    color="success"
+                                                    variant="contained"
+                                                    onClick={() => setAddDialog({ open: true, user })}
+                                                    disabled={actionLoading === user.id}
+                                                    sx={{ textTransform: "none" }}
+                                                >
+                                                    {actionLoading === user.id ? "Adding..." : "+ Add to Saleor"}
+                                                </Button>
+                                            )}
+                                        </Stack>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+
+            {/* Add Dialog */}
+            <Dialog open={addDialog.open} onClose={() => setAddDialog({ open: false, user: null })}>
+                <DialogTitle>Add to Saleor Staff?</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Add <strong>{addDialog.user?.email}</strong> to Saleor staff with <strong>Full Access</strong> permission?
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setAddDialog({ open: false, user: null })}>Cancel</Button>
+                    <Button
+                        color="success"
+                        variant="contained"
+                        onClick={() => handleAddToSaleor(addDialog.user)}
+                        disabled={actionLoading === addDialog.user?.id}
+                    >
+                        {actionLoading === addDialog.user?.id ? "Adding..." : "Add to Saleor"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Remove Dialog */}
+            <Dialog open={removeDialog.open} onClose={() => setRemoveDialog({ open: false, user: null })}>
+                <DialogTitle>Remove from Saleor Staff?</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to remove <strong>{removeDialog.user?.email}</strong> from Saleor staff?
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRemoveDialog({ open: false, user: null })}>Cancel</Button>
+                    <Button
+                        color="error"
+                        variant="contained"
+                        onClick={() => handleRemoveFromSaleor(removeDialog.user)}
+                        disabled={actionLoading === removeDialog.user?.id}
+                    >
+                        {actionLoading === removeDialog.user?.id ? "Removing..." : "Remove"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar
+                open={snack.open}
+                autoHideDuration={4000}
+                onClose={() => setSnack({ ...snack, open: false })}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            >
+                <Alert severity={snack.severity} onClose={() => setSnack({ ...snack, open: false })}>
+                    {snack.message}
+                </Alert>
+            </Snackbar>
+        </Box>
+    );
+}
 
 export default function AdminStaffPage() {
 
@@ -388,8 +684,8 @@ export default function AdminStaffPage() {
     const [selectedPrimaryId, setSelectedPrimaryId] = React.useState(null);
 
     const fetchData = React.useCallback(async () => {
-        // Skip fetchData if on duplicates tab
-        if (userTypeFilter === "duplicates") return;
+        // Skip fetchData if on duplicates or saleor-staff tab
+        if (userTypeFilter === "duplicates" || userTypeFilter === "saleor-staff") return;
 
         setLoading(true);
         try {
@@ -669,68 +965,75 @@ export default function AdminStaffPage() {
                         </Box>
 
                         {/* Actions */}
-                        <Box
-                            sx={{
-                                width: { xs: "100%", sm: "auto" },
-                                display: "flex",
-                                flexWrap: "wrap",
-                                justifyContent: { xs: "flex-start", sm: "flex-end" },
-                                gap: 1,
-                            }}
-                        >
-                            {owner && (
-                                <>
-                                    <Button
-                                        variant="outlined"
-                                        color="primary"
-                                        startIcon={<AddIcon />}
-                                        onClick={handleOpenManualCreate}
-                                        sx={{ borderRadius: 8, textTransform: "none" }}
-                                    >
-                                        Create User
-                                    </Button>
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        startIcon={<AddIcon />}
-                                        onClick={handleOpenCreate}
-                                        sx={{ borderRadius: 8, textTransform: "none" }}
-                                    >
-                                        Invite User
-                                    </Button>
-                                </>
-                            )}
-                        </Box>
+                        {userTypeFilter !== "saleor-staff" && (
+                            <Box
+                                sx={{
+                                    width: { xs: "100%", sm: "auto" },
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    justifyContent: { xs: "flex-start", sm: "flex-end" },
+                                    gap: 1,
+                                }}
+                            >
+                                {owner && (
+                                    <>
+                                        <Button
+                                            variant="outlined"
+                                            color="primary"
+                                            startIcon={<AddIcon />}
+                                            onClick={handleOpenManualCreate}
+                                            sx={{ borderRadius: 8, textTransform: "none" }}
+                                        >
+                                            Create User
+                                        </Button>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            startIcon={<AddIcon />}
+                                            onClick={handleOpenCreate}
+                                            sx={{ borderRadius: 8, textTransform: "none" }}
+                                        >
+                                            Invite User
+                                        </Button>
+                                    </>
+                                )}
+                            </Box>
+                        )}
                     </Box>
 
-                    <TextField
-                        size="small"
-                        placeholder="Search users..."
-                        value={q}
-                        onChange={(e) => setQ(e.target.value)}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon />
-                                </InputAdornment>
-                            ),
-                        }}
-                        sx={{ mb: 2, width: { xs: "100%", md: 360 } }}
-                    />
+                    {userTypeFilter !== "saleor-staff" && (
+                        <TextField
+                            size="small"
+                            placeholder="Search users..."
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon />
+                                    </InputAdornment>
+                                ),
+                            }}
+                            sx={{ mb: 2, width: { xs: "100%", md: 360 } }}
+                        />
+                    )}
 
                     <Tabs
                         value={userTypeFilter}
-                        onChange={(e, newValue) => setUserTypeFilter(newValue)}
+                        onChange={(_, newValue) => setUserTypeFilter(newValue)}
                         sx={{ mb: 2, borderBottom: `1px solid #e5e7eb` }}
                     >
                         <Tab label="All Users" value="all" />
                         <Tab label="Superuser" value="superuser" />
                         <Tab label="Staff" value="staff" />
                         <Tab label="Normal User" value="normal" />
+                        {owner && <Tab label="Saleor Staff" value="saleor-staff" />}
                         {owner && <Tab label="Duplicate Accounts" value="duplicates" />}
                     </Tabs>
 
-                    {userTypeFilter !== "duplicates" ? (
+                    {userTypeFilter === "saleor-staff" ? (
+                        <SaleorStaffTab currentUserId={currentUser?.id} />
+                    ) : userTypeFilter !== "duplicates" ? (
                         <Box>
                             <TableContainer component={Paper} variant="outlined">
                             <Table>
