@@ -7041,6 +7041,11 @@ export default function EventManagePage() {
                 return `${option.first_name || ""} ${option.last_name || ""} (${option.email})`;
               }}
               filterOptions={(x) => x} // Disable client-side filtering since we do server-side
+              getOptionDisabled={(option) => {
+                return registrations.some(
+                  reg => reg.user_email?.toLowerCase() === option.email?.toLowerCase()
+                );
+              }}
               inputValue={searchQuery}
               onInputChange={(event, newInputValue) => {
                 setSearchQuery(newInputValue);
@@ -7079,8 +7084,11 @@ export default function EventManagePage() {
               )}
               renderOption={(props, option) => {
                 const { key, ...optionProps } = props;
+                const isAlreadyRegistered = registrations.some(
+                  reg => reg.user_email?.toLowerCase() === option.email?.toLowerCase()
+                );
                 return (
-                  <li key={key} {...optionProps}>
+                  <li key={key} {...optionProps} style={{ opacity: isAlreadyRegistered ? 0.6 : 1 }}>
                     <Grid container alignItems="center">
                       <Grid item sx={{ display: 'flex', width: 44 }}>
                         <Avatar
@@ -7090,8 +7098,15 @@ export default function EventManagePage() {
                         />
                       </Grid>
                       <Grid item sx={{ width: 'calc(100% - 44px)', wordWrap: 'break-word' }}>
-                        <Box component="span" sx={{ fontWeight: 'bold' }}>
+                        <Box component="span" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
                           {option.first_name} {option.last_name}
+                          {isAlreadyRegistered && (
+                            <Chip
+                              label="Already Registered"
+                              size="small"
+                              sx={{ ml: 1, height: 20, fontSize: 10, bgcolor: '#fed7aa', color: '#92400e' }}
+                            />
+                          )}
                         </Box>
                         <Typography variant="body2" color="text.secondary">
                           {option.email}
