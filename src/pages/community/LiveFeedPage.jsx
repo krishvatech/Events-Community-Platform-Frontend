@@ -761,6 +761,7 @@ function mapFeedItem(item) {
     author: {
       id: authorId,      // NEW
       name: displayName,
+      username: item.actor_username || m.author_username || m.actor_username || "",
       avatar: toMediaUrl(item.actor_avatar || m.author_avatar || ""),
       kyc_status: authorKycStatus,   // 👈 so PostCard can show the badge
     },
@@ -3817,10 +3818,16 @@ export default function LiveFeedPage({
       arr = arr.filter((p) => {
         const haystack = [
           p.text,
+          p.community,
           p.group,
           p.author?.name,
+          p.author?.username,
           p.url_title,
           p.url_desc,
+          p.resource?.title,
+          p.resource?.event_title,
+          p.resource?.link_url,
+          p.resource?.video_url,
           p.event?.title,
           p.event?.where,
         ]
