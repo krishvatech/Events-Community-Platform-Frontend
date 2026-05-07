@@ -78,6 +78,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import ForwardToInboxRoundedIcon from "@mui/icons-material/ForwardToInboxRounded";
 import PeopleTwoToneIcon from "@mui/icons-material/PeopleTwoTone";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import AttachMoneyRoundedIcon from "@mui/icons-material/AttachMoneyRounded";
@@ -368,6 +369,12 @@ export default function EventManagePage() {
   const [inviteUsersOpen, setInviteUsersOpen] = useState(false);
   const [inviteEmailsOpen, setInviteEmailsOpen] = useState(false);
   const [regsRefresh, setRegsRefresh] = useState(0);
+
+  // Resend Mail to All State
+  const [resendMailOpen, setResendMailOpen] = useState(false);
+  const [resendMailLoading, setResendMailLoading] = useState(false);
+  const [resendMailResult, setResendMailResult] = useState(null);
+  const [resendMailResultOpen, setResendMailResultOpen] = useState(false);
 
   // User Search State
   const [userOptions, setUserOptions] = useState([]);
@@ -1680,6 +1687,29 @@ export default function EventManagePage() {
       toast.error(e.message);
     } finally {
       setAddParticipantLoading(false);
+    }
+  };
+
+  const handleResendMailToAll = async () => {
+    setResendMailLoading(true);
+    setResendMailOpen(false);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/resend-registration-emails/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || json.error || "Failed to send emails");
+      setResendMailResult(json);
+      setResendMailResultOpen(true);
+    } catch (err) {
+      toast.error(err.message || "Failed to send emails");
+    } finally {
+      setResendMailLoading(false);
     }
   };
 
@@ -3470,6 +3500,16 @@ export default function EventManagePage() {
               sx={{ textTransform: "none", borderRadius: 999, ml: 1 }}
             >
               Invite by Email
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={resendMailLoading ? <CircularProgress size={14} /> : <ForwardToInboxRoundedIcon />}
+              onClick={() => setResendMailOpen(true)}
+              disabled={resendMailLoading || registrations.length === 0}
+              sx={{ textTransform: "none", borderRadius: 999, ml: 1, borderColor: "warning.main", color: "warning.dark" }}
+            >
+              {resendMailLoading ? "Sending..." : "Resend Mail to All"}
             </Button>
           </Stack>
         </Stack>
@@ -7405,6 +7445,67 @@ export default function EventManagePage() {
               mode="event"
               targetIdOrSlug={eventId}
             />
+
+            {/* Resend Mail to All — Confirmation Dialog */}
+            <Dialog
+              open={resendMailOpen}
+              onClose={() => !resendMailLoading && setResendMailOpen(false)}
+              PaperProps={{ style: { borderRadius: 16, padding: 8 } }}
+            >
+              <DialogTitle sx={{ fontWeight: 700 }}>Resend Registration Email?</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  This will resend the registration confirmation email to all{" "}
+                  <strong>{registrations.filter(r => r.status === "registered" && r.attendee_status === "confirmed").length}</strong>{" "}
+                  confirmed registered members. Are you sure?
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={() => setResendMailOpen(false)} disabled={resendMailLoading} color="inherit">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleResendMailToAll}
+                  disabled={resendMailLoading}
+                  variant="contained"
+                  color="warning"
+                  autoFocus
+                >
+                  {resendMailLoading ? "Sending..." : "Yes, Resend All"}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Resend Mail to All — Result Dialog */}
+            <Dialog
+              open={resendMailResultOpen}
+              onClose={() => setResendMailResultOpen(false)}
+              PaperProps={{ style: { borderRadius: 16, padding: 8 } }}
+            >
+              <DialogTitle sx={{ fontWeight: 700 }}>Email Resend Complete</DialogTitle>
+              <DialogContent>
+                <DialogContentText component="div">
+                  <Stack spacing={1} sx={{ mt: 1 }}>
+                    <Typography variant="body2">
+                      <strong>Total targeted:</strong> {resendMailResult?.total_count ?? 0}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: "success.main" }}>
+                      <strong>Successfully sent:</strong> {resendMailResult?.success_count ?? 0}
+                    </Typography>
+                    {(resendMailResult?.failed_count ?? 0) > 0 && (
+                      <Typography variant="body2" sx={{ color: "error.main" }}>
+                        <strong>Failed:</strong> {resendMailResult?.failed_count} (missing or invalid email addresses)
+                      </Typography>
+                    )}
+                  </Stack>
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={() => setResendMailResultOpen(false)} variant="contained">
+                  Done
+                </Button>
+              </DialogActions>
+            </Dialog>
           </>
         )}
 
