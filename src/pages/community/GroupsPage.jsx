@@ -851,7 +851,7 @@ function TopicHeader({ title, groupCount, myGroupCount }) {
         <Box sx={{ mt: 1 }}>
           <Button
             variant="contained"
-            onClick={() => navigate("/group/create")}
+            onClick={() => navigate("/admin/groups", { state: { openCreateGroup: true, redirectAfterCreate: "/community/mygroups" } })}
             sx={{
               textTransform: "none", fontWeight: 700, fontSize: 13,
               bgcolor: "#0A9396", "&:hover": { bgcolor: "#077B7E" },

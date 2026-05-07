@@ -1,7 +1,7 @@
 // src/pages/AdminGroups.jsx
 import React from "react";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
@@ -992,11 +992,21 @@ export default function AdminGroups() {
   }, []);
   const myId = user?.id || user?.pk || user?.user_id || null;
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [groups, setGroups] = React.useState([]);
   const [q, setQ] = React.useState("");
   const [loading, setLoading] = React.useState(true);
 
   const [createOpen, setCreateOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (location.state?.openCreateGroup) {
+      setCreateOpen(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const [editOpen, setEditOpen] = React.useState(false);
   const [editing, setEditing] = React.useState(null);
@@ -1115,9 +1125,14 @@ export default function AdminGroups() {
   }, [totalPages, page]);
 
 
-  const onCreated = (g) => setGroups((prev) => [g, ...prev]);
+  const onCreated = (g) => {
+    setGroups((prev) => [g, ...prev]);
+    const redirectAfterCreate = location.state?.redirectAfterCreate;
+    if (redirectAfterCreate) {
+      navigate(redirectAfterCreate, { replace: true });
+    }
+  };
 
-  const navigate = useNavigate();
   const onOpen = (g) => {
     const id = g?.slug || g?.id;
     if (!id) return;
