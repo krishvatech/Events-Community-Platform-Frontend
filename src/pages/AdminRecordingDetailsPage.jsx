@@ -30,6 +30,10 @@ import {
     MenuItem,
     Alert,
     TextField,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
@@ -44,7 +48,9 @@ import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import InfoIcon from "@mui/icons-material/Info";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
+import { isOwnerUser } from "../utils/adminRole";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
     .toString()
@@ -167,6 +173,12 @@ export default function AdminRecordingDetailsPage() {
     // --- Attendance Category Filter State (for Replay Notifications section) ---
     const [notificationAttendanceFilter, setNotificationAttendanceFilter] = useState("all"); // all, noshow, partial, full
     const [allRegistrations, setAllRegistrations] = useState([]); // Store ALL registrations for attendance filtering
+
+    // --- Delete Event State ---
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteConfirmStep, setDeleteConfirmStep] = useState(1);
+    const [deleteConfirmText, setDeleteConfirmText] = useState("");
+    const [isDeletingEvent, setIsDeletingEvent] = useState(false);
 
     // Fetch all registrations when in attendance filter mode
     useEffect(() => {
@@ -645,6 +657,50 @@ export default function AdminRecordingDetailsPage() {
         }
     };
 
+    const handleDeleteClick = () => {
+        setDeleteConfirmStep(1);
+        setDeleteConfirmText("");
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (deleteConfirmStep === 1) {
+            setDeleteConfirmStep(2);
+            return;
+        }
+
+        if (deleteConfirmText.toUpperCase() !== "DELETE") {
+            alert("Please type DELETE to confirm");
+            return;
+        }
+
+        setIsDeletingEvent(true);
+        try {
+            const res = await fetch(`${API}/events/${id}/`, {
+                method: "DELETE",
+                headers: getTokenHeader(),
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data?.error || "Failed to delete event");
+            }
+
+            // Redirect back after successful deletion
+            navigate("/admin/events");
+        } catch (err) {
+            alert(`Failed to delete event: ${err.message}`);
+        } finally {
+            setIsDeletingEvent(false);
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteDialogOpen(false);
+        setDeleteConfirmStep(1);
+        setDeleteConfirmText("");
+    };
+
     return (
         <Container maxWidth="xl" className="py-8">
             {/* Header */}
@@ -677,6 +733,16 @@ export default function AdminRecordingDetailsPage() {
                     >
                         Export CSV
                     </Button>
+                    {isOwnerUser() && (
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            startIcon={<DeleteOutlineRoundedIcon />}
+                            onClick={handleDeleteClick}
+                        >
+                            Delete Permanently
+                        </Button>
+                    )}
                 </Box>
             </Box>
 
@@ -1205,6 +1271,71 @@ export default function AdminRecordingDetailsPage() {
                     </Paper>
                 </Grid>
             </Grid>
+
+            {/* Delete Event Dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={handleDeleteCancel}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Delete Event Permanently</DialogTitle>
+                <DialogContent>
+                    {deleteConfirmStep === 1 ? (
+                        <>
+                            <Typography sx={{ mb: 1.5, mt: 2 }}>
+                                This will <strong>permanently delete</strong> the entire event, including all recordings and registration data.
+                            </Typography>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: "error.main",
+                                    bgcolor: "rgba(244,67,54,0.1)",
+                                    p: 1.5,
+                                    borderRadius: 1,
+                                    border: "1px solid rgba(244,67,54,0.3)",
+                                    mb: 1,
+                                }}
+                            >
+                                Warning: This action cannot be undone.
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                All participant data, registrations, and recordings will be permanently removed from the system.
+                            </Typography>
+                        </>
+                    ) : (
+                        <>
+                            <Typography sx={{ mb: 1.25, mt: 2 }}>
+                                Type <strong>DELETE</strong> to confirm permanent deletion.
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                placeholder='Type "DELETE"'
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                sx={{ mt: 1 }}
+                            />
+                        </>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleDeleteCancel} disabled={isDeletingEvent}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteConfirm}
+                        color="error"
+                        variant="contained"
+                        disabled={isDeletingEvent}
+                    >
+                        {isDeletingEvent
+                            ? "Deleting..."
+                            : deleteConfirmStep === 1
+                            ? "Continue"
+                            : "Delete Permanently"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Container>
     );
 }
