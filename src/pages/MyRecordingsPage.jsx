@@ -208,7 +208,12 @@ export default function MyRecordingsPage() {
         const past = asList(json)
           .map((r) => r?.event || null)
           .filter(Boolean)
-          .filter(isPast);
+          .filter((ev) =>
+            isPast(ev) &&
+            ev?.replay_available === true &&
+            ev?.replay_visible_to_participants === true &&
+            !!ev?.recording_url
+          );
 
         if (!alive) return;
         setItems(past);

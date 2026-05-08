@@ -478,7 +478,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   // Replay Options
   const [replayAvailable, setReplayAvailable] = React.useState(false);
   const [replayDuration, setReplayDuration] = React.useState("");
-  const [autoPublish, setAutoPublish] = React.useState(true);
+  const [autoPublish, setAutoPublish] = React.useState(false);
 
   // Resources
   const [resourceType, setResourceType] = React.useState("file"); // 'file' | 'link' | 'video'
@@ -957,8 +957,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("recording_url", "");
     fd.append("qna_ai_public_suggestions_enabled", String(qnaAiPublicSuggestionsEnabled));
 
-    const publishMode = autoPublish ? "auto_publish" : "manual_review";
-    console.log("🔍 AdminEvents - Creating event with replay_publishing_mode:", publishMode, "autoPublish:", autoPublish);
+    const publishMode = replayAvailable && autoPublish ? "auto_publish" : "manual_review";
+    console.log("🔍 AdminEvents - Creating event with replay_publishing_mode:", publishMode, "replayAvailable:", replayAvailable, "autoPublish:", autoPublish);
 
     fd.append("replay_publishing_mode", publishMode);
 
@@ -1365,7 +1365,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   control={
                     <Switch
                       checked={replayAvailable}
-                      onChange={(e) => setReplayAvailable(e.target.checked)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setReplayAvailable(checked);
+                        setAutoPublish(checked);
+                      }}
                     />
                   }
                   label="Replay will be available"
@@ -1377,6 +1381,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     control={
                       <Switch
                         checked={autoPublish}
+                        disabled={!replayAvailable}
                         onChange={(e) => setAutoPublish(e.target.checked)}
                       />
                     }
@@ -1386,6 +1391,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       justifyContent: "flex-start",
                       gap: 1.5,
                       "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                      opacity: !replayAvailable ? 0.5 : 1,
                     }}
                   />
                   <Chip

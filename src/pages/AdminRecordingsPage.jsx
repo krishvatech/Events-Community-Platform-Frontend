@@ -209,7 +209,7 @@ export default function AdminRecordingsPage() {
           const json = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
 
-          past = asList(json).filter(isPast);
+          past = asList(json).filter((ev) => isPast(ev) && ev?.replay_available);
         } else {
           // NORMAL USER: only events they registered for
           const url = new URL(`${API}/event-registrations/mine/`);
@@ -224,7 +224,7 @@ export default function AdminRecordingsPage() {
           past = asList(json)
             .map((r) => r?.event || null)
             .filter(Boolean)
-            .filter(isPast);
+            .filter((ev) => isPast(ev) && ev?.replay_available);
         }
 
         if (!alive) return;

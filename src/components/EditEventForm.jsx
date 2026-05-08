@@ -425,7 +425,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
     const [replayAvailable, setReplayAvailable] = React.useState(false);
     const [replayDuration, setReplayDuration] = React.useState("");
-    const [autoPublish, setAutoPublish] = React.useState(true); // ✅ Default true, sync from event in useEffect
+    const [autoPublish, setAutoPublish] = React.useState(false); // Default false, sync with replayAvailable state
 
     // ----- Seed Questions -----
     const [seedQuestions, setSeedQuestions] = useState([]);
@@ -593,10 +593,11 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
         setWaitingRoomGracePeriodMinutes(String(event?.waiting_room_grace_period_minutes || "0"));
         // Init replay options
-        setReplayAvailable(!!event?.replay_available);
+        const replayAvail = !!event?.replay_available;
+        setReplayAvailable(replayAvail);
         setReplayDuration(event?.replay_availability_duration || "");
         console.log("🔍 EditEventForm - replay_publishing_mode from event:", event?.replay_publishing_mode);
-        setAutoPublish(event?.replay_publishing_mode === "auto_publish" ? true : false);
+        setAutoPublish(replayAvail && event?.replay_publishing_mode === "auto_publish" ? true : false);
 
         setParticipants(normalizeParticipantsFromEvent(event));
 
@@ -1336,9 +1337,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("start_time", combineToISO(startDate, startTime));
         fd.append("end_time", combineToISO(isMultiDay ? endDate : startDate, endTime));
 
-        // Send replay publishing mode regardless of replay_available status
-        const publishMode = autoPublish ? "auto_publish" : "manual_review";
-        console.log("🔍 EditEventForm - Updating event with replay_publishing_mode:", publishMode, "autoPublish:", autoPublish);
+        // Only send replay publishing mode if replay is actually available
+        // If replay is not available, force manual_review mode to backend
+        const publishMode = replayAvailable && autoPublish ? "auto_publish" : "manual_review";
+        console.log("🔍 EditEventForm - Updating event with replay_publishing_mode:", publishMode, "replayAvailable:", replayAvailable, "autoPublish:", autoPublish);
         fd.append("replay_publishing_mode", publishMode);
 
         // Send replay update - explicitly send 'true'/'false' and duration (or empty string/null)
@@ -1535,7 +1537,17 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                 control={
                                     <Switch
                                         checked={replayAvailable}
-                                        onChange={(e) => setReplayAvailable(e.target.checked)}
+                                        onChange={(e) => {
+                                            const newReplayAvailable = e.target.checked;
+                                            setReplayAvailable(newReplayAvailable);
+                                            // When replay is turned ON, auto-enable Auto Publish by default
+                                            // When replay is turned OFF, auto-disable Auto Publish
+                                            if (newReplayAvailable) {
+                                                setAutoPublish(true);
+                                            } else {
+                                                setAutoPublish(false);
+                                            }
+                                        }}
                                     />
                                 }
                                 label="Replay will be available"
@@ -1547,6 +1559,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     control={
                                         <Switch
                                             checked={autoPublish}
+                                            disabled={!replayAvailable}
                                             onChange={(e) => setAutoPublish(e.target.checked)}
                                         />
                                     }
@@ -1556,6 +1569,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                         justifyContent: "flex-start",
                                         gap: 1.5,
                                         "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                                        opacity: !replayAvailable ? 0.5 : 1,
                                     }}
                                 />
                                 <Chip

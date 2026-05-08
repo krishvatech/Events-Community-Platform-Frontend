@@ -645,7 +645,7 @@ export default function AdminRecordingDetailsPage() {
 
     // Determine if recording is still being processed
     const meetingEnded = !!(event?.live_ended_at || event?.status === "ended" || event?.end_time);
-    const isRecordingProcessing = meetingEnded && !hasRec && !event?.replay_available;
+    const isRecordingProcessing = meetingEnded && !hasRec && event?.replay_available;
 
     const handleBack = () => {
         if (location.state?.from === "admin") {
@@ -749,41 +749,62 @@ export default function AdminRecordingDetailsPage() {
             <Grid container spacing={3}>
                 {/* Left Col: Video & Info */}
                 <Grid item xs={12} md={7} lg={8}>
-                    <Paper className="rounded-2xl overflow-hidden border border-slate-200 mb-6" elevation={0}>
-                        {hasRec ? (
-                            <Box sx={{ aspectRatio: "16/9", bgcolor: "black", position: "relative" }}>
-                                <video
-                                    src={recordingSrc}
-                                    controls
-                                    style={{ width: "100%", height: "100%" }}
-                                />
-                            </Box>
-                        ) : isRecordingProcessing ? (
-                            <Box className="p-10 text-center bg-amber-50 flex flex-col items-center justify-center" sx={{ minHeight: "300px" }}>
-                                <CircularProgress size={40} sx={{ mb: 2 }} />
-                                <Typography variant="h6" className="font-semibold">Recording is Being Processed</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
-                                    Your recording is being processed. This may take a few minutes. Refresh to check if it's ready.
-                                </Typography>
-                                <Button variant="outlined" size="small" onClick={handleRefreshEvent}>
-                                    Refresh Now
-                                </Button>
-                            </Box>
-                        ) : (
-                            <Box className="p-10 text-center bg-slate-100">
-                                <Typography color="text.secondary">No recording available</Typography>
-                            </Box>
-                        )}
-                        {hasRec && (
-                            <Box className="p-3 flex justify-end bg-slate-50 border-t border-slate-200">
-                                <Button startIcon={<DownloadRoundedIcon />} onClick={handleDownloadVideo}>Download Video</Button>
-                            </Box>
-                        )}
-                    </Paper>
+                    {event?.replay_available && (
+                        <Paper className="rounded-2xl overflow-hidden border border-slate-200 mb-6" elevation={0}>
+                            {hasRec ? (
+                                <Box sx={{ aspectRatio: "16/9", bgcolor: "black", position: "relative" }}>
+                                    <video
+                                        src={recordingSrc}
+                                        controls
+                                        style={{ width: "100%", height: "100%" }}
+                                    />
+                                </Box>
+                            ) : isRecordingProcessing ? (
+                                <Box className="p-10 text-center bg-amber-50 flex flex-col items-center justify-center" sx={{ minHeight: "300px" }}>
+                                    <CircularProgress size={40} sx={{ mb: 2 }} />
+                                    <Typography variant="h6" className="font-semibold">Recording is Being Processed</Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+                                        Your recording is being processed. This may take a few minutes. Refresh to check if it's ready.
+                                    </Typography>
+                                    <Button variant="outlined" size="small" onClick={handleRefreshEvent}>
+                                        Refresh Now
+                                    </Button>
+                                </Box>
+                            ) : (
+                                <Box className="p-10 text-center bg-slate-100">
+                                    <Typography color="text.secondary">No recording available</Typography>
+                                </Box>
+                            )}
+                            {hasRec && (
+                                <Box className="p-3 flex justify-end bg-slate-50 border-t border-slate-200">
+                                    <Button startIcon={<DownloadRoundedIcon />} onClick={handleDownloadVideo}>Download Video</Button>
+                                </Box>
+                            )}
+                        </Paper>
+                    )}
 
                     {/* --- Expiry Timeline Info --- */}
                     <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
-                    {(event?.replay_available || (event?.end_time || event?.live_ended_at)) && getExpiryInfo(event)?.status === "active" && (
+                    {!event?.replay_available ? (
+                        <Box sx={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 2,
+                            p: 2,
+                            bgcolor: "action.hover",
+                            borderRadius: 1
+                        }}>
+                            <InfoIcon sx={{ color: "text.secondary", mt: 0.5 }} />
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" className="font-semibold">
+                                    Replay is disabled for this event
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Recording and replay functionality are not enabled for this event.
+                                </Typography>
+                            </Box>
+                        </Box>
+                    ) : event?.replay_available && getExpiryInfo(event)?.status === "active" && (
                         <Box sx={{
                             mt: 0,
                             pt: 0,
@@ -854,7 +875,7 @@ export default function AdminRecordingDetailsPage() {
                             </Box>
                         </Box>
                     )}
-                    {(event?.replay_available || (event?.end_time || event?.live_ended_at)) && getExpiryInfo(event)?.status === "expired" && (
+                    {event?.replay_available && getExpiryInfo(event)?.status === "expired" && (
                         <Box sx={{
                             mt: 0,
                             pt: 0,
@@ -877,6 +898,7 @@ export default function AdminRecordingDetailsPage() {
                     </Paper>
 
                     {/* --- Upload Replay Section --- */}
+                    {event?.replay_available && (
                     <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
                         <Typography variant="subtitle1" className="font-semibold mb-3">
                             Upload Edited Replay
@@ -937,6 +959,7 @@ export default function AdminRecordingDetailsPage() {
                             </Alert>
                         )}
                     </Paper>
+                    )}
 
                     {/* --- Publish / upload prompt (only for manual_review mode) --- */}
                     {event?.replay_available && !notifPreview?.visible_to_participants && hasRec && replayPublishingMode === "manual_review" && (

@@ -6135,10 +6135,10 @@ export default function NewLiveMeeting() {
   }, [eventId, showSnackbar]);
 
   const triggerAutoRecordingIfEnabled = useCallback(() => {
-    if (autoRecordOnAdmit && !isRecording && !isRecordingPaused) {
+    if (eventData?.replay_available && autoRecordOnAdmit && !isRecording && !isRecordingPaused) {
       handleStartRecording();
     }
-  }, [autoRecordOnAdmit, isRecording, isRecordingPaused, handleStartRecording]);
+  }, [eventData?.replay_available, autoRecordOnAdmit, isRecording, isRecordingPaused, handleStartRecording]);
 
   // Break Mode API Callbacks
   const handleStartBreak = useCallback(async (durationSeconds) => {
@@ -9672,7 +9672,7 @@ export default function NewLiveMeeting() {
       });
 
       // ✅ Auto-record for direct joins (Waiting Room disabled)
-      if (isHost && autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
+      if (isHost && eventData?.replay_available && autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
         // rtkMeeting.participants.joined is a MAP-like object (size/length vary by SDK)
         const participantsCount = rtkMeeting.participants.joined?.size || rtkMeeting.participants.joined?.length || 0;
         if (participantsCount > 0) {
@@ -11825,7 +11825,7 @@ export default function NewLiveMeeting() {
       }
 
       // ✅ Auto-record for direct joins (Waiting Room disabled)
-      if (autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
+      if (eventData?.replay_available && autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
         console.log("[LiveMeeting] Auto-recording triggered by new direct participant join");
         triggerAutoRecordingIfEnabled();
       }
