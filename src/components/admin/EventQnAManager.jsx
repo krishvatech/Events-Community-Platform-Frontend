@@ -37,6 +37,9 @@ const getToken = () =>
   localStorage.getItem("access") ||
   "";
 
+const normalizeList = (data) =>
+  Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+
 export default function EventQnAManager({ event, onEventUpdated }) {
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState([]);
@@ -57,6 +60,13 @@ export default function EventQnAManager({ event, onEventUpdated }) {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [suggestionActionLoading, setSuggestionActionLoading] = useState(null);
   const [expandedGroupId, setExpandedGroupId] = useState(null);
+  const [unansweredPostEventQuestions, setUnansweredPostEventQuestions] = useState([]);
+  const [postEventAnswerDialog, setPostEventAnswerDialog] = useState(null);
+  const [postEventAnswerText, setPostEventAnswerText] = useState("");
+  const [postEventNotifyAuthor, setPostEventNotifyAuthor] = useState(true);
+  const [postEventNotifyInterested, setPostEventNotifyInterested] = useState(true);
+  const [postEventNotifyAll, setPostEventNotifyAll] = useState(false);
+  const [postEventAnswerLoading, setPostEventAnswerLoading] = useState(false);
 
   const pollIntervalRef = useRef(null);
 
@@ -70,18 +80,21 @@ export default function EventQnAManager({ event, onEventUpdated }) {
     setLoading(true);
     setError("");
     try {
-      const [preRes, allRes, postAnsRes] = await Promise.all([
+      const [preRes, allRes, postAnsRes, postUnansweredRes] = await Promise.all([
         fetch(`${API_ROOT}/interactions/questions/admin-pre-event/?event_id=${event.id}`, { headers: authHeaders }),
         fetch(`${API_ROOT}/interactions/questions/?event_id=${event.id}`, { headers: authHeaders }),
         fetch(`${API_ROOT}/interactions/questions/post_event_answered/?event_id=${event.id}`, { headers: authHeaders }),
+        fetch(`${API_ROOT}/interactions/questions/unanswered/?event_id=${event.id}`, { headers: authHeaders }),
       ]);
       if (!preRes.ok) throw new Error("Failed to load pre-event questions.");
       const preData = await preRes.json();
       const allData = allRes.ok ? await allRes.json() : [];
       const postAnsData = postAnsRes.ok ? await postAnsRes.json() : [];
+      const postUnansweredData = postUnansweredRes.ok ? await postUnansweredRes.json() : [];
       setQuestions(Array.isArray(preData) ? preData : []);
       setAllQuestions(Array.isArray(allData) ? allData : []);
-      setPostEventAnswered(Array.isArray(postAnsData) ? postAnsData : []);
+      setPostEventAnswered(normalizeList(postAnsData));
+      setUnansweredPostEventQuestions(normalizeList(postUnansweredData));
     } catch (e) {
       setError(e.message || "Failed to load Q&A data.");
     } finally {
@@ -155,6 +168,36 @@ export default function EventQnAManager({ event, onEventUpdated }) {
       throw new Error(data.detail || `Request failed (${res.status})`);
     }
     return res.status === 204 ? null : res.json().catch(() => null);
+  };
+
+  const handlePostEventAnswer = async () => {
+    if (!postEventAnswerDialog || !postEventAnswerText.trim()) {
+      setError("Answer cannot be empty.");
+      return;
+    }
+    setPostEventAnswerLoading(true);
+    try {
+      await doAction(
+        `${API_ROOT}/interactions/questions/${postEventAnswerDialog.id}/post_event_answer/`,
+        "POST",
+        {
+          answer_text: postEventAnswerText.trim(),
+          notify_author: postEventNotifyAuthor,
+          notify_interested_participants: postEventNotifyInterested,
+          notify_all_participants: postEventNotifyAll,
+        }
+      );
+      setPostEventAnswerDialog(null);
+      setPostEventAnswerText("");
+      setPostEventNotifyAuthor(true);
+      setPostEventNotifyInterested(true);
+      setPostEventNotifyAll(false);
+      load();
+    } catch (e) {
+      setError(e.message || "Failed to submit answer.");
+    } finally {
+      setPostEventAnswerLoading(false);
+    }
   };
 
   const handleSetupSave = async (field, value) => {
@@ -494,11 +537,98 @@ export default function EventQnAManager({ event, onEventUpdated }) {
       </Paper>
 
       <Paper sx={sectionSx}>
-        <Typography variant="h5" sx={{ fontWeight: 500 }}>Post-event Q&A</Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mt: 0.4 }}>
-          Unanswered: {unansweredPostEvent.length} | Answered (post-event): {postEventAnswered.length}
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+          <Typography variant="h5" sx={{ fontWeight: 500 }}>Post-event Q&A</Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => load()}
+            disabled={loading}
+            sx={{
+              textTransform: "uppercase",
+              borderRadius: 1,
+              fontSize: "0.7rem",
+              px: 1.5,
+            }}
+          >
+            {loading ? "Refreshing..." : "Refresh"}
+          </Button>
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Unanswered: {unansweredPostEventQuestions.length} | Answered (post-event): {postEventAnswered.length}
         </Typography>
-        <Button sx={{ mt: 1.5, textTransform: "uppercase", color: "#14b8a6" }} onClick={load}>Refresh Post-event Q&A</Button>
+
+        {/* Unanswered Questions Section */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Unanswered Questions</Typography>
+          {unansweredPostEventQuestions.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">No unanswered post-event questions.</Typography>
+          ) : (
+            <Stack spacing={1.5}>
+              {unansweredPostEventQuestions.map((q) => (
+                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "#ffffff" }}>
+                  <Typography variant="body2" sx={{ mb: 0.8, fontWeight: 500 }}>{q.content}</Typography>
+                  <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      <strong>Asker:</strong> {q.user_display || "Anonymous"}
+                    </Typography>
+                    {q.created_at && (
+                      <Typography variant="caption" color="text.secondary">
+                        <strong>Asked:</strong> {new Date(q.created_at).toLocaleDateString()}
+                      </Typography>
+                    )}
+                  </Stack>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="primary"
+                      onClick={() => {
+                        setPostEventAnswerDialog(q);
+                        setPostEventAnswerText("");
+                        setPostEventNotifyAuthor(true);
+                        setPostEventNotifyInterested(true);
+                        setPostEventNotifyAll(false);
+                      }}
+                      disabled={postEventAnswerLoading}
+                    >
+                      Answer
+                    </Button>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </Box>
+
+        {/* Answered Questions Section */}
+        {postEventAnswered.length > 0 && (
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Answered Questions</Typography>
+            <Stack spacing={1.5}>
+              {postEventAnswered.map((q) => (
+                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "#f0fdf4" }}>
+                  <Typography variant="body2" sx={{ mb: 0.8, fontWeight: 500 }}>{q.content}</Typography>
+                  <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      <strong>Asker:</strong> {q.user_display || "Anonymous"}
+                    </Typography>
+                    {q.answered_at && (
+                      <Typography variant="caption" color="text.secondary">
+                        <strong>Answered:</strong> {new Date(q.answered_at).toLocaleDateString()}
+                      </Typography>
+                    )}
+                  </Stack>
+                  {q.answer_text && (
+                    <Alert severity="success" sx={{ mt: 1, py: 0.8 }}>
+                      <Typography variant="caption"><strong>Answer:</strong> {q.answer_text}</Typography>
+                    </Alert>
+                  )}
+                </Paper>
+              ))}
+            </Stack>
+          </Box>
+        )}
       </Paper>
 
       <Dialog open={!!editing} onClose={() => setEditing(null)} fullWidth maxWidth="sm">
@@ -516,6 +646,48 @@ export default function EventQnAManager({ event, onEventUpdated }) {
         <DialogActions>
           <Button onClick={() => setFeedbackFor(null)}>Cancel</Button>
           <Button onClick={async () => { await doAction(`${API_ROOT}/interactions/questions/${feedbackFor.id}/feedback/`, "POST", { feedback_message: feedbackText }); setFeedbackFor(null); load(); }} variant="contained">Save Feedback</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!postEventAnswerDialog} onClose={() => !postEventAnswerLoading && setPostEventAnswerDialog(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Answer Post-Event Question</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body2" sx={{ mb: 2, fontWeight: 500 }}>Question: {postEventAnswerDialog?.content}</Typography>
+          <TextField
+            fullWidth
+            multiline
+            minRows={4}
+            value={postEventAnswerText}
+            onChange={(e) => setPostEventAnswerText(e.target.value)}
+            placeholder="Type your answer here..."
+            sx={{ mb: 2 }}
+            disabled={postEventAnswerLoading}
+          />
+          <Stack spacing={1}>
+            <FormControlLabel
+              control={<Switch checked={postEventNotifyAuthor} onChange={(e) => setPostEventNotifyAuthor(e.target.checked)} disabled={postEventAnswerLoading} />}
+              label="Notify question author"
+            />
+            <FormControlLabel
+              control={<Switch checked={postEventNotifyInterested} onChange={(e) => setPostEventNotifyInterested(e.target.checked)} disabled={postEventAnswerLoading} />}
+              label="Notify upvoters"
+            />
+            <FormControlLabel
+              control={<Switch checked={postEventNotifyAll} onChange={(e) => setPostEventNotifyAll(e.target.checked)} disabled={postEventAnswerLoading} />}
+              label="Notify all participants"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPostEventAnswerDialog(null)} disabled={postEventAnswerLoading}>Cancel</Button>
+          <Button
+            onClick={handlePostEventAnswer}
+            variant="contained"
+            disabled={postEventAnswerLoading || !postEventAnswerText.trim()}
+            startIcon={postEventAnswerLoading ? <CircularProgress size={16} /> : null}
+          >
+            {postEventAnswerLoading ? "Submitting..." : "Submit Answer"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Stack>
