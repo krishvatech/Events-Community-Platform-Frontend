@@ -29,6 +29,7 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PlaceIcon from "@mui/icons-material/Place";
 import GroupsIcon from "@mui/icons-material/Groups";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
+import PushPinIcon from "@mui/icons-material/PushPin";
 import { FormControl, Select, MenuItem, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -293,7 +294,7 @@ function getTotalRegisteredCount(ev = {}) {
   );
 }
 
-function toCard(ev) {
+function toCard(ev, isPinnedTopCopy = false) {
   const totalRegisteredCount = getTotalRegisteredCount(ev);
 
   // map backend fields to the fields your UI already uses
@@ -347,6 +348,8 @@ function toCard(ev) {
     cpd_cpe_minutes_per_credit: ev.cpd_cpe_minutes_per_credit || 60,
     cpd_cpe_credits: ev.cpd_cpe_credits || null,
     show_cpd_cpe: ev.show_cpd_cpe !== false,
+    is_pinned: ev.is_pinned || false,
+    isPinnedTopCopy: isPinnedTopCopy,
     use_external_streaming: ev.use_external_streaming || false,
     external_streaming_platform: ev.external_streaming_platform,
     external_streaming_url: ev.external_streaming_url,
@@ -761,9 +764,14 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         )}
       </Box>
       <CardContent className="p-4 sm:p-5 md:p-6 flex-1 flex flex-col min-h-[260px] sm:min-h-[280px] md:min-h-[300px]">
-        <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 leading-snug two-line">
-          {ev.title}
-        </h3>
+        <div className="flex items-start gap-2 mb-1">
+          <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 leading-snug two-line flex-1">
+            {ev.title}
+          </h3>
+          {ev.isPinnedTopCopy && (
+            <PushPinIcon sx={{ color: "error.main", fontSize: 24, flexShrink: 0 }} />
+          )}
+        </div>
 
         {ev.description && (
           <p className="mt-2 text-neutral-600 text-sm three-line">{ev.description}</p>
@@ -1525,9 +1533,14 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
         <CardContent className="p-6 md:w-3/5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h3 className="text-xl md:text-2xl font-semibold text-neutral-900 leading-snug">
-                {ev.title}
-              </h3>
+              <div className="flex items-start gap-2 mb-1">
+                <h3 className="text-xl md:text-2xl font-semibold text-neutral-900 leading-snug flex-1">
+                  {ev.title}
+                </h3>
+                {ev.isPinnedTopCopy && (
+                  <PushPinIcon sx={{ color: "error.main", fontSize: 24, flexShrink: 0 }} />
+                )}
+              </div>
               {ev.description && (
                 <p className="mt-2 text-neutral-600 text-sm md:text-base leading-relaxed">
                   {truncate(ev.description, 220)}
@@ -1904,6 +1917,8 @@ export default function EventsPage() {
   const [myRegistrations, setMyRegistrations] = useState({}); // { eventId: registrationObj }
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)
   const [rawEvents, setRawEvents] = useState([]);
+  const [pinnedEvents, setPinnedEvents] = useState([]);
+  const [pinnedLoading, setPinnedLoading] = useState(false);
   const [cmsLoading, setCmsLoading] = useState(true);
   const [cmsError, setCmsError] = useState("");
   const [cmsPage, setCmsPage] = useState(null);
@@ -2392,6 +2407,68 @@ export default function EventsPage() {
   }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId]);
 
   useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, filterEventId]);
+
+  // Fetch pinned events with same filters as normal events
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        setPinnedLoading(true);
+        const headers = { "Content-Type": "application/json" };
+        const token =
+          localStorage.getItem("access_token") ||
+          localStorage.getItem("access_token") ||
+          localStorage.getItem("access");
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const url = new URL(`${EVENTS_URL}pinned/`);
+        url.searchParams.set("min_price", String(priceRange[0]));
+        url.searchParams.set("max_price", String(priceRange[1]));
+        const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
+        topicsToSend.forEach((t) => url.searchParams.append("category", t));
+        if (dateRange) url.searchParams.set("date_range", dateRange);
+        if (selectedLocation) url.searchParams.set("location", selectedLocation);
+
+        const preset = presetRangeISO(dateRange);
+        const startISO = dmyToISO(startDMY) || preset.start || todayISO();
+        const endISO = dmyToISO(endDMY) || preset.end || '';
+        if (startISO) url.searchParams.set("start_date", startISO);
+        if (endISO) url.searchParams.set("end_date", endISO);
+        const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
+        fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
+        if (q) url.searchParams.set("search", q);
+
+        const res = await fetch(url, { headers: { ...headers, ...authHeaders() }, signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : (data.results || []);
+        const now = Date.now();
+
+        const filtered = items.filter((ev) => {
+          const isEndedStatus = String(ev?.status || "").toLowerCase() === "ended";
+          const endMs = ev?.end_time ? new Date(ev.end_time).getTime() : null;
+          const startMs = ev?.start_time ? new Date(ev.start_time).getTime() : null;
+
+          const endedByTime = endMs ? endMs < now : (startMs ? startMs < now : false);
+          if (isEndedStatus || endedByTime) return false;
+
+          if (filterEventId && String(ev?.id) !== filterEventId) return false;
+
+          return true;
+        });
+
+        setPinnedEvents(filtered);
+      } catch (e) {
+        if (e.name !== "AbortError") {
+          console.error("Failed to load pinned events:", e);
+        }
+      } finally {
+        setPinnedLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId]);
 
   // Fetch series data for events that belong to series (debounced to not block initial render)
   useEffect(() => {
@@ -3231,6 +3308,27 @@ export default function EventsPage() {
                     </Box>
                   ))
                   : <>
+                    {/* Display Pinned Events Section */}
+                    {pinnedEvents.length > 0 && (
+                      <>
+                        {pinnedEvents.map((ev) => {
+                          const pinnedCard = toCard(ev, true);
+                          return (
+                            <Box key={`pinned-${ev.id}`}>
+                              <EventCard
+                                ev={{ ...pinnedCard, isRegistered: !!myRegistrations[ev.id] }}
+                                myRegistrations={myRegistrations}
+                                setMyRegistrations={setMyRegistrations}
+                                setRawEvents={setRawEvents}
+                                onShowParticipants={handleShowParticipants}
+                                onGuestJoinRequested={handleGuestJoinRequested}
+                              />
+                            </Box>
+                          );
+                        })}
+                      </>
+                    )}
+
                     {/* Display Series Cards (full_series_only) */}
                     {Array.from(seriesToDisplay.values()).map((series) => (
                       <div
@@ -3343,6 +3441,27 @@ export default function EventsPage() {
                     </Grid>
                   ))
                   : <>
+                    {/* Display Pinned Events Section (list view) */}
+                    {pinnedEvents.length > 0 && (
+                      <>
+                        {pinnedEvents.map((ev) => {
+                          const pinnedCard = toCard(ev, true);
+                          return (
+                            <Grid item key={`pinned-list-${ev.id}`} xs={12}>
+                              <EventRow
+                                ev={{ ...pinnedCard, isRegistered: !!myRegistrations[ev.id] }}
+                                myRegistrations={myRegistrations}
+                                setMyRegistrations={setMyRegistrations}
+                                setRawEvents={setRawEvents}
+                                onShowParticipants={handleShowParticipants}
+                                onGuestJoinRequested={handleGuestJoinRequested}
+                              />
+                            </Grid>
+                          );
+                        })}
+                      </>
+                    )}
+
                     {/* Display Series Cards (list view) */}
                     {Array.from(seriesToDisplay.values()).map((series) => (
                       <Grid item key={`series-${series.id}`} xs={12}>

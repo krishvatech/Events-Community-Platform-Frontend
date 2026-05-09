@@ -66,6 +66,8 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import PushPinIcon from "@mui/icons-material/PushPin";
+import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import SessionDialog from "../components/SessionDialog";
 import SessionList from "../components/SessionList";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
@@ -2881,6 +2883,9 @@ function AdminEventCard({
   reg,
   onUnregistered,
   onCancelRequested,
+  isPlatformAdmin,
+  onPinEvent,
+  onUnpinEvent,
 }) {
   const navigate = useNavigate();
 
@@ -2995,11 +3000,16 @@ function AdminEventCard({
       {/* Content */}
       <Box className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <Chip
-            size="small"
-            label={chip.label}
-            className={`${chip.className} font-medium`}
-          />
+          <div className="flex gap-2 items-center">
+            <Chip
+              size="small"
+              label={chip.label}
+              className={`${chip.className} font-medium`}
+            />
+            {ev.is_pinned && (
+              <PushPinIcon sx={{ color: "error.main", fontSize: 20 }} />
+            )}
+          </div>
           {ev.category && (
             <span className="text-xs text-slate-500">{ev.category}</span>
           )}
@@ -3572,6 +3582,25 @@ function AdminEventCard({
             </>
           )}
 
+          {/* Pin/Unpin Icon Button (superadmin only) */}
+          {isPlatformAdmin && (
+            <Tooltip title={ev.is_pinned ? "Unpin event" : "Pin event"}>
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  ev.is_pinned ? onUnpinEvent?.(ev) : onPinEvent?.(ev);
+                }}
+                sx={{
+                  color: ev.is_pinned ? "error.main" : "#94a3b8",
+                  "&:hover": {
+                    backgroundColor: ev.is_pinned ? "rgba(220, 38, 38, 0.08)" : "rgba(148, 163, 184, 0.08)",
+                  },
+                }}
+              >
+                {ev.is_pinned ? <PushPinIcon /> : <PushPinOutlinedIcon />}
+              </IconButton>
+            </Tooltip>
+          )}
 
           {/* Cancellation / Unregistration Actions (for Staff side) */}
           {!isOwner && reg && status !== "cancelled" && (
@@ -3754,6 +3783,48 @@ function EventsPage() {
       cancelled = true;
     };
   }, [page, tab, q, isPlatformAdmin, token, refreshKey]);
+
+  // Pin/Unpin handlers
+  const handlePinEvent = async (ev) => {
+    if (!isPlatformAdmin || !ev?.id) return;
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`${API_ROOT}/events/${ev.id}/pin/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ pin_priority: 100 }),
+      });
+      if (!res.ok) throw new Error("Failed to pin event");
+      const updated = await res.json();
+      setEvents(prev => prev.map(e => e.id === ev.id ? updated : e));
+    } catch (e) {
+      setErrMsg(e?.message || "Failed to pin event");
+      setErrOpen(true);
+    }
+  };
+
+  const handleUnpinEvent = async (ev) => {
+    if (!isPlatformAdmin || !ev?.id) return;
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`${API_ROOT}/events/${ev.id}/unpin/`, {
+        method: "POST",
+        headers,
+      });
+      if (!res.ok) throw new Error("Failed to unpin event");
+      const updated = await res.json();
+      setEvents(prev => prev.map(e => e.id === ev.id ? updated : e));
+    } catch (e) {
+      setErrMsg(e?.message || "Failed to unpin event");
+      setErrOpen(true);
+    }
+  };
 
   // Actions
   const onHost = async (ev) => {
@@ -3951,7 +4022,8 @@ function EventsPage() {
         <>
           <Box sx={{ flexGrow: 1 }}>
             <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
-              {events.map((ev) => (
+              {/* Pinned Events First */}
+              {events.filter(e => e.is_pinned).map((ev) => (
                 <Grid key={ev.id || ev.slug} size={{ xs: 4, sm: 4, md: 4 }}>
                   <AdminEventCard
                     ev={ev}
@@ -3961,23 +4033,56 @@ function EventsPage() {
                     isJoining={joiningId === (ev.id ?? null)}
                     isOwner={(ev.created_by_id === currentUser?.id) || isOwnerUser()}
                     onEdit={handleEditEvent}
-                    // ✅ Pass registration data & handlers
+                    isPlatformAdmin={isPlatformAdmin}
+                    onPinEvent={handlePinEvent}
+                    onUnpinEvent={handleUnpinEvent}
                     reg={myRegistrations[ev.id]}
                     onUnregistered={(eventId) => {
-                      // Remove from local registration map
                       setMyRegistrations(prev => {
                         const next = { ...prev };
                         delete next[eventId];
                         return next;
                       });
-                      // Remove from events list immediately (since this is "my events" view)
                       setEvents(prev => prev.filter(e => e.id !== eventId));
                       setTotalCount(prev => Math.max(0, prev - 1));
-
                       navigate("/admin/events");
                     }}
                     onCancelRequested={(eventId, updatedReg) => {
-                      // Update local registration map
+                      setMyRegistrations(prev => ({
+                        ...prev,
+                        [eventId]: updatedReg
+                      }));
+                    }}
+                  />
+                </Grid>
+              ))}
+
+              {/* Regular Events */}
+              {events.filter(e => !e.is_pinned).map((ev) => (
+                <Grid key={ev.id || ev.slug} size={{ xs: 4, sm: 4, md: 4 }}>
+                  <AdminEventCard
+                    ev={ev}
+                    onHost={onHost}
+                    isHosting={hostingId === (ev.id ?? null)}
+                    onJoinLive={handleJoinLive}
+                    isJoining={joiningId === (ev.id ?? null)}
+                    isOwner={(ev.created_by_id === currentUser?.id) || isOwnerUser()}
+                    onEdit={handleEditEvent}
+                    isPlatformAdmin={isPlatformAdmin}
+                    onPinEvent={handlePinEvent}
+                    onUnpinEvent={handleUnpinEvent}
+                    reg={myRegistrations[ev.id]}
+                    onUnregistered={(eventId) => {
+                      setMyRegistrations(prev => {
+                        const next = { ...prev };
+                        delete next[eventId];
+                        return next;
+                      });
+                      setEvents(prev => prev.filter(e => e.id !== eventId));
+                      setTotalCount(prev => Math.max(0, prev - 1));
+                      navigate("/admin/events");
+                    }}
+                    onCancelRequested={(eventId, updatedReg) => {
                       setMyRegistrations(prev => ({
                         ...prev,
                         [eventId]: updatedReg
