@@ -565,11 +565,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             <Box sx={{
                 flex: 1,
                 overflowY: "auto",
-                py: 1,
-                // Hide scrollbar
-                "&::-webkit-scrollbar": { display: "none" },
-                scrollbarWidth: "none",
-                msOverflowStyle: "none"
+                py: 1
             }}>
                 {renderList(discoverItems, "EVENTS & COMMUNITY")}
                 {isNormalUser && renderList(trainingsItems, "TRAININGS & COURSES")}
