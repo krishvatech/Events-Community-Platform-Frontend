@@ -347,6 +347,13 @@ function toCard(ev) {
     cpd_cpe_minutes_per_credit: ev.cpd_cpe_minutes_per_credit || 60,
     cpd_cpe_credits: ev.cpd_cpe_credits || null,
     show_cpd_cpe: ev.show_cpd_cpe !== false,
+    use_external_streaming: ev.use_external_streaming || false,
+    external_streaming_platform: ev.external_streaming_platform,
+    external_streaming_url: ev.external_streaming_url,
+    external_streaming_meeting_id: ev.external_streaming_meeting_id,
+    external_streaming_password: ev.external_streaming_password,
+    external_streaming_other_details: ev.external_streaming_other_details,
+    external_streaming_host_link: ev.external_streaming_host_link,
   };
 }
 
@@ -688,6 +695,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   };
 
   const handleJoinCard = () => {
+    // If external streaming enabled, redirect to external platform instead of RTK
+    if (ev?.use_external_streaming && ev?.external_streaming_url) {
+      window.open(ev.external_streaming_url, '_blank');
+      return;
+    }
     const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${isHost ? "publisher" : "audience"}`;
     navigate(livePath, {
       state: {
@@ -1145,7 +1157,23 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         if (isLive) {
                           return (
                             <Button
-                              onClick={() => navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`)}
+                              onClick={() => {
+                                console.log('[EventsPage] Join Live clicked (guest):', {
+                                  eventId: ev.id,
+                                  use_external_streaming: ev?.use_external_streaming,
+                                  external_streaming_url: ev?.external_streaming_url,
+                                  external_streaming_platform: ev?.external_streaming_platform,
+                                  eventObj: ev
+                                });
+                                // If external streaming enabled, redirect to external platform instead of RTK
+                                if (ev?.use_external_streaming && ev?.external_streaming_url) {
+                                  console.log('[EventsPage] ✅ Redirecting to external platform:', ev.external_streaming_url);
+                                  window.open(ev.external_streaming_url, '_blank');
+                                  return;
+                                }
+                                console.log('[EventsPage] ❌ External streaming not enabled, navigating to RTK');
+                                navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`);
+                              }}
                               variant="contained"
                               size="medium"
                               sx={{
@@ -1442,6 +1470,11 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   };
 
   const handleJoinRow = () => {
+    // If external streaming enabled, redirect to external platform instead of RTK
+    if (ev?.use_external_streaming && ev?.external_streaming_url) {
+      window.open(ev.external_streaming_url, '_blank');
+      return;
+    }
     const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${isHost ? "publisher" : "audience"}`;
     navigate(livePath, {
       state: {
@@ -1714,7 +1747,23 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                         if (isLive) {
                           return (
                             <Button
-                              onClick={() => navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`)}
+                              onClick={() => {
+                                console.log('[EventsPage] Join Live clicked (approved guest):', {
+                                  eventId: ev.id,
+                                  use_external_streaming: ev?.use_external_streaming,
+                                  external_streaming_url: ev?.external_streaming_url,
+                                  external_streaming_platform: ev?.external_streaming_platform,
+                                  eventObj: ev
+                                });
+                                // If external streaming enabled, redirect to external platform instead of RTK
+                                if (ev?.use_external_streaming && ev?.external_streaming_url) {
+                                  console.log('[EventsPage] ✅ Redirecting to external platform:', ev.external_streaming_url);
+                                  window.open(ev.external_streaming_url, '_blank');
+                                  return;
+                                }
+                                console.log('[EventsPage] ❌ External streaming not enabled, navigating to RTK');
+                                navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`);
+                              }}
                               variant="contained"
                               size="medium"
                               sx={{

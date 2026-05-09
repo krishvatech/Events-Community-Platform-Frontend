@@ -884,6 +884,26 @@ export default function MyEventsPage() {
     const effectiveIsHost = isActualOwner || isHost;
 
     if (!ev?.id) return;
+
+    // Debug: log event data to check if external streaming fields exist
+    console.log("[MyEventsPage] handleJoinLive - Event data:", {
+      id: ev.id,
+      use_external_streaming: ev?.use_external_streaming,
+      external_streaming_url: ev?.external_streaming_url,
+      external_streaming_host_link: ev?.external_streaming_host_link,
+      all_keys: Object.keys(ev || {}).slice(0, 20)
+    });
+
+    // If external streaming enabled, redirect to external platform instead of RTK
+    if (ev?.use_external_streaming && ev?.external_streaming_url) {
+      // Use host link if available and user is host, otherwise use participant link
+      const redirectUrl = effectiveIsHost && ev?.external_streaming_host_link
+        ? ev.external_streaming_host_link
+        : ev.external_streaming_url;
+      window.open(redirectUrl, '_blank');
+      return;
+    }
+
     setJoiningId(ev.id);
     try {
       const isPreEventLounge = isPreEventLoungeOpen(ev);

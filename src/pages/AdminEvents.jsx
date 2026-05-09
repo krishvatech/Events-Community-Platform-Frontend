@@ -480,6 +480,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [replayDuration, setReplayDuration] = React.useState("");
   const [autoPublish, setAutoPublish] = React.useState(false);
 
+  // External Streaming
+  const [useExternalStreaming, setUseExternalStreaming] = React.useState(false);
+  const [externalStreamingPlatform, setExternalStreamingPlatform] = React.useState("zoom");
+  const [externalStreamingUrl, setExternalStreamingUrl] = React.useState("");
+  const [externalStreamingMeetingId, setExternalStreamingMeetingId] = React.useState("");
+  const [externalStreamingOtherDetails, setExternalStreamingOtherDetails] = React.useState("");
+  const [externalStreamingHostLink, setExternalStreamingHostLink] = React.useState("");
+
   // Resources
   const [resourceType, setResourceType] = React.useState("file"); // 'file' | 'link' | 'video'
   const [resFiles, setResFiles] = React.useState([]);
@@ -756,6 +764,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setEditingSeedIdx(null);
     setQnaAiPublicSuggestionsEnabled(false);
 
+    // External streaming
+    setExternalStreamingPlatform("zoom");
+    setExternalStreamingUrl("");
+    setExternalStreamingMeetingId("");
+    setExternalStreamingOtherDetails("");
+    setExternalStreamingHostLink("");
+
     setErrors({});
   };
 
@@ -981,6 +996,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     }
     fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
     fd.append("pre_event_qna_enabled", String(preEventQnaEnabled));
+
+    // External Streaming Configuration
+    fd.append("use_external_streaming", String(useExternalStreaming));
+    fd.append("external_streaming_platform", externalStreamingPlatform);
+    fd.append("external_streaming_url", externalStreamingUrl.trim());
+    fd.append("external_streaming_meeting_id", externalStreamingMeetingId.trim());
+    fd.append("external_streaming_other_details", externalStreamingOtherDetails.trim());
+
     fd.append("publish_resources_immediately", resourcesPublishNow ? "true" : "false");
     if (!resourcesPublishNow) {
       const publishISO = iso(resPublishDate, resPublishTime);
@@ -1436,6 +1459,89 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       </MenuItem>
                     ))}
                   </TextField>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          {/* External Streaming Options - Only for Virtual/Hybrid */}
+          {(format === "virtual" || format === "hybrid") && (
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+              <Typography variant="h6" className="font-semibold mb-3">Streaming Platform</Typography>
+              <Stack direction="column" spacing={2}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={useExternalStreaming}
+                      onChange={(e) => {
+                        setUseExternalStreaming(e.target.checked);
+                        if (e.target.checked && externalStreamingPlatform === "native") {
+                          setExternalStreamingPlatform("zoom");
+                        }
+                      }}
+                    />
+                  }
+                  label="Use external streaming platform instead of RTK"
+                  sx={{ m: 0 }}
+                />
+
+                {useExternalStreaming && (
+                  <Box sx={{ pl: 2, pt: 1 }}>
+                    <TextField
+                      select
+                      label="Platform *"
+                      value={externalStreamingPlatform}
+                      onChange={(e) => setExternalStreamingPlatform(e.target.value)}
+                      fullWidth
+                      className="mb-3"
+                    >
+                      <MenuItem value="zoom">Zoom</MenuItem>
+                      <MenuItem value="google_meet">Google Meet</MenuItem>
+                      <MenuItem value="microsoft_teams">Microsoft Teams</MenuItem>
+                    </TextField>
+
+                    <TextField
+                      label="Join URL *"
+                      value={externalStreamingUrl}
+                      onChange={(e) => setExternalStreamingUrl(e.target.value)}
+                      placeholder="https://meet.google.com/oai-uunh-kqt"
+                      fullWidth
+                      className="mb-3"
+                      helperText="Direct link for attendees to join"
+                    />
+
+                    <TextField
+                      label="Meeting ID"
+                      value={externalStreamingMeetingId}
+                      onChange={(e) => setExternalStreamingMeetingId(e.target.value)}
+                      placeholder="e.g., oai-uunh-kqt"
+                      fullWidth
+                      className="mb-3"
+                      helperText="Optional: meeting ID for reference"
+                    />
+
+                    <TextField
+                      label="Additional Login Instructions"
+                      value={externalStreamingOtherDetails}
+                      onChange={(e) => setExternalStreamingOtherDetails(e.target.value)}
+                      placeholder="e.g., 'Click the link to join'"
+                      multiline
+                      minRows={2}
+                      fullWidth
+                      className="mb-3"
+                      helperText="Optional: shown to attendees on event details page"
+                    />
+
+                    <TextField
+                      label="Host/Moderator Join Link"
+                      value={externalStreamingHostLink}
+                      onChange={(e) => setExternalStreamingHostLink(e.target.value)}
+                      placeholder="https://zoom.us/j/123456789?pwd=... (host link with password)"
+                      fullWidth
+                      className="mb-3"
+                      helperText="Optional: your personal host link (you'll be redirected here when you click Host). Keep this private!"
+                    />
+                  </Box>
                 )}
               </Stack>
             </Paper>
@@ -3188,6 +3294,116 @@ function AdminEventCard({
                     </Tooltip>
                   )}
 
+                  {/* Mark as Live - For External Streaming Events */}
+                  {ev?.use_external_streaming && ev.status !== "live" && ev.status !== "past" && ev.status !== "cancelled" && (
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const token = getToken();
+                          const headers = {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                          };
+                          // Update local state immediately so button hides right away
+                          ev.status = 'live';
+                          ev.is_live = true;
+
+                          const res = await fetch(`${API_ROOT}/events/${ev.id}/`, {
+                            method: 'PATCH',
+                            headers,
+                            body: JSON.stringify({
+                              status: 'live',
+                              is_live: true
+                            })
+                          });
+                          if (res.ok) {
+                            setErrMsg("Event marked as LIVE! ✅");
+                            setErrOpen(true);
+                            // Refresh events list after a delay
+                            setTimeout(() => window.location.reload(), 1000);
+                          } else {
+                            throw new Error('Failed to mark event as live');
+                          }
+                        } catch (e) {
+                          // Revert local state on error
+                          ev.status = ev.status || 'published';
+                          ev.is_live = false;
+                          setErrMsg(e?.message || "Error marking event as live");
+                          setErrOpen(true);
+                        }
+                      }}
+                      variant="contained"
+                      className="rounded-xl flex-1"
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#10b8a6",
+                        "&:hover": { backgroundColor: "#0ea5a4" },
+                        minWidth: 0,
+                        px: 1.5,
+                        fontSize: "0.85rem",
+                        fontWeight: 500,
+                        boxShadow: "0 2px 8px rgba(16, 184, 166, 0.2)",
+                      }}
+                    >
+                      🔴 Go Live
+                    </Button>
+                  )}
+
+                  {/* End Event - For External Streaming Events that are Live */}
+                  {ev?.use_external_streaming && ev.status === "live" && (
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const token = getToken();
+                          const headers = {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                          };
+                          // Update local state immediately so button hides right away
+                          ev.status = 'ended';
+                          ev.is_live = false;
+
+                          const res = await fetch(`${API_ROOT}/events/${ev.id}/`, {
+                            method: 'PATCH',
+                            headers,
+                            body: JSON.stringify({
+                              status: 'ended',
+                              is_live: false
+                            })
+                          });
+                          if (res.ok) {
+                            setErrMsg("Event ended! ✅");
+                            setErrOpen(true);
+                            // Refresh events list after a delay
+                            setTimeout(() => window.location.reload(), 1000);
+                          } else {
+                            throw new Error('Failed to end event');
+                          }
+                        } catch (e) {
+                          // Revert local state on error
+                          ev.status = 'live';
+                          ev.is_live = true;
+                          setErrMsg(e?.message || "Error ending event");
+                          setErrOpen(true);
+                        }
+                      }}
+                      variant="contained"
+                      className="rounded-xl flex-1"
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#f97316",
+                        "&:hover": { backgroundColor: "#ea580c" },
+                        minWidth: 0,
+                        px: 1.5,
+                        fontSize: "0.85rem",
+                        fontWeight: 500,
+                        boxShadow: "0 2px 8px rgba(249, 115, 22, 0.2)",
+                      }}
+                    >
+                      ⏹️ End Event
+                    </Button>
+                  )}
+
                   {/* Upcoming/Live → View Details (Event Manage) */}
                   <Button
                     component={Link}
@@ -3542,6 +3758,17 @@ function EventsPage() {
   // Actions
   const onHost = async (ev) => {
     if (!ev?.id) return;
+
+    // If external streaming enabled, redirect to external platform instead of RTK
+    if (ev?.use_external_streaming && ev?.external_streaming_url) {
+      // Use host link if available (for organizer), otherwise use participant link
+      const redirectUrl = ev?.external_streaming_host_link
+        ? ev.external_streaming_host_link
+        : ev.external_streaming_url;
+      window.open(redirectUrl, '_blank');
+      return;
+    }
+
     setHostingId(ev.id);
     try {
       const livePath = `/live/${encodeURIComponent(ev.slug || ev.id)}?id=${ev.id}&role=publisher`;

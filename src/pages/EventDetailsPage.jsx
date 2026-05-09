@@ -1154,7 +1154,7 @@ export default function EventDetailsPage() {
   const isLive = status === "live" && event.status !== "ended";
   const multiDayJoinLabel = event.is_multi_day ? joinState?.buttonText : null;
 
-  const primaryActionLabel = isEventOwner ? "Host Now" : getResolvedJoinLabel(event, isLive, false, registration, isEventOwner, multiDayJoinLabel);
+  const primaryActionLabel = isEventOwner ? (event?.use_external_streaming ? "Host on External Platform" : "Host Now") : getResolvedJoinLabel(event, isLive, false, registration, isEventOwner, multiDayJoinLabel);
   const isPostEventLounge = isPostEventLoungeOpen(event);
   const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
@@ -1438,6 +1438,65 @@ export default function EventDetailsPage() {
                           );
                         })()}
 
+                        {/* External Streaming Link - Show when external streaming is enabled */}
+                        {(() => {
+                          if (!event?.use_external_streaming || !event?.external_streaming_url) {
+                            return null;
+                          }
+                          return (
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="flex-start"
+                              sx={{
+                                p: 1.5,
+                                bgcolor: 'success.50',
+                                border: '1px solid',
+                                borderColor: 'success.200',
+                                borderRadius: 1.5,
+                              }}
+                            >
+                              <span role="img" aria-label="video" style={{ marginTop: '2px', fontSize: '1.2rem' }}>
+                                🎥
+                              </span>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" fontWeight={600} sx={{ color: 'success.700', mb: 0.5 }}>
+                                  {event.external_streaming_platform?.charAt(0).toUpperCase() +
+                                    event.external_streaming_platform?.slice(1).replace('_', ' ')}
+                                  {' '}Streaming
+                                  {isLive && (
+                                    <Chip
+                                      label="LIVE NOW"
+                                      size="small"
+                                      sx={{ ml: 1, height: 20, bgcolor: '#10b8a6', color: 'white', fontWeight: 700, fontSize: '0.7rem' }}
+                                    />
+                                  )}
+                                </Typography>
+                                {isLive && (
+                                  <Typography variant="caption" sx={{ display: 'block', color: 'success.700', mb: 1, fontWeight: 600 }}>
+                                    🔴 Event is being streamed on {event.external_streaming_platform?.charAt(0).toUpperCase() + event.external_streaming_platform?.slice(1).replace('_', ' ')} now!
+                                  </Typography>
+                                )}
+                                {event.external_streaming_other_details && (
+                                  <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 1 }}>
+                                    {event.external_streaming_other_details}
+                                  </Typography>
+                                )}
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  href={event.external_streaming_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  sx={{ mt: 0.5, bgcolor: '#10b8a6', '&:hover': { bgcolor: '#0ea5a4' } }}
+                                >
+                                  {isLive ? '🔴 Join Stream (LIVE)' : 'Join Stream'}
+                                </Button>
+                              </Box>
+                            </Stack>
+                          );
+                        })()}
+
                         {/* Participant Count */}
                         {(() => {
                           const totalRegisteredCount = Number(
@@ -1646,7 +1705,17 @@ export default function EventDetailsPage() {
                         ) : canShowActiveJoin && canJoinEventNow ? (
                           <Button
                             onClick={() => {
-                              // If not authenticated, show guest modal; otherwise navigate
+                              // If external streaming enabled, redirect to external platform instead of RTK
+                              if (event?.use_external_streaming && event?.external_streaming_url) {
+                                // Use host link if available (for host), otherwise use participant link
+                                const redirectUrl = isEventOwner && event?.external_streaming_host_link
+                                  ? event.external_streaming_host_link
+                                  : event.external_streaming_url;
+                                window.open(redirectUrl, '_blank');
+                                return;
+                              }
+
+                              // If not authenticated, show guest modal; otherwise navigate to RTK
                               if (!token) {
                                 setGuestModalOpen(true);
                               } else {
@@ -1711,8 +1780,8 @@ export default function EventDetailsPage() {
                                   // After approval, check if user can join with guest token or is registered
                                   const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
                                   if (guestToken) {
-                                    // Guest has JWT token - can join only if event is live
-                                    if (isLive) {
+                                    // Guest has JWT token - can join only if event is live AND not using external streaming
+                                    if (isLive && !event?.use_external_streaming) {
                                       return (
                                         <Button
                                           onClick={() => navigate(`/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=audience`)}
@@ -1726,6 +1795,20 @@ export default function EventDetailsPage() {
                                         >
                                           Join Live
                                         </Button>
+                                      );
+                                    } else if (event?.use_external_streaming && isLive) {
+                                      // Event is live but using external streaming - show message
+                                      return (
+                                        <Chip
+                                          label="Hosted on External Platform"
+                                          variant="outlined"
+                                          sx={{
+                                            py: 2.5,
+                                            borderColor: "#10b8a6",
+                                            color: "#10b8a6",
+                                            fontWeight: 500
+                                          }}
+                                        />
                                       );
                                     } else {
                                       // Event not live yet

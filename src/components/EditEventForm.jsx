@@ -425,7 +425,16 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
     const [replayAvailable, setReplayAvailable] = React.useState(false);
     const [replayDuration, setReplayDuration] = React.useState("");
-    const [autoPublish, setAutoPublish] = React.useState(false); // Default false, sync with replayAvailable state
+    const [autoPublish, setAutoPublish] = React.useState(true); // ✅ Default true, sync from event in useEffect
+
+    // ----- External Streaming -----
+    const [useExternalStreaming, setUseExternalStreaming] = useState(event?.use_external_streaming || false);
+    const [externalStreamingPlatform, setExternalStreamingPlatform] = useState(event?.external_streaming_platform || "native");
+    const [externalStreamingUrl, setExternalStreamingUrl] = useState(event?.external_streaming_url || "");
+    const [externalStreamingMeetingId, setExternalStreamingMeetingId] = useState(event?.external_streaming_meeting_id || "");
+    const [externalStreamingPassword, setExternalStreamingPassword] = useState(event?.external_streaming_password || "");
+    const [externalStreamingOtherDetails, setExternalStreamingOtherDetails] = useState(event?.external_streaming_other_details || "");
+    const [externalStreamingHostLink, setExternalStreamingHostLink] = useState(event?.external_streaming_host_link || "");
 
     // ----- Seed Questions -----
     const [seedQuestions, setSeedQuestions] = useState([]);
@@ -598,6 +607,14 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setReplayDuration(event?.replay_availability_duration || "");
         console.log("🔍 EditEventForm - replay_publishing_mode from event:", event?.replay_publishing_mode);
         setAutoPublish(replayAvail && event?.replay_publishing_mode === "auto_publish" ? true : false);
+        // Init external streaming options
+        setUseExternalStreaming(event?.use_external_streaming || false);
+        setExternalStreamingPlatform(event?.external_streaming_platform || "native");
+        setExternalStreamingUrl(event?.external_streaming_url || "");
+        setExternalStreamingMeetingId(event?.external_streaming_meeting_id || "");
+        setExternalStreamingPassword(event?.external_streaming_password || "");
+        setExternalStreamingOtherDetails(event?.external_streaming_other_details || "");
+        setExternalStreamingHostLink(event?.external_streaming_host_link || "");
 
         setParticipants(normalizeParticipantsFromEvent(event));
 
@@ -1372,6 +1389,15 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             fd.append("total_hours_override_minutes", String(totalHoursOverrideMinutes));
         }
 
+        // Send external streaming configuration
+        fd.append("use_external_streaming", String(useExternalStreaming));
+        fd.append("external_streaming_platform", externalStreamingPlatform);
+        fd.append("external_streaming_url", externalStreamingUrl.trim());
+        fd.append("external_streaming_meeting_id", externalStreamingMeetingId.trim());
+        fd.append("external_streaming_password", externalStreamingPassword.trim());
+        fd.append("external_streaming_other_details", externalStreamingOtherDetails.trim());
+        fd.append("external_streaming_host_link", externalStreamingHostLink.trim());
+
         // Always send participants so backend can replace existing list (including clearing with []).
         const participantsData = participants.map((p, idx) => {
             const data = {
@@ -1614,6 +1640,89 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                         </MenuItem>
                                     ))}
                                 </TextField>
+                            )}
+                        </Stack>
+                    </Paper>
+                )}
+
+                {/* External Streaming Options - Only for Virtual/Hybrid */}
+                {(format === "virtual" || format === "hybrid") && (
+                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+                        <Typography variant="h6" className="font-semibold mb-3">Streaming Platform</Typography>
+                        <Stack direction="column" spacing={2}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={useExternalStreaming}
+                                        onChange={(e) => {
+                                            setUseExternalStreaming(e.target.checked);
+                                            if (e.target.checked && externalStreamingPlatform === "native") {
+                                                setExternalStreamingPlatform("zoom");
+                                            }
+                                        }}
+                                    />
+                                }
+                                label="Use external streaming platform instead of RTK"
+                                sx={{ m: 0 }}
+                            />
+
+                            {useExternalStreaming && (
+                                <Box sx={{ pl: 2, pt: 1 }}>
+                                    <TextField
+                                        select
+                                        label="Platform *"
+                                        value={externalStreamingPlatform}
+                                        onChange={(e) => setExternalStreamingPlatform(e.target.value)}
+                                        fullWidth
+                                        className="mb-3"
+                                    >
+                                        <MenuItem value="zoom">Zoom</MenuItem>
+                                        <MenuItem value="google_meet">Google Meet</MenuItem>
+                                        <MenuItem value="microsoft_teams">Microsoft Teams</MenuItem>
+                                    </TextField>
+
+                                    <TextField
+                                        label="Join URL *"
+                                        value={externalStreamingUrl}
+                                        onChange={(e) => setExternalStreamingUrl(e.target.value)}
+                                        placeholder="https://zoom.us/j/123456789"
+                                        fullWidth
+                                        className="mb-3"
+                                        helperText="Direct link for attendees to join"
+                                    />
+
+                                    <TextField
+                                        label="Meeting ID"
+                                        value={externalStreamingMeetingId}
+                                        onChange={(e) => setExternalStreamingMeetingId(e.target.value)}
+                                        placeholder="e.g., oai-uunh-kqt"
+                                        fullWidth
+                                        className="mb-3"
+                                        helperText="Optional: meeting ID for reference"
+                                    />
+
+                                    <TextField
+                                        label="Additional Login Instructions"
+                                        value={externalStreamingOtherDetails}
+                                        onChange={(e) => setExternalStreamingOtherDetails(e.target.value)}
+                                        placeholder="e.g., 'Click the link to join'"
+                                        multiline
+                                        minRows={2}
+                                        fullWidth
+                                        className="mb-3"
+                                        helperText="Optional: shown to attendees on event details page"
+                                    />
+
+                                    <TextField
+                                        label="Host/Moderator Join Link"
+                                        value={externalStreamingHostLink}
+                                        onChange={(e) => setExternalStreamingHostLink(e.target.value)}
+                                        placeholder="https://zoom.us/j/123456789?pwd=... (host link with password)"
+                                        fullWidth
+                                        className="mb-3"
+                                        helperText="Optional: your personal host link (you'll be redirected here when you click Host). Keep this private!"
+                                    />
+                                </Box>
                             )}
                         </Stack>
                     </Paper>

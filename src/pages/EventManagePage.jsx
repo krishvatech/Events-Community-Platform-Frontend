@@ -1780,6 +1780,17 @@ export default function EventManagePage() {
   // ---- Host / Join Handlers ----
   const onHost = async () => {
     if (!event?.id) return;
+
+    // If external streaming enabled, redirect to external platform instead of RTK
+    if (event?.use_external_streaming && event?.external_streaming_url) {
+      // Use host link if available (for organizer), otherwise use participant link
+      const redirectUrl = event?.external_streaming_host_link
+        ? event.external_streaming_host_link
+        : event.external_streaming_url;
+      window.open(redirectUrl, '_blank');
+      return;
+    }
+
     setHostingId(event.id);
     try {
       const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=publisher`;
@@ -1794,6 +1805,17 @@ export default function EventManagePage() {
 
   const handleJoinLive = async () => {
     if (!event?.id) return;
+
+    // If external streaming enabled, redirect to external platform instead of RTK
+    if (event?.use_external_streaming && event?.external_streaming_url) {
+      // Use host link if available and user is owner, otherwise use participant link
+      const redirectUrl = isOwner && event?.external_streaming_host_link
+        ? event.external_streaming_host_link
+        : event.external_streaming_url;
+      window.open(redirectUrl, '_blank');
+      return;
+    }
+
     setJoiningId(event.id);
     try {
       const isPreEventLounge = isPreEventLoungeOpen(event);
@@ -2302,6 +2324,54 @@ export default function EventManagePage() {
                         )}
                       </Button>
                     </Tooltip>
+
+                    {/* Mark as Live Button - For External Streaming Events */}
+                    {event?.use_external_streaming && status !== "live" && status !== "past" && status !== "cancelled" && (
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const token = getToken();
+                            const headers = {
+                              "Content-Type": "application/json",
+                              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            };
+                            const res = await fetch(`${API_ROOT}/events/${event.id}/`, {
+                              method: 'PATCH',
+                              headers,
+                              body: JSON.stringify({
+                                status: 'live',
+                                is_live: true
+                              })
+                            });
+                            if (res.ok) {
+                              setErrMsg("Event marked as LIVE! ✅");
+                              setErrOpen(true);
+                              // Refresh event data
+                              await refreshEvent();
+                            } else {
+                              setErrMsg("Failed to mark event as live");
+                              setErrOpen(true);
+                            }
+                          } catch (e) {
+                            setErrMsg(e?.message || "Error marking event as live");
+                            setErrOpen(true);
+                          }
+                        }}
+                        variant="contained"
+                        fullWidth
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: "none",
+                          bgcolor: "#10b8a6",
+                          fontSize: 15,
+                          fontWeight: 600,
+                          "&:hover": { bgcolor: "#0ea5a4" },
+                        }}
+                      >
+                        Mark as LIVE 🔴
+                      </Button>
+                    )}
+
                     {status !== "cancelled" && status !== "past" && event.status !== "ended" && event.status !== "cancelled" && (
                       <Button
                         onClick={() => setCancelEventOpen(true)}
