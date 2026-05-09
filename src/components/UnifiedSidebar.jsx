@@ -168,8 +168,12 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     // --- State for badges ---
     const [notifCount, setNotifCount] = useState(0);
     const [messageCount, setMessageCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showMoreIndicator, setShowMoreIndicator] = useState(false);
+    const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
     const menuScrollRef = useRef(null);
     const activeItemRef = useRef(null);
+    const searchInputRef = useRef(null);
 
     // --- Navigation Config ---
     const discoverItems = [
@@ -326,6 +330,24 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         return () => clearTimeout(t);
     }, [location.pathname, location.search, isMobile, mobileOpen]);
 
+    useEffect(() => {
+        const menuEl = menuScrollRef.current;
+        if (!menuEl) return;
+
+        const handleScroll = () => {
+            const isScrollable = menuEl.scrollHeight > menuEl.clientHeight;
+            const notAtBottom = menuEl.scrollTop < menuEl.scrollHeight - menuEl.clientHeight - 50;
+            setShowMoreIndicator(isScrollable && notAtBottom);
+        };
+
+        // Small delay to ensure DOM is measured correctly
+        setTimeout(handleScroll, 100);
+        menuEl.addEventListener("scroll", handleScroll);
+
+        return () => menuEl.removeEventListener("scroll", handleScroll);
+    }, [searchQuery]);
+
+
 
     // --- Actions ---
     const [openLogoutDialog, setOpenLogoutDialog] = useState(false);
@@ -377,7 +399,17 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     };
 
 
-    const renderList = (items, title) => (
+    const filterMenuItems = (items) => {
+        if (!searchQuery.trim()) return items;
+        const query = searchQuery.toLowerCase();
+        return items.filter(item => item.label.toLowerCase().includes(query));
+    };
+
+    const renderList = (items, title) => {
+        const filteredItems = filterMenuItems(items);
+        if (filteredItems.length === 0) return null;
+
+        return (
         <Box sx={{ mb: 2 }}>
             {title && (
                 <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: "block", color: "#C0BAB4", fontWeight: 800, fontSize: 10, letterSpacing: "0.1em" }}>
@@ -385,7 +417,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 </Typography>
             )}
             <List disablePadding>
-                {items.map((item, idx) => {
+                {filteredItems.map((item, idx) => {
                     const isActive = item.to ? location.pathname === item.to || (item.to.includes("?") && location.pathname + location.search === item.to) : false;
                     // Approximate active check for query params? 
                     // UnifiedSidebar might need smarter matching if we have query params.
@@ -473,10 +505,51 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 })}
             </List>
         </Box>
-    );
+        );
+    };
 
     // --- User Profile State ---
     const [user, setUser] = useState(null);
+
+    // Calculate total filtered items
+    const allItems = [
+        ...discoverItems,
+        ...(isNormalUser ? trainingsItems : []),
+        ...(isNormalUser ? resourcesItems : []),
+        ...manageItems,
+        ...(adminItems.length > 0 ? adminItems : [])
+    ];
+
+    const filteredCount = searchQuery.trim()
+        ? allItems.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase())).length
+        : 0;
+
+    // Search keyboard shortcuts
+    useEffect(() => {
+        if (filteredCount === 0) {
+            setCurrentSearchIndex(0);
+            return;
+        }
+
+        const handleKeyDown = (e) => {
+            if (e.key === "/" && !searchQuery) {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            } else if (e.key === "Escape" && searchQuery) {
+                setSearchQuery("");
+                setCurrentSearchIndex(0);
+            } else if (e.key === "ArrowDown" && searchQuery) {
+                e.preventDefault();
+                setCurrentSearchIndex(prev => (prev + 1) % filteredCount);
+            } else if (e.key === "ArrowUp" && searchQuery) {
+                e.preventDefault();
+                setCurrentSearchIndex(prev => (prev - 1 + filteredCount) % filteredCount);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [searchQuery, filteredCount]);
 
     useEffect(() => {
         let active = true;
@@ -565,13 +638,129 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             <Box sx={{
                 flex: 1,
                 overflowY: "auto",
-                py: 1
-            }}>
+                py: 1,
+                position: "relative",
+                "&::-webkit-scrollbar": {
+                    width: "6px"
+                },
+                "&::-webkit-scrollbar-track": {
+                    bg: "transparent"
+                },
+                "&::-webkit-scrollbar-thumb": {
+                    bgcolor: "rgba(0, 0, 0, 0.2)",
+                    borderRadius: "3px",
+                    "&:hover": {
+                        bgcolor: "rgba(0, 0, 0, 0.3)"
+                    }
+                },
+                scrollbarWidth: "thin",
+                scrollbarColor: "rgba(0, 0, 0, 0.2) transparent"
+            }} ref={menuScrollRef}>
+                {/* Sticky Search Bar */}
+                <Box sx={{
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 10,
+                    bgcolor: "#ffffff",
+                    p: 1.5,
+                    mb: 1,
+                    borderBottom: `1px solid ${CARD_BORDER}`
+                }}>
+                    <Box sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        bgcolor: "rgba(0, 0, 0, 0.04)",
+                        borderRadius: 1.5,
+                        px: 1.5,
+                        py: 0.75,
+                        justifyContent: "space-between"
+                    }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flex: 1, minWidth: 0 }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="m21 21-4.35-4.35" />
+                            </svg>
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                placeholder="Search"
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    setCurrentSearchIndex(0);
+                                }}
+                                style={{
+                                    flex: 1,
+                                    border: "none",
+                                    background: "transparent",
+                                    outline: "none",
+                                    fontSize: "14px",
+                                    fontFamily: "inherit",
+                                    color: TEXT,
+                                    minWidth: 0
+                                }}
+                            />
+                        </Box>
+                        <Box sx={{ fontSize: "12px", color: "#666", fontWeight: 600, whiteSpace: "nowrap", ml: 1 }}>
+                            {searchQuery && filteredCount > 0
+                                ? `${currentSearchIndex + 1} / ${filteredCount}`
+                                : `${allItems.length}`
+                            }
+                        </Box>
+                    </Box>
+                </Box>
+
                 {renderList(discoverItems, "EVENTS & COMMUNITY")}
                 {isNormalUser && renderList(trainingsItems, "TRAININGS & COURSES")}
                 {isNormalUser && renderList(resourcesItems, "RESOURCES")}
                 {renderList(manageItems, isNormalUser ? "PERSONAL" : "MY CONTENT")}
                 {adminItems.length > 0 && renderList(adminItems, "PLATFORM")}
+
+                {/* More Indicator - sticky positioning */}
+                <Box sx={{
+                    position: "sticky",
+                    bottom: 0,
+                    display: "flex",
+                    justifyContent: "center",
+                    py: 1.5,
+                    px: 1.5,
+                    bgcolor: "#ffffff",
+                    borderTop: `1px solid ${CARD_BORDER}`,
+                    opacity: showMoreIndicator ? 1 : 0,
+                    pointerEvents: showMoreIndicator ? "auto" : "none",
+                    transition: "opacity 0.2s",
+                    zIndex: 5
+                }}>
+                    <Button
+                        onClick={() => {
+                            const menuEl = menuScrollRef.current;
+                            if (menuEl) {
+                                menuEl.scrollBy({
+                                    top: menuEl.clientHeight,
+                                    behavior: "smooth"
+                                });
+                            }
+                        }}
+                        sx={{
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontSize: "13px",
+                            fontWeight: 500,
+                            color: ORANGE,
+                            bgcolor: HOVER_BG,
+                            padding: "8px 16px",
+                            border: `1px solid ${ORANGE}20`,
+                            "&:hover": {
+                                bgcolor: "rgba(232,83,47,0.12)",
+                                borderColor: `${ORANGE}40`
+                            },
+                            transition: "all 0.2s"
+                        }}
+                    >
+                        ↓ More
+                    </Button>
+                </Box>
             </Box>
 
             <Box sx={{ px: 1, pt: 0.5, pb: 0.5 }}>
