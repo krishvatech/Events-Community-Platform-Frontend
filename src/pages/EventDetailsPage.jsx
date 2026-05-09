@@ -900,7 +900,7 @@ export default function EventDetailsPage() {
       try {
         // If we came from a list and have the ID, fetch by ID only (avoid slug 404 spam)
         if (fallbackId) {
-          const byIdUrl = urlJoin(API_BASE, `/events/${fallbackId}/?include=questions`);
+          const byIdUrl = urlJoin(API_BASE, `/events/${fallbackId}/?include=questions&include_ended=true`);
           const res = await fetch(byIdUrl, {
             headers: {
               "Content-Type": "application/json",
@@ -923,7 +923,7 @@ export default function EventDetailsPage() {
           return;
         }
         // No ID in state? User probably hit a direct link — try by slug.
-        const bySlugUrl = urlJoin(API_BASE, `/events/${encodeURIComponent(slug)}/?include=questions`);
+        const bySlugUrl = urlJoin(API_BASE, `/events/${encodeURIComponent(slug)}/?include=questions&include_ended=true`);
         const resSlug = await fetch(bySlugUrl, {
           headers: {
             "Content-Type": "application/json",
