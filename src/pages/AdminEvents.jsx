@@ -3235,11 +3235,11 @@ function AdminEventCard({
                     </Button>)
                   )}
 
-                  {/* Past -> View Details (Recording Details Page) */}
+                  {/* Past -> View Details (Event Details Page) */}
                   <Button
                     component={Link}
-                    to={`/admin/recordings/${ev.id}`}
-                    state={{ from: "admin" }}
+                    to={`/admin/events/${ev.id}`}
+                    state={{ event: ev, from: "admin" }}
                     variant="outlined"
                     className="rounded-xl flex-1"
                     sx={{
