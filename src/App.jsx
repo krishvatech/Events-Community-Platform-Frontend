@@ -226,10 +226,11 @@ const AppShell = () => {
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/cms" element={<RequireAuth><CmsBridge /></RequireAuth>} />
-          <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
-          <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
-          <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
-          <Route path="/auth/magic-link" element={<MagicLinkPage />} />
+	          <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
+	          <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
+	          <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+	          <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
+	          <Route path="/auth/magic-link" element={<MagicLinkPage />} />
           <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
           <Route path="/oauth/callback" element={<SocialOAuthCallback />} />
           <Route path="/cognito/callback" element={<CognitoOAuthCallback />} />

@@ -5,7 +5,7 @@ import FeaturesSection from '../components/FeaturesSection.jsx';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { cognitoForgotPassword, cognitoConfirmForgotPassword } from "../utils/cognitoAuth";
+import { API_BASE } from "../utils/api";
 import { InputAdornment, IconButton } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
@@ -32,21 +32,27 @@ const ForgotPassword = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState(initialEmail);
-    const [resolvedIdentifier, setResolvedIdentifier] = useState('');
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
+    const [deliveryHint, setDeliveryHint] = useState('');
 
-    const getForgotPasswordCandidates = (emailValue) => {
-        const normalizedEmail = (emailValue || '').trim().toLowerCase();
-        const candidates = [
-            localStorage.getItem('last_cognito_username') || '',
-            localStorage.getItem('last_login_email') || '',
-            normalizedEmail,
-        ]
-            .map((v) => String(v || '').trim())
-            .filter(Boolean);
-
-        return [...new Set(candidates)];
+    const postJson = async (path, payload) => {
+        const res = await fetch(`${API_BASE}${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload || {}),
+        });
+        let data = null;
+        try {
+            data = await res.clone().json();
+        } catch {
+            data = null;
+        }
+        if (!res.ok) {
+            const msg = data?.detail || `HTTP ${res.status}`;
+            throw new Error(msg);
+        }
+        return data;
     };
 
     const validate = () => {
@@ -88,14 +94,13 @@ const ForgotPassword = () => {
             setLoading(true);
             try {
                 const emailLower = email.trim().toLowerCase();
-                const candidates = getForgotPasswordCandidates(emailLower);
-                const result = await cognitoForgotPassword({
-                    usernameOrEmail: emailLower,
-                    candidates,
-                });
-                setResolvedIdentifier(result?.usedIdentifier || emailLower);
+                const resp = await postJson("/auth/password/forgot-cognito/", { email: emailLower });
+                const medium = (resp?.delivery?.medium || "").toString().toUpperCase();
+                if (medium === "EMAIL") setDeliveryHint("Check your email for the verification code.");
+                else if (medium === "SMS") setDeliveryHint("Check your phone (SMS) for the verification code.");
+                else setDeliveryHint("Check your email (and possibly SMS) for the verification code.");
 
-                toast.success('If the account exists, an OTP has been sent.');
+                toast.success('If the account exists, a verification code has been sent.');
                 setStep('confirm'); // ✅ stay on same page
             } catch (err) {
                 const msg = err?.message || 'Something went wrong. Please try again.';
@@ -113,12 +118,11 @@ const ForgotPassword = () => {
         setLoading(true);
         try {
             const emailLower = email.trim().toLowerCase();
-            const candidates = getForgotPasswordCandidates(emailLower);
-            await cognitoConfirmForgotPassword({
-                usernameOrEmail: resolvedIdentifier || emailLower,
-                candidates,
+            await postJson("/auth/password/reset-cognito/", {
+                email: emailLower,
                 code: code.trim(),
-                newPassword,
+                new_password: newPassword,
+                confirm_new_password: confirmPassword,
             });
 
             toast.success('Password reset successfully! Redirecting...');
@@ -182,6 +186,11 @@ const ForgotPassword = () => {
                             <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
                                 Enter your email and we&apos;ll send you a verification code (OTP).
                             </Typography>
+                            {step === 'confirm' && deliveryHint ? (
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                    {deliveryHint}
+                                </Typography>
+                            ) : null}
                         </Box>
 
                         {/* Card */}
