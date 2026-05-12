@@ -2722,8 +2722,14 @@ export default function EventsPage() {
   // Compute which series and events to display
   const seriesToDisplay = new Map(); // seriesId -> series object
   const eventsToDisplay = [];
+  const pinnedEventIds = new Set(pinnedEvents.map(ev => ev.id));
 
   events.forEach((ev) => {
+    // Skip if this event is already pinned (will be shown in pinned section)
+    if (pinnedEventIds.has(ev.id)) {
+      return;
+    }
+
     // If event has a series with "full_series_only" mode, add series to display
     if (ev.series && seriesData.has(ev.series)) {
       const series = seriesData.get(ev.series);
