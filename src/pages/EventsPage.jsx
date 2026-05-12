@@ -2354,8 +2354,18 @@ export default function EventsPage() {
         if (token) headers.Authorization = `Bearer ${token}`;
 
         const url = new URL(EVENTS_URL);
-        url.searchParams.set("limit", String(PAGE_SIZE));
-        url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
+        // Paginate considering pinned events: pinned cards occupy slots before regular cards
+        // Example: 9 slots/page, 1 pinned event
+        // Page 1: 1 pinned + 8 regular = 9 cards
+        // Page 2: 0 pinned + 9 regular = 9 cards, but offset must be 8 (not 9) to skip the pinned
+        const pageStartIndex = (page - 1) * PAGE_SIZE;
+        const pinnedBeforeThisPage = Math.min(pinnedEvents.length, pageStartIndex);
+        const regularOffset = Math.max(0, pageStartIndex - pinnedBeforeThisPage);
+
+        // Fetch extra to account for pinned events in the regular API response
+        const fetchLimit = PAGE_SIZE + pinnedEvents.length;
+        url.searchParams.set("limit", String(fetchLimit));
+        url.searchParams.set("offset", String(regularOffset));
         url.searchParams.set("min_price", String(priceRange[0]));
         url.searchParams.set("max_price", String(priceRange[1]));
         url.searchParams.set("ordering", "start_time");
@@ -2404,7 +2414,7 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId]);
+  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId, pinnedEvents.length]);
 
   useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, filterEventId]);
 
@@ -2723,8 +2733,26 @@ export default function EventsPage() {
   const seriesToDisplay = new Map(); // seriesId -> series object
   const eventsToDisplay = [];
   const pinnedEventIds = new Set(pinnedEvents.map(ev => ev.id));
+  const displayedPinnedEvents = [];
+
+  // Paginate pinned events: determine which ones to show on this page
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pageEnd = page * PAGE_SIZE;
+
+  // Pinned events to show on this page
+  for (let i = pageStart; i < pageEnd && i < pinnedEvents.length; i++) {
+    displayedPinnedEvents.push(pinnedEvents[i]);
+  }
+
+  // Regular events needed to fill remaining slots
+  const remainingSlots = PAGE_SIZE - displayedPinnedEvents.length;
 
   events.forEach((ev) => {
+    // Skip if already have enough events for this page
+    if (eventsToDisplay.length >= remainingSlots) {
+      return;
+    }
+
     // Skip if this event is already pinned (will be shown in pinned section)
     if (pinnedEventIds.has(ev.id)) {
       return;
@@ -3315,9 +3343,9 @@ export default function EventsPage() {
                   ))
                   : <>
                     {/* Display Pinned Events Section */}
-                    {pinnedEvents.length > 0 && (
+                    {displayedPinnedEvents.length > 0 && (
                       <>
-                        {pinnedEvents.map((ev) => {
+                        {displayedPinnedEvents.map((ev) => {
                           const pinnedCard = toCard(ev, true);
                           return (
                             <Box key={`pinned-${ev.id}`}>
@@ -3448,9 +3476,9 @@ export default function EventsPage() {
                   ))
                   : <>
                     {/* Display Pinned Events Section (list view) */}
-                    {pinnedEvents.length > 0 && (
+                    {displayedPinnedEvents.length > 0 && (
                       <>
-                        {pinnedEvents.map((ev) => {
+                        {displayedPinnedEvents.map((ev) => {
                           const pinnedCard = toCard(ev, true);
                           return (
                             <Grid item key={`pinned-list-${ev.id}`} xs={12}>
