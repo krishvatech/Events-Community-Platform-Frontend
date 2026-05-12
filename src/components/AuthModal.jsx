@@ -22,6 +22,7 @@ import { cognitoSignIn, cognitoSignUp, cognitoConfirmSignUp, cognitoResendSignUp
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
 import { API_BASE } from "../utils/api";
+import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
 
 const GOOGLE_ICON = (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -323,12 +324,43 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
     }
   };
 
-  const handleSocialLogin = (provider) => {
+  const handleSocialLogin = async (provider) => {
     const base = import.meta.env.VITE_COGNITO_DOMAIN || "";
     const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
-    const redirect = `${window.location.origin}/cognito/callback`;
+    const redirect = import.meta.env.VITE_COGNITO_REDIRECT_URI || `${window.location.origin}/cognito/callback`;
     if (base && clientId) {
-      window.location.href = `${base}/oauth2/authorize?identity_provider=${provider}&redirect_uri=${encodeURIComponent(redirect)}&response_type=CODE&client_id=${clientId}&scope=email+openid+profile`;
+      // Prevent stale-session refresh loops while OAuth callback is in progress.
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("id_token");
+      localStorage.removeItem("user");
+
+      const state = randomString(16);
+      const verifier = randomString(48);
+      const challenge = await pkceChallengeFromVerifier(verifier);
+
+      sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
+      localStorage.setItem(`pkce_verifier_${state}`, verifier);
+
+      const intended =
+        new URLSearchParams(window.location.search).get("next") ||
+        window.location.pathname ||
+        "/account/events";
+      sessionStorage.setItem(`post_login_redirect_${state}`, intended);
+      localStorage.setItem(`post_login_redirect_${state}`, intended);
+
+      const params = new URLSearchParams({
+        response_type: "code",
+        client_id: clientId,
+        redirect_uri: redirect,
+        scope: "openid email profile",
+        state,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        identity_provider: provider,
+      });
+
+      window.location.href = `${base}/oauth2/authorize?${params.toString()}`;
     }
   };
 

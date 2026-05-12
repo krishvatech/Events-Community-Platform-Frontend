@@ -67,13 +67,19 @@ const CognitoOAuthCallback = () => {
     console.log("🔍 URL Parameters:", { code, state, error, errorDescription });
 
     // Check if user came from WordPress login (has higher priority)
-    const wpRedirect = sessionStorage.getItem("post_wordpress_cognito_redirect");
+    const wpRedirect = sessionStorage.getItem("post_wordpress_cognito_redirect") || localStorage.getItem("post_wordpress_cognito_redirect");
 
     const redirectKey = `post_login_redirect_${state}`;
-    const intended = wpRedirect || sessionStorage.getItem(redirectKey) || "/account/events";
+    const intended =
+      wpRedirect ||
+      sessionStorage.getItem(redirectKey) ||
+      localStorage.getItem(redirectKey) ||
+      "/account/events";
 
     sessionStorage.removeItem(redirectKey);
+    localStorage.removeItem(redirectKey);
     sessionStorage.removeItem("post_wordpress_cognito_redirect");
+    localStorage.removeItem("post_wordpress_cognito_redirect");
 
     if (error) {
       console.error("❌ Cognito error:", error, errorDescription);
@@ -97,6 +103,12 @@ const CognitoOAuthCallback = () => {
       return;
     }
 
+    // Clear stale auth before exchanging OAuth code.
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("id_token");
+    localStorage.removeItem("user");
+
     console.log("✅ Authorization code received:", code);
 
     // Use state if present, otherwise generate a temporary one
@@ -114,7 +126,7 @@ const CognitoOAuthCallback = () => {
     }));
 
     const verifierKey = `pkce_verifier_${finalState}`;
-    let verifier = sessionStorage.getItem(verifierKey);
+    let verifier = sessionStorage.getItem(verifierKey) || localStorage.getItem(verifierKey);
     console.log("🔍 Looking for verifier with key:", verifierKey, "Found:", !!verifier);
 
     // If no verifier for this state, try to find any stored verifier
@@ -125,16 +137,20 @@ const CognitoOAuthCallback = () => {
         const key = sessionStorage.key(i);
         if (key?.startsWith("pkce_verifier_")) {
           verifier = sessionStorage.getItem(key);
+          if (!verifier) verifier = localStorage.getItem(key);
           console.log("✅ Found stored verifier:", key);
           sessionStorage.removeItem(key);
+          localStorage.removeItem(key);
           break;
         }
       }
     }
 
     if (!verifier) {
-      console.warn("⚠️ PKCE verifier missing - proceeding without PKCE (Google IdP limitation)");
-      // Don't fail here - Google IdP doesn't always return state/verifier
+      console.error("❌ PKCE verifier missing - cannot exchange token safely");
+      toast.error("Login session expired. Please try Google/LinkedIn login again.");
+      navigate("/signin", { replace: true });
+      return;
     }
 
     (async () => {
@@ -147,13 +163,9 @@ const CognitoOAuthCallback = () => {
           redirect_uri: COGNITO_REDIRECT_URI,
         };
 
-        // Only add code_verifier if we have it (PKCE)
-        if (verifier) {
-          tokenBody.code_verifier = verifier;
-          console.log("✅ Using PKCE code_verifier");
-        } else {
-          console.log("⚠️ Skipping PKCE - verifier not available");
-        }
+        // PKCE verifier is required for this client.
+        tokenBody.code_verifier = verifier;
+        console.log("✅ Using PKCE code_verifier");
 
         const body = new URLSearchParams(tokenBody);
 
@@ -176,6 +188,7 @@ const CognitoOAuthCallback = () => {
         }
 
         sessionStorage.removeItem(verifierKey);
+        localStorage.removeItem(verifierKey);
 
         const access = t.access_token;
         const refresh = t.refresh_token || "";
@@ -265,7 +278,7 @@ const CognitoOAuthCallback = () => {
         });
 
         console.log("🎯 Redirecting to:", path);
-        navigate(path, { replace: true });
+        navigate(intended || path, { replace: true });
       } catch (e) {
         console.error("❌ Cognito callback error:", e);
         toast.error("❌ Could not finish Cognito social login.");

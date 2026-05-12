@@ -18,6 +18,11 @@ const SocialLogin = () => {
 
       // If Cognito config is present, use Cognito Hosted UI Google
       if (AUTH_PROVIDER === "cognito" && COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("id_token");
+        localStorage.removeItem("user");
+
         console.log("✅ Using Cognito OAuth flow");
         const state = randomString(16);
         const verifier = randomString(48);
@@ -27,6 +32,7 @@ const SocialLogin = () => {
 
         // Store in sessionStorage
         sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
+        localStorage.setItem(`pkce_verifier_${state}`, verifier);
         console.log("✅ Stored verifier in sessionStorage:", { key: `pkce_verifier_${state}`, value: verifier?.substring(0, 20) + "..." });
 
         // ✅ store where user should land after login
@@ -36,6 +42,7 @@ const SocialLogin = () => {
           "/account/events";
 
         sessionStorage.setItem(`post_login_redirect_${state}`, intended);
+        localStorage.setItem(`post_login_redirect_${state}`, intended);
         console.log("✅ Stored redirect in sessionStorage:", { key: `post_login_redirect_${state}`, value: intended });
 
         // DEBUG: Log all sessionStorage keys
@@ -81,11 +88,17 @@ const SocialLogin = () => {
 
       // Use Cognito Hosted UI LinkedIn (OIDC provider)
       if (AUTH_PROVIDER === "cognito" && COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("id_token");
+        localStorage.removeItem("user");
+
         const state = randomString(16);
         const verifier = randomString(48);
         const challenge = await pkceChallengeFromVerifier(verifier);
 
         sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
+        localStorage.setItem(`pkce_verifier_${state}`, verifier);
 
         // ✅ store where user should land after login
         const intended =
@@ -94,6 +107,7 @@ const SocialLogin = () => {
           "/community";
 
         sessionStorage.setItem(`post_login_redirect_${state}`, intended);
+        localStorage.setItem(`post_login_redirect_${state}`, intended);
 
         const params = new URLSearchParams({
           response_type: "code",

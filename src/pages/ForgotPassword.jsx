@@ -32,8 +32,22 @@ const ForgotPassword = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState(initialEmail);
+    const [resolvedIdentifier, setResolvedIdentifier] = useState('');
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
+
+    const getForgotPasswordCandidates = (emailValue) => {
+        const normalizedEmail = (emailValue || '').trim().toLowerCase();
+        const candidates = [
+            localStorage.getItem('last_cognito_username') || '',
+            localStorage.getItem('last_login_email') || '',
+            normalizedEmail,
+        ]
+            .map((v) => String(v || '').trim())
+            .filter(Boolean);
+
+        return [...new Set(candidates)];
+    };
 
     const validate = () => {
         const errs = {};
@@ -74,12 +88,18 @@ const ForgotPassword = () => {
             setLoading(true);
             try {
                 const emailLower = email.trim().toLowerCase();
-                await cognitoForgotPassword({ usernameOrEmail: emailLower });
+                const candidates = getForgotPasswordCandidates(emailLower);
+                const result = await cognitoForgotPassword({
+                    usernameOrEmail: emailLower,
+                    candidates,
+                });
+                setResolvedIdentifier(result?.usedIdentifier || emailLower);
 
                 toast.success('If the account exists, an OTP has been sent.');
                 setStep('confirm'); // ✅ stay on same page
             } catch (err) {
-                toast.error('Something went wrong. Please try again.');
+                const msg = err?.message || 'Something went wrong. Please try again.';
+                toast.error(msg);
             } finally {
                 setLoading(false);
             }
@@ -92,8 +112,11 @@ const ForgotPassword = () => {
 
         setLoading(true);
         try {
+            const emailLower = email.trim().toLowerCase();
+            const candidates = getForgotPasswordCandidates(emailLower);
             await cognitoConfirmForgotPassword({
-                usernameOrEmail: email.trim().toLowerCase(),
+                usernameOrEmail: resolvedIdentifier || emailLower,
+                candidates,
                 code: code.trim(),
                 newPassword,
             });
