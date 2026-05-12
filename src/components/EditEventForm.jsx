@@ -427,6 +427,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [replayDuration, setReplayDuration] = React.useState("");
     const [autoPublish, setAutoPublish] = React.useState(true); // ✅ Default true, sync from event in useEffect
 
+    // Post-event replay access
+    const [replayEnabled, setReplayEnabled] = React.useState(false);
+    const [replayCTAText, setReplayCTAText] = React.useState("Sign up to watch full replay");
+
     // ----- External Streaming -----
     const [useExternalStreaming, setUseExternalStreaming] = useState(event?.use_external_streaming || false);
     const [externalStreamingPlatform, setExternalStreamingPlatform] = useState(event?.external_streaming_platform || "native");
@@ -607,6 +611,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setReplayDuration(event?.replay_availability_duration || "");
         console.log("🔍 EditEventForm - replay_publishing_mode from event:", event?.replay_publishing_mode);
         setAutoPublish(replayAvail && event?.replay_publishing_mode === "auto_publish" ? true : false);
+        // Init post-event replay access options
+        setReplayEnabled(!!event?.replay_enabled);
+        setReplayCTAText(event?.replay_cta_text || "Sign up to watch full replay");
         // Init external streaming options
         setUseExternalStreaming(event?.use_external_streaming || false);
         setExternalStreamingPlatform(event?.external_streaming_platform || "native");
@@ -1369,6 +1376,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             fd.append("replay_availability_duration", "");
         }
 
+        // Send post-event replay access options
+        fd.append("replay_enabled", String(replayEnabled));
+        fd.append("replay_cta_text", replayCTAText.trim());
+
         if (logoImageFile) fd.append("preview_image", logoImageFile, logoImageFile.name);
         if (coverImageFile) fd.append("cover_image", coverImageFile, coverImageFile.name);
         if (waitingRoomImageFile) fd.append("waiting_room_image", waitingRoomImageFile, waitingRoomImageFile.name);
@@ -1642,6 +1653,79 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                 </TextField>
                             )}
                         </Stack>
+
+                        {/* Post-event replay access */}
+                        <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #e2e8f0" }}>
+                            <Typography variant="subtitle2" className="font-semibold mb-2 text-slate-700">
+                                Replay Access (After Event)
+                            </Typography>
+                            <Stack spacing={2}>
+                                <FormControlLabel
+                                    control={<Switch checked={replayEnabled} onChange={(e) => setReplayEnabled(e.target.checked)} />}
+                                    label="Enable replay sign-up for new users"
+                                    sx={{ m: 0 }}
+                                />
+                                {replayEnabled && (
+                                    <>
+                                        {event?.id && event?.slug && (
+                                            <Box sx={{ p: 2, bgcolor: "rgba(16,184,166,0.08)", borderRadius: 1, border: "1px solid rgba(16,184,166,0.2)" }}>
+                                                <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 1 }}>
+                                                    📋 Public Replay Link (for sharing on LinkedIn/YouTube posts)
+                                                </Typography>
+                                                <TextField
+                                                    size="small"
+                                                    fullWidth
+                                                    value={`${window.location.origin}/events/${event.slug}`}
+                                                    InputProps={{
+                                                        readOnly: true,
+                                                        endAdornment: (
+                                                            <InputAdornment position="end">
+                                                                <Tooltip title="Copy link">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        onClick={() => {
+                                                                            const replayLink = `${window.location.origin}/events/${event.slug}`;
+                                                                            navigator.clipboard.writeText(replayLink).then(
+                                                                                () => {
+                                                                                    setToast({
+                                                                                        open: true,
+                                                                                        type: "success",
+                                                                                        msg: "Replay link copied to clipboard!"
+                                                                                    });
+                                                                                }
+                                                                            ).catch(() => {
+                                                                                setToast({
+                                                                                    open: true,
+                                                                                    type: "error",
+                                                                                    msg: "Could not copy link. Please copy manually."
+                                                                                });
+                                                                            });
+                                                                        }}
+                                                                        edge="end"
+                                                                    >
+                                                                        📋
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            </InputAdornment>
+                                                        ),
+                                                    }}
+                                                    helperText="Share this link in LinkedIn/YouTube posts. Non-registered users will see 'Sign up to watch full replay'. Registered users will see the full recording."
+                                                />
+                                            </Box>
+                                        )}
+                                        <TextField
+                                            label="Sign-up CTA Text (optional)"
+                                            value={replayCTAText}
+                                            onChange={(e) => setReplayCTAText(e.target.value)}
+                                            size="small"
+                                            fullWidth
+                                            placeholder="Sign up to watch full replay"
+                                            helperText="Button text shown to non-registered users"
+                                        />
+                                    </>
+                                )}
+                            </Stack>
+                        </Box>
                     </Paper>
                 )}
 

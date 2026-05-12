@@ -879,6 +879,20 @@ export default function EventDetailsPage() {
         const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
         setRegistration(mineForEvent || null);
 
+        // Refetch event to update can_signup_for_replay and has_replay_access fields
+        try {
+          const eventRes = await fetch(urlJoin(API_BASE, `/events/${encodeURIComponent(slug)}/?include=questions&include_ended=true`), {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (eventRes.ok) {
+            const eventData = await eventRes.json();
+            setEvent(eventData);
+          }
+        } catch (_) {}
+
         // Show success toast and dispatch unread notification event
         toast.success(`You have successfully registered for "${event?.title || "this event"}"!`);
         try {
@@ -1172,6 +1186,16 @@ export default function EventDetailsPage() {
     ? (joinState?.enabled || isPreEventLounge || isPostEventLounge || isHost)
     : (isHost || Boolean(registration));
   const canWatch = isPast && !!event.recording_url;
+
+  // Replay access variables
+  const replayEnabled = !!event?.replay_enabled;
+  const replayVideoUrl = event?.replay_video_url || null;
+  const replayCtaText = event?.replay_cta_text || "Sign up to watch full replay";
+  const canSignupForReplay = !!event?.can_signup_for_replay;
+  const hasReplayAccess = !!event?.has_replay_access;
+  const showReplayCTA = replayEnabled && canSignupForReplay;
+  const showReplayAccess = hasReplayAccess && replayEnabled;
+
   const desc = event?.description ?? "";
 
   // Pre-event Q&A eligibility
@@ -1693,6 +1717,8 @@ export default function EventDetailsPage() {
                           </Box>
                         )}
 
+                        {/* YouTube and LinkedIn summary links */}
+
                         {status === "cancelled" ? (
                           <Button
                             disabled
@@ -1903,6 +1929,44 @@ export default function EventDetailsPage() {
                               </Alert>
                             )}
                           </>
+                        ) : hasReplayAccess && replayVideoUrl ? (
+                          <Button
+                            component="a"
+                            href={replayVideoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="contained"
+                            sx={{
+                              textTransform: "none",
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
+                            }}
+                            className="rounded-xl"
+                          >
+                            Watch Replay
+                          </Button>
+                        ) : hasReplayAccess && !replayVideoUrl ? (
+                          <Button
+                            disabled
+                            variant="contained"
+                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            className="rounded-xl"
+                          >
+                            Replay Coming Soon
+                          </Button>
+                        ) : showReplayCTA ? (
+                          <Button
+                            onClick={handleRegister}
+                            variant="contained"
+                            sx={{
+                              textTransform: "none",
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
+                            }}
+                            className="rounded-xl"
+                          >
+                            {replayCtaText}
+                          </Button>
                         ) : canWatch ? (
                           <Button
                             component="a"
