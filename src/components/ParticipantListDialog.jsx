@@ -137,7 +137,7 @@ export default function ParticipantListDialog({
                                             )}
                                         </Box>
                                     }
-                                    secondary={reg.user_email}
+                                    secondary={reg.email || reg.user_email || ""}
                                 />
                             </ListItem>
                         ))}

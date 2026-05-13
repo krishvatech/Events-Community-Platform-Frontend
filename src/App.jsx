@@ -21,6 +21,7 @@ import MyResourcesPage from "./pages/MyResourcesPage.jsx";
 import MyCartPage from "./pages/MyCartPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
+import EventCompanionDirectoryPage from "./pages/EventCompanionDirectoryPage.jsx";
 import LiveMeetingPage from "./pages/LiveMeetingPage.jsx";
 import Footer from "./components/Footer.jsx";
 import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
@@ -155,6 +156,7 @@ const AppShell = () => {
 
   // Hide header & footer on auth pages, live meeting routes, and public branded event pages
   // Also hide chrome on event marketing pages (single slug route or /landing/:slug)
+  const isCompanionPage = location.pathname.includes("/companion");
   const isSingleEventPage = (location.pathname.startsWith("/landing/") && location.pathname !== "/landing") ||
                             (!location.pathname.startsWith("/events") &&
                             !location.pathname.startsWith("/account") &&
@@ -175,6 +177,7 @@ const AppShell = () => {
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/") ||
     location.pathname.startsWith("/public/") ||
+    isCompanionPage ||
     isSingleEventPage;
 
   const showSidebar = authed && !hideChrome;
@@ -210,7 +213,7 @@ const AppShell = () => {
         </>
       )}
 
-      <KYCNotification />
+      {!isCompanionPage && <KYCNotification />}
 
       {/* Main Content Wrapper */}
       <Box
@@ -268,6 +271,7 @@ const AppShell = () => {
           <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
           <Route path="/landing/:slug" element={<SingleEventMarketingPage />} />
           <Route path="/series/:slug" element={<PublicSeriesLanding />} />
+          <Route path="/events/:slug/companion" element={<RequireAuth><EventCompanionDirectoryPage /></RequireAuth>} />
           <Route path="/events/:slug" element={<EventDetailsPage />} />
           <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />

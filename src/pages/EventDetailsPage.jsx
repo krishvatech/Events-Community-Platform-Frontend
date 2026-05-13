@@ -2012,6 +2012,35 @@ export default function EventDetailsPage() {
                           </Box>
                         )}
 
+                        {/* Participant Directory Button - Only for Registered Users */}
+                        {hasActiveRegistration && status !== "cancelled" && (
+                          <Box className="flex justify-center py-2">
+                            <Link
+                              to={`/events/${event.slug}/companion`}
+                              style={{ textDecoration: 'none', width: '100%' }}
+                            >
+                              <Button
+                                variant="outlined"
+                                fullWidth
+                                sx={{
+                                  textTransform: 'none',
+                                  borderColor: '#10b8a6',
+                                  color: '#10b8a6',
+                                  fontWeight: 600,
+                                  py: 1.5,
+                                  '&:hover': {
+                                    borderColor: '#0ea5a4',
+                                    bgcolor: 'rgba(16,184,166,0.04)',
+                                  },
+                                }}
+                                className="rounded-xl"
+                              >
+                                👥 View Participant Directory
+                              </Button>
+                            </Link>
+                          </Box>
+                        )}
+
                         {/* Pre-Event Q&A for Registered Users */}
                         {showPreEventQnaPrompt && (
                           <Box
