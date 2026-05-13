@@ -50,10 +50,7 @@ export const wordpressAuthService = {
       }
 
       return {
-        user_id: syncData.user_id,
-        username: syncData.username,
-        email: syncData.email,
-        created: syncData.created,
+        ...syncData,
         status: 'success',
       };
     } catch (error) {

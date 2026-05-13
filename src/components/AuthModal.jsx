@@ -23,6 +23,7 @@ import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
 import { API_BASE } from "../utils/api";
 import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
+import { wordpressAuthService } from "../services/wordpressAuth";
 
 const GOOGLE_ICON = (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -112,28 +113,72 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-    if (!loginEmail.trim() || !loginPassword) { setError("Please enter your email and password."); return; }
+    const trimmedEmail = loginEmail.trim();
+    if (!trimmedEmail || !loginPassword) {
+      setError("Please enter your email and password.");
+      return;
+    }
     setLoading(true);
     try {
-      const result = await cognitoSignIn({ usernameOrEmail: loginEmail.trim(), password: loginPassword });
+      // Step 1: Try primary Cognito login
+      try {
+        const result = await cognitoSignIn({ usernameOrEmail: trimmedEmail, password: loginPassword });
 
-      // Call parent's onLoginSuccess if provided — let it handle token storage and redirect
-      if (onLoginSuccess) {
-        const data = {
-          access_token: result.idToken || "",
-          access: result.accessToken || "",
-          refresh: result.refreshToken || "",
-          user: result.payload,
-          id_token: result.idToken || "",
-          email: loginEmail.trim(),
-        };
-        onLoginSuccess(data);
-      } else {
-        saveLoginPayload({ id_token: result.idToken, refresh: result.refreshToken });
-        window.dispatchEvent(new Event("auth:changed"));
-        // Redirect to community home
-        handleClose();
-        navigate("/community?view=home", { replace: true });
+        // Cognito success
+        if (onLoginSuccess) {
+          const data = {
+            access_token: result.idToken || "",
+            access: result.accessToken || "",
+            refresh: result.refreshToken || "",
+            user: result.payload,
+            id_token: result.idToken || "",
+            email: trimmedEmail,
+          };
+          onLoginSuccess(data);
+        } else {
+          saveLoginPayload({ id_token: result.idToken, refresh: result.refreshToken });
+          window.dispatchEvent(new Event("auth:changed"));
+          handleClose();
+          navigate("/community?view=home", { replace: true });
+        }
+      } catch (cognitoErr) {
+        // Step 2: Cognito failed, try WordPress fallback
+        console.log("Cognito login failed, attempting WordPress fallback...");
+        
+        try {
+          const wpResult = await wordpressAuthService.loginWithWordPress(trimmedEmail, loginPassword);
+          
+          // WordPress success - normalize response for saveLoginPayload
+          const normalizedPayload = {
+            access_token: wpResult.id_token || wpResult.access_token,
+            access: wpResult.access_token,
+            id_token: wpResult.id_token || wpResult.access_token,
+            refresh: wpResult.refresh_token,
+            user: {
+              id: wpResult.user_id,
+              username: wpResult.username,
+              email: wpResult.email,
+              name: wpResult.username,
+              first_name: wpResult.username
+            }
+          };
+
+          if (onLoginSuccess) {
+            onLoginSuccess({
+              ...normalizedPayload,
+              email: trimmedEmail
+            });
+          } else {
+            saveLoginPayload(normalizedPayload, { email: trimmedEmail });
+            window.dispatchEvent(new Event("auth:changed"));
+            handleClose();
+            navigate("/community?view=home", { replace: true });
+          }
+        } catch (wpErr) {
+          // Both failed
+          console.error("WordPress fallback also failed:", wpErr);
+          throw new Error("Invalid email or password. Please try again.");
+        }
       }
     } catch (err) {
       setError(err?.message || "Invalid email or password. Please try again.");
