@@ -2437,6 +2437,7 @@ export default function EventsPage() {
         const fetchLimit = PAGE_SIZE + pinnedEvents.length;
         url.searchParams.set("limit", String(fetchLimit));
         url.searchParams.set("offset", String(regularOffset));
+        url.searchParams.set("exclude_pinned", "1");
         url.searchParams.set("min_price", String(priceRange[0]));
         url.searchParams.set("max_price", String(priceRange[1]));
         url.searchParams.set("ordering", "start_time");
@@ -2477,7 +2478,8 @@ export default function EventsPage() {
         });
 
         setRawEvents(filtered);
-        setTotal(Number(data.count ?? filtered.length));
+        // Total is the sum of regular events (from backend) and total pinned events (pre-fetched)
+        setTotal(Number(data.count ?? filtered.length) + pinnedEvents.length);
       } catch (e) {
         if (e.name !== "AbortError") setError(String(e?.message || e));
       } finally {
