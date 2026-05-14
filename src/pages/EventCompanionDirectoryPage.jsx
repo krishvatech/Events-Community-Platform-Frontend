@@ -307,7 +307,7 @@ function MobileView({ allParticipants, loading, error, searchQuery, onSearchChan
                   <Button
                     size="small"
                     variant="outlined"
-                    startIcon={<VideoCallIcon />}
+                    startIcon={<CoffeeIcon />}
                     sx={{
                       borderColor: COLORS.teal,
                       color: COLORS.teal,
