@@ -138,3 +138,32 @@ export const sanitizeSlugInput = (s) =>
         .replace(/\s+/g, "-")    // spaces → hyphens
         .replace(/^-+/g, ""); // trim leading hyphens (allow trailing while editing)
 // Allows: @, #, $, &, ?, !, (, ), *, +, ;, :, ~, ' and other special chars
+
+export const getDisplayPrice = (event) => {
+  const label = String(event?.price_label || "").trim();
+  if (label) return label;
+
+  if (event?.is_free) return "Free";
+
+  const rawPrice = event?.price;
+
+  if (rawPrice === null || rawPrice === undefined || rawPrice === "") {
+    return "Price to be announced";
+  }
+
+  const amount = Number(rawPrice);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return "Price to be announced";
+  }
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: event?.currency || "USD",
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `$${amount}`;
+  }
+};

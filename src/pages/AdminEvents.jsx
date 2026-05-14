@@ -925,13 +925,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("category", category);
     fd.append("format", format);
     // Paid events: price/label/max_participants managed via Product Management tab
-    if (isFree) {
-      fd.append("price", "0");
-      fd.append("price_label", priceLabel.trim());
-    } else {
-      fd.append("price", "");         // null in DB — managed in Product Management
-      fd.append("price_label", "");
-    }
+    fd.append("price", isFree ? "0" : "");
+    fd.append("price_label", priceLabel.trim());  // always send, never clear
     fd.append("is_free", String(isFree));
     fd.append("registration_type", registrationType);
     if (cpdCpeMinutes === "") {
@@ -1729,6 +1724,17 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 </Box>
               </Box>
             ) : null}
+
+            {/* Public price display text — shown for both free and paid */}
+            <TextField
+              label="Public price display text"
+              fullWidth
+              value={priceLabel}
+              onChange={(e) => setPriceLabel(e.target.value)}
+              helperText='Optional. Shown instead of Saleor price. E.g. "By Invitation Only", "From $990"'
+              sx={{ mt: 2 }}
+              inputProps={{ maxLength: 100 }}
+            />
           </Box>
 
           <Box sx={{ mb: 3, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fafafa" }}>

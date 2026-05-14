@@ -487,6 +487,8 @@ export default function EventManagePage() {
   const [saleorStockChanges, setSaleorStockChanges] = useState({}); // { warehouseId: quantity }
   const [saleorName, setSaleorName] = useState("");
   const [saleorDescription, setSaleorDescription] = useState("");
+  const [saleorPriceLabel, setSaleorPriceLabel] = useState(event?.price_label || "");
+  const [targetChannelSlug, setTargetChannelSlug] = useState("default-channel");
 
   // Discount Management State
   const [saleorDiscounts, setSaleorDiscounts] = useState([]);
@@ -592,6 +594,8 @@ export default function EventManagePage() {
       setSaleorStockChanges(stocks);
       setSaleorName(data.product?.name || "");
       setSaleorDescription(extractTextFromSaleorDescription(data.product?.description));
+      setTargetChannelSlug(json.target_channel_slug || "default-channel");
+      setSaleorPriceLabel(json.event_price_label || "");
     } catch (err) {
       console.error("Failed to fetch Saleor product:", err);
       setSaleorError(err.message || "Failed to load Saleor product details");
@@ -5581,6 +5585,7 @@ export default function EventManagePage() {
       const payload = {
         name: saleorName,
         description: saleorDescription,
+        price_label: saleorPriceLabel.trim(),
         channel_listings: Object.entries(saleorPriceChanges).map(([id, price]) => ({
           channel_id: id,
           price: parseFloat(price) || 0
@@ -5610,6 +5615,45 @@ export default function EventManagePage() {
       toast.error(err.message);
     } finally {
       setSaleorSaving(false);
+    }
+  };
+
+  const handleSyncSaleorProduct = async () => {
+    if (!eventId) return;
+    setSaleorLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/sync-saleor-product/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Sync failed");
+      toast.success("Saleor product synced!");
+      fetchSaleorProduct();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaleorLoading(false);
+    }
+  };
+
+  const handleSavePriceLabel = async () => {
+    if (!eventId) return;
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ price_label: saleorPriceLabel.trim() })
+      });
+      if (!res.ok) throw new Error("Failed to save price label");
+      toast.success("Price label saved!");
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -5685,13 +5729,32 @@ export default function EventManagePage() {
         <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
           <InfoRoundedIcon sx={{ fontSize: 48, color: 'info.main', mb: 2 }} />
           <Typography variant="h6" gutterBottom>No Product Linked</Typography>
-          <Typography variant="body2" color="text.secondary">This event does not have a linked Saleor product.</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            This event does not have a linked Saleor product.
+          </Typography>
+          {/* Public price display override shown even without a product */}
+          <Box sx={{ mb: 3, maxWidth: 400, mx: 'auto', textAlign: 'left' }}>
+            <TextField
+              label="Public price display text"
+              fullWidth
+              value={saleorPriceLabel}
+              onChange={(e) => setSaleorPriceLabel(e.target.value)}
+              helperText='Optional. This text is shown on public event pages instead of the Saleor price. It does not change the checkout price. Examples: "From $990", "By Invitation Only", "Price on application".'
+              inputProps={{ maxLength: 100 }}
+            />
+            <Button sx={{ mt: 2 }} variant="outlined" onClick={handleSavePriceLabel}>
+              Save label
+            </Button>
+          </Box>
+          <Button variant="contained" onClick={handleSyncSaleorProduct} startIcon={<RefreshRoundedIcon />} disabled={saleorLoading}>
+            Create / Re-sync Saleor Product
+          </Button>
         </Paper>
       );
     }
 
     // Derived checks for publish section
-    const targetChannelSlug = 'default-channel';
+    // targetChannelSlug is loaded from API response
     const defaultChannel = saleorChannels.find(c => c.slug === targetChannelSlug);
     const defaultChannelPrice = defaultChannel ? parseFloat(saleorPriceChanges[defaultChannel.id] ?? 0) : 0;
     const hasValidPrice = defaultChannelPrice > 0;
@@ -5759,15 +5822,24 @@ export default function EventManagePage() {
                   sx={{ mb: 4, width: 400, display: 'block' }}
                 />
 
-                <Box sx={{ 
-                  p: 1.5, 
-                  bgcolor: 'grey.50', 
-                  borderRadius: 3, 
-                  border: '1px solid', 
-                  borderColor: 'divider', 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: 3 
+                <TextField
+                  label="Public price display text"
+                  value={saleorPriceLabel}
+                  onChange={(e) => { setSaleorPriceLabel(e.target.value); setProductDirty(true); }}
+                  helperText='Optional. If filled, this text overrides the Saleor price on public event pages. It does not affect checkout pricing. Examples: "From $990", "By Invitation Only", "Price on application".'
+                  sx={{ mb: 4, width: 400, display: 'block' }}
+                  inputProps={{ maxLength: 100 }}
+                />
+
+                <Box sx={{
+                  p: 1.5,
+                  bgcolor: 'grey.50',
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3
                 }}>
                   <Box>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 600 }}>SKU</Typography>
@@ -5810,7 +5882,7 @@ export default function EventManagePage() {
                   </TableHead>
                   <TableBody>
                     {saleorChannels.map((channel) => {
-                      const isDisabled = channel.slug !== 'default-channel';
+                      const isDisabled = channel.slug !== targetChannelSlug;
                       return (
                       <TableRow key={channel.id} hover sx={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
                         <TableCell sx={{ py: 2 }}>

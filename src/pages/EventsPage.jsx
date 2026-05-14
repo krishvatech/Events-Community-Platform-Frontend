@@ -56,6 +56,7 @@ import { getUniqueSeries } from "../utils/seriesEventUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
+import { getDisplayPrice } from "../utils/eventUtils";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -98,9 +99,9 @@ function priceStr(p) {
 }
 
 function displayPrice(ev) {
-  if (ev.is_free) return <span className="text-teal-600">Free to Join</span>;
-  if (ev.price_label) return ev.price_label;
-  return priceStr(ev.price);
+  const price = getDisplayPrice(ev);
+  if (price === "Free") return <span className="text-teal-600">Free to Join</span>;
+  return price;
 }
 
 // Get location display text, handling virtual/hybrid events
@@ -2596,6 +2597,7 @@ export default function EventsPage() {
       } catch (e) {
         if (e.name !== "AbortError") {
           console.error("[EventsPage] Failed to load replay events:", e);
+          console.error("[EventsPage] Replay fetch error details:", e.message, e.stack);
         }
       } finally {
         setReplayLoading(false);

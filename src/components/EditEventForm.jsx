@@ -1325,13 +1325,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("category", category);
         fd.append("format", format);
         // Paid events: price/label/max_participants managed via Product Management tab
-        if (isFree) {
-            fd.append("price", "0");
-            fd.append("price_label", priceLabel.trim());
-        } else {
-            fd.append("price", "");         // null in DB — managed in Product Management
-            fd.append("price_label", "");
-        }
+        fd.append("price", isFree ? "0" : "");
+        fd.append("price_label", priceLabel.trim());  // always send, never clear
         fd.append("is_free", String(isFree));
         fd.append("registration_type", registrationType);
         if (cpdCpeMinutes === "") {
@@ -1976,12 +1971,12 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     <Box sx={{ fontSize: 20, mt: 0.1 }}>💳</Box>
                                     <Box>
                                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1565c0", mb: 0.5 }}>
-                                            💳 Paid Event
+                                            💳 Paid Event — Saved as Draft
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: "#1565c0" }}>
-                                            Price, price label, and max participants are managed in the
-                                            <strong> Product Management tab</strong>.
-                                            The event must be <strong>published manually</strong> after price is configured.
+                                            This event will remain Draft until the actual Saleor checkout price, channel, and stock are configured in
+                                            <strong> Product Management</strong>.
+                                            The field below is for public display text only and does not set the checkout price.
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -1995,6 +1990,17 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     sx={{ mt: 2 }}
                                 />
                             )}
+
+                            {/* Public price display text — shown for both free and paid */}
+                            <TextField
+                                label="Public price display text"
+                                fullWidth
+                                value={priceLabel}
+                                onChange={(e) => setPriceLabel(e.target.value)}
+                                helperText='Optional. Shown instead of Saleor price. E.g. "By Invitation Only", "From $990"'
+                                sx={{ mt: 2 }}
+                                inputProps={{ maxLength: 100 }}
+                            />
                         </Box>
 
                         <TextField
