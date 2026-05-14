@@ -202,7 +202,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Confirmation Email"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Confirmation Email"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
@@ -222,6 +222,14 @@ const getTabLabels = (event, isOwner) => {
 const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
 
+const PREDEFINED_ROLES = [
+  { name: "Speaker", color: "#7c3aed" },
+  { name: "VIP", color: "#b45309" },
+  { name: "Sponsor", color: "#0369a1" },
+  { name: "Host", color: "#15803d" },
+  { name: "Moderator", color: "#dc2626" },
+  { name: "Chair", color: "#0891b2" },
+];
 
 
 export default function EventManagePage() {
@@ -369,6 +377,37 @@ export default function EventManagePage() {
   const [inviteUsersOpen, setInviteUsersOpen] = useState(false);
   const [inviteEmailsOpen, setInviteEmailsOpen] = useState(false);
   const [regsRefresh, setRegsRefresh] = useState(0);
+
+  // ---- Companion Tab State ----
+  const [companionLabels, setCompanionLabels] = useState([]);
+  const [companionLabelsLoading, setCompanionLabelsLoading] = useState(false);
+  const [companionLabelsError, setCompanionLabelsError] = useState("");
+  const [companionNewName, setCompanionNewName] = useState("");
+  const [companionNewColor, setCompanionNewColor] = useState("#6366f1");
+  const [companionLabelSaving, setCompanionLabelSaving] = useState(false);
+  const [companionLabelError, setCompanionLabelError] = useState("");
+  const [companionDeleteTarget, setCompanionDeleteTarget] = useState(null);
+  const [companionDeleteOpen, setCompanionDeleteOpen] = useState(false);
+  const [companionDeleteLoading, setCompanionDeleteLoading] = useState(false);
+  const [companionEditTarget, setCompanionEditTarget] = useState(null);
+  const [companionEditName, setCompanionEditName] = useState("");
+  const [companionEditColor, setCompanionEditColor] = useState("#6366f1");
+  const [companionEditSaving, setCompanionEditSaving] = useState(false);
+  const [companionEditOpen, setCompanionEditOpen] = useState(false);
+  const [companionAssignTarget, setCompanionAssignTarget] = useState(null);
+  const [companionAssignOpen, setCompanionAssignOpen] = useState(false);
+  const [companionAssignSelected, setCompanionAssignSelected] = useState([]);
+  const [companionAssignSaving, setCompanionAssignSaving] = useState(false);
+  const [companionBulkSelected, setCompanionBulkSelected] = useState([]);
+  const [companionBulkAssignOpen, setCompanionBulkAssignOpen] = useState(false);
+  const [companionBulkLabels, setCompanionBulkLabels] = useState([]);
+  const [companionBulkSaving, setCompanionBulkSaving] = useState(false);
+  const [companionBulkMode, setCompanionBulkMode] = useState("add");
+  const [companionRegs, setCompanionRegs] = useState([]);
+  const [companionRegsLoading, setCompanionRegsLoading] = useState(false);
+  const [companionRegsError, setCompanionRegsError] = useState("");
+  const [companionSearch, setCompanionSearch] = useState("");
+  const [companionRegsRefresh, setCompanionRegsRefresh] = useState(0);
 
   // Resend Mail to All State
   const [resendMailOpen, setResendMailOpen] = useState(false);
@@ -1058,6 +1097,59 @@ export default function EventManagePage() {
     loadRegs();
     return () => controller.abort();
   }, [eventId, isOwner, regsRefresh]);
+
+  // ---- Companion Tab: load badge labels ----
+  const companionTabIndex = tabLabels.indexOf("Companion");
+  useEffect(() => {
+    if (!eventId || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
+    const controller = new AbortController();
+    setCompanionLabelsLoading(true);
+    setCompanionLabelsError("");
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_ROOT}/event-badge-labels/?event_id=${eventId}`,
+          { headers: { Authorization: `Bearer ${getToken()}` }, signal: controller.signal }
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+        const data = Array.isArray(json) ? json : (json.results || []);
+        setCompanionLabels(data);
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        setCompanionLabelsError(e.message || "Failed to load labels");
+      } finally {
+        setCompanionLabelsLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [eventId, isOwner, tab, companionTabIndex, companionRegsRefresh]);
+
+  // ---- Companion Tab: load registrations with badge_labels ----
+  useEffect(() => {
+    if (!eventId || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
+    const controller = new AbortController();
+    setCompanionRegsLoading(true);
+    setCompanionRegsError("");
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_ROOT}/events/${eventId}/registrations/?limit=200`,
+          { headers: { Authorization: `Bearer ${getToken()}` }, signal: controller.signal }
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+        const data = Array.isArray(json) ? json : (json.results || []);
+        setCompanionRegs(data);
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        setCompanionRegsError(e.message || "Failed to load participants");
+      } finally {
+        setCompanionRegsLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [eventId, isOwner, tab, companionTabIndex, companionRegsRefresh]);
 
   useEffect(() => {
     if (!eventId || !isOwner || guestAuditTabIndex === -1 || tab !== guestAuditTabIndex) return;
@@ -6380,6 +6472,385 @@ export default function EventManagePage() {
     );
   };
 
+  const renderCompanion = () => {
+    if (!isOwner) {
+      return (
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Companion</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>Only the event owner can access Companion features.</Typography>
+        </Paper>
+      );
+    }
+
+    const createLabel = async (name, color) => {
+      setCompanionLabelSaving(true);
+      setCompanionLabelError("");
+      try {
+        const res = await fetch(`${API_ROOT}/event-badge-labels/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+          body: JSON.stringify({ event_id: eventId, name, color }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.name?.[0] || json?.detail || `HTTP ${res.status}`);
+        setCompanionLabels(prev => [...prev, json]);
+        setCompanionNewName("");
+        setCompanionNewColor("#6366f1");
+        toast.success(`Label "${name}" created`);
+      } catch (e) {
+        setCompanionLabelError(e.message || "Failed to create label");
+      } finally {
+        setCompanionLabelSaving(false);
+      }
+    };
+
+    const deleteLabel = async (labelId) => {
+      setCompanionDeleteLoading(true);
+      try {
+        const res = await fetch(`${API_ROOT}/event-badge-labels/${labelId}/`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+        setCompanionLabels(prev => prev.filter(l => l.id !== labelId));
+        setCompanionRegs(prev => prev.map(r => ({
+          ...r,
+          badge_labels: (r.badge_labels || []).filter(bl => bl.id !== labelId),
+        })));
+        toast.success("Label deleted");
+      } catch (e) {
+        toast.error("Failed to delete label");
+      } finally {
+        setCompanionDeleteLoading(false);
+        setCompanionDeleteOpen(false);
+        setCompanionDeleteTarget(null);
+      }
+    };
+
+    const saveEditLabel = async () => {
+      if (!companionEditTarget) return;
+      setCompanionEditSaving(true);
+      try {
+        const res = await fetch(`${API_ROOT}/event-badge-labels/${companionEditTarget.id}/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+          body: JSON.stringify({ name: companionEditName, color: companionEditColor }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.name?.[0] || json?.detail || `HTTP ${res.status}`);
+        setCompanionLabels(prev => prev.map(l => l.id === json.id ? json : l));
+        setCompanionEditOpen(false);
+        setCompanionEditTarget(null);
+        toast.success("Label updated");
+      } catch (e) {
+        toast.error(e.message || "Failed to update label");
+      } finally {
+        setCompanionEditSaving(false);
+      }
+    };
+
+    const assignLabels = async (regId, labelIds) => {
+      setCompanionAssignSaving(true);
+      try {
+        const res = await fetch(`${API_ROOT}/event-registrations/${regId}/assign-labels/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+          body: JSON.stringify({ label_ids: labelIds }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+        const newLabels = companionLabels.filter(l => labelIds.includes(l.id));
+        setCompanionRegs(prev => prev.map(r =>
+          r.id === regId ? { ...r, badge_labels: newLabels } : r
+        ));
+        setCompanionAssignOpen(false);
+        setCompanionAssignTarget(null);
+        toast.success("Labels assigned");
+      } catch (e) {
+        toast.error(e.message || "Failed to assign labels");
+      } finally {
+        setCompanionAssignSaving(false);
+      }
+    };
+
+    const bulkAssignLabels = async () => {
+      setCompanionBulkSaving(true);
+      try {
+        const res = await fetch(`${API_ROOT}/event-registrations/bulk-assign-labels/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+          body: JSON.stringify({
+            registration_ids: companionBulkSelected,
+            label_ids: companionBulkLabels,
+            mode: companionBulkMode,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+        setCompanionRegsRefresh(p => p + 1);
+        setCompanionBulkSelected([]);
+        setCompanionBulkAssignOpen(false);
+        setCompanionBulkLabels([]);
+        toast.success(`Labels updated for ${json.updated} participant(s)`);
+      } catch (e) {
+        toast.error(e.message || "Failed to bulk assign");
+      } finally {
+        setCompanionBulkSaving(false);
+      }
+    };
+
+    const filteredCompanionRegs = companionRegs.filter(r => {
+      const q = companionSearch.toLowerCase();
+      return !q || (r.user_name || "").toLowerCase().includes(q) || (r.user_email || "").toLowerCase().includes(q);
+    });
+
+    const allBulkSelected = filteredCompanionRegs.length > 0 && filteredCompanionRegs.every(r => companionBulkSelected.includes(r.id));
+
+    return (
+      <Stack spacing={3}>
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Badge Labels</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>Create and manage custom badge labels for this event's participants.</Typography>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-start" sx={{ mb: 2 }}>
+            <TextField size="small" label="Label name" value={companionNewName} onChange={e => setCompanionNewName(e.target.value)} sx={{ flex: 1 }} inputProps={{ maxLength: 100 }} onKeyDown={e => { if (e.key === "Enter" && companionNewName.trim()) createLabel(companionNewName.trim(), companionNewColor); }} />
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>Color:</Typography>
+              <Box component="input" type="color" value={companionNewColor} onChange={e => setCompanionNewColor(e.target.value)} style={{ width: 40, height: 36, border: "1px solid #e0e0e0", borderRadius: 6, cursor: "pointer", padding: 2 }} />
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>{companionNewColor}</Typography>
+            </Box>
+            <Button variant="contained" size="small" startIcon={companionLabelSaving ? <CircularProgress size={14} /> : <AddIcon />} disabled={!companionNewName.trim() || companionLabelSaving} onClick={() => createLabel(companionNewName.trim(), companionNewColor)} sx={{ textTransform: "none", borderRadius: 999, whiteSpace: "nowrap" }}>
+              {companionLabelSaving ? "Creating..." : "Create Label"}
+            </Button>
+          </Stack>
+
+          {companionLabelError && <Alert severity="error" sx={{ mb: 2 }}>{companionLabelError}</Alert>}
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ color: "text.secondary", mb: 1, fontWeight: 500 }}>Quick-add predefined roles:</Typography>
+            <Stack direction="row" flexWrap="wrap" gap={1}>
+              {PREDEFINED_ROLES.map(role => {
+                const alreadyExists = companionLabels.some(l => l.name.toLowerCase() === role.name.toLowerCase());
+                return (
+                  <Chip key={role.name} label={role.name} size="small" disabled={alreadyExists || companionLabelSaving} onClick={() => !alreadyExists && createLabel(role.name, role.color)} sx={{ bgcolor: alreadyExists ? "grey.100" : role.color + "22", color: alreadyExists ? "text.disabled" : role.color, border: `1px solid ${alreadyExists ? "#e0e0e0" : role.color + "66"}`, fontWeight: 600, cursor: alreadyExists ? "default" : "pointer", "&:hover": { bgcolor: alreadyExists ? "grey.100" : role.color + "33" } }} />
+                );
+              })}
+            </Stack>
+          </Box>
+
+          {companionLabelsLoading ? (
+            <CircularProgress size={20} />
+          ) : companionLabelsError ? (
+            <Alert severity="error">{companionLabelsError}</Alert>
+          ) : companionLabels.length === 0 ? (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>No labels yet. Create one above.</Typography>
+          ) : (
+            <Stack direction="row" flexWrap="wrap" gap={1}>
+              {companionLabels.map(label => (
+                <Box key={label.id} sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: label.color + "22", border: `1px solid ${label.color + "66"}`, borderRadius: 999, px: 1.5, py: 0.5 }}>
+                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: label.color, flexShrink: 0 }} />
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: label.color }}>{label.name}</Typography>
+                  <Tooltip title="Edit">
+                    <IconButton size="small" onClick={() => { setCompanionEditTarget(label); setCompanionEditName(label.name); setCompanionEditColor(label.color); setCompanionEditOpen(true); }} sx={{ p: 0.25, ml: 0.5 }}>
+                      <EditRoundedIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton size="small" onClick={() => { setCompanionDeleteTarget(label); setCompanionDeleteOpen(true); }} sx={{ p: 0.25 }}>
+                      <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" gap={1}>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.25 }}>Assign Labels to Participants</Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>Select participants and assign badge labels individually or in bulk.</Typography>
+            </Box>
+            <Stack direction="row" spacing={1} alignItems="center">
+              {companionBulkSelected.length > 0 && <Button variant="contained" size="small" onClick={() => setCompanionBulkAssignOpen(true)} sx={{ textTransform: "none", borderRadius: 999 }}>Bulk Assign ({companionBulkSelected.length})</Button>}
+              <IconButton size="small" onClick={() => setCompanionRegsRefresh(p => p + 1)}><RefreshRoundedIcon fontSize="small" /></IconButton>
+            </Stack>
+          </Stack>
+
+          <TextField size="small" fullWidth placeholder="Search participants by name or email..." value={companionSearch} onChange={e => setCompanionSearch(e.target.value)} sx={{ mb: 2 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment> }} />
+
+          {companionRegsLoading ? (
+            <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={22} /></Box>
+          ) : companionRegsError ? (
+            <Alert severity="error">{companionRegsError}</Alert>
+          ) : (
+            <TableContainer sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "grey.50", "& th": { fontSize: 13, color: "text.secondary" } }}>
+                    <TableCell padding="checkbox">
+                      <Checkbox size="small" checked={allBulkSelected} indeterminate={companionBulkSelected.length > 0 && !allBulkSelected} onChange={e => {
+                        if (e.target.checked) setCompanionBulkSelected(filteredCompanionRegs.map(r => r.id));
+                        else setCompanionBulkSelected([]);
+                      }} />
+                    </TableCell>
+                    <TableCell>Participant</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Badge Labels</TableCell>
+                    <TableCell align="right">Assign</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredCompanionRegs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        <Typography variant="body2" sx={{ color: "text.secondary", py: 2 }}>No participants found.</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredCompanionRegs.map(reg => (
+                      <TableRow key={reg.id} hover>
+                        <TableCell padding="checkbox">
+                          <Checkbox size="small" checked={companionBulkSelected.includes(reg.id)} onChange={e => {
+                            if (e.target.checked) setCompanionBulkSelected(prev => [...prev, reg.id]);
+                            else setCompanionBulkSelected(prev => prev.filter(id => id !== reg.id));
+                          }} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>{reg.user_name || "—"}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>{reg.user_email || "—"}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                            {(reg.badge_labels || []).length === 0
+                              ? <Typography variant="caption" sx={{ color: "text.disabled" }}>None</Typography>
+                              : (reg.badge_labels || []).map(bl => (
+                                <Chip key={bl.id} label={bl.name} size="small" sx={{ bgcolor: bl.color + "22", color: bl.color, border: `1px solid ${bl.color + "66"}`, fontWeight: 600, height: 20, fontSize: 11 }} />
+                              ))
+                            }
+                          </Stack>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Button size="small" variant="outlined" sx={{ textTransform: "none", borderRadius: 999, borderColor: "divider", color: "text.primary" }} onClick={() => {
+                            setCompanionAssignTarget(reg);
+                            setCompanionAssignSelected((reg.badge_labels || []).map(bl => bl.id));
+                            setCompanionAssignOpen(true);
+                          }}>
+                            Edit Labels
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
+
+        <Dialog open={companionEditOpen} onClose={() => setCompanionEditOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Edit Badge Label</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField size="small" label="Label name" value={companionEditName} onChange={e => setCompanionEditName(e.target.value)} inputProps={{ maxLength: 100 }} />
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="body2">Color:</Typography>
+                <Box component="input" type="color" value={companionEditColor} onChange={e => setCompanionEditColor(e.target.value)} style={{ width: 40, height: 36, border: "1px solid #e0e0e0", borderRadius: 6, cursor: "pointer", padding: 2 }} />
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>{companionEditColor}</Typography>
+              </Stack>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCompanionEditOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+            <Button variant="contained" disabled={!companionEditName.trim() || companionEditSaving} onClick={saveEditLabel} sx={{ textTransform: "none" }}>
+              {companionEditSaving ? "Saving..." : "Save"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={companionDeleteOpen} onClose={() => setCompanionDeleteOpen(false)} maxWidth="xs">
+          <DialogTitle>Delete Badge Label</DialogTitle>
+          <DialogContent>
+            <DialogContentText>Delete label "<strong>{companionDeleteTarget?.name}</strong>"? It will be removed from all participants assigned to it.</DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCompanionDeleteOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+            <Button variant="contained" color="error" disabled={companionDeleteLoading} onClick={() => companionDeleteTarget && deleteLabel(companionDeleteTarget.id)} sx={{ textTransform: "none" }}>
+              {companionDeleteLoading ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={companionAssignOpen} onClose={() => setCompanionAssignOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Assign Labels — {companionAssignTarget?.user_name || companionAssignTarget?.user_email || "Participant"}</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ color: "text.secondary", mb: 2, mt: 1 }}>Select labels to assign. This will replace any currently assigned labels.</Typography>
+            {companionLabels.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>No labels created yet. Create labels in the section above first.</Typography>
+            ) : (
+              <Stack direction="row" flexWrap="wrap" gap={1}>
+                {companionLabels.map(label => {
+                  const selected = companionAssignSelected.includes(label.id);
+                  return (
+                    <Chip key={label.id} label={label.name} size="small" onClick={() => {
+                      setCompanionAssignSelected(prev =>
+                        selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                      );
+                    }} sx={{ bgcolor: selected ? label.color : label.color + "22", color: selected ? "#fff" : label.color, border: `1px solid ${label.color}`, fontWeight: 600, cursor: "pointer" }} />
+                  );
+                })}
+              </Stack>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCompanionAssignOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+            <Button variant="contained" disabled={companionAssignSaving} onClick={() => companionAssignTarget && assignLabels(companionAssignTarget.id, companionAssignSelected)} sx={{ textTransform: "none" }}>
+              {companionAssignSaving ? "Saving..." : "Save Labels"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={companionBulkAssignOpen} onClose={() => setCompanionBulkAssignOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Bulk Assign Labels ({companionBulkSelected.length} participants)</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Mode</InputLabel>
+                <Select value={companionBulkMode} onChange={e => setCompanionBulkMode(e.target.value)} label="Mode">
+                  <MenuItem value="add">Add labels (keep existing)</MenuItem>
+                  <MenuItem value="set">Replace labels (remove existing)</MenuItem>
+                  <MenuItem value="remove">Remove selected labels only</MenuItem>
+                </Select>
+              </FormControl>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>Select labels:</Typography>
+              <Stack direction="row" flexWrap="wrap" gap={1}>
+                {companionLabels.map(label => {
+                  const selected = companionBulkLabels.includes(label.id);
+                  return (
+                    <Chip key={label.id} label={label.name} size="small" onClick={() => {
+                      setCompanionBulkLabels(prev =>
+                        selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                      );
+                    }} sx={{ bgcolor: selected ? label.color : label.color + "22", color: selected ? "#fff" : label.color, border: `1px solid ${label.color}`, fontWeight: 600, cursor: "pointer" }} />
+                  );
+                })}
+              </Stack>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCompanionBulkAssignOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+            <Button variant="contained" disabled={companionBulkLabels.length === 0 || companionBulkSaving} onClick={bulkAssignLabels} sx={{ textTransform: "none" }}>
+              {companionBulkSaving ? "Applying..." : "Apply to All Selected"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Stack>
+    );
+  };
+
   // ── Q&A export download ──────────────────────────────────────────────────
   const handleQnaExport = async (fmt) => {
     if (!event) return;
@@ -6784,6 +7255,7 @@ export default function EventManagePage() {
                       {tab === tabLabels.indexOf("Social Lounge") && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                       {tab === tabLabels.indexOf("Lounge Settings") && renderLoungeSettings()}
                       {tab === tabLabels.indexOf("Confirmation Email") && <EventConfirmationEmailManager event={event} />}
+                      {tab === tabLabels.indexOf("Companion") && renderCompanion()}
                       {tabLabels.indexOf("Product Management") !== -1 && tab === tabLabels.indexOf("Product Management") && renderProductManagement()}
                       {tab === tabLabels.indexOf("Edit") && renderEdit()}
                     </>
@@ -6799,6 +7271,7 @@ export default function EventManagePage() {
                       {tab === tabLabels.indexOf("Social Lounge") && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                       {tab === tabLabels.indexOf("Lounge Settings") && renderLoungeSettings()}
                       {tab === tabLabels.indexOf("Confirmation Email") && <EventConfirmationEmailManager event={event} />}
+                      {tab === tabLabels.indexOf("Companion") && renderCompanion()}
                       {tabLabels.indexOf("Product Management") !== -1 && tab === tabLabels.indexOf("Product Management") && renderProductManagement()}
                       {tab === tabLabels.indexOf("Edit") && renderEdit()}
                     </>

@@ -139,17 +139,32 @@ function DesktopView({ event, allParticipants, loading, error, userInitials, sea
                     <Typography sx={{ fontSize: 15, fontWeight: 640, color: COLORS.dark }}>
                       {p.display_name}
                     </Typography>
-                    {p.badge_key && p.badge_key !== 'attendee' && (
-                      <Chip
-                        label={p.badge_label}
-                        size="small"
-                        sx={{
-                          height: 18, fontSize: '0.65rem', fontWeight: 750,
-                          backgroundColor: ROLE_CHIP_COLORS[p.badge_key]?.backgroundColor,
-                          color: ROLE_CHIP_COLORS[p.badge_key]?.color,
-                        }}
-                      />
-                    )}
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {p.badge_key && p.badge_key !== 'attendee' && (
+                        <Chip
+                          label={p.badge_label}
+                          size="small"
+                          sx={{
+                            height: 18, fontSize: '0.65rem', fontWeight: 750,
+                            backgroundColor: ROLE_CHIP_COLORS[p.badge_key]?.backgroundColor,
+                            color: ROLE_CHIP_COLORS[p.badge_key]?.color,
+                          }}
+                        />
+                      )}
+                      {(p.badge_labels || []).map(badge => (
+                        <Chip
+                          key={badge.id}
+                          label={badge.name}
+                          size="small"
+                          sx={{
+                            height: 18, fontSize: '0.65rem', fontWeight: 700,
+                            backgroundColor: badge.color + '22',
+                            color: badge.color,
+                            border: `1px solid ${badge.color}66`,
+                          }}
+                        />
+                      ))}
+                    </Box>
                   </Box>
                   <Typography sx={{ fontSize: 13, color: '#888' }}>
                     {[p.job_title, p.company].filter(Boolean).join(' – ')}
@@ -256,7 +271,7 @@ function MobileView({ allParticipants, loading, error, searchQuery, onSearchChan
                     {p.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
                   </Avatar>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25, flexWrap: 'wrap' }}>
                       <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
                         {p.display_name}
                       </Typography>
@@ -271,6 +286,19 @@ function MobileView({ allParticipants, loading, error, searchQuery, onSearchChan
                           }}
                         />
                       )}
+                      {(p.badge_labels || []).map(badge => (
+                        <Chip
+                          key={badge.id}
+                          label={badge.name}
+                          size="small"
+                          sx={{
+                            height: 16, fontSize: '0.6rem', fontWeight: 700,
+                            backgroundColor: badge.color + '22',
+                            color: badge.color,
+                            border: `1px solid ${badge.color}66`,
+                          }}
+                        />
+                      ))}
                     </Box>
                     <Typography sx={{ fontSize: 11.5, color: '#999' }}>
                       {[p.job_title, p.company].filter(Boolean).join(' – ')}
