@@ -22,7 +22,10 @@ import {
   Card as MUICard,
   CardContent,
   Pagination,
-  Skeleton
+  Skeleton,
+  Tabs,
+  Tab,
+  Paper
 } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
@@ -1983,6 +1986,7 @@ export default function EventsPage() {
   const [pinnedLoading, setPinnedLoading] = useState(false);
   const [replayEvents, setReplayEvents] = useState([]);
   const [replayLoading, setReplayLoading] = useState(false);
+  const [replayTotal, setReplayTotal] = useState(0);
   const [cmsLoading, setCmsLoading] = useState(true);
   const [cmsError, setCmsError] = useState("");
   const [cmsPage, setCmsPage] = useState(null);
@@ -1993,8 +1997,10 @@ export default function EventsPage() {
   );
 
   const [page, setPage] = useState(1);
+  const [replayPage, setReplayPage] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [view, setView] = useState("grid"); // 'grid' | 'list'
+  const [selectedTab, setSelectedTab] = useState("upcoming"); // 'upcoming' | 'replays'
   const [dateRange, setDateRange] = useState(""); // "",
   const [topic, setTopic] = useState("");   // or "Topic/Industry" if you prefer
   const [format, setFormat] = useState(""); // or "Event Format"
@@ -2558,6 +2564,8 @@ export default function EventsPage() {
         if (token) headers.Authorization = `Bearer ${token}`;
 
         const url = new URL(`${EVENTS_URL}replays/`);
+        url.searchParams.set("limit", String(PAGE_SIZE));
+        url.searchParams.set("offset", String((replayPage - 1) * PAGE_SIZE));
         url.searchParams.set("min_price", String(priceRange[0]));
         url.searchParams.set("max_price", String(priceRange[1]));
         const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
@@ -2583,6 +2591,7 @@ export default function EventsPage() {
         console.log("[EventsPage] Replay API response - items count:", items.length, "data:", data);
 
         setReplayEvents(items);
+        setReplayTotal(Array.isArray(data) ? 0 : (data.count || 0));
         console.log("[EventsPage] Replay events state updated with", items.length, "events");
       } catch (e) {
         if (e.name !== "AbortError") {
@@ -2593,7 +2602,7 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId]);
+  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId, replayPage]);
 
   // Fetch series data for events that belong to series (debounced to not block initial render)
   useEffect(() => {
@@ -2778,12 +2787,19 @@ export default function EventsPage() {
 
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const replayPageCount = Math.max(1, Math.ceil(replayTotal / PAGE_SIZE));
 
   useEffect(() => {
     // if the total dropped (e.g., 4 items total), don't stay on page 2
     const pc = Math.max(1, Math.ceil(total / PAGE_SIZE));
     if (page > pc) setPage(pc);
   }, [total]);
+
+  useEffect(() => {
+    // if the replay total dropped, don't stay on a page that no longer exists
+    const rpc = Math.max(1, Math.ceil(replayTotal / PAGE_SIZE));
+    if (replayPage > rpc) setReplayPage(rpc);
+  }, [replayTotal]);
 
   useEffect(() => {
     setPage(1);
@@ -3420,22 +3436,60 @@ export default function EventsPage() {
             lg={showAdvanced && isDesktop ? 10 : 12}
             sx={{ flex: 1, minWidth: 0 }}
           >
+            {/* Tab Navigation */}
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
+              <Tabs
+                value={selectedTab === "upcoming" ? 0 : 1}
+                onChange={(_, value) => {
+                  setSelectedTab(value === 0 ? "upcoming" : "replays");
+                  setPage(1);
+                }}
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{
+                  px: 1,
+                  "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
+                  "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
+                  "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+                }}
+              >
+                <Tab label="Upcoming Events" />
+                <Tab label={`Available Replays${replayTotal > 0 ? ` (${replayTotal})` : ''}`} />
+              </Tabs>
+            </Paper>
+
             <div className="w-full">
-              <h2 className="text-3xl font-bold">Upcoming Events</h2>
+              <h2 className="text-3xl font-bold">
+                {selectedTab === "replays" ? "Available Replays" : "Upcoming Events"}
+              </h2>
               <p className="text-neutral-600 mt-1">
-                {loading ? (
-                  <Skeleton variant="text" width={140} sx={{ display: "inline-block" }} />
+                {selectedTab === "replays" ? (
+                  replayLoading ? (
+                    <Skeleton variant="text" width={140} sx={{ display: "inline-block" }} />
+                  ) : (
+                    `${replayTotal} replays found`
+                  )
                 ) : (
-                  `${total} events found`
+                  <>
+                    {replayLoading ? (
+                      <Skeleton variant="text" width={140} sx={{ display: "inline-block" }} />
+                    ) : loading ? (
+                      <Skeleton variant="text" width={140} sx={{ display: "inline-block" }} />
+                    ) : (
+                      `${total} events found`
+                    )}
+                  </>
                 )}
               </p>
-              {error && (
+              {selectedTab === "upcoming" && error && (
                 <p className="mt-2 text-red-600 text-sm">
                   Failed to load events: {error}
                 </p>
               )}
             </div>
 
+            {selectedTab === "upcoming" && (
+            <>
             {view === "grid" ? (
               <Box
                 sx={{
@@ -3700,6 +3754,24 @@ export default function EventsPage() {
                 }
               </Grid>
             )}
+
+            {/* Pagination */}
+            <Box
+              className="mt-8 flex items-center justify-center"
+              sx={{ opacity: loading ? 0.6 : 1, pointerEvents: loading ? "none" : "auto" }}
+            >
+              <Pagination
+                count={pageCount}
+                page={page}
+                onChange={handlePageChange}
+                color="primary"
+                shape="rounded"
+                siblingCount={1}
+                boundaryCount={1}
+              />
+            </Box>
+            </>
+            )}
           </Grid>
         </Grid>
 
@@ -3922,54 +3994,31 @@ export default function EventsPage() {
           </Drawer>
         )}
 
-        {/* Pagination */}
-        <Box
-          className="mt-8 flex items-center justify-center"
-          sx={{ opacity: loading ? 0.6 : 1, pointerEvents: loading ? "none" : "auto" }}
-        >
-          <Pagination
-            count={pageCount}
-            page={page}
-            onChange={handlePageChange}
-            color="primary"
-            shape="rounded"
-            siblingCount={1}
-            boundaryCount={1}
-          />
-        </Box>
-      </Container>
 
-      {/* Available Replays Section */}
-      {replayEvents.length > 0 && (
-        <Container maxWidth={false} disableGutters className="mt-16 mb-16 px-4 sm:px-6">
-          <div className="w-full">
-            <h2 className="text-3xl font-bold">Available Replays</h2>
-            <p className="text-neutral-600 mt-1">
-              Watch recordings from past events
-            </p>
-          </div>
-
-          {view === "grid" ? (
-            <Box
-              sx={{
-                mt: 3,
-                display: "grid",
-                gap: 3,
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  sm: "repeat(2, minmax(0,1fr))",
-                  md: "repeat(3, minmax(0,1fr))",
-                  lg: "repeat(3, minmax(0,1fr))",
-                },
-              }}
-            >
-              {replayLoading
-                ? skeletonItems.map((i) => (
+            {/* Available Replays Tab */}
+            {selectedTab === "replays" && (
+            <>
+            {view === "grid" ? (
+              <Box
+                sx={{
+                  mt: 3,
+                  display: "grid",
+                  gap: 3,
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0,1fr))",
+                    md: "repeat(3, minmax(0,1fr))",
+                    lg: "repeat(3, minmax(0,1fr))",
+                  },
+                }}
+              >
+                {replayLoading
+                  ? skeletonItems.map((i) => (
                     <Box key={`sk-replay-grid-${i}`}>
                       <EventCardSkeleton />
                     </Box>
                   ))
-                : replayEvents.map((ev) => {
+                  : replayEvents.map((ev) => {
                     const replayCard = toCard(ev);
                     return (
                       <Box key={`replay-${ev.id}`}>
@@ -3985,16 +4034,16 @@ export default function EventsPage() {
                       </Box>
                     );
                   })}
-            </Box>
-          ) : (
-            <Grid container spacing={3} direction="column">
-              {replayLoading
-                ? skeletonItems.map((i) => (
+              </Box>
+            ) : (
+              <Grid container spacing={3} direction="column">
+                {replayLoading
+                  ? skeletonItems.map((i) => (
                     <Grid item key={`sk-replay-list-${i}`} xs={12}>
                       <EventRowSkeleton />
                     </Grid>
                   ))
-                : replayEvents.map((ev) => {
+                  : replayEvents.map((ev) => {
                     const replayCard = toCard(ev);
                     return (
                       <Grid item key={`replay-list-${ev.id}`} xs={12}>
@@ -4010,10 +4059,27 @@ export default function EventsPage() {
                       </Grid>
                     );
                   })}
-            </Grid>
-          )}
-        </Container>
-      )}
+              </Grid>
+            )}
+
+            {/* Pagination for Replays */}
+            <Box
+              className="mt-8 flex items-center justify-center"
+              sx={{ opacity: replayLoading ? 0.6 : 1, pointerEvents: replayLoading ? "none" : "auto" }}
+            >
+              <Pagination
+                count={replayPageCount}
+                page={replayPage}
+                onChange={(e, value) => setReplayPage(value)}
+                color="primary"
+                shape="rounded"
+                siblingCount={1}
+                boundaryCount={1}
+              />
+            </Box>
+            </>
+            )}
+      </Container>
 
       <ParticipantListDialog
         open={participantDialogOpen}
