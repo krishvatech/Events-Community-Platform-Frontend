@@ -21,6 +21,7 @@ import CoffeeIcon from '@mui/icons-material/Coffee';
 import { Helmet } from 'react-helmet-async';
 import NetworkingMeetingRequestModal from '../components/NetworkingMeetingRequestModal';
 import MyMeetingsView from '../components/MyMeetingsView';
+import ScheduleTab from '../components/ScheduleTab';
 import { toast } from 'react-toastify';
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
@@ -413,8 +414,9 @@ function EventCompanionDirectoryPage() {
   const [networkingSettings, setNetworkingSettings] = useState(null);
   const [selectedAttendee, setSelectedAttendee] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(0); // 0: Directory, 1: My Meetings
+  const [activeTab, setActiveTab] = useState(0); // 0: Directory, 1: My Meetings, 2: Schedule
   const [highlightedMeetingId, setHighlightedMeetingId] = useState(null);
+  const [scheduleAvailable, setScheduleAvailable] = useState(false);
   const debounceTimer = useRef(null);
 
   // Handle tab and meeting query parameters
@@ -501,6 +503,28 @@ function EventCompanionDirectoryPage() {
     };
 
     fetchNetworkingSettings();
+  }, [event?.id, token]);
+
+  useEffect(() => {
+    if (!event?.id || !token) return;
+
+    const checkSchedule = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/events/${event.id}/schedule/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          setScheduleAvailable(false);
+          return;
+        }
+        const data = await res.json();
+        setScheduleAvailable(data.days && data.days.some(d => d.sessions && d.sessions.length > 0));
+      } catch (err) {
+        setScheduleAvailable(false);
+      }
+    };
+
+    checkSchedule();
   }, [event?.id, token]);
 
   useEffect(() => {
@@ -602,6 +626,18 @@ function EventCompanionDirectoryPage() {
                   minHeight: 50,
                 }}
               />
+              {scheduleAvailable && (
+                <Tab
+                  label="Schedule"
+                  sx={{
+                    textTransform: 'none',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: activeTab === 2 ? COLORS.teal : '#999',
+                    minHeight: 50,
+                  }}
+                />
+              )}
             </Tabs>
           </Box>
         )}
@@ -634,12 +670,19 @@ function EventCompanionDirectoryPage() {
                 onRequestMeeting={handleRequestMeeting}
               />
             )
-          ) : (
+          ) : activeTab === 1 ? (
             <MyMeetingsView
               eventId={event?.id}
               currentUserId={currentUserId}
               networkingSettings={networkingSettings}
               isMobile={isMobile}
+            />
+          ) : (
+            <ScheduleTab
+              eventId={event?.id}
+              token={token}
+              isMobile={isMobile}
+              currentUserId={currentUserId}
             />
           )}
         </Box>
