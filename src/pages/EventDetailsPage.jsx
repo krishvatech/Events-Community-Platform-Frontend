@@ -1995,8 +1995,8 @@ export default function EventDetailsPage() {
                           </Box>
                         )}
 
-                        {/* Participant Directory Button - Only for Registered Users */}
-                        {hasActiveRegistration && status !== "cancelled" && (
+                        {/* Participant Directory Button - Only for In-Person Events */}
+                        {(event?.format === 'in_person' || event?.event_format === 'in_person') && status !== 'cancelled' && (
                           <Box className="flex justify-center py-2">
                             <Link
                               to={`/events/${event.slug}/companion`}

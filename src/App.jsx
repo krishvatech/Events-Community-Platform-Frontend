@@ -22,6 +22,8 @@ import MyCartPage from "./pages/MyCartPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import EventCompanionDirectoryPage from "./pages/EventCompanionDirectoryPage.jsx";
+import EventCompanionAccessPage from "./pages/EventCompanionAccessPage.jsx";
+import EventCompanionGuard from "./components/EventCompanionGuard.jsx";
 import LiveMeetingPage from "./pages/LiveMeetingPage.jsx";
 import Footer from "./components/Footer.jsx";
 import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
@@ -271,7 +273,8 @@ const AppShell = () => {
           <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
           <Route path="/landing/:slug" element={<SingleEventMarketingPage />} />
           <Route path="/series/:slug" element={<PublicSeriesLanding />} />
-          <Route path="/events/:slug/companion" element={<RequireAuth><EventCompanionDirectoryPage /></RequireAuth>} />
+          <Route path="/events/:slug/companion/access" element={<EventCompanionAccessPage />} />
+          <Route path="/events/:slug/companion" element={<RequireAuth><EventCompanionGuard><EventCompanionDirectoryPage /></EventCompanionGuard></RequireAuth>} />
           <Route path="/events/:slug" element={<EventDetailsPage />} />
           <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />

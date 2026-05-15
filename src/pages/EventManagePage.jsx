@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import RegisteredActions from "../components/RegisteredActions";
 import InviteUsersDialog from "../components/InviteUsersDialog";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
+import QRCodeDisplay from "../components/QRCodeDisplay.jsx";
 
 import {
   Avatar,
@@ -7024,6 +7025,28 @@ export default function EventManagePage() {
                   </Button>
                 </Stack>
               )}
+            </Stack>
+          )}
+        </Paper>
+
+        {/* ---- Event Companion Access Section ---- */}
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Event Companion Access</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>Generate QR code and share direct link for attendees to access the Event Companion.</Typography>
+
+          {eventId && (
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 2 }}>Direct Access URL</Typography>
+                <QRCodeDisplay
+                  url={`${window.location.origin}/events/${event?.slug}/companion/access`}
+                  eventSlug={event?.slug || 'event'}
+                  size={250}
+                />
+              </Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+                Share the QR code or direct link with attendees. They can scan or click to access the Event Companion.
+              </Typography>
             </Stack>
           )}
         </Paper>
