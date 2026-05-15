@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -12,10 +12,16 @@ import {
   Button,
   useMediaQuery,
   useTheme,
+  Tooltip,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import CoffeeIcon from '@mui/icons-material/Coffee';
 import { Helmet } from 'react-helmet-async';
+import NetworkingMeetingRequestModal from '../components/NetworkingMeetingRequestModal';
+import MyMeetingsView from '../components/MyMeetingsView';
+import { toast } from 'react-toastify';
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -36,7 +42,18 @@ const ROLE_CHIP_COLORS = {
   attendee: { backgroundColor: '#f5f5f5', color: '#424242' },
 };
 
-function DesktopView({ event, allParticipants, loading, error, userInitials, searchQuery, onSearchChange }) {
+function DesktopView({
+  event,
+  allParticipants,
+  loading,
+  error,
+  userInitials,
+  searchQuery,
+  onSearchChange,
+  networkingSettings,
+  currentUserId,
+  onRequestMeeting,
+}) {
   return (
     <Box sx={{
       bgcolor: '#fff',
@@ -171,26 +188,44 @@ function DesktopView({ event, allParticipants, loading, error, userInitials, sea
                   </Typography>
                 </Box>
 
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<CoffeeIcon />}
-                  sx={{
-                    borderColor: COLORS.teal,
-                    color: COLORS.teal,
-                    textTransform: 'none',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    px: 1.5,
-                    py: 0.75,
-                    '&:hover': {
-                      borderColor: COLORS.teal,
-                      bgcolor: COLORS.teal + '08',
-                    },
-                  }}
+                <Tooltip
+                  title={
+                    !networkingSettings?.enabled
+                      ? '1:1 meetings not enabled'
+                      : currentUserId === p.user_id
+                      ? 'Cannot request meeting with yourself'
+                      : 'Request a 1:1 meeting'
+                  }
                 >
-                  Request 1:1
-                </Button>
+                  <span>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<CoffeeIcon />}
+                      disabled={!networkingSettings?.enabled || currentUserId === p.user_id}
+                      onClick={() => onRequestMeeting(p)}
+                      sx={{
+                        borderColor: COLORS.teal,
+                        color: COLORS.teal,
+                        textTransform: 'none',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        px: 1.5,
+                        py: 0.75,
+                        '&:hover': {
+                          borderColor: COLORS.teal,
+                          bgcolor: COLORS.teal + '08',
+                        },
+                        '&:disabled': {
+                          borderColor: '#ccc',
+                          color: '#ccc',
+                        },
+                      }}
+                    >
+                      Request 1:1
+                    </Button>
+                  </span>
+                </Tooltip>
               </Box>
             ))}
           </Stack>
@@ -200,7 +235,16 @@ function DesktopView({ event, allParticipants, loading, error, userInitials, sea
   );
 }
 
-function MobileView({ allParticipants, loading, error, searchQuery, onSearchChange }) {
+function MobileView({
+  allParticipants,
+  loading,
+  error,
+  searchQuery,
+  onSearchChange,
+  networkingSettings,
+  currentUserId,
+  onRequestMeeting,
+}) {
   return (
     <Box sx={{
       width: '100%', maxWidth: '100%',
@@ -304,27 +348,45 @@ function MobileView({ allParticipants, loading, error, searchQuery, onSearchChan
                       {[p.job_title, p.company].filter(Boolean).join(' – ')}
                     </Typography>
                   </Box>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<CoffeeIcon />}
-                    sx={{
-                      borderColor: COLORS.teal,
-                      color: COLORS.teal,
-                      textTransform: 'none',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      px: 1,
-                      py: 0.5,
-                      flexShrink: 0,
-                      '&:hover': {
-                        borderColor: COLORS.teal,
-                        bgcolor: COLORS.teal + '08',
-                      },
-                    }}
+                  <Tooltip
+                    title={
+                      !networkingSettings?.enabled
+                        ? '1:1 meetings not enabled'
+                        : currentUserId === p.user_id
+                        ? 'Cannot request meeting with yourself'
+                        : 'Request a 1:1 meeting'
+                    }
                   >
-                    Request 1:1
-                  </Button>
+                    <span>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<CoffeeIcon />}
+                        disabled={!networkingSettings?.enabled || currentUserId === p.user_id}
+                        onClick={() => onRequestMeeting(p)}
+                        sx={{
+                          borderColor: COLORS.teal,
+                          color: COLORS.teal,
+                          textTransform: 'none',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          px: 1,
+                          py: 0.5,
+                          flexShrink: 0,
+                          '&:hover': {
+                            borderColor: COLORS.teal,
+                            bgcolor: COLORS.teal + '08',
+                          },
+                          '&:disabled': {
+                            borderColor: '#ccc',
+                            color: '#ccc',
+                          },
+                        }}
+                      >
+                        Request 1:1
+                      </Button>
+                    </span>
+                  </Tooltip>
                 </Box>
               ))}
             </Stack>
@@ -336,6 +398,7 @@ function MobileView({ allParticipants, loading, error, searchQuery, onSearchChan
 
 function EventCompanionDirectoryPage() {
   const { slug } = useParams();
+  const location = useLocation();
   const token = localStorage.getItem('access_token');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -346,7 +409,27 @@ function EventCompanionDirectoryPage() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [userInitials, setUserInitials] = useState('');
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [networkingSettings, setNetworkingSettings] = useState(null);
+  const [selectedAttendee, setSelectedAttendee] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(0); // 0: Directory, 1: My Meetings
+  const [highlightedMeetingId, setHighlightedMeetingId] = useState(null);
   const debounceTimer = useRef(null);
+
+  // Handle tab and meeting query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    const meetingId = params.get('meeting');
+
+    if (tab === 'meetings') {
+      setActiveTab(1);
+    }
+    if (meetingId) {
+      setHighlightedMeetingId(parseInt(meetingId));
+    }
+  }, [location.search]);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -370,7 +453,7 @@ function EventCompanionDirectoryPage() {
     }
   }, [slug, token]);
 
-  // Get current user initials
+  // Get current user info and networking settings
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -384,6 +467,7 @@ function EventCompanionDirectoryPage() {
           const lastName = user.last_name || '';
           const initials = (firstName[0] + lastName[0]).toUpperCase();
           setUserInitials(initials);
+          setCurrentUserId(user.id);
         }
       } catch (err) {
         // Fallback to empty string if API not available
@@ -392,6 +476,32 @@ function EventCompanionDirectoryPage() {
     };
     fetchCurrentUser();
   }, [token]);
+
+  // Fetch networking settings
+  useEffect(() => {
+    if (!event?.id) return;
+
+    const fetchNetworkingSettings = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/events/${event.id}/networking-settings/`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (res.ok) {
+          const settings = await res.json();
+          setNetworkingSettings(settings);
+        } else {
+          // If 404 or other error, networking not configured
+          setNetworkingSettings(null);
+        }
+      } catch (err) {
+        // Silently fail - networking is optional
+        setNetworkingSettings(null);
+      }
+    };
+
+    fetchNetworkingSettings();
+  }, [event?.id, token]);
 
   useEffect(() => {
     if (!event?.id) return;
@@ -440,41 +550,115 @@ function EventCompanionDirectoryPage() {
     return <Alert severity="error">{error}</Alert>;
   }
 
+  const handleRequestMeeting = (attendee) => {
+    setSelectedAttendee(attendee);
+    setModalOpen(true);
+  };
+
   return (
     <>
       <Helmet>
         <title>{event?.title || 'Event'} - Participant Directory</title>
       </Helmet>
       <Box sx={{
-        p: isMobile ? 2 : 0,
         display: 'flex',
-        gap: 2,
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
+        height: '100vh',
         bgcolor: COLORS.bg,
-        minHeight: '100vh',
       }}>
-        {isMobile ? (
-          <MobileView
-            allParticipants={allParticipants}
-            loading={loading}
-            error={error}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-          />
-        ) : (
-          <DesktopView
-            event={event}
-            allParticipants={allParticipants}
-            loading={loading}
-            error={error}
-            userInitials={userInitials}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-          />
+        {/* Tab Navigation */}
+        {networkingSettings?.enabled && (
+          <Box sx={{
+            bgcolor: '#fff',
+            borderBottom: '1px solid #F0EEEB',
+            display: 'flex',
+            alignItems: 'center',
+            px: isMobile ? 2 : 3,
+          }}>
+            <Tabs
+              value={activeTab}
+              onChange={(e, newValue) => setActiveTab(newValue)}
+              sx={{
+                '& .MuiTabs-indicator': { backgroundColor: COLORS.teal, height: 3 },
+              }}
+            >
+              <Tab
+                label="Directory"
+                sx={{
+                  textTransform: 'none',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: activeTab === 0 ? COLORS.teal : '#999',
+                  minHeight: 50,
+                }}
+              />
+              <Tab
+                label="My Meetings"
+                sx={{
+                  textTransform: 'none',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: activeTab === 1 ? COLORS.teal : '#999',
+                  minHeight: 50,
+                }}
+              />
+            </Tabs>
+          </Box>
         )}
+
+        {/* Content */}
+        <Box sx={{ flex: 1, overflowY: 'auto', p: isMobile ? 2 : 0 }}>
+          {activeTab === 0 ? (
+            isMobile ? (
+              <MobileView
+                allParticipants={allParticipants}
+                loading={loading}
+                error={error}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                networkingSettings={networkingSettings}
+                currentUserId={currentUserId}
+                onRequestMeeting={handleRequestMeeting}
+              />
+            ) : (
+              <DesktopView
+                event={event}
+                allParticipants={allParticipants}
+                loading={loading}
+                error={error}
+                userInitials={userInitials}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                networkingSettings={networkingSettings}
+                currentUserId={currentUserId}
+                onRequestMeeting={handleRequestMeeting}
+              />
+            )
+          ) : (
+            <MyMeetingsView
+              eventId={event?.id}
+              currentUserId={currentUserId}
+              networkingSettings={networkingSettings}
+              isMobile={isMobile}
+            />
+          )}
+        </Box>
       </Box>
+
+      {/* Meeting Request Modal */}
+      {selectedAttendee && event && (
+        <NetworkingMeetingRequestModal
+          open={modalOpen}
+          onClose={() => {
+            setModalOpen(false);
+            setSelectedAttendee(null);
+          }}
+          attendee={selectedAttendee}
+          eventId={event.id}
+          networkingSettings={networkingSettings}
+          currentUser={{ id: currentUserId }}
+        />
+      )}
     </>
   );
 }

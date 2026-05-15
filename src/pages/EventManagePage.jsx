@@ -409,6 +409,34 @@ export default function EventManagePage() {
   const [companionSearch, setCompanionSearch] = useState("");
   const [companionRegsRefresh, setCompanionRegsRefresh] = useState(0);
 
+  // ---- 1:1 Networking Scheduling State ----
+  const [networkingSettings, setNetworkingSettings] = useState(null);
+  const [networkingSettingsLoading, setNetworkingSettingsLoading] = useState(false);
+  const [networkingSettingsSaving, setNetworkingSettingsSaving] = useState(false);
+  const [networkingSettingsError, setNetworkingSettingsError] = useState("");
+  const [networkingTablesLoading, setNetworkingTablesLoading] = useState(false);
+  const [networkingTables, setNetworkingTables] = useState([]);
+  const [networkingTablesError, setNetworkingTablesError] = useState("");
+  const [newTableName, setNewTableName] = useState("");
+  const [newTableLocation, setNewTableLocation] = useState("");
+  const [newTableSaving, setNewTableSaving] = useState(false);
+  const [networkingTableEditTarget, setNetworkingTableEditTarget] = useState(null);
+  const [networkingTableEditOpen, setNetworkingTableEditOpen] = useState(false);
+  const [networkingTableEditName, setNetworkingTableEditName] = useState("");
+  const [networkingTableEditLocation, setNetworkingTableEditLocation] = useState("");
+  const [networkingTableEditSaving, setNetworkingTableEditSaving] = useState(false);
+  const [networkingTableDeleteTarget, setNetworkingTableDeleteTarget] = useState(null);
+  const [networkingTableDeleteOpen, setNetworkingTableDeleteOpen] = useState(false);
+  const [networkingTableDeleteLoading, setNetworkingTableDeleteLoading] = useState(false);
+  const [networkingDurations, setNetworkingDurations] = useState([5, 10, 15]);
+  const [customDurationInput, setCustomDurationInput] = useState("");
+  const [customDurationError, setCustomDurationError] = useState("");
+  const [networkingAllowedWindows, setNetworkingAllowedWindows] = useState([]);
+  const [networkingEnabled, setNetworkingEnabled] = useState(false);
+  const [networkingSmsEnabled, setNetworkingSmsEnabled] = useState(false);
+  const [networkingReminderMinutes, setNetworkingReminderMinutes] = useState(15);
+  const [networkingSuccessMessage, setNetworkingSuccessMessage] = useState("");
+
   // Resend Mail to All State
   const [resendMailOpen, setResendMailOpen] = useState(false);
   const [resendMailLoading, setResendMailLoading] = useState(false);
@@ -1150,6 +1178,50 @@ export default function EventManagePage() {
     })();
     return () => controller.abort();
   }, [eventId, isOwner, tab, companionTabIndex, companionRegsRefresh]);
+
+  // ---- Load 1:1 Networking Settings and Tables ----
+  useEffect(() => {
+    if (!eventId || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
+    const controller = new AbortController();
+    const loadNetworking = async () => {
+      setNetworkingSettingsLoading(true);
+      setNetworkingTablesLoading(true);
+      try {
+        const token = getToken();
+        const settingsRes = await fetch(`${API_ROOT}/events/${eventId}/networking-settings/`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json();
+          setNetworkingSettings(settings);
+          setNetworkingEnabled(settings.enabled || false);
+          setNetworkingDurations(settings.duration_options_minutes || [5, 10, 15]);
+          setNetworkingAllowedWindows(settings.allowed_windows || []);
+          setNetworkingSmsEnabled(settings.sms_enabled || false);
+          setNetworkingReminderMinutes(settings.reminder_minutes_before || 15);
+        }
+
+        const tablesRes = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (tablesRes.ok) {
+          const tables = await tablesRes.json();
+          setNetworkingTables(Array.isArray(tables) ? tables : (tables.results || []));
+        }
+      } catch (e) {
+        if (e.name !== "AbortError") {
+          setNetworkingSettingsError(e.message || "Failed to load networking settings");
+        }
+      } finally {
+        setNetworkingSettingsLoading(false);
+        setNetworkingTablesLoading(false);
+      }
+    };
+    loadNetworking();
+    return () => controller.abort();
+  }, [eventId, isOwner, tab, companionTabIndex]);
 
   useEffect(() => {
     if (!eventId || !isOwner || guestAuditTabIndex === -1 || tab !== guestAuditTabIndex) return;
@@ -6606,8 +6678,462 @@ export default function EventManagePage() {
 
     const allBulkSelected = filteredCompanionRegs.length > 0 && filteredCompanionRegs.every(r => companionBulkSelected.includes(r.id));
 
+    const saveNetworkingSettings = async () => {
+      setNetworkingSettingsSaving(true);
+      setNetworkingSettingsError("");
+      setNetworkingSuccessMessage("");
+      try {
+        const token = getToken();
+        const res = await fetch(`${API_ROOT}/events/${eventId}/networking-settings/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            enabled: networkingEnabled,
+            duration_options_minutes: networkingDurations,
+            allowed_windows: networkingAllowedWindows,
+            sms_enabled: networkingSmsEnabled,
+            reminder_minutes_before: networkingReminderMinutes,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.detail || json?.enabled?.[0] || `HTTP ${res.status}`);
+        setNetworkingSettings(json);
+        setNetworkingSuccessMessage("Networking settings saved successfully");
+        setTimeout(() => setNetworkingSuccessMessage(""), 5000);
+        toast.success("Networking settings saved");
+      } catch (e) {
+        setNetworkingSettingsError(e.message || "Failed to save settings");
+        toast.error(e.message || "Failed to save settings");
+      } finally {
+        setNetworkingSettingsSaving(false);
+      }
+    };
+
+    const addNetworkingTable = async () => {
+      if (!newTableName.trim()) {
+        toast.error("Table name is required");
+        return;
+      }
+
+      setNewTableSaving(true);
+      setNetworkingTablesError("");
+      try {
+        const token = getToken();
+        const res = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            name: newTableName.trim(),
+            location_note: newTableLocation.trim(),
+            is_active: true,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          let errorMsg = json?.detail || `HTTP ${res.status}`;
+          if (json?.name) errorMsg = json.name[0] || "Invalid table name";
+          if (json?.location_note) errorMsg = json.location_note[0] || "Invalid location/note";
+          if (json?.table_number) errorMsg = json.table_number[0] || "Invalid table number";
+          if (json?.non_field_errors) errorMsg = json.non_field_errors[0] || "Validation error";
+          throw new Error(errorMsg);
+        }
+
+        const tablesRes = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (tablesRes.ok) {
+          const tables = await tablesRes.json();
+          setNetworkingTables(Array.isArray(tables) ? tables : (tables.results || []));
+        } else {
+          setNetworkingTables(prev => [...prev, json]);
+        }
+
+        setNewTableName("");
+        setNewTableLocation("");
+        toast.success("Table added successfully");
+      } catch (e) {
+        setNetworkingTablesError(e.message || "Failed to add table");
+        toast.error(e.message || "Failed to add table");
+      } finally {
+        setNewTableSaving(false);
+      }
+    };
+
+    const updateNetworkingTable = async () => {
+      if (!networkingTableEditTarget) return;
+      setNetworkingTableEditSaving(true);
+      try {
+        const token = getToken();
+        const res = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/${networkingTableEditTarget.id}/`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            name: networkingTableEditName.trim(),
+            location_note: networkingTableEditLocation.trim(),
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.detail || json?.name?.[0] || `HTTP ${res.status}`);
+        setNetworkingTables(prev => prev.map(t => t.id === json.id ? json : t));
+        setNetworkingTableEditOpen(false);
+        setNetworkingTableEditTarget(null);
+        toast.success("Table updated");
+      } catch (e) {
+        toast.error(e.message || "Failed to update table");
+      } finally {
+        setNetworkingTableEditSaving(false);
+      }
+    };
+
+    const deleteNetworkingTable = async () => {
+      if (!networkingTableDeleteTarget) return;
+      setNetworkingTableDeleteLoading(true);
+      try {
+        const token = getToken();
+        const res = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/${networkingTableDeleteTarget.id}/`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+        setNetworkingTables(prev => prev.filter(t => t.id !== networkingTableDeleteTarget.id));
+        setNetworkingTableDeleteOpen(false);
+        setNetworkingTableDeleteTarget(null);
+        toast.success("Table deleted");
+      } catch (e) {
+        toast.error(e.message || "Failed to delete table");
+      } finally {
+        setNetworkingTableDeleteLoading(false);
+      }
+    };
+
+    const toggleDuration = (duration) => {
+      setNetworkingDurations(prev =>
+        prev.includes(duration) ? prev.filter(d => d !== duration) : [...prev, duration].sort((a, b) => a - b)
+      );
+    };
+
+    const addCustomDuration = () => {
+      setCustomDurationError("");
+      const input = customDurationInput.trim();
+
+      // Validate empty input
+      if (!input) {
+        setCustomDurationError("Please enter duration.");
+        return;
+      }
+
+      // Validate number
+      const duration = parseInt(input, 10);
+      if (isNaN(duration) || duration !== parseFloat(input)) {
+        setCustomDurationError("Please enter a valid duration in minutes.");
+        return;
+      }
+
+      // Validate range
+      if (duration < 1 || duration > 180) {
+        setCustomDurationError("Duration must be between 1 and 180 minutes.");
+        return;
+      }
+
+      // Check for duplicates
+      if (networkingDurations.includes(duration)) {
+        setCustomDurationError("This duration already exists.");
+        return;
+      }
+
+      // Add duration
+      setNetworkingDurations(prev => [...prev, duration].sort((a, b) => a - b));
+      setCustomDurationInput("");
+      setCustomDurationError("");
+    };
+
+    const removeDuration = (duration) => {
+      // Only allow removing durations over 30 minutes (custom ones)
+      if (duration > 30 || ![5, 10, 15, 20, 30].includes(duration)) {
+        setNetworkingDurations(prev => prev.filter(d => d !== duration));
+      }
+    };
+
+    const addNetworkingWindow = () => {
+      setNetworkingAllowedWindows(prev => [...prev, { date: "", start: "09:00", end: "17:00" }]);
+    };
+
+    const removeNetworkingWindow = (index) => {
+      setNetworkingAllowedWindows(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const updateNetworkingWindow = (index, field, value) => {
+      setNetworkingAllowedWindows(prev => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], [field]: value };
+        return updated;
+      });
+    };
+
     return (
       <Stack spacing={3}>
+        {/* ---- 1:1 Meeting Scheduling Section ---- */}
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>1:1 Meeting Scheduling</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>Configure 1:1 networking meeting options for attendees.</Typography>
+
+          {networkingSettingsError && <Alert severity="error" sx={{ mb: 2 }}>{networkingSettingsError}</Alert>}
+          {networkingSuccessMessage && <Alert severity="success" sx={{ mb: 2 }}>{networkingSuccessMessage}</Alert>}
+
+          {networkingSettingsLoading ? (
+            <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={24} /></Box>
+          ) : (
+            <Stack spacing={3}>
+              {/* Enable/Disable Toggle */}
+              <FormControlLabel
+                control={<Switch checked={networkingEnabled} onChange={e => setNetworkingEnabled(e.target.checked)} />}
+                label={
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Enable 1:1 Meeting Scheduling</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>Allow attendees to request 1:1 networking meetings</Typography>
+                  </Box>
+                }
+              />
+
+              {networkingEnabled && (
+                <Stack spacing={3}>
+                  {/* Duration Options */}
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>Available Meeting Durations</Typography>
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" flexWrap="wrap" gap={1}>
+                        {[5, 10, 15, 20, 30].map(duration => (
+                          <Chip
+                            key={duration}
+                            label={`${duration} min`}
+                            onClick={() => toggleDuration(duration)}
+                            variant={networkingDurations.includes(duration) ? "filled" : "outlined"}
+                            color={networkingDurations.includes(duration) ? "primary" : "default"}
+                            icon={networkingDurations.includes(duration) ? <CheckCircleRoundedIcon /> : undefined}
+                            sx={{ fontWeight: 600 }}
+                          />
+                        ))}
+                        {/* Custom durations */}
+                        {networkingDurations.filter(d => ![5, 10, 15, 20, 30].includes(d)).map(duration => (
+                          <Chip
+                            key={`custom-${duration}`}
+                            label={`${duration} min`}
+                            variant="filled"
+                            color="primary"
+                            onDelete={() => removeDuration(duration)}
+                            icon={<CheckCircleRoundedIcon />}
+                            sx={{ fontWeight: 600 }}
+                          />
+                        ))}
+                      </Stack>
+
+                      {/* Custom Duration Input */}
+                      <Stack direction={{ xs: "column", sm: "row" }} gap={1} alignItems={{ xs: "stretch", sm: "flex-start" }}>
+                        <TextField
+                          size="small"
+                          label="Custom duration"
+                          type="number"
+                          value={customDurationInput}
+                          onChange={e => {
+                            setCustomDurationInput(e.target.value);
+                            if (customDurationError) setCustomDurationError("");
+                          }}
+                          onKeyPress={e => e.key === "Enter" && addCustomDuration()}
+                          placeholder="e.g., 25"
+                          error={!!customDurationError}
+                          helperText={customDurationError}
+                          inputProps={{ min: 1, max: 180 }}
+                          sx={{ minWidth: 150 }}
+                        />
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={addCustomDuration}
+                          sx={{ textTransform: "none", whiteSpace: "nowrap", borderRadius: 999 }}
+                        >
+                          + Add
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </Box>
+
+                  {/* Allowed Networking Windows */}
+                  <Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>Allowed Networking Windows</Typography>
+                      <Button size="small" startIcon={<AddIcon />} onClick={addNetworkingWindow} sx={{ textTransform: "none" }}>Add Window</Button>
+                    </Box>
+                    <Stack spacing={2}>
+                      {networkingAllowedWindows.length === 0 ? (
+                        <Typography variant="body2" sx={{ color: "text.secondary", fontStyle: "italic" }}>No windows added yet. Add one to enable networking.</Typography>
+                      ) : (
+                        networkingAllowedWindows.map((window, idx) => (
+                          <Stack key={idx} direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: "grey.50", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
+                            <TextField
+                              size="small"
+                              label="Date"
+                              type="date"
+                              value={window.date || ""}
+                              onChange={e => updateNetworkingWindow(idx, "date", e.target.value)}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ flex: 1 }}
+                            />
+                            <TextField
+                              size="small"
+                              label="Start Time"
+                              type="time"
+                              value={window.start || ""}
+                              onChange={e => updateNetworkingWindow(idx, "start", e.target.value)}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ flex: 1 }}
+                            />
+                            <TextField
+                              size="small"
+                              label="End Time"
+                              type="time"
+                              value={window.end || ""}
+                              onChange={e => updateNetworkingWindow(idx, "end", e.target.value)}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{ flex: 1 }}
+                            />
+                            <IconButton size="small" onClick={() => removeNetworkingWindow(idx)} color="error"><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
+                          </Stack>
+                        ))
+                      )}
+                    </Stack>
+                  </Box>
+
+                  {/* Reminder Minutes */}
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Meeting Reminder (minutes before)</Typography>
+                    <TextField
+                      size="small"
+                      type="number"
+                      value={networkingReminderMinutes}
+                      onChange={e => setNetworkingReminderMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                      inputProps={{ min: 0, max: 1440 }}
+                      sx={{ maxWidth: 150 }}
+                    />
+                  </Box>
+
+                  {/* SMS Toggle */}
+                  <FormControlLabel
+                    control={<Switch checked={networkingSmsEnabled} onChange={e => setNetworkingSmsEnabled(e.target.checked)} />}
+                    label={
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>Enable SMS Notifications</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>Send SMS reminders for scheduled meetings (if backend supports)</Typography>
+                      </Box>
+                    }
+                  />
+
+                  <Button
+                    variant="contained"
+                    startIcon={networkingSettingsSaving ? <CircularProgress size={16} /> : <SaveRoundedIcon />}
+                    disabled={networkingSettingsSaving}
+                    onClick={saveNetworkingSettings}
+                    sx={{ textTransform: "none", alignSelf: "flex-start", borderRadius: 999 }}
+                  >
+                    {networkingSettingsSaving ? "Saving..." : "Save Settings"}
+                  </Button>
+                </Stack>
+              )}
+            </Stack>
+          )}
+        </Paper>
+
+        {/* ---- Networking Tables Section ---- */}
+        {networkingEnabled && (
+          <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Networking Tables</Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>Create and manage networking tables for assigning meeting attendees.</Typography>
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="flex-start" sx={{ mb: 2 }}>
+              <TextField
+                size="small"
+                label="Table name"
+                value={newTableName}
+                onChange={e => setNewTableName(e.target.value)}
+                placeholder="e.g., VIP Table, Main Hall"
+                sx={{ flex: 1 }}
+                inputProps={{ maxLength: 100 }}
+              />
+              <TextField
+                size="small"
+                label="Location/Note"
+                value={newTableLocation}
+                onChange={e => setNewTableLocation(e.target.value)}
+                placeholder="e.g., Rooftop Level"
+                sx={{ flex: 1 }}
+                inputProps={{ maxLength: 200 }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={newTableSaving ? <CircularProgress size={14} /> : <AddIcon />}
+                disabled={!newTableName.trim() || newTableSaving}
+                onClick={addNetworkingTable}
+                sx={{ textTransform: "none", borderRadius: 999, whiteSpace: "nowrap" }}
+              >
+                {newTableSaving ? "Adding..." : "Add Table"}
+              </Button>
+            </Stack>
+
+            {networkingTablesError && <Alert severity="error" sx={{ mb: 2 }}>{networkingTablesError}</Alert>}
+
+            {networkingTablesLoading ? (
+              <Box sx={{ py: 3, textAlign: "center" }}><CircularProgress size={22} /></Box>
+            ) : networkingTables.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "text.secondary", fontStyle: "italic" }}>No tables yet. Create one above.</Typography>
+            ) : (
+              <Stack direction="row" flexWrap="wrap" gap={1.5}>
+                {networkingTables.map(table => (
+                  <Paper
+                    key={table.id}
+                    elevation={0}
+                    sx={{
+                      bgcolor: table.is_active ? "primary.50" : "grey.100",
+                      border: `1px solid ${table.is_active ? "primary.200" : "divider"}`,
+                      p: 2,
+                      borderRadius: 2,
+                      flex: { xs: "1 1 calc(50% - 8px)", sm: "0 1 auto" },
+                      minWidth: 200,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{table.name}</Typography>
+                        {table.location_note && <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>{table.location_note}</Typography>}
+                        <Chip size="small" label={table.is_active ? "Active" : "Inactive"} variant="outlined" sx={{ mt: 1, fontWeight: 600 }} color={table.is_active ? "success" : "default"} />
+                      </Box>
+                      <Box sx={{ display: "flex", gap: 0.5 }}>
+                        <Tooltip title="Edit">
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setNetworkingTableEditTarget(table);
+                              setNetworkingTableEditName(table.name);
+                              setNetworkingTableEditLocation(table.location_note || "");
+                              setNetworkingTableEditOpen(true);
+                            }}
+                          >
+                            <EditRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" onClick={() => { setNetworkingTableDeleteTarget(table); setNetworkingTableDeleteOpen(true); }} color="error">
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+        )}
+
         <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Badge Labels</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>Create and manage custom badge labels for this event's participants.</Typography>
@@ -6844,6 +7370,62 @@ export default function EventManagePage() {
             <Button onClick={() => setCompanionBulkAssignOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
             <Button variant="contained" disabled={companionBulkLabels.length === 0 || companionBulkSaving} onClick={bulkAssignLabels} sx={{ textTransform: "none" }}>
               {companionBulkSaving ? "Applying..." : "Apply to All Selected"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ---- Networking Table Edit Dialog ---- */}
+        <Dialog open={networkingTableEditOpen} onClose={() => setNetworkingTableEditOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Edit Networking Table</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField
+                size="small"
+                label="Table name"
+                value={networkingTableEditName}
+                onChange={e => setNetworkingTableEditName(e.target.value)}
+                fullWidth
+                inputProps={{ maxLength: 100 }}
+              />
+              <TextField
+                size="small"
+                label="Location/Note"
+                value={networkingTableEditLocation}
+                onChange={e => setNetworkingTableEditLocation(e.target.value)}
+                fullWidth
+                inputProps={{ maxLength: 200 }}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setNetworkingTableEditOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+            <Button
+              variant="contained"
+              disabled={!networkingTableEditName.trim() || networkingTableEditSaving}
+              onClick={updateNetworkingTable}
+              sx={{ textTransform: "none" }}
+            >
+              {networkingTableEditSaving ? "Saving..." : "Save"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ---- Networking Table Delete Dialog ---- */}
+        <Dialog open={networkingTableDeleteOpen} onClose={() => setNetworkingTableDeleteOpen(false)} maxWidth="xs">
+          <DialogTitle>Delete Networking Table</DialogTitle>
+          <DialogContent>
+            <DialogContentText>Delete table <strong>{networkingTableDeleteTarget?.name}</strong>? This action cannot be undone.</DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setNetworkingTableDeleteOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+            <Button
+              variant="contained"
+              color="error"
+              disabled={networkingTableDeleteLoading}
+              onClick={deleteNetworkingTable}
+              sx={{ textTransform: "none" }}
+            >
+              {networkingTableDeleteLoading ? "Deleting..." : "Delete"}
             </Button>
           </DialogActions>
         </Dialog>
