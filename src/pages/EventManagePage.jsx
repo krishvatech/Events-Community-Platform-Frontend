@@ -7039,7 +7039,7 @@ export default function EventManagePage() {
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 2 }}>Direct Access URL</Typography>
                 <QRCodeDisplay
-                  url={`${window.location.origin}/events/${event?.slug}/companion/access`}
+                  url={`${window.location.origin}/events/${event?.slug}/companion`}
                   eventSlug={event?.slug || 'event'}
                   size={250}
                 />

@@ -273,8 +273,7 @@ const AppShell = () => {
           <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
           <Route path="/landing/:slug" element={<SingleEventMarketingPage />} />
           <Route path="/series/:slug" element={<PublicSeriesLanding />} />
-          <Route path="/events/:slug/companion/access" element={<EventCompanionAccessPage />} />
-          <Route path="/events/:slug/companion" element={<RequireAuth><EventCompanionGuard><EventCompanionDirectoryPage /></EventCompanionGuard></RequireAuth>} />
+          <Route path="/events/:slug/companion" element={<EventCompanionAccessPage />} />
           <Route path="/events/:slug" element={<EventDetailsPage />} />
           <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />

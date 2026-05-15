@@ -16,6 +16,7 @@ import { Helmet } from 'react-helmet-async';
 import LoginIcon from '@mui/icons-material/Login';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import EventNoteIcon from '@mui/icons-material/EventNote';
+import EventCompanionDirectoryPage from './EventCompanionDirectoryPage';
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -57,8 +58,9 @@ function EventCompanionAccessPage() {
       // Check if user is authenticated
       const token = getToken();
       if (!token) {
-        setIsAuthenticated(false);
-        setLoading(false);
+        // Redirect to login page instead of showing access page
+        const nextUrl = `/events/${slug}/companion`;
+        navigate(`/signin?next=${encodeURIComponent(nextUrl)}`);
         return;
       }
 
@@ -78,10 +80,7 @@ function EventCompanionAccessPage() {
       const user = await userRes.json();
       setUserData(user);
       setIsAuthenticated(true);
-
-      // Authenticated users go directly to companion directory
-      setTimeout(() => navigate(`/events/${slug}/companion`), 0);
-      return;
+      setIsRegistered(true);
     } catch (err) {
       setError(err.message || 'Failed to check access');
     } finally {
@@ -124,8 +123,6 @@ function EventCompanionAccessPage() {
       }
 
       setIsRegistered(true);
-      // Redirect to companion
-      setTimeout(() => navigate(`/events/${slug}/companion`), 500);
     } catch (err) {
       setError(err.message || 'Registration failed');
     } finally {
@@ -154,93 +151,49 @@ function EventCompanionAccessPage() {
     );
   }
 
-  return (
-    <>
-      <Helmet>
-        <title>Event Companion Access - {event?.title || 'Event'}</title>
-      </Helmet>
+  // If authenticated and registered, show the directory
+  if (isAuthenticated && isRegistered) {
+    return <EventCompanionDirectoryPage />;
+  }
 
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: '#f5f5f5',
-          p: 2,
-        }}
-      >
-        <Container maxWidth="sm">
-          <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
-            {/* Header */}
-            <Box sx={{ textAlign: 'center', mb: 4 }}>
-              <EventNoteIcon sx={{ fontSize: 48, color: '#E8532F', mb: 2 }} />
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
-                Event Companion
-              </Typography>
-              {event && (
+  // If authenticated but not registered, show registration prompt
+  if (isAuthenticated && !isRegistered && event && userData) {
+    return (
+      <>
+        <Helmet>
+          <title>Register for Event - {event?.title || 'Event'}</title>
+        </Helmet>
+
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: '#f5f5f5',
+            p: 2,
+          }}
+        >
+          <Container maxWidth="sm">
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
+              {/* Header */}
+              <Box sx={{ textAlign: 'center', mb: 4 }}>
+                <EventNoteIcon sx={{ fontSize: 48, color: '#E8532F', mb: 2 }} />
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
+                  Event Companion
+                </Typography>
                 <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5, color: '#333' }}>
                   {event.title}
                 </Typography>
-              )}
-              <Typography variant="body2" sx={{ color: '#666' }}>
-                Connect with attendees, join networking meetings, and stay updated
-              </Typography>
-            </Box>
-
-            {/* Error Alert */}
-            {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-
-            {/* Not Authenticated */}
-            {!isAuthenticated && (
-              <Stack spacing={3}>
-                <Box sx={{ p: 2, bgcolor: '#f0f0f0', borderRadius: 1 }}>
-                  <Typography variant="body2" sx={{ mb: 2, color: '#333' }}>
-                    Sign in to access the Event Companion and connect with other attendees.
-                  </Typography>
-                </Box>
-
-                <Stack spacing={2}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<LoginIcon />}
-                    onClick={handleLoginClick}
-                    sx={{
-                      bgcolor: '#E8532F',
-                      '&:hover': { bgcolor: '#D64020' },
-                      textTransform: 'none',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Sign In
-                  </Button>
-
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    startIcon={<HowToRegIcon />}
-                    onClick={handleSignupClick}
-                    sx={{
-                      borderColor: '#E8532F',
-                      color: '#E8532F',
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      '&:hover': { bgcolor: '#fff9f7' },
-                    }}
-                  >
-                    Create Account
-                  </Button>
-                </Stack>
-
-                <Typography variant="caption" sx={{ textAlign: 'center', color: '#666' }}>
-                  We'll redirect you back to the Event Companion after sign in.
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  Connect with attendees, join networking meetings, and stay updated
                 </Typography>
-              </Stack>
-            )}
+              </Box>
 
-            {/* Authenticated but Not Registered */}
-            {isAuthenticated && !isRegistered && userData && (
+              {/* Error Alert */}
+              {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+
+              {/* Registration Section */}
               <Stack spacing={3}>
                 <Box sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
@@ -280,29 +233,19 @@ function EventCompanionAccessPage() {
                   Registration is free. You'll be able to access the Event Companion immediately after.
                 </Typography>
               </Stack>
-            )}
+            </Paper>
 
-            {/* Loading Registration */}
-            {isAuthenticated && isRegistered && (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <CircularProgress sx={{ mb: 2 }} />
-                <Typography variant="body2" sx={{ color: '#666' }}>
-                  Opening Event Companion...
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-
-          {/* Info Footer */}
-          <Box sx={{ mt: 4, textAlign: 'center' }}>
-            <Typography variant="caption" sx={{ color: '#999' }}>
-              For issues or questions, contact event organizers
-            </Typography>
-          </Box>
-        </Container>
-      </Box>
-    </>
-  );
+            {/* Info Footer */}
+            <Box sx={{ mt: 4, textAlign: 'center' }}>
+              <Typography variant="caption" sx={{ color: '#999' }}>
+                For issues or questions, contact event organizers
+              </Typography>
+            </Box>
+          </Container>
+        </Box>
+      </>
+    );
+  }
 }
 
 export default EventCompanionAccessPage;

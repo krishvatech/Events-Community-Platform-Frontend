@@ -540,11 +540,19 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             description: session.description || "",
             sessionType: session.sessionType || session.session_type || "main",
             startTime: startISO,
+            start_time: startISO, // snake_case alias for SessionList compatibility
             endTime: endISO,
+            end_time: endISO, // snake_case alias for SessionList compatibility
             sessionDate: session.sessionDate || session.session_date || dateFromStart,
+            session_date: session.session_date || session.sessionDate || dateFromStart, // snake_case alias for SessionList
             displayOrder: Number(session.displayOrder ?? session.display_order ?? 0),
             session_image: session.session_image || null,
             imageFile: session.imageFile || null, // Preserve image file when pending
+            // Preserve duration fields for display
+            effective_duration_minutes: session.effective_duration_minutes || session.computed_duration_minutes,
+            duration_minutes_override: session.duration_minutes_override,
+            has_duration_override: session.has_duration_override || false,
+            session_breaks: session.session_breaks || [],
             _pending: Boolean(session._pending),
             _localId: session._localId || session.localId || null,
         };
@@ -660,7 +668,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
     // Fetch sessions for multi-day events
     useEffect(() => {
-        if (!event?.id || !isMultiDay) return;
+        if (!event?.id || !event?.is_multi_day) return;
 
         let cancelled = false;
         const headers = {
@@ -707,7 +715,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         return () => {
             cancelled = true;
         };
-    }, [event?.id, token, isMultiDay, normalizeSession, withSequentialSessionOrder]);
+    }, [event?.id, event?.is_multi_day, token, normalizeSession, withSequentialSessionOrder]);
 
     // ----- Seed Questions CRUD -----
     const seedHeaders = useCallback(() => ({

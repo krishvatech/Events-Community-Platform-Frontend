@@ -1,4 +1,7 @@
 import React from "react";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import {
   Table,
   TableBody,
@@ -22,6 +25,9 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const SESSION_TYPE_COLORS = {
   main: "#10b8a6",
@@ -69,6 +75,39 @@ function SessionList({
       primary: formatted.primary,
       secondary: formatted.secondary,
     };
+  };
+
+  const formatEndTimeOnly = (endTime) => {
+    if (!endTime) return "";
+    try {
+      const timeFormat = "h:mm A";
+      const dateFormat = "MMM D, YYYY";
+
+      // Organizer's timezone (if provided)
+      const orgEndObj = timezone ? dayjs(endTime).tz(timezone) : dayjs(endTime);
+      const orgEndTime = orgEndObj.format(timeFormat);
+      const orgEndDate = orgEndObj.format(dateFormat);
+
+      // User's local timezone
+      const localEndObj = dayjs(endTime).local();
+      const localEndTime = localEndObj.format(timeFormat);
+      const localEndDate = localEndObj.format(dateFormat);
+
+      // Check if they differ
+      const userTimezoneName = dayjs.tz.guess() || "UTC";
+      const timesDiffer = (orgEndTime !== localEndTime) || (orgEndDate !== localEndDate);
+
+      return {
+        primary: `${orgEndDate} | ${orgEndTime}`,
+        secondary: timesDiffer ? {
+          label: `Your Time: ${localEndDate} | ${localEndTime}`,
+          timezone: userTimezoneName
+        } : null
+      };
+    } catch (error) {
+      console.warn("Error formatting end time:", error);
+      return { primary: "", secondary: null };
+    }
   };
 
   const formatDuration = (minutes) => {
@@ -265,7 +304,7 @@ function SessionList({
                       </TableCell>
                       <TableCell sx={{ fontSize: "0.875rem" }}>
                         {(() => {
-                          const formatted = formatSessionDisplay(session.startTime, session.endTime);
+                          const formatted = formatEndTimeOnly(session.endTime);
                           return (
                             <Stack spacing={0.5}>
                               <Typography variant="body2" sx={{ fontWeight: 500 }}>

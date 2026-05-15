@@ -25,7 +25,7 @@ function EventCompanionGuard({ children }) {
       const token = getToken();
       if (!token) {
         // Should not happen as RequireAuth handles this, but just in case
-        navigate(`/events/${slug}/companion/access`);
+        navigate(`/events/${slug}/companion`);
         return;
       }
 
@@ -33,7 +33,7 @@ function EventCompanionGuard({ children }) {
       setIsRegistered(true);
     } catch (err) {
       // On error, redirect to access page for proper error handling
-      navigate(`/events/${slug}/companion/access`, { replace: true });
+      navigate(`/events/${slug}/companion`, { replace: true });
     } finally {
       setLoading(false);
     }
