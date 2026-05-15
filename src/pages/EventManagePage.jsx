@@ -433,7 +433,6 @@ export default function EventManagePage() {
   const [customDurationError, setCustomDurationError] = useState("");
   const [networkingAllowedWindows, setNetworkingAllowedWindows] = useState([]);
   const [networkingEnabled, setNetworkingEnabled] = useState(false);
-  const [networkingSmsEnabled, setNetworkingSmsEnabled] = useState(false);
   const [networkingReminderMinutes, setNetworkingReminderMinutes] = useState(15);
   const [networkingSuccessMessage, setNetworkingSuccessMessage] = useState("");
 
@@ -1198,7 +1197,6 @@ export default function EventManagePage() {
           setNetworkingEnabled(settings.enabled || false);
           setNetworkingDurations(settings.duration_options_minutes || [5, 10, 15]);
           setNetworkingAllowedWindows(settings.allowed_windows || []);
-          setNetworkingSmsEnabled(settings.sms_enabled || false);
           setNetworkingReminderMinutes(settings.reminder_minutes_before || 15);
         }
 
@@ -6691,7 +6689,6 @@ export default function EventManagePage() {
             enabled: networkingEnabled,
             duration_options_minutes: networkingDurations,
             allowed_windows: networkingAllowedWindows,
-            sms_enabled: networkingSmsEnabled,
             reminder_minutes_before: networkingReminderMinutes,
           }),
         });
@@ -7015,17 +7012,6 @@ export default function EventManagePage() {
                       sx={{ maxWidth: 150 }}
                     />
                   </Box>
-
-                  {/* SMS Toggle */}
-                  <FormControlLabel
-                    control={<Switch checked={networkingSmsEnabled} onChange={e => setNetworkingSmsEnabled(e.target.checked)} />}
-                    label={
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>Enable SMS Notifications</Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>Send SMS reminders for scheduled meetings (if backend supports)</Typography>
-                      </Box>
-                    }
-                  />
 
                   <Button
                     variant="contained"
