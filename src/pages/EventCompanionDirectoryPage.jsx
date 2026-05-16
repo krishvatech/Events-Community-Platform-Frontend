@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -101,6 +101,9 @@ function DesktopView({
   setShowCancelDialog,
   handleCancelMeetingConfirm,
   hoveredAttendee,
+  activeMeeting,
+  getOtherParty,
+  isSameMeetingDay,
 }) {
   const durations = [
     { mins: 5, label: '5 min', desc: 'Quick intro' },
@@ -119,12 +122,14 @@ function DesktopView({
         borderBottom: '1px solid #F0EEEB',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography sx={{ fontWeight: 850, fontSize: 20, color: COLORS.dark, letterSpacing: -0.5 }}>imaa</Typography>
-          <Box sx={{ height: 20, width: 1, background: '#E8E4DF' }} />
-          <Typography sx={{ fontSize: 13, color: '#999', fontWeight: 500 }}>
-            {event?.title || 'Annual M&A Conference 2026'}
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 850, fontSize: 20, color: COLORS.dark, letterSpacing: -0.5, flexShrink: 0 }}>imaa</Typography>
+          <Typography sx={{
+            fontSize: 13, color: '#666', fontWeight: 500,
+            flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0
+          }}>
+            {event?.title || 'Annual M&A Conference 2026'}
+          </Typography>
         </Box>
         <Box sx={{
           width: 34, height: 34, borderRadius: 1.125,
@@ -547,10 +552,10 @@ function DesktopView({
               </Typography>
               {[
                 { icon: Mail, text: selectedAttendee.display_name?.split(' ')[0] + ' receives an email notification', color: COLORS.teal },
-                { icon: Bell, text: 'She also gets an in-app push notification', color: COLORS.primary },
-                { icon: CheckCircle, text: 'She can accept, decline, or suggest a different slot', color: COLORS.teal },
-                { icon: Coffee, text: 'On accept → system assigns a free table and notifies you both', color: COLORS.purple },
-                { icon: AlertCircle, text: 'If no response within 24h, request expires', color: COLORS.gold },
+                { icon: Bell, text: 'An in-app push notification is sent', color: COLORS.primary },
+                { icon: CheckCircle, text: 'The request can be accepted, declined, or a different slot can be suggested', color: COLORS.teal },
+                { icon: Coffee, text: 'On acceptance → the system assigns a free table and sends notifications to both users', color: COLORS.purple },
+                { icon: AlertCircle, text: 'If there is no response within 24 hours, the request expires', color: COLORS.gold },
               ].map((s, i) => (
                 <Box key={i} sx={{
                   display: 'flex', alignItems: 'center', gap: 1.25,
@@ -562,207 +567,235 @@ function DesktopView({
               ))}
             </Box>
 
-            <Button
-              onClick={() => setFlowStep(4)}
-              sx={{
-                mt: 2.5, p: '10px 24px', borderRadius: 1.25,
-                background: COLORS.teal, border: 'none', color: '#fff',
-                fontSize: 13, fontWeight: 650, cursor: 'pointer', fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: 0.75,
-                textTransform: 'none',
-              }}
-            >
-              Simulate: {selectedAttendee.display_name?.split(' ')[0]} Accepts <ArrowRight size={14} strokeWidth={2} />
-            </Button>
+            <Box sx={{
+              mt: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 1, p: '12px 20px', borderRadius: 1.25,
+              background: COLORS.gold + '10', color: COLORS.gold,
+              fontSize: 13, fontWeight: 600,
+            }}>
+              <Clock size={16} strokeWidth={2} style={{ animation: 'spin 2s linear infinite' }} />
+              Waiting for response...
+            </Box>
           </Box>
         )}
 
         {/* STEP 4: Confirmed */}
-        {flowStep === 4 && selectedAttendee && (
-          <Box sx={{ textAlign: 'center', p: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Box sx={{
-              width: 72, height: 72, borderRadius: 2.5, margin: '0 auto 20px',
-              background: COLORS.teal + '10', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <CheckCircle size={36} color={COLORS.teal} strokeWidth={1.5} />
-            </Box>
-            <Typography sx={{ fontSize: 20, fontWeight: 740, color: COLORS.dark, mb: 1 }}>
-              Meeting Confirmed!
-            </Typography>
-            <Typography sx={{ fontSize: 14, color: '#999', mb: 3, maxWidth: 400 }}>
-              {selectedAttendee.display_name?.split(' ')[0]} accepted · The system assigned you a table
-            </Typography>
+        {flowStep === 4 && activeMeeting && (
+          (() => {
+            const otherParty = getOtherParty(activeMeeting);
+            const meetingDate = activeMeeting.start_time
+              ? new Date(activeMeeting.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              : 'TBA';
+            const meetingTime = activeMeeting.start_time
+              ? new Date(activeMeeting.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+              : 'TBA';
+            const tableName = activeMeeting.table?.name || 'Table assigned soon';
+            const tableLocation = activeMeeting.table?.location_note || '';
 
-            <Box sx={{
-              width: '100%', maxWidth: 440, borderRadius: 2, overflow: 'hidden',
-              boxShadow: '0 4px 20px rgba(27,42,74,0.08)',
-              border: '1px solid ' + COLORS.teal + '20', textAlign: 'left',
-            }}>
-              <Box sx={{
-                p: '16px 18px', background: COLORS.teal + '06',
-                display: 'flex', alignItems: 'center', gap: 1.5,
-              }}>
-                <Avatar
-                  src={selectedAttendee.avatar_url}
-                  sx={{
-                    width: 48, height: 48, borderRadius: 1.5,
-                    background: `linear-gradient(135deg, ${COLORS.dark}, #2C3E5A)`,
-                    fontWeight: 700, fontSize: 16, color: '#fff',
-                  }}
-                >
-                  {selectedAttendee.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
-                </Avatar>
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontSize: 16, fontWeight: 660, color: COLORS.dark }}>
-                    {selectedAttendee.display_name}
-                  </Typography>
-                  <Typography sx={{ fontSize: 12, color: '#999' }}>
-                    {selectedAttendee.job_title} · {selectedAttendee.company}
-                  </Typography>
+            // Filter other meetings for today: same day, accepted/pending status, excluding active meeting
+            const otherMeetingsToday = myMeetings?.filter(m =>
+              m.id !== activeMeeting.id &&
+              isSameMeetingDay(m.start_time, activeMeeting.start_time) &&
+              ['accepted', 'pending'].includes(m.status)
+            ) || [];
+
+            return (
+              <Box sx={{ textAlign: 'center', p: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Box sx={{
+                  width: 72, height: 72, borderRadius: 2.5, margin: '0 auto 20px',
+                  background: COLORS.teal + '10', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <CheckCircle size={36} color={COLORS.teal} strokeWidth={1.5} />
                 </Box>
-                <Chip
-                  label="Confirmed"
-                  size="small"
-                  sx={{
-                    fontSize: 10, fontWeight: 750, p: '4px 10px',
-                    borderRadius: 0.75, background: COLORS.teal + '14', color: COLORS.teal,
-                  }}
-                />
-              </Box>
-              <Box sx={{ p: '16px 18px', background: '#fff' }}>
-                <Box sx={{ display: 'flex', gap: 2.5, mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 14, color: COLORS.dark }}>
-                    <Calendar size={15} color={COLORS.teal} strokeWidth={2} />
-                    <Typography sx={{ fontWeight: 620 }}>Jun 12</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 14, color: COLORS.dark }}>
-                    <Clock size={15} color={COLORS.teal} strokeWidth={2} />
-                    <Typography sx={{ fontWeight: 620 }}>12:45 ({[5, 10, 15][selectedDuration]}min)</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 14, color: COLORS.dark }}>
-                    <Timer size={15} color={COLORS.teal} strokeWidth={2} />
-                    <Typography sx={{ fontWeight: 620 }}>Quick chat</Typography>
-                  </Box>
-                </Box>
+                <Typography sx={{ fontSize: 20, fontWeight: 740, color: COLORS.dark, mb: 1 }}>
+                  Meeting Confirmed!
+                </Typography>
+                <Typography sx={{ fontSize: 14, color: '#999', mb: 3, maxWidth: 400 }}>
+                  {otherParty?.display_name?.split(' ')[0]} accepted · The system assigned you a table
+                </Typography>
 
                 <Box sx={{
-                  display: 'flex', alignItems: 'center', gap: 1.5,
-                  p: '14px 16px', borderRadius: 1.5,
-                  background: COLORS.primary + '06', border: '1.5px solid ' + COLORS.primary + '18',
+                  width: '100%', maxWidth: 440, borderRadius: 2, overflow: 'hidden',
+                  boxShadow: '0 4px 20px rgba(27,42,74,0.08)',
+                  border: '1px solid ' + COLORS.teal + '20', textAlign: 'left',
                 }}>
                   <Box sx={{
-                    width: 48, height: 48, borderRadius: 1.5, background: COLORS.primary,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 20, fontWeight: 800, color: '#fff',
-                  }}>7</Box>
-                  <Box>
-                    <Typography sx={{ fontSize: 15, fontWeight: 680, color: COLORS.dark }}>
-                      Networking Table 7
-                    </Typography>
-                    <Typography sx={{ fontSize: 12.5, color: '#999', mt: 0.25 }}>
-                      Outside the main hall, numbered tables area
-                    </Typography>
+                    p: '16px 18px', background: COLORS.teal + '06',
+                    display: 'flex', alignItems: 'center', gap: 1.5,
+                  }}>
+                    <Avatar
+                      src={otherParty?.avatar_url}
+                      sx={{
+                        width: 48, height: 48, borderRadius: 1.5,
+                        background: `linear-gradient(135deg, ${COLORS.dark}, #2C3E5A)`,
+                        fontWeight: 700, fontSize: 16, color: '#fff',
+                      }}
+                    >
+                      {otherParty?.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 16, fontWeight: 660, color: COLORS.dark }}>
+                        {otherParty?.display_name}
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, color: '#999' }}>
+                        {otherParty?.job_title} · {otherParty?.company}
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label="Confirmed"
+                      size="small"
+                      sx={{
+                        fontSize: 10, fontWeight: 750, p: '4px 10px',
+                        borderRadius: 0.75, background: COLORS.teal + '14', color: COLORS.teal,
+                      }}
+                    />
+                  </Box>
+                  <Box sx={{ p: '16px 18px', background: '#fff' }}>
+                    <Box sx={{ display: 'flex', gap: 2.5, mb: 2, flexWrap: 'wrap' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 14, color: COLORS.dark }}>
+                        <Calendar size={15} color={COLORS.teal} strokeWidth={2} />
+                        <Typography sx={{ fontWeight: 620 }}>{meetingDate}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 14, color: COLORS.dark }}>
+                        <Clock size={15} color={COLORS.teal} strokeWidth={2} />
+                        <Typography sx={{ fontWeight: 620 }}>{meetingTime} ({activeMeeting.duration_minutes}min)</Typography>
+                      </Box>
+                    </Box>
+
+                    {activeMeeting.table ? (
+                      <Box sx={{
+                        display: 'flex', alignItems: 'center', gap: 1.5,
+                        p: '14px 16px', borderRadius: 1.5,
+                        background: COLORS.primary + '06', border: '1.5px solid ' + COLORS.primary + '18',
+                      }}>
+                        <Box sx={{
+                          width: 48, height: 48, borderRadius: 1.5, background: COLORS.primary,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 20, fontWeight: 800, color: '#fff',
+                        }}>{activeMeeting.table.table_number || '?'}</Box>
+                        <Box>
+                          <Typography sx={{ fontSize: 15, fontWeight: 680, color: COLORS.dark }}>
+                            {tableName}
+                          </Typography>
+                          {tableLocation && (
+                            <Typography sx={{ fontSize: 12.5, color: '#999', mt: 0.25 }}>
+                              {tableLocation}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{
+                        p: '12px 16px', borderRadius: 1.5,
+                        background: COLORS.gold + '10', border: '1.5px solid ' + COLORS.gold + '20',
+                        fontSize: 13, color: COLORS.gold, fontWeight: 600,
+                      }}>
+                        Table will be assigned soon
+                      </Box>
+                    )}
+
+                    <Box sx={{
+                      display: 'flex', alignItems: 'center', gap: 1, mt: 1.5,
+                      p: '10px 12px', borderRadius: 1, background: COLORS.bg,
+                      fontSize: 12, color: '#888',
+                    }}>
+                      <Bell size={13} color={COLORS.gold} strokeWidth={2} />
+                      You'll get a push notification 5 minutes before
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 1, pt: 2, borderTop: '1px solid #F0EEEB' }}>
+                    <Button
+                      onClick={() => handleMessageAttendee(activeMeeting)}
+                      disabled={!activeMeeting?.id}
+                      sx={{
+                        flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        fontSize: 12.5, fontWeight: 640, color: COLORS.teal,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
+                        textTransform: 'none', transition: 'all 0.2s',
+                        '&:hover': { background: COLORS.teal + '08', borderRadius: 0.75 },
+                        '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
+                      }}
+                    >
+                      <MessageSquare size={14} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
+                    </Button>
+                    <Button
+                      onClick={() => setShowCancelDialog(true)}
+                      sx={{
+                        flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                        fontSize: 12.5, fontWeight: 640, color: COLORS.primary,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
+                        textTransform: 'none', transition: 'all 0.2s',
+                        '&:hover': { background: COLORS.primary + '08', borderRadius: 0.75 },
+                      }}
+                    >
+                      <X size={14} strokeWidth={2} /> Cancel Meeting
+                    </Button>
                   </Box>
                 </Box>
 
-                <Box sx={{
-                  display: 'flex', alignItems: 'center', gap: 1, mt: 1.5,
-                  p: '10px 12px', borderRadius: 1, background: COLORS.bg,
-                  fontSize: 12, color: '#888',
-                }}>
-                  <Bell size={13} color={COLORS.gold} strokeWidth={2} />
-                  You'll get a push notification 5 minutes before
+                {/* Other meetings */}
+                <Box sx={{ maxWidth: 440, mx: 'auto', mt: 4, textAlign: 'left' }}>
+                  <Typography sx={{
+                    fontSize: 10, fontWeight: 750, textTransform: 'uppercase',
+                    letterSpacing: 1, color: COLORS.dark + '40', mb: 2,
+                  }}>Your Other Meetings Today</Typography>
+                  {otherMeetingsToday && otherMeetingsToday.length > 0 ? (
+                    otherMeetingsToday.map((m) => {
+                      const otherPerson = getOtherParty(m);
+                      if (!otherPerson?.user_id) return null;
+                      const participantName = otherPerson?.display_name || 'Unknown';
+                      const participantCompany = otherPerson?.company || 'Not specified';
+                      const startTime = m.start_time ? new Date(m.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
+                      const endTime = m.end_time ? new Date(m.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
+
+                      return (
+                        <Box key={m.id} sx={{
+                          display: 'flex', alignItems: 'center', gap: 2,
+                          p: '14px 16px', borderRadius: 1.25, background: '#fff',
+                          mb: 1, border: '1px solid #ECEAE6',
+                        }}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
+                              {participantName}
+                            </Typography>
+                            <Typography sx={{ fontSize: 12, color: '#BBB' }}>
+                              {participantCompany} · {startTime} - {endTime}
+                            </Typography>
+                          </Box>
+                          {m.status === 'accepted' && m.table ? (
+                            <Chip
+                              label={`Table ${m.table.table_number || '?'}`}
+                              size="small"
+                              sx={{
+                                fontSize: 12, fontWeight: 700, p: '6px 12px', borderRadius: 0.75,
+                                background: COLORS.primary + '10', color: COLORS.primary, border: `1px solid ${COLORS.primary}30`,
+                              }}
+                            />
+                          ) : (
+                            <Chip
+                              label="Pending"
+                              size="small"
+                              sx={{
+                                fontSize: 12, fontWeight: 700, p: '6px 12px', borderRadius: 0.75,
+                                background: COLORS.gold + '10', color: COLORS.gold, border: `1px solid ${COLORS.gold}30`,
+                              }}
+                            />
+                          )}
+                        </Box>
+                      );
+                    })
+                  ) : (
+                    <Typography sx={{ fontSize: 13, color: '#999', fontStyle: 'italic' }}>
+                      No other meetings scheduled
+                    </Typography>
+                  )}
                 </Box>
               </Box>
-
-              <Box sx={{ display: 'flex', gap: 1, pt: 2, borderTop: '1px solid #F0EEEB' }}>
-                <Button
-                  onClick={handleMessageAttendee}
-                  sx={{
-                    flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                    fontSize: 12.5, fontWeight: 640, color: COLORS.teal,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
-                    textTransform: 'none', transition: 'all 0.2s',
-                    '&:hover': { background: COLORS.teal + '08', borderRadius: 0.75 },
-                  }}
-                >
-                  <MessageSquare size={14} strokeWidth={2} /> Message {selectedAttendee.display_name?.split(' ')[0]}
-                </Button>
-                <Button
-                  onClick={() => setShowCancelDialog(true)}
-                  sx={{
-                    flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
-                    cursor: 'pointer', fontFamily: 'inherit',
-                    fontSize: 12.5, fontWeight: 640, color: COLORS.primary,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
-                    textTransform: 'none', transition: 'all 0.2s',
-                    '&:hover': { background: COLORS.primary + '08', borderRadius: 0.75 },
-                  }}
-                >
-                  <X size={14} strokeWidth={2} /> Cancel Meeting
-                </Button>
-              </Box>
-            </Box>
-
-            {/* Other meetings */}
-            <Box sx={{ maxWidth: 440, mx: 'auto', mt: 4, textAlign: 'left' }}>
-              <Typography sx={{
-                fontSize: 10, fontWeight: 750, textTransform: 'uppercase',
-                letterSpacing: 1, color: COLORS.dark + '40', mb: 2,
-              }}>Your Other Meetings Today</Typography>
-              {myMeetings && myMeetings.length > 0 ? (
-                myMeetings.filter(m => m.id !== selectedAttendee?.id).map((m) => {
-                  const recipientName = m.recipient?.display_name || m.recipient?.first_name || 'Unknown';
-                  const recipientCompany = m.recipient?.company || 'Not specified';
-                  const startTime = m.start_time ? new Date(m.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
-                  const endTime = m.end_time ? new Date(m.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
-                  const table = m.table_number;
-                  const confirmed = m.status === 'confirmed';
-
-                  return (
-                    <Box key={m.id} sx={{
-                      display: 'flex', alignItems: 'center', gap: 2,
-                      p: '14px 16px', borderRadius: 1.25, background: '#fff',
-                      mb: 1, border: '1px solid #ECEAE6',
-                    }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
-                          {recipientName}
-                        </Typography>
-                        <Typography sx={{ fontSize: 12, color: '#BBB' }}>
-                          {recipientCompany} · {startTime} - {endTime}
-                        </Typography>
-                      </Box>
-                      {table ? (
-                        <Chip
-                          label={`Table ${table}`}
-                          size="small"
-                          sx={{
-                            fontSize: 12, fontWeight: 700, p: '6px 12px', borderRadius: 0.75,
-                            background: COLORS.primary + '10', color: COLORS.primary, border: `1px solid ${COLORS.primary}30`,
-                          }}
-                        />
-                      ) : (
-                        <Chip
-                          label="Pending"
-                          size="small"
-                          sx={{
-                            fontSize: 12, fontWeight: 700, p: '6px 12px', borderRadius: 0.75,
-                            background: COLORS.gold + '10', color: COLORS.gold, border: `1px solid ${COLORS.gold}30`,
-                          }}
-                        />
-                      )}
-                    </Box>
-                  );
-                })
-              ) : (
-                <Typography sx={{ fontSize: 13, color: '#999', fontStyle: 'italic' }}>
-                  No other meetings scheduled
-                </Typography>
-              )}
-            </Box>
-          </Box>
+            );
+          })()
         )}
 
         {/* Cancel Meeting Confirmation Dialog */}
@@ -781,7 +814,7 @@ function DesktopView({
           </DialogTitle>
           <DialogContent>
             <Typography sx={{ color: '#666', mt: 1 }}>
-              Are you sure you want to cancel your meeting with {selectedAttendee?.display_name}?
+              Are you sure you want to cancel your meeting with {activeMeeting ? getOtherParty(activeMeeting)?.display_name : selectedAttendee?.display_name}?
             </Typography>
           </DialogContent>
           <DialogActions sx={{ p: 2, gap: 1 }}>
@@ -855,6 +888,9 @@ function MobileView({
   showCancelDialog,
   setShowCancelDialog,
   handleCancelMeetingConfirm,
+  activeMeeting,
+  getOtherParty,
+  isSameMeetingDay,
 }) {
   return (
     <Box sx={{
@@ -1170,196 +1206,226 @@ function MobileView({
               ))}
             </Box>
 
-            <Button
-              onClick={() => setFlowStep(4)}
-              sx={{
-                mt: 1.75, p: '10px 18px', borderRadius: 1.25,
-                background: COLORS.teal, border: 'none', color: '#fff',
-                fontSize: 12, fontWeight: 650, cursor: 'pointer', fontFamily: 'inherit',
-                textTransform: 'none',
-              }}
-            >
-              Simulate: {selectedAttendee.display_name?.split(' ')[0]} Accepts →
-            </Button>
+            <Box sx={{
+              mt: 1.75, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 1, p: '10px 16px', borderRadius: 1.25,
+              background: COLORS.gold + '10', color: COLORS.gold,
+              fontSize: 12, fontWeight: 600,
+            }}>
+              <Clock size={14} strokeWidth={2} style={{ animation: 'spin 2s linear infinite' }} />
+              Waiting for response...
+            </Box>
           </Box>
         )}
 
-        {/* STEP 4: Confirmed */}
-        {flowStep === 4 && selectedAttendee && (
-          <Box sx={{ p: '24px 14px' }}>
-            <Box sx={{ textAlign: 'center', mb: 2 }}>
-              <Box sx={{
-                width: 56, height: 56, borderRadius: 2, margin: '0 auto 10px',
-                background: COLORS.teal + '10', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <CheckCircle size={26} color={COLORS.teal} strokeWidth={1.5} />
-              </Box>
-              <Typography sx={{ fontSize: 17, fontWeight: 740, color: COLORS.dark }}>
-                It\'s a Date!
-              </Typography>
-            </Box>
+        {/* STEP 4: Confirmed - Mobile */}
+        {flowStep === 4 && activeMeeting && (
+          (() => {
+            const otherParty = getOtherParty(activeMeeting);
+            const meetingDate = activeMeeting.start_time
+              ? new Date(activeMeeting.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              : 'TBA';
+            const meetingTime = activeMeeting.start_time
+              ? new Date(activeMeeting.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+              : 'TBA';
+            const tableName = activeMeeting.table?.name || 'Table assigned soon';
+            const tableLocation = activeMeeting.table?.location_note || '';
 
-            <Box sx={{
-              borderRadius: 1.75, overflow: 'hidden', border: '1px solid ' + COLORS.teal + '20',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
-            }}>
-              <Box sx={{
-                display: 'flex', alignItems: 'center', gap: 1.25,
-                p: '12px 14px', background: COLORS.teal + '06',
-              }}>
-                <Avatar
-                  src={selectedAttendee.avatar_url}
-                  sx={{
-                    width: 40, height: 40, borderRadius: 1.25,
-                    background: `linear-gradient(135deg, ${COLORS.dark}, #2C3E5A)`,
-                    fontWeight: 700, fontSize: 13, color: '#fff',
-                  }}
-                >
-                  {selectedAttendee.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
-                </Avatar>
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontSize: 14, fontWeight: 640, color: COLORS.dark }}>
-                    {selectedAttendee.display_name}
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: '#999' }}>
-                    {selectedAttendee.company || 'Company'}
-                  </Typography>
-                </Box>
-                <Chip
-                  label="Confirmed"
-                  size="small"
-                  sx={{
-                    fontSize: 9, fontWeight: 750, p: '3px 8px',
-                    borderRadius: 0.625, background: COLORS.teal + '14', color: COLORS.teal,
-                  }}
-                />
-              </Box>
-              <Box sx={{ p: '12px 14px', background: '#fff' }}>
-                <Box sx={{ display: 'flex', gap: 1.5, mb: 1.25, flexWrap: 'wrap' }}>
-                  <Typography sx={{ fontSize: 12.5, color: COLORS.dark, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Calendar size={13} color={COLORS.teal} strokeWidth={2} /> <strong>Jun 12</strong>
-                  </Typography>
-                  <Typography sx={{ fontSize: 12.5, color: COLORS.dark, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Clock size={13} color={COLORS.teal} strokeWidth={2} /> <strong>12:45 ({[5, 10, 15][selectedDuration]}m)</strong>
-                  </Typography>
-                  <Typography sx={{ fontSize: 12.5, color: COLORS.dark, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Timer size={13} color={COLORS.teal} strokeWidth={2} /> <strong>Quick chat</strong>
+            // Filter other meetings for today: same day, accepted/pending status, excluding active meeting
+            const otherMeetingsToday = myMeetings?.filter(m =>
+              m.id !== activeMeeting.id &&
+              isSameMeetingDay(m.start_time, activeMeeting.start_time) &&
+              ['accepted', 'pending'].includes(m.status)
+            ) || [];
+
+            return (
+              <Box sx={{ p: '24px 14px' }}>
+                <Box sx={{ textAlign: 'center', mb: 2 }}>
+                  <Box sx={{
+                    width: 56, height: 56, borderRadius: 2, margin: '0 auto 10px',
+                    background: COLORS.teal + '10', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <CheckCircle size={26} color={COLORS.teal} strokeWidth={1.5} />
+                  </Box>
+                  <Typography sx={{ fontSize: 17, fontWeight: 740, color: COLORS.dark }}>
+                    It\'s a Date!
                   </Typography>
                 </Box>
 
                 <Box sx={{
-                  display: 'flex', alignItems: 'center', gap: 1.25,
-                  p: '12px', borderRadius: 1.25,
-                  background: COLORS.primary + '06', border: '1.5px solid ' + COLORS.primary + '15',
+                  borderRadius: 1.75, overflow: 'hidden', border: '1px solid ' + COLORS.teal + '20',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
                 }}>
                   <Box sx={{
-                    width: 44, height: 44, borderRadius: 1.375, background: COLORS.primary,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, fontWeight: 800, color: '#fff',
-                  }}>7</Box>
-                  <Box>
-                    <Typography sx={{ fontSize: 14, fontWeight: 660, color: COLORS.dark }}>
-                      Networking Table 7
-                    </Typography>
-                    <Typography sx={{ fontSize: 11.5, color: '#999' }}>
-                      Outside the main hall
-                    </Typography>
+                    display: 'flex', alignItems: 'center', gap: 1.25,
+                    p: '12px 14px', background: COLORS.teal + '06',
+                  }}>
+                    <Avatar
+                      src={otherParty?.avatar_url}
+                      sx={{
+                        width: 40, height: 40, borderRadius: 1.25,
+                        background: `linear-gradient(135deg, ${COLORS.dark}, #2C3E5A)`,
+                        fontWeight: 700, fontSize: 13, color: '#fff',
+                      }}
+                    >
+                      {otherParty?.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 14, fontWeight: 640, color: COLORS.dark }}>
+                        {otherParty?.display_name}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: '#999' }}>
+                        {otherParty?.company || 'Company'}
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label="Confirmed"
+                      size="small"
+                      sx={{
+                        fontSize: 9, fontWeight: 750, p: '3px 8px',
+                        borderRadius: 0.625, background: COLORS.teal + '14', color: COLORS.teal,
+                      }}
+                    />
+                  </Box>
+                  <Box sx={{ p: '12px 14px', background: '#fff' }}>
+                    <Box sx={{ display: 'flex', gap: 1.5, mb: 1.25, flexWrap: 'wrap' }}>
+                      <Typography sx={{ fontSize: 12.5, color: COLORS.dark, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Calendar size={13} color={COLORS.teal} strokeWidth={2} /> <strong>{meetingDate}</strong>
+                      </Typography>
+                      <Typography sx={{ fontSize: 12.5, color: COLORS.dark, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Clock size={13} color={COLORS.teal} strokeWidth={2} /> <strong>{meetingTime} ({activeMeeting.duration_minutes}m)</strong>
+                      </Typography>
+                    </Box>
+
+                    {activeMeeting.table ? (
+                      <Box sx={{
+                        display: 'flex', alignItems: 'center', gap: 1.25,
+                        p: '12px', borderRadius: 1.25,
+                        background: COLORS.primary + '06', border: '1.5px solid ' + COLORS.primary + '15',
+                      }}>
+                        <Box sx={{
+                          width: 44, height: 44, borderRadius: 1.375, background: COLORS.primary,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 18, fontWeight: 800, color: '#fff',
+                        }}>{activeMeeting.table.table_number || '?'}</Box>
+                        <Box>
+                          <Typography sx={{ fontSize: 14, fontWeight: 660, color: COLORS.dark }}>
+                            {tableName}
+                          </Typography>
+                          {tableLocation && (
+                            <Typography sx={{ fontSize: 11.5, color: '#999' }}>
+                              {tableLocation}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{
+                        p: '10px 12px', borderRadius: 1.25,
+                        background: COLORS.gold + '10', border: '1.5px solid ' + COLORS.gold + '20',
+                        fontSize: 12, color: COLORS.gold, fontWeight: 600,
+                      }}>
+                        Table will be assigned soon
+                      </Box>
+                    )}
+
+                    <Box sx={{
+                      display: 'flex', alignItems: 'center', gap: 0.75, mt: 1.25,
+                      p: '8px 10px', borderRadius: 0.875, background: COLORS.gold + '06',
+                      fontSize: 11.5, color: COLORS.gold, fontWeight: 580,
+                    }}>
+                      <Bell size={12} strokeWidth={2} /> Push notification 5 min before
+                    </Box>
                   </Box>
                 </Box>
 
-                <Box sx={{
-                  display: 'flex', alignItems: 'center', gap: 0.75, mt: 1.25,
-                  p: '8px 10px', borderRadius: 0.875, background: COLORS.gold + '06',
-                  fontSize: 11.5, color: COLORS.gold, fontWeight: 580,
-                }}>
-                  <Bell size={12} strokeWidth={2} /> Push notification 5 min before
+                <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+                  <Button
+                    onClick={() => handleMessageAttendee(activeMeeting)}
+                    disabled={!activeMeeting?.id}
+                    sx={{
+                      flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
+                      background: '#fff', fontSize: 12, fontWeight: 620, color: COLORS.dark,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
+                      textTransform: 'none',
+                      '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
+                    }}
+                  >
+                    <MessageSquare size={13} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
+                  </Button>
+                  <Button
+                    onClick={() => setShowCancelDialog(true)}
+                    sx={{
+                      flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
+                      background: '#fff', fontSize: 12, fontWeight: 620, color: '#CC4422',
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
+                      textTransform: 'none',
+                    }}
+                  >
+                    <X size={13} strokeWidth={2} /> Cancel
+                  </Button>
+                </Box>
+
+                {/* YOUR OTHER MEETINGS TODAY */}
+                <Box sx={{ maxWidth: 440, mx: 'auto', mt: 4, textAlign: 'left' }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 680, color: COLORS.dark, mb: 2 }}>
+                    YOUR OTHER MEETINGS TODAY
+                  </Typography>
+                  {otherMeetingsToday && otherMeetingsToday.length > 0 ? (
+                    otherMeetingsToday.map((m) => {
+                      const otherPerson = getOtherParty(m);
+                      if (!otherPerson?.user_id) return null;
+                      const participantName = otherPerson?.display_name || 'Unknown';
+                      const startTime = m.start_time ? new Date(m.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
+                      const endTime = m.end_time ? new Date(m.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
+
+                      return (
+                        <Box
+                          key={m.id}
+                          sx={{
+                            display: 'flex', alignItems: 'center', gap: 1.25, p: '12px 14px', mb: 1,
+                            border: '1px solid #E8DDD4', borderRadius: 1.25, background: '#fff',
+                          }}
+                        >
+                          <Avatar
+                            sx={{
+                              width: 36, height: 36, borderRadius: 1, fontSize: 12, fontWeight: 700,
+                              background: `linear-gradient(135deg, ${COLORS.purple}, #9B4FB5)`, color: '#fff',
+                            }}
+                          >
+                            {participantName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                          </Avatar>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography sx={{ fontSize: 12, fontWeight: 620, color: COLORS.dark }}>
+                              {participantName}
+                            </Typography>
+                            <Typography sx={{ fontSize: 11, color: '#999' }}>
+                              {startTime} - {endTime}
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label={m.status === 'accepted' && m.table ? `Table ${m.table.table_number || '?'}` : 'Pending'}
+                            size="small"
+                            sx={{
+                              fontSize: 9, fontWeight: 650, p: '2px 8px', borderRadius: 0.5,
+                              background: m.status === 'accepted' && m.table ? COLORS.primary + '14' : COLORS.gold + '10',
+                              color: m.status === 'accepted' && m.table ? COLORS.primary : COLORS.gold,
+                            }}
+                          />
+                        </Box>
+                      );
+                    })
+                  ) : (
+                    <Typography sx={{ fontSize: 11, color: '#999', fontStyle: 'italic' }}>
+                      No other meetings scheduled
+                    </Typography>
+                  )}
                 </Box>
               </Box>
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
-              <Button
-                onClick={handleMessageAttendee}
-                sx={{
-                  flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
-                  background: '#fff', fontSize: 12, fontWeight: 620, color: COLORS.dark,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
-                  textTransform: 'none',
-                }}
-              >
-                <MessageSquare size={13} strokeWidth={2} /> Message {selectedAttendee.display_name?.split(' ')[0]}
-              </Button>
-              <Button
-                onClick={() => setShowCancelDialog(true)}
-                sx={{
-                  flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
-                  background: '#fff', fontSize: 12, fontWeight: 620, color: '#CC4422',
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
-                  textTransform: 'none',
-                }}
-              >
-                <X size={13} strokeWidth={2} /> Cancel
-              </Button>
-            </Box>
-
-            {/* YOUR OTHER MEETINGS TODAY */}
-            <Box sx={{ maxWidth: 440, mx: 'auto', mt: 4, textAlign: 'left' }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 680, color: COLORS.dark, mb: 2 }}>
-                YOUR OTHER MEETINGS TODAY
-              </Typography>
-              {myMeetings && myMeetings.length > 0 ? (
-                myMeetings.filter(m => m.id !== selectedAttendee?.id).map((m) => {
-                  const recipientName = m.recipient?.display_name || m.recipient?.first_name || 'Unknown';
-                  const startTime = m.start_time ? new Date(m.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
-                  const endTime = m.end_time ? new Date(m.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
-                  const table = m.table_number;
-                  const confirmed = m.status === 'confirmed';
-
-                  return (
-                    <Box
-                      key={m.id}
-                      sx={{
-                        display: 'flex', alignItems: 'center', gap: 1.25, p: '12px 14px', mb: 1,
-                        border: '1px solid #E8DDD4', borderRadius: 1.25, background: '#fff',
-                      }}
-                    >
-                      <Avatar
-                        sx={{
-                          width: 36, height: 36, borderRadius: 1, fontSize: 12, fontWeight: 700,
-                          background: `linear-gradient(135deg, ${COLORS.purple}, #9B4FB5)`, color: '#fff',
-                        }}
-                      >
-                        {recipientName.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 12, fontWeight: 620, color: COLORS.dark }}>
-                          {recipientName}
-                        </Typography>
-                        <Typography sx={{ fontSize: 11, color: '#999' }}>
-                          {startTime} - {endTime}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={table ? `Table ${table}` : 'Pending'}
-                        size="small"
-                        sx={{
-                          fontSize: 9, fontWeight: 650, p: '2px 8px', borderRadius: 0.5,
-                          background: !table ? '#FFE8E8' : COLORS.primary + '14',
-                          color: !table ? '#CC4422' : COLORS.primary,
-                        }}
-                      />
-                    </Box>
-                  );
-                })
-              ) : (
-                <Typography sx={{ fontSize: 11, color: '#999', fontStyle: 'italic' }}>
-                  No other meetings scheduled
-                </Typography>
-              )}
-            </Box>
-          </Box>
+            );
+          })()
         )}
 
         {/* Cancel Meeting Confirmation Dialog */}
@@ -1378,7 +1444,7 @@ function MobileView({
           </DialogTitle>
           <DialogContent>
             <Typography sx={{ color: '#666', mt: 1 }}>
-              Are you sure you want to cancel your meeting with {selectedAttendee?.display_name}?
+              Are you sure you want to cancel your meeting with {activeMeeting ? getOtherParty(activeMeeting)?.display_name : selectedAttendee?.display_name}?
             </Typography>
           </DialogContent>
           <DialogActions sx={{ p: 2, gap: 1 }}>
@@ -1428,6 +1494,7 @@ function MobileView({
 function EventCompanionDirectoryPage() {
   const { slug } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const token = localStorage.getItem('access_token');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -1456,18 +1523,40 @@ function EventCompanionDirectoryPage() {
   const [submitting, setSubmitting] = useState(false);
   const [hoveredAttendee, setHoveredAttendee] = useState(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [activeMeeting, setActiveMeeting] = useState(null);
+  const [pollingMeeting, setPollingMeeting] = useState(false);
 
   const debounceTimer = useRef(null);
   const slotsAbortController = useRef(null);
+  const pollingInterval = useRef(null);
 
   // Handle tab and meeting query parameters
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
-    if (tab === 'meetings') {
+    const meetingId = params.get('meeting');
+
+    if (meetingId && myMeetings) {
+      const meeting = myMeetings.find(m => m.id === parseInt(meetingId));
+      if (meeting && meeting.status === 'accepted') {
+        setActiveMeeting(meeting);
+        const otherParty = meeting.requester_detail?.user_id === currentUserId
+          ? meeting.recipient_detail
+          : meeting.requester_detail;
+        setSelectedAttendee(otherParty);
+        setFlowStep(4);
+        setActiveTab(0);
+      } else if (meeting && ['declined', 'cancelled', 'expired'].includes(meeting.status)) {
+        setActiveTab(0);
+        setFlowStep(1);
+      }
+    } else if (tab === 'meetings') {
       setActiveTab(1);
+    } else if (tab === 'directory') {
+      setActiveTab(0);
+      setFlowStep(1);
     }
-  }, [location.search]);
+  }, [location.search, myMeetings, currentUserId]);
 
   // Fetch user's confirmed meetings for today
   useEffect(() => {
@@ -1620,6 +1709,60 @@ function EventCompanionDirectoryPage() {
     return () => clearTimeout(debounceTimer.current);
   }, [event?.id, token, searchQuery]);
 
+  // Poll meeting status when on Step 3 (Awaiting)
+  useEffect(() => {
+    if (flowStep !== 3 || !activeMeeting?.id || !event?.id || !token) return;
+
+    setPollingMeeting(true);
+
+    const pollMeetingStatus = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/events/${event.id}/networking-meetings/my/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const meetings = Array.isArray(data) ? data : data.results || [];
+        const updatedMeeting = meetings.find(m => m.id === activeMeeting.id);
+
+        if (!updatedMeeting) return;
+
+        if (updatedMeeting.status === 'accepted') {
+          setActiveMeeting(updatedMeeting);
+          setFlowStep(4);
+          toast.success('Meeting confirmed!');
+        } else if (updatedMeeting.status === 'declined') {
+          toast.error(`${selectedAttendee?.display_name} declined your meeting request.`);
+          setActiveMeeting(null);
+          setSelectedAttendee(null);
+          setSelectedSlot(null);
+          setFlowStep(1);
+          setActiveTab(0);
+        } else if (['cancelled', 'expired'].includes(updatedMeeting.status)) {
+          const message = updatedMeeting.status === 'expired'
+            ? 'Your meeting request expired.'
+            : 'The meeting was cancelled.';
+          toast.warning(message);
+          setActiveMeeting(null);
+          setSelectedAttendee(null);
+          setSelectedSlot(null);
+          setFlowStep(1);
+          setActiveTab(0);
+        }
+      } catch (err) {
+        console.error('Error polling meeting status:', err);
+      }
+    };
+
+    // Poll every 5 seconds
+    pollingInterval.current = setInterval(pollMeetingStatus, 5000);
+    return () => {
+      if (pollingInterval.current) clearInterval(pollingInterval.current);
+    };
+  }, [flowStep, activeMeeting?.id, event?.id, token, selectedAttendee?.display_name]);
+
   // Fetch available slots when attendee and duration change
   useEffect(() => {
     if (!selectedAttendee || flowStep !== 2 || !event?.id) return;
@@ -1652,6 +1795,17 @@ function EventCompanionDirectoryPage() {
     fetchSlots();
   }, [selectedAttendee, selectedDuration, flowStep, event?.id, token]);
 
+  // Helper to get other party from meeting
+  const getOtherParty = (meeting) => {
+    const userIsRequester = meeting.requester_detail?.user_id === currentUserId;
+    return userIsRequester ? meeting.recipient_detail : meeting.requester_detail;
+  };
+
+  // Helper to check if two dates are the same day
+  const isSameMeetingDay = (a, b) => {
+    return new Date(a).toDateString() === new Date(b).toDateString();
+  };
+
   // Handle send meeting request
   const handleSendRequest = async () => {
     if (!selectedAttendee || selectedSlot === null || !event?.id) return;
@@ -1683,6 +1837,8 @@ function EventCompanionDirectoryPage() {
         throw new Error(data?.detail || data?.message || 'Failed to create meeting');
       }
 
+      const createdMeeting = await res.json();
+      setActiveMeeting(createdMeeting);
       toast.success('Meeting request sent!');
       setFlowStep(3);
     } catch (err) {
@@ -1692,21 +1848,44 @@ function EventCompanionDirectoryPage() {
     }
   };
 
-  const handleMessageAttendee = async () => {
-    if (!selectedAttendee?.user_id) {
+  const handleMessageAttendee = async (meeting) => {
+    const targetMeeting = meeting || activeMeeting;
+    let otherParty = null;
+    let meetingId = null;
+
+    // If a meeting object is provided, use it to get otherParty and meeting ID
+    if (targetMeeting?.id) {
+      otherParty = getOtherParty(targetMeeting);
+      meetingId = targetMeeting.id;
+    }
+
+    // Fall back to selectedAttendee if no meeting provided
+    if (!otherParty && !selectedAttendee) {
+      toast.error('Cannot message - user information not found');
+      return;
+    }
+
+    const recipientId = otherParty?.user_id || selectedAttendee?.user_id;
+
+    if (!recipientId) {
       toast.error('Cannot message this user');
       return;
     }
 
     try {
       // Create or get direct message conversation
+      const body = { recipient_id: recipientId };
+      if (meetingId) {
+        body.meeting_id = meetingId;
+      }
+
       const res = await fetch(`${API_BASE}/messaging/conversations/ensure-direct/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ recipient_id: selectedAttendee.user_id }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -1715,18 +1894,23 @@ function EventCompanionDirectoryPage() {
       }
 
       const conversation = await res.json();
-      // Navigate to community messages page
-      window.location.href = `/community/messages?conversation=${conversation.id}`;
+      const conversationId = conversation?.id || conversation?.conversation?.id;
+
+      if (!conversationId) {
+        throw new Error('Conversation created but ID was not returned');
+      }
+
+      // Navigate to community messages page with conversation query param
+      navigate(`/community?view=messages&conversation=${conversationId}`);
     } catch (err) {
       toast.error(err.message || 'Failed to message this user');
     }
   };
 
   const handleCancelMeetingConfirm = async () => {
-    // Find the meeting ID from myMeetings based on recipient_id
-    const meeting = myMeetings?.find(m => m.recipient?.id === selectedAttendee?.user_id || m.recipient_id === selectedAttendee?.user_id);
+    const meetingToCancel = activeMeeting || myMeetings?.find(m => m.recipient?.id === selectedAttendee?.user_id || m.recipient_id === selectedAttendee?.user_id);
 
-    if (!meeting?.id) {
+    if (!meetingToCancel?.id) {
       toast.error('Meeting not found');
       return;
     }
@@ -1735,7 +1919,7 @@ function EventCompanionDirectoryPage() {
 
     try {
       const res = await fetch(
-        `${API_BASE}/networking-meetings/${meeting.id}/cancel/`,
+        `${API_BASE}/networking-meetings/${meetingToCancel.id}/cancel/`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -1750,10 +1934,11 @@ function EventCompanionDirectoryPage() {
       toast.success('Meeting cancelled');
       setFlowStep(1);
       setSelectedAttendee(null);
+      setActiveMeeting(null);
 
       // Refresh meetings list
       const meetingsRes = await fetch(
-        `${API_BASE}/events/${event.id}/networking-meetings/?status=confirmed`,
+        `${API_BASE}/events/${event.id}/networking-meetings/my/`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (meetingsRes.ok) {
@@ -1872,6 +2057,9 @@ function EventCompanionDirectoryPage() {
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
+                activeMeeting={activeMeeting}
+                getOtherParty={getOtherParty}
+                isSameMeetingDay={isSameMeetingDay}
               />
             ) : (
               <DesktopView
@@ -1905,6 +2093,9 @@ function EventCompanionDirectoryPage() {
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
+                activeMeeting={activeMeeting}
+                getOtherParty={getOtherParty}
+                isSameMeetingDay={isSameMeetingDay}
               />
             )
           ) : activeTab === 1 ? (
@@ -1951,6 +2142,9 @@ function EventCompanionDirectoryPage() {
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
+                activeMeeting={activeMeeting}
+                getOtherParty={getOtherParty}
+                isSameMeetingDay={isSameMeetingDay}
               />
             ) : (
               <DesktopView

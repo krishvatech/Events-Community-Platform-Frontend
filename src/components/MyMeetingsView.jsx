@@ -55,6 +55,7 @@ function MeetingCard({
   onAction,
   onSuggest,
   onReschedule,
+  onMessage,
   currentUserId,
 }) {
   // Determine if current user is requester or recipient
@@ -308,6 +309,31 @@ function MeetingCard({
 
         {meeting.status === 'accepted' && (
           <Stack direction="row" spacing={0.75} sx={{ mt: 2 }}>
+            {otherParty?.user_id && (
+              <Button
+                size="small"
+                onClick={() => onMessage(meeting)}
+                sx={{
+                  flex: 1,
+                  p: '8px 12px',
+                  borderRadius: 1,
+                  background: COLORS.teal,
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 650,
+                  cursor: 'pointer',
+                  textTransform: 'none',
+                  fontFamily: 'inherit',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.5,
+                  '&:hover': { background: '#069393' },
+                }}
+              >
+                <MessageCircle size={13} strokeWidth={2} /> Message
+              </Button>
+            )}
             <Button
               size="small"
               onClick={() => onReschedule(meeting.id)}
@@ -585,6 +611,51 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
     }
   };
 
+  const handleMessageMeetingParticipant = async (meeting) => {
+    try {
+      const token = getToken();
+
+      // Determine if current user is requester or recipient
+      const currentUserIsRequester = meeting.requester_detail?.user_id === currentUserId;
+      const otherParty = currentUserIsRequester ? meeting.recipient_detail : meeting.requester_detail;
+
+      if (!otherParty?.user_id) {
+        toast.error('Unable to message - participant information missing');
+        return;
+      }
+
+      // Call ensure-direct endpoint with meeting_id
+      const res = await fetch(`${API_BASE}/messaging/conversations/ensure-direct/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          recipient_id: otherParty.user_id,
+          meeting_id: meeting.id,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.detail || `Failed to create conversation (HTTP ${res.status})`);
+      }
+
+      const conversation = await res.json();
+      const conversationId = conversation.id || (conversation.conversation && conversation.conversation.id);
+
+      if (!conversationId) {
+        throw new Error('No conversation ID in response');
+      }
+
+      // Navigate to Messages page with conversation query param
+      window.location.href = `/community?view=messages&conversation=${conversationId}`;
+    } catch (err) {
+      toast.error(err.message || 'Failed to start message');
+    }
+  };
+
   const submitSuggestion = async () => {
     if (!suggestingMeetingId) return;
 
@@ -651,6 +722,7 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
                   onAction={handleAction}
                   onSuggest={handleSuggest}
                   onReschedule={handleReschedule}
+                  onMessage={handleMessageMeetingParticipant}
                   currentUserId={currentUserId}
                 />
               </Box>
@@ -764,6 +836,7 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
                           onAction={() => {}}
                           onSuggest={() => {}}
                           onReschedule={() => {}}
+                          onMessage={() => {}}
                           currentUserId={currentUserId}
                         />
                       </Box>

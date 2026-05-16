@@ -58,7 +58,7 @@ import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 
 const BORDER = "#e2e8f0";
@@ -1768,6 +1768,7 @@ const resizeImage = (file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) => 
 /** ---------- PAGE ---------- */
 export default function MessagesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   // 🔹 Responsive breakpoints
   const theme = useTheme();
   const isMobileOrTablet = useMediaQuery(theme.breakpoints.down("md"));   // < 900px
@@ -2641,6 +2642,22 @@ export default function MessagesPage() {
   }, [loadConversations]);
 
   React.useEffect(() => { loadConversations(); }, [loadConversations]);
+
+  // Handle conversation query param to auto-open a conversation
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const conversationId = params.get("conversation");
+
+    if (conversationId && threads.length > 0) {
+      try {
+        const convId = Number(conversationId);
+        setActiveId(convId);
+        setMobileView("chat");
+      } catch (e) {
+        console.warn("Invalid conversation ID in URL:", conversationId);
+      }
+    }
+  }, [location.search, threads.length]);
 
   // load me
   React.useEffect(() => {
