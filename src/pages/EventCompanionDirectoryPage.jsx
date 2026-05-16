@@ -220,7 +220,7 @@ function DesktopView({
                       {p.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25, flexWrap: 'wrap' }}>
                         <Typography sx={{ fontSize: 15, fontWeight: 640, color: COLORS.dark }}>
                           {p.display_name}
                           {p.user_id === currentUserId && (
@@ -229,7 +229,21 @@ function DesktopView({
                             </Typography>
                           )}
                         </Typography>
-                        {p.badge_key && p.badge_key !== 'attendee' && (
+                        {p.badge_labels && p.badge_labels.length > 0 ? (
+                          p.badge_labels.map((badge) => (
+                            <Chip
+                              key={badge.id}
+                              label={badge.name}
+                              size="small"
+                              sx={{
+                                height: 18, fontSize: '0.65rem', fontWeight: 750,
+                                backgroundColor: badge.color + '20',
+                                color: badge.color,
+                                border: `1px solid ${badge.color}40`,
+                              }}
+                            />
+                          ))
+                        ) : p.badge_key && p.badge_key !== 'attendee' && (
                           <Chip
                             label={p.badge_label}
                             size="small"
@@ -977,7 +991,7 @@ function MobileView({
                       {p.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.625, mb: 0.25 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25, flexWrap: 'wrap' }}>
                         <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
                           {p.display_name}
                           {p.user_id === currentUserId && (
@@ -986,7 +1000,21 @@ function MobileView({
                             </Typography>
                           )}
                         </Typography>
-                        {p.badge_key && p.badge_key !== 'attendee' && (
+                        {p.badge_labels && p.badge_labels.length > 0 ? (
+                          p.badge_labels.map((badge) => (
+                            <Chip
+                              key={badge.id}
+                              label={badge.name}
+                              size="small"
+                              sx={{
+                                height: 16, fontSize: '0.6rem', fontWeight: 750,
+                                backgroundColor: badge.color + '20',
+                                color: badge.color,
+                                border: `1px solid ${badge.color}40`,
+                              }}
+                            />
+                          ))
+                        ) : p.badge_key && p.badge_key !== 'attendee' && (
                           <Chip
                             label={p.badge_label}
                             size="small"
@@ -1258,7 +1286,7 @@ function MobileView({
                     <CheckCircle size={26} color={COLORS.teal} strokeWidth={1.5} />
                   </Box>
                   <Typography sx={{ fontSize: 17, fontWeight: 740, color: COLORS.dark }}>
-                    It\'s a Date!
+                    Meeting Confirmed!
                   </Typography>
                 </Box>
 
@@ -1571,13 +1599,13 @@ function EventCompanionDirectoryPage() {
     }
   }, [location.search, myMeetings, currentUserId]);
 
-  // Fetch user's confirmed meetings for today
+  // Fetch user's meetings (all statuses for proper URL handling)
   useEffect(() => {
     if (!event?.id || !token) return;
 
     const fetchMyMeetings = async () => {
       try {
-        const res = await fetch(`${API_BASE}/events/${event.id}/networking-meetings/?status=confirmed`, {
+        const res = await fetch(`${API_BASE}/events/${event.id}/networking-meetings/my/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
