@@ -1,4 +1,4 @@
-// src/pages/AdminEvents.jsx
+  // src/pages/AdminEvents.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { isOwnerUser, getBackendUserFromStorage } from "../utils/adminRole.js";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -663,6 +663,27 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       ...session,
       displayOrder: index,
     }));
+  }, []);
+
+  const normalizeDraftSession = React.useCallback((session = {}) => {
+    const startISO = session.startTime || session.start_time || null;
+    const endISO = session.endTime || session.end_time || null;
+    const sessionDate =
+      session.session_date ||
+      session.sessionDate ||
+      session._startDate ||
+      (startISO ? dayjs(startISO).format("YYYY-MM-DD") : null);
+
+    return {
+      ...session,
+      startTime: startISO,
+      endTime: endISO,
+      start_time: startISO,
+      end_time: endISO,
+      session_date: sessionDate,
+      sessionDate,
+      sessionType: session.sessionType || session.session_type || "main",
+    };
   }, []);
 
   const moveSession = React.useCallback((fromIndex, toIndex) => {
@@ -2776,17 +2797,18 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             setEditingSessionIndex(null);
           }}
           onSubmit={(sessionData) => {
+            const normalizedSession = normalizeDraftSession(sessionData);
             console.log("🟢 SessionDialog onSubmit called with sessionData:", {
-              title: sessionData.title,
-              _startTime: sessionData._startTime,
-              _endTime: sessionData._endTime,
-              startTime: sessionData.startTime,
-              endTime: sessionData.endTime,
+              title: normalizedSession.title,
+              _startTime: normalizedSession._startTime,
+              _endTime: normalizedSession._endTime,
+              startTime: normalizedSession.startTime,
+              endTime: normalizedSession.endTime,
             });
             if (editingSessionIndex !== null) {
               // Edit existing
               setSessions(prev => prev.map((s, i) =>
-                i === editingSessionIndex ? sessionData : s
+                i === editingSessionIndex ? normalizedSession : s
               ));
               setToast({ open: true, type: "success", msg: "Session updated" });
             } else {
@@ -2794,7 +2816,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               console.log("🟢 Adding new session. Current startTime before setSessions:", startTime);
               setSessions(prev => {
                 console.log("🟢 Inside setSessions callback. startTime is:", startTime);
-                return [...prev, sessionData];
+                return [...prev, normalizedSession];
               });
               setToast({ open: true, type: "success", msg: "Session added" });
             }
