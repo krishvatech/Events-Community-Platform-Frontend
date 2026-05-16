@@ -301,6 +301,12 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
   const [suggestModalOpen, setSuggestModalOpen] = useState(false);
   const [suggestingMeetingId, setSuggestingMeetingId] = useState(null);
   const [suggestingMessage, setSuggestingMessage] = useState('');
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [reschedulingMeetingId, setReschedulingMeetingId] = useState(null);
+  const [rescheduleSlots, setRescheduleSlots] = useState([]);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState(null);
 
   useEffect(() => {
     loadMeetings();
@@ -375,10 +381,81 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
     setSuggestModalOpen(true);
   };
 
-  const handleReschedule = (meetingId) => {
-    // For reschedule, we would need to open a slot picker modal
-    // For now, show a placeholder
-    toast.info('Reschedule feature coming soon - please use Suggest Different Slot instead');
+  const handleReschedule = async (meetingId) => {
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+
+    setReschedulingMeetingId(meetingId);
+    setSelectedSlot(null);
+    setRescheduleError('');
+    setRescheduleSlots([]);
+    setRescheduleModalOpen(true);
+
+    // Fetch available slots
+    setRescheduleLoading(true);
+    try {
+      const token = getToken();
+      const currentUserIsRequester = meeting.requester_detail?.user_id === currentUserId;
+      const otherPersonRegistrationId = currentUserIsRequester
+        ? meeting.recipient_detail.id
+        : meeting.requester_detail.id;
+
+      const res = await fetch(
+        `${API_BASE}/events/${eventId}/networking-meetings/availability/?recipient_registration_id=${otherPersonRegistrationId}&duration_minutes=${meeting.duration_minutes}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.detail || `Failed to load available slots (HTTP ${res.status})`);
+      }
+
+      const data = await res.json();
+      setRescheduleSlots(data.available_slots || []);
+      if ((!data.available_slots || data.available_slots.length === 0) && !rescheduleError) {
+        setRescheduleError('No available slots for rescheduling.');
+      }
+    } catch (err) {
+      setRescheduleError(err.message || 'Failed to load available slots');
+      setRescheduleSlots([]);
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
+
+  const submitReschedule = async () => {
+    if (!reschedulingMeetingId || !selectedSlot) return;
+
+    setRescheduleLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/networking-meetings/${reschedulingMeetingId}/reschedule/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          suggested_start_time: selectedSlot.start_time,
+          suggested_end_time: selectedSlot.end_time,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.detail || `Failed to reschedule (HTTP ${res.status})`);
+      }
+
+      await loadMeetings();
+      setRescheduleModalOpen(false);
+      toast.success('Meeting rescheduled successfully');
+    } catch (err) {
+      toast.error(err.message || 'Failed to reschedule meeting');
+    } finally {
+      setRescheduleLoading(false);
+    }
   };
 
   const submitSuggestion = async () => {
@@ -567,6 +644,87 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
             onClick={submitSuggestion}
           >
             {actionLoading[suggestingMeetingId] ? 'Sending...' : 'Suggest'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reschedule Meeting Modal */}
+      <Dialog open={rescheduleModalOpen} onClose={() => setRescheduleModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Reschedule Meeting</DialogTitle>
+        <DialogContent>
+          {rescheduleLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress size={32} />
+            </Box>
+          ) : rescheduleError ? (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {rescheduleError}
+            </Alert>
+          ) : rescheduleSlots.length === 0 ? (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              No available time slots for rescheduling. Please try again later.
+            </Alert>
+          ) : (
+            <>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, mt: 1 }}>
+                Select a new time slot for your meeting:
+              </Typography>
+              <Stack spacing={1}>
+                {rescheduleSlots.map((slot, idx) => {
+                  const slotStart = new Date(slot.start_time).toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  });
+                  const slotEnd = new Date(slot.end_time).toLocaleString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  });
+
+                  return (
+                    <Box
+                      key={idx}
+                      onClick={() => setSelectedSlot(slot)}
+                      sx={{
+                        p: 2,
+                        border: '1px solid',
+                        borderColor: selectedSlot?.start_time === slot.start_time ? '#4CAF50' : '#ddd',
+                        borderRadius: 1,
+                        cursor: 'pointer',
+                        bgcolor: selectedSlot?.start_time === slot.start_time ? '#4CAF5022' : '#fff',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          borderColor: '#4CAF50',
+                          bgcolor: '#4CAF5011',
+                        },
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                        {slotStart} – {slotEnd}
+                      </Typography>
+                      {selectedSlot?.start_time === slot.start_time && (
+                        <Typography sx={{ fontSize: 12, color: '#4CAF50', fontWeight: 600, mt: 0.5 }}>
+                          ✓ Selected
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRescheduleModalOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={rescheduleLoading || !selectedSlot || rescheduleError}
+            onClick={submitReschedule}
+          >
+            {rescheduleLoading ? 'Rescheduling...' : 'Confirm Reschedule'}
           </Button>
         </DialogActions>
       </Dialog>

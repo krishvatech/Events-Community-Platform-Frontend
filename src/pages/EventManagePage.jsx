@@ -1197,7 +1197,23 @@ export default function EventManagePage() {
           setNetworkingSettings(settings);
           setNetworkingEnabled(settings.enabled || false);
           setNetworkingDurations(settings.duration_options_minutes || [5, 10, 15]);
-          setNetworkingAllowedWindows(settings.allowed_windows || []);
+
+          // Normalize allowed windows with default values if empty
+          const getTodayDateValue = () => {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, "0");
+            const day = String(today.getDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+          };
+
+          const normalizedWindows = (settings.allowed_windows || []).map(window => ({
+            date: window.date || getTodayDateValue(),
+            start: window.start || "09:00",
+            end: window.end || "17:00"
+          }));
+          setNetworkingAllowedWindows(normalizedWindows);
+
           setNetworkingReminderMinutes(settings.reminder_minutes_before || 15);
         }
 
@@ -6852,8 +6868,16 @@ export default function EventManagePage() {
       }
     };
 
+    const getTodayDateValue = () => {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const day = String(today.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
     const addNetworkingWindow = () => {
-      setNetworkingAllowedWindows(prev => [...prev, { date: "", start: "09:00", end: "17:00" }]);
+      setNetworkingAllowedWindows(prev => [...prev, { date: getTodayDateValue(), start: "09:00", end: "17:00" }]);
     };
 
     const removeNetworkingWindow = (index) => {
