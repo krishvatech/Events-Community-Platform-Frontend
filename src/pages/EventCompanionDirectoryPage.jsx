@@ -293,7 +293,13 @@ function DesktopView({
         {flowStep === 2 && selectedAttendee && (
           <Box>
             <Button
-              onClick={() => setFlowStep(1)}
+              onClick={() => {
+                setFlowStep(1);
+                setSelectedAttendee(null);
+                setSelectedSlot(null);
+                setMeetingNote('');
+                setSelectedDuration(null);
+              }}
               sx={{
                 background: 'none', border: 'none', cursor: 'pointer', display: 'flex',
                 alignItems: 'center', gap: 0.5, fontSize: 12, color: '#999', fontFamily: 'inherit',
@@ -431,11 +437,10 @@ function DesktopView({
                 ) : (
                   availableSlots.map((slot, i) => {
                     const mins = [5, 10, 15][selectedDuration];
-                    const startH = parseInt(slot.start_time?.split('T')[1]?.split(':')[0] || '0');
-                    const startM = parseInt(slot.start_time?.split('T')[1]?.split(':')[1] || '0');
-                    const endTotal = startH * 60 + startM + mins;
-                    const endTime = `${Math.floor(endTotal / 60)}:${String(endTotal % 60).padStart(2, '0')}`;
-                    const displayTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+                    const slotDate = new Date(slot.start_time);
+                    const endDate = new Date(slotDate.getTime() + mins * 60_000);
+                    const displayTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                     return (
                       <Button
                         key={i}
@@ -553,14 +558,24 @@ function DesktopView({
                 {selectedAttendee.display_name}
               </strong>. A table number will be assigned once she confirms.
             </Typography>
-            <Box sx={{
-              display: 'inline-flex', alignItems: 'center', gap: 1,
-              p: '10px 18px', borderRadius: 1.25,
-              background: COLORS.gold + '08', border: '1px solid ' + COLORS.gold + '18',
-              fontSize: 13, color: COLORS.gold, fontWeight: 600,
-            }}>
-              <Clock size={14} strokeWidth={2} /> Requested: 12:45 · {[5, 10, 15][selectedDuration]} min · Table TBD
-            </Box>
+            {(() => {
+              const slot = selectedSlot !== null ? availableSlots[selectedSlot] : null;
+              const rawTime = slot?.start_time || activeMeeting?.start_time;
+              const displayTime = rawTime
+                ? new Date(rawTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+                : 'Requested time selected';
+              const durationMins = activeMeeting?.duration_minutes || [5, 10, 15][selectedDuration] || '?';
+              return (
+                <Box sx={{
+                  display: 'inline-flex', alignItems: 'center', gap: 1,
+                  p: '10px 18px', borderRadius: 1.25,
+                  background: COLORS.gold + '08', border: '1px solid ' + COLORS.gold + '18',
+                  fontSize: 13, color: COLORS.gold, fontWeight: 600,
+                }}>
+                  <Clock size={14} strokeWidth={2} /> Requested: {displayTime} · {durationMins} min
+                </Box>
+              );
+            })()}
 
             <Box sx={{
               mt: 3, p: '16px', borderRadius: 1.5,
@@ -924,7 +939,16 @@ function MobileView({
       }}>
         {flowStep > 1 && (
           <Button
-            onClick={() => setFlowStep(Math.max(1, flowStep - 1))}
+            onClick={() => {
+              const newStep = Math.max(1, flowStep - 1);
+              setFlowStep(newStep);
+              if (newStep === 1) {
+                setSelectedAttendee(null);
+                setSelectedSlot(null);
+                setMeetingNote('');
+                setSelectedDuration(null);
+              }
+            }}
             sx={{
               background: 'none', border: 'none', cursor: 'pointer', p: 0.5,
               mr: 1,
@@ -1133,11 +1157,10 @@ function MobileView({
             ) : (
               availableSlots.map((slot, i) => {
                 const mins = [5, 10, 15][selectedDuration];
-                const startH = parseInt(slot.start_time?.split('T')[1]?.split(':')[0] || '0');
-                const startM = parseInt(slot.start_time?.split('T')[1]?.split(':')[1] || '0');
-                const endTotal = startH * 60 + startM + mins;
-                const endTime = `${Math.floor(endTotal / 60)}:${String(endTotal % 60).padStart(2, '0')}`;
-                const displayTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+                const slotDate = new Date(slot.start_time);
+                const endDate = new Date(slotDate.getTime() + mins * 60_000);
+                const displayTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                 return (
                   <Button
                     key={i}
@@ -1214,13 +1237,23 @@ function MobileView({
               Waiting for {selectedAttendee.display_name?.split(' ')[0]} to respond.
               <br />Table assigned on confirmation.
             </Typography>
-            <Box sx={{
-              display: 'inline-flex', alignItems: 'center', gap: 0.75,
-              p: '8px 14px', borderRadius: 1, background: COLORS.gold + '08',
-              fontSize: 12, color: COLORS.gold, fontWeight: 600,
-            }}>
-              <Clock size={12} strokeWidth={2} /> 12:45 · {[5, 10, 15][selectedDuration]} min · Table TBD
-            </Box>
+            {(() => {
+              const slot = selectedSlot !== null ? availableSlots[selectedSlot] : null;
+              const rawTime = slot?.start_time || activeMeeting?.start_time;
+              const displayTime = rawTime
+                ? new Date(rawTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+                : 'Requested time selected';
+              const durationMins = activeMeeting?.duration_minutes || [5, 10, 15][selectedDuration] || '?';
+              return (
+                <Box sx={{
+                  display: 'inline-flex', alignItems: 'center', gap: 0.75,
+                  p: '8px 14px', borderRadius: 1, background: COLORS.gold + '08',
+                  fontSize: 12, color: COLORS.gold, fontWeight: 600,
+                }}>
+                  <Clock size={12} strokeWidth={2} /> {displayTime} · {durationMins} min
+                </Box>
+              );
+            })()}
 
             <Box sx={{
               mt: 2, textAlign: 'left', p: '14px',
@@ -1564,12 +1597,10 @@ function EventCompanionDirectoryPage() {
   const [activeMeeting, setActiveMeeting] = useState(null);
   const [pollingMeeting, setPollingMeeting] = useState(false);
   const [myMeetingsCount, setMyMeetingsCount] = useState(0);
-  const [hasViewedNewMeetings, setHasViewedNewMeetings] = useState(true);
 
   const debounceTimer = useRef(null);
   const slotsAbortController = useRef(null);
   const pollingInterval = useRef(null);
-  const prevMeetingsCount = useRef(0);
 
   // Handle tab and meeting query parameters
   useEffect(() => {
@@ -1634,20 +1665,18 @@ function EventCompanionDirectoryPage() {
     return () => clearInterval(interval);
   }, [event?.id, token]);
 
-  // Mark notification as viewed when user opens My Meetings tab
+  // Mark meetings as seen when user opens My Meetings tab
   useEffect(() => {
-    if (activeTab === 1) {
-      setHasViewedNewMeetings(true);
+    if (activeTab === 1 && event?.id && token) {
+      fetch(`${API_BASE}/events/${event.id}/networking-meetings/mark-seen/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(() => {
+        // Refresh count after marking as seen
+        loadMyMeetingsCount();
+      }).catch(err => console.warn('Failed to mark meetings as seen:', err));
     }
-  }, [activeTab]);
-
-  // Mark notification as unviewed when new meetings arrive
-  useEffect(() => {
-    if (myMeetingsCount > prevMeetingsCount.current) {
-      setHasViewedNewMeetings(false);
-    }
-    prevMeetingsCount.current = myMeetingsCount;
-  }, [myMeetingsCount]);
+  }, [activeTab, event?.id, token]);
 
   // Fetch event
   useEffect(() => {
@@ -1895,11 +1924,17 @@ function EventCompanionDirectoryPage() {
       if (res.ok) {
         const data = await res.json();
         const meetings = Array.isArray(data) ? data : (data.results || []);
-        // Count only active meetings (pending, accepted, suggested)
-        const activeMeetingsCount = meetings.filter(m =>
-          ['pending', 'accepted', 'suggested'].includes(m.status)
-        ).length;
-        setMyMeetingsCount(activeMeetingsCount);
+        setMyMeetings(meetings);
+
+        // Count unread/unseen meeting updates
+        const userId = currentUserId;
+        const unreadCount = meetings.filter(m => {
+          const isRequester = m.requester_detail?.user_id === userId;
+          const seenAt = isRequester ? m.requester_seen_at : m.recipient_seen_at;
+          // Unseen if: never viewed (null) OR last viewed before the last update
+          return !seenAt || new Date(seenAt) < new Date(m.updated_at);
+        }).length;
+        setMyMeetingsCount(unreadCount);
       }
     } catch (err) {
       // Silently fail - badge not being updated won't break the app
@@ -2075,8 +2110,8 @@ function EventCompanionDirectoryPage() {
         height: '100vh',
         bgcolor: COLORS.bg,
       }}>
-        {/* Tab Navigation - Only show when in browse mode */}
-        {networkingSettings?.enabled && flowStep === 1 && (
+        {/* Tab Navigation - Always visible */}
+        {networkingSettings?.enabled && (
           <Box sx={{
             bgcolor: '#fff',
             borderBottom: '1px solid #F0EEEB',
@@ -2086,7 +2121,26 @@ function EventCompanionDirectoryPage() {
           }}>
             <Tabs
               value={activeTab}
-              onChange={(e, newValue) => setActiveTab(newValue)}
+              onChange={(e, newValue) => {
+                if (newValue === 0) {
+                  // Directory tab clicked - reset flow state
+                  setActiveTab(0);
+                  setFlowStep(1);
+                  setSelectedAttendee(null);
+                  setSelectedSlot(null);
+                  setMeetingNote('');
+                  setSelectedDuration(null);
+                  navigate(`?tab=directory`);
+                } else if (newValue === 1) {
+                  // My Meetings tab clicked
+                  setActiveTab(1);
+                  navigate(`?tab=meetings`);
+                } else if (newValue === 2) {
+                  // Schedule tab clicked
+                  setActiveTab(2);
+                  navigate('');
+                }
+              }}
               sx={{
                 '& .MuiTabs-indicator': { backgroundColor: COLORS.teal, height: 3 },
               }}
@@ -2102,7 +2156,7 @@ function EventCompanionDirectoryPage() {
                 }}
               />
               <Tab
-                label={`My Meetings${activeTab !== 1 && myMeetingsCount > 0 && !hasViewedNewMeetings ? ` (${myMeetingsCount})` : ''}`}
+                label={`My Meetings${activeTab !== 1 && myMeetingsCount > 0 ? ` (${myMeetingsCount})` : ''}`}
                 sx={{
                   textTransform: 'none',
                   fontSize: 14,
