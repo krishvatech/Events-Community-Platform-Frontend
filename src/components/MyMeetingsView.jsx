@@ -21,11 +21,17 @@ import {
   IconButton,
   Grid,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
-import EditIcon from '@mui/icons-material/Edit';
+import { ChevronDown, Check, X, Clock, MapPin, MessageCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
+
+const COLORS = {
+  primary: '#E8532F',
+  dark: '#1B2A4A',
+  teal: '#0A9396',
+  purple: '#7B2D8E',
+  gold: '#D4920B',
+  bg: '#F7F5F2',
+};
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -118,34 +124,45 @@ function MeetingCard({
   return (
     <Card
       sx={{
-        borderRadius: 2,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: `1px solid ${statusInfo.color}22`,
+        borderRadius: 1.5,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        border: `1.5px solid ${statusInfo.color}20`,
         transition: 'all 0.2s',
+        bgcolor: '#fff',
         '&:hover': {
-          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+          transform: 'translateY(-2px)',
         },
       }}
     >
-      <CardContent>
+      <CardContent sx={{ p: '16px 18px' }}>
         {/* Status-based title */}
-        <Typography sx={{ fontWeight: 600, fontSize: 14, mb: 1.5, color: '#1B2A4A' }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1.5, color: COLORS.dark }}>
           {getCardTitle()}
         </Typography>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-          <Box sx={{ display: 'flex', gap: 1.5, flex: 1, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box sx={{ display: 'flex', gap: 1.25, flex: 1, minWidth: 0 }}>
             <Avatar
               src={otherParty?.avatar_url}
-              sx={{ width: 40, height: 40, flexShrink: 0 }}
+              sx={{
+                width: 44,
+                height: 44,
+                flexShrink: 0,
+                borderRadius: 1.25,
+                background: `linear-gradient(135deg, ${COLORS.dark}, #2C3E5A)`,
+                fontWeight: 700,
+                fontSize: 13,
+                color: '#fff',
+              }}
             >
               {otherParty?.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
             </Avatar>
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+              <Typography sx={{ fontWeight: 640, fontSize: 13.5, color: COLORS.dark }}>
                 {otherParty?.display_name}
               </Typography>
-              <Typography sx={{ fontSize: 12, color: '#999' }}>
+              <Typography sx={{ fontSize: 11.5, color: '#999', mt: 0.25 }}>
                 {[otherParty?.job_title, otherParty?.company].filter(Boolean).join(' • ')}
               </Typography>
             </Box>
@@ -154,65 +171,114 @@ function MeetingCard({
             label={statusInfo.label}
             size="small"
             sx={{
-              bgcolor: statusInfo.color + '22',
+              bgcolor: statusInfo.color + '18',
               color: statusInfo.color,
-              fontWeight: 600,
-              fontSize: 11,
+              fontWeight: 700,
+              fontSize: 10,
               flexShrink: 0,
+              borderRadius: 0.625,
+              p: '3px 8px',
+              height: 'auto',
             }}
           />
         </Box>
 
-        <Box sx={{ mb: 1.5 }}>
-          <Typography sx={{ fontSize: 12, color: '#999', mb: 0.5 }}>
-            {startTime} • {meeting.duration_minutes} min
-          </Typography>
-          {meeting.table && (
-            <Typography sx={{ fontSize: 12, color: '#999' }}>
-              {meeting.table.name}
-              {meeting.table.location_note && ` • ${meeting.table.location_note}`}
+        <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 12, color: COLORS.dark }}>
+            <Clock size={13} color={COLORS.teal} strokeWidth={2} />
+            <Typography sx={{ fontSize: 12, color: COLORS.dark }}>
+              {startTime} • {meeting.duration_minutes} min
             </Typography>
+          </Box>
+          {meeting.table && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 12, color: COLORS.dark }}>
+              <MapPin size={13} color={COLORS.teal} strokeWidth={2} />
+              <Typography sx={{ fontSize: 12, color: COLORS.dark }}>
+                {meeting.table.name}
+                {meeting.table.location_note && ` • ${meeting.table.location_note}`}
+              </Typography>
+            </Box>
           )}
           {meeting.message && !currentUserIsRequester && (
-            <Typography sx={{ fontSize: 12, mt: 1, p: 1, bgcolor: '#f5f5f5', borderRadius: 1, fontStyle: 'italic' }}>
-              "{meeting.message}"
-            </Typography>
+            <Box sx={{ mt: 0.5, p: '8px 10px', bgcolor: COLORS.bg, borderRadius: 1, borderLeft: `2px solid ${COLORS.teal}` }}>
+              <Typography sx={{ fontSize: 11.5, color: COLORS.dark, fontStyle: 'italic' }}>
+                "{meeting.message}"
+              </Typography>
+            </Box>
           )}
         </Box>
 
         {/* Actions based on status and direction */}
         {meeting.status === 'pending' && isIncoming && (
-          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+          <Stack direction="row" spacing={0.75} sx={{ mt: 2 }}>
             <Button
               size="small"
-              variant="contained"
-              startIcon={<CheckIcon />}
               onClick={() => onAction(meeting.id, 'accept')}
               sx={{
                 flex: 1,
+                p: '8px 12px',
+                borderRadius: 1,
+                background: COLORS.teal,
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 650,
+                cursor: 'pointer',
                 textTransform: 'none',
-                bgcolor: '#4CAF50',
-                '&:hover': { bgcolor: '#45a049' },
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.5,
+                '&:hover': { background: '#069393' },
               }}
             >
-              Accept
+              <Check size={13} strokeWidth={2} /> Accept
             </Button>
             <Button
               size="small"
-              variant="outlined"
               onClick={() => onAction(meeting.id, 'decline')}
-              sx={{ flex: 1, textTransform: 'none' }}
+              sx={{
+                flex: 1,
+                p: '8px 12px',
+                borderRadius: 1,
+                border: `1.5px solid #E0DCD7`,
+                background: '#fff',
+                fontSize: 12,
+                fontWeight: 650,
+                color: COLORS.dark,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.5,
+              }}
             >
-              Decline
+              <X size={13} strokeWidth={2} /> Decline
             </Button>
             <Button
               size="small"
-              variant="outlined"
-              startIcon={<EditIcon sx={{ fontSize: 14 }} />}
               onClick={() => onSuggest(meeting.id)}
-              sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+              sx={{
+                flex: 1,
+                p: '8px 12px',
+                borderRadius: 1,
+                border: `1.5px solid #E0DCD7`,
+                background: '#fff',
+                fontSize: 12,
+                fontWeight: 650,
+                color: COLORS.dark,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.5,
+              }}
             >
-              Suggest
+              <MessageCircle size={13} strokeWidth={2} /> Suggest
             </Button>
           </Stack>
         )}
@@ -220,32 +286,63 @@ function MeetingCard({
         {meeting.status === 'pending' && !isIncoming && (
           <Button
             size="small"
-            variant="outlined"
             fullWidth
             onClick={() => onAction(meeting.id, 'cancel')}
-            sx={{ mt: 2, textTransform: 'none' }}
+            sx={{
+              mt: 2,
+              p: '10px 14px',
+              borderRadius: 1,
+              border: `1.5px solid #E0DCD7`,
+              background: '#fff',
+              fontSize: 12,
+              fontWeight: 650,
+              color: COLORS.primary,
+              cursor: 'pointer',
+              textTransform: 'none',
+              fontFamily: 'inherit',
+            }}
           >
             Cancel Request
           </Button>
         )}
 
         {meeting.status === 'accepted' && (
-          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+          <Stack direction="row" spacing={0.75} sx={{ mt: 2 }}>
             <Button
               size="small"
-              variant="outlined"
-              startIcon={<EditIcon sx={{ fontSize: 14 }} />}
               onClick={() => onReschedule(meeting.id)}
-              sx={{ flex: 1, textTransform: 'none' }}
+              sx={{
+                flex: 1,
+                p: '8px 12px',
+                borderRadius: 1,
+                border: `1.5px solid #E0DCD7`,
+                background: '#fff',
+                fontSize: 12,
+                fontWeight: 650,
+                color: COLORS.dark,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+              }}
             >
               Reschedule
             </Button>
             <Button
               size="small"
-              variant="outlined"
-              color="error"
               onClick={() => onAction(meeting.id, 'cancel')}
-              sx={{ flex: 1, textTransform: 'none' }}
+              sx={{
+                flex: 1,
+                p: '8px 12px',
+                borderRadius: 1,
+                border: `1.5px solid #E0DCD7`,
+                background: '#fff',
+                fontSize: 12,
+                fontWeight: 650,
+                color: COLORS.primary,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+              }}
             >
               Cancel
             </Button>
@@ -253,35 +350,65 @@ function MeetingCard({
         )}
 
         {meeting.status === 'suggested' && (
-          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+          <Stack direction="row" spacing={0.75} sx={{ mt: 2 }}>
             <Button
               size="small"
-              variant="contained"
-              startIcon={<CheckIcon />}
               onClick={() => onAction(meeting.id, 'accept')}
               sx={{
                 flex: 1,
+                p: '8px 12px',
+                borderRadius: 1,
+                background: COLORS.teal,
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 650,
+                cursor: 'pointer',
                 textTransform: 'none',
-                bgcolor: '#4CAF50',
-                '&:hover': { bgcolor: '#45a049' },
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.5,
+                '&:hover': { background: '#069393' },
               }}
             >
-              Accept
+              <Check size={13} strokeWidth={2} /> Accept
             </Button>
             <Button
               size="small"
-              variant="outlined"
               onClick={() => onAction(meeting.id, 'decline')}
-              sx={{ flex: 1, textTransform: 'none' }}
+              sx={{
+                flex: 1,
+                p: '8px 12px',
+                borderRadius: 1,
+                border: `1.5px solid #E0DCD7`,
+                background: '#fff',
+                fontSize: 12,
+                fontWeight: 650,
+                color: COLORS.dark,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+              }}
             >
               Decline
             </Button>
             <Button
               size="small"
-              variant="outlined"
-              startIcon={<EditIcon sx={{ fontSize: 14 }} />}
               onClick={() => onSuggest(meeting.id)}
-              sx={{ flex: 1, textTransform: 'none', fontSize: 12 }}
+              sx={{
+                flex: 1,
+                p: '8px 12px',
+                borderRadius: 1,
+                border: `1.5px solid #E0DCD7`,
+                background: '#fff',
+                fontSize: 12,
+                fontWeight: 650,
+                color: COLORS.dark,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+              }}
             >
               Counter
             </Button>
@@ -494,25 +621,29 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
     if (items.length === 0 && !isHistory) return null;
 
     return (
-      <Box key={title} sx={{ mb: 3 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 2, color: '#1B2A4A' }}>
+      <Box key={title} sx={{ mb: 3.5 }}>
+        <Typography sx={{
+          fontWeight: 750,
+          fontSize: 14,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          color: COLORS.dark + '80',
+          mb: 2,
+        }}>
           {title} ({items.length})
         </Typography>
         {items.length === 0 ? (
-          <Typography sx={{ fontSize: 14, color: '#999', fontStyle: 'italic' }}>
+          <Typography sx={{ fontSize: 13.5, color: '#999', fontStyle: 'italic' }}>
             No meetings in this category
           </Typography>
         ) : (
-          <Grid
-            container
-            spacing={isMobile ? 1 : 2}
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))',
-            }}
-          >
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))',
+            gap: isMobile ? 1.5 : 2,
+          }}>
             {items.map(meeting => (
-              <Grid item xs={12} key={meeting.id} sx={{ display: 'block' }}>
+              <Box key={meeting.id}>
                 <MeetingCard
                   meeting={meeting}
                   isIncoming={isIncoming}
@@ -522,9 +653,9 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
                   onReschedule={handleReschedule}
                   currentUserId={currentUserId}
                 />
-              </Grid>
+              </Box>
             ))}
-          </Grid>
+          </Box>
         )}
       </Box>
     );
@@ -541,17 +672,37 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
   const hasAnyMeetings = Object.values(groupedMeetings).some(arr => arr.length > 0);
 
   return (
-    <Box sx={{ p: isMobile ? 2 : 4, maxWidth: 1200, mx: 'auto' }}>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+    <Box sx={{
+      p: isMobile ? '16px' : '24px',
+      maxWidth: 1200,
+      mx: 'auto',
+      bgcolor: COLORS.bg,
+      minHeight: '100vh',
+    }}>
+      {error && (
+        <Alert severity="error" sx={{
+          mb: 2,
+          borderRadius: 1.5,
+          border: `1.5px solid #F44336`,
+        }}>
+          {error}
+        </Alert>
+      )}
 
       {!hasAnyMeetings ? (
-        <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#fff' }}>
-          <Typography sx={{ fontSize: 16, color: '#999' }}>
+        <Paper sx={{
+          p: 4,
+          textAlign: 'center',
+          bgcolor: '#fff',
+          borderRadius: 2,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        }}>
+          <Typography sx={{ fontSize: 15, color: '#999', fontWeight: 500 }}>
             No meetings yet. Start by requesting a 1:1 meeting with someone from the directory!
           </Typography>
         </Paper>
       ) : (
-        <Stack spacing={4}>
+        <Box>
           {renderSection('Incoming Requests', groupedMeetings.incomingPending, true)}
           {renderSection('Outgoing Requests', groupedMeetings.outgoingPending, false)}
           {renderSection('Accepted Meetings', groupedMeetings.accepted)}
@@ -567,36 +718,45 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
                   gap: 1,
                   cursor: 'pointer',
                   mb: 2,
+                  p: 1,
+                  borderRadius: 1,
+                  transition: 'all 0.2s',
+                  '&:hover': { bgcolor: COLORS.bg },
                 }}
                 onClick={() => setExpandedHistory(!expandedHistory)}
               >
-                <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#1B2A4A', flex: 1 }}>
+                <Typography sx={{
+                  fontWeight: 750,
+                  fontSize: 14,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  color: COLORS.dark + '80',
+                  flex: 1,
+                }}>
                   History ({groupedMeetings.history.length})
                 </Typography>
-                <IconButton
-                  size="small"
-                  sx={{
-                    transform: expandedHistory ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s',
-                  }}
-                >
-                  <ExpandMoreIcon />
-                </IconButton>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transform: expandedHistory ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s',
+                }}>
+                  <ChevronDown size={18} color={COLORS.dark} strokeWidth={2} />
+                </Box>
               </Box>
 
               <Collapse in={expandedHistory}>
-                <Grid
-                  container
-                  spacing={isMobile ? 1 : 2}
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))',
-                  }}
-                >
+                <Box sx={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))',
+                  gap: isMobile ? 1.5 : 2,
+                  opacity: 0.65,
+                }}>
                   {groupedMeetings.history.map(meeting => {
                     const isIncoming = meeting.requester_detail?.user_id !== currentUserId;
                     return (
-                      <Grid item xs={12} key={meeting.id} sx={{ display: 'block', opacity: 0.7 }}>
+                      <Box key={meeting.id}>
                         <MeetingCard
                           meeting={meeting}
                           isIncoming={isIncoming}
@@ -606,21 +766,31 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
                           onReschedule={() => {}}
                           currentUserId={currentUserId}
                         />
-                      </Grid>
+                      </Box>
                     );
                   })}
-                </Grid>
+                </Box>
               </Collapse>
             </Box>
           )}
-        </Stack>
+        </Box>
       )}
 
       {/* Suggest Different Slot Modal */}
-      <Dialog open={suggestModalOpen} onClose={() => setSuggestModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Suggest Different Time</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, mt: 1 }}>
+      <Dialog
+        open={suggestModalOpen}
+        onClose={() => setSuggestModalOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2, boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: 16, color: COLORS.dark }}>
+          Suggest Different Time
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography sx={{ fontSize: 13.5, color: '#666', mb: 2 }}>
             Suggest an alternative time for this meeting. The other person will receive your proposal.
           </Typography>
           <TextField
@@ -631,17 +801,53 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
             value={suggestingMessage}
             onChange={e => setSuggestingMessage(e.target.value)}
             inputProps={{ maxLength: 500 }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 1,
+                '& fieldset': { borderColor: '#E0DCD7' },
+              },
+            }}
           />
-          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
+          <Typography sx={{ fontSize: 11.5, color: '#999', display: 'block', mt: 1 }}>
             {suggestingMessage.length}/500
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSuggestModalOpen(false)}>Cancel</Button>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
           <Button
-            variant="contained"
+            onClick={() => setSuggestModalOpen(false)}
+            sx={{
+              px: 3,
+              py: 1,
+              borderRadius: 1,
+              border: `1.5px solid #E0DCD7`,
+              background: '#fff',
+              fontSize: 12,
+              fontWeight: 600,
+              color: COLORS.dark,
+              cursor: 'pointer',
+              textTransform: 'none',
+              fontFamily: 'inherit',
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
             disabled={actionLoading[suggestingMeetingId]}
             onClick={submitSuggestion}
+            sx={{
+              px: 3,
+              py: 1,
+              borderRadius: 1,
+              background: COLORS.teal,
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#fff',
+              cursor: 'pointer',
+              textTransform: 'none',
+              fontFamily: 'inherit',
+              '&:hover': { background: '#069393' },
+              '&:disabled': { opacity: 0.6, cursor: 'not-allowed' },
+            }}
           >
             {actionLoading[suggestingMeetingId] ? 'Sending...' : 'Suggest'}
           </Button>
