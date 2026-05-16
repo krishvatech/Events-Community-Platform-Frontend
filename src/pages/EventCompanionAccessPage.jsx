@@ -33,6 +33,7 @@ function EventCompanionAccessPage() {
   const [event, setEvent] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [registrationStatus, setRegistrationStatus] = useState(null); // pending, approved, declined
   const [registering, setRegistering] = useState(false);
   const [userData, setUserData] = useState(null);
 
@@ -80,7 +81,55 @@ function EventCompanionAccessPage() {
       const user = await userRes.json();
       setUserData(user);
       setIsAuthenticated(true);
-      setIsRegistered(true);
+
+      // For 'apply' type events, check applications; for others, check registrations
+      if (eventItem.registration_type === 'apply') {
+        // Check if user has an application for this event
+        const appRes = await fetch(
+          `${API_BASE}/events/${eventItem.id}/apply/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (appRes.ok) {
+          const appData = await appRes.json();
+          // Backend returns {"status":"none"} if no application exists
+          if (appData && appData.status && appData.status !== 'none') {
+            setIsRegistered(true);
+            // Get application status (pending, approved, declined)
+            setRegistrationStatus(appData.status);
+          } else {
+            // No application exists yet
+            setIsRegistered(false);
+            setRegistrationStatus(null);
+          }
+        } else {
+          setIsRegistered(false);
+          setRegistrationStatus(null);
+        }
+      } else {
+        // Check if user is registered for this event (for 'open' type)
+        const regRes = await fetch(
+          `${API_BASE}/event-registrations/?event=${eventItem.id}&user=${user.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (regRes.ok) {
+          const regData = await regRes.json();
+          const registrations = Array.isArray(regData) ? regData : regData.results || [];
+
+          if (registrations.length > 0) {
+            const reg = registrations[0];
+            setIsRegistered(true);
+            setRegistrationStatus(reg.status || 'registered');
+          } else {
+            setIsRegistered(false);
+            setRegistrationStatus(null);
+          }
+        } else {
+          setIsRegistered(false);
+          setRegistrationStatus(null);
+        }
+      }
     } catch (err) {
       setError(err.message || 'Failed to check access');
     } finally {
@@ -106,15 +155,29 @@ function EventCompanionAccessPage() {
 
     try {
       const token = getToken();
-      const res = await fetch(`${API_BASE}/events/${event.id}/register/`, {
+      // Use /apply/ endpoint for application-required events, /register/ for open events
+      const endpoint = event.registration_type === 'apply' ? 'apply' : 'register';
+
+      const payload = {
+        event: event.id,
+      };
+
+      // For 'apply' type events, include user data in application
+      if (event.registration_type === 'apply' && userData) {
+        payload.email = userData.email || '';
+        payload.first_name = userData.first_name || '';
+        payload.last_name = userData.last_name || '';
+        payload.job_title = userData.profile?.job_title || '';
+        payload.company_name = userData.profile?.company || '';
+      }
+
+      const res = await fetch(`${API_BASE}/events/${event.id}/${endpoint}/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          event: event.id,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -122,7 +185,21 @@ function EventCompanionAccessPage() {
         throw new Error(data?.detail || data?.error || 'Registration failed');
       }
 
+      const regData = await res.json();
+      console.log('Registration response:', regData);
+
+      // For application-required events, status will be 'pending'
+      // For open registration, status will be 'registered'
+      const status = regData.status || (event.registration_type === 'apply' ? 'pending' : 'registered');
+
       setIsRegistered(true);
+      setRegistrationStatus(status);
+
+      // Re-check access to ensure the page updates correctly
+      // This is especially important for open registration which should immediately show the directory
+      setTimeout(() => {
+        checkAccess();
+      }, 500);
     } catch (err) {
       setError(err.message || 'Registration failed');
     } finally {
@@ -152,8 +229,112 @@ function EventCompanionAccessPage() {
   }
 
   // If authenticated and registered, show the directory
-  if (isAuthenticated && isRegistered) {
+  // For 'open' registration: status will be 'registered'
+  // For 'apply' registration: status will be 'approved'
+  if (isAuthenticated && isRegistered && (registrationStatus === 'approved' || registrationStatus === 'registered')) {
     return <EventCompanionDirectoryPage />;
+  }
+
+  // If authenticated and registered but application is pending, show pending message
+  if (isAuthenticated && isRegistered && (registrationStatus === 'pending' || registrationStatus === 'submitted') && event && userData) {
+    return (
+      <>
+        <Helmet>
+          <title>Application Pending - {event?.title || 'Event'}</title>
+        </Helmet>
+
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: '#f5f5f5',
+            p: 2,
+          }}
+        >
+          <Container maxWidth="sm">
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
+              <Box sx={{ textAlign: 'center', mb: 4 }}>
+                <EventNoteIcon sx={{ fontSize: 48, color: '#FF9800', mb: 2 }} />
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
+                  Application Under Review
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5, color: '#333' }}>
+                  {event.title}
+                </Typography>
+              </Box>
+
+              <Stack spacing={3}>
+                <Box sx={{ p: 2, bgcolor: '#fff3e0', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#FF9800' }}>
+                    Your application is pending
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#333' }}>
+                    Thank you for applying! Your application for the Event Companion is being reviewed by the event organizer. You'll be notified once it's approved.
+                  </Typography>
+                </Box>
+
+                <Typography variant="body2" sx={{ textAlign: 'center', color: '#666' }}>
+                  Please check back soon or wait for an email notification.
+                </Typography>
+              </Stack>
+            </Paper>
+          </Container>
+        </Box>
+      </>
+    );
+  }
+
+  // If authenticated and registered but application is declined, show declined message
+  if (isAuthenticated && isRegistered && registrationStatus === 'declined' && event && userData) {
+    return (
+      <>
+        <Helmet>
+          <title>Application Declined - {event?.title || 'Event'}</title>
+        </Helmet>
+
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: '#f5f5f5',
+            p: 2,
+          }}
+        >
+          <Container maxWidth="sm">
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
+              <Box sx={{ textAlign: 'center', mb: 4 }}>
+                <EventNoteIcon sx={{ fontSize: 48, color: '#F44336', mb: 2 }} />
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
+                  Application Declined
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5, color: '#333' }}>
+                  {event.title}
+                </Typography>
+              </Box>
+
+              <Stack spacing={3}>
+                <Box sx={{ p: 2, bgcolor: '#ffebee', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#F44336' }}>
+                    Your application was not approved
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#333' }}>
+                    Unfortunately, your application for the Event Companion was declined by the event organizer.
+                  </Typography>
+                </Box>
+
+                <Typography variant="body2" sx={{ textAlign: 'center', color: '#666' }}>
+                  If you have questions, please contact the event organizers.
+                </Typography>
+              </Stack>
+            </Paper>
+          </Container>
+        </Box>
+      </>
+    );
   }
 
   // If authenticated but not registered, show registration prompt
@@ -200,7 +381,9 @@ function EventCompanionAccessPage() {
                     Welcome back, {userData.first_name || userData.username}!
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#333' }}>
-                    To access the Event Companion, you need to register for this event first.
+                    {event.registration_type === 'apply'
+                      ? 'To access the Event Companion, you need to submit an application. The event organizer will review and approve your application.'
+                      : 'To access the Event Companion, you need to register for this event first.'}
                   </Typography>
                 </Box>
 
@@ -219,18 +402,20 @@ function EventCompanionAccessPage() {
                   {registering ? (
                     <>
                       <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Registering...
+                      {event.registration_type === 'apply' ? 'Submitting...' : 'Registering...'}
                     </>
                   ) : (
                     <>
                       <HowToRegIcon sx={{ mr: 1 }} />
-                      Register for Event
+                      {event.registration_type === 'apply' ? 'Submit Application' : 'Register for Event'}
                     </>
                   )}
                 </Button>
 
                 <Typography variant="caption" sx={{ textAlign: 'center', color: '#666' }}>
-                  Registration is free. You'll be able to access the Event Companion immediately after.
+                  {event.registration_type === 'apply'
+                    ? 'Your application will be reviewed by the event organizer.'
+                    : 'Registration is free. You\'ll be able to access the Event Companion immediately after.'}
                 </Typography>
               </Stack>
             </Paper>

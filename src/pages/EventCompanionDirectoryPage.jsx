@@ -15,6 +15,10 @@ import {
   Tooltip,
   Tabs,
   Tab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -90,8 +94,12 @@ function DesktopView({
   setMeetingNote,
   submitting,
   handleSendRequest,
+  handleMessageAttendee,
   myMeetings,
   onHoveredAttendee,
+  showCancelDialog,
+  setShowCancelDialog,
+  handleCancelMeetingConfirm,
   hoveredAttendee,
 }) {
   const durations = [
@@ -669,6 +677,7 @@ function DesktopView({
 
               <Box sx={{ display: 'flex', gap: 1, pt: 2, borderTop: '1px solid #F0EEEB' }}>
                 <Button
+                  onClick={handleMessageAttendee}
                   sx={{
                     flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
                     cursor: 'pointer', fontFamily: 'inherit',
@@ -681,6 +690,7 @@ function DesktopView({
                   <MessageSquare size={14} strokeWidth={2} /> Message {selectedAttendee.display_name?.split(' ')[0]}
                 </Button>
                 <Button
+                  onClick={() => setShowCancelDialog(true)}
                   sx={{
                     flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
                     cursor: 'pointer', fontFamily: 'inherit',
@@ -701,47 +711,118 @@ function DesktopView({
                 fontSize: 10, fontWeight: 750, textTransform: 'uppercase',
                 letterSpacing: 1, color: COLORS.dark + '40', mb: 2,
               }}>Your Other Meetings Today</Typography>
-              {[
-                { name: 'Thomas Richter', company: 'Deutsche Bank', time: '13:00 - 13:15', table: 3, confirmed: true },
-                { name: 'Raj Patel', company: 'Tata Consultancy', time: '10:20 - 10:35', table: null, confirmed: false },
-              ].map((m, i) => (
-                <Box key={i} sx={{
-                  display: 'flex', alignItems: 'center', gap: 2,
-                  p: '14px 16px', borderRadius: 1.25, background: '#fff',
-                  mb: 1, border: '1px solid #ECEAE6',
-                }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
-                      {m.name}
-                    </Typography>
-                    <Typography sx={{ fontSize: 12, color: '#BBB' }}>
-                      {m.company} · {m.time}
-                    </Typography>
-                  </Box>
-                  {m.table ? (
-                    <Chip
-                      label={`Table ${m.table}`}
-                      size="small"
-                      sx={{
-                        fontSize: 12, fontWeight: 700, p: '6px 12px', borderRadius: 0.75,
-                        background: COLORS.primary + '10', color: COLORS.primary, border: `1px solid ${COLORS.primary}30`,
-                      }}
-                    />
-                  ) : (
-                    <Chip
-                      label="Pending"
-                      size="small"
-                      sx={{
-                        fontSize: 12, fontWeight: 700, p: '6px 12px', borderRadius: 0.75,
-                        background: COLORS.gold + '10', color: COLORS.gold, border: `1px solid ${COLORS.gold}30`,
-                      }}
-                    />
-                  )}
-                </Box>
-              ))}
+              {myMeetings && myMeetings.length > 0 ? (
+                myMeetings.filter(m => m.id !== selectedAttendee?.id).map((m) => {
+                  const recipientName = m.recipient?.display_name || m.recipient?.first_name || 'Unknown';
+                  const recipientCompany = m.recipient?.company || 'Not specified';
+                  const startTime = m.start_time ? new Date(m.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
+                  const endTime = m.end_time ? new Date(m.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
+                  const table = m.table_number;
+                  const confirmed = m.status === 'confirmed';
+
+                  return (
+                    <Box key={m.id} sx={{
+                      display: 'flex', alignItems: 'center', gap: 2,
+                      p: '14px 16px', borderRadius: 1.25, background: '#fff',
+                      mb: 1, border: '1px solid #ECEAE6',
+                    }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
+                          {recipientName}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: '#BBB' }}>
+                          {recipientCompany} · {startTime} - {endTime}
+                        </Typography>
+                      </Box>
+                      {table ? (
+                        <Chip
+                          label={`Table ${table}`}
+                          size="small"
+                          sx={{
+                            fontSize: 12, fontWeight: 700, p: '6px 12px', borderRadius: 0.75,
+                            background: COLORS.primary + '10', color: COLORS.primary, border: `1px solid ${COLORS.primary}30`,
+                          }}
+                        />
+                      ) : (
+                        <Chip
+                          label="Pending"
+                          size="small"
+                          sx={{
+                            fontSize: 12, fontWeight: 700, p: '6px 12px', borderRadius: 0.75,
+                            background: COLORS.gold + '10', color: COLORS.gold, border: `1px solid ${COLORS.gold}30`,
+                          }}
+                        />
+                      )}
+                    </Box>
+                  );
+                })
+              ) : (
+                <Typography sx={{ fontSize: 13, color: '#999', fontStyle: 'italic' }}>
+                  No other meetings scheduled
+                </Typography>
+              )}
             </Box>
           </Box>
         )}
+
+        {/* Cancel Meeting Confirmation Dialog */}
+        <Dialog
+          open={showCancelDialog}
+          onClose={() => setShowCancelDialog(false)}
+          PaperProps={{
+            sx: {
+              borderRadius: 2,
+              boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+            }
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 700, fontSize: 16, color: COLORS.dark }}>
+            Cancel Meeting?
+          </DialogTitle>
+          <DialogContent>
+            <Typography sx={{ color: '#666', mt: 1 }}>
+              Are you sure you want to cancel your meeting with {selectedAttendee?.display_name}?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button
+              onClick={() => setShowCancelDialog(false)}
+              sx={{
+                px: 3,
+                py: 1,
+                borderRadius: 1,
+                border: '1.5px solid #E0DCD7',
+                background: '#fff',
+                fontSize: 12,
+                fontWeight: 600,
+                color: COLORS.dark,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+              }}
+            >
+              Keep Meeting
+            </Button>
+            <Button
+              onClick={handleCancelMeetingConfirm}
+              sx={{
+                px: 3,
+                py: 1,
+                borderRadius: 1,
+                background: '#CC4422',
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#fff',
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+                '&:hover': { background: '#B83A1A' },
+              }}
+            >
+              Cancel Meeting
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </Box>
   );
@@ -769,6 +850,11 @@ function MobileView({
   setMeetingNote,
   submitting,
   handleSendRequest,
+  handleMessageAttendee,
+  myMeetings,
+  showCancelDialog,
+  setShowCancelDialog,
+  handleCancelMeetingConfirm,
 }) {
   return (
     <Box sx={{
@@ -1193,6 +1279,7 @@ function MobileView({
 
             <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
               <Button
+                onClick={handleMessageAttendee}
                 sx={{
                   flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
                   background: '#fff', fontSize: 12, fontWeight: 620, color: COLORS.dark,
@@ -1204,6 +1291,7 @@ function MobileView({
                 <MessageSquare size={13} strokeWidth={2} /> Message {selectedAttendee.display_name?.split(' ')[0]}
               </Button>
               <Button
+                onClick={() => setShowCancelDialog(true)}
                 sx={{
                   flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
                   background: '#fff', fontSize: 12, fontWeight: 620, color: '#CC4422',
@@ -1221,48 +1309,117 @@ function MobileView({
               <Typography sx={{ fontSize: 13, fontWeight: 680, color: COLORS.dark, mb: 2 }}>
                 YOUR OTHER MEETINGS TODAY
               </Typography>
-              {[
-                { attendee: 'Mike Chen', time: '2:00 - 2:15 PM', table: 'Table 3', duration: '15 min' },
-                { attendee: 'Lisa Wong', time: '3:30 - 3:40 PM', table: 'Table 5', duration: '10 min' },
-                { attendee: 'Carlos Rodriguez', time: '4:15 - 4:20 PM', pending: true, duration: '5 min' },
-              ].map((m, i) => (
-                <Box
-                  key={i}
-                  sx={{
-                    display: 'flex', alignItems: 'center', gap: 1.25, p: '12px 14px', mb: 1,
-                    border: '1px solid #E8DDD4', borderRadius: 1.25, background: '#fff',
-                  }}
-                >
-                  <Avatar
-                    sx={{
-                      width: 36, height: 36, borderRadius: 1, fontSize: 12, fontWeight: 700,
-                      background: `linear-gradient(135deg, ${COLORS.purple}, #9B4FB5)`, color: '#fff',
-                    }}
-                  >
-                    {m.attendee.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                  </Avatar>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontSize: 12, fontWeight: 620, color: COLORS.dark }}>
-                      {m.attendee}
-                    </Typography>
-                    <Typography sx={{ fontSize: 11, color: '#999' }}>
-                      {m.time}
-                    </Typography>
-                  </Box>
-                  <Chip
-                    label={m.pending ? 'Pending' : m.table}
-                    size="small"
-                    sx={{
-                      fontSize: 9, fontWeight: 650, p: '2px 8px', borderRadius: 0.5,
-                      background: m.pending ? '#FFE8E8' : COLORS.primary + '14',
-                      color: m.pending ? '#CC4422' : COLORS.primary,
-                    }}
-                  />
-                </Box>
-              ))}
+              {myMeetings && myMeetings.length > 0 ? (
+                myMeetings.filter(m => m.id !== selectedAttendee?.id).map((m) => {
+                  const recipientName = m.recipient?.display_name || m.recipient?.first_name || 'Unknown';
+                  const startTime = m.start_time ? new Date(m.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
+                  const endTime = m.end_time ? new Date(m.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBA';
+                  const table = m.table_number;
+                  const confirmed = m.status === 'confirmed';
+
+                  return (
+                    <Box
+                      key={m.id}
+                      sx={{
+                        display: 'flex', alignItems: 'center', gap: 1.25, p: '12px 14px', mb: 1,
+                        border: '1px solid #E8DDD4', borderRadius: 1.25, background: '#fff',
+                      }}
+                    >
+                      <Avatar
+                        sx={{
+                          width: 36, height: 36, borderRadius: 1, fontSize: 12, fontWeight: 700,
+                          background: `linear-gradient(135deg, ${COLORS.purple}, #9B4FB5)`, color: '#fff',
+                        }}
+                      >
+                        {recipientName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 12, fontWeight: 620, color: COLORS.dark }}>
+                          {recipientName}
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, color: '#999' }}>
+                          {startTime} - {endTime}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={table ? `Table ${table}` : 'Pending'}
+                        size="small"
+                        sx={{
+                          fontSize: 9, fontWeight: 650, p: '2px 8px', borderRadius: 0.5,
+                          background: !table ? '#FFE8E8' : COLORS.primary + '14',
+                          color: !table ? '#CC4422' : COLORS.primary,
+                        }}
+                      />
+                    </Box>
+                  );
+                })
+              ) : (
+                <Typography sx={{ fontSize: 11, color: '#999', fontStyle: 'italic' }}>
+                  No other meetings scheduled
+                </Typography>
+              )}
             </Box>
           </Box>
         )}
+
+        {/* Cancel Meeting Confirmation Dialog */}
+        <Dialog
+          open={showCancelDialog}
+          onClose={() => setShowCancelDialog(false)}
+          PaperProps={{
+            sx: {
+              borderRadius: 2,
+              boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+            }
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 700, fontSize: 16, color: COLORS.dark }}>
+            Cancel Meeting?
+          </DialogTitle>
+          <DialogContent>
+            <Typography sx={{ color: '#666', mt: 1 }}>
+              Are you sure you want to cancel your meeting with {selectedAttendee?.display_name}?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button
+              onClick={() => setShowCancelDialog(false)}
+              sx={{
+                px: 3,
+                py: 1,
+                borderRadius: 1,
+                border: '1.5px solid #E0DCD7',
+                background: '#fff',
+                fontSize: 12,
+                fontWeight: 600,
+                color: COLORS.dark,
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+              }}
+            >
+              Keep Meeting
+            </Button>
+            <Button
+              onClick={handleCancelMeetingConfirm}
+              sx={{
+                px: 3,
+                py: 1,
+                borderRadius: 1,
+                background: '#CC4422',
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#fff',
+                cursor: 'pointer',
+                textTransform: 'none',
+                fontFamily: 'inherit',
+                '&:hover': { background: '#B83A1A' },
+              }}
+            >
+              Cancel Meeting
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </Box>
   );
@@ -1298,6 +1455,7 @@ function EventCompanionDirectoryPage() {
   const [meetingNote, setMeetingNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [hoveredAttendee, setHoveredAttendee] = useState(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const debounceTimer = useRef(null);
   const slotsAbortController = useRef(null);
@@ -1310,6 +1468,31 @@ function EventCompanionDirectoryPage() {
       setActiveTab(1);
     }
   }, [location.search]);
+
+  // Fetch user's confirmed meetings for today
+  useEffect(() => {
+    if (!event?.id || !token) return;
+
+    const fetchMyMeetings = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/events/${event.id}/networking-meetings/?status=confirmed`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const meetings = Array.isArray(data) ? data : data.results || [];
+          setMyMeetings(meetings);
+        }
+      } catch (err) {
+        console.error('Failed to fetch meetings:', err);
+      }
+    };
+
+    fetchMyMeetings();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchMyMeetings, 30000);
+    return () => clearInterval(interval);
+  }, [event?.id, token]);
 
   // Fetch event
   useEffect(() => {
@@ -1509,6 +1692,79 @@ function EventCompanionDirectoryPage() {
     }
   };
 
+  const handleMessageAttendee = async () => {
+    if (!selectedAttendee?.user_id) {
+      toast.error('Cannot message this user');
+      return;
+    }
+
+    try {
+      // Create or get direct message conversation
+      const res = await fetch(`${API_BASE}/messaging/conversations/ensure-direct/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ recipient_id: selectedAttendee.user_id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.detail || 'Failed to start conversation');
+      }
+
+      const conversation = await res.json();
+      // Navigate to community messages page
+      window.location.href = `/community/messages?conversation=${conversation.id}`;
+    } catch (err) {
+      toast.error(err.message || 'Failed to message this user');
+    }
+  };
+
+  const handleCancelMeetingConfirm = async () => {
+    // Find the meeting ID from myMeetings based on recipient_id
+    const meeting = myMeetings?.find(m => m.recipient?.id === selectedAttendee?.user_id || m.recipient_id === selectedAttendee?.user_id);
+
+    if (!meeting?.id) {
+      toast.error('Meeting not found');
+      return;
+    }
+
+    setShowCancelDialog(false);
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/networking-meetings/${meeting.id}/cancel/`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.detail || 'Failed to cancel meeting');
+      }
+
+      toast.success('Meeting cancelled');
+      setFlowStep(1);
+      setSelectedAttendee(null);
+
+      // Refresh meetings list
+      const meetingsRes = await fetch(
+        `${API_BASE}/events/${event.id}/networking-meetings/?status=confirmed`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (meetingsRes.ok) {
+        const data = await meetingsRes.json();
+        setMyMeetings(Array.isArray(data) ? data : data.results || []);
+      }
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   if (!event && loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -1611,6 +1867,11 @@ function EventCompanionDirectoryPage() {
                 setMeetingNote={setMeetingNote}
                 submitting={submitting}
                 handleSendRequest={handleSendRequest}
+                handleMessageAttendee={handleMessageAttendee}
+                myMeetings={myMeetings}
+                showCancelDialog={showCancelDialog}
+                setShowCancelDialog={setShowCancelDialog}
+                handleCancelMeetingConfirm={handleCancelMeetingConfirm}
               />
             ) : (
               <DesktopView
@@ -1637,9 +1898,13 @@ function EventCompanionDirectoryPage() {
                 setMeetingNote={setMeetingNote}
                 submitting={submitting}
                 handleSendRequest={handleSendRequest}
+                handleMessageAttendee={handleMessageAttendee}
                 myMeetings={myMeetings}
                 onHoveredAttendee={setHoveredAttendee}
                 hoveredAttendee={hoveredAttendee}
+                showCancelDialog={showCancelDialog}
+                setShowCancelDialog={setShowCancelDialog}
+                handleCancelMeetingConfirm={handleCancelMeetingConfirm}
               />
             )
           ) : activeTab === 1 ? (
@@ -1681,6 +1946,11 @@ function EventCompanionDirectoryPage() {
                 setMeetingNote={setMeetingNote}
                 submitting={submitting}
                 handleSendRequest={handleSendRequest}
+                handleMessageAttendee={handleMessageAttendee}
+                myMeetings={myMeetings}
+                showCancelDialog={showCancelDialog}
+                setShowCancelDialog={setShowCancelDialog}
+                handleCancelMeetingConfirm={handleCancelMeetingConfirm}
               />
             ) : (
               <DesktopView
@@ -1707,9 +1977,13 @@ function EventCompanionDirectoryPage() {
                 setMeetingNote={setMeetingNote}
                 submitting={submitting}
                 handleSendRequest={handleSendRequest}
+                handleMessageAttendee={handleMessageAttendee}
                 myMeetings={myMeetings}
                 onHoveredAttendee={setHoveredAttendee}
                 hoveredAttendee={hoveredAttendee}
+                showCancelDialog={showCancelDialog}
+                setShowCancelDialog={setShowCancelDialog}
+                handleCancelMeetingConfirm={handleCancelMeetingConfirm}
               />
             )
           )}
