@@ -218,6 +218,11 @@ const getTabLabels = (event, isOwner) => {
   if (event?.is_free !== false) {
     labels = labels.filter(label => label !== "Product Management");
   }
+  // Hide Companion tab for virtual-only events
+  const eventFormat = event?.event_format || event?.format;
+  if (eventFormat === 'virtual') {
+    labels = labels.filter(label => label !== "Companion");
+  }
   return labels;
 };
 const MEMBERS_PER_PAGE = 10;
