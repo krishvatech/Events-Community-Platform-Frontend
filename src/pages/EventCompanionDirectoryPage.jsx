@@ -223,6 +223,11 @@ function DesktopView({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
                         <Typography sx={{ fontSize: 15, fontWeight: 640, color: COLORS.dark }}>
                           {p.display_name}
+                          {p.user_id === currentUserId && (
+                            <Typography component="span" sx={{ fontSize: 13, color: '#999', fontWeight: 400, ml: 0.75 }}>
+                              (me)
+                            </Typography>
+                          )}
                         </Typography>
                         {p.badge_key && p.badge_key !== 'attendee' && (
                           <Chip
@@ -975,6 +980,11 @@ function MobileView({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.625, mb: 0.25 }}>
                         <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
                           {p.display_name}
+                          {p.user_id === currentUserId && (
+                            <Typography component="span" sx={{ fontSize: 12, color: '#999', fontWeight: 400, ml: 0.625 }}>
+                              (me)
+                            </Typography>
+                          )}
                         </Typography>
                         {p.badge_key && p.badge_key !== 'attendee' && (
                           <Chip
@@ -1525,10 +1535,13 @@ function EventCompanionDirectoryPage() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [activeMeeting, setActiveMeeting] = useState(null);
   const [pollingMeeting, setPollingMeeting] = useState(false);
+  const [myMeetingsCount, setMyMeetingsCount] = useState(0);
+  const [hasViewedNewMeetings, setHasViewedNewMeetings] = useState(true);
 
   const debounceTimer = useRef(null);
   const slotsAbortController = useRef(null);
   const pollingInterval = useRef(null);
+  const prevMeetingsCount = useRef(0);
 
   // Handle tab and meeting query parameters
   useEffect(() => {
@@ -1582,6 +1595,31 @@ function EventCompanionDirectoryPage() {
     const interval = setInterval(fetchMyMeetings, 30000);
     return () => clearInterval(interval);
   }, [event?.id, token]);
+
+  // Load and poll my meetings count for tab badge
+  useEffect(() => {
+    if (!event?.id || !token) return;
+
+    loadMyMeetingsCount();
+    // Poll every 15 seconds
+    const interval = setInterval(loadMyMeetingsCount, 15000);
+    return () => clearInterval(interval);
+  }, [event?.id, token]);
+
+  // Mark notification as viewed when user opens My Meetings tab
+  useEffect(() => {
+    if (activeTab === 1) {
+      setHasViewedNewMeetings(true);
+    }
+  }, [activeTab]);
+
+  // Mark notification as unviewed when new meetings arrive
+  useEffect(() => {
+    if (myMeetingsCount > prevMeetingsCount.current) {
+      setHasViewedNewMeetings(false);
+    }
+    prevMeetingsCount.current = myMeetingsCount;
+  }, [myMeetingsCount]);
 
   // Fetch event
   useEffect(() => {
@@ -1782,7 +1820,18 @@ function EventCompanionDirectoryPage() {
 
         const data = await res.json();
         const slots = Array.isArray(data) ? data : (data.available_slots || []);
-        setAvailableSlots(slots);
+
+        // Filter out past/current slots and sort by start_time
+        const now = new Date();
+        const futureSlots = slots.filter(slot => {
+          if (!slot?.start_time) return false;
+          return new Date(slot.start_time) > now;
+        });
+
+        // Sort by start_time ascending
+        futureSlots.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+        setAvailableSlots(futureSlots);
         setSelectedSlot(null);
       } catch (err) {
         setAvailableSlots([]);
@@ -1804,6 +1853,30 @@ function EventCompanionDirectoryPage() {
   // Helper to check if two dates are the same day
   const isSameMeetingDay = (a, b) => {
     return new Date(a).toDateString() === new Date(b).toDateString();
+  };
+
+  // Load count of active meetings for tab badge
+  const loadMyMeetingsCount = async () => {
+    if (!event?.id || !token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/events/${event.id}/networking-meetings/my/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const meetings = Array.isArray(data) ? data : (data.results || []);
+        // Count only active meetings (pending, accepted, suggested)
+        const activeMeetingsCount = meetings.filter(m =>
+          ['pending', 'accepted', 'suggested'].includes(m.status)
+        ).length;
+        setMyMeetingsCount(activeMeetingsCount);
+      }
+    } catch (err) {
+      // Silently fail - badge not being updated won't break the app
+      console.warn('Failed to load meetings count:', err);
+    }
   };
 
   // Handle send meeting request
@@ -1841,6 +1914,7 @@ function EventCompanionDirectoryPage() {
       setActiveMeeting(createdMeeting);
       toast.success('Meeting request sent!');
       setFlowStep(3);
+      loadMyMeetingsCount();  // Update the meetings count badge
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -2000,7 +2074,7 @@ function EventCompanionDirectoryPage() {
                 }}
               />
               <Tab
-                label="My Meetings"
+                label={`My Meetings${activeTab !== 1 && myMeetingsCount > 0 && !hasViewedNewMeetings ? ` (${myMeetingsCount})` : ''}`}
                 sx={{
                   textTransform: 'none',
                   fontSize: 14,
@@ -2104,6 +2178,7 @@ function EventCompanionDirectoryPage() {
               currentUserId={currentUserId}
               networkingSettings={networkingSettings}
               isMobile={isMobile}
+              onMeetingsChanged={loadMyMeetingsCount}
             />
           ) : activeTab === 2 ? (
             <ScheduleTab

@@ -445,7 +445,7 @@ function MeetingCard({
   );
 }
 
-function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }) {
+function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, onMeetingsChanged }) {
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -521,6 +521,7 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
 
       await loadMeetings();
       toast.success(`Meeting ${action}ed successfully`);
+      onMeetingsChanged?.();  // Notify parent to update count
     } catch (err) {
       toast.error(err.message || `Failed to ${action} meeting`);
     } finally {
@@ -604,6 +605,7 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile }
       await loadMeetings();
       setRescheduleModalOpen(false);
       toast.success('Meeting rescheduled successfully');
+      onMeetingsChanged?.();  // Notify parent to update count
     } catch (err) {
       toast.error(err.message || 'Failed to reschedule meeting');
     } finally {
