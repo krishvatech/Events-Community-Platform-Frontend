@@ -292,21 +292,30 @@ function ParticipantDirectoryPage() {
                     {/* Badges */}
                     {participant.badges && participant.badges.length > 0 && (
                       <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ gap: 0.5 }}>
-                        {participant.badges.map((badge) => (
-                          <Chip
-                            key={`${participant.id}-${badge.id}`}
-                            label={badge.name}
-                            size="small"
-                            sx={{
-                              height: 20,
-                              fontSize: '0.7rem',
-                              fontWeight: 700,
-                              backgroundColor: badge.color + '22',
-                              color: badge.color,
-                              border: `1px solid ${badge.color}66`,
-                            }}
-                          />
-                        ))}
+                        {(() => {
+                          const filteredBadges = participant.badges.filter(badge => {
+                            if (badge.name.toLowerCase() === 'participant' && participant.badges.length > 1) {
+                              return false;
+                            }
+                            return true;
+                          });
+
+                          return filteredBadges.map((badge) => (
+                            <Chip
+                              key={`${participant.id}-${badge.id}`}
+                              label={badge.name}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                backgroundColor: badge.color + '22',
+                                color: badge.color,
+                                border: `1px solid ${badge.color}66`,
+                              }}
+                            />
+                          ));
+                        })()}
                       </Stack>
                     )}
                   </Paper>
