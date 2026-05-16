@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Badge,
 } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -739,21 +740,52 @@ function DesktopView({
                   </Box>
 
                   <Box sx={{ display: 'flex', gap: 1, pt: 2, borderTop: '1px solid #F0EEEB' }}>
-                    <Button
-                      onClick={() => handleMessageAttendee(activeMeeting)}
-                      disabled={!activeMeeting?.id}
-                      sx={{
-                        flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
-                        cursor: 'pointer', fontFamily: 'inherit',
-                        fontSize: 12.5, fontWeight: 640, color: COLORS.teal,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
-                        textTransform: 'none', transition: 'all 0.2s',
-                        '&:hover': { background: COLORS.teal + '08', borderRadius: 0.75 },
-                        '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
-                      }}
-                    >
-                      <MessageSquare size={14} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
-                    </Button>
+                    {(() => {
+                      const otherPartyForMeeting = getOtherParty(activeMeeting);
+                      const unreadCount = unreadCounts[otherPartyForMeeting?.user_id] || 0;
+                      return (
+                        <Badge
+                          badgeContent={unreadCount > 99 ? '99+' : unreadCount}
+                          color="error"
+                          invisible={!unreadCount || unreadCount <= 0}
+                          overlap="rectangular"
+                          anchorOrigin={{
+                            vertical: 'top',
+                            horizontal: 'right',
+                          }}
+                          sx={{
+                            flex: 1,
+                            '& .MuiBadge-badge': {
+                              background: '#F44336',
+                              color: '#fff',
+                              fontWeight: 700,
+                              fontSize: '10px',
+                              minWidth: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              padding: '0 4px',
+                            },
+                          }}
+                        >
+                          <Button
+                            onClick={() => handleMessageAttendee(activeMeeting)}
+                            disabled={!activeMeeting?.id}
+                            sx={{
+                              flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
+                              cursor: 'pointer', fontFamily: 'inherit',
+                              fontSize: 12.5, fontWeight: 640, color: COLORS.teal,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
+                              textTransform: 'none', transition: 'all 0.2s',
+                              '&:hover': { background: COLORS.teal + '08', borderRadius: 0.75 },
+                              '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
+                            }}
+                          >
+                            <MessageSquare size={14} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
+                          </Button>
+                        </Badge>
+                      );
+                    })()}
+
                     <Button
                       onClick={() => setShowCancelDialog(true)}
                       sx={{
@@ -1411,20 +1443,50 @@ function MobileView({
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
-                  <Button
-                    onClick={() => handleMessageAttendee(activeMeeting)}
-                    disabled={!activeMeeting?.id}
-                    sx={{
-                      flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
-                      background: '#fff', fontSize: 12, fontWeight: 620, color: COLORS.dark,
-                      cursor: 'pointer', fontFamily: 'inherit',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
-                      textTransform: 'none',
-                      '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
-                    }}
-                  >
-                    <MessageSquare size={13} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
-                  </Button>
+                  {(() => {
+                    const otherPartyForMeeting = getOtherParty(activeMeeting);
+                    const unreadCount = unreadCounts[otherPartyForMeeting?.user_id] || 0;
+                    return (
+                      <Badge
+                        badgeContent={unreadCount > 99 ? '99+' : unreadCount}
+                        color="error"
+                        invisible={!unreadCount || unreadCount <= 0}
+                        overlap="rectangular"
+                        anchorOrigin={{
+                          vertical: 'top',
+                          horizontal: 'right',
+                        }}
+                        sx={{
+                          flex: 1,
+                          '& .MuiBadge-badge': {
+                            background: '#F44336',
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: '9px',
+                            minWidth: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            padding: '0 3px',
+                          },
+                        }}
+                      >
+                        <Button
+                          onClick={() => handleMessageAttendee(activeMeeting)}
+                          disabled={!activeMeeting?.id}
+                          sx={{
+                            flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
+                            background: '#fff', fontSize: 12, fontWeight: 620, color: COLORS.dark,
+                            cursor: 'pointer', fontFamily: 'inherit',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
+                            textTransform: 'none',
+                            '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
+                          }}
+                        >
+                          <MessageSquare size={13} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
+                        </Button>
+                      </Badge>
+                    );
+                  })()}
                   <Button
                     onClick={() => setShowCancelDialog(true)}
                     sx={{
@@ -1601,6 +1663,8 @@ function EventCompanionDirectoryPage() {
   const debounceTimer = useRef(null);
   const slotsAbortController = useRef(null);
   const pollingInterval = useRef(null);
+  const unreadPollInterval = useRef(null);
+  const [unreadCounts, setUnreadCounts] = useState({});
 
   // Handle tab and meeting query parameters
   useEffect(() => {
@@ -1664,6 +1728,17 @@ function EventCompanionDirectoryPage() {
     const interval = setInterval(loadMyMeetingsCount, 15000);
     return () => clearInterval(interval);
   }, [event?.id, token]);
+
+  // Load and poll unread message counts
+  useEffect(() => {
+    if (!token || !currentUserId) return;
+
+    loadUnreadCounts();
+    // Poll every 15 seconds
+    const interval = setInterval(loadUnreadCounts, 15000);
+    unreadPollInterval.current = interval;
+    return () => clearInterval(interval);
+  }, [token, currentUserId]);
 
   // Mark meetings as seen when user opens My Meetings tab
   useEffect(() => {
@@ -1942,6 +2017,40 @@ function EventCompanionDirectoryPage() {
     }
   };
 
+  // Load unread counts for direct conversations
+  const loadUnreadCounts = async () => {
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/messaging/conversations/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) return;
+
+      const conversations = await res.json();
+      const counts = {};
+
+      // Build a map of user_id -> unread_count from direct conversations
+      conversations.forEach(conv => {
+        if (conv.chat_type === 'dm') {
+          const userIds = conv.participant_ids || [];
+          // For DMs, identify the "other" user
+          userIds.forEach(userId => {
+            if (userId && userId !== currentUserId) {
+              counts[userId] = conv.unread_count || 0;
+            }
+          });
+        }
+      });
+
+      setUnreadCounts(counts);
+    } catch (err) {
+      // Silently fail on unread count load - don't block UI
+      console.error('Failed to load unread counts:', err);
+    }
+  };
+
   // Handle send meeting request
   const handleSendRequest = async () => {
     if (!selectedAttendee || selectedSlot === null || !event?.id) return;
@@ -2036,6 +2145,22 @@ function EventCompanionDirectoryPage() {
       if (!conversationId) {
         throw new Error('Conversation created but ID was not returned');
       }
+
+      // Mark all messages as read in this conversation
+      if (conversationId && token) {
+        fetch(`${API_BASE}/messaging/conversations/${conversationId}/mark-all-read/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }).catch(err => console.error('Failed to mark messages as read:', err));
+      }
+
+      // Refresh unread counts
+      setTimeout(() => {
+        loadUnreadCounts();
+      }, 100);
 
       // Navigate to community messages page with conversation query param
       navigate(`/community?view=messages&conversation=${conversationId}`);

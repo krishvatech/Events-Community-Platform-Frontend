@@ -20,6 +20,7 @@ import {
   Collapse,
   IconButton,
   Grid,
+  Badge,
 } from '@mui/material';
 import { ChevronDown, Check, X, Clock, MapPin, MessageCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -57,6 +58,7 @@ function MeetingCard({
   onReschedule,
   onMessage,
   currentUserId,
+  unreadCount = 0,
 }) {
   // Determine if current user is requester or recipient
   const currentUserIsRequester = meeting.requester_detail?.user_id === currentUserId;
@@ -310,29 +312,53 @@ function MeetingCard({
         {meeting.status === 'accepted' && (
           <Stack direction="row" spacing={0.75} sx={{ mt: 2 }}>
             {otherParty?.user_id && (
-              <Button
-                size="small"
-                onClick={() => onMessage(meeting)}
+              <Badge
+                badgeContent={unreadCount > 99 ? '99+' : unreadCount}
+                color="error"
+                invisible={!unreadCount || unreadCount <= 0}
+                overlap="rectangular"
+                anchorOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
                 sx={{
                   flex: 1,
-                  p: '8px 12px',
-                  borderRadius: 1,
-                  background: COLORS.teal,
-                  color: '#fff',
-                  fontSize: 12,
-                  fontWeight: 650,
-                  cursor: 'pointer',
-                  textTransform: 'none',
-                  fontFamily: 'inherit',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0.5,
-                  '&:hover': { background: '#069393' },
+                  '& .MuiBadge-badge': {
+                    background: '#F44336',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '10px',
+                    minWidth: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    padding: '0 4px',
+                  },
                 }}
               >
-                <MessageCircle size={13} strokeWidth={2} /> Message
-              </Button>
+                <Button
+                  size="small"
+                  onClick={() => onMessage(meeting)}
+                  sx={{
+                    flex: 1,
+                    p: '8px 12px',
+                    borderRadius: 1,
+                    background: COLORS.teal,
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 650,
+                    cursor: 'pointer',
+                    textTransform: 'none',
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 0.5,
+                    '&:hover': { background: '#069393' },
+                  }}
+                >
+                  <MessageCircle size={13} strokeWidth={2} /> Message
+                </Button>
+              </Badge>
             )}
             <Button
               size="small"
@@ -460,10 +486,28 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, 
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [rescheduleError, setRescheduleError] = useState('');
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [unreadCounts, setUnreadCounts] = useState({});
+  const [pollIntervalId, setPollIntervalId] = useState(null);
 
   useEffect(() => {
     loadMeetings();
+    loadUnreadCounts();
+
+    // Set up polling for unread counts every 15 seconds
+    const interval = setInterval(loadUnreadCounts, 15000);
+    setPollIntervalId(interval);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [eventId]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalId) clearInterval(pollIntervalId);
+    };
+  }, [pollIntervalId]);
 
   const loadMeetings = async () => {
     if (!eventId) return;
@@ -487,6 +531,39 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, 
       setError(err.message || 'Failed to load meetings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUnreadCounts = async () => {
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/messaging/conversations/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!res.ok) return;
+
+      const conversations = await res.json();
+      const counts = {};
+
+      // Build a map of user_id -> unread_count from direct conversations
+      conversations.forEach(conv => {
+        if (conv.chat_type === 'dm') {
+          const userIds = conv.participant_ids || [];
+          // For DMs, we need to identify the "other" user
+          // The participant_ids should contain user1_id and user2_id
+          userIds.forEach(userId => {
+            if (userId && userId !== currentUserId) {
+              counts[userId] = conv.unread_count || 0;
+            }
+          });
+        }
+      });
+
+      setUnreadCounts(counts);
+    } catch (err) {
+      // Silently fail on unread count load - don't block UI
+      console.error('Failed to load unread counts:', err);
     }
   };
 
@@ -651,6 +728,22 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, 
         throw new Error('No conversation ID in response');
       }
 
+      // Mark all messages as read in this conversation
+      if (conversationId && token) {
+        fetch(`${API_BASE}/messaging/conversations/${conversationId}/mark-all-read/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }).catch(err => console.error('Failed to mark messages as read:', err));
+      }
+
+      // Refresh unread counts and navigate
+      setTimeout(() => {
+        loadUnreadCounts();
+      }, 100);
+
       // Navigate to Messages page with conversation query param
       window.location.href = `/community?view=messages&conversation=${conversationId}`;
     } catch (err) {
@@ -715,20 +808,28 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, 
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))',
             gap: isMobile ? 1.5 : 2,
           }}>
-            {items.map(meeting => (
-              <Box key={meeting.id}>
-                <MeetingCard
-                  meeting={meeting}
-                  isIncoming={isIncoming}
-                  eventId={eventId}
-                  onAction={handleAction}
-                  onSuggest={handleSuggest}
-                  onReschedule={handleReschedule}
-                  onMessage={handleMessageMeetingParticipant}
-                  currentUserId={currentUserId}
-                />
-              </Box>
-            ))}
+            {items.map(meeting => {
+              const otherParty = meeting.requester_detail?.user_id === currentUserId
+                ? meeting.recipient_detail
+                : meeting.requester_detail;
+              const unreadCount = otherParty?.user_id ? (unreadCounts[otherParty.user_id] || 0) : 0;
+
+              return (
+                <Box key={meeting.id}>
+                  <MeetingCard
+                    meeting={meeting}
+                    isIncoming={isIncoming}
+                    eventId={eventId}
+                    onAction={handleAction}
+                    onSuggest={handleSuggest}
+                    onReschedule={handleReschedule}
+                    onMessage={handleMessageMeetingParticipant}
+                    currentUserId={currentUserId}
+                    unreadCount={unreadCount}
+                  />
+                </Box>
+              );
+            })}
           </Box>
         )}
       </Box>
@@ -829,6 +930,11 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, 
                 }}>
                   {groupedMeetings.history.map(meeting => {
                     const isIncoming = meeting.requester_detail?.user_id !== currentUserId;
+                    const otherParty = meeting.requester_detail?.user_id === currentUserId
+                      ? meeting.recipient_detail
+                      : meeting.requester_detail;
+                    const unreadCount = otherParty?.user_id ? (unreadCounts[otherParty.user_id] || 0) : 0;
+
                     return (
                       <Box key={meeting.id}>
                         <MeetingCard
@@ -840,6 +946,7 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, 
                           onReschedule={() => {}}
                           onMessage={() => {}}
                           currentUserId={currentUserId}
+                          unreadCount={unreadCount}
                         />
                       </Box>
                     );
