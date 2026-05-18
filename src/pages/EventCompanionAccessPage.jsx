@@ -33,15 +33,22 @@ function EventCompanionAccessPage() {
   const [event, setEvent] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
-  const [registrationStatus, setRegistrationStatus] = useState(null); // pending, approved, declined
+  const [registrationStatus, setRegistrationStatus] = useState(null); // pending, approved, declined, registered
   const [registering, setRegistering] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [inviteToken, setInviteToken] = useState(null);
+  const [processingInvite, setProcessingInvite] = useState(false);
 
   useEffect(() => {
-    checkAccess();
-  }, [slug]);
+    // Extract invite_token from URL and call checkAccess with it
+    const params = new URLSearchParams(location.search);
+    const token = params.get('invite_token');
+    setInviteToken(token || null);
+    // Note: checkAccess will use the token from location.search directly, not from state
+    checkAccess(token);
+  }, [slug, location]);
 
-  const checkAccess = async () => {
+  const checkAccess = async (inviteTokenParam = null) => {
     setLoading(true);
     setError('');
 
@@ -59,8 +66,10 @@ function EventCompanionAccessPage() {
       // Check if user is authenticated
       const token = getToken();
       if (!token) {
-        // Redirect to login page instead of showing access page
-        const nextUrl = `/events/${slug}/companion`;
+        // Redirect to login page, preserving invite_token if present
+        const nextUrl = inviteTokenParam
+          ? `/events/${slug}/companion?invite_token=${inviteTokenParam}`
+          : `/events/${slug}/companion`;
         navigate(`/signin?next=${encodeURIComponent(nextUrl)}`);
         return;
       }
@@ -82,9 +91,63 @@ function EventCompanionAccessPage() {
       setUserData(user);
       setIsAuthenticated(true);
 
-      // For 'apply' type events, check applications; for others, check registrations
-      if (eventItem.registration_type === 'apply') {
-        // Check if user has an application for this event
+      // If we have an invite token, process it first
+      if (inviteTokenParam) {
+        setProcessingInvite(true);
+        try {
+          const acceptRes = await fetch(
+            `${API_BASE}/events/${eventItem.id}/invite-emails/accept/`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ token: inviteTokenParam }),
+            }
+          );
+
+          if (acceptRes.ok) {
+            const acceptData = await acceptRes.json();
+            setIsRegistered(true);
+            setRegistrationStatus(acceptData.registration_status || 'registered');
+            setProcessingInvite(false);
+            setLoading(false);
+            return; // Skip the rest, we're done
+          } else {
+            // Token is invalid or expired, but don't error - just continue with normal flow
+            setProcessingInvite(false);
+          }
+        } catch (err) {
+          console.error('Failed to process invite token:', err);
+          setProcessingInvite(false);
+        }
+      }
+
+      // Check registration first (for all events, regardless of type)
+      const regRes = await fetch(
+        `${API_BASE}/event-registrations/?event=${eventItem.id}&user=${user.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      let hasRegistration = false;
+      if (regRes.ok) {
+        const regData = await regRes.json();
+        const registrations = Array.isArray(regData) ? regData : regData.results || [];
+
+        if (registrations.length > 0) {
+          const reg = registrations[0];
+          if (reg.status === 'registered') {
+            // User is registered - grant access immediately
+            setIsRegistered(true);
+            setRegistrationStatus('registered');
+            hasRegistration = true;
+          }
+        }
+      }
+
+      // If not registered, check application status (only for 'apply' type events)
+      if (!hasRegistration && eventItem.registration_type === 'apply') {
         const appRes = await fetch(
           `${API_BASE}/events/${eventItem.id}/apply/`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -106,29 +169,10 @@ function EventCompanionAccessPage() {
           setIsRegistered(false);
           setRegistrationStatus(null);
         }
-      } else {
-        // Check if user is registered for this event (for 'open' type)
-        const regRes = await fetch(
-          `${API_BASE}/event-registrations/?event=${eventItem.id}&user=${user.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        if (regRes.ok) {
-          const regData = await regRes.json();
-          const registrations = Array.isArray(regData) ? regData : regData.results || [];
-
-          if (registrations.length > 0) {
-            const reg = registrations[0];
-            setIsRegistered(true);
-            setRegistrationStatus(reg.status || 'registered');
-          } else {
-            setIsRegistered(false);
-            setRegistrationStatus(null);
-          }
-        } else {
-          setIsRegistered(false);
-          setRegistrationStatus(null);
-        }
+      } else if (!hasRegistration) {
+        // For 'open' type events without registration
+        setIsRegistered(false);
+        setRegistrationStatus(null);
       }
     } catch (err) {
       setError(err.message || 'Failed to check access');
@@ -138,12 +182,16 @@ function EventCompanionAccessPage() {
   };
 
   const handleLoginClick = () => {
-    const nextUrl = `/events/${slug}/companion`;
+    const nextUrl = inviteToken
+      ? `/events/${slug}/companion?invite_token=${inviteToken}`
+      : `/events/${slug}/companion`;
     navigate(`/signin?next=${encodeURIComponent(nextUrl)}`);
   };
 
   const handleSignupClick = () => {
-    const nextUrl = `/events/${slug}/companion`;
+    const nextUrl = inviteToken
+      ? `/events/${slug}/companion?invite_token=${inviteToken}`
+      : `/events/${slug}/companion`;
     navigate(`/signup?next=${encodeURIComponent(nextUrl)}`);
   };
 
@@ -207,10 +255,13 @@ function EventCompanionAccessPage() {
     }
   };
 
-  if (loading) {
+  if (loading || processingInvite) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', flexDirection: 'column' }}>
         <CircularProgress />
+        {processingInvite && (
+          <Typography sx={{ mt: 2 }}>Processing invite...</Typography>
+        )}
       </Box>
     );
   }

@@ -31,10 +31,17 @@ import { toast } from "react-toastify";
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
-const buildDefaultInviteMessage = (eventTitle) =>
-    `You are invited to${eventTitle ? ` ${eventTitle}` : " this event"}. Please check the event details and register if you would like to join.`;
+const buildDefaultInviteMessage = (eventTitle, eventSlug) => {
+  const origin = window.location.origin;
+  const companionUrl = eventSlug ? `${origin}/events/${eventSlug}/companion` : null;
+  const message = `You are invited to${eventTitle ? ` ${eventTitle}` : " this event"}. You now have access to the Event Companion to connect with attendees.`;
+  if (companionUrl) {
+    return `${message}\n\nOpen Companion: ${companionUrl}`;
+  }
+  return message;
+};
 
-export default function InviteUsersDialog({ open, onClose, eventId, eventTitle = "" }) {
+export default function InviteUsersDialog({ open, onClose, eventId, eventTitle = "", eventSlug = "" }) {
     const [tab, setTab] = useState(0); // 0 = Users, 1 = Groups
     const [searchQuery, setSearchQuery] = useState("");
     const [loading, setLoading] = useState(false);
@@ -53,7 +60,7 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
         }
 
         setAlsoSendMessage(true);
-        setInviteMessage(buildDefaultInviteMessage(eventTitle));
+        setInviteMessage(buildDefaultInviteMessage(eventTitle, eventSlug));
 
         const timer = setTimeout(() => {
             if (searchQuery.trim().length >= 2) {
