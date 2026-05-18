@@ -3728,7 +3728,7 @@ export default function EventManagePage() {
           <Stack direction="row" spacing={1} alignItems="center">
             <Chip
               size="small"
-              label={registrations.length}
+              label={totalMembersCount}
               sx={{ bgcolor: "grey.100", color: "text.secondary" }}
             />
             <Button
