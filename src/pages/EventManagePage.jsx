@@ -299,6 +299,7 @@ export default function EventManagePage() {
   const [registrations, setRegistrations] = useState([]);
   const [registrationsLoading, setRegistrationsLoading] = useState(false);
   const [registrationsError, setRegistrationsError] = useState("");
+  const [totalMembersCount, setTotalMembersCount] = useState(0);
   const [guestAuditRows, setGuestAuditRows] = useState([]);
   const [guestAuditLoading, setGuestAuditLoading] = useState(false);
   const [guestAuditError, setGuestAuditError] = useState("");
@@ -1083,7 +1084,7 @@ export default function EventManagePage() {
     }
   }, [event]);
 
-  // ---- load registrations (owner only) ----
+  // ---- load registrations with lazy loading (owner only) ----
   useEffect(() => {
     if (!eventId || !isOwner) return;
 
@@ -1091,33 +1092,42 @@ export default function EventManagePage() {
     if (!token) return;
 
     const controller = new AbortController();
+    const MEMBERS_PER_PAGE = 10;
 
-    const loadRegs = async () => {
+    const loadRegsPage = async (pageNum) => {
       setRegistrationsLoading(true);
       setRegistrationsError("");
       try {
+        const offset = (pageNum - 1) * MEMBERS_PER_PAGE;
         const headers = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         };
 
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/registrations/?limit=50`,
+          `${API_ROOT}/events/${eventId}/registrations/?limit=${MEMBERS_PER_PAGE}&offset=${offset}`,
           { headers, signal: controller.signal }
         );
-        const json = await res.json().catch(() => []);
+        const json = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(json?.detail || `HTTP ${res.status}`);
         }
 
         let data = [];
+        let count = 0;
+
         if (Array.isArray(json)) {
           data = json;
-        } else if (json && Array.isArray(json.results)) {
+          count = json.length;
+        } else if (json?.results && Array.isArray(json.results)) {
           data = json.results;
+          count = json.count || 0;
         }
 
         setRegistrations(data);
+        if (pageNum === 1) {
+          setTotalMembersCount(count);
+        }
       } catch (e) {
         if (e.name === "AbortError") return;
         setRegistrationsError(e?.message || "Unable to load members");
@@ -1126,10 +1136,10 @@ export default function EventManagePage() {
       }
     };
 
-    loadRegs();
-    loadRegs();
+    // Load requested page
+    loadRegsPage(memberPage);
     return () => controller.abort();
-  }, [eventId, isOwner, regsRefresh]);
+  }, [eventId, isOwner, memberPage, regsRefresh]);
 
   // ---- Companion Tab: load badge labels ----
   const companionTabIndex = tabLabels.indexOf("Companion");
@@ -1167,7 +1177,7 @@ export default function EventManagePage() {
     (async () => {
       try {
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/registrations/?limit=200`,
+          `${API_ROOT}/events/${eventId}/registrations/?limit=100`,
           { headers: { Authorization: `Bearer ${getToken()}` }, signal: controller.signal }
         );
         const json = await res.json().catch(() => ({}));
@@ -2125,20 +2135,15 @@ export default function EventManagePage() {
     return rows;
   }, [registrations, memberSearch, memberSort]);
 
-  const totalMembers = filteredMembers.length;
+  const totalMembers = totalMembersCount;
   const memberPageCount = Math.max(
     1,
     Math.ceil(totalMembers / MEMBERS_PER_PAGE || 1)
   );
   const memberStart = totalMembers === 0 ? 0 : (memberPage - 1) * MEMBERS_PER_PAGE + 1;
-  const memberEnd = Math.min(
-    memberPage * MEMBERS_PER_PAGE,
-    totalMembers
-  );
-  const pagedMembers = filteredMembers.slice(
-    (memberPage - 1) * MEMBERS_PER_PAGE,
-    memberPage * MEMBERS_PER_PAGE
-  );
+  const memberEnd = Math.min(memberStart + filteredMembers.length - 1, totalMembers);
+  // With lazy loading, registrations already contains only current page data
+  const pagedMembers = filteredMembers;
 
   // Load friend statuses for visible members
   useEffect(() => {
