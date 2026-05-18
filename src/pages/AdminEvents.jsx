@@ -68,6 +68,8 @@ import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
+import StarIcon from "@mui/icons-material/Star";
+import StarOutlineIcon from "@mui/icons-material/StarOutline";
 import SessionDialog from "../components/SessionDialog";
 import SessionList from "../components/SessionList";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
@@ -2914,6 +2916,8 @@ function AdminEventCard({
   isPlatformAdmin,
   onPinEvent,
   onUnpinEvent,
+  onSetFeaturedEvent,
+  onRemoveFeaturedEvent,
 }) {
   const navigate = useNavigate();
 
@@ -3630,6 +3634,26 @@ function AdminEventCard({
             </Tooltip>
           )}
 
+          {/* Featured Event Icon Button (superadmin only) */}
+          {isPlatformAdmin && (
+            <Tooltip title={ev.is_featured ? "Remove from featured" : "Set as featured event"}>
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  ev.is_featured ? onRemoveFeaturedEvent?.(ev) : onSetFeaturedEvent?.(ev);
+                }}
+                sx={{
+                  color: ev.is_featured ? "#fbbf24" : "#cbd5e1",
+                  "&:hover": {
+                    backgroundColor: ev.is_featured ? "rgba(251, 191, 36, 0.08)" : "rgba(203, 213, 225, 0.08)",
+                  },
+                }}
+              >
+                {ev.is_featured ? <StarIcon /> : <StarOutlineIcon />}
+              </IconButton>
+            </Tooltip>
+          )}
+
           {/* Cancellation / Unregistration Actions (for Staff side) */}
           {!isOwner && reg && status !== "cancelled" && (
             <RegisteredActions
@@ -3854,6 +3878,53 @@ function EventsPage() {
     }
   };
 
+  const handleSetFeaturedEvent = async (ev) => {
+    if (!isPlatformAdmin || !ev?.id) return;
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`${API_ROOT}/events/${ev.id}/`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ is_featured: true }),
+      });
+      if (!res.ok) throw new Error("Failed to set featured event");
+      const updated = await res.json();
+      // Update all events: selected one gets is_featured=true, others get is_featured=false
+      setEvents(prev => prev.map(e => ({
+        ...e,
+        is_featured: e.id === ev.id ? true : false
+      })));
+    } catch (e) {
+      setErrMsg(e?.message || "Failed to set featured event");
+      setErrOpen(true);
+    }
+  };
+
+  const handleRemoveFeaturedEvent = async (ev) => {
+    if (!isPlatformAdmin || !ev?.id) return;
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`${API_ROOT}/events/${ev.id}/`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ is_featured: false }),
+      });
+      if (!res.ok) throw new Error("Failed to remove featured event");
+      const updated = await res.json();
+      // Update selected event to remove featured status
+      setEvents(prev => prev.map(e => e.id === ev.id ? { ...e, is_featured: false } : e));
+    } catch (e) {
+      setErrMsg(e?.message || "Failed to remove featured event");
+      setErrOpen(true);
+    }
+  };
+
   // Actions
   const onHost = async (ev) => {
     if (!ev?.id) return;
@@ -4064,6 +4135,8 @@ function EventsPage() {
                     isPlatformAdmin={isPlatformAdmin}
                     onPinEvent={handlePinEvent}
                     onUnpinEvent={handleUnpinEvent}
+                    onSetFeaturedEvent={handleSetFeaturedEvent}
+                    onRemoveFeaturedEvent={handleRemoveFeaturedEvent}
                     reg={myRegistrations[ev.id]}
                     onUnregistered={(eventId) => {
                       setMyRegistrations(prev => {
@@ -4099,6 +4172,8 @@ function EventsPage() {
                     isPlatformAdmin={isPlatformAdmin}
                     onPinEvent={handlePinEvent}
                     onUnpinEvent={handleUnpinEvent}
+                    onSetFeaturedEvent={handleSetFeaturedEvent}
+                    onRemoveFeaturedEvent={handleRemoveFeaturedEvent}
                     reg={myRegistrations[ev.id]}
                     onUnregistered={(eventId) => {
                       setMyRegistrations(prev => {

@@ -525,19 +525,25 @@ export default function DashboardPage() {
     let active = true;
     Promise.all([
       apiClient.get("/users/me/").then(r => r.data).catch(() => null),
-      apiClient.get("/events/?bucket=upcoming&ordering=start_date&page_size=4").then(r => {
-        const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
-      }).catch(() => []),
+      apiClient.get("/events/landing/").then(r => r.data).catch(() => ({ hero_event: null, upcoming_events: [] })),
       apiClient.get("/content/posts/?page_size=3").then(r => {
         const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
       }).catch(() => []),
       apiClient.get("/groups/?page_size=3").then(r => {
         const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
       }).catch(() => []),
-    ]).then(([userData, eventsData, postsData, groupsData]) => {
+    ]).then(([userData, landingData, postsData, groupsData]) => {
       if (!active) return;
       setUser(userData);
-      setEvents(eventsData.slice(0, 4));
+      // Build events array: hero first, then upcoming events
+      const allEvents = [];
+      if (landingData.hero_event) {
+        allEvents.push(landingData.hero_event);
+      }
+      if (landingData.upcoming_events && Array.isArray(landingData.upcoming_events)) {
+        allEvents.push(...landingData.upcoming_events);
+      }
+      setEvents(allEvents.slice(0, 10)); // Store up to 10 for flexibility
       // setDiscussions(postsData.length ? postsData.slice(0, 3) : STATIC_DISCUSSIONS); // COMMENTED OUT
       // setGroups(groupsData.length ? groupsData.slice(0, 3) : STATIC_GROUPS); // COMMENTED OUT
       setLoading(false);
@@ -565,8 +571,71 @@ export default function DashboardPage() {
   const firstName = user?.first_name || user?.username || "there";
   const isMember = profile.is_member || user?.is_member || false;
   const displayEvents = events.length >= 2 ? events : STATIC_EVENTS;
-  const featuredEvent = displayEvents[0];
-  const gridEvents = displayEvents.slice(1, 4);
+
+  // Select featured event by priority: featured > pinned > nearest upcoming
+  const selectFeaturedEvent = (eventList) => {
+    if (eventList.length === 0) return null;
+
+    // Priority 1: Featured event
+    const featured = eventList.find(e => e.is_featured === true);
+    if (featured) return featured;
+
+    // Priority 2: Pinned event with lowest pin_priority
+    const pinned = eventList.filter(e => e.is_pinned === true);
+    if (pinned.length > 0) {
+      return pinned.reduce((prev, curr) =>
+        (curr.pin_priority < prev.pin_priority) ? curr : prev
+      );
+    }
+
+    // Priority 3: Nearest upcoming event by start_time
+    if (eventList.length > 0) {
+      const upcoming = eventList.filter(e => e.start_time && new Date(e.start_time) > new Date());
+      if (upcoming.length > 0) {
+        return upcoming.reduce((prev, curr) =>
+          new Date(curr.start_time) < new Date(prev.start_time) ? curr : prev
+        );
+      }
+    }
+
+    // Fallback: first event
+    return eventList[0];
+  };
+
+  const featuredEvent = selectFeaturedEvent(displayEvents);
+
+  // Sort upcoming events: pinned first (by pin_priority), then normal by start_time
+  const sortGridEvents = (eventList, excludeEvent) => {
+    // Exclude featured event
+    const filtered = eventList.filter(e => !excludeEvent || e.id !== excludeEvent.id);
+
+    // Sort by: pinned DESC > pin_priority ASC > pinned_at DESC > start_time ASC
+    return filtered.sort((a, b) => {
+      // Pinned events first
+      const aPinned = a.is_pinned === true ? 1 : 0;
+      const bPinned = b.is_pinned === true ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+
+      // Within pinned: lower pin_priority first
+      if (aPinned && bPinned) {
+        const aPriority = a.pin_priority || 999999;
+        const bPriority = b.pin_priority || 999999;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+
+        // Same priority: most recent pinned_at first
+        const aPinnedTime = a.pinned_at ? new Date(a.pinned_at).getTime() : 0;
+        const bPinnedTime = b.pinned_at ? new Date(b.pinned_at).getTime() : 0;
+        if (aPinnedTime !== bPinnedTime) return bPinnedTime - aPinnedTime;
+      }
+
+      // Non-pinned events: nearest by start_time first
+      const aStart = a.start_time ? new Date(a.start_time).getTime() : Infinity;
+      const bStart = b.start_time ? new Date(b.start_time).getTime() : Infinity;
+      return aStart - bStart;
+    });
+  };
+
+  const gridEvents = sortGridEvents(displayEvents, featuredEvent).slice(0, 3);
 
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT }}>

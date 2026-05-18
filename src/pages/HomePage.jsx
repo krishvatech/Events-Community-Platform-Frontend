@@ -9,6 +9,7 @@ import {
   Button,
   Typography,
   Card,
+  Chip,
 } from "@mui/material";
 import {
   EventNote as EventNoteIcon,
@@ -17,6 +18,7 @@ import {
   TrendingUp as TrendingIcon,
   VerifiedUser as VerifiedIcon,
   Groups as GroupsIcon,
+  AccessTime as AccessTimeIcon,
 } from "@mui/icons-material";
 
 const getAccessToken = () => localStorage.getItem("access_token");
@@ -115,6 +117,7 @@ export default function HomePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("login");
   const [page, setPage] = useState(null);
+  const [featuredEvent, setFeaturedEvent] = useState(null);
 
   useEffect(() => {
     const m = searchParams.get("openModal");
@@ -123,6 +126,47 @@ export default function HomePage() {
 
   useEffect(() => {
     apiClient.get("/cms/pages/home/").then(r => setPage(r.data)).catch(() => null);
+  }, []);
+
+  // Fetch and choose hero event by priority: featured > pinned > upcoming
+  useEffect(() => {
+    apiClient.get("/events/?status=published&exclude_ended=1&limit=20")
+      .then(r => {
+        const events = r.data?.results || [];
+        const now = new Date();
+
+        // Filter to upcoming events only
+        const upcomingEvents = events.filter(e => new Date(e.start_time) > now);
+
+        if (upcomingEvents.length === 0) {
+          setFeaturedEvent(null);
+          return;
+        }
+
+        // Priority 1: Featured event
+        const featuredEvent = upcomingEvents.find(e => e.is_featured);
+        if (featuredEvent) {
+          setFeaturedEvent(featuredEvent);
+          return;
+        }
+
+        // Priority 2: Pinned event with lowest pin_priority
+        const pinnedEvents = upcomingEvents.filter(e => e.is_pinned);
+        if (pinnedEvents.length > 0) {
+          const pinned = pinnedEvents.reduce((prev, curr) =>
+            (curr.pin_priority < prev.pin_priority) ? curr : prev
+          );
+          setFeaturedEvent(pinned);
+          return;
+        }
+
+        // Priority 3: Nearest upcoming event (by start_time)
+        const nearest = upcomingEvents.reduce((prev, curr) =>
+          new Date(curr.start_time) < new Date(prev.start_time) ? curr : prev
+        );
+        setFeaturedEvent(nearest);
+      })
+      .catch(() => setFeaturedEvent(null));
   }, []);
 
   const openLogin = () => { setModalMode("login"); setModalOpen(true); };
@@ -332,6 +376,118 @@ export default function HomePage() {
           </Box>
         </Container>
       </Box>
+
+      {/* FEATURED EVENT */}
+      {featuredEvent && (
+        <Box
+          component="section"
+          sx={{
+            py: { xs: 8, md: 10 },
+            bgcolor: "#F5F8FC",
+          }}
+        >
+          <Container maxWidth="lg">
+            <Box
+              component={Link}
+              to={`/events/${featuredEvent.slug}`}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                gap: 4,
+                alignItems: "center",
+                backgroundColor: "#FFFFFF",
+                borderRadius: "16px",
+                overflow: "hidden",
+                border: `2px solid ${TEAL}`,
+                textDecoration: "none",
+                color: "inherit",
+                "&:hover": {
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+                  transform: "translateY(-2px)",
+                },
+                transition: "all 0.2s ease",
+              }}
+            >
+              {featuredEvent.preview_image && (
+                <Box
+                  sx={{
+                    backgroundImage: `url(${featuredEvent.preview_image})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    height: { xs: 250, md: 400 },
+                  }}
+                />
+              )}
+              <Box sx={{ p: { xs: 3, md: 5 }, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <Chip
+                  label="⭐ Featured Event"
+                  sx={{
+                    width: "fit-content",
+                    mb: 2,
+                    fontWeight: 600,
+                    bgcolor: "#FCD34D",
+                    color: NAVY,
+                  }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: { xs: 24, md: 36 },
+                    fontWeight: 800,
+                    color: NAVY,
+                    mb: 2,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {featuredEvent.title}
+                </Typography>
+                <Typography sx={{ color: "#6B7A90", mb: 3, lineHeight: 1.7, fontSize: { xs: 14, md: 16 } }}>
+                  {featuredEvent.description?.substring(0, 200)}
+                  {featuredEvent.description?.length > 200 ? "..." : ""}
+                </Typography>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, fontSize: { xs: 13, md: 15 }, color: "#475569" }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <AccessTimeIcon sx={{ fontSize: 20 }} />
+                    <span>
+                      {new Date(featuredEvent.start_time).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}{" "}
+                      at{" "}
+                      {new Date(featuredEvent.start_time).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <EventNoteIcon sx={{ fontSize: 20 }} />
+                    <span>{featuredEvent.location || "Virtual"}</span>
+                  </Box>
+                </Box>
+                <Button
+                  component={Link}
+                  to={`/events/${featuredEvent.slug}`}
+                  variant="contained"
+                  sx={{
+                    mt: 3,
+                    bgcolor: ORANGE,
+                    "&:hover": { bgcolor: "#CC4422" },
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    textTransform: "none",
+                    width: "fit-content",
+                    px: 4,
+                    py: 1.5,
+                  }}
+                >
+                  View Event
+                </Button>
+              </Box>
+            </Box>
+          </Container>
+        </Box>
+      )}
 
       {/* CTA BANNER */}
       {!authed && (
