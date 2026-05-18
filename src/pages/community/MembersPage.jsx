@@ -807,26 +807,59 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
     const map = useMap();
 
     React.useEffect(() => {
-      if (!markers || markers.length === 0) return;
+      try {
+        if (!markers || markers.length === 0 || !map) return;
 
-      // If only one marker, zoom in strongly on it
-      if (markers.length === 1) {
-        const [lng, lat] = markers[0].coordinates;
-        map.flyTo([lat, lng], 12, { duration: 0.8 }); // zoom 12 = closer
-        return;
+        // Check if map has valid dimensions
+        const container = map.getContainer();
+        if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
+          return;
+        }
+
+        // Small delay to ensure map is fully rendered
+        const timer = setTimeout(() => {
+          try {
+            // If only one marker, zoom in strongly on it
+            if (markers.length === 1) {
+              const coords = markers[0].coordinates;
+              if (!Array.isArray(coords) || coords.length < 2) return;
+              const lng = Number(coords[0]);
+              const lat = Number(coords[1]);
+              if (!isFinite(lng) || !isFinite(lat)) return;
+              map.flyTo([lat, lng], 12, { duration: 0.8 }); // zoom 12 = closer
+              return;
+            }
+
+            // If multiple markers, fit bounds but don't zoom too far out
+            const latLngs = markers
+              .map((m) => {
+                if (!m || !m.coordinates) return null;
+                if (!Array.isArray(m.coordinates) || m.coordinates.length < 2) return null;
+                const lng = Number(m.coordinates[0]);
+                const lat = Number(m.coordinates[1]);
+                if (!isFinite(lng) || !isFinite(lat)) return null;
+                return [lat, lng];
+              })
+              .filter(coord => coord !== null);
+
+            if (latLngs.length === 0) return;
+
+            const bounds = L.latLngBounds(latLngs);
+            map.fitBounds(bounds, {
+              padding: [40, 40],
+              maxZoom: 10, // more zoom than before, but not too tight
+            });
+          } catch (error) {
+            console.error('Error in MarkerFitLayer timeout:', error);
+          }
+        }, 100);
+
+        return () => {
+          clearTimeout(timer);
+        };
+      } catch (error) {
+        console.error("Error in MarkerFitLayer:", error);
       }
-
-      // If multiple markers, fit bounds but don't zoom too far out
-      const latLngs = markers.map((m) => {
-        const [lng, lat] = m.coordinates;
-        return [lat, lng];
-      });
-
-      const bounds = L.latLngBounds(latLngs);
-      map.fitBounds(bounds, {
-        padding: [40, 40],
-        maxZoom: 10, // more zoom than before, but not too tight
-      });
     }, [markers, map]);
 
     return null;
@@ -837,35 +870,69 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
     const map = useMap();
 
     React.useEffect(() => {
-      if (!map || !markers || markers.length === 0) return;
+      try {
+        if (!map || !markers || markers.length === 0) return;
 
-      // Convert your markers -> [lat, lng, intensity]
-      const points = markers.map((m) => {
-        const [lng, lat] = m.coordinates;
-        // base intensity: friends slightly “hotter”
-        const base = m.isFriend ? 0.9 : 0.6;
-        return [lat, lng, base];
-      });
+        // Check if map has valid dimensions
+        const container = map.getContainer();
+        if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
+          return;
+        }
 
-      const heat = L.heatLayer(points, {
-        radius: 38,      // size of each hotspot
-        blur: 32,        // softness of edges
-        maxZoom: 18,
-        minOpacity: 0.25,
-        // Snapchat-style gradient: green → yellow → orange → red
-        gradient: {
-          0.2: "#4ade80", // light green
-          0.4: "#a3e635", // yellow-green
-          0.6: "#facc15", // yellow
-          0.8: "#f97316", // orange
-          1.0: "#dc2626", // red
-        },
-      }).addTo(map);
+        // Convert your markers -> [lat, lng, intensity]
+        const points = markers
+          .map((m) => {
+            if (!m || !m.coordinates) return null;
+            if (!Array.isArray(m.coordinates) || m.coordinates.length < 2) return null;
+            const lng = Number(m.coordinates[0]);
+            const lat = Number(m.coordinates[1]);
+            if (!isFinite(lng) || !isFinite(lat)) return null;
+            // base intensity: friends slightly “hotter”
+            const base = m.isFriend ? 0.9 : 0.6;
+            return [lat, lng, base];
+          })
+          .filter(p => p !== null);
 
-      // cleanup when markers change / component unmounts
-      return () => {
-        map.removeLayer(heat);
-      };
+        if (points.length === 0) return;
+
+        // Small delay to ensure map is fully rendered
+        const timer = setTimeout(() => {
+          try {
+            const heat = L.heatLayer(points, {
+              radius: 38,
+              blur: 32,
+              maxZoom: 18,
+              minOpacity: 0.25,
+              gradient: {
+                0.2: '#4ade80',
+                0.4: '#a3e635',
+                0.6: '#facc15',
+                0.8: '#f97316',
+                1.0: '#dc2626'
+              }
+            }).addTo(map);
+
+            // cleanup when markers change / component unmounts
+            return () => {
+              try {
+                if (map && map.hasLayer && map.hasLayer(heat)) {
+                  map.removeLayer(heat);
+                }
+              } catch (e) {
+                console.error('Error removing heat layer:', e);
+              }
+            };
+          } catch (error) {
+            console.error('Error creating heatmap:', error);
+          }
+        }, 100);
+
+        return () => {
+          clearTimeout(timer);
+        };
+      } catch (error) {
+        console.error('Error in MembersHeatLayer:', error);
+      }
     }, [map, markers]);
 
     return null;
@@ -877,12 +944,19 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
   if (hasMarkers) {
     let sumLat = 0;
     let sumLng = 0;
+    let validCount = 0;
     markers.forEach((m) => {
-      const [lng, lat] = m.coordinates; // our data is [lng, lat]
+      if (!m || !m.coordinates || !Array.isArray(m.coordinates) || m.coordinates.length < 2) return;
+      const lng = Number(m.coordinates[0]);
+      const lat = Number(m.coordinates[1]);
+      if (!isFinite(lng) || !isFinite(lat)) return;
       sumLat += lat;
       sumLng += lng;
+      validCount++;
     });
-    center = [sumLat / markers.length, sumLng / markers.length];
+    if (validCount > 0) {
+      center = [sumLat / validCount, sumLng / validCount];
+    }
   }
 
   return (

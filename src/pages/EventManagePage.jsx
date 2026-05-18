@@ -7360,15 +7360,70 @@ export default function EventManagePage() {
             {companionLabels.length === 0 ? (
               <Typography variant="body2" sx={{ color: "text.secondary" }}>No labels created yet. Create labels in the section above first.</Typography>
             ) : (
-              <Stack direction="row" flexWrap="wrap" gap={1}>
+              <Stack spacing={0.5}>
                 {companionLabels.map(label => {
                   const selected = companionAssignSelected.includes(label.id);
                   return (
-                    <Chip key={label.id} label={label.name} size="small" onClick={() => {
-                      setCompanionAssignSelected(prev =>
-                        selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
-                      );
-                    }} sx={{ bgcolor: selected ? label.color : label.color + "22", color: selected ? "#fff" : label.color, border: `1px solid ${label.color}`, fontWeight: 600, cursor: "pointer" }} />
+                    <Box
+                      key={label.id}
+                      onClick={() => {
+                        setCompanionAssignSelected(prev =>
+                          selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                        );
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: '10px 12px',
+                        borderRadius: 1,
+                        border: `1.5px solid ${label.color}30`,
+                        backgroundColor: selected ? label.color + '08' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          backgroundColor: label.color + '12',
+                          borderColor: label.color + '60',
+                        },
+                      }}
+                    >
+                      <Checkbox
+                        checked={selected}
+                        onChange={() => {
+                          setCompanionAssignSelected(prev =>
+                            selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                          );
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        size="small"
+                        sx={{
+                          color: label.color,
+                          '&.Mui-checked': {
+                            color: label.color,
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: label.color,
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                          {label.name}
+                        </Typography>
+                      </Box>
+                    </Box>
                   );
                 })}
               </Stack>
@@ -7395,15 +7450,70 @@ export default function EventManagePage() {
                 </Select>
               </FormControl>
               <Typography variant="body2" sx={{ color: "text.secondary" }}>Select labels:</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1}>
+              <Stack spacing={0.5}>
                 {companionLabels.map(label => {
                   const selected = companionBulkLabels.includes(label.id);
                   return (
-                    <Chip key={label.id} label={label.name} size="small" onClick={() => {
-                      setCompanionBulkLabels(prev =>
-                        selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
-                      );
-                    }} sx={{ bgcolor: selected ? label.color : label.color + "22", color: selected ? "#fff" : label.color, border: `1px solid ${label.color}`, fontWeight: 600, cursor: "pointer" }} />
+                    <Box
+                      key={label.id}
+                      onClick={() => {
+                        setCompanionBulkLabels(prev =>
+                          selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                        );
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: '10px 12px',
+                        borderRadius: 1,
+                        border: `1.5px solid ${label.color}30`,
+                        backgroundColor: selected ? label.color + '08' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          backgroundColor: label.color + '12',
+                          borderColor: label.color + '60',
+                        },
+                      }}
+                    >
+                      <Checkbox
+                        checked={selected}
+                        onChange={() => {
+                          setCompanionBulkLabels(prev =>
+                            selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                          );
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        size="small"
+                        sx={{
+                          color: label.color,
+                          '&.Mui-checked': {
+                            color: label.color,
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: label.color,
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                          {label.name}
+                        </Typography>
+                      </Box>
+                    </Box>
                   );
                 })}
               </Stack>
