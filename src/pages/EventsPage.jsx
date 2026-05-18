@@ -551,7 +551,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                 url += `?email=${encodeURIComponent(parsed.email)}`;
               }
             } catch (err) {
-              console.error("Failed to parse application_cache:", err);
             }
           }
         }
@@ -730,7 +729,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
     // Navigate to event details page with full event data
     const eventDetailsPath = `/events/${ev.slug || ev.id}`;
-    console.log(`[EventsPage] Navigating to event details:`, eventDetailsPath, ev);
     navigate(eventDetailsPath, {
       state: { event: ev, fromEventsList: true },
       replace: false
@@ -790,14 +788,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
         <div className="mt-4 space-y-2 text-neutral-800 text-sm meta-rows sm:min-h-[88px] md:min-h-[96px]">
           {(() => {
-            // DEBUG: Log event data
-            console.log(`[EventsPage EventCard Debug] Event "${ev.title}":`, {
-              is_multi_day: ev.is_multi_day,
-              sessions_present: !!ev.sessions,
-              sessions_count: ev.sessions?.length || 0,
-              timezone: ev.timezone,
-            });
-
             // For multi-day events with sessions
             if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
               const now = new Date();
@@ -835,7 +825,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       <div className="font-medium text-slate-700">⏱️ {ev.calculated_hours_display}</div>
                     )}
                     {(() => {
-                      console.log(`Event ${ev.title}: cpd_cpe_minutes=${ev.cpd_cpe_minutes}, show_cpd_cpe=${ev.show_cpd_cpe}`);
                       return ev.cpd_cpe_minutes && ev.show_cpd_cpe !== false ? (
                         <div className="font-medium text-slate-700">
                           CPD/CPE Credits: {Number(ev.cpd_cpe_credits ?? (ev.cpd_cpe_minutes / (ev.cpd_cpe_minutes_per_credit || 60))).toFixed(2).replace(/\.?0+$/, "")} (at {ev.cpd_cpe_minutes_per_credit || 60} min/credit)
@@ -1172,20 +1161,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           return (
                             <Button
                               onClick={() => {
-                                console.log('[EventsPage] Join Live clicked (guest):', {
-                                  eventId: ev.id,
-                                  use_external_streaming: ev?.use_external_streaming,
-                                  external_streaming_url: ev?.external_streaming_url,
-                                  external_streaming_platform: ev?.external_streaming_platform,
-                                  eventObj: ev
-                                });
                                 // If external streaming enabled, redirect to external platform instead of RTK
                                 if (ev?.use_external_streaming && ev?.external_streaming_url) {
-                                  console.log('[EventsPage] ✅ Redirecting to external platform:', ev.external_streaming_url);
                                   window.open(ev.external_streaming_url, '_blank');
                                   return;
                                 }
-                                console.log('[EventsPage] ❌ External streaming not enabled, navigating to RTK');
                                 navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`);
                               }}
                               variant="contained"
@@ -1430,7 +1410,6 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                 url += `?email=${encodeURIComponent(parsed.email)}`;
               }
             } catch (err) {
-              console.error("Failed to parse application_cache:", err);
             }
           }
         }
@@ -1798,20 +1777,11 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           return (
                             <Button
                               onClick={() => {
-                                console.log('[EventsPage] Join Live clicked (approved guest):', {
-                                  eventId: ev.id,
-                                  use_external_streaming: ev?.use_external_streaming,
-                                  external_streaming_url: ev?.external_streaming_url,
-                                  external_streaming_platform: ev?.external_streaming_platform,
-                                  eventObj: ev
-                                });
                                 // If external streaming enabled, redirect to external platform instead of RTK
                                 if (ev?.use_external_streaming && ev?.external_streaming_url) {
-                                  console.log('[EventsPage] ✅ Redirecting to external platform:', ev.external_streaming_url);
                                   window.open(ev.external_streaming_url, '_blank');
                                   return;
                                 }
-                                console.log('[EventsPage] ❌ External streaming not enabled, navigating to RTK');
                                 navigate(`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`);
                               }}
                               variant="contained"
@@ -2006,10 +1976,13 @@ export default function EventsPage() {
   const [topic, setTopic] = useState("");   // or "Topic/Industry" if you prefer
   const [format, setFormat] = useState(""); // or "Event Format"
   const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Kept for backward compatibility
+  const [initialLoading, setInitialLoading] = useState(true); // true only for first load
+  const [refreshing, setRefreshing] = useState(false); // true for background refetch
   const [error, setError] = useState("");
   const [locationOptionsCache, setLocationOptionsCache] = useState([]);
   const [total, setTotal] = useState(0);
+  const [searchDebouncedValue, setSearchDebouncedValue] = useState(""); // Debounced search
   const CATEGORIES_URL = `${EVENTS_URL}categories/`; // /api/events/categories/
   const [categories, setCategories] = useState([]);
   const FORMATS_URL = `${EVENTS_URL}formats/`; // /api/events/formats/
@@ -2033,10 +2006,8 @@ export default function EventsPage() {
   const seriesCacheRef = React.useRef(new Map());
 
   const handleGuestJoinRequested = React.useCallback((eventData) => {
-    console.debug("[EventsPage] handleGuestJoinRequested called with event:", eventData);
     setGuestJoinEvent(eventData);
     setGuestModalOpen(true);
-    console.debug("[EventsPage] Modal state set - guestJoinEvent and guestModalOpen=true");
   }, []);
 
   const handleShowParticipants = React.useCallback(async (eventId, eventTitle) => {
@@ -2111,7 +2082,6 @@ export default function EventsPage() {
         toast.error(data.detail || 'Failed to register for series');
       }
     } catch (error) {
-      console.error('Error registering for series:', error);
       toast.error('Failed to register for series');
     }
   };
@@ -2250,7 +2220,6 @@ export default function EventsPage() {
         setLocations(distinct);
       } catch (err) {
         if (err?.name === "AbortError") return;
-        console.error("Failed to load locations:", err);
         setLocations([]);
       }
     })();
@@ -2306,7 +2275,6 @@ export default function EventsPage() {
     if (!token) return; // Not logged in
 
     const handleFocus = () => {
-      console.log("[EventsPage] Page regained focus - refreshing registrations...");
 
       // Refresh all current registrations
       if (myRegistrations && Object.keys(myRegistrations).length > 0) {
@@ -2327,11 +2295,9 @@ export default function EventsPage() {
                 const rList = Array.isArray(rData?.results) ? rData.results : (Array.isArray(rData) ? rData : []);
                 if (rList.length > 0) {
                   refreshRegs[eventId] = rList[0];
-                  console.log(`[EventsPage] ✅ Updated registration for event ${eventId}:`, rList[0].admission_status);
                 }
               }
             } catch (e) {
-              console.warn(`[EventsPage] Failed to refresh registration for event ${eventId}:`, e);
             }
           })
         ).then(() => {
@@ -2416,7 +2382,13 @@ export default function EventsPage() {
     const controller = new AbortController();
     (async () => {
       try {
-        setLoading(true);
+        // Only show initial loading if no events are displayed yet
+        if (rawEvents.length === 0) {
+          setInitialLoading(true);
+        } else {
+          setRefreshing(true);
+        }
+
         const headers = { "Content-Type": "application/json" };
         const token =
           localStorage.getItem("access_token") ||
@@ -2454,7 +2426,7 @@ export default function EventsPage() {
         url.searchParams.set("exclude_ended", "1");
         const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
         fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
-        if (q) url.searchParams.set("search", q);   // matches title, location, topic (if backend search_fields include them)
+        if (searchDebouncedValue) url.searchParams.set("search", searchDebouncedValue);
 
         const res = await fetch(url, { headers: { ...headers, ...authHeaders() }, signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -2483,11 +2455,21 @@ export default function EventsPage() {
       } catch (e) {
         if (e.name !== "AbortError") setError(String(e?.message || e));
       } finally {
+        setInitialLoading(false);
+        setRefreshing(false);
         setLoading(false);
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId, pinnedEvents.length]);
+  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId]);
+
+  // Debounce search input (400ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchDebouncedValue(q);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [q]);
 
   useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, filterEventId]);
 
@@ -2519,7 +2501,7 @@ export default function EventsPage() {
         if (endISO) url.searchParams.set("end_date", endISO);
         const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
         fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
-        if (q) url.searchParams.set("search", q);
+        if (searchDebouncedValue) url.searchParams.set("search", searchDebouncedValue);
 
         const res = await fetch(url, { headers: { ...headers, ...authHeaders() }, signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -2544,17 +2526,20 @@ export default function EventsPage() {
         setPinnedEvents(filtered);
       } catch (e) {
         if (e.name !== "AbortError") {
-          console.error("Failed to load pinned events:", e);
+          // Silently handle pinned fetch errors
         }
       } finally {
         setPinnedLoading(false);
       }
     })();
     return () => controller.abort();
-  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId]);
+  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId]);
 
-  // Fetch replay events with same filters as normal events
+  // Fetch replay events only when on replays tab
   useEffect(() => {
+    // Only fetch replays if user is on the replays tab
+    if (selectedTab !== "replays") return;
+
     const controller = new AbortController();
     (async () => {
       try {
@@ -2583,30 +2568,26 @@ export default function EventsPage() {
         if (endISO) url.searchParams.set("end_date", endISO);
         const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
         fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
-        if (q) url.searchParams.set("search", q);
+        if (searchDebouncedValue) url.searchParams.set("search", searchDebouncedValue);
 
-        console.log("[EventsPage] Fetching replay events from:", url.toString());
         const res = await fetch(url, { headers: { ...headers, ...authHeaders() }, signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
         const items = Array.isArray(data) ? data : (data.results || []);
-        console.log("[EventsPage] Replay API response - items count:", items.length, "data:", data);
 
         setReplayEvents(items);
         setReplayTotal(Array.isArray(data) ? 0 : (data.count || 0));
-        console.log("[EventsPage] Replay events state updated with", items.length, "events");
       } catch (e) {
         if (e.name !== "AbortError") {
-          console.error("[EventsPage] Failed to load replay events:", e);
-          console.error("[EventsPage] Replay fetch error details:", e.message, e.stack);
+          // Silently handle replay fetch errors
         }
       } finally {
         setReplayLoading(false);
       }
     })();
     return () => controller.abort();
-  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange, filterEventId, replayPage]);
+  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId, replayPage, selectedTab]);
 
   // Fetch series data for events that belong to series (debounced to not block initial render)
   useEffect(() => {
@@ -2663,7 +2644,6 @@ export default function EventsPage() {
         });
         setSeriesData(seriesMap);
       } catch (error) {
-        console.error('Error fetching series data:', error);
       }
     }, 300); // 300ms delay to let page render
 
@@ -3475,9 +3455,7 @@ export default function EventsPage() {
                   )
                 ) : (
                   <>
-                    {replayLoading ? (
-                      <Skeleton variant="text" width={140} sx={{ display: "inline-block" }} />
-                    ) : loading ? (
+                    {initialLoading ? (
                       <Skeleton variant="text" width={140} sx={{ display: "inline-block" }} />
                     ) : (
                       `${total} events found`
@@ -3508,13 +3486,18 @@ export default function EventsPage() {
                   },
                 }}
               >
-                {loading
+                {initialLoading
                   ? skeletonItems.map((i) => (
                     <Box key={`sk-grid-${i}`}>
                       <EventCardSkeleton />
                     </Box>
                   ))
                   : <>
+                    {refreshing && (
+                      <Box sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 2, opacity: 0.6 }}>
+                        <Typography variant="body2" color="textSecondary">Updating events...</Typography>
+                      </Box>
+                    )}
                     {/* Display Pinned Events Section */}
                     {displayedPinnedEvents.length > 0 && (
                       <>
@@ -3641,13 +3624,18 @@ export default function EventsPage() {
               </Box>
             ) : (
               <Grid container spacing={3} direction="column">
-                {loading
+                {initialLoading
                   ? skeletonItems.map((i) => (
                     <Grid item key={`sk-list-${i}`} xs={12}>
                       <EventRowSkeleton />
                     </Grid>
                   ))
                   : <>
+                    {refreshing && (
+                      <Grid item xs={12} sx={{ textAlign: 'center', opacity: 0.6 }}>
+                        <Typography variant="body2" color="textSecondary">Updating events...</Typography>
+                      </Grid>
+                    )}
                     {/* Display Pinned Events Section (list view) */}
                     {displayedPinnedEvents.length > 0 && (
                       <>
@@ -3762,7 +3750,7 @@ export default function EventsPage() {
             {/* Pagination */}
             <Box
               className="mt-8 flex items-center justify-center"
-              sx={{ opacity: loading ? 0.6 : 1, pointerEvents: loading ? "none" : "auto" }}
+              sx={{ opacity: initialLoading ? 0.6 : 1, pointerEvents: initialLoading ? "none" : "auto" }}
             >
               <Pagination
                 count={pageCount}

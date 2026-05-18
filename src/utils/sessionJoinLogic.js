@@ -28,16 +28,7 @@ export const determineJoinState = (event, currentTime = new Date()) => {
   // ===== MULTI-DAY EVENT LOGIC =====
   const sessions = event.sessions || [];
 
-  // DEBUG: Log session data
-  console.log(`[determineJoinState] Event ${event.id} (${event.title}):`, {
-    is_multi_day: event.is_multi_day,
-    sessions_count: sessions.length,
-    sessions: sessions.map(s => ({ id: s.id, title: s.title, start: s.start_time, end: s.end_time })),
-    currentTime,
-  });
-
   if (sessions.length === 0) {
-    console.warn(`[determineJoinState] Event ${event.id} has no sessions!`);
     return {
       buttonText: "No Sessions Created",
       enabled: false,

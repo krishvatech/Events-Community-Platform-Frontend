@@ -3739,6 +3739,10 @@ function EventsPage() {
           : `${API_ROOT}/events/mine/`;
 
         const url = new URL(baseUrl);
+        // Use optimized card view for non-superusers
+        if (!isPlatformAdmin) {
+          url.searchParams.set("view", "card");
+        }
         url.searchParams.set("limit", String(PAGE_SIZE));
         url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
 

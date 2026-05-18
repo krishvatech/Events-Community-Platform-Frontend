@@ -22,7 +22,6 @@ import {
 import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
-import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
@@ -182,22 +181,12 @@ function statusChip(status) {
 
 // ---------------------- Event Card (kept, with small MOD) ----------------------
 function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJoining, hideStatusChip }) {
-  console.log(`[EventCard] Rendering event ${ev.id} (${ev.title}), is_multi_day=${ev.is_multi_day}`);
-
   const [imgFailed, setImgFailed] = useState(false);
   const currentUser = getBackendUserFromStorage();
   const isOwner = ev.created_by_id === currentUser?.id;
   const isHost = isOwner || Boolean(reg?.is_host);
 
-  // ✅ NEW: Use session-based join logic for multi-day events
-  console.log(`[EventCard] Event ${ev.id} input data:`, {
-    is_multi_day: ev.is_multi_day,
-    has_sessions: !!ev.sessions,
-    sessions_count: ev.sessions?.length,
-    sessions: ev.sessions,
-  });
   const joinState = useJoinLiveState(ev);
-  console.log(`[EventCard] Event ${ev.id} joinState:`, joinState);
 
   // For multi-day events, determine status from joinState instead of computeStatus
   let status = computeStatus(ev);
@@ -287,15 +276,6 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
         <div className="text-sm text-slate-500">
           {(() => {
-            // DEBUG: Log event data to see what we're receiving
-            console.log(`[EventCard Debug] Event "${ev.title}":`, {
-              is_multi_day: ev.is_multi_day,
-              sessions_present: !!ev.sessions,
-              sessions_count: ev.sessions?.length || 0,
-              sessions: ev.sessions,
-              timezone: ev.timezone,
-            });
-
             // For multi-day events with sessions, show only the next upcoming session
             if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
               const totalDurationMinutes = calculateTotalDuration(ev.sessions);
@@ -460,13 +440,9 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
               isPostEventLounge ||
               (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
 
-            // ✅ NEW: For multi-day events with sessions, use session-based logic
-            // For single-day events, use existing logic
+            // For multi-day events with sessions, use session-based logic
             if (ev.is_multi_day) {
-              console.log(`[EventCard] Event ${ev.id}: is_multi_day=true, joinState=`, joinState);
               if (joinState) {
-                console.log(`[EventCard] Event ${ev.id}: Using session-based join logic:`, joinState.buttonText);
-                // Multi-day event: show session-based button
                 return (
                   <Button
                     onClick={() => onJoinLive?.(ev, isHost, joinState.sessionId)}
@@ -484,8 +460,6 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                     {getResolvedJoinLabel(ev, isLive, isJoining, reg, isOwner, joinState.buttonText)}
                   </Button>
                 );
-              } else {
-                console.warn(`[EventCard] Event ${ev.id}: is_multi_day=true but joinState is undefined!`);
               }
             }
 
@@ -698,10 +672,6 @@ export default function MyEventsPage() {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // ✅ Force re-render every second to update grace period button text in real-time
-  // This ensures "Join Live" changes to "Join Waiting Room" when grace period expires
-  // Uses 1-second ticker for guaranteed button updates regardless of when page loads
-  useSecondTick(); // Re-render every second while page is visible
 
   // Small helper for JSON GET
   async function fetchJSON(path) {
@@ -731,6 +701,7 @@ export default function MyEventsPage() {
     async function load() {
       try {
         const url = new URL(urlJoin(API_BASE, "/events/mine/"));
+        url.searchParams.set("view", "card");
         url.searchParams.set("limit", String(PAGE_SIZE));
         url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
 
@@ -745,7 +716,7 @@ export default function MyEventsPage() {
           url.searchParams.set("bucket", bucket);
         }
 
-        // 1) Fetch paginated events
+        // Fetch paginated events with optimized card view
         const res = await fetch(url.toString(), {
           headers: {
             "Content-Type": "application/json",
@@ -759,45 +730,18 @@ export default function MyEventsPage() {
 
         if (cancelled) return;
 
-        // 2) Fetch registration details for these events (for Unregister/Cancel)
-        // We do this concurrently for the displayed page items.
+        // Build registration map from my_registration in event data
         const newRegs = {};
-        if (results.length > 0) {
-          await Promise.all(results.map(async (ev) => {
-            try {
-              // Filter specifically for *my* registration for this event
-              const regUrl = new URL(urlJoin(API_BASE, "/event-registrations/"));
-              regUrl.searchParams.set("event", String(ev.id));
-              // get_queryset on backend already filters by user=request.user
-              const rRes = await fetch(regUrl.toString(), {
-                headers: {
-                  "Content-Type": "application/json",
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-              });
-              if (rRes.ok) {
-                const rData = await rRes.json();
-                const rList = asList(rData);
-                if (rList.length > 0) {
-                  newRegs[ev.id] = rList[0];
-                }
-              }
-            } catch (e) {
-              // ignore individual reg fetch failures
-            }
-          }));
-        }
+        results.forEach((ev) => {
+          if (ev.my_registration) {
+            newRegs[ev.id] = ev.my_registration;
+          }
+        });
 
         if (cancelled) return;
 
         setEvents(results);
         setMyRegistrations(newRegs);
-        // We need a total count for pagination. 
-        // If the API returns count, great. If not (and we have results), we might guess, but DRF pagination usually returns count.
-        // We'll store it in a new state or repurpose logic.
-        // Let's rely on component derived state updates.
-        // Wait, the component currently computes `pageCount` from `filtered.length`.
-        // We need to store `totalCount` in state.
         setTotalCount(count);
 
       } catch (e) {
@@ -820,8 +764,6 @@ export default function MyEventsPage() {
   // This ensures button text updates when user returns from live meeting after admission
   useEffect(() => {
     const handleFocus = () => {
-      console.log("[MyEvents] Page regained focus - refreshing registrations...");
-
       // Refresh all current registrations
       if (myRegistrations && Object.keys(myRegistrations).length > 0) {
         const refreshRegs = {};
@@ -841,11 +783,10 @@ export default function MyEventsPage() {
                 const rList = asList(rData);
                 if (rList.length > 0) {
                   refreshRegs[eventId] = rList[0];
-                  console.log(`[MyEvents] ✅ Updated registration for event ${eventId}:`, rList[0].admission_status);
                 }
               }
             } catch (e) {
-              console.warn(`[MyEvents] Failed to refresh registration for event ${eventId}:`, e);
+              // ignore individual refresh failures
             }
           })
         ).then(() => {
@@ -886,14 +827,6 @@ export default function MyEventsPage() {
     if (!ev?.id) return;
 
     // Debug: log event data to check if external streaming fields exist
-    console.log("[MyEventsPage] handleJoinLive - Event data:", {
-      id: ev.id,
-      use_external_streaming: ev?.use_external_streaming,
-      external_streaming_url: ev?.external_streaming_url,
-      external_streaming_host_link: ev?.external_streaming_host_link,
-      all_keys: Object.keys(ev || {}).slice(0, 20)
-    });
-
     // If external streaming enabled, redirect to external platform instead of RTK
     if (ev?.use_external_streaming && ev?.external_streaming_url) {
       // Use host link if available and user is host, otherwise use participant link
