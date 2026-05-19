@@ -442,6 +442,7 @@ export default function EventManagePage() {
   const [networkingEnabled, setNetworkingEnabled] = useState(false);
   const [networkingReminderMinutes, setNetworkingReminderMinutes] = useState(15);
   const [networkingSuccessMessage, setNetworkingSuccessMessage] = useState("");
+  const [networkingWindowErrors, setNetworkingWindowErrors] = useState([]);
 
   // Resend Mail to All State
   const [resendMailOpen, setResendMailOpen] = useState(false);
@@ -6886,18 +6887,101 @@ export default function EventManagePage() {
       return `${year}-${month}-${day}`;
     };
 
+    const getEventStartDateValue = () => {
+      if (!event?.start_time) return getTodayDateValue();
+      return dayjs(event.start_time).format("YYYY-MM-DD");
+    };
+
+    const getEventStartDateTime = () => {
+      if (!event?.start_time) return null;
+      return dayjs(event.start_time);
+    };
+
+    const getEventEndDateTime = () => {
+      if (!event?.end_time) return null;
+      return dayjs(event.end_time);
+    };
+
+    const validateNetworkingWindows = (windows) => {
+      const errors = [];
+      const eventStart = getEventStartDateTime();
+      const eventEnd = getEventEndDateTime();
+
+      if (!eventStart || !eventEnd || !eventStart.isValid() || !eventEnd.isValid()) {
+        return errors;
+      }
+
+      for (let i = 0; i < windows.length; i++) {
+        const window = windows[i];
+        if (!window.date || !window.start || !window.end) continue;
+
+        try {
+          const windowDate = dayjs(window.date, "YYYY-MM-DD");
+          if (!windowDate.isValid()) continue;
+
+          // Parse time as HH:mm and create full datetime for that day
+          const [startHour, startMin] = window.start.split(':').map(Number);
+          const [endHour, endMin] = window.end.split(':').map(Number);
+
+          const windowStartTime = windowDate.hour(startHour).minute(startMin).second(0);
+          const windowEndTime = windowDate.hour(endHour).minute(endMin).second(0);
+
+          // Check if date is within event bounds
+          if (windowDate.isBefore(eventStart, 'day') || windowDate.isAfter(eventEnd, 'day')) {
+            const eventDisplay = eventStart.format('MMM DD, YYYY, h:mm A') + " – " + eventEnd.format('h:mm A');
+            errors[i] = `Window ${i + 1} must be within event time: ${eventDisplay}.`;
+            continue;
+          }
+
+          // Check if window start/end times are within event bounds
+          if (windowStartTime.isBefore(eventStart) || windowEndTime.isAfter(eventEnd)) {
+            const eventDisplay = eventStart.format('MMM DD, YYYY, h:mm A') + " – " + eventEnd.format('h:mm A');
+            errors[i] = `Window ${i + 1} must be within event time: ${eventDisplay}.`;
+            continue;
+          }
+
+          // Check if end > start
+          if (windowEndTime.isSameOrBefore(windowStartTime)) {
+            errors[i] = `Window ${i + 1} end time must be after start time.`;
+          }
+        } catch (e) {
+          // Silently skip on parse error
+          continue;
+        }
+      }
+
+      return errors;
+    };
+
     const addNetworkingWindow = () => {
-      setNetworkingAllowedWindows(prev => [...prev, { date: getTodayDateValue(), start: "09:00", end: "17:00" }]);
+      const eventStartDate = getEventStartDateValue();
+      const eventStart = getEventStartDateTime();
+      const defaultStart = eventStart ? eventStart.format("HH:mm") : "09:00";
+      const defaultEnd = eventStart ? eventStart.add(1, 'hour').format("HH:mm") : "10:00";
+
+      const newWindow = { date: eventStartDate, start: defaultStart, end: defaultEnd };
+      const updatedWindows = [...networkingAllowedWindows, newWindow];
+      setNetworkingAllowedWindows(updatedWindows);
+
+      // Validate immediately
+      const errors = validateNetworkingWindows(updatedWindows);
+      setNetworkingWindowErrors(errors);
     };
 
     const removeNetworkingWindow = (index) => {
       setNetworkingAllowedWindows(prev => prev.filter((_, i) => i !== index));
+      setNetworkingWindowErrors(prev => prev.filter((_, i) => i !== index));
     };
 
     const updateNetworkingWindow = (index, field, value) => {
       setNetworkingAllowedWindows(prev => {
         const updated = [...prev];
         updated[index] = { ...updated[index], [field]: value };
+
+        // Validate immediately
+        const errors = validateNetworkingWindows(updated);
+        setNetworkingWindowErrors(errors);
+
         return updated;
       });
     };
@@ -7000,36 +7084,47 @@ export default function EventManagePage() {
                         <Typography variant="body2" sx={{ color: "text.secondary", fontStyle: "italic" }}>No windows added yet. Add one to enable networking.</Typography>
                       ) : (
                         networkingAllowedWindows.map((window, idx) => (
-                          <Stack key={idx} direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: "grey.50", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
-                            <TextField
-                              size="small"
-                              label="Date"
-                              type="date"
-                              value={window.date || ""}
-                              onChange={e => updateNetworkingWindow(idx, "date", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <TextField
-                              size="small"
-                              label="Start Time"
-                              type="time"
-                              value={window.start || ""}
-                              onChange={e => updateNetworkingWindow(idx, "start", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <TextField
-                              size="small"
-                              label="End Time"
-                              type="time"
-                              value={window.end || ""}
-                              onChange={e => updateNetworkingWindow(idx, "end", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <IconButton size="small" onClick={() => removeNetworkingWindow(idx)} color="error"><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
-                          </Stack>
+                          <Box key={idx}>
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: networkingWindowErrors[idx] ? "error.50" : "grey.50", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
+                              <TextField
+                                size="small"
+                                label="Date"
+                                type="date"
+                                value={window.date || ""}
+                                onChange={e => updateNetworkingWindow(idx, "date", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                inputProps={{ min: getEventStartDateValue(), max: getEventEndDateTime()?.format("YYYY-MM-DD") }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <TextField
+                                size="small"
+                                label="Start Time"
+                                type="time"
+                                value={window.start || ""}
+                                onChange={e => updateNetworkingWindow(idx, "start", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <TextField
+                                size="small"
+                                label="End Time"
+                                type="time"
+                                value={window.end || ""}
+                                onChange={e => updateNetworkingWindow(idx, "end", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <IconButton size="small" onClick={() => removeNetworkingWindow(idx)} color="error"><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
+                            </Stack>
+                            {networkingWindowErrors[idx] && (
+                              <Typography variant="caption" sx={{ color: "error.main", display: "block", mt: 0.5, ml: 2 }}>
+                                {networkingWindowErrors[idx]}
+                              </Typography>
+                            )}
+                          </Box>
                         ))
                       )}
                     </Stack>
@@ -7051,7 +7146,7 @@ export default function EventManagePage() {
                   <Button
                     variant="contained"
                     startIcon={networkingSettingsSaving ? <CircularProgress size={16} /> : <SaveRoundedIcon />}
-                    disabled={networkingSettingsSaving}
+                    disabled={networkingSettingsSaving || networkingWindowErrors.some(e => e)}
                     onClick={saveNetworkingSettings}
                     sx={{ textTransform: "none", alignSelf: "flex-start", borderRadius: 999 }}
                   >

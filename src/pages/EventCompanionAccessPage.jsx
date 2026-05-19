@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import {
   Box,
   Button,
@@ -16,7 +19,11 @@ import { Helmet } from 'react-helmet-async';
 import LoginIcon from '@mui/icons-material/Login';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import EventNoteIcon from '@mui/icons-material/EventNote';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EventCompanionDirectoryPage from './EventCompanionDirectoryPage';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -38,6 +45,9 @@ function EventCompanionAccessPage() {
   const [userData, setUserData] = useState(null);
   const [inviteToken, setInviteToken] = useState(null);
   const [processingInvite, setProcessingInvite] = useState(false);
+  const [isEventManager, setIsEventManager] = useState(false);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [eventStarted, setEventStarted] = useState(false);
 
   useEffect(() => {
     // Extract invite_token from URL and call checkAccess with it
@@ -195,6 +205,110 @@ function EventCompanionAccessPage() {
     navigate(`/signup?next=${encodeURIComponent(nextUrl)}`);
   };
 
+  // Helper function to format event start time for display
+  const formatEventStartTime = (isoDateTime) => {
+    try {
+      const date = new Date(isoDateTime);
+      if (isNaN(date.getTime())) return '';
+
+      // Use Intl.DateTimeFormat for proper localization
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        month: 'long',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      const parts = formatter.formatToParts(date);
+      const formatted = formatter.format(date);
+
+      return formatted;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return '';
+    }
+  };
+
+  // Helper function to calculate countdown safely
+  const calculateCountdown = (eventStartTime) => {
+    try {
+      console.log("event.start_time", eventStartTime);
+      const startDate = new Date(eventStartTime);
+      console.log("parsed start", startDate);
+      console.log("now", new Date());
+
+      // Check if date is valid
+      if (isNaN(startDate.getTime())) {
+        console.error("Invalid date:", eventStartTime);
+        return null;
+      }
+
+      const now = Date.now();
+      const startMs = startDate.getTime();
+      console.log("diff", startMs - now);
+
+      const diffMs = startMs - now;
+
+      // If already started, return null
+      if (diffMs <= 0) {
+        return null;
+      }
+
+      // Calculate days, hours, minutes, seconds
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const days = Math.floor(totalSeconds / 86400); // 86400 seconds in a day
+      const hours = Math.floor((totalSeconds % 86400) / 3600); // 3600 seconds in an hour
+      const minutes = Math.floor((totalSeconds % 3600) / 60); // 60 seconds in a minute
+      const seconds = totalSeconds % 60;
+
+      return { days, hours, minutes, seconds };
+    } catch (error) {
+      console.error("Error calculating countdown:", error);
+      return null;
+    }
+  };
+
+  // Check if event has started and update countdown
+  useEffect(() => {
+    if (!event || !event.start_time) return;
+
+    // Calculate immediately on mount
+    const result = calculateCountdown(event.start_time);
+    if (result === null) {
+      // Event has already started
+      setEventStarted(true);
+    } else {
+      setCountdown(result);
+    }
+
+    // Update countdown every second
+    const timer = setInterval(() => {
+      const result = calculateCountdown(event.start_time);
+      if (result === null) {
+        // Event has started, refresh to show directory
+        setEventStarted(true);
+        clearInterval(timer);
+        // Re-check access to switch from countdown to directory
+        checkAccess();
+      } else {
+        setCountdown(result);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [event?.start_time]);
+
+  // Check if user is event manager
+  useEffect(() => {
+    if (userData && event && userData.id === event.created_by_id) {
+      setIsEventManager(true);
+    } else {
+      setIsEventManager(false);
+    }
+  }, [userData, event]);
+
   const handleRegisterClick = async () => {
     if (!event || !userData) return;
 
@@ -279,9 +393,130 @@ function EventCompanionAccessPage() {
     );
   }
 
+  // If event hasn't started yet and user is not an event manager, show countdown
+  if (isAuthenticated && isRegistered && (registrationStatus === 'approved' || registrationStatus === 'registered') && event && !eventStarted && !isEventManager) {
+    return (
+      <>
+        <Helmet>
+          <title>Event Countdown - {event?.title || 'Event'}</title>
+        </Helmet>
+
+        <Box
+          sx={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: '#f5f5f5',
+            p: 2,
+          }}
+        >
+          <Container maxWidth="sm">
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
+              <Box sx={{ textAlign: 'center', mb: 4 }}>
+                <EventNoteIcon sx={{ fontSize: 48, color: '#1976d2', mb: 2 }} />
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
+                  Get Ready!
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5, color: '#333' }}>
+                  {event.title}
+                </Typography>
+              </Box>
+
+              <Stack spacing={3}>
+                <Box sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
+                    Participant Directory opens when the event starts
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#333' }}>
+                    Get ready to connect with attendees, view the participant directory, and request 1:1 networking meetings!
+                  </Typography>
+                </Box>
+
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#666' }}>
+                    Event starts on
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 3, color: '#1B2A4A' }}>
+                    {formatEventStartTime(event.start_time)}
+                  </Typography>
+
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#666' }}>
+                    Time remaining
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(4, 1fr)',
+                      gap: 1.5,
+                      mb: 3,
+                    }}
+                  >
+                    {[
+                      { label: 'Days', value: countdown.days },
+                      { label: 'Hours', value: countdown.hours },
+                      { label: 'Minutes', value: countdown.minutes },
+                      { label: 'Seconds', value: countdown.seconds },
+                    ].map((item) => (
+                      <Box
+                        key={item.label}
+                        sx={{
+                          p: 2,
+                          bgcolor: '#fff3e0',
+                          borderRadius: 1,
+                          textAlign: 'center',
+                        }}
+                      >
+                        <Typography
+                          variant="h4"
+                          sx={{
+                            fontWeight: 700,
+                            color: '#FF9800',
+                            mb: 0.5,
+                          }}
+                        >
+                          {String(item.value).padStart(2, '0')}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 600,
+                            color: '#666',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {item.label}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  onClick={() => navigate(`/events/${slug}`)}
+                  startIcon={<ArrowBackIcon />}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                  }}
+                >
+                  Back to Event
+                </Button>
+              </Stack>
+            </Paper>
+          </Container>
+        </Box>
+      </>
+    );
+  }
+
   // If authenticated and registered, show the directory
   // For 'open' registration: status will be 'registered'
   // For 'apply' registration: status will be 'approved'
+  // Event managers can also preview before event start
   if (isAuthenticated && isRegistered && (registrationStatus === 'approved' || registrationStatus === 'registered')) {
     return <EventCompanionDirectoryPage />;
   }
