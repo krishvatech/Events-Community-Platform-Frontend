@@ -7417,7 +7417,7 @@ export default function NewLiveMeeting() {
 
   // ✅ AUTO-RECONNECT: Main function to attempt reconnect
   const initiateAutoReconnect = async () => {
-    const MAX_ATTEMPTS = 60; // 60 attempts × 2 seconds = 120 seconds max
+    const MAX_ATTEMPTS = 30; // 30 attempts × 2 seconds = 60 seconds max
     const RETRY_INTERVAL = 2000; // 2 seconds
 
     // ✅ GUARD: Mark as reconnecting to prevent automatic leave handlers
@@ -7426,20 +7426,33 @@ export default function NewLiveMeeting() {
 
     const attemptReconnect = async () => {
       if (reconnectAttemptRef.current >= MAX_ATTEMPTS) {
-        console.error("[Reconnect] Max reconnection attempts reached");
+        console.error(`[Reconnect] Max reconnection attempts reached (${MAX_ATTEMPTS})`);
+        // ✅ CLEANUP: Clear UI and state
         setIsReconnecting(false);
-        setReconnectMessage("Could not reconnect. Please refresh or rejoin.");
+        setReconnectMessage("");
         reconnectLocked.current = false;
-        // ✅ GUARD: Clear the flag when max attempts reached
         isReconnectingRef.current = false;
-        console.log("[Reconnect] Set isReconnectingRef = false, max attempts reached");
-        showSnackbar("Connection could not be restored. Please refresh the page.", "error");
+        shouldPausePollingRef.current = false;
+
+        // ✅ CLEANUP: Clear any pending timers
+        if (reconnectTimerRef.current) {
+          clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = null;
+        }
+
+        console.log("[Reconnect] Cleanup complete, navigating away from meeting");
+        showSnackbar("Could not reconnect. Returning to event page.", "error");
+
+        // ✅ NAVIGATE: Return to event page after cleanup
+        setTimeout(() => {
+          navigate(`/community/${slug}/events`, { replace: true });
+        }, 500);
         return;
       }
 
       reconnectAttemptRef.current += 1;
       console.log(`[Reconnect] Attempt ${reconnectAttemptRef.current}/${MAX_ATTEMPTS}`);
-      setReconnectMessage(`Reconnecting... (${reconnectAttemptRef.current}/${Math.ceil(MAX_ATTEMPTS / 2)})`);
+      setReconnectMessage(`Reconnecting... (${reconnectAttemptRef.current}/${MAX_ATTEMPTS})`);
 
       // Call rejoin endpoint
       const rejoinResult = await callRejoinEndpoint();
