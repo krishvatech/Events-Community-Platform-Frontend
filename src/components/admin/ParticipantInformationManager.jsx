@@ -45,15 +45,29 @@ export default function ParticipantInformationManager({ eventId }) {
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterRole, setFilterRole] = useState('all');
+  const [filterAttendanceMode, setFilterAttendanceMode] = useState('all');
+  const [filterVisaSupport, setFilterVisaSupport] = useState('all');
+  const [filterAccessibilityNeed, setFilterAccessibilityNeed] = useState('all');
+  const [filterPhotoConcent, setFilterPhotoConcent] = useState('all');
   const [selectedAssignments, setSelectedAssignments] = useState(new Set());
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [summary, setSummary] = useState({
+    total: 0,
+    completed: 0,
+    in_progress: 0,
+    not_started: 0,
+    lapsed: 0,
+    completion_percentage: 0,
+  });
 
-  // Fetch assignments
+  // Fetch assignments and summary
   useEffect(() => {
     fetchAssignments();
-  }, [eventId]);
+    fetchSummary();
+  }, [eventId, page, rowsPerPage, searchText, filterStatus, filterRole, filterAttendanceMode, filterVisaSupport, filterAccessibilityNeed, filterPhotoConcent]);
 
   const fetchAssignments = async () => {
     try {
@@ -61,6 +75,21 @@ export default function ParticipantInformationManager({ eventId }) {
       const params = new URLSearchParams();
       if (filterStatus !== 'all') {
         params.append('status', filterStatus);
+      }
+      if (filterRole !== 'all') {
+        params.append('attendee_role', filterRole);
+      }
+      if (filterAttendanceMode !== 'all') {
+        params.append('attendance_mode', filterAttendanceMode);
+      }
+      if (filterVisaSupport !== 'all') {
+        params.append('visa_support_requested', filterVisaSupport);
+      }
+      if (filterAccessibilityNeed !== 'all') {
+        params.append('accessibility_need_declared', filterAccessibilityNeed);
+      }
+      if (filterPhotoConcent !== 'all') {
+        params.append('photo_consent_denied', filterPhotoConcent);
       }
       if (searchText) {
         params.append('search', searchText);
@@ -81,6 +110,17 @@ export default function ParticipantInformationManager({ eventId }) {
     }
   };
 
+  const fetchSummary = async () => {
+    try {
+      const { data } = await apiClient.get(
+        `/events/${eventId}/post-acceptance-form-assignments-admin/summary/`
+      );
+      setSummary(data);
+    } catch (err) {
+      console.error('Error fetching summary:', err);
+    }
+  };
+
   const handleSearchChange = (e) => {
     setSearchText(e.target.value);
     setPage(0);
@@ -88,6 +128,31 @@ export default function ParticipantInformationManager({ eventId }) {
 
   const handleFilterChange = (e) => {
     setFilterStatus(e.target.value);
+    setPage(0);
+  };
+
+  const handleRoleFilterChange = (e) => {
+    setFilterRole(e.target.value);
+    setPage(0);
+  };
+
+  const handleAttendanceModeFilterChange = (e) => {
+    setFilterAttendanceMode(e.target.value);
+    setPage(0);
+  };
+
+  const handleVisaSupportFilterChange = (e) => {
+    setFilterVisaSupport(e.target.value);
+    setPage(0);
+  };
+
+  const handleAccessibilityNeedFilterChange = (e) => {
+    setFilterAccessibilityNeed(e.target.value);
+    setPage(0);
+  };
+
+  const handlePhotoConsentFilterChange = (e) => {
+    setFilterPhotoConcent(e.target.value);
     setPage(0);
   };
 
@@ -227,8 +292,8 @@ export default function ParticipantInformationManager({ eventId }) {
     );
   }
 
-  const completedCount = assignments.filter(a => a.status === 'completed').length;
-  const progressPercent = assignments.length > 0 ? Math.round((completedCount / assignments.length) * 100) : 0;
+  const completedCount = summary.completed;
+  const progressPercent = summary.completion_percentage;
 
   return (
     <Box>
@@ -238,7 +303,7 @@ export default function ParticipantInformationManager({ eventId }) {
           Participant Information Forms
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-          {completedCount} of {assignments.length} completed ({progressPercent}%)
+          {completedCount} of {summary.total} completed ({progressPercent}%)
         </Typography>
         {/* Progress bar */}
         <Box
@@ -270,7 +335,8 @@ export default function ParticipantInformationManager({ eventId }) {
 
       {/* Toolbar */}
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap' }}>
+        {/* Search and Refresh Row */}
+        <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: 'center' }}>
           <TextField
             placeholder="Search by name or email..."
             size="small"
@@ -283,9 +349,16 @@ export default function ParticipantInformationManager({ eventId }) {
                 </InputAdornment>
               ),
             }}
-            sx={{ minWidth: 250 }}
+            sx={{ minWidth: 250, flex: 1 }}
           />
-          <FormControl size="small" sx={{ minWidth: 150 }}>
+          <IconButton size="small" onClick={fetchAssignments} disabled={loading}>
+            <RefreshRoundedIcon />
+          </IconButton>
+        </Stack>
+
+        {/* Filters Row 1 */}
+        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Status</InputLabel>
             <Select
               value={filterStatus}
@@ -299,9 +372,71 @@ export default function ParticipantInformationManager({ eventId }) {
               <MenuItem value="lapsed">Lapsed</MenuItem>
             </Select>
           </FormControl>
-          <IconButton size="small" onClick={fetchAssignments} disabled={loading}>
-            <RefreshRoundedIcon />
-          </IconButton>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Role</InputLabel>
+            <Select
+              value={filterRole}
+              onChange={handleRoleFilterChange}
+              label="Role"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="speaker">Speaker</MenuItem>
+              <MenuItem value="moderator">Moderator</MenuItem>
+              <MenuItem value="host">Host</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <InputLabel>Attendance Mode</InputLabel>
+            <Select
+              value={filterAttendanceMode}
+              onChange={handleAttendanceModeFilterChange}
+              label="Attendance Mode"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="in_person">In Person</MenuItem>
+              <MenuItem value="online">Online</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Visa Support</InputLabel>
+            <Select
+              value={filterVisaSupport}
+              onChange={handleVisaSupportFilterChange}
+              label="Visa Support"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="true">Requested</MenuItem>
+              <MenuItem value="false">Not Requested</MenuItem>
+            </Select>
+          </FormControl>
+        </Stack>
+
+        {/* Filters Row 2 */}
+        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Accessibility Need</InputLabel>
+            <Select
+              value={filterAccessibilityNeed}
+              onChange={handleAccessibilityNeedFilterChange}
+              label="Accessibility Need"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="true">Declared</MenuItem>
+              <MenuItem value="false">Not Declared</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <InputLabel>Photo Consent</InputLabel>
+            <Select
+              value={filterPhotoConcent}
+              onChange={handlePhotoConsentFilterChange}
+              label="Photo Consent"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="true">Denied</MenuItem>
+              <MenuItem value="false">Allowed</MenuItem>
+            </Select>
+          </FormControl>
         </Stack>
 
         {/* Action buttons */}
@@ -355,6 +490,10 @@ export default function ParticipantInformationManager({ eventId }) {
               <TableCell>Deadline</TableCell>
               <TableCell>Completed</TableCell>
               <TableCell>Reminders</TableCell>
+              <TableCell>Role(s)</TableCell>
+              <TableCell>Attendance Mode</TableCell>
+              <TableCell>Accessibility Need</TableCell>
+              <TableCell>Photo Consent Denied</TableCell>
               <TableCell>Visa Support</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
@@ -388,6 +527,14 @@ export default function ParticipantInformationManager({ eventId }) {
                     : '-'}
                 </TableCell>
                 <TableCell>{assignment.reminders_sent}</TableCell>
+                <TableCell>{assignment.attendee_role || '-'}</TableCell>
+                <TableCell>{assignment.attendance_mode || '-'}</TableCell>
+                <TableCell>
+                  {assignment.accessibility_need_declared ? '✓' : '-'}
+                </TableCell>
+                <TableCell>
+                  {assignment.photo_consent_denied ? '✗' : '-'}
+                </TableCell>
                 <TableCell>
                   {assignment.visa_support_requested ? '✓' : '-'}
                 </TableCell>
@@ -408,7 +555,7 @@ export default function ParticipantInformationManager({ eventId }) {
       <TablePagination
         rowsPerPageOptions={[25, 50, 100]}
         component="div"
-        count={assignments.length > 0 ? assignments.length * 2 : 0} // Approximate for pagination
+        count={summary.total}
         rowsPerPage={rowsPerPage}
         page={page}
         onPageChange={handlePageChange}
