@@ -2394,6 +2394,16 @@ export default function NewLiveMeeting() {
   const lastLoungeFetchRef = useRef(0);
   const speedNetworkingTimeoutRef = useRef(null);
 
+  // ✅ WebSocket auto-reconnect on disconnect
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [reconnectMessage, setReconnectMessage] = useState("");
+  const reconnectTimerRef = useRef(null);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectLocked = useRef(false);
+  const isReconnectingRef = useRef(false); // ✅ Guard: prevent leave during reconnect
+  const manualLeaveRef = useRef(false); // ✅ Flag: allow leave even during reconnect if user clicks Leave
+  const shouldPausePollingRef = useRef(false); // ✅ POLLING PAUSE: Pause non-essential APIs when offline
+
   // ✅ Fullscreen support
   const rootRef = useRef(null);
   const stageViewportRef = useRef(null);
@@ -3236,6 +3246,10 @@ export default function NewLiveMeeting() {
   }, [rtkMeeting?.self, role, selfAssignedRole]);
 
   const syncMoodMapFromApi = useCallback(async () => {
+    // ✅ POLLING PAUSE: Skip if offline/reconnecting
+    if (shouldPausePollingRef.current || !navigator.onLine) {
+      return;
+    }
     if (!eventId) return;
     try {
       const res = await fetch(toApiUrl(`events/${eventId}/moods/`), {
@@ -7224,6 +7238,10 @@ export default function NewLiveMeeting() {
 
   // Fallback: fetch lounge state periodically in case websocket updates are missed
   const fetchLoungeState = useCallback(async () => {
+    // ✅ POLLING PAUSE: Skip if offline/reconnecting
+    if (shouldPausePollingRef.current || !navigator.onLine) {
+      return;
+    }
     if (!eventId) return;
 
     // ✅ CRITICAL FOR PARTICIPANTS: Stop polling once meeting ends
@@ -7297,6 +7315,255 @@ export default function NewLiveMeeting() {
     fetchLoungeStateRef.current = fetchLoungeState;
   }, [fetchLoungeState]);
 
+  // ✅ AUTO-RECONNECT: Function to call rejoin endpoint with timeout
+  const callRejoinEndpoint = async () => {
+    if (!eventId) {
+      console.warn("[Reconnect] No eventId available");
+      return null;
+    }
+
+    // ✅ TIMEOUT: 3-second AbortController for rejoin API
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/live/rejoin/`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        signal: controller.signal,
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        // Check if auth token expired (401)
+        if (res.status === 401) {
+          console.warn("[Reconnect] Auth token expired (401)");
+          // Redirect to login - will require re-authentication
+          setIsReconnecting(false);
+          // ✅ GUARD: Clear the flag when auth fails
+          isReconnectingRef.current = false;
+          console.log("[Reconnect] Set isReconnectingRef = false, auth failed");
+          showSnackbar("Your session has expired. Please log in again.", "error");
+          navigate("/login", { replace: true });
+          return null;
+        }
+
+        const reason = data?.reason || "unknown";
+        console.warn("[Reconnect] Rejoin failed:", reason, data?.detail);
+        // ✅ GUARD: If backend says can't rejoin, stop reconnecting
+        if (data?.can_rejoin === false) {
+          isReconnectingRef.current = false;
+          console.log("[Reconnect] Set isReconnectingRef = false, backend says can't rejoin");
+        }
+        return { success: false, reason, detail: data?.detail };
+      }
+
+      console.log("[Reconnect] Rejoin successful:", data);
+      return { success: true, data };
+    } catch (error) {
+      // ✅ TIMEOUT: Handle AbortError separately from other errors
+      if (error.name === "AbortError") {
+        console.warn("[Reconnect] Rejoin endpoint timeout (3s)");
+        return { success: false, reason: "timeout", detail: "Rejoin request timed out" };
+      }
+      console.warn("[Reconnect] Rejoin endpoint error:", error);
+      return { success: false, reason: "network_error", detail: error.message };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  // ✅ AUTO-RECONNECT: Function to restore user state from rejoin response
+  const restoreUserStateFromRejoin = (rejoinData) => {
+    if (!rejoinData || !rejoinData.success || !rejoinData.data) {
+      return false;
+    }
+
+    const data = rejoinData.data;
+    console.log("[Reconnect] Restoring state from rejoin response:", data);
+
+    // Restore break state if meeting is on break
+    if (data.is_on_break) {
+      setIsOnBreak(true);
+      setBreakDurationSeconds(data.break_duration_seconds || 600);
+      setBreakRemainingSeconds(data.break_remaining_seconds);
+      console.log("[Reconnect] Meeting is on break - restored break state");
+    }
+
+    // Restore RTK token and meeting ID for reconnect
+    if (data.rtk_token) {
+      console.log("[Reconnect] Received RTK token, will rejoin meeting");
+      // Store for later use in RTK reconnect
+      rejoinDataRef.current = {
+        rtk_token: data.rtk_token,
+        rtk_meeting_id: data.rtk_meeting_id,
+        room_type: data.room_type,
+      };
+    }
+
+    // Restore breakout room state if needed
+    if (data.room_type === "breakout" && data.breakout_table_id) {
+      console.log("[Reconnect] Restoring breakout room:", data.breakout_table_id);
+      setActiveTableId(data.breakout_table_id);
+      setActiveTableName(data.breakout_table_name || `Room ${data.breakout_table_id}`);
+    }
+
+    return true;
+  };
+
+  // ✅ AUTO-RECONNECT: Main function to attempt reconnect
+  const initiateAutoReconnect = async () => {
+    const MAX_ATTEMPTS = 60; // 60 attempts × 2 seconds = 120 seconds max
+    const RETRY_INTERVAL = 2000; // 2 seconds
+
+    // ✅ GUARD: Mark as reconnecting to prevent automatic leave handlers
+    isReconnectingRef.current = true;
+    console.log("[Reconnect] Set isReconnectingRef = true, will not auto-leave during reconnect");
+
+    const attemptReconnect = async () => {
+      if (reconnectAttemptRef.current >= MAX_ATTEMPTS) {
+        console.error("[Reconnect] Max reconnection attempts reached");
+        setIsReconnecting(false);
+        setReconnectMessage("Could not reconnect. Please refresh or rejoin.");
+        reconnectLocked.current = false;
+        // ✅ GUARD: Clear the flag when max attempts reached
+        isReconnectingRef.current = false;
+        console.log("[Reconnect] Set isReconnectingRef = false, max attempts reached");
+        showSnackbar("Connection could not be restored. Please refresh the page.", "error");
+        return;
+      }
+
+      reconnectAttemptRef.current += 1;
+      console.log(`[Reconnect] Attempt ${reconnectAttemptRef.current}/${MAX_ATTEMPTS}`);
+      setReconnectMessage(`Reconnecting... (${reconnectAttemptRef.current}/${Math.ceil(MAX_ATTEMPTS / 2)})`);
+
+      // Call rejoin endpoint
+      const rejoinResult = await callRejoinEndpoint();
+
+      if (rejoinResult?.success) {
+        // Restore state from rejoin response
+        restoreUserStateFromRejoin(rejoinResult);
+
+        // Attempt to reconnect WebSocket
+        // The WebSocket useEffect will handle reconnection based on eventId change or manual trigger
+        // For now, we'll just show success message and let the next reconnect handle it
+        console.log("[Reconnect] Rejoin succeeded, reconnecting WebSocket");
+        setIsReconnecting(false);
+        setReconnectMessage("Reconnected");
+        reconnectLocked.current = false;
+        // ✅ GUARD: Clear the flag when successfully reconnected
+        isReconnectingRef.current = false;
+        console.log("[Reconnect] Set isReconnectingRef = false, rejoin succeeded");
+
+        // Show brief success message then clear
+        setTimeout(() => {
+          setReconnectMessage("");
+        }, 2000);
+
+        return;
+      }
+
+      // Schedule next retry
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+      reconnectTimerRef.current = setTimeout(attemptReconnect, RETRY_INTERVAL);
+    };
+
+    // Start attempting
+    attemptReconnect();
+  };
+
+  // ✅ AUTO-RECONNECT: Cleanup reconnect timer on unmount
+  useEffect(() => {
+    return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+    };
+  }, []);
+
+  // ✅ AUTO-RECONNECT: Handle window offline/online events (for DevTools Network throttling)
+  useEffect(() => {
+    if (!eventId) return;
+
+    const handleOffline = () => {
+      console.log("[OfflineDetector] Window offline event triggered. navigator.onLine:", navigator.onLine);
+
+      // Only trigger if not already reconnecting and we're in a meeting
+      if (!reconnectLocked.current && eventId) {
+        reconnectLocked.current = true;
+        isReconnectingRef.current = true;  // ✅ Guard: prevent leave during reconnect
+        shouldPausePollingRef.current = true;  // ✅ POLLING PAUSE: Stop non-essential APIs
+        reconnectAttemptRef.current = 0;
+        setIsReconnecting(true);
+        setReconnectMessage("Connection lost. Reconnecting...");
+        console.log("[OfflineDetector] Starting auto-reconnect due to offline event");
+        initiateAutoReconnect();
+      }
+    };
+
+    const handleOnline = async () => {
+      console.log("[OfflineDetector] Window online event triggered. navigator.onLine:", navigator.onLine);
+
+      if (eventId) {
+        console.log("[OfflineDetector] Network restored, attempting rejoin...");
+
+        // Immediately try to rejoin on online event
+        const rejoinResult = await callRejoinEndpoint();
+
+        if (rejoinResult?.success) {
+          console.log("[OfflineDetector] Rejoin succeeded on online event");
+          restoreUserStateFromRejoin(rejoinResult);
+          setIsReconnecting(false);
+          setReconnectMessage("Reconnected");
+          reconnectLocked.current = false;
+          isReconnectingRef.current = false;  // ✅ Allow leave now that reconnect succeeded
+          shouldPausePollingRef.current = false;  // ✅ POLLING RESUME: Resume non-essential APIs
+
+          // Clear message after 2 seconds
+          setTimeout(() => {
+            setReconnectMessage("");
+          }, 2000);
+
+          // Clear any pending reconnect timers
+          if (reconnectTimerRef.current) {
+            clearTimeout(reconnectTimerRef.current);
+            reconnectTimerRef.current = null;
+          }
+          reconnectAttemptRef.current = 0;
+        } else {
+          console.log("[OfflineDetector] Rejoin failed on online event, continuing reconnect loop");
+          // If rejoin fails, keep trying with existing loop
+        }
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    console.log("[OfflineDetector] Offline/Online event listeners registered");
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+      console.log("[OfflineDetector] Offline/Online event listeners removed");
+    };
+  }, [eventId]);
+
+  // ✅ AUTO-RECONNECT: Store rejoin data for RTK reconnect
+  const rejoinDataRef = useRef({
+    rtk_token: null,
+    rtk_meeting_id: null,
+    room_type: null,
+  });
+
   // ---------- Persistent Main Event WebSocket (for Force Join, Timer, Broadcast) ----------
   useEffect(() => {
     if (!eventId) return;
@@ -7333,6 +7600,17 @@ export default function NewLiveMeeting() {
         const msg = JSON.parse(event.data);
         setLastMessage(msg);
         console.log("[MainSocket] Received:", msg.type, msg);
+
+        // ✅ HEARTBEAT: Handle ping from server and respond with pong
+        if (msg.type === "ping") {
+          console.log("[MainSocket] Received ping, sending pong");
+          try {
+            ws.send(JSON.stringify({ action: "pong" }));
+          } catch (e) {
+            console.warn("[MainSocket] Failed to send pong:", e);
+          }
+          return;
+        }
 
         if (msg.type === "force_join_breakout") {
           // Host-initiated force join - enter the breakout room
@@ -8419,6 +8697,16 @@ export default function NewLiveMeeting() {
       mainSocketReadyRef.current = false;
       // ✅ IMPORTANT: Keep pending actions so they can be sent when socket reconnects
       // DO NOT clear pendingMainSocketActionsRef.current here
+
+      // ✅ AUTO-RECONNECT: Trigger reconnect on WebSocket close
+      if (!reconnectLocked.current) {
+        reconnectLocked.current = true;
+        reconnectAttemptRef.current = 0;
+        setIsReconnecting(true);
+        setReconnectMessage("Connection lost. Reconnecting...");
+        console.log("[MainSocket] Starting auto-reconnect sequence");
+        initiateAutoReconnect();
+      }
     };
 
     return () => {
@@ -10551,6 +10839,18 @@ export default function NewLiveMeeting() {
 
   const handleMeetingEnd = useCallback(
     async (state, options = {}) => {
+      // ✅ GUARD: Do not end meeting if we're in the middle of reconnecting
+      // EXCEPT: Allow leave if user manually clicked Leave button
+      if (isReconnectingRef.current && !manualLeaveRef.current) {
+        console.log("[LiveMeeting] Ignoring handleMeetingEnd during reconnect. state:", state);
+        return;
+      }
+
+      // ✅ Clear manual leave flag after processing
+      if (manualLeaveRef.current) {
+        manualLeaveRef.current = false;
+      }
+
       // If user is banned, do NOT navigate away. We want to show the banned screen.
       if (isBanned) {
         console.log("[LiveMeeting] User is banned, not processing end");
@@ -10799,6 +11099,11 @@ export default function NewLiveMeeting() {
     const handleRoomLeft = ({ state }) => {
       if (ignoreRoomLeftRef.current) return;
       if (rejoinFromLoungeRef.current) return;
+      // ✅ GUARD: Ignore RTK roomLeft events during reconnect (unless user manually left)
+      if (isReconnectingRef.current && !manualLeaveRef.current) {
+        console.log("[HandleRoomLeft] Ignoring roomLeft during reconnect. state:", state);
+        return;
+      }
       if (["left", "ended", "kicked", "rejected", "disconnected", "failed"].includes(state)) {
         if (!isBreakout) handleMeetingEnd(state);
       }
@@ -14061,6 +14366,19 @@ export default function NewLiveMeeting() {
       setLeaveDialogOpen(true);
       return;
     }
+    // ✅ Manual leave: Set flag to allow leave even during reconnect
+    manualLeaveRef.current = true;
+    console.log("[LiveMeeting] User manually clicked Leave");
+    // ✅ Stop any ongoing reconnect
+    if (isReconnectingRef.current) {
+      isReconnectingRef.current = false;
+      setIsReconnecting(false);
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      console.log("[LiveMeeting] Stopped reconnect due to manual leave");
+    }
     await handleMeetingEnd("left");
   }, [handleMeetingEnd, isHost]);
 
@@ -14524,6 +14842,10 @@ export default function NewLiveMeeting() {
     const tick = async () => {
       if (!alive) return;
       if (!getToken()) return;
+      // ✅ POLLING PAUSE: Skip if offline/reconnecting
+      if (shouldPausePollingRef.current || !navigator.onLine) {
+        return;
+      }
 
       try {
         const res = await fetch(toApiUrl("messaging/conversations/"), {
@@ -14581,6 +14903,10 @@ export default function NewLiveMeeting() {
     const tick = async () => {
       if (!alive) return;
       if (!getToken()) return;
+      // ✅ POLLING PAUSE: Skip if offline/reconnecting
+      if (shouldPausePollingRef.current || !navigator.onLine) {
+        return;
+      }
 
       try {
         // 1) Check unread for THIS DM
@@ -14691,6 +15017,10 @@ export default function NewLiveMeeting() {
     const tick = async () => {
       if (!alive) return;
       if (!getToken()) return;
+      // ✅ POLLING PAUSE: Skip if offline/reconnecting
+      if (shouldPausePollingRef.current || !navigator.onLine) {
+        return;
+      }
 
       try {
         const unread = await fetchChatUnread();
@@ -26833,6 +27163,38 @@ export default function NewLiveMeeting() {
             }}
           >
             {snackbar.message}
+          </Alert>
+        </Snackbar>
+
+        {/* ✅ AUTO-RECONNECT: Reconnecting notification with high z-index */}
+        <Snackbar
+          open={isReconnecting}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          autoHideDuration={null}
+          sx={{ zIndex: 99999 }}
+        >
+          <Alert
+            severity="warning"
+            variant="filled"
+            icon={<CircularProgress size={20} sx={{ color: "white" }} />}
+            sx={{
+              width: "100%",
+              boxShadow: 3,
+              fontSize: "16px",
+              fontWeight: 500,
+              letterSpacing: "0.5px",
+              minWidth: "300px",
+              justifyContent: "center",
+              backgroundColor: "#ff9800",
+              color: "white",
+              "& .MuiAlert-icon": {
+                marginRight: "12px",
+                display: "flex",
+                alignItems: "center",
+              },
+            }}
+          >
+            {reconnectMessage || "Reconnecting to meeting..."}
           </Alert>
         </Snackbar>
 
