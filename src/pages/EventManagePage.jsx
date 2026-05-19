@@ -58,6 +58,7 @@ import EditEventForm from "../components/EditEventForm.jsx";
 import EventPreApprovalManager from "../components/admin/EventPreApprovalManager.jsx";
 import EventQnAManager from "../components/admin/EventQnAManager.jsx";
 import EventConfirmationEmailManager from "../components/admin/EventConfirmationEmailManager.jsx";
+import ParticipantInformationManager from "../components/admin/ParticipantInformationManager.jsx";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
@@ -203,7 +204,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Confirmation Email"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Participant Information", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Confirmation Email"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
@@ -7871,6 +7872,7 @@ export default function EventManagePage() {
                     <>
                       {tab === tabLabels.indexOf("Applications") && renderApplications()}
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
+                      {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
                       {tab === tabLabels.indexOf("Session") && renderSessions()}
                       {tab === tabLabels.indexOf("Resources") && renderResources()}
@@ -7887,6 +7889,7 @@ export default function EventManagePage() {
                   ) : (
                     <>
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
+                      {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
                       {tab === tabLabels.indexOf("Session") && renderSessions()}
                       {tab === tabLabels.indexOf("Resources") && renderResources()}

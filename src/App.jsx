@@ -69,6 +69,7 @@ import VirtualSpeakersPage from "./pages/VirtualSpeakersPage.jsx";
 import SaleorManager from "./pages/SaleorManager.jsx";
 import EventLandingPage_Marketing from "./pages/EventLandingPage_Marketing.jsx";
 import SingleEventMarketingPage from "./pages/SingleEventMarketingPage.jsx";
+import AttendeeFormPage from "./pages/AttendeeFormPage.jsx";
 import { CircularProgress } from "@mui/material";
 
 
@@ -285,6 +286,9 @@ const AppShell = () => {
           {/* My Events list and details */}
           <Route path="/account/events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
           <Route path="/account/events/:slug" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
+
+          {/* Post-Acceptance Forms */}
+          <Route path="/forms/:assignmentId" element={<RequireAuth><AttendeeFormPage /></RequireAuth>} />
 
           {/* LIVE meeting page — no header/footer */}
           <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
