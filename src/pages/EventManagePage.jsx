@@ -3432,6 +3432,9 @@ export default function EventManagePage() {
   const [appPreapprovedFilter, setAppPreapprovedFilter] = React.useState("all");
   const [appSourceFilter, setAppSourceFilter] = React.useState("all");
   const [appCommentsFilter, setAppCommentsFilter] = React.useState("all");
+  const [selectedAppIds, setSelectedAppIds] = React.useState(new Set());
+  const [bulkApprovalDialogOpen, setBulkApprovalDialogOpen] = React.useState(false);
+  const [bulkApprovalLoading, setBulkApprovalLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (event?.registration_type !== 'apply' || !event?.id) return;
@@ -3497,6 +3500,84 @@ export default function EventManagePage() {
     }
   };
 
+  const handleToggleAppCheckbox = (appId) => {
+    const newSelected = new Set(selectedAppIds);
+    if (newSelected.has(appId)) {
+      newSelected.delete(appId);
+    } else {
+      newSelected.add(appId);
+    }
+    setSelectedAppIds(newSelected);
+  };
+
+  const handleSelectAllPending = () => {
+    const pendingApps = applications.filter(app => app.status === 'pending');
+    if (selectedAppIds.size === pendingApps.length) {
+      setSelectedAppIds(new Set());
+    } else {
+      setSelectedAppIds(new Set(pendingApps.map(app => app.id)));
+    }
+  };
+
+  const handleBulkApproveSelected = async () => {
+    if (selectedAppIds.size === 0) {
+      toast.error('Please select at least one application');
+      return;
+    }
+    setBulkApprovalDialogOpen(true);
+  };
+
+  const handleBulkApproveAllPending = () => {
+    const pendingApps = applications.filter(app => app.status === 'pending');
+    if (pendingApps.length === 0) {
+      toast.error('No pending applications to approve');
+      return;
+    }
+    setBulkApprovalDialogOpen(true);
+  };
+
+  const confirmBulkApproval = async (approveAll = false) => {
+    setBulkApprovalLoading(true);
+    try {
+      const endpoint = `${API_ROOT}/events/${event.id}/applications/bulk-approve/`;
+      const body = approveAll
+        ? { approve_all_pending: true }
+        : { application_ids: Array.from(selectedAppIds) };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const approvedCount = data.approved_count || 0;
+        toast.success(`${approvedCount} application(s) approved successfully`);
+
+        // Refresh applications list
+        setApplications(prev => prev.map(app => {
+          const shouldApprove = approveAll
+            ? app.status === 'pending'
+            : selectedAppIds.has(app.id) && app.status === 'pending';
+          return shouldApprove ? { ...app, status: 'approved' } : app;
+        }));
+
+        setSelectedAppIds(new Set());
+        setBulkApprovalDialogOpen(false);
+        setRegsRefresh(prev => prev + 1);
+      } else {
+        const error = await res.json();
+        toast.error(error.detail || 'Failed to approve applications');
+      }
+    } catch (err) {
+      console.error('Bulk approval error:', err);
+      toast.error('Failed to approve applications');
+    } finally {
+      setBulkApprovalLoading(false);
+    }
+  };
+
   const renderApplications = () => {
     if (!isOwner || event?.registration_type !== 'apply') {
       return (
@@ -3555,6 +3636,47 @@ export default function EventManagePage() {
             </Select>
           </Stack>
 
+          {selectedAppIds.size > 0 && (
+            <Box sx={{ p: 2, backgroundColor: '#f0f0f0', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {selectedAppIds.size} application(s) selected
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}
+                  onClick={handleBulkApproveSelected}
+                  disabled={bulkApprovalLoading}
+                >
+                  Approve Selected
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setSelectedAppIds(new Set())}
+                  disabled={bulkApprovalLoading}
+                >
+                  Clear Selection
+                </Button>
+              </Stack>
+            </Box>
+          )}
+
+          {(appFilter === 'all' || appFilter === 'pending') && (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                sx={{ bgcolor: '#2196F3', '&:hover': { bgcolor: '#1976D2' } }}
+                onClick={handleBulkApproveAllPending}
+                disabled={bulkApprovalLoading || !applications.some(app => app.status === 'pending')}
+                size="small"
+              >
+                Approve All Pending
+              </Button>
+            </Box>
+          )}
+
           {appLoading ? (
             <CircularProgress />
           ) : filteredApps.length === 0 ? (
@@ -3564,6 +3686,13 @@ export default function EventManagePage() {
               <Table sx={{ minWidth: 650, '& thead th': { fontWeight: 600, backgroundColor: '#f5f5f5' } }}>
                 <TableHead>
                   <TableRow>
+                    <TableCell sx={{ fontWeight: 600, width: 50 }}>
+                      <Checkbox
+                        checked={selectedAppIds.size > 0 && selectedAppIds.size === applications.filter(app => app.status === 'pending').length}
+                        indeterminate={selectedAppIds.size > 0 && selectedAppIds.size < applications.filter(app => app.status === 'pending').length}
+                        onChange={handleSelectAllPending}
+                      />
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Job Title</TableCell>
@@ -3579,6 +3708,14 @@ export default function EventManagePage() {
                 <TableBody>
                   {filteredApps.map(app => (
                     <TableRow key={app.id} sx={{ '&:hover': { backgroundColor: '#fafafa' } }}>
+                      <TableCell sx={{ width: 50 }}>
+                        {app.status === 'pending' && (
+                          <Checkbox
+                            checked={selectedAppIds.has(app.id)}
+                            onChange={() => handleToggleAppCheckbox(app.id)}
+                          />
+                        )}
+                      </TableCell>
                       <TableCell>{app.applicant_name}</TableCell>
                       <TableCell>{app.email}</TableCell>
                       <TableCell>{app.job_title}</TableCell>
@@ -3677,6 +3814,41 @@ export default function EventManagePage() {
               }}
             >
               Send & Decline
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={bulkApprovalDialogOpen} onClose={() => setBulkApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>
+            Confirm Bulk Approval
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              Are you sure you want to approve {selectedAppIds.size > 0 ? selectedAppIds.size : 'all pending'} application(s)?
+              They will receive approval emails immediately.
+            </DialogContentText>
+            {bulkApprovalLoading && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2">Processing approvals...</Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button
+              onClick={() => setBulkApprovalDialogOpen(false)}
+              variant="outlined"
+              disabled={bulkApprovalLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}
+              onClick={() => confirmBulkApproval(selectedAppIds.size === 0)}
+              disabled={bulkApprovalLoading}
+            >
+              {bulkApprovalLoading ? 'Approving...' : 'Confirm Approval'}
             </Button>
           </DialogActions>
         </Dialog>
