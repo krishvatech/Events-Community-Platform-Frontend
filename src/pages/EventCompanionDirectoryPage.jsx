@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Badge,
 } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -104,6 +105,7 @@ function DesktopView({
   activeMeeting,
   getOtherParty,
   isSameMeetingDay,
+  navigate,
 }) {
   const durations = [
     { mins: 5, label: '5 min', desc: 'Quick intro' },
@@ -202,11 +204,14 @@ function DesktopView({
                     key={`${p.registration_id || 'v'}-${p.user_id || p.display_name}`}
                     onMouseEnter={() => onHoveredAttendee(i)}
                     onMouseLeave={() => onHoveredAttendee(null)}
+                    onClick={() => p.user_id && navigate(`/community/rich-profile/${p.user_id}`)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 2,
                       p: '14px 16px', borderRadius: 1.5, transition: 'all 0.15s',
                       background: hoveredAttendee === i ? COLORS.bg : 'transparent',
                       border: '1px solid ' + (hoveredAttendee === i ? '#E8E4DF' : 'transparent'),
+                      cursor: 'pointer',
+                      '&:active': { opacity: 0.9 },
                     }}
                   >
                     <Avatar
@@ -264,7 +269,8 @@ function DesktopView({
                       </Box>
                     </Box>
                     <Button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setFlowStep(2);
                         setSelectedAttendee(p);
                         setSelectedDuration(1);
@@ -293,7 +299,13 @@ function DesktopView({
         {flowStep === 2 && selectedAttendee && (
           <Box>
             <Button
-              onClick={() => setFlowStep(1)}
+              onClick={() => {
+                setFlowStep(1);
+                setSelectedAttendee(null);
+                setSelectedSlot(null);
+                setMeetingNote('');
+                setSelectedDuration(null);
+              }}
               sx={{
                 background: 'none', border: 'none', cursor: 'pointer', display: 'flex',
                 alignItems: 'center', gap: 0.5, fontSize: 12, color: '#999', fontFamily: 'inherit',
@@ -431,11 +443,10 @@ function DesktopView({
                 ) : (
                   availableSlots.map((slot, i) => {
                     const mins = [5, 10, 15][selectedDuration];
-                    const startH = parseInt(slot.start_time?.split('T')[1]?.split(':')[0] || '0');
-                    const startM = parseInt(slot.start_time?.split('T')[1]?.split(':')[1] || '0');
-                    const endTotal = startH * 60 + startM + mins;
-                    const endTime = `${Math.floor(endTotal / 60)}:${String(endTotal % 60).padStart(2, '0')}`;
-                    const displayTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+                    const slotDate = new Date(slot.start_time);
+                    const endDate = new Date(slotDate.getTime() + mins * 60_000);
+                    const displayTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                     return (
                       <Button
                         key={i}
@@ -553,14 +564,24 @@ function DesktopView({
                 {selectedAttendee.display_name}
               </strong>. A table number will be assigned once she confirms.
             </Typography>
-            <Box sx={{
-              display: 'inline-flex', alignItems: 'center', gap: 1,
-              p: '10px 18px', borderRadius: 1.25,
-              background: COLORS.gold + '08', border: '1px solid ' + COLORS.gold + '18',
-              fontSize: 13, color: COLORS.gold, fontWeight: 600,
-            }}>
-              <Clock size={14} strokeWidth={2} /> Requested: 12:45 · {[5, 10, 15][selectedDuration]} min · Table TBD
-            </Box>
+            {(() => {
+              const slot = selectedSlot !== null ? availableSlots[selectedSlot] : null;
+              const rawTime = slot?.start_time || activeMeeting?.start_time;
+              const displayTime = rawTime
+                ? new Date(rawTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+                : 'Requested time selected';
+              const durationMins = activeMeeting?.duration_minutes || [5, 10, 15][selectedDuration] || '?';
+              return (
+                <Box sx={{
+                  display: 'inline-flex', alignItems: 'center', gap: 1,
+                  p: '10px 18px', borderRadius: 1.25,
+                  background: COLORS.gold + '08', border: '1px solid ' + COLORS.gold + '18',
+                  fontSize: 13, color: COLORS.gold, fontWeight: 600,
+                }}>
+                  <Clock size={14} strokeWidth={2} /> Requested: {displayTime} · {durationMins} min
+                </Box>
+              );
+            })()}
 
             <Box sx={{
               mt: 3, p: '16px', borderRadius: 1.5,
@@ -724,21 +745,52 @@ function DesktopView({
                   </Box>
 
                   <Box sx={{ display: 'flex', gap: 1, pt: 2, borderTop: '1px solid #F0EEEB' }}>
-                    <Button
-                      onClick={() => handleMessageAttendee(activeMeeting)}
-                      disabled={!activeMeeting?.id}
-                      sx={{
-                        flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
-                        cursor: 'pointer', fontFamily: 'inherit',
-                        fontSize: 12.5, fontWeight: 640, color: COLORS.teal,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
-                        textTransform: 'none', transition: 'all 0.2s',
-                        '&:hover': { background: COLORS.teal + '08', borderRadius: 0.75 },
-                        '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
-                      }}
-                    >
-                      <MessageSquare size={14} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
-                    </Button>
+                    {(() => {
+                      const otherPartyForMeeting = getOtherParty(activeMeeting);
+                      const unreadCount = unreadCounts[otherPartyForMeeting?.user_id] || 0;
+                      return (
+                        <Badge
+                          badgeContent={unreadCount > 99 ? '99+' : unreadCount}
+                          color="error"
+                          invisible={!unreadCount || unreadCount <= 0}
+                          overlap="rectangular"
+                          anchorOrigin={{
+                            vertical: 'top',
+                            horizontal: 'right',
+                          }}
+                          sx={{
+                            flex: 1,
+                            '& .MuiBadge-badge': {
+                              background: '#F44336',
+                              color: '#fff',
+                              fontWeight: 700,
+                              fontSize: '10px',
+                              minWidth: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              padding: '0 4px',
+                            },
+                          }}
+                        >
+                          <Button
+                            onClick={() => handleMessageAttendee(activeMeeting)}
+                            disabled={!activeMeeting?.id}
+                            sx={{
+                              flex: 1, p: '12px 14px', border: 'none', background: 'transparent',
+                              cursor: 'pointer', fontFamily: 'inherit',
+                              fontSize: 12.5, fontWeight: 640, color: COLORS.teal,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
+                              textTransform: 'none', transition: 'all 0.2s',
+                              '&:hover': { background: COLORS.teal + '08', borderRadius: 0.75 },
+                              '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
+                            }}
+                          >
+                            <MessageSquare size={14} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
+                          </Button>
+                        </Badge>
+                      );
+                    })()}
+
                     <Button
                       onClick={() => setShowCancelDialog(true)}
                       sx={{
@@ -910,6 +962,7 @@ function MobileView({
   activeMeeting,
   getOtherParty,
   isSameMeetingDay,
+  navigate,
 }) {
   return (
     <Box sx={{
@@ -924,7 +977,16 @@ function MobileView({
       }}>
         {flowStep > 1 && (
           <Button
-            onClick={() => setFlowStep(Math.max(1, flowStep - 1))}
+            onClick={() => {
+              const newStep = Math.max(1, flowStep - 1);
+              setFlowStep(newStep);
+              if (newStep === 1) {
+                setSelectedAttendee(null);
+                setSelectedSlot(null);
+                setMeetingNote('');
+                setSelectedDuration(null);
+              }
+            }}
             sx={{
               background: 'none', border: 'none', cursor: 'pointer', p: 0.5,
               mr: 1,
@@ -974,10 +1036,14 @@ function MobileView({
                 {allParticipants.map((p) => (
                   <Box
                     key={`${p.registration_id || 'v'}-${p.user_id}`}
+                    onClick={() => p.user_id && navigate(`/community/rich-profile/${p.user_id}`)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 1.25,
                       p: 1.5, borderRadius: 1.5, bgcolor: '#fff',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      '&:active': { opacity: 0.9 },
                     }}
                   >
                     <Avatar
@@ -1031,7 +1097,8 @@ function MobileView({
                       </Typography>
                     </Box>
                     <Button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setFlowStep(2);
                         setSelectedAttendee(p);
                         setSelectedDuration(1);
@@ -1133,11 +1200,10 @@ function MobileView({
             ) : (
               availableSlots.map((slot, i) => {
                 const mins = [5, 10, 15][selectedDuration];
-                const startH = parseInt(slot.start_time?.split('T')[1]?.split(':')[0] || '0');
-                const startM = parseInt(slot.start_time?.split('T')[1]?.split(':')[1] || '0');
-                const endTotal = startH * 60 + startM + mins;
-                const endTime = `${Math.floor(endTotal / 60)}:${String(endTotal % 60).padStart(2, '0')}`;
-                const displayTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+                const slotDate = new Date(slot.start_time);
+                const endDate = new Date(slotDate.getTime() + mins * 60_000);
+                const displayTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                 return (
                   <Button
                     key={i}
@@ -1214,13 +1280,23 @@ function MobileView({
               Waiting for {selectedAttendee.display_name?.split(' ')[0]} to respond.
               <br />Table assigned on confirmation.
             </Typography>
-            <Box sx={{
-              display: 'inline-flex', alignItems: 'center', gap: 0.75,
-              p: '8px 14px', borderRadius: 1, background: COLORS.gold + '08',
-              fontSize: 12, color: COLORS.gold, fontWeight: 600,
-            }}>
-              <Clock size={12} strokeWidth={2} /> 12:45 · {[5, 10, 15][selectedDuration]} min · Table TBD
-            </Box>
+            {(() => {
+              const slot = selectedSlot !== null ? availableSlots[selectedSlot] : null;
+              const rawTime = slot?.start_time || activeMeeting?.start_time;
+              const displayTime = rawTime
+                ? new Date(rawTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+                : 'Requested time selected';
+              const durationMins = activeMeeting?.duration_minutes || [5, 10, 15][selectedDuration] || '?';
+              return (
+                <Box sx={{
+                  display: 'inline-flex', alignItems: 'center', gap: 0.75,
+                  p: '8px 14px', borderRadius: 1, background: COLORS.gold + '08',
+                  fontSize: 12, color: COLORS.gold, fontWeight: 600,
+                }}>
+                  <Clock size={12} strokeWidth={2} /> {displayTime} · {durationMins} min
+                </Box>
+              );
+            })()}
 
             <Box sx={{
               mt: 2, textAlign: 'left', p: '14px',
@@ -1378,20 +1454,50 @@ function MobileView({
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
-                  <Button
-                    onClick={() => handleMessageAttendee(activeMeeting)}
-                    disabled={!activeMeeting?.id}
-                    sx={{
-                      flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
-                      background: '#fff', fontSize: 12, fontWeight: 620, color: COLORS.dark,
-                      cursor: 'pointer', fontFamily: 'inherit',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
-                      textTransform: 'none',
-                      '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
-                    }}
-                  >
-                    <MessageSquare size={13} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
-                  </Button>
+                  {(() => {
+                    const otherPartyForMeeting = getOtherParty(activeMeeting);
+                    const unreadCount = unreadCounts[otherPartyForMeeting?.user_id] || 0;
+                    return (
+                      <Badge
+                        badgeContent={unreadCount > 99 ? '99+' : unreadCount}
+                        color="error"
+                        invisible={!unreadCount || unreadCount <= 0}
+                        overlap="rectangular"
+                        anchorOrigin={{
+                          vertical: 'top',
+                          horizontal: 'right',
+                        }}
+                        sx={{
+                          flex: 1,
+                          '& .MuiBadge-badge': {
+                            background: '#F44336',
+                            color: '#fff',
+                            fontWeight: 700,
+                            fontSize: '9px',
+                            minWidth: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            padding: '0 3px',
+                          },
+                        }}
+                      >
+                        <Button
+                          onClick={() => handleMessageAttendee(activeMeeting)}
+                          disabled={!activeMeeting?.id}
+                          sx={{
+                            flex: 1, p: '12px', borderRadius: 1.25, border: '1.5px solid #E0DCD7',
+                            background: '#fff', fontSize: 12, fontWeight: 620, color: COLORS.dark,
+                            cursor: 'pointer', fontFamily: 'inherit',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.625,
+                            textTransform: 'none',
+                            '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
+                          }}
+                        >
+                          <MessageSquare size={13} strokeWidth={2} /> Message {otherParty?.display_name?.split(' ')[0]}
+                        </Button>
+                      </Badge>
+                    );
+                  })()}
                   <Button
                     onClick={() => setShowCancelDialog(true)}
                     sx={{
@@ -1564,12 +1670,12 @@ function EventCompanionDirectoryPage() {
   const [activeMeeting, setActiveMeeting] = useState(null);
   const [pollingMeeting, setPollingMeeting] = useState(false);
   const [myMeetingsCount, setMyMeetingsCount] = useState(0);
-  const [hasViewedNewMeetings, setHasViewedNewMeetings] = useState(true);
 
   const debounceTimer = useRef(null);
   const slotsAbortController = useRef(null);
   const pollingInterval = useRef(null);
-  const prevMeetingsCount = useRef(0);
+  const unreadPollInterval = useRef(null);
+  const [unreadCounts, setUnreadCounts] = useState({});
 
   // Handle tab and meeting query parameters
   useEffect(() => {
@@ -1634,20 +1740,29 @@ function EventCompanionDirectoryPage() {
     return () => clearInterval(interval);
   }, [event?.id, token]);
 
-  // Mark notification as viewed when user opens My Meetings tab
+  // Load and poll unread message counts
   useEffect(() => {
-    if (activeTab === 1) {
-      setHasViewedNewMeetings(true);
-    }
-  }, [activeTab]);
+    if (!token || !currentUserId) return;
 
-  // Mark notification as unviewed when new meetings arrive
+    loadUnreadCounts();
+    // Poll every 15 seconds
+    const interval = setInterval(loadUnreadCounts, 15000);
+    unreadPollInterval.current = interval;
+    return () => clearInterval(interval);
+  }, [token, currentUserId]);
+
+  // Mark meetings as seen when user opens My Meetings tab
   useEffect(() => {
-    if (myMeetingsCount > prevMeetingsCount.current) {
-      setHasViewedNewMeetings(false);
+    if (activeTab === 1 && event?.id && token) {
+      fetch(`${API_BASE}/events/${event.id}/networking-meetings/mark-seen/`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(() => {
+        // Refresh count after marking as seen
+        loadMyMeetingsCount();
+      }).catch(err => console.warn('Failed to mark meetings as seen:', err));
     }
-    prevMeetingsCount.current = myMeetingsCount;
-  }, [myMeetingsCount]);
+  }, [activeTab, event?.id, token]);
 
   // Fetch event
   useEffect(() => {
@@ -1895,15 +2010,55 @@ function EventCompanionDirectoryPage() {
       if (res.ok) {
         const data = await res.json();
         const meetings = Array.isArray(data) ? data : (data.results || []);
-        // Count only active meetings (pending, accepted, suggested)
-        const activeMeetingsCount = meetings.filter(m =>
-          ['pending', 'accepted', 'suggested'].includes(m.status)
-        ).length;
-        setMyMeetingsCount(activeMeetingsCount);
+        setMyMeetings(meetings);
+
+        // Count unread/unseen meeting updates
+        const userId = currentUserId;
+        const unreadCount = meetings.filter(m => {
+          const isRequester = m.requester_detail?.user_id === userId;
+          const seenAt = isRequester ? m.requester_seen_at : m.recipient_seen_at;
+          // Unseen if: never viewed (null) OR last viewed before the last update
+          return !seenAt || new Date(seenAt) < new Date(m.updated_at);
+        }).length;
+        setMyMeetingsCount(unreadCount);
       }
     } catch (err) {
       // Silently fail - badge not being updated won't break the app
       console.warn('Failed to load meetings count:', err);
+    }
+  };
+
+  // Load unread counts for direct conversations
+  const loadUnreadCounts = async () => {
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/messaging/conversations/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) return;
+
+      const conversations = await res.json();
+      const counts = {};
+
+      // Build a map of user_id -> unread_count from direct conversations
+      conversations.forEach(conv => {
+        if (conv.chat_type === 'dm') {
+          const userIds = conv.participant_ids || [];
+          // For DMs, identify the "other" user
+          userIds.forEach(userId => {
+            if (userId && userId !== currentUserId) {
+              counts[userId] = conv.unread_count || 0;
+            }
+          });
+        }
+      });
+
+      setUnreadCounts(counts);
+    } catch (err) {
+      // Silently fail on unread count load - don't block UI
+      console.error('Failed to load unread counts:', err);
     }
   };
 
@@ -2002,6 +2157,22 @@ function EventCompanionDirectoryPage() {
         throw new Error('Conversation created but ID was not returned');
       }
 
+      // Mark all messages as read in this conversation
+      if (conversationId && token) {
+        fetch(`${API_BASE}/messaging/conversations/${conversationId}/mark-all-read/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }).catch(err => console.error('Failed to mark messages as read:', err));
+      }
+
+      // Refresh unread counts
+      setTimeout(() => {
+        loadUnreadCounts();
+      }, 100);
+
       // Navigate to community messages page with conversation query param
       navigate(`/community?view=messages&conversation=${conversationId}`);
     } catch (err) {
@@ -2075,8 +2246,8 @@ function EventCompanionDirectoryPage() {
         height: '100vh',
         bgcolor: COLORS.bg,
       }}>
-        {/* Tab Navigation - Only show when in browse mode */}
-        {networkingSettings?.enabled && flowStep === 1 && (
+        {/* Tab Navigation - Always visible */}
+        {networkingSettings?.enabled && (
           <Box sx={{
             bgcolor: '#fff',
             borderBottom: '1px solid #F0EEEB',
@@ -2086,7 +2257,26 @@ function EventCompanionDirectoryPage() {
           }}>
             <Tabs
               value={activeTab}
-              onChange={(e, newValue) => setActiveTab(newValue)}
+              onChange={(e, newValue) => {
+                if (newValue === 0) {
+                  // Directory tab clicked - reset flow state
+                  setActiveTab(0);
+                  setFlowStep(1);
+                  setSelectedAttendee(null);
+                  setSelectedSlot(null);
+                  setMeetingNote('');
+                  setSelectedDuration(null);
+                  navigate(`?tab=directory`);
+                } else if (newValue === 1) {
+                  // My Meetings tab clicked
+                  setActiveTab(1);
+                  navigate(`?tab=meetings`);
+                } else if (newValue === 2) {
+                  // Schedule tab clicked
+                  setActiveTab(2);
+                  navigate('');
+                }
+              }}
               sx={{
                 '& .MuiTabs-indicator': { backgroundColor: COLORS.teal, height: 3 },
               }}
@@ -2102,7 +2292,7 @@ function EventCompanionDirectoryPage() {
                 }}
               />
               <Tab
-                label={`My Meetings${activeTab !== 1 && myMeetingsCount > 0 && !hasViewedNewMeetings ? ` (${myMeetingsCount})` : ''}`}
+                label={`My Meetings${activeTab !== 1 && myMeetingsCount > 0 ? ` (${myMeetingsCount})` : ''}`}
                 sx={{
                   textTransform: 'none',
                   fontSize: 14,
@@ -2162,6 +2352,7 @@ function EventCompanionDirectoryPage() {
                 activeMeeting={activeMeeting}
                 getOtherParty={getOtherParty}
                 isSameMeetingDay={isSameMeetingDay}
+                navigate={navigate}
               />
             ) : (
               <DesktopView
@@ -2198,6 +2389,7 @@ function EventCompanionDirectoryPage() {
                 activeMeeting={activeMeeting}
                 getOtherParty={getOtherParty}
                 isSameMeetingDay={isSameMeetingDay}
+                navigate={navigate}
               />
             )
           ) : activeTab === 1 ? (
@@ -2248,6 +2440,7 @@ function EventCompanionDirectoryPage() {
                 activeMeeting={activeMeeting}
                 getOtherParty={getOtherParty}
                 isSameMeetingDay={isSameMeetingDay}
+                navigate={navigate}
               />
             ) : (
               <DesktopView
@@ -2281,6 +2474,10 @@ function EventCompanionDirectoryPage() {
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
+                activeMeeting={activeMeeting}
+                getOtherParty={getOtherParty}
+                isSameMeetingDay={isSameMeetingDay}
+                navigate={navigate}
               />
             )
           )}

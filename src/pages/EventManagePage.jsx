@@ -299,6 +299,7 @@ export default function EventManagePage() {
   const [registrations, setRegistrations] = useState([]);
   const [registrationsLoading, setRegistrationsLoading] = useState(false);
   const [registrationsError, setRegistrationsError] = useState("");
+  const [totalMembersCount, setTotalMembersCount] = useState(0);
   const [guestAuditRows, setGuestAuditRows] = useState([]);
   const [guestAuditLoading, setGuestAuditLoading] = useState(false);
   const [guestAuditError, setGuestAuditError] = useState("");
@@ -441,6 +442,7 @@ export default function EventManagePage() {
   const [networkingEnabled, setNetworkingEnabled] = useState(false);
   const [networkingReminderMinutes, setNetworkingReminderMinutes] = useState(15);
   const [networkingSuccessMessage, setNetworkingSuccessMessage] = useState("");
+  const [networkingWindowErrors, setNetworkingWindowErrors] = useState([]);
 
   // Resend Mail to All State
   const [resendMailOpen, setResendMailOpen] = useState(false);
@@ -1083,7 +1085,7 @@ export default function EventManagePage() {
     }
   }, [event]);
 
-  // ---- load registrations (owner only) ----
+  // ---- load registrations with lazy loading (owner only) ----
   useEffect(() => {
     if (!eventId || !isOwner) return;
 
@@ -1091,33 +1093,42 @@ export default function EventManagePage() {
     if (!token) return;
 
     const controller = new AbortController();
+    const MEMBERS_PER_PAGE = 10;
 
-    const loadRegs = async () => {
+    const loadRegsPage = async (pageNum) => {
       setRegistrationsLoading(true);
       setRegistrationsError("");
       try {
+        const offset = (pageNum - 1) * MEMBERS_PER_PAGE;
         const headers = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         };
 
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/registrations/?limit=50`,
+          `${API_ROOT}/events/${eventId}/registrations/?limit=${MEMBERS_PER_PAGE}&offset=${offset}`,
           { headers, signal: controller.signal }
         );
-        const json = await res.json().catch(() => []);
+        const json = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(json?.detail || `HTTP ${res.status}`);
         }
 
         let data = [];
+        let count = 0;
+
         if (Array.isArray(json)) {
           data = json;
-        } else if (json && Array.isArray(json.results)) {
+          count = json.length;
+        } else if (json?.results && Array.isArray(json.results)) {
           data = json.results;
+          count = json.count || 0;
         }
 
         setRegistrations(data);
+        if (pageNum === 1) {
+          setTotalMembersCount(count);
+        }
       } catch (e) {
         if (e.name === "AbortError") return;
         setRegistrationsError(e?.message || "Unable to load members");
@@ -1126,10 +1137,10 @@ export default function EventManagePage() {
       }
     };
 
-    loadRegs();
-    loadRegs();
+    // Load requested page
+    loadRegsPage(memberPage);
     return () => controller.abort();
-  }, [eventId, isOwner, regsRefresh]);
+  }, [eventId, isOwner, memberPage, regsRefresh]);
 
   // ---- Companion Tab: load badge labels ----
   const companionTabIndex = tabLabels.indexOf("Companion");
@@ -1167,7 +1178,7 @@ export default function EventManagePage() {
     (async () => {
       try {
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/registrations/?limit=200`,
+          `${API_ROOT}/events/${eventId}/registrations/?limit=100`,
           { headers: { Authorization: `Bearer ${getToken()}` }, signal: controller.signal }
         );
         const json = await res.json().catch(() => ({}));
@@ -2125,20 +2136,15 @@ export default function EventManagePage() {
     return rows;
   }, [registrations, memberSearch, memberSort]);
 
-  const totalMembers = filteredMembers.length;
+  const totalMembers = totalMembersCount;
   const memberPageCount = Math.max(
     1,
     Math.ceil(totalMembers / MEMBERS_PER_PAGE || 1)
   );
   const memberStart = totalMembers === 0 ? 0 : (memberPage - 1) * MEMBERS_PER_PAGE + 1;
-  const memberEnd = Math.min(
-    memberPage * MEMBERS_PER_PAGE,
-    totalMembers
-  );
-  const pagedMembers = filteredMembers.slice(
-    (memberPage - 1) * MEMBERS_PER_PAGE,
-    memberPage * MEMBERS_PER_PAGE
-  );
+  const memberEnd = Math.min(memberStart + filteredMembers.length - 1, totalMembers);
+  // With lazy loading, registrations already contains only current page data
+  const pagedMembers = filteredMembers;
 
   // Load friend statuses for visible members
   useEffect(() => {
@@ -6881,18 +6887,101 @@ export default function EventManagePage() {
       return `${year}-${month}-${day}`;
     };
 
+    const getEventStartDateValue = () => {
+      if (!event?.start_time) return getTodayDateValue();
+      return dayjs(event.start_time).format("YYYY-MM-DD");
+    };
+
+    const getEventStartDateTime = () => {
+      if (!event?.start_time) return null;
+      return dayjs(event.start_time);
+    };
+
+    const getEventEndDateTime = () => {
+      if (!event?.end_time) return null;
+      return dayjs(event.end_time);
+    };
+
+    const validateNetworkingWindows = (windows) => {
+      const errors = [];
+      const eventStart = getEventStartDateTime();
+      const eventEnd = getEventEndDateTime();
+
+      if (!eventStart || !eventEnd || !eventStart.isValid() || !eventEnd.isValid()) {
+        return errors;
+      }
+
+      for (let i = 0; i < windows.length; i++) {
+        const window = windows[i];
+        if (!window.date || !window.start || !window.end) continue;
+
+        try {
+          const windowDate = dayjs(window.date, "YYYY-MM-DD");
+          if (!windowDate.isValid()) continue;
+
+          // Parse time as HH:mm and create full datetime for that day
+          const [startHour, startMin] = window.start.split(':').map(Number);
+          const [endHour, endMin] = window.end.split(':').map(Number);
+
+          const windowStartTime = windowDate.hour(startHour).minute(startMin).second(0);
+          const windowEndTime = windowDate.hour(endHour).minute(endMin).second(0);
+
+          // Check if date is within event bounds
+          if (windowDate.isBefore(eventStart, 'day') || windowDate.isAfter(eventEnd, 'day')) {
+            const eventDisplay = eventStart.format('MMM DD, YYYY, h:mm A') + " – " + eventEnd.format('h:mm A');
+            errors[i] = `Window ${i + 1} must be within event time: ${eventDisplay}.`;
+            continue;
+          }
+
+          // Check if window start/end times are within event bounds
+          if (windowStartTime.isBefore(eventStart) || windowEndTime.isAfter(eventEnd)) {
+            const eventDisplay = eventStart.format('MMM DD, YYYY, h:mm A') + " – " + eventEnd.format('h:mm A');
+            errors[i] = `Window ${i + 1} must be within event time: ${eventDisplay}.`;
+            continue;
+          }
+
+          // Check if end > start
+          if (windowEndTime.isSameOrBefore(windowStartTime)) {
+            errors[i] = `Window ${i + 1} end time must be after start time.`;
+          }
+        } catch (e) {
+          // Silently skip on parse error
+          continue;
+        }
+      }
+
+      return errors;
+    };
+
     const addNetworkingWindow = () => {
-      setNetworkingAllowedWindows(prev => [...prev, { date: getTodayDateValue(), start: "09:00", end: "17:00" }]);
+      const eventStartDate = getEventStartDateValue();
+      const eventStart = getEventStartDateTime();
+      const defaultStart = eventStart ? eventStart.format("HH:mm") : "09:00";
+      const defaultEnd = eventStart ? eventStart.add(1, 'hour').format("HH:mm") : "10:00";
+
+      const newWindow = { date: eventStartDate, start: defaultStart, end: defaultEnd };
+      const updatedWindows = [...networkingAllowedWindows, newWindow];
+      setNetworkingAllowedWindows(updatedWindows);
+
+      // Validate immediately
+      const errors = validateNetworkingWindows(updatedWindows);
+      setNetworkingWindowErrors(errors);
     };
 
     const removeNetworkingWindow = (index) => {
       setNetworkingAllowedWindows(prev => prev.filter((_, i) => i !== index));
+      setNetworkingWindowErrors(prev => prev.filter((_, i) => i !== index));
     };
 
     const updateNetworkingWindow = (index, field, value) => {
       setNetworkingAllowedWindows(prev => {
         const updated = [...prev];
         updated[index] = { ...updated[index], [field]: value };
+
+        // Validate immediately
+        const errors = validateNetworkingWindows(updated);
+        setNetworkingWindowErrors(errors);
+
         return updated;
       });
     };
@@ -6995,36 +7084,47 @@ export default function EventManagePage() {
                         <Typography variant="body2" sx={{ color: "text.secondary", fontStyle: "italic" }}>No windows added yet. Add one to enable networking.</Typography>
                       ) : (
                         networkingAllowedWindows.map((window, idx) => (
-                          <Stack key={idx} direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: "grey.50", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
-                            <TextField
-                              size="small"
-                              label="Date"
-                              type="date"
-                              value={window.date || ""}
-                              onChange={e => updateNetworkingWindow(idx, "date", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <TextField
-                              size="small"
-                              label="Start Time"
-                              type="time"
-                              value={window.start || ""}
-                              onChange={e => updateNetworkingWindow(idx, "start", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <TextField
-                              size="small"
-                              label="End Time"
-                              type="time"
-                              value={window.end || ""}
-                              onChange={e => updateNetworkingWindow(idx, "end", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <IconButton size="small" onClick={() => removeNetworkingWindow(idx)} color="error"><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
-                          </Stack>
+                          <Box key={idx}>
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: networkingWindowErrors[idx] ? "error.50" : "grey.50", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
+                              <TextField
+                                size="small"
+                                label="Date"
+                                type="date"
+                                value={window.date || ""}
+                                onChange={e => updateNetworkingWindow(idx, "date", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                inputProps={{ min: getEventStartDateValue(), max: getEventEndDateTime()?.format("YYYY-MM-DD") }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <TextField
+                                size="small"
+                                label="Start Time"
+                                type="time"
+                                value={window.start || ""}
+                                onChange={e => updateNetworkingWindow(idx, "start", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <TextField
+                                size="small"
+                                label="End Time"
+                                type="time"
+                                value={window.end || ""}
+                                onChange={e => updateNetworkingWindow(idx, "end", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <IconButton size="small" onClick={() => removeNetworkingWindow(idx)} color="error"><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
+                            </Stack>
+                            {networkingWindowErrors[idx] && (
+                              <Typography variant="caption" sx={{ color: "error.main", display: "block", mt: 0.5, ml: 2 }}>
+                                {networkingWindowErrors[idx]}
+                              </Typography>
+                            )}
+                          </Box>
                         ))
                       )}
                     </Stack>
@@ -7046,7 +7146,7 @@ export default function EventManagePage() {
                   <Button
                     variant="contained"
                     startIcon={networkingSettingsSaving ? <CircularProgress size={16} /> : <SaveRoundedIcon />}
-                    disabled={networkingSettingsSaving}
+                    disabled={networkingSettingsSaving || networkingWindowErrors.some(e => e)}
                     onClick={saveNetworkingSettings}
                     sx={{ textTransform: "none", alignSelf: "flex-start", borderRadius: 999 }}
                   >
@@ -7355,15 +7455,70 @@ export default function EventManagePage() {
             {companionLabels.length === 0 ? (
               <Typography variant="body2" sx={{ color: "text.secondary" }}>No labels created yet. Create labels in the section above first.</Typography>
             ) : (
-              <Stack direction="row" flexWrap="wrap" gap={1}>
+              <Stack spacing={0.5}>
                 {companionLabels.map(label => {
                   const selected = companionAssignSelected.includes(label.id);
                   return (
-                    <Chip key={label.id} label={label.name} size="small" onClick={() => {
-                      setCompanionAssignSelected(prev =>
-                        selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
-                      );
-                    }} sx={{ bgcolor: selected ? label.color : label.color + "22", color: selected ? "#fff" : label.color, border: `1px solid ${label.color}`, fontWeight: 600, cursor: "pointer" }} />
+                    <Box
+                      key={label.id}
+                      onClick={() => {
+                        setCompanionAssignSelected(prev =>
+                          selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                        );
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: '10px 12px',
+                        borderRadius: 1,
+                        border: `1.5px solid ${label.color}30`,
+                        backgroundColor: selected ? label.color + '08' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          backgroundColor: label.color + '12',
+                          borderColor: label.color + '60',
+                        },
+                      }}
+                    >
+                      <Checkbox
+                        checked={selected}
+                        onChange={() => {
+                          setCompanionAssignSelected(prev =>
+                            selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                          );
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        size="small"
+                        sx={{
+                          color: label.color,
+                          '&.Mui-checked': {
+                            color: label.color,
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: label.color,
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                          {label.name}
+                        </Typography>
+                      </Box>
+                    </Box>
                   );
                 })}
               </Stack>
@@ -7390,15 +7545,70 @@ export default function EventManagePage() {
                 </Select>
               </FormControl>
               <Typography variant="body2" sx={{ color: "text.secondary" }}>Select labels:</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1}>
+              <Stack spacing={0.5}>
                 {companionLabels.map(label => {
                   const selected = companionBulkLabels.includes(label.id);
                   return (
-                    <Chip key={label.id} label={label.name} size="small" onClick={() => {
-                      setCompanionBulkLabels(prev =>
-                        selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
-                      );
-                    }} sx={{ bgcolor: selected ? label.color : label.color + "22", color: selected ? "#fff" : label.color, border: `1px solid ${label.color}`, fontWeight: 600, cursor: "pointer" }} />
+                    <Box
+                      key={label.id}
+                      onClick={() => {
+                        setCompanionBulkLabels(prev =>
+                          selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                        );
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: '10px 12px',
+                        borderRadius: 1,
+                        border: `1.5px solid ${label.color}30`,
+                        backgroundColor: selected ? label.color + '08' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          backgroundColor: label.color + '12',
+                          borderColor: label.color + '60',
+                        },
+                      }}
+                    >
+                      <Checkbox
+                        checked={selected}
+                        onChange={() => {
+                          setCompanionBulkLabels(prev =>
+                            selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                          );
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        size="small"
+                        sx={{
+                          color: label.color,
+                          '&.Mui-checked': {
+                            color: label.color,
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: label.color,
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                          {label.name}
+                        </Typography>
+                      </Box>
+                    </Box>
                   );
                 })}
               </Stack>
@@ -8673,6 +8883,7 @@ export default function EventManagePage() {
               onClose={() => setInviteUsersOpen(false)}
               eventId={eventId}
               eventTitle={event?.title || ""}
+              eventSlug={event?.slug || ""}
             />
             <InviteEmailsDialog
               open={inviteEmailsOpen}
