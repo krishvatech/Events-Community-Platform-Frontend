@@ -6,6 +6,7 @@ import RegisteredActions from "../components/RegisteredActions";
 import InviteUsersDialog from "../components/InviteUsersDialog";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
 import QRCodeDisplay from "../components/QRCodeDisplay.jsx";
+import ParticipantsAttendanceTable from "../components/ParticipantsAttendanceTable.jsx";
 
 import {
   Avatar,
@@ -82,6 +83,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import ForwardToInboxRoundedIcon from "@mui/icons-material/ForwardToInboxRounded";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import PeopleTwoToneIcon from "@mui/icons-material/PeopleTwoTone";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import AttachMoneyRoundedIcon from "@mui/icons-material/AttachMoneyRounded";
@@ -224,6 +226,11 @@ const getTabLabels = (event, isOwner) => {
   const eventFormat = event?.event_format || event?.format;
   if (eventFormat === 'virtual') {
     labels = labels.filter(label => label !== "Companion");
+  }
+  // Hide Participants tab for upcoming or live events (only show for past events)
+  const eventStatus = computeStatus(event);
+  if (eventStatus !== 'past') {
+    labels = labels.filter(label => label !== "Participants");
   }
   return labels;
 };
@@ -444,6 +451,7 @@ export default function EventManagePage() {
   const [networkingEnabled, setNetworkingEnabled] = useState(false);
   const [networkingReminderMinutes, setNetworkingReminderMinutes] = useState(15);
   const [networkingSuccessMessage, setNetworkingSuccessMessage] = useState("");
+  const [networkingWindowErrors, setNetworkingWindowErrors] = useState([]);
 
   // Resend Mail to All State
   const [resendMailOpen, setResendMailOpen] = useState(false);
@@ -517,6 +525,10 @@ export default function EventManagePage() {
   // Q&A Export State
   const [qnaExportLoading, setQnaExportLoading] = useState({ csv: false, pdf: false });
   const [qnaExportError, setQnaExportError] = useState("");
+
+  // Members Export State
+  const [membersExportLoading, setMembersExportLoading] = useState(false);
+  const [membersExportError, setMembersExportError] = useState("");
 
   // Post-Event Q&A Answer State
   const [postEventQnaQuestions, setPostEventQnaQuestions] = useState([]);
@@ -3427,6 +3439,9 @@ export default function EventManagePage() {
   const [appPreapprovedFilter, setAppPreapprovedFilter] = React.useState("all");
   const [appSourceFilter, setAppSourceFilter] = React.useState("all");
   const [appCommentsFilter, setAppCommentsFilter] = React.useState("all");
+  const [selectedAppIds, setSelectedAppIds] = React.useState(new Set());
+  const [bulkApprovalDialogOpen, setBulkApprovalDialogOpen] = React.useState(false);
+  const [bulkApprovalLoading, setBulkApprovalLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (event?.registration_type !== 'apply' || !event?.id) return;
@@ -3492,6 +3507,84 @@ export default function EventManagePage() {
     }
   };
 
+  const handleToggleAppCheckbox = (appId) => {
+    const newSelected = new Set(selectedAppIds);
+    if (newSelected.has(appId)) {
+      newSelected.delete(appId);
+    } else {
+      newSelected.add(appId);
+    }
+    setSelectedAppIds(newSelected);
+  };
+
+  const handleSelectAllPending = () => {
+    const pendingApps = applications.filter(app => app.status === 'pending');
+    if (selectedAppIds.size === pendingApps.length) {
+      setSelectedAppIds(new Set());
+    } else {
+      setSelectedAppIds(new Set(pendingApps.map(app => app.id)));
+    }
+  };
+
+  const handleBulkApproveSelected = async () => {
+    if (selectedAppIds.size === 0) {
+      toast.error('Please select at least one application');
+      return;
+    }
+    setBulkApprovalDialogOpen(true);
+  };
+
+  const handleBulkApproveAllPending = () => {
+    const pendingApps = applications.filter(app => app.status === 'pending');
+    if (pendingApps.length === 0) {
+      toast.error('No pending applications to approve');
+      return;
+    }
+    setBulkApprovalDialogOpen(true);
+  };
+
+  const confirmBulkApproval = async (approveAll = false) => {
+    setBulkApprovalLoading(true);
+    try {
+      const endpoint = `${API_ROOT}/events/${event.id}/applications/bulk-approve/`;
+      const body = approveAll
+        ? { approve_all_pending: true }
+        : { application_ids: Array.from(selectedAppIds) };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const approvedCount = data.approved_count || 0;
+        toast.success(`${approvedCount} application(s) approved successfully`);
+
+        // Refresh applications list
+        setApplications(prev => prev.map(app => {
+          const shouldApprove = approveAll
+            ? app.status === 'pending'
+            : selectedAppIds.has(app.id) && app.status === 'pending';
+          return shouldApprove ? { ...app, status: 'approved' } : app;
+        }));
+
+        setSelectedAppIds(new Set());
+        setBulkApprovalDialogOpen(false);
+        setRegsRefresh(prev => prev + 1);
+      } else {
+        const error = await res.json();
+        toast.error(error.detail || 'Failed to approve applications');
+      }
+    } catch (err) {
+      console.error('Bulk approval error:', err);
+      toast.error('Failed to approve applications');
+    } finally {
+      setBulkApprovalLoading(false);
+    }
+  };
+
   const renderApplications = () => {
     if (!isOwner || event?.registration_type !== 'apply') {
       return (
@@ -3550,6 +3643,47 @@ export default function EventManagePage() {
             </Select>
           </Stack>
 
+          {selectedAppIds.size > 0 && (
+            <Box sx={{ p: 2, backgroundColor: '#f0f0f0', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {selectedAppIds.size} application(s) selected
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}
+                  onClick={handleBulkApproveSelected}
+                  disabled={bulkApprovalLoading}
+                >
+                  Approve Selected
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setSelectedAppIds(new Set())}
+                  disabled={bulkApprovalLoading}
+                >
+                  Clear Selection
+                </Button>
+              </Stack>
+            </Box>
+          )}
+
+          {(appFilter === 'all' || appFilter === 'pending') && (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                sx={{ bgcolor: '#2196F3', '&:hover': { bgcolor: '#1976D2' } }}
+                onClick={handleBulkApproveAllPending}
+                disabled={bulkApprovalLoading || !applications.some(app => app.status === 'pending')}
+                size="small"
+              >
+                Approve All Pending
+              </Button>
+            </Box>
+          )}
+
           {appLoading ? (
             <CircularProgress />
           ) : filteredApps.length === 0 ? (
@@ -3559,6 +3693,13 @@ export default function EventManagePage() {
               <Table sx={{ minWidth: 650, '& thead th': { fontWeight: 600, backgroundColor: '#f5f5f5' } }}>
                 <TableHead>
                   <TableRow>
+                    <TableCell sx={{ fontWeight: 600, width: 50 }}>
+                      <Checkbox
+                        checked={selectedAppIds.size > 0 && selectedAppIds.size === applications.filter(app => app.status === 'pending').length}
+                        indeterminate={selectedAppIds.size > 0 && selectedAppIds.size < applications.filter(app => app.status === 'pending').length}
+                        onChange={handleSelectAllPending}
+                      />
+                    </TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Job Title</TableCell>
@@ -3574,6 +3715,14 @@ export default function EventManagePage() {
                 <TableBody>
                   {filteredApps.map(app => (
                     <TableRow key={app.id} sx={{ '&:hover': { backgroundColor: '#fafafa' } }}>
+                      <TableCell sx={{ width: 50 }}>
+                        {app.status === 'pending' && (
+                          <Checkbox
+                            checked={selectedAppIds.has(app.id)}
+                            onChange={() => handleToggleAppCheckbox(app.id)}
+                          />
+                        )}
+                      </TableCell>
                       <TableCell>{app.applicant_name}</TableCell>
                       <TableCell>{app.email}</TableCell>
                       <TableCell>{app.job_title}</TableCell>
@@ -3675,6 +3824,41 @@ export default function EventManagePage() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <Dialog open={bulkApprovalDialogOpen} onClose={() => setBulkApprovalDialogOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>
+            Confirm Bulk Approval
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              Are you sure you want to approve {selectedAppIds.size > 0 ? selectedAppIds.size : 'all pending'} application(s)?
+              They will receive approval emails immediately.
+            </DialogContentText>
+            {bulkApprovalLoading && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2">Processing approvals...</Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1 }}>
+            <Button
+              onClick={() => setBulkApprovalDialogOpen(false)}
+              variant="outlined"
+              disabled={bulkApprovalLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}
+              onClick={() => confirmBulkApproval(selectedAppIds.size === 0)}
+              disabled={bulkApprovalLoading}
+            >
+              {bulkApprovalLoading ? 'Approving...' : 'Confirm Approval'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     );
   };
@@ -3735,7 +3919,7 @@ export default function EventManagePage() {
           <Stack direction="row" spacing={1} alignItems="center">
             <Chip
               size="small"
-              label={registrations.length}
+              label={totalMembersCount}
               sx={{ bgcolor: "grey.100", color: "text.secondary" }}
             />
             <Button
@@ -3775,6 +3959,16 @@ export default function EventManagePage() {
               sx={{ textTransform: "none", borderRadius: 999, ml: 1, borderColor: "warning.main", color: "warning.dark" }}
             >
               {resendMailLoading ? "Sending..." : "Resend Mail to All"}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={membersExportLoading ? <CircularProgress size={14} /> : <FileDownloadRoundedIcon />}
+              onClick={handleMembersExport}
+              disabled={membersExportLoading || registrations.length === 0}
+              sx={{ textTransform: "none", borderRadius: 999, ml: 1, borderColor: "success.main", color: "success.dark" }}
+            >
+              {membersExportLoading ? "Exporting..." : "Export CSV"}
             </Button>
           </Stack>
         </Stack>
@@ -4647,6 +4841,15 @@ export default function EventManagePage() {
       </Paper>
     );
   };
+
+  const renderParticipants = () => (
+    <ParticipantsAttendanceTable
+      eventId={eventId}
+      event={event}
+      token={token}
+      apiRoot={API_ROOT}
+    />
+  );
 
   const renderResources = () => (
     <Paper
@@ -6888,18 +7091,101 @@ export default function EventManagePage() {
       return `${year}-${month}-${day}`;
     };
 
+    const getEventStartDateValue = () => {
+      if (!event?.start_time) return getTodayDateValue();
+      return dayjs(event.start_time).format("YYYY-MM-DD");
+    };
+
+    const getEventStartDateTime = () => {
+      if (!event?.start_time) return null;
+      return dayjs(event.start_time);
+    };
+
+    const getEventEndDateTime = () => {
+      if (!event?.end_time) return null;
+      return dayjs(event.end_time);
+    };
+
+    const validateNetworkingWindows = (windows) => {
+      const errors = [];
+      const eventStart = getEventStartDateTime();
+      const eventEnd = getEventEndDateTime();
+
+      if (!eventStart || !eventEnd || !eventStart.isValid() || !eventEnd.isValid()) {
+        return errors;
+      }
+
+      for (let i = 0; i < windows.length; i++) {
+        const window = windows[i];
+        if (!window.date || !window.start || !window.end) continue;
+
+        try {
+          const windowDate = dayjs(window.date, "YYYY-MM-DD");
+          if (!windowDate.isValid()) continue;
+
+          // Parse time as HH:mm and create full datetime for that day
+          const [startHour, startMin] = window.start.split(':').map(Number);
+          const [endHour, endMin] = window.end.split(':').map(Number);
+
+          const windowStartTime = windowDate.hour(startHour).minute(startMin).second(0);
+          const windowEndTime = windowDate.hour(endHour).minute(endMin).second(0);
+
+          // Check if date is within event bounds
+          if (windowDate.isBefore(eventStart, 'day') || windowDate.isAfter(eventEnd, 'day')) {
+            const eventDisplay = eventStart.format('MMM DD, YYYY, h:mm A') + " – " + eventEnd.format('h:mm A');
+            errors[i] = `Window ${i + 1} must be within event time: ${eventDisplay}.`;
+            continue;
+          }
+
+          // Check if window start/end times are within event bounds
+          if (windowStartTime.isBefore(eventStart) || windowEndTime.isAfter(eventEnd)) {
+            const eventDisplay = eventStart.format('MMM DD, YYYY, h:mm A') + " – " + eventEnd.format('h:mm A');
+            errors[i] = `Window ${i + 1} must be within event time: ${eventDisplay}.`;
+            continue;
+          }
+
+          // Check if end > start
+          if (windowEndTime.isSameOrBefore(windowStartTime)) {
+            errors[i] = `Window ${i + 1} end time must be after start time.`;
+          }
+        } catch (e) {
+          // Silently skip on parse error
+          continue;
+        }
+      }
+
+      return errors;
+    };
+
     const addNetworkingWindow = () => {
-      setNetworkingAllowedWindows(prev => [...prev, { date: getTodayDateValue(), start: "09:00", end: "17:00" }]);
+      const eventStartDate = getEventStartDateValue();
+      const eventStart = getEventStartDateTime();
+      const defaultStart = eventStart ? eventStart.format("HH:mm") : "09:00";
+      const defaultEnd = eventStart ? eventStart.add(1, 'hour').format("HH:mm") : "10:00";
+
+      const newWindow = { date: eventStartDate, start: defaultStart, end: defaultEnd };
+      const updatedWindows = [...networkingAllowedWindows, newWindow];
+      setNetworkingAllowedWindows(updatedWindows);
+
+      // Validate immediately
+      const errors = validateNetworkingWindows(updatedWindows);
+      setNetworkingWindowErrors(errors);
     };
 
     const removeNetworkingWindow = (index) => {
       setNetworkingAllowedWindows(prev => prev.filter((_, i) => i !== index));
+      setNetworkingWindowErrors(prev => prev.filter((_, i) => i !== index));
     };
 
     const updateNetworkingWindow = (index, field, value) => {
       setNetworkingAllowedWindows(prev => {
         const updated = [...prev];
         updated[index] = { ...updated[index], [field]: value };
+
+        // Validate immediately
+        const errors = validateNetworkingWindows(updated);
+        setNetworkingWindowErrors(errors);
+
         return updated;
       });
     };
@@ -7002,36 +7288,47 @@ export default function EventManagePage() {
                         <Typography variant="body2" sx={{ color: "text.secondary", fontStyle: "italic" }}>No windows added yet. Add one to enable networking.</Typography>
                       ) : (
                         networkingAllowedWindows.map((window, idx) => (
-                          <Stack key={idx} direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: "grey.50", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
-                            <TextField
-                              size="small"
-                              label="Date"
-                              type="date"
-                              value={window.date || ""}
-                              onChange={e => updateNetworkingWindow(idx, "date", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <TextField
-                              size="small"
-                              label="Start Time"
-                              type="time"
-                              value={window.start || ""}
-                              onChange={e => updateNetworkingWindow(idx, "start", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <TextField
-                              size="small"
-                              label="End Time"
-                              type="time"
-                              value={window.end || ""}
-                              onChange={e => updateNetworkingWindow(idx, "end", e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{ flex: 1 }}
-                            />
-                            <IconButton size="small" onClick={() => removeNetworkingWindow(idx)} color="error"><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
-                          </Stack>
+                          <Box key={idx}>
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: networkingWindowErrors[idx] ? "error.50" : "grey.50", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
+                              <TextField
+                                size="small"
+                                label="Date"
+                                type="date"
+                                value={window.date || ""}
+                                onChange={e => updateNetworkingWindow(idx, "date", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                inputProps={{ min: getEventStartDateValue(), max: getEventEndDateTime()?.format("YYYY-MM-DD") }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <TextField
+                                size="small"
+                                label="Start Time"
+                                type="time"
+                                value={window.start || ""}
+                                onChange={e => updateNetworkingWindow(idx, "start", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <TextField
+                                size="small"
+                                label="End Time"
+                                type="time"
+                                value={window.end || ""}
+                                onChange={e => updateNetworkingWindow(idx, "end", e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                error={!!networkingWindowErrors[idx]}
+                                sx={{ flex: 1 }}
+                              />
+                              <IconButton size="small" onClick={() => removeNetworkingWindow(idx)} color="error"><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
+                            </Stack>
+                            {networkingWindowErrors[idx] && (
+                              <Typography variant="caption" sx={{ color: "error.main", display: "block", mt: 0.5, ml: 2 }}>
+                                {networkingWindowErrors[idx]}
+                              </Typography>
+                            )}
+                          </Box>
                         ))
                       )}
                     </Stack>
@@ -7053,7 +7350,7 @@ export default function EventManagePage() {
                   <Button
                     variant="contained"
                     startIcon={networkingSettingsSaving ? <CircularProgress size={16} /> : <SaveRoundedIcon />}
-                    disabled={networkingSettingsSaving}
+                    disabled={networkingSettingsSaving || networkingWindowErrors.some(e => e)}
                     onClick={saveNetworkingSettings}
                     sx={{ textTransform: "none", alignSelf: "flex-start", borderRadius: 999 }}
                   >
@@ -7362,15 +7659,70 @@ export default function EventManagePage() {
             {companionLabels.length === 0 ? (
               <Typography variant="body2" sx={{ color: "text.secondary" }}>No labels created yet. Create labels in the section above first.</Typography>
             ) : (
-              <Stack direction="row" flexWrap="wrap" gap={1}>
+              <Stack spacing={0.5}>
                 {companionLabels.map(label => {
                   const selected = companionAssignSelected.includes(label.id);
                   return (
-                    <Chip key={label.id} label={label.name} size="small" onClick={() => {
-                      setCompanionAssignSelected(prev =>
-                        selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
-                      );
-                    }} sx={{ bgcolor: selected ? label.color : label.color + "22", color: selected ? "#fff" : label.color, border: `1px solid ${label.color}`, fontWeight: 600, cursor: "pointer" }} />
+                    <Box
+                      key={label.id}
+                      onClick={() => {
+                        setCompanionAssignSelected(prev =>
+                          selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                        );
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: '10px 12px',
+                        borderRadius: 1,
+                        border: `1.5px solid ${label.color}30`,
+                        backgroundColor: selected ? label.color + '08' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          backgroundColor: label.color + '12',
+                          borderColor: label.color + '60',
+                        },
+                      }}
+                    >
+                      <Checkbox
+                        checked={selected}
+                        onChange={() => {
+                          setCompanionAssignSelected(prev =>
+                            selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                          );
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        size="small"
+                        sx={{
+                          color: label.color,
+                          '&.Mui-checked': {
+                            color: label.color,
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: label.color,
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                          {label.name}
+                        </Typography>
+                      </Box>
+                    </Box>
                   );
                 })}
               </Stack>
@@ -7397,15 +7749,70 @@ export default function EventManagePage() {
                 </Select>
               </FormControl>
               <Typography variant="body2" sx={{ color: "text.secondary" }}>Select labels:</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1}>
+              <Stack spacing={0.5}>
                 {companionLabels.map(label => {
                   const selected = companionBulkLabels.includes(label.id);
                   return (
-                    <Chip key={label.id} label={label.name} size="small" onClick={() => {
-                      setCompanionBulkLabels(prev =>
-                        selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
-                      );
-                    }} sx={{ bgcolor: selected ? label.color : label.color + "22", color: selected ? "#fff" : label.color, border: `1px solid ${label.color}`, fontWeight: 600, cursor: "pointer" }} />
+                    <Box
+                      key={label.id}
+                      onClick={() => {
+                        setCompanionBulkLabels(prev =>
+                          selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                        );
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: '10px 12px',
+                        borderRadius: 1,
+                        border: `1.5px solid ${label.color}30`,
+                        backgroundColor: selected ? label.color + '08' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          backgroundColor: label.color + '12',
+                          borderColor: label.color + '60',
+                        },
+                      }}
+                    >
+                      <Checkbox
+                        checked={selected}
+                        onChange={() => {
+                          setCompanionBulkLabels(prev =>
+                            selected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                          );
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        size="small"
+                        sx={{
+                          color: label.color,
+                          '&.Mui-checked': {
+                            color: label.color,
+                          },
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: label.color,
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                          {label.name}
+                        </Typography>
+                      </Box>
+                    </Box>
                   );
                 })}
               </Stack>
@@ -7509,6 +7916,41 @@ export default function EventManagePage() {
       setQnaExportError(err.message || "Export failed. Please try again.");
     } finally {
       setQnaExportLoading((prev) => ({ ...prev, [fmt]: false }));
+    }
+  };
+
+  const handleMembersExport = async () => {
+    if (!event) return;
+    setMembersExportLoading(true);
+    setMembersExportError("");
+    try {
+      const token = getToken();
+      const url = `${API_ROOT}/events/${event.id}/export-members-csv/`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const nameMatch = disposition.match(/filename\s*=\s*"?([^";\n]+)"?/);
+      const filename = nameMatch ? nameMatch[1].trim() : `Registered_Participants_Details.csv`;
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objUrl);
+      toast.success("Members exported successfully!");
+    } catch (err) {
+      setMembersExportError(err.message || "Export failed. Please try again.");
+      toast.error(err.message || "Export failed. Please try again.");
+    } finally {
+      setMembersExportLoading(false);
     }
   };
 
@@ -8684,6 +9126,7 @@ export default function EventManagePage() {
               onClose={() => setInviteUsersOpen(false)}
               eventId={eventId}
               eventTitle={event?.title || ""}
+              eventSlug={event?.slug || ""}
             />
             <InviteEmailsDialog
               open={inviteEmailsOpen}

@@ -3687,19 +3687,41 @@ export default function LiveFeedPage({
 
       const page = await res.json();
       const rawItems = (page.results || page).map(mapFeedItem).filter(Boolean);
-      const items = await hydrateMetrics(rawItems); // ⬅️ enrich with like/comment/share + me_liked
-      await ensureGroupCommentSettings(items.map((p) => p.group_id).filter(Boolean));
 
-      setPosts((curr) => (append ? [...curr, ...items] : items));
+      // Render immediately with raw items
+      setPosts((curr) => (append ? [...curr, ...rawItems] : rawItems));
       const next = page?.next ? page.next : null;
       setHasMore(Boolean(next));
       setNextUrl(next);
+      setLoading(false);
+
+      // Run hydration in background without blocking UI
+      (async () => {
+        try {
+          const items = await hydrateMetrics(rawItems);
+          // Patch existing posts with hydrated data
+          setPosts((curr) => {
+            const idxMap = new Map(curr.map((p, i) => [p.id, i]));
+            const updated = [...curr];
+            items.forEach((item) => {
+              const idx = idxMap.get(item.id);
+              if (idx !== undefined) {
+                updated[idx] = { ...updated[idx], ...item };
+              }
+            });
+            return updated;
+          });
+
+          // Then load comment settings
+          await ensureGroupCommentSettings(items.map((p) => p.group_id).filter(Boolean));
+        } catch (e) {
+          // Background hydration failures are non-critical
+        }
+      })();
     } catch (e) {
-      console.error("Failed to fetch feed:", e);
+      setLoading(false);
       setError(e.message);
       setHasMore(false);
-    } finally {
-      setLoading(false);
     }
   }
 

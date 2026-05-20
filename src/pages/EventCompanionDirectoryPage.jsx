@@ -105,6 +105,7 @@ function DesktopView({
   activeMeeting,
   getOtherParty,
   isSameMeetingDay,
+  navigate,
 }) {
   const durations = [
     { mins: 5, label: '5 min', desc: 'Quick intro' },
@@ -203,11 +204,14 @@ function DesktopView({
                     key={`${p.registration_id || 'v'}-${p.user_id || p.display_name}`}
                     onMouseEnter={() => onHoveredAttendee(i)}
                     onMouseLeave={() => onHoveredAttendee(null)}
+                    onClick={() => p.user_id && navigate(`/community/rich-profile/${p.user_id}`)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 2,
                       p: '14px 16px', borderRadius: 1.5, transition: 'all 0.15s',
                       background: hoveredAttendee === i ? COLORS.bg : 'transparent',
                       border: '1px solid ' + (hoveredAttendee === i ? '#E8E4DF' : 'transparent'),
+                      cursor: 'pointer',
+                      '&:active': { opacity: 0.9 },
                     }}
                   >
                     <Avatar
@@ -265,7 +269,8 @@ function DesktopView({
                       </Box>
                     </Box>
                     <Button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setFlowStep(2);
                         setSelectedAttendee(p);
                         setSelectedDuration(1);
@@ -957,6 +962,7 @@ function MobileView({
   activeMeeting,
   getOtherParty,
   isSameMeetingDay,
+  navigate,
 }) {
   return (
     <Box sx={{
@@ -1030,10 +1036,14 @@ function MobileView({
                 {allParticipants.map((p) => (
                   <Box
                     key={`${p.registration_id || 'v'}-${p.user_id}`}
+                    onClick={() => p.user_id && navigate(`/community/rich-profile/${p.user_id}`)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 1.25,
                       p: 1.5, borderRadius: 1.5, bgcolor: '#fff',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      '&:active': { opacity: 0.9 },
                     }}
                   >
                     <Avatar
@@ -1087,7 +1097,8 @@ function MobileView({
                       </Typography>
                     </Box>
                     <Button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setFlowStep(2);
                         setSelectedAttendee(p);
                         setSelectedDuration(1);
@@ -2341,6 +2352,7 @@ function EventCompanionDirectoryPage() {
                 activeMeeting={activeMeeting}
                 getOtherParty={getOtherParty}
                 isSameMeetingDay={isSameMeetingDay}
+                navigate={navigate}
               />
             ) : (
               <DesktopView
@@ -2377,6 +2389,7 @@ function EventCompanionDirectoryPage() {
                 activeMeeting={activeMeeting}
                 getOtherParty={getOtherParty}
                 isSameMeetingDay={isSameMeetingDay}
+                navigate={navigate}
               />
             )
           ) : activeTab === 1 ? (
@@ -2427,6 +2440,7 @@ function EventCompanionDirectoryPage() {
                 activeMeeting={activeMeeting}
                 getOtherParty={getOtherParty}
                 isSameMeetingDay={isSameMeetingDay}
+                navigate={navigate}
               />
             ) : (
               <DesktopView
@@ -2460,6 +2474,10 @@ function EventCompanionDirectoryPage() {
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
+                activeMeeting={activeMeeting}
+                getOtherParty={getOtherParty}
+                isSameMeetingDay={isSameMeetingDay}
+                navigate={navigate}
               />
             )
           )}
