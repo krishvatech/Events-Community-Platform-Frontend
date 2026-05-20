@@ -3504,7 +3504,7 @@ export default function EventsPage() {
                         {displayedPinnedEvents.map((ev) => {
                           const pinnedCard = toCard(ev, true);
                           return (
-                            <Box key={`pinned-${ev.id}`}>
+                            <Box key={`pinned-${ev.id}`} sx={{ width: '100%' }}>
                               <EventCard
                                 ev={{ ...pinnedCard, isRegistered: !!myRegistrations[ev.id] }}
                                 myRegistrations={myRegistrations}
@@ -3608,7 +3608,7 @@ export default function EventsPage() {
 
                     {/* Display Individual Event Cards */}
                     {eventsToDisplay.map((ev) => (
-                      <Box key={ev.id}>
+                      <Box key={ev.id} sx={{ width: '100%' }}>
                         <EventCard
                           ev={ev}
                           myRegistrations={myRegistrations}
@@ -4013,7 +4013,7 @@ export default function EventsPage() {
                   : replayEvents.map((ev) => {
                     const replayCard = toCard(ev);
                     return (
-                      <Box key={`replay-${ev.id}`}>
+                      <Box key={`replay-${ev.id}`} sx={{ width: '100%' }}>
                         <EventCard
                           ev={{ ...replayCard, isRegistered: !!myRegistrations[ev.id] }}
                           myRegistrations={myRegistrations}
