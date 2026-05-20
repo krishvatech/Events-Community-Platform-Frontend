@@ -52,17 +52,55 @@ export default function AttendeeFormPage() {
         if (Object.keys(draftData).length > 0) {
           setFormData(draftData);
         } else {
-          // Initialize form data based on event format
-          // For in-person: auto-set attendance_mode to 'in_person'
-          // For hybrid: leave attendance_mode empty (user must select)
-          // For online: no attendance_mode needed
+          // Initialize form data based on event format and user profile
           const eventFormat = data.event_format || data.event?.format;
           const isInPerson = eventFormat === 'in_person';
 
           const initialData = {};
+
+          // Auto-set attendance mode for in-person events
           if (isInPerson && !formData.attendance_mode) {
             initialData.attendance_mode = 'in_person';
           }
+
+          // Prefill speaker module fields if they exist in the form template
+          if (data.form_template?.question_schema?.sections) {
+            const schema = data.form_template.question_schema;
+            const sectionIds = schema.sections.map(s => s.id);
+
+            // Check if this is a promotional profile form with speaker module
+            if (data.form_type === 'promotional_profile' && data.active_modules?.includes('speaker')) {
+              // Prefill from user profile if available
+              if (data.user_profile) {
+                const profile = data.user_profile;
+
+                // Prefill display_name from user profile if available
+                if (!initialData.display_name && profile.display_name) {
+                  initialData.display_name = profile.display_name;
+                } else if (!initialData.display_name && profile.full_name) {
+                  initialData.display_name = profile.full_name;
+                }
+
+                // Prefill programme_title from profile
+                if (!initialData.programme_title && profile.title) {
+                  initialData.programme_title = profile.title;
+                }
+
+                // Prefill programme_affiliation from profile
+                if (!initialData.programme_affiliation && profile.organization) {
+                  initialData.programme_affiliation = profile.organization;
+                } else if (!initialData.programme_affiliation && profile.company) {
+                  initialData.programme_affiliation = profile.company;
+                }
+
+                // Prefill LinkedIn from profile
+                if (!initialData.linkedin_url && profile.linkedin_url) {
+                  initialData.linkedin_url = profile.linkedin_url;
+                }
+              }
+            }
+          }
+
           if (Object.keys(initialData).length > 0) {
             setFormData(initialData);
           }
@@ -115,12 +153,21 @@ export default function AttendeeFormPage() {
       }
     }
 
-    // Check showIfIncludes condition (for multi_select fields)
+    // Check showIfIncludes condition (for multi_select fields and promotional modules)
     if (field.showIfIncludes) {
       const { field: conditionField, value: conditionValue } = field.showIfIncludes;
-      const fieldValue = formData[conditionField];
-      if (!Array.isArray(fieldValue) || !fieldValue.includes(conditionValue)) {
-        return false;
+
+      // Special case: active_modules check
+      if (conditionField === 'active_modules') {
+        if (!assignment.active_modules?.includes(conditionValue)) {
+          return false;
+        }
+      } else {
+        // Standard form field check
+        const fieldValue = formData[conditionField];
+        if (!Array.isArray(fieldValue) || !fieldValue.includes(conditionValue)) {
+          return false;
+        }
       }
     }
 
@@ -156,6 +203,7 @@ export default function AttendeeFormPage() {
 
     for (const section of schema.sections) {
       // Skip validation for sections that shouldn't be shown
+      if (!isSectionVisible(section)) continue;
       if (section.showOnlyForHybrid && !isHybrid) continue;
       if (section.showOnlyForPhysical && !showPhysicalSections) continue;
 
@@ -174,9 +222,88 @@ export default function AttendeeFormPage() {
             if (!value || (Array.isArray(value) && value.length === 0)) {
               errors[field.id] = 'This field is required';
             }
+          } else if (field.type === 'file_upload') {
+            if (!value) {
+              errors[field.id] = 'This field is required';
+            }
           } else {
             if (!value || value === '') {
               errors[field.id] = 'This field is required';
+            }
+          }
+        }
+
+        // Validate single file uploads (both required and optional if provided)
+        if (field.type === 'file_upload') {
+          const value = formData[field.id];
+          if (value instanceof File) {
+            const file = value;
+
+            // Get file size limits based on field
+            let maxSizeMB = 10; // default
+            if (field.id === 'slide_deck') {
+              maxSizeMB = 50;
+            } else if (field.id === 'headshot') {
+              maxSizeMB = 10;
+            }
+
+            // Check file size
+            const maxBytes = maxSizeMB * 1024 * 1024;
+            if (file.size > maxBytes) {
+              errors[field.id] = `File too large (max ${maxSizeMB}MB). Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB`;
+            }
+
+            // Check file type
+            const acceptTypes = (field.accept || '').split(',').map(t => t.trim());
+            if (acceptTypes.length > 0 && acceptTypes[0] !== '') {
+              // Convert MIME types to extensions for display
+              let typeError = false;
+              const fileType = file.type;
+
+              if (field.id === 'headshot') {
+                if (!['image/jpeg', 'image/png'].includes(fileType)) {
+                  errors[field.id] = 'Headshot must be JPG or PNG format';
+                  typeError = true;
+                }
+              } else if (field.id === 'slide_deck') {
+                if (!['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'].includes(fileType)) {
+                  errors[field.id] = 'Slide deck must be PDF or PPTX format';
+                  typeError = true;
+                }
+              }
+
+              if (typeError && !errors[field.id]) {
+                // Generic type error if not caught above
+                errors[field.id] = `File type not allowed. Expected: ${acceptTypes.join(', ')}`;
+              }
+            }
+          }
+        }
+
+        // Validate multiple file uploads
+        if (field.type === 'file_upload_multiple') {
+          const value = formData[field.id];
+          const fileList = Array.isArray(value) ? value : (value ? [value] : []);
+
+          if (fileList.length > 0) {
+            let maxSizeMB = field.maxSize || 10;
+
+            fileList.forEach((file, index) => {
+              if (file instanceof File) {
+                // Check file size
+                const maxBytes = maxSizeMB * 1024 * 1024;
+                if (file.size > maxBytes) {
+                  if (!errors[field.id]) {
+                    errors[field.id] = `File ${index + 1} (${file.name}) is too large (max ${maxSizeMB}MB)`;
+                  }
+                }
+              }
+            });
+
+            // Check max file count if specified
+            const maxFiles = field.maxFiles || 5;
+            if (fileList.length > maxFiles) {
+              errors[field.id] = `Maximum ${maxFiles} files allowed, you have ${fileList.length}`;
             }
           }
         }
@@ -203,6 +330,7 @@ export default function AttendeeFormPage() {
       const visibleData = {};
       if (schema?.sections) {
         for (const section of schema.sections) {
+          if (!isSectionVisible(section)) continue;
           if (section.showOnlyForHybrid && !isHybrid) continue;
           if (section.showOnlyForPhysical && !showPhysicalSections) continue;
 
@@ -258,8 +386,10 @@ export default function AttendeeFormPage() {
       const showPhysicalSections = isInPerson || (isHybrid && attendanceMode === 'in_person');
 
       const visibleData = {};
+      let hasFiles = false;
       if (schema?.sections) {
         for (const section of schema.sections) {
+          if (!isSectionVisible(section)) continue;
           if (section.showOnlyForHybrid && !isHybrid) continue;
           if (section.showOnlyForPhysical && !showPhysicalSections) continue;
 
@@ -270,21 +400,57 @@ export default function AttendeeFormPage() {
             const value = formData[field.id];
             // Include non-empty values and non-empty arrays
             if (value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0)) {
+              if (value instanceof File) {
+                hasFiles = true;
+              } else if (Array.isArray(value) && value.some(item => item instanceof File)) {
+                hasFiles = true;
+              }
               visibleData[field.id] = value;
             }
           }
         }
       }
 
-      await apiClient.post(`/post-acceptance-form-assignments/${assignmentId}/submit/`, {
-        answers: visibleData
-      });
+      // Use FormData if there are files, otherwise use JSON
+      if (hasFiles) {
+        const formDataObj = new FormData();
+
+        // Append all answers data
+        for (const [key, value] of Object.entries(visibleData)) {
+          if (value instanceof File) {
+            // Single file
+            formDataObj.append(`answers.${key}`, value);
+          } else if (Array.isArray(value)) {
+            // Check if array contains files or is a multi-select array
+            const hasFileInArray = value.some(item => item instanceof File);
+            if (hasFileInArray) {
+              // Append each file separately
+              value.forEach((item, idx) => {
+                if (item instanceof File) {
+                  formDataObj.append(`answers.${key}`, item);
+                }
+              });
+            } else {
+              // Multi-select values - JSON stringify the array
+              formDataObj.append(`answers.${key}`, JSON.stringify(value));
+            }
+          } else {
+            formDataObj.append(`answers.${key}`, value);
+          }
+        }
+
+        await apiClient.post(`/post-acceptance-form-assignments/${assignmentId}/submit/`, formDataObj);
+      } else {
+        await apiClient.post(`/post-acceptance-form-assignments/${assignmentId}/submit/`, {
+          answers: visibleData
+        });
+      }
 
       // Clear draft from localStorage
       localStorage.removeItem(`formDraft_${assignmentId}`);
 
       alert('Form submitted successfully!');
-      navigate('/my-events');
+      navigate('/account/events');
     } catch (err) {
       // Handle field-level validation errors from backend
       if (err.response?.data?.errors && typeof err.response.data.errors === 'object') {
@@ -325,6 +491,23 @@ export default function AttendeeFormPage() {
   // Show physical sections if in-person OR (hybrid AND user selected in-person)
   const showPhysicalSections = isInPerson || (isHybrid && attendanceMode === 'in_person');
 
+  // Check if section should be visible based on showIfIncludes condition
+  const isSectionVisible = (section) => {
+    if (section.showIfIncludes) {
+      const { field, value } = section.showIfIncludes;
+
+      if (field === 'active_modules') {
+        return assignment.active_modules?.includes(value);
+      }
+
+      const fieldValue = formData[field];
+      return Array.isArray(fieldValue) && fieldValue.includes(value);
+    }
+
+    return true;
+  };
+
+
   return (
     <div className="form-page">
       <div className="form-container">
@@ -343,30 +526,58 @@ export default function AttendeeFormPage() {
           <p className="form-description">{assignment.form_template.description}</p>
         )}
 
-        {/* Privacy Notice */}
-        <div className="privacy-notice">
-          <div className="privacy-notice-icon">🔒</div>
-          <div className="privacy-notice-content">
-            <h3>Data Privacy Notice</h3>
-            <p>
-              The following information is <strong>restricted to authorized event staff only</strong> and will not be shared publicly:
-            </p>
-            <ul>
-              <li><strong>Emergency Contact Details</strong> (name, phone, relationship)</li>
-              <li><strong>Medical & Accessibility Information</strong> (accessibility needs, medical details, mobility requirements)</li>
-              <li><strong>Dietary Information</strong> (allergies, restrictions, preferences)</li>
-            </ul>
-            <p>
-              All restricted data will be automatically deleted <strong>30 days after the event ends</strong>.
-              Your attendance and general information will remain visible to organizers.
-            </p>
+        {/* Privacy Notice - Different messages for participant info vs promotional profile */}
+        {assignment.form_type === 'participant_information' && (
+          <div className="privacy-notice">
+            <div className="privacy-notice-icon">🔒</div>
+            <div className="privacy-notice-content">
+              <h3>Data Privacy Notice</h3>
+              <p>
+                The following information is <strong>restricted to authorized event staff only</strong> and will not be shared publicly:
+              </p>
+              <ul>
+                <li><strong>Emergency Contact Details</strong> (name, phone, relationship)</li>
+                <li><strong>Medical & Accessibility Information</strong> (accessibility needs, medical details, mobility requirements)</li>
+                <li><strong>Dietary Information</strong> (allergies, restrictions, preferences)</li>
+              </ul>
+              <p>
+                All restricted data will be automatically deleted <strong>30 days after the event ends</strong>.
+                Your attendance and general information will remain visible to organizers.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Privacy Notice for Promotional Profile */}
+        {assignment.form_type === 'promotional_profile' && (
+          <div className="privacy-notice promotional-privacy">
+            <div className="privacy-notice-icon">🌐</div>
+            <div className="privacy-notice-content">
+              <h3>Public Profile Notice</h3>
+              <p>
+                The information you provide will be published on the event website and may be used in promotional materials:
+              </p>
+              <ul>
+                <li><strong>Profile Information</strong> (name, bio, headshot, titles)</li>
+                <li><strong>Company/Organization Details</strong> (logos, descriptions, links)</li>
+                <li><strong>Professional Information</strong> (social media, website)</li>
+              </ul>
+              <p>
+                You control visibility through the <strong>display consent</strong> setting. You can withdraw consent at any time.
+              </p>
+            </div>
+          </div>
+        )}
 
         {draftSaved && <div className="draft-saved-message">✓ Draft saved successfully</div>}
 
         <form onSubmit={handleSubmit}>
           {sections.map((section, sectionIndex) => {
+            // Skip section if not visible based on showIfIncludes condition
+            if (!isSectionVisible(section)) {
+              return null;
+            }
+
             // Skip section if it should only show for hybrid but isn't hybrid
             if (section.showOnlyForHybrid && !isHybrid) {
               return null;
@@ -480,7 +691,7 @@ export default function AttendeeFormPage() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/my-events')}
+              onClick={() => navigate('/account/events')}
               className="btn btn-secondary"
             >
               Cancel
@@ -505,6 +716,42 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
           <input
             id={field.id}
             type="text"
+            placeholder={field.placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? 'input-error' : ''}
+          />
+          {error && <p className="field-error">{error}</p>}
+        </div>
+      );
+
+    case 'url':
+      return (
+        <div className="field-wrapper">
+          <label htmlFor={field.id}>
+            {field.label}{isRequired}
+          </label>
+          <input
+            id={field.id}
+            type="url"
+            placeholder={field.placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className={error ? 'input-error' : ''}
+          />
+          {error && <p className="field-error">{error}</p>}
+        </div>
+      );
+
+    case 'email':
+      return (
+        <div className="field-wrapper">
+          <label htmlFor={field.id}>
+            {field.label}{isRequired}
+          </label>
+          <input
+            id={field.id}
+            type="email"
             placeholder={field.placeholder}
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -619,11 +866,17 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             onChange={(e) => onChange(e.target.value)}
             className={error ? 'input-error' : ''}
           >
-            {field.options?.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            <option value="">-- Select --</option>
+            {field.options?.map((option) => {
+              // Support both string[] and {value, label}[] formats
+              const optionValue = typeof option === 'string' ? option : option.value;
+              const optionLabel = typeof option === 'string' ? option : option.label;
+              return (
+                <option key={optionValue} value={optionValue}>
+                  {optionLabel}
+                </option>
+              );
+            })}
           </select>
           {error && <p className="field-error">{error}</p>}
         </div>
@@ -650,34 +903,183 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
         <div className="field-wrapper">
           <label>{field.label}{isRequired}</label>
           <div className="multi-select-options">
-            {field.options?.map((option) => (
-              <label key={option.value} className="multi-select-item">
-                <input
-                  type="checkbox"
-                  value={option.value}
-                  checked={Array.isArray(value) && value.includes(option.value)}
-                  onChange={(e) => {
-                    const newValue = Array.isArray(value) ? [...value] : [];
-                    if (e.target.checked) {
-                      // If checking "none", clear all other options
-                      if (option.value === 'none') {
-                        onChange(['none']);
-                      } else {
-                        // If checking any other option, remove "none"
-                        const filtered = newValue.filter(v => v !== 'none');
-                        if (!filtered.includes(option.value)) {
-                          onChange([...filtered, option.value]);
+            {field.options?.map((option) => {
+              // Support both string[] and {value, label}[] formats
+              const optionValue = typeof option === 'string' ? option : option.value;
+              const optionLabel = typeof option === 'string' ? option : option.label;
+              return (
+                <label key={optionValue} className="multi-select-item">
+                  <input
+                    type="checkbox"
+                    value={optionValue}
+                    checked={Array.isArray(value) && value.includes(optionValue)}
+                    onChange={(e) => {
+                      const newValue = Array.isArray(value) ? [...value] : [];
+                      if (e.target.checked) {
+                        // If checking "none", clear all other options
+                        if (optionValue === 'none') {
+                          onChange(['none']);
+                        } else {
+                          // If checking any other option, remove "none"
+                          const filtered = newValue.filter(v => v !== 'none');
+                          if (!filtered.includes(optionValue)) {
+                            onChange([...filtered, optionValue]);
+                          }
                         }
+                      } else {
+                        // If unchecking, just remove from array
+                        onChange(newValue.filter(v => v !== optionValue));
                       }
-                    } else {
-                      // If unchecking, just remove from array
-                      onChange(newValue.filter(v => v !== option.value));
-                    }
-                  }}
-                />
-                <span>{option.label}</span>
+                    }}
+                  />
+                  <span>{optionLabel}</span>
+                </label>
+              );
+            })}
+          </div>
+          {error && <p className="field-error">{error}</p>}
+        </div>
+      );
+
+    case 'file_upload':
+      const fileName = value instanceof File ? value.name : (typeof value === 'string' ? value : '');
+      const acceptTypes = field.accept || '*/*';
+      const maxSizeMB = field.maxSize || (field.id === 'headshot' ? 10 : field.id === 'slide_deck' ? 50 : 10);
+
+      return (
+        <div className="field-wrapper file-upload-field">
+          <label htmlFor={field.id}>
+            {field.label}{isRequired}
+          </label>
+          {field.help_text && (
+            <p className="field-help-text">{field.help_text}</p>
+          )}
+          <div className="file-upload-container">
+            <input
+              id={field.id}
+              type="file"
+              accept={acceptTypes}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  // Check file size
+                  const maxBytes = maxSizeMB * 1024 * 1024;
+                  if (file.size > maxBytes) {
+                    onChange(null);
+                    return;
+                  }
+                  onChange(file);
+                }
+              }}
+              className={error ? 'input-error' : ''}
+              style={{ display: 'none' }}
+            />
+            <div className="file-upload-area">
+              <label htmlFor={field.id} className="file-upload-label">
+                <div className="file-upload-icon">📎</div>
+                <div className="file-upload-text">
+                  {fileName ? (
+                    <>
+                      <p className="file-name">{fileName}</p>
+                      <p className="file-action">Click to change or drag a new file</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="file-action">Click to select or drag file here</p>
+                      <p className="file-hint">Max {maxSizeMB}MB</p>
+                    </>
+                  )}
+                </div>
               </label>
-            ))}
+            </div>
+            {fileName && (
+              <button
+                type="button"
+                className="file-remove-btn"
+                onClick={() => onChange(null)}
+                title="Remove file"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {error && <p className="field-error">{error}</p>}
+        </div>
+      );
+
+    case 'file_upload_multiple':
+      const fileList = Array.isArray(value) ? value : (value ? [value] : []);
+      const acceptTypesMulti = field.accept || '*/*';
+      const maxSizeMulti = field.maxSize || 10;
+      const maxFilesCount = field.maxFiles || 5;
+
+      return (
+        <div className="field-wrapper file-upload-multiple-field">
+          <label htmlFor={field.id}>
+            {field.label}{isRequired}
+          </label>
+          {field.help_text && (
+            <p className="field-help-text">{field.help_text}</p>
+          )}
+          <div className="file-upload-multiple-container">
+            <input
+              id={field.id}
+              type="file"
+              accept={acceptTypesMulti}
+              multiple
+              disabled={fileList.length >= maxFilesCount}
+              onChange={(e) => {
+                const newFiles = Array.from(e.target.files || []);
+                // Filter valid files
+                const validFiles = newFiles.filter(file => {
+                  const maxBytes = maxSizeMulti * 1024 * 1024;
+                  return file.size <= maxBytes;
+                });
+                if (fileList.length + validFiles.length > maxFilesCount) {
+                  // Limit to maxFilesCount
+                  onChange([...fileList, ...validFiles].slice(0, maxFilesCount));
+                } else {
+                  onChange([...fileList, ...validFiles]);
+                }
+              }}
+              className={error ? 'input-error' : ''}
+              style={{ display: 'none' }}
+            />
+            <div className="file-upload-multiple-area">
+              <label htmlFor={field.id} className="file-upload-multiple-label">
+                <div className="file-upload-icon">📁</div>
+                <div className="file-upload-text">
+                  <p className="file-action">Click to select or drag files here</p>
+                  <p className="file-hint">
+                    Up to {maxFilesCount} files, max {maxSizeMulti}MB each
+                    {fileList.length > 0 && ` (${fileList.length}/${maxFilesCount} uploaded)`}
+                  </p>
+                </div>
+              </label>
+            </div>
+            {fileList.length > 0 && (
+              <div className="file-list">
+                <div className="file-list-header">Uploaded Files ({fileList.length})</div>
+                {fileList.map((file, index) => (
+                  <div key={index} className="file-list-item">
+                    <span className="file-list-name">
+                      {file instanceof File ? file.name : file}
+                    </span>
+                    <button
+                      type="button"
+                      className="file-list-remove-btn"
+                      onClick={() => {
+                        const newFiles = fileList.filter((_, i) => i !== index);
+                        onChange(newFiles.length > 0 ? newFiles : null);
+                      }}
+                      title="Remove file"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {error && <p className="field-error">{error}</p>}
         </div>

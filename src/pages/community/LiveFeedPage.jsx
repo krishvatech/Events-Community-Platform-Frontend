@@ -2953,10 +2953,7 @@ export default function LiveFeedPage({
         }
 
         const candidatePaths = [
-          "events/my-registrations/?page_size=1000",
-          "events/registrations/mine/?page_size=1000",
           "event-registrations/mine/?page_size=1000",
-          "events/registered/?page_size=1000",
         ];
 
         for (const path of candidatePaths) {
