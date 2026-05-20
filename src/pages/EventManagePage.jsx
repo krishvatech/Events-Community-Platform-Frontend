@@ -6,6 +6,7 @@ import RegisteredActions from "../components/RegisteredActions";
 import InviteUsersDialog from "../components/InviteUsersDialog";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
 import QRCodeDisplay from "../components/QRCodeDisplay.jsx";
+import ParticipantsAttendanceTable from "../components/ParticipantsAttendanceTable.jsx";
 
 import {
   Avatar,
@@ -203,7 +204,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Confirmation Email"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Participants", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Confirmation Email"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
@@ -222,6 +223,11 @@ const getTabLabels = (event, isOwner) => {
   const eventFormat = event?.event_format || event?.format;
   if (eventFormat === 'virtual') {
     labels = labels.filter(label => label !== "Companion");
+  }
+  // Hide Participants tab for upcoming or live events (only show for past events)
+  const eventStatus = computeStatus(event);
+  if (eventStatus !== 'past') {
+    labels = labels.filter(label => label !== "Participants");
   }
   return labels;
 };
@@ -4647,6 +4653,15 @@ export default function EventManagePage() {
     );
   };
 
+  const renderParticipants = () => (
+    <ParticipantsAttendanceTable
+      eventId={eventId}
+      event={event}
+      token={token}
+      apiRoot={API_ROOT}
+    />
+  );
+
   const renderResources = () => (
     <Paper
       elevation={0}
@@ -8076,6 +8091,7 @@ export default function EventManagePage() {
                     <>
                       {tab === tabLabels.indexOf("Applications") && renderApplications()}
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
+                      {tab === tabLabels.indexOf("Participants") && renderParticipants()}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
                       {tab === tabLabels.indexOf("Session") && renderSessions()}
                       {tab === tabLabels.indexOf("Resources") && renderResources()}
@@ -8092,6 +8108,7 @@ export default function EventManagePage() {
                   ) : (
                     <>
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
+                      {tab === tabLabels.indexOf("Participants") && renderParticipants()}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
                       {tab === tabLabels.indexOf("Session") && renderSessions()}
                       {tab === tabLabels.indexOf("Resources") && renderResources()}
