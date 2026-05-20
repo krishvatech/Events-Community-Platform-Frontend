@@ -81,6 +81,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import ForwardToInboxRoundedIcon from "@mui/icons-material/ForwardToInboxRounded";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import PeopleTwoToneIcon from "@mui/icons-material/PeopleTwoTone";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import AttachMoneyRoundedIcon from "@mui/icons-material/AttachMoneyRounded";
@@ -522,6 +523,10 @@ export default function EventManagePage() {
   // Q&A Export State
   const [qnaExportLoading, setQnaExportLoading] = useState({ csv: false, pdf: false });
   const [qnaExportError, setQnaExportError] = useState("");
+
+  // Members Export State
+  const [membersExportLoading, setMembersExportLoading] = useState(false);
+  const [membersExportError, setMembersExportError] = useState("");
 
   // Post-Event Q&A Answer State
   const [postEventQnaQuestions, setPostEventQnaQuestions] = useState([]);
@@ -3952,6 +3957,16 @@ export default function EventManagePage() {
               sx={{ textTransform: "none", borderRadius: 999, ml: 1, borderColor: "warning.main", color: "warning.dark" }}
             >
               {resendMailLoading ? "Sending..." : "Resend Mail to All"}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={membersExportLoading ? <CircularProgress size={14} /> : <FileDownloadRoundedIcon />}
+              onClick={handleMembersExport}
+              disabled={membersExportLoading || registrations.length === 0}
+              sx={{ textTransform: "none", borderRadius: 999, ml: 1, borderColor: "success.main", color: "success.dark" }}
+            >
+              {membersExportLoading ? "Exporting..." : "Export CSV"}
             </Button>
           </Stack>
         </Stack>
@@ -7899,6 +7914,41 @@ export default function EventManagePage() {
       setQnaExportError(err.message || "Export failed. Please try again.");
     } finally {
       setQnaExportLoading((prev) => ({ ...prev, [fmt]: false }));
+    }
+  };
+
+  const handleMembersExport = async () => {
+    if (!event) return;
+    setMembersExportLoading(true);
+    setMembersExportError("");
+    try {
+      const token = getToken();
+      const url = `${API_ROOT}/events/${event.id}/export-members-csv/`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const nameMatch = disposition.match(/filename\s*=\s*"?([^";\n]+)"?/);
+      const filename = nameMatch ? nameMatch[1].trim() : `Registered_Participants_Details.csv`;
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objUrl);
+      toast.success("Members exported successfully!");
+    } catch (err) {
+      setMembersExportError(err.message || "Export failed. Please try again.");
+      toast.error(err.message || "Export failed. Please try again.");
+    } finally {
+      setMembersExportLoading(false);
     }
   };
 
