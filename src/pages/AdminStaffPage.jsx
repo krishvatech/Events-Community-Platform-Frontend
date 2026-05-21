@@ -674,6 +674,7 @@ export default function AdminStaffPage() {
     // Delete Dialog State
     const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
     const [userToDelete, setUserToDelete] = React.useState(null);
+    const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = React.useState(false);
 
     // Duplicate Accounts Tab State
     const [dupGroups, setDupGroups] = React.useState([]);
@@ -733,9 +734,10 @@ export default function AdminStaffPage() {
         }
     }, [communityId]);
 
-    // Reset page on search or filter change
+    // Reset page and clear selection on search or filter change
     React.useEffect(() => {
         setPage(1);
+        setSelected(new Set());
     }, [q, userTypeFilter]);
 
     React.useEffect(() => { fetchData(); }, [fetchData]);
@@ -914,6 +916,57 @@ export default function AdminStaffPage() {
         }
     };
 
+    const handleSelectRow = (userId) => {
+        setSelected(prev => {
+            const updated = new Set(prev);
+            if (updated.has(userId)) {
+                updated.delete(userId);
+            } else {
+                updated.add(userId);
+            }
+            return updated;
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selected.size === paginatedRows.length && paginatedRows.length > 0) {
+            setSelected(new Set());
+        } else {
+            const allIds = new Set(paginatedRows.map(u => u.id));
+            setSelected(allIds);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setActionLoading(true);
+        const ids = [...selected];
+        try {
+            const results = await Promise.allSettled(ids.map(id => deleteAdminUser(id)));
+            const failed = results.filter(r => r.status === "rejected").length;
+            const succeeded = ids.length - failed;
+
+            setSelected(new Set());
+            setBulkDeleteDialogOpen(false);
+            await fetchData();
+
+            setSnack({
+                open: true,
+                severity: failed > 0 ? "warning" : "success",
+                message: failed > 0
+                    ? `⚠️ Deleted ${succeeded}, failed to delete ${failed}`
+                    : `✅ Deleted ${ids.length} user${ids.length !== 1 ? "s" : ""}`,
+            });
+        } catch (err) {
+            setSnack({
+                open: true,
+                severity: "error",
+                message: "Bulk delete failed: " + (err.response?.data?.detail || err.message),
+            });
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
 
     // Calculate total pages from server count
     const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -1035,10 +1088,58 @@ export default function AdminStaffPage() {
                         <SaleorStaffTab currentUserId={currentUser?.id} />
                     ) : userTypeFilter !== "duplicates" ? (
                         <Box>
+                            {/* Bulk Delete Action Bar */}
+                            {selected.size >= 2 && (
+                                <Box sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 2,
+                                    mb: 2,
+                                    p: 2,
+                                    bgcolor: "#fef2f2",
+                                    border: "1px solid #fecaca",
+                                    borderRadius: 1
+                                }}>
+                                    <Chip
+                                        label={`${selected.size} selected`}
+                                        color="error"
+                                        variant="filled"
+                                        size="small"
+                                    />
+                                    <Button
+                                        variant="contained"
+                                        color="error"
+                                        size="small"
+                                        onClick={() => setBulkDeleteDialogOpen(true)}
+                                        disabled={actionLoading}
+                                        sx={{ textTransform: "none", ml: "auto" }}
+                                    >
+                                        {actionLoading ? "Deleting..." : "Delete Selected"}
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => setSelected(new Set())}
+                                        disabled={actionLoading}
+                                        sx={{ textTransform: "none" }}
+                                    >
+                                        Clear
+                                    </Button>
+                                </Box>
+                            )}
+
                             <TableContainer component={Paper} variant="outlined">
                             <Table>
                             <TableHead>
                                 <TableRow>
+                                    <TableCell padding="checkbox">
+                                        <Checkbox
+                                            checked={selected.size === paginatedRows.length && paginatedRows.length > 0}
+                                            indeterminate={selected.size > 0 && selected.size < paginatedRows.length}
+                                            onChange={handleSelectAll}
+                                            disabled={paginatedRows.length === 0}
+                                        />
+                                    </TableCell>
                                     <TableCell>User</TableCell>
                                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                                         Email
@@ -1055,14 +1156,23 @@ export default function AdminStaffPage() {
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, idx) => (
                                         <TableRow key={idx}>
-                                            <TableCell colSpan={6}>
+                                            <TableCell colSpan={owner ? 8 : 7}>
                                                 <Skeleton height={40} />
                                             </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     paginatedRows.map((u) => (
-                                        <TableRow key={u.id} hover>
+                                        <TableRow key={u.id} hover selected={selected.has(u.id)}>
+
+                                            {/* Checkbox */}
+                                            <TableCell padding="checkbox">
+                                                <Checkbox
+                                                    checked={selected.has(u.id)}
+                                                    onChange={() => handleSelectRow(u.id)}
+                                                    disabled={currentUser && currentUser.id === u.id}
+                                                />
+                                            </TableCell>
 
                                             {/* User */}
                                             <TableCell>
@@ -1176,7 +1286,7 @@ export default function AdminStaffPage() {
                                 )}
                                 {!loading && paginatedRows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={owner ? 7 : 6} align="center" sx={{ py: 4 }}>
+                                        <TableCell colSpan={owner ? 8 : 7} align="center" sx={{ py: 4 }}>
                                             <Typography color="text.secondary">No users found.</Typography>
                                         </TableCell>
                                     </TableRow>
@@ -1331,6 +1441,38 @@ export default function AdminStaffPage() {
                                 startIcon={actionLoading ? <CircularProgress size={20} color="inherit" /> : null}
                             >
                                 {actionLoading ? "Deleting..." : "Delete User"}
+                            </Button>
+                        </DialogActions>
+                    </Dialog>
+
+                    {/* Bulk Delete Confirmation Dialog */}
+                    <Dialog
+                        open={bulkDeleteDialogOpen}
+                        onClose={() => setBulkDeleteDialogOpen(false)}
+                        maxWidth="xs"
+                        fullWidth
+                    >
+                        <DialogTitle>Delete {selected.size} Users?</DialogTitle>
+                        <DialogContent>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                Are you sure you want to delete {selected.size} selected users?
+                            </Typography>
+                            <Alert severity="error">
+                                ⚠️ This action is permanent. These users will be removed from the platform.
+                            </Alert>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={() => setBulkDeleteDialogOpen(false)} color="inherit" disabled={actionLoading}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleBulkDelete}
+                                color="error"
+                                variant="contained"
+                                disabled={actionLoading}
+                                startIcon={actionLoading ? <CircularProgress size={20} color="inherit" /> : null}
+                            >
+                                {actionLoading ? "Deleting..." : "Delete All"}
                             </Button>
                         </DialogActions>
                     </Dialog>
