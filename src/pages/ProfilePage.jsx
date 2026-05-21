@@ -2706,7 +2706,6 @@ export default function ProfilePage() {
     if (!(eduForm.school || "").trim()) reqErrors.school = "School is required";
     if (!(eduForm.degree || "").trim()) reqErrors.degree = "Degree is required";
     if (!(eduForm.field || "").trim()) reqErrors.field = "Field of study is required.";
-    if (!(eduForm.start || "").trim()) reqErrors.start = "Start year is required";
     if (Object.values(reqErrors).some(Boolean)) {
       setEduReqErrors(reqErrors);
       if (reqErrors.school || reqErrors.degree) {
