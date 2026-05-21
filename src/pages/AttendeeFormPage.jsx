@@ -779,24 +779,6 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
         </div>
       );
 
-    case 'email':
-      return (
-        <div className="field-wrapper">
-          <label htmlFor={field.id}>
-            {field.label}{isRequired}
-          </label>
-          <input
-            id={field.id}
-            type="email"
-            placeholder={field.placeholder}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className={error ? 'input-error' : ''}
-          />
-          {error && <p className="field-error">{error}</p>}
-        </div>
-      );
-
     case 'tel':
       return (
         <div className="field-wrapper">

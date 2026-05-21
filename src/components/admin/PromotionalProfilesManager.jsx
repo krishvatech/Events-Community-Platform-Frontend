@@ -14,14 +14,16 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Select, MenuItem, Checkbox, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress,
-  Chip, Tooltip, Typography
+  Chip, Tooltip, Typography, FormControl, InputLabel, Stack, IconButton,
+  InputAdornment
 } from '@mui/material';
 import {
-  Download as DownloadIcon,
-  Send as SendIcon,
-  CheckCircle as CheckIcon,
-  Refresh as RefreshIcon,
-  Settings as SettingsIcon
+  DownloadRounded as DownloadIcon,
+  SendRounded as SendIcon,
+  CheckCircleRounded as CheckIcon,
+  RefreshRounded as RefreshIcon,
+  SettingsRounded as SettingsIcon,
+  SearchRounded as SearchIcon
 } from '@mui/icons-material';
 import { apiClient } from '../../utils/api';
 
@@ -145,6 +147,22 @@ export default function PromotionalProfilesManager() {
       return;
     }
 
+    // Check if any selected profiles are completed
+    const completedProfiles = profiles.filter(p => selected.has(p.id) && p.status === 'completed');
+    const incompleteProfiles = profiles.filter(p => selected.has(p.id) && p.status !== 'completed');
+
+    if (completedProfiles.length > 0 && incompleteProfiles.length === 0) {
+      setError('Cannot send reminders to completed profiles. Please select profiles that are in progress or not started.');
+      setReminderDialog(false);
+      return;
+    }
+
+    if (completedProfiles.length > 0) {
+      setError(`${completedProfiles.length} selected profile(s) are already completed. Reminders will only be sent to ${incompleteProfiles.length} incomplete profile(s).`);
+      setReminderDialog(false);
+      return;
+    }
+
     try {
       await apiClient.post(
         `/events/${eventId}/promotional-profiles-admin/reminders/`,
@@ -165,6 +183,17 @@ export default function PromotionalProfilesManager() {
       return;
     }
 
+    // Check if any selected profiles are already completed
+    const alreadyCompleted = profiles.filter(p =>
+      selected.has(p.id) && p.status === 'completed'
+    );
+
+    if (alreadyCompleted.length > 0) {
+      setError(`${alreadyCompleted.length} selected profile(s) are already marked as complete.`);
+      setCompleteDialog(false);
+      return;
+    }
+
     try {
       await apiClient.post(
         `/events/${eventId}/promotional-profiles-admin/mark-complete/`,
@@ -175,6 +204,7 @@ export default function PromotionalProfilesManager() {
       );
       setSuccess(`Marked ${selected.size} profiles complete`);
       setCompleteDialog(false);
+      setSelectedModule('');
       loadProfiles();
     } catch (err) {
       setError('Failed to mark profiles complete');
@@ -313,13 +343,15 @@ export default function PromotionalProfilesManager() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <h2>Promotional Profiles Manager</h2>
-
+    <Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
-      <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} sx={{ mb: 3 }}>
+      <Typography variant="h6" sx={{ mb: 2 }}>
+        Promotional Profiles Manager
+      </Typography>
+
+      <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
         <Tab label="Profiles" />
         <Tab label="Progress Summary" />
         <Tab label="Missing Assets" />
@@ -327,94 +359,91 @@ export default function PromotionalProfilesManager() {
 
       {activeTab === 0 && (
         <>
-          {/* Filters */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={2}>
-                  <TextField
-                    label="Search"
-                    size="small"
-                    fullWidth
-                    value={filters.search}
-                    onChange={(e) => handleFilterChange('search', e.target.value)}
-                    placeholder="Name or email"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <Select
-                    label="Role"
-                    size="small"
-                    fullWidth
-                    value={filters.role}
-                    onChange={(e) => handleFilterChange('role', e.target.value)}
-                  >
-                    <MenuItem value="">All Roles</MenuItem>
-                    {ROLES.map(role => (
-                      <MenuItem key={role} value={role}>{role}</MenuItem>
-                    ))}
-                  </Select>
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <Select
-                    label="Status"
-                    size="small"
-                    fullWidth
-                    value={filters.status}
-                    onChange={(e) => handleFilterChange('status', e.target.value)}
-                  >
-                    <MenuItem value="">All Statuses</MenuItem>
-                    {STATUSES.map(status => (
-                      <MenuItem key={status} value={status}>{status}</MenuItem>
-                    ))}
-                  </Select>
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <Select
-                    label="Consent"
-                    size="small"
-                    fullWidth
-                    value={filters.display_consent}
-                    onChange={(e) => handleFilterChange('display_consent', e.target.value)}
-                  >
-                    <MenuItem value="">All</MenuItem>
-                    <MenuItem value="granted">Granted</MenuItem>
-                    <MenuItem value="denied">Denied</MenuItem>
-                    <MenuItem value="pending">Pending</MenuItem>
-                  </Select>
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <Select
-                    label="Missing"
-                    size="small"
-                    fullWidth
-                    value={filters.missing_assets}
-                    onChange={(e) => handleFilterChange('missing_assets', e.target.value)}
-                  >
-                    <MenuItem value="">All</MenuItem>
-                    <MenuItem value="headshot">Missing Headshot</MenuItem>
-                    <MenuItem value="logo">Missing Logo</MenuItem>
-                    <MenuItem value="pitch_deck">Missing Pitch Deck</MenuItem>
-                  </Select>
-                </Grid>
-                <Grid item xs={12} sm={6} md={2}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<RefreshIcon />}
-                    onClick={loadProfiles}
-                  >
-                    Refresh
-                  </Button>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
+          {/* Filters and Actions */}
+          <Paper sx={{ p: 2, mb: 3 }}>
+            {/* Search and Refresh Row */}
+            <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: 'center' }}>
+              <TextField
+                placeholder="Search by name or email..."
+                size="small"
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ minWidth: 250, flex: 1 }}
+              />
+              <IconButton size="small" onClick={loadProfiles}>
+                <RefreshIcon />
+              </IconButton>
+            </Stack>
+
+            {/* Filters Row */}
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={filters.status}
+                  label="Status"
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {STATUSES.map(status => (
+                    <MenuItem key={status} value={status}>{status}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>Role</InputLabel>
+                <Select
+                  value={filters.role}
+                  label="Role"
+                  onChange={(e) => handleFilterChange('role', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {ROLES.map(role => (
+                    <MenuItem key={role} value={role}>{role}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 130 }}>
+                <InputLabel>Consent</InputLabel>
+                <Select
+                  value={filters.display_consent}
+                  label="Consent"
+                  onChange={(e) => handleFilterChange('display_consent', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="granted">Granted</MenuItem>
+                  <MenuItem value="denied">Denied</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 140 }}>
+                <InputLabel>Missing Assets</InputLabel>
+                <Select
+                  value={filters.missing_assets}
+                  label="Missing Assets"
+                  onChange={(e) => handleFilterChange('missing_assets', e.target.value)}
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="headshot">Missing Headshot</MenuItem>
+                  <MenuItem value="logo">Missing Logo</MenuItem>
+                  <MenuItem value="pitch_deck">Missing Pitch Deck</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
+          </Paper>
 
           {/* Bulk Actions */}
-          <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Button
+                size="small"
                 variant="outlined"
                 startIcon={<SendIcon />}
                 onClick={() => setReminderDialog(true)}
@@ -423,6 +452,7 @@ export default function PromotionalProfilesManager() {
                 Send Reminders ({selected.size})
               </Button>
               <Button
+                size="small"
                 variant="outlined"
                 startIcon={<CheckIcon />}
                 onClick={() => setCompleteDialog(true)}
@@ -430,14 +460,14 @@ export default function PromotionalProfilesManager() {
               >
                 Mark Complete ({selected.size})
               </Button>
-            </Box>
+            </Stack>
 
             {/* Export Buttons */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 600, color: 'textSecondary' }}>
                 Export Completed Profiles:
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', ml: 1 }}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
                 <Button
                   variant="contained"
                   size="small"
@@ -500,9 +530,9 @@ export default function PromotionalProfilesManager() {
                 >
                   Advanced...
                 </Button>
-              </Box>
+              </Stack>
             </Box>
-          </Box>
+          </Paper>
 
           {/* Table */}
           <TableContainer component={Paper}>
@@ -582,7 +612,9 @@ export default function PromotionalProfilesManager() {
               <Grid item xs={12} sm={6} md={4} key={role}>
                 <Card>
                   <CardContent>
-                    <h3 style={{ textTransform: 'capitalize', marginTop: 0 }}>{role}s</h3>
+                    <Typography variant="subtitle1" sx={{ textTransform: 'capitalize', mb: 2, fontWeight: 600 }}>
+                      {role}s
+                    </Typography>
                     <Box sx={{ mb: 2 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                         <span>{data.completed}/{data.total} Complete</span>
@@ -599,7 +631,7 @@ export default function PromotionalProfilesManager() {
                         fullWidth
                         size="small"
                         variant="outlined"
-                        onClick={() => handleExportByRole(role)}
+                        onClick={() => handleExportRoleProduction(role)}
                         disabled={exportingRole === role}
                       >
                         {exportingRole === role ? 'Exporting...' : 'Export ZIP'}
@@ -632,16 +664,24 @@ export default function PromotionalProfilesManager() {
             <Grid item xs={12} md={6} key={idx}>
               <Card>
                 <CardContent>
-                  <h3>{section.title} ({section.count || 0})</h3>
+                  <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                    {section.title} ({section.count || 0})
+                  </Typography>
                   <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
                     {section.items?.length === 0 ? (
-                      <p style={{ color: '#999' }}>None missing</p>
+                      <Typography variant="body2" color="textSecondary">
+                        None missing
+                      </Typography>
                     ) : (
-                      <ul style={{ paddingLeft: 20 }}>
+                      <ul style={{ paddingLeft: 20, margin: 0 }}>
                         {section.items?.map(item => (
-                          <li key={item.id}>
-                            <strong>{item.name}</strong> <br />
-                            <small>{item.email}</small>
+                          <li key={item.id} style={{ marginBottom: 8 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {item.name}
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                              {item.email}
+                            </Typography>
                           </li>
                         ))}
                       </ul>
@@ -658,7 +698,39 @@ export default function PromotionalProfilesManager() {
       <Dialog open={reminderDialog} onClose={() => setReminderDialog(false)}>
         <DialogTitle>Send Reminders</DialogTitle>
         <DialogContent>
-          <p>Send reminders to {selected.size} selected profiles?</p>
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {(() => {
+              const completedProfiles = profiles.filter(p => selected.has(p.id) && p.status === 'completed');
+              const incompleteProfiles = profiles.filter(p => selected.has(p.id) && p.status !== 'completed');
+
+              if (completedProfiles.length > 0 && incompleteProfiles.length === 0) {
+                return (
+                  <Alert severity="error">
+                    All selected profiles are already completed. Reminders can only be sent to profiles that are in progress or not started.
+                  </Alert>
+                );
+              }
+
+              if (completedProfiles.length > 0) {
+                return (
+                  <>
+                    <Alert severity="warning">
+                      {completedProfiles.length} of {selected.size} selected profile(s) are already completed.
+                    </Alert>
+                    <Typography variant="body2">
+                      Reminders will only be sent to {incompleteProfiles.length} incomplete profile(s)?
+                    </Typography>
+                  </>
+                );
+              }
+
+              return (
+                <Typography variant="body2">
+                  Send reminders to {selected.size} selected profiles?
+                </Typography>
+              );
+            })()}
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setReminderDialog(false)}>Cancel</Button>
@@ -666,6 +738,7 @@ export default function PromotionalProfilesManager() {
             onClick={handleSendReminders}
             variant="contained"
             color="primary"
+            disabled={profiles.filter(p => selected.has(p.id) && p.status === 'completed').length === selected.size && selected.size > 0}
           >
             Send
           </Button>
@@ -676,18 +749,34 @@ export default function PromotionalProfilesManager() {
         <DialogTitle>Mark as Complete</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Select
-              label="Module"
-              value={selectedModule}
-              onChange={(e) => setSelectedModule(e.target.value)}
-              fullWidth
-            >
-              <MenuItem value="">Select Module...</MenuItem>
-              {MODULES.map(m => (
-                <MenuItem key={m} value={m}>{m}</MenuItem>
-              ))}
-            </Select>
-            <p>Mark {selected.size} profiles as complete for this module?</p>
+            <FormControl fullWidth>
+              <InputLabel>Module</InputLabel>
+              <Select
+                value={selectedModule}
+                label="Module"
+                onChange={(e) => setSelectedModule(e.target.value)}
+              >
+                <MenuItem value="">Select Module...</MenuItem>
+                {MODULES.map(m => (
+                  <MenuItem key={m} value={m}>{m}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {(() => {
+              const completedProfiles = profiles.filter(p => selected.has(p.id) && p.status === 'completed');
+
+              if (completedProfiles.length > 0) {
+                return (
+                  <Alert severity="warning">
+                    {completedProfiles.length} of {selected.size} selected profile(s) are already completed.
+                  </Alert>
+                );
+              }
+              return null;
+            })()}
+            <Typography variant="body2">
+              Mark {selected.size} profiles as complete for this module?
+            </Typography>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -710,9 +799,9 @@ export default function PromotionalProfilesManager() {
             <Typography variant="body2" color="textSecondary">
               Exports completed profiles. Excludes profiles with denied consent.
             </Typography>
-            <div>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Format:</Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Format:</Typography>
+              <Stack direction="row" spacing={1}>
                 <Button
                   variant={exportFormat === 'zip' ? 'contained' : 'outlined'}
                   onClick={() => setExportFormat('zip')}
@@ -734,8 +823,8 @@ export default function PromotionalProfilesManager() {
                 >
                   JSON
                 </Button>
-              </Box>
-            </div>
+              </Stack>
+            </Box>
             {exportFormat === 'zip' && (
               <Typography variant="caption" color="textSecondary">
                 ZIP contains organized folders by role with profile.json + media files
