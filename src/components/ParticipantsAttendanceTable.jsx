@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import {
   Box,
   Paper,
@@ -16,10 +17,12 @@ import {
   Pagination,
   CircularProgress,
   Alert,
+  Button,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 
 const isVerifiedStatus = (raw) => {
   const v = String(raw || "").toLowerCase();
@@ -38,6 +41,7 @@ export default function ParticipantsAttendanceTable({
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const tabFilterMap = {
     0: null, // All
@@ -116,13 +120,67 @@ export default function ParticipantsAttendanceTable({
     setPage(1);
   };
 
+  const handleExportAttendance = async () => {
+    if (!token || !eventId) {
+      toast.error("Missing authentication or event information");
+      return;
+    }
+
+    setExportLoading(true);
+    try {
+      const url = `${apiRoot}/events/${eventId}/export-registrations/`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Export failed with status ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const nameMatch = disposition.match(/filename\s*=\s*"?([^";\n]+)"?/);
+      const filename = nameMatch
+        ? nameMatch[1].trim()
+        : `participants_attendance_${eventId}.csv`;
+
+      const objUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objUrl);
+
+      toast.success("Participants data exported successfully");
+    } catch (err) {
+      console.error("Error exporting participants:", err);
+      toast.error(err.message || "Failed to export participants data");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   return (
     <Paper elevation={0} className="border border-slate-200 rounded-2xl overflow-hidden">
       {/* Header with stats */}
       <Box className="p-6 bg-slate-50 border-b border-slate-200">
-        <Typography variant="h6" className="font-semibold mb-4">
-          Participant Attendance
-        </Typography>
+        <Box className="flex items-center justify-between mb-4">
+          <Typography variant="h6" className="font-semibold">
+            Participant Attendance
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={exportLoading}
+            onClick={handleExportAttendance}
+            startIcon={<FileDownloadRoundedIcon />}
+            sx={{ textTransform: "none" }}
+          >
+            {exportLoading ? "Exporting…" : "Export CSV"}
+          </Button>
+        </Box>
 
         {/* Stats Cards */}
         <Box className="flex gap-4">
