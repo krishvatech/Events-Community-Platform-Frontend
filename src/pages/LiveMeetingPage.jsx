@@ -2403,6 +2403,9 @@ export default function NewLiveMeeting() {
   const isReconnectingRef = useRef(false); // ✅ Guard: prevent leave during reconnect
   const manualLeaveRef = useRef(false); // ✅ Flag: allow leave even during reconnect if user clicks Leave
   const shouldPausePollingRef = useRef(false); // ✅ POLLING PAUSE: Pause non-essential APIs when offline
+  const rejoinRequestRef = useRef(null);
+  const intentionalMainSocketCloseRef = useRef(false);
+  const [mainSocketReconnectKey, setMainSocketReconnectKey] = useState(0);
 
   // ✅ Fullscreen support
   const rootRef = useRef(null);
@@ -7322,58 +7325,74 @@ export default function NewLiveMeeting() {
       return null;
     }
 
-    // ✅ TIMEOUT: 3-second AbortController for rejoin API
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    if (rejoinRequestRef.current) {
+      console.log("[Reconnect] Rejoin request already in flight, reusing it");
+      return rejoinRequestRef.current;
+    }
 
+    const request = (async () => {
+      // ✅ TIMEOUT: 3-second AbortController for rejoin API
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/live/rejoin/`), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader(),
+          },
+          signal: controller.signal,
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          // Check if auth token expired (401)
+          if (res.status === 401) {
+            console.warn("[Reconnect] Auth token expired (401)");
+            // Redirect to login - will require re-authentication
+            setIsReconnecting(false);
+            // ✅ GUARD: Clear the flag when auth fails
+            isReconnectingRef.current = false;
+            console.log("[Reconnect] Set isReconnectingRef = false, auth failed");
+            showSnackbar("Your session has expired. Please log in again.", "error");
+            navigate("/login", { replace: true });
+            return null;
+          }
+
+          const reason = data?.reason || "unknown";
+          console.warn("[Reconnect] Rejoin failed:", reason, data?.detail);
+          // ✅ GUARD: If backend says can't rejoin, stop reconnecting
+          if (data?.can_rejoin === false) {
+            isReconnectingRef.current = false;
+            console.log("[Reconnect] Set isReconnectingRef = false, backend says can't rejoin");
+          }
+          return { success: false, reason, detail: data?.detail };
+        }
+
+        console.log("[Reconnect] Rejoin successful:", data);
+        return { success: true, data };
+      } catch (error) {
+        // ✅ TIMEOUT: Handle AbortError separately from other errors
+        if (error.name === "AbortError") {
+          console.warn("[Reconnect] Rejoin endpoint timeout (3s)");
+          return { success: false, reason: "timeout", detail: "Rejoin request timed out" };
+        }
+        console.warn("[Reconnect] Rejoin endpoint error:", error);
+        return { success: false, reason: "network_error", detail: error.message };
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    })();
+
+    rejoinRequestRef.current = request;
     try {
-      const res = await fetch(toApiUrl(`events/${eventId}/live/rejoin/`), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeader(),
-        },
-        signal: controller.signal,
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        // Check if auth token expired (401)
-        if (res.status === 401) {
-          console.warn("[Reconnect] Auth token expired (401)");
-          // Redirect to login - will require re-authentication
-          setIsReconnecting(false);
-          // ✅ GUARD: Clear the flag when auth fails
-          isReconnectingRef.current = false;
-          console.log("[Reconnect] Set isReconnectingRef = false, auth failed");
-          showSnackbar("Your session has expired. Please log in again.", "error");
-          navigate("/login", { replace: true });
-          return null;
-        }
-
-        const reason = data?.reason || "unknown";
-        console.warn("[Reconnect] Rejoin failed:", reason, data?.detail);
-        // ✅ GUARD: If backend says can't rejoin, stop reconnecting
-        if (data?.can_rejoin === false) {
-          isReconnectingRef.current = false;
-          console.log("[Reconnect] Set isReconnectingRef = false, backend says can't rejoin");
-        }
-        return { success: false, reason, detail: data?.detail };
-      }
-
-      console.log("[Reconnect] Rejoin successful:", data);
-      return { success: true, data };
-    } catch (error) {
-      // ✅ TIMEOUT: Handle AbortError separately from other errors
-      if (error.name === "AbortError") {
-        console.warn("[Reconnect] Rejoin endpoint timeout (3s)");
-        return { success: false, reason: "timeout", detail: "Rejoin request timed out" };
-      }
-      console.warn("[Reconnect] Rejoin endpoint error:", error);
-      return { success: false, reason: "network_error", detail: error.message };
+      return await request;
     } finally {
-      clearTimeout(timeoutId);
+      if (rejoinRequestRef.current === request) {
+        rejoinRequestRef.current = null;
+      }
     }
   };
 
@@ -7461,16 +7480,16 @@ export default function NewLiveMeeting() {
         // Restore state from rejoin response
         restoreUserStateFromRejoin(rejoinResult);
 
-        // Attempt to reconnect WebSocket
-        // The WebSocket useEffect will handle reconnection based on eventId change or manual trigger
-        // For now, we'll just show success message and let the next reconnect handle it
+        // Recreate the main socket after a successful rejoin.
         console.log("[Reconnect] Rejoin succeeded, reconnecting WebSocket");
         setIsReconnecting(false);
         setReconnectMessage("Reconnected");
         reconnectLocked.current = false;
         // ✅ GUARD: Clear the flag when successfully reconnected
         isReconnectingRef.current = false;
+        shouldPausePollingRef.current = false;
         console.log("[Reconnect] Set isReconnectingRef = false, rejoin succeeded");
+        setMainSocketReconnectKey((value) => value + 1);
 
         // Show brief success message then clear
         setTimeout(() => {
@@ -7549,6 +7568,7 @@ export default function NewLiveMeeting() {
             reconnectTimerRef.current = null;
           }
           reconnectAttemptRef.current = 0;
+          setMainSocketReconnectKey((value) => value + 1);
         } else {
           console.log("[OfflineDetector] Rejoin failed on online event, continuing reconnect loop");
           // If rejoin fails, keep trying with existing loop
@@ -7588,6 +7608,7 @@ export default function NewLiveMeeting() {
     const WS_ROOT = API_ROOT.replace(/^http/, "ws").replace(/\/api\/?$/, "");
     const wsUrl = `${WS_ROOT}/ws/events/${eventId}/${qs}`.replace(/([^:]\/)\/+/g, "$1");
 
+    intentionalMainSocketCloseRef.current = false;
     console.log("[MainSocket] Connecting to:", wsUrl);
     const ws = new WebSocket(wsUrl);
     mainSocketRef.current = ws;
@@ -8708,6 +8729,10 @@ export default function NewLiveMeeting() {
       });
       mainSocketRef.current = null;
       mainSocketReadyRef.current = false;
+      if (intentionalMainSocketCloseRef.current || manualLeaveRef.current) {
+        console.log("[MainSocket] Close was intentional; skipping auto-reconnect");
+        return;
+      }
       // ✅ IMPORTANT: Keep pending actions so they can be sent when socket reconnects
       // DO NOT clear pendingMainSocketActionsRef.current here
 
@@ -8717,6 +8742,7 @@ export default function NewLiveMeeting() {
         reconnectAttemptRef.current = 0;
         setIsReconnecting(true);
         setReconnectMessage("Connection lost. Reconnecting...");
+        shouldPausePollingRef.current = true;
         console.log("[MainSocket] Starting auto-reconnect sequence");
         initiateAutoReconnect();
       }
@@ -8724,9 +8750,10 @@ export default function NewLiveMeeting() {
 
     return () => {
       console.log("[MainSocket] Cleanup function called - closing WebSocket");
+      intentionalMainSocketCloseRef.current = true;
       if (ws.readyState <= WebSocket.OPEN) ws.close();
     };
-  }, [eventId, isGuest]);
+  }, [eventId, isGuest, mainSocketReconnectKey]);
 
   // ✅ Additional polling for lounge status while in breakout (more frequent)
   // Ensures lounge close is detected quickly even if WebSocket updates are delayed
@@ -11000,13 +11027,18 @@ export default function NewLiveMeeting() {
   // Poll event status so clients exit when backend ends the meeting
   useEffect(() => {
     if (!eventId) return;
-    const controller = new AbortController();
     let cancelled = false;
     let failureCount = 0;
     let timerId = null;
 
     const fetchStatus = async () => {
       if (cancelled) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        scheduleNext();
+        return;
+      }
+
+      const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
         const res = await fetch(toApiUrl(`events/${eventId}/`), {
@@ -11055,15 +11087,19 @@ export default function NewLiveMeeting() {
 
     const scheduleNext = () => {
       if (cancelled) return;
-      const delay = failureCount === 0 ? 2000 : Math.min(2000 * 2 ** failureCount, 30000);
+      const socketReady = mainSocketRef.current?.readyState === WebSocket.OPEN;
+      const baseDelay = socketReady ? 30000 : 10000;
+      const delay =
+        failureCount === 0
+          ? baseDelay
+          : Math.min(baseDelay * 2 ** failureCount, 60000);
       timerId = setTimeout(fetchStatus, delay);
     };
 
-    // ✅ Fetch immediately on mount
+    // ✅ Fetch once on mount, then rely primarily on WebSocket updates with a slower fallback poll.
     fetchStatus();
     return () => {
       cancelled = true;
-      controller.abort();
       if (timerId) clearTimeout(timerId);
     };
   }, [eventId, handleMeetingEnd]);
@@ -14500,6 +14536,8 @@ export default function NewLiveMeeting() {
   const activeChatConversationId = isRoomChatActive
     ? roomChatConversationId
     : chatConversationId;
+  const ensureEventConversationPromiseRef = useRef(null);
+  const ensureLoungeConversationPromiseRef = useRef(null);
 
   const fetchChatMessages = useCallback(
     async (conversationId) => {
@@ -14517,20 +14555,36 @@ export default function NewLiveMeeting() {
 
   const ensureEventConversation = useCallback(async () => {
     if (!eventId) return null;
-    const res = await fetch(toApiUrl("messaging/conversations/ensure-event/"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeader() },
-      body: JSON.stringify({ event: eventId }),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(data?.detail || "Failed to open chat.");
+    if (chatConversationId) return chatConversationId;
+    if (ensureEventConversationPromiseRef.current) {
+      return ensureEventConversationPromiseRef.current;
     }
-    const cid = data?.id;
-    if (!cid) throw new Error("Chat conversation missing.");
-    setChatConversationId(cid);
-    return cid;
-  }, [eventId]);
+
+    const request = (async () => {
+      const res = await fetch(toApiUrl("messaging/conversations/ensure-event/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ event: eventId }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to open chat.");
+      }
+      const cid = data?.id;
+      if (!cid) throw new Error("Chat conversation missing.");
+      setChatConversationId(cid);
+      return cid;
+    })();
+
+    ensureEventConversationPromiseRef.current = request;
+    try {
+      return await request;
+    } finally {
+      if (ensureEventConversationPromiseRef.current === request) {
+        ensureEventConversationPromiseRef.current = null;
+      }
+    }
+  }, [chatConversationId, eventId]);
 
   const ensureSeatedInLounge = useCallback(async () => {
     if (!eventId) return null;
@@ -14555,46 +14609,61 @@ export default function NewLiveMeeting() {
 
   const ensureLoungeConversation = useCallback(async () => {
     if (!activeTableId) return null;
-
-    // First ensure user is seated in the lounge
-    try {
-      await ensureSeatedInLounge();
-    } catch (error) {
-      throw new Error("Must be seated in lounge to access chat.");
+    if (roomChatConversationId) return roomChatConversationId;
+    if (ensureLoungeConversationPromiseRef.current) {
+      return ensureLoungeConversationPromiseRef.current;
     }
 
-    const attemptEnsure = async () => {
-      const res = await fetch(toApiUrl("messaging/conversations/ensure-lounge/"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ table_id: activeTableId, title: activeRoomLabel }),
-      });
-      const data = await res.json().catch(() => null);
-      return { res, data };
-    };
-
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-    let lastError = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const { res, data } = await attemptEnsure();
-      if (res.ok) {
-        const cid = data?.id;
-        if (!cid) throw new Error("Room chat conversation missing.");
-        setRoomChatConversationId(cid);
-        return cid;
-      }
-      lastError = data?.detail || "Failed to open room chat.";
-      if (res.status !== 403) break;
-      // Seat creation can race join_table; re-ensure and retry briefly
+    const request = (async () => {
+      // First ensure user is seated in the lounge
       try {
         await ensureSeatedInLounge();
-      } catch { }
-      await sleep(350);
-    }
+      } catch (error) {
+        throw new Error("Must be seated in lounge to access chat.");
+      }
 
-    throw new Error(lastError || "Failed to open room chat.");
-  }, [activeRoomLabel, activeTableId, ensureSeatedInLounge]);
+      const attemptEnsure = async () => {
+        const res = await fetch(toApiUrl("messaging/conversations/ensure-lounge/"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ table_id: activeTableId, title: activeRoomLabel }),
+        });
+        const data = await res.json().catch(() => null);
+        return { res, data };
+      };
+
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      let lastError = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const { res, data } = await attemptEnsure();
+        if (res.ok) {
+          const cid = data?.id;
+          if (!cid) throw new Error("Room chat conversation missing.");
+          setRoomChatConversationId(cid);
+          return cid;
+        }
+        lastError = data?.detail || "Failed to open room chat.";
+        if (res.status !== 403) break;
+        // Seat creation can race join_table; re-ensure and retry briefly
+        try {
+          await ensureSeatedInLounge();
+        } catch { }
+        await sleep(350);
+      }
+
+      throw new Error(lastError || "Failed to open room chat.");
+    })();
+
+    ensureLoungeConversationPromiseRef.current = request;
+    try {
+      return await request;
+    } finally {
+      if (ensureLoungeConversationPromiseRef.current === request) {
+        ensureLoungeConversationPromiseRef.current = null;
+      }
+    }
+  }, [activeRoomLabel, activeTableId, ensureSeatedInLounge, roomChatConversationId]);
 
   const ensureActiveConversation = useCallback(async () => {
     if (isRoomChatActive) return ensureLoungeConversation();
@@ -14619,18 +14688,65 @@ export default function NewLiveMeeting() {
     }
   }, [activeChatConversationId, ensureActiveConversation]);
 
-  const markChatAllRead = useCallback(async (conversationId) => {
-    const cid = conversationId || activeChatConversationId;
-    if (!cid) return;
+  const MARK_ALL_READ_COOLDOWN_MS = 7000;
+  const markAllReadPendingRef = useRef(new Set());
+  const markAllReadLastSentRef = useRef(new Map());
 
+  const isDocumentVisible = useCallback(() => {
+    if (typeof document === "undefined") return true;
+    return document.visibilityState === "visible";
+  }, []);
+
+  const markConversationAllRead = useCallback(async (
+    conversationId,
+    { force = false, clearEventUnread = false, clearPrivateRecipientId = null } = {}
+  ) => {
+    const cid = conversationId ? String(conversationId) : "";
+    if (!cid) return false;
+    if (!isDocumentVisible()) return false;
+    if (markAllReadPendingRef.current.has(cid)) return false;
+
+    const lastSentAt = markAllReadLastSentRef.current.get(cid) || 0;
+    if (!force && Date.now() - lastSentAt < MARK_ALL_READ_COOLDOWN_MS) {
+      return false;
+    }
+
+    markAllReadPendingRef.current.add(cid);
     try {
-      await fetch(toApiUrl(`messaging/conversations/${cid}/mark-all-read/`), {
+      const res = await fetch(toApiUrl(`messaging/conversations/${cid}/mark-all-read/`), {
         method: "POST",
         headers: { ...authHeader() },
       });
-      setChatUnreadCount(0);
-    } catch { }
-  }, [activeChatConversationId]);
+      if (!res.ok) return false;
+
+      markAllReadLastSentRef.current.set(cid, Date.now());
+
+      if (clearEventUnread) {
+        setChatUnreadCount(0);
+      }
+
+      if (clearPrivateRecipientId) {
+        setPrivateUnreadByUserId((prev) => {
+          if (!prev?.[clearPrivateRecipientId]) return prev;
+          const next = { ...prev };
+          delete next[clearPrivateRecipientId];
+          return next;
+        });
+      }
+
+      return true;
+    } catch {
+      return false;
+    } finally {
+      markAllReadPendingRef.current.delete(cid);
+    }
+  }, [isDocumentVisible]);
+
+  const markChatAllRead = useCallback(async (conversationId) => {
+    const cid = conversationId || activeChatConversationId;
+    if (!cid) return;
+    await markConversationAllRead(cid, { clearEventUnread: true });
+  }, [activeChatConversationId, markConversationAllRead]);
 
   // ============ PRIVATE CHAT STATE ============
   const [privateChatUser, setPrivateChatUser] = useState(null);
@@ -14678,17 +14794,10 @@ export default function NewLiveMeeting() {
 
       // ✅ Clear unread for this DM as soon as it opens
       try {
-        await fetch(toApiUrl(`messaging/conversations/${convData.id}/mark-all-read/`), {
-          method: "POST",
-          headers: { ...authHeader() },
-        });
-
         const ridKey = String(recipientId);
-        setPrivateUnreadByUserId((prev) => {
-          if (!prev?.[ridKey]) return prev;
-          const next = { ...prev };
-          delete next[ridKey];
-          return next;
+        await markConversationAllRead(convData.id, {
+          force: true,
+          clearPrivateRecipientId: ridKey,
         });
       } catch { }
 
@@ -14855,6 +14964,7 @@ export default function NewLiveMeeting() {
     const tick = async () => {
       if (!alive) return;
       if (!getToken()) return;
+      if (!isDocumentVisible()) return;
       // ✅ POLLING PAUSE: Skip if offline/reconnecting
       if (shouldPausePollingRef.current || !navigator.onLine) {
         return;
@@ -14916,6 +15026,7 @@ export default function NewLiveMeeting() {
     const tick = async () => {
       if (!alive) return;
       if (!getToken()) return;
+      if (!isDocumentVisible()) return;
       // ✅ POLLING PAUSE: Skip if offline/reconnecting
       if (shouldPausePollingRef.current || !navigator.onLine) {
         return;
@@ -14942,17 +15053,9 @@ export default function NewLiveMeeting() {
         if (alive) setPrivateMessages(Array.isArray(msgs) ? msgs : []);
 
         // 3) Mark read + clear dot
-        await fetch(
-          toApiUrl(`messaging/conversations/${privateConversationId}/mark-all-read/`),
-          { method: "POST", headers: { ...authHeader() } }
-        );
-
-        if (recipientId) {
-          setPrivateUnreadByUserId((prev) => {
-            if (!prev?.[recipientId]) return prev;
-            const next = { ...prev };
-            delete next[recipientId];
-            return next;
+        if (unread > 0) {
+          await markConversationAllRead(privateConversationId, {
+            clearPrivateRecipientId: recipientId || null,
           });
         }
       } catch { }
@@ -14965,7 +15068,7 @@ export default function NewLiveMeeting() {
       alive = false;
       clearInterval(t);
     };
-  }, [privateChatUser, privateConversationId, isGuest]);
+  }, [isDocumentVisible, isGuest, markConversationAllRead, privateChatUser, privateConversationId]);
 
   // ✅ WebSocket listener for real-time edit/delete updates on private messages
   useEffect(() => {
@@ -15030,6 +15133,7 @@ export default function NewLiveMeeting() {
     const tick = async () => {
       if (!alive) return;
       if (!getToken()) return;
+      if (!isDocumentVisible()) return;
       // ✅ POLLING PAUSE: Skip if offline/reconnecting
       if (shouldPausePollingRef.current || !navigator.onLine) {
         return;
@@ -15044,7 +15148,9 @@ export default function NewLiveMeeting() {
             const cid = activeChatConversationId || (await ensureActiveConversation());
             if (cid) {
               await fetchChatMessages(cid);
-              await markChatAllRead(cid);
+              if (unread > 0) {
+                await markChatAllRead(cid);
+              }
             }
           } catch (error) {
             // Handle "not seated in room" error gracefully - user may still be joining the lounge
@@ -15071,6 +15177,7 @@ export default function NewLiveMeeting() {
   }, [
     eventId,
     activeTableId,
+    isDocumentVisible,
     isGuest,
     hostPerms.chat,
     isChatActive,
@@ -15149,14 +15256,16 @@ export default function NewLiveMeeting() {
       const cid = await ensureActiveConversation();
       if (cid) {
         await fetchChatMessages(cid);
-        await markChatAllRead(cid);
+        if (isChatActive && isDocumentVisible()) {
+          await markChatAllRead(cid);
+        }
       }
     } catch (e) {
       setChatError(e?.message || "Unable to load chat.");
     } finally {
       setChatLoading(false);
     }
-  }, [ensureActiveConversation, fetchChatMessages, markChatAllRead]);
+  }, [ensureActiveConversation, fetchChatMessages, isChatActive, isDocumentVisible, markChatAllRead]);
 
   const sendChatMessage = useCallback(async () => {
     // ✅ Guard: prevent guests from sending chat messages
@@ -23079,6 +23188,8 @@ export default function NewLiveMeeting() {
         rtkMeeting={rtkMeeting}
         onParticipantClick={openLoungeParticipantInfo}
         onJoinMain={forceRejoinMainFromLounge}
+        eventSocketMessage={lastMessage}
+        sendEventAction={sendMainSocketAction}
       />
     ) : (
       <PreEventLoungeGate
@@ -23318,6 +23429,8 @@ export default function NewLiveMeeting() {
           rtkMeeting={rtkMeeting}
           onParticipantClick={openLoungeParticipantInfo}
           onJoinMain={forceRejoinMainFromLounge}
+          eventSocketMessage={lastMessage}
+          sendEventAction={sendMainSocketAction}
         />
         <PreEventQnAModal
           open={preEventQnaModalOpen}
@@ -27013,6 +27126,8 @@ export default function NewLiveMeeting() {
             await applyBreakoutToken(newToken, tableId, tableName, logoUrl); // ✅ Pass logo URL
           }}
           onJoinMain={forceRejoinMainFromLounge}
+          eventSocketMessage={lastMessage}
+          sendEventAction={sendMainSocketAction}
         />
         <LoungeSettingsDialog
           open={loungeSettingsOpen}
