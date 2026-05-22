@@ -14,7 +14,20 @@ function getToken() {
     return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
 }
 
-const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, rtkMeeting, onParticipantClick, onJoinMain, onOpenSettings }) => {
+const LoungeOverlay = ({
+    open,
+    onClose,
+    eventId,
+    currentUserId,
+    isAdmin,
+    onEnterBreakout,
+    rtkMeeting,
+    onParticipantClick,
+    onJoinMain,
+    onOpenSettings,
+    eventSocketMessage = null,
+    sendEventAction = null,
+}) => {
     const [tables, setTables] = useState([]);
     const [breakoutTables, setBreakoutTables] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -269,8 +282,158 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         return () => URL.revokeObjectURL(previewUrl);
     }, [editIconFile]);
 
+    const sendSocketAction = useCallback((payload) => {
+        if (typeof sendEventAction === "function") {
+            return sendEventAction(payload);
+        }
+
+        const ws = socketRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(payload));
+            return true;
+        }
+        return false;
+    }, [sendEventAction]);
+
+    const handleSocketMessage = useCallback(async (msg) => {
+        if (!msg?.type) return;
+
+        console.log("[Lounge] Incoming Message:", msg.type, msg);
+        if (msg.type === "welcome" || msg.type === "lounge_state") {
+            if (msg.type === "welcome") {
+                const internalId = msg.your_user_id || msg.your_id || msg.user_id;
+                console.log("[Lounge] Detected myInternalId from welcome:", internalId, "Keys in msg:", Object.keys(msg));
+                if (internalId) setMyInternalId(internalId);
+            }
+            const newState = msg.lounge_state || msg.state || [];
+            console.log("[Lounge] Updating Tables:", newState);
+            const loungeOnly = newState.filter(t => t.category === 'LOUNGE' || !t.category);
+            const breakoutOnly = newState.filter(t => t.category === 'BREAKOUT');
+            setTables(normalizeTables(loungeOnly));
+            setBreakoutTables(normalizeTables(breakoutOnly));
+            if (msg.lounge_open_status) {
+                setLoungeOpenStatus(msg.lounge_open_status);
+            }
+            setLoading(false);
+        } else if (msg.type === "breakout_end") {
+            // Host has ended all breakouts - refresh lounge state
+            console.log("[Lounge] Received breakout_end - refreshing table state");
+            setBreakoutTables([]); // Clear all breakout tables
+            // Trigger a fresh fetch to ensure consistency
+            fetchLoungeState();
+        } else if (msg.type === "late_joiner_notification") {
+            // Host receives notification about new late joiner
+            console.log("[Lounge] Late joiner notification:", msg.notification);
+            setLateJoiners(prev => [
+                ...prev.filter(lj => lj.participant_id !== msg.notification.participant_id),
+                msg.notification
+            ]);
+        } else if (msg.type === "waiting_for_breakout_assignment") {
+            // ✅ INTENT-BASED SUPPRESSION: Don't show waiting message if user intentionally opened lounge
+            // User explicitly chose to join the lounge instead of waiting for assignment
+            if (userIntentionallyOpenedLoungeRef.current) {
+                console.log("[Lounge] 🚫 Suppressing waiting_for_breakout_assignment - user intentionally in lounge");
+                return; // Don't show waiting message, user is actively browsing lounge
+            }
+
+            // ✅ GRACE PERIOD: Also don't show if user just left a breakout room
+            const timeSinceLeftBreakout = leftBreakoutAtRef.current
+                ? Date.now() - leftBreakoutAtRef.current
+                : Infinity;
+            const GRACE_PERIOD_MS = 10000; // 10 second grace period after leaving breakout
+
+            if (timeSinceLeftBreakout < GRACE_PERIOD_MS) {
+                console.log(`[Lounge] ⏳ Ignoring waiting_for_breakout_assignment (${Math.round(timeSinceLeftBreakout)}ms since leaving breakout, grace period: ${GRACE_PERIOD_MS}ms)`);
+                return; // Skip this message, don't show waiting state
+            }
+
+            // Participant receives message that they are waiting for assignment
+            console.log("[Lounge] Participant is waiting for breakout assignment");
+            setIsWaitingForAssignment(true);
+            setWaitingJoinedAt(msg.joined_at || new Date().toISOString());
+        } else if (msg.type === "late_joiner_assigned") {
+            // Participant receives assignment to a breakout room
+            console.log("[Lounge] Late joiner assigned:", msg);
+            setIsWaitingForAssignment(false);
+
+            // ✅ Refresh RTK participant list to show newly assigned participant
+            if (rtkMeeting) {
+                console.log("[Lounge] Refreshing RTK participants after assignment...");
+                try {
+                    // Refresh video subscriptions to detect new participant
+                    if (typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                        await rtkMeeting.participants.videoSubscribed.refresh();
+                        console.log("[Lounge] ✅ RTK participants refreshed");
+                    }
+                    // Also try to refresh active participants list
+                    if (typeof rtkMeeting.participants?.refresh === 'function') {
+                        await rtkMeeting.participants.refresh();
+                    }
+                } catch (e) {
+                    console.warn("[Lounge] Failed to refresh RTK participants:", e);
+                }
+            }
+
+            // Notify parent to join the breakout room
+            if (onEnterBreakout) {
+                onEnterBreakout(null, msg.room_id, msg.room_name, "");
+            }
+        } else if (msg.type === "late_joiner_dismissed") {
+            // Participant receives message that they stay in main room
+            console.log("[Lounge] Late joiner dismissed - staying in main room");
+            setIsWaitingForAssignment(false);
+        } else if (msg.type === "refresh_breakout_participants") {
+            // Someone was assigned to a breakout room - refresh that room's participant list
+            console.log("[Lounge] Refreshing breakout participants for room:", msg.room_id);
+
+            // ✅ Refresh RTK participants to sync with late joiner assignment
+            if (rtkMeeting) {
+                console.log("[Lounge] Refreshing RTK participants due to assignment...");
+                try {
+                    // Refresh video subscriptions to detect newly assigned participant
+                    if (typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                        await rtkMeeting.participants.videoSubscribed.refresh();
+                        console.log("[Lounge] ✅ RTK participants refreshed");
+                    }
+                    // Also try to refresh active participants list
+                    if (typeof rtkMeeting.participants?.refresh === 'function') {
+                        await rtkMeeting.participants.refresh();
+                    }
+                } catch (e) {
+                    console.warn("[Lounge] Failed to refresh RTK participants:", e);
+                }
+            }
+
+            // The fetchLoungeState will get latest data
+            fetchLoungeState();
+        } else if (msg.type === "lounge_settings_update") {
+            // Host changed lounge settings - immediately refresh status banner
+            console.log("[Lounge] Settings updated, refreshing lounge state immediately...");
+            fetchLoungeState();
+        } else if (msg.type === "error") {
+            console.error("[Lounge] Backend Error:", msg.message);
+        }
+    }, [fetchLoungeState, normalizeTables, onEnterBreakout, rtkMeeting]);
+
+    useEffect(() => {
+        if (!open || !eventSocketMessage) return;
+        handleSocketMessage(eventSocketMessage);
+    }, [open, eventSocketMessage, handleSocketMessage]);
+
+    useEffect(() => {
+        if (!open || typeof sendEventAction !== "function") return;
+
+        setWsStatus('open');
+        sendEventAction({ action: "enter_lounge" });
+
+        return () => {
+            sendEventAction({ action: "exit_lounge" });
+        };
+    }, [open, sendEventAction]);
+
     useEffect(() => {
         if (!open || !eventId) return;
+        if (typeof sendEventAction === "function") return;
 
         // Avoid multiple connections if already open for this event
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN && socketRef.current._eventId === eventId) {
@@ -300,121 +463,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         ws.onmessage = async (event) => {
             try {
                 const msg = JSON.parse(event.data);
-                console.log("[Lounge] Incoming Message:", msg.type, msg);
-                if (msg.type === "welcome" || msg.type === "lounge_state") {
-                    if (msg.type === "welcome") {
-                        const internalId = msg.your_user_id || msg.your_id || msg.user_id;
-                        console.log("[Lounge] Detected myInternalId from welcome:", internalId, "Keys in msg:", Object.keys(msg));
-                        if (internalId) setMyInternalId(internalId);
-                    }
-                    const newState = msg.lounge_state || msg.state || [];
-                    console.log("[Lounge] Updating Tables:", newState);
-                    const loungeOnly = newState.filter(t => t.category === 'LOUNGE' || !t.category);
-                    const breakoutOnly = newState.filter(t => t.category === 'BREAKOUT');
-                    setTables(normalizeTables(loungeOnly));
-                    setBreakoutTables(normalizeTables(breakoutOnly));
-                    if (msg.lounge_open_status) {
-                        setLoungeOpenStatus(msg.lounge_open_status);
-                    }
-                    setLoading(false);
-                } else if (msg.type === "breakout_end") {
-                    // Host has ended all breakouts - refresh lounge state
-                    console.log("[Lounge] Received breakout_end - refreshing table state");
-                    setBreakoutTables([]); // Clear all breakout tables
-                    // Trigger a fresh fetch to ensure consistency
-                    fetchLoungeState();
-                } else if (msg.type === "late_joiner_notification") {
-                    // Host receives notification about new late joiner
-                    console.log("[Lounge] Late joiner notification:", msg.notification);
-                    setLateJoiners(prev => [
-                        ...prev.filter(lj => lj.participant_id !== msg.notification.participant_id),
-                        msg.notification
-                    ]);
-                } else if (msg.type === "waiting_for_breakout_assignment") {
-                    // ✅ INTENT-BASED SUPPRESSION: Don't show waiting message if user intentionally opened lounge
-                    // User explicitly chose to join the lounge instead of waiting for assignment
-                    if (userIntentionallyOpenedLoungeRef.current) {
-                        console.log(`[Lounge] 🚫 Suppressing waiting_for_breakout_assignment - user intentionally in lounge`);
-                        return; // Don't show waiting message, user is actively browsing lounge
-                    }
-
-                    // ✅ GRACE PERIOD: Also don't show if user just left a breakout room
-                    const timeSinceLeftBreakout = leftBreakoutAtRef.current
-                        ? Date.now() - leftBreakoutAtRef.current
-                        : Infinity;
-                    const GRACE_PERIOD_MS = 10000; // 10 second grace period after leaving breakout
-
-                    if (timeSinceLeftBreakout < GRACE_PERIOD_MS) {
-                        console.log(`[Lounge] ⏳ Ignoring waiting_for_breakout_assignment (${Math.round(timeSinceLeftBreakout)}ms since leaving breakout, grace period: ${GRACE_PERIOD_MS}ms)`);
-                        return; // Skip this message, don't show waiting state
-                    }
-
-                    // Participant receives message that they are waiting for assignment
-                    console.log("[Lounge] Participant is waiting for breakout assignment");
-                    setIsWaitingForAssignment(true);
-                    setWaitingJoinedAt(msg.joined_at || new Date().toISOString());
-                } else if (msg.type === "late_joiner_assigned") {
-                    // Participant receives assignment to a breakout room
-                    console.log("[Lounge] Late joiner assigned:", msg);
-                    setIsWaitingForAssignment(false);
-
-                    // ✅ Refresh RTK participant list to show newly assigned participant
-                    if (rtkMeeting) {
-                        console.log("[Lounge] Refreshing RTK participants after assignment...");
-                        try {
-                            // Refresh video subscriptions to detect new participant
-                            if (typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
-                                await rtkMeeting.participants.videoSubscribed.refresh();
-                                console.log("[Lounge] ✅ RTK participants refreshed");
-                            }
-                            // Also try to refresh active participants list
-                            if (typeof rtkMeeting.participants?.refresh === 'function') {
-                                await rtkMeeting.participants.refresh();
-                            }
-                        } catch (e) {
-                            console.warn("[Lounge] Failed to refresh RTK participants:", e);
-                        }
-                    }
-
-                    // Notify parent to join the breakout room
-                    if (onEnterBreakout) {
-                        onEnterBreakout(null, msg.room_id, msg.room_name, "");
-                    }
-                } else if (msg.type === "late_joiner_dismissed") {
-                    // Participant receives message that they stay in main room
-                    console.log("[Lounge] Late joiner dismissed - staying in main room");
-                    setIsWaitingForAssignment(false);
-                } else if (msg.type === "refresh_breakout_participants") {
-                    // Someone was assigned to a breakout room - refresh that room's participant list
-                    console.log("[Lounge] Refreshing breakout participants for room:", msg.room_id);
-
-                    // ✅ Refresh RTK participants to sync with late joiner assignment
-                    if (rtkMeeting) {
-                        console.log("[Lounge] Refreshing RTK participants due to assignment...");
-                        try {
-                            // Refresh video subscriptions to detect newly assigned participant
-                            if (typeof rtkMeeting.participants?.videoSubscribed?.refresh === 'function') {
-                                await rtkMeeting.participants.videoSubscribed.refresh();
-                                console.log("[Lounge] ✅ RTK participants refreshed");
-                            }
-                            // Also try to refresh active participants list
-                            if (typeof rtkMeeting.participants?.refresh === 'function') {
-                                await rtkMeeting.participants.refresh();
-                            }
-                        } catch (e) {
-                            console.warn("[Lounge] Failed to refresh RTK participants:", e);
-                        }
-                    }
-
-                    // The fetchLoungeState will get latest data
-                    fetchLoungeState();
-                } else if (msg.type === "lounge_settings_update") {
-                    // Host changed lounge settings - immediately refresh status banner
-                    console.log("[Lounge] Settings updated, refreshing lounge state immediately...");
-                    fetchLoungeState();
-                } else if (msg.type === "error") {
-                    console.error("[Lounge] Backend Error:", msg.message);
-                }
+                await handleSocketMessage(msg);
             } catch (err) {
                 console.warn("[Lounge] Failed to parse message:", err);
             }
@@ -444,17 +493,15 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                 ws.close();
             }
         };
-    }, [open, eventId]);
+    }, [eventId, handleSocketMessage, open, sendEventAction]);
 
     const handleJoinTable = (tableId, seatIndex) => {
-        const ws = socketRef.current;
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (sendSocketAction({
+            action: "join_table",
+            table_id: tableId,
+            seat_index: seatIndex
+        })) {
             console.log("[Lounge] Sending join_table:", { tableId, seatIndex });
-            ws.send(JSON.stringify({
-                action: "join_table",
-                table_id: tableId,
-                seat_index: seatIndex
-            }));
         }
     };
 
@@ -489,12 +536,8 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
 
 
         // 2. Send WebSocket message to update backend state
-        const ws = socketRef.current;
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (sendSocketAction({ action: "leave_table" })) {
             console.log("[Lounge] Sending leave_table to backend");
-            ws.send(JSON.stringify({
-                action: "leave_table"
-            }));
         }
 
         // 3. Signal to parent component to return to main meeting
@@ -563,14 +606,12 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     };
 
     const handleAssignLateJoiner = (participantId, roomId) => {
-        const ws = socketRef.current;
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (sendSocketAction({
+            action: "assign_late_joiner",
+            participant_id: participantId,
+            room_id: roomId
+        })) {
             console.log("[Lounge] Assigning late joiner:", { participantId, roomId });
-            ws.send(JSON.stringify({
-                action: "assign_late_joiner",
-                participant_id: participantId,
-                room_id: roomId
-            }));
             // Remove from UI immediately
             setLateJoiners(prev => prev.filter(lj => lj.participant_id !== participantId));
         } else {
@@ -580,13 +621,11 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     };
 
     const handleDismissLateJoiner = (participantId) => {
-        const ws = socketRef.current;
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (sendSocketAction({
+            action: "dismiss_late_joiner",
+            participant_id: participantId
+        })) {
             console.log("[Lounge] Dismissing late joiner:", participantId);
-            ws.send(JSON.stringify({
-                action: "dismiss_late_joiner",
-                participant_id: participantId
-            }));
             // Remove from UI immediately
             setLateJoiners(prev => prev.filter(lj => lj.participant_id !== participantId));
         } else {
