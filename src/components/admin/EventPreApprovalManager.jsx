@@ -5,6 +5,8 @@ import {
   Button,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
   MenuItem,
   Pagination,
   Paper,
@@ -20,6 +22,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { apiClient } from "../../utils/api";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -36,19 +39,34 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
     attendee_marker_label: event?.attendee_marker_label || "",
   });
 
+  // FIX 3: Add tracks and submission modes state
+  const [tracks, setTracks] = React.useState([]);
+  const SUBMISSION_MODES = [
+    { value: "self_submission", label: "Self Submission" },
+    { value: "confirmed", label: "Confirmed" },
+    { value: "self_nomination", label: "Self Nomination" },
+    { value: "third_party_nomination", label: "Third Party Nomination" },
+  ];
+
   const [codes, setCodes] = React.useState([]);
   const [codeStatus, setCodeStatus] = React.useState("active");
   const [codeSearch, setCodeSearch] = React.useState("");
   const [codePage, setCodePage] = React.useState(1);
   const [newCode, setNewCode] = React.useState("");
   const [newCodeNotes, setNewCodeNotes] = React.useState("");
+  const [newCodeTrackId, setNewCodeTrackId] = React.useState(""); // FIX 3
+  const [newCodeSubmissionMode, setNewCodeSubmissionMode] = React.useState(""); // FIX 3
   const [batchPrefix, setBatchPrefix] = React.useState("");
   const [batchCount, setBatchCount] = React.useState(20);
+  const [batchTrackId, setBatchTrackId] = React.useState(""); // FIX 3
+  const [batchSubmissionMode, setBatchSubmissionMode] = React.useState(""); // FIX 3
 
   const [allowlist, setAllowlist] = React.useState([]);
   const [allowFirst, setAllowFirst] = React.useState("");
   const [allowLast, setAllowLast] = React.useState("");
   const [allowEmail, setAllowEmail] = React.useState("");
+  const [allowTrackId, setAllowTrackId] = React.useState(""); // FIX 2
+  const [allowSubmissionMode, setAllowSubmissionMode] = React.useState(""); // FIX 2
 
   React.useEffect(() => {
     setConfig({
@@ -59,32 +77,47 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
     });
   }, [event]);
 
+  // FIX 3: Load application tracks for dropdowns
+  React.useEffect(() => {
+    if (!event?.id) return;
+    const loadTracks = async () => {
+      try {
+        const { data } = await apiClient.get(`/events/${event.id}/application-tracks/`);
+        const tracksArray = Array.isArray(data) ? data : (data.results || []);
+        setTracks(tracksArray);
+      } catch (err) {
+        console.error("Failed to load tracks:", err);
+      }
+    };
+    loadTracks();
+  }, [event?.id]);
+
   const authHeaders = React.useMemo(
     () => ({ "Content-Type": "application/json", Authorization: `Bearer ${token}` }),
     [token]
   );
 
   const fetchCodes = React.useCallback(async () => {
-    if (!event?.id || !token) return;
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/codes/?status=${codeStatus}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setCodes(Array.isArray(data) ? data : []);
+    if (!event?.id) return;
+    try {
+      // FIX 11: Use apiClient instead of fetch
+      const { data } = await apiClient.get(`/events/${event.id}/preapproval/codes/?status=${codeStatus}`);
+      setCodes(Array.isArray(data) ? data : (data.results || []));
+    } catch (err) {
+      console.error("Failed to fetch codes:", err);
     }
-  }, [event?.id, token, codeStatus]);
+  }, [event?.id, codeStatus]);
 
   const fetchAllowlist = React.useCallback(async () => {
-    if (!event?.id || !token) return;
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/allowlist/`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setAllowlist(Array.isArray(data) ? data : []);
+    if (!event?.id) return;
+    try {
+      // FIX 11: Use apiClient instead of fetch
+      const { data } = await apiClient.get(`/events/${event.id}/preapproval/allowlist/`);
+      setAllowlist(Array.isArray(data) ? data : (data.results || []));
+    } catch (err) {
+      console.error("Failed to fetch allowlist:", err);
     }
-  }, [event?.id, token]);
+  }, [event?.id]);
 
   React.useEffect(() => { fetchCodes(); }, [fetchCodes]);
   React.useEffect(() => { fetchAllowlist(); }, [fetchAllowlist]);
@@ -111,97 +144,129 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
     setSavingConfig(true);
     setConfigMsg("");
     try {
-      const res = await fetch(`${API_ROOT}/events/${event.id}/`, {
-        method: "PATCH",
-        headers: authHeaders,
-        body: JSON.stringify(config),
-      });
-      if (!res.ok) throw new Error("Failed to save pre-approval configuration.");
-      const data = await res.json();
+      // FIX 11: Use apiClient instead of fetch
+      const { data } = await apiClient.patch(`/events/${event.id}/`, config);
       onEventUpdated?.(data);
       setConfigMsg("Configuration saved.");
     } catch (e) {
-      setConfigMsg(e.message || "Failed to save configuration.");
+      setConfigMsg(e.response?.data?.detail || "Failed to save configuration.");
     } finally {
       setSavingConfig(false);
     }
   };
 
   const createSingleCode = async () => {
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/codes/`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({ code: newCode.trim(), notes: newCodeNotes.trim() }),
-    });
-    if (res.ok) {
+    try {
+      // FIX 3: Include track_id and submission_mode
+      // FIX 11: Use apiClient instead of fetch
+      const payload = {
+        code: newCode.trim(),
+        notes: newCodeNotes.trim(),
+      };
+      if (newCodeTrackId) payload.track_id = newCodeTrackId;
+      if (newCodeSubmissionMode) payload.submission_mode = newCodeSubmissionMode;
+
+      await apiClient.post(`/events/${event.id}/preapproval/codes/`, payload);
       setNewCode("");
       setNewCodeNotes("");
+      setNewCodeTrackId("");
+      setNewCodeSubmissionMode("");
       fetchCodes();
+    } catch (err) {
+      console.error("Failed to create code:", err);
     }
   };
 
   const createBatchCodes = async () => {
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/codes/batch/`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({ count: Number(batchCount), prefix: batchPrefix.trim() }),
-    });
-    if (res.ok) fetchCodes();
+    try {
+      // FIX 3: Include track_id and submission_mode
+      // FIX 11: Use apiClient instead of fetch
+      const payload = {
+        count: Number(batchCount),
+        prefix: batchPrefix.trim(),
+      };
+      if (batchTrackId) payload.track_id = batchTrackId;
+      if (batchSubmissionMode) payload.submission_mode = batchSubmissionMode;
+
+      await apiClient.post(`/events/${event.id}/preapproval/codes/batch/`, payload);
+      setBatchPrefix("");
+      setBatchCount(20);
+      setBatchTrackId("");
+      setBatchSubmissionMode("");
+      fetchCodes();
+    } catch (err) {
+      console.error("Failed to create batch codes:", err);
+    }
   };
 
   const revokeCode = async (codeId) => {
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/codes/${codeId}/revoke/`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({}),
-    });
-    if (res.ok) fetchCodes();
+    try {
+      // FIX 11: Use apiClient instead of fetch
+      await apiClient.post(`/events/${event.id}/preapproval/codes/${codeId}/revoke/`, {});
+      fetchCodes();
+    } catch (err) {
+      console.error("Failed to revoke code:", err);
+    }
   };
 
   const markCodeUsed = async (codeId) => {
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/codes/${codeId}/mark-used/`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({}),
-    });
-    if (res.ok) fetchCodes();
+    try {
+      // FIX 11: Use apiClient instead of fetch
+      await apiClient.post(`/events/${event.id}/preapproval/codes/${codeId}/mark-used/`, {});
+      fetchCodes();
+    } catch (err) {
+      console.error("Failed to mark code used:", err);
+    }
   };
 
   const addAllowlist = async () => {
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/allowlist/`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({
+    try {
+      // FIX 2: Include track_id and submission_mode in allowlist creation
+      // FIX 11: Use apiClient instead of fetch
+      const payload = {
         first_name: allowFirst.trim(),
         last_name: allowLast.trim(),
         email: allowEmail.trim().toLowerCase(),
-      }),
-    });
-    if (res.ok) {
+      };
+      if (allowTrackId) payload.track_id = allowTrackId;
+      if (allowSubmissionMode) payload.submission_mode = allowSubmissionMode;
+
+      await apiClient.post(`/events/${event.id}/preapproval/allowlist/`, payload);
       setAllowFirst("");
       setAllowLast("");
       setAllowEmail("");
+      setAllowTrackId("");
+      setAllowSubmissionMode("");
       fetchAllowlist();
+    } catch (err) {
+      console.error("Failed to add allowlist entry:", err);
     }
   };
 
   const removeAllowlist = async (entryId) => {
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/allowlist/${entryId}/`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) fetchAllowlist();
+    try {
+      // FIX 11: Use apiClient instead of fetch
+      await apiClient.delete(`/events/${event.id}/preapproval/allowlist/${entryId}/`);
+      fetchAllowlist();
+    } catch (err) {
+      console.error("Failed to remove allowlist entry:", err);
+    }
   };
 
   const importCsv = async (file) => {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch(`${API_ROOT}/events/${event.id}/preapproval/allowlist/import-csv/`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: fd,
-    });
-    if (res.ok) fetchAllowlist();
+    try {
+      // FIX 2: CSV import must include track_id and submission_mode (via CSV columns)
+      // FIX 11: Use apiClient instead of fetch
+      const fd = new FormData();
+      fd.append("file", file);
+      if (allowTrackId) fd.append("track_id", allowTrackId);
+      if (allowSubmissionMode) fd.append("submission_mode", allowSubmissionMode);
+
+      await apiClient.post(`/events/${event.id}/preapproval/allowlist/import-csv/`, fd);
+      fetchAllowlist();
+    } catch (err) {
+      console.error("Failed to import CSV:", err);
+    }
   };
 
   return (
@@ -239,14 +304,51 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
 
         <Divider />
         <Typography variant="subtitle2">Codes</Typography>
+        {/* FIX 3: Add track and submission mode dropdowns */}
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
           <TextField size="small" label="Custom-Code (optional)" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
           <TextField size="small" label="Notes" value={newCodeNotes} onChange={(e) => setNewCodeNotes(e.target.value)} />
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Track (optional)</InputLabel>
+            <Select value={newCodeTrackId} label="Track (optional)" onChange={(e) => setNewCodeTrackId(e.target.value)}>
+              <MenuItem value="">None (event-level)</MenuItem>
+              {tracks.map((t) => (
+                <MenuItem key={t.id} value={t.id}>{t.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Submission Mode (optional)</InputLabel>
+            <Select value={newCodeSubmissionMode} label="Submission Mode (optional)" onChange={(e) => setNewCodeSubmissionMode(e.target.value)}>
+              <MenuItem value="">Any mode</MenuItem>
+              {SUBMISSION_MODES.map((m) => (
+                <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button variant="outlined" onClick={createSingleCode}>Create Code</Button>
         </Stack>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
           <TextField size="small" label="Prefix" value={batchPrefix} onChange={(e) => setBatchPrefix(e.target.value)} />
           <TextField size="small" type="number" label="Count" value={batchCount} onChange={(e) => setBatchCount(e.target.value)} />
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Track (optional)</InputLabel>
+            <Select value={batchTrackId} label="Track (optional)" onChange={(e) => setBatchTrackId(e.target.value)}>
+              <MenuItem value="">None (event-level)</MenuItem>
+              {tracks.map((t) => (
+                <MenuItem key={t.id} value={t.id}>{t.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Submission Mode (optional)</InputLabel>
+            <Select value={batchSubmissionMode} label="Submission Mode (optional)" onChange={(e) => setBatchSubmissionMode(e.target.value)}>
+              <MenuItem value="">Any mode</MenuItem>
+              {SUBMISSION_MODES.map((m) => (
+                <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button variant="outlined" onClick={createBatchCodes}>Generate Batch</Button>
           <Select size="small" value={codeStatus} onChange={(e) => setCodeStatus(e.target.value)}>
             <MenuItem value="active">Active</MenuItem>
@@ -314,10 +416,29 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
 
         <Divider />
         <Typography variant="subtitle2">Allowlist</Typography>
+        {/* FIX 2: Add track and submission mode to allowlist */}
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
           <TextField size="small" label="First Name" value={allowFirst} onChange={(e) => setAllowFirst(e.target.value)} />
           <TextField size="small" label="Last Name" value={allowLast} onChange={(e) => setAllowLast(e.target.value)} />
           <TextField size="small" label="Email" value={allowEmail} onChange={(e) => setAllowEmail(e.target.value)} />
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Track (optional)</InputLabel>
+            <Select value={allowTrackId} label="Track (optional)" onChange={(e) => setAllowTrackId(e.target.value)}>
+              <MenuItem value="">None (event-level)</MenuItem>
+              {tracks.map((t) => (
+                <MenuItem key={t.id} value={t.id}>{t.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Submission Mode (optional)</InputLabel>
+            <Select value={allowSubmissionMode} label="Submission Mode (optional)" onChange={(e) => setAllowSubmissionMode(e.target.value)}>
+              <MenuItem value="">Any mode</MenuItem>
+              {SUBMISSION_MODES.map((m) => (
+                <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button variant="outlined" onClick={addAllowlist}>Add Entry</Button>
           <Button variant="outlined" component="label">
             Import CSV

@@ -62,6 +62,7 @@ import EventConfirmationEmailManager from "../components/admin/EventConfirmation
 import ParticipantInformationManager from "../components/admin/ParticipantInformationManager.jsx";
 import PromotionalProfilesManager from "../components/admin/PromotionalProfilesManager.jsx";
 import ApplicationTracksManager from "../components/ApplicationTracksManager.jsx";
+import EventManageApplications from "./EventManageApplications.jsx";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
@@ -8314,7 +8315,7 @@ export default function EventManagePage() {
                   {tab === tabLabels.indexOf("Overview") && renderOverview()}
                   {event?.registration_type === 'apply' ? (
                     <>
-                      {tab === tabLabels.indexOf("Applications") && renderApplications()}
+                      {tab === tabLabels.indexOf("Applications") && <EventManageApplications />}
                       {tab === tabLabels.indexOf("Application Tracks") && <ApplicationTracksManager eventId={eventId} token={getToken()} />}
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
                       {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}

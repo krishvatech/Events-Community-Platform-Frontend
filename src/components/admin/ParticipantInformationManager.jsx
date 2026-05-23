@@ -73,6 +73,8 @@ export default function ParticipantInformationManager({ eventId }) {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      // FIX 7: Filter by participant_information form type only
+      params.append('form_type', 'participant_information');
       if (filterStatus !== 'all') {
         params.append('status', filterStatus);
       }
@@ -112,8 +114,11 @@ export default function ParticipantInformationManager({ eventId }) {
 
   const fetchSummary = async () => {
     try {
+      // FIX 7: Include form_type filter in summary API call
+      const params = new URLSearchParams();
+      params.append('form_type', 'participant_information');
       const { data } = await apiClient.get(
-        `/events/${eventId}/post-acceptance-form-assignments-admin/summary/`
+        `/events/${eventId}/post-acceptance-form-assignments-admin/summary/?${params.toString()}`
       );
       setSummary(data);
     } catch (err) {
