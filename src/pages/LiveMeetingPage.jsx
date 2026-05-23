@@ -2969,6 +2969,36 @@ export default function NewLiveMeeting() {
   const waitingRoomQueueRef = useRef([]);
 
   const [authToken, setAuthToken] = useState("");
+  const guestAttendeePayload = useMemo(() => {
+    if (!isGuest) return null;
+    try {
+      return JSON.parse(localStorage.getItem("guest_attendee") || "null");
+    } catch {
+      return null;
+    }
+  }, [eventId, isGuest]);
+  const guestSessionEventId =
+    guestAttendeePayload?.event_id ??
+    guestAttendeePayload?.event?.id ??
+    null;
+  const guestSessionMatchesEvent = Boolean(
+    isGuest &&
+    eventId &&
+    localStorage.getItem("guest_token") &&
+    (!guestSessionEventId || String(guestSessionEventId) === String(eventId))
+  );
+  const hasLiveInteractiveAccess = Boolean(
+    eventId &&
+    (
+      isHost ||
+      guestSessionMatchesEvent ||
+      waitingRoomActive ||
+      waitingRoomStatus === "admitted" ||
+      Boolean(authToken) ||
+      roomJoined
+    )
+  );
+
   const mainAuthTokenRef = useRef("");
   const joinRoomRetryRef = useRef(0);
   const tokenFetchInFlightRef = useRef(false);
@@ -14635,6 +14665,9 @@ export default function NewLiveMeeting() {
 
   const ensureEventConversation = useCallback(async () => {
     if (!eventId) return null;
+    if (!hasLiveInteractiveAccess) {
+      throw new Error("Chat becomes available after you join the live event.");
+    }
     if (chatConversationId) return chatConversationId;
     if (ensureEventConversationPromiseRef.current) {
       return ensureEventConversationPromiseRef.current;
@@ -14664,7 +14697,7 @@ export default function NewLiveMeeting() {
         ensureEventConversationPromiseRef.current = null;
       }
     }
-  }, [chatConversationId, eventId]);
+  }, [chatConversationId, eventId, hasLiveInteractiveAccess]);
 
   const ensureSeatedInLounge = useCallback(async () => {
     if (!eventId) return null;
@@ -14752,6 +14785,7 @@ export default function NewLiveMeeting() {
 
   const fetchChatUnread = useCallback(async () => {
     try {
+      if (!hasLiveInteractiveAccess) return 0;
       const cid = activeChatConversationId;
       if (!cid) return 0;
 
@@ -14766,7 +14800,7 @@ export default function NewLiveMeeting() {
     } catch {
       return 0;
     }
-  }, [activeChatConversationId]);
+  }, [activeChatConversationId, hasLiveInteractiveAccess]);
 
   const MARK_ALL_READ_COOLDOWN_MS = 7000;
   const markAllReadPendingRef = useRef(new Set());
@@ -15217,11 +15251,14 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!hostPerms.chat) return;
     if (!eventId && !activeTableId) return;
+    if (!hasLiveInteractiveAccess) return;
 
     let alive = true;
+    let tickInFlight = false;
 
     const tick = async () => {
       if (!alive) return;
+      if (tickInFlight) return;
       if (!getToken()) return;
       if (!isDocumentVisible()) return;
       // ✅ POLLING PAUSE: Skip if offline/reconnecting
@@ -15229,18 +15266,14 @@ export default function NewLiveMeeting() {
         return;
       }
 
+      tickInFlight = true;
       try {
-        const unread = await fetchChatUnread();
-
-        // If user is actively viewing chat, auto-refresh and clear unread
         if (isChatActive) {
           try {
             const cid = activeChatConversationId || (await ensureActiveConversation());
             if (cid) {
               await fetchChatMessages(cid);
-              if (unread > 0) {
-                await markChatAllRead(cid);
-              }
+              await markChatAllRead(cid);
             }
           } catch (error) {
             // Handle "not seated in room" error gracefully - user may still be joining the lounge
@@ -15251,14 +15284,19 @@ export default function NewLiveMeeting() {
             // Log other errors but don't crash
             console.warn("[ChatSync] Failed to ensure conversation:", error?.message || error);
           }
+          return;
         }
+
+        await fetchChatUnread();
       } catch (error) {
         console.warn("[ChatSync] Tick failed:", error?.message || error);
+      } finally {
+        tickInFlight = false;
       }
     };
 
     tick();
-    const t = setInterval(tick, isChatActive ? 3000 : 15000);
+    const t = setInterval(tick, isChatActive ? 10000 : 30000);
 
     return () => {
       alive = false;
@@ -15269,6 +15307,7 @@ export default function NewLiveMeeting() {
     activeTableId,
     isDocumentVisible,
     isGuest,
+    hasLiveInteractiveAccess,
     hostPerms.chat,
     isChatActive,
     activeChatConversationId,
@@ -15735,7 +15774,7 @@ export default function NewLiveMeeting() {
 
   const [groups, setGroups] = useState([]);
   const loadGroups = useCallback(async () => {
-    if (!eventId) return;
+    if (!eventId || !hasLiveInteractiveAccess) return;
     try {
       const res = await fetch(toApiUrl(`interactions/qna-groups/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
       if (res.ok) {
@@ -15745,10 +15784,10 @@ export default function NewLiveMeeting() {
     } catch (e) {
       console.error(e);
     }
-  }, [eventId]);
+  }, [eventId, hasLiveInteractiveAccess]);
 
   const loadAiSuggestions = useCallback(async () => {
-    if (!eventId || !isHost) return;
+    if (!eventId || !isHost || !hasLiveInteractiveAccess) return;
     try {
       const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
       if (res.ok) {
@@ -15762,25 +15801,25 @@ export default function NewLiveMeeting() {
         }
       }
     } catch (e) { console.error(e); }
-  }, [eventId, isHost]);
+  }, [eventId, hasLiveInteractiveAccess, isHost]);
 
   useEffect(() => {
-    if (eventId) {
+    if (eventId && isQnaActive && hasLiveInteractiveAccess) {
       loadGroups();
       if (isHost) loadAiSuggestions();
     }
-  }, [eventId, isHost, activeTableId, loadAiSuggestions, loadGroups]);
+  }, [activeTableId, eventId, hasLiveInteractiveAccess, isHost, isQnaActive, loadAiSuggestions, loadGroups]);
 
-  // Poll for new AI suggestions every 5 seconds (host only) - more aggressive for faster feedback
+  // Keep host suggestion refresh active only while Q&A is open.
   useEffect(() => {
-    if (!isHost || !eventId) return;
+    if (!isHost || !eventId || !isQnaActive || !hasLiveInteractiveAccess) return;
 
     const interval = setInterval(() => {
       loadAiSuggestions();
-    }, 5000); // 5 seconds for faster detection
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [eventId, isHost, loadAiSuggestions]);
+  }, [eventId, hasLiveInteractiveAccess, isHost, isQnaActive, loadAiSuggestions]);
   const [qnaLoading, setQnaLoading] = useState(false);
   const [qnaSubmitting, setQnaSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
@@ -15894,7 +15933,7 @@ export default function NewLiveMeeting() {
   }, [userQnaAnonymousDefault, qnaAnonymousModeEnabled]);
 
   const loadQuestions = useCallback(async (opts = {}) => {
-    if (!eventId) return;
+    if (!eventId || !hasLiveInteractiveAccess) return;
     const { silent = false } = opts;
     if (!silent) setQnaLoading(true);
     setQnaError("");
@@ -15942,15 +15981,15 @@ export default function NewLiveMeeting() {
     } finally {
       if (!silent) setQnaLoading(false);
     }
-  }, [eventId, activeTableId]);
+  }, [activeTableId, eventId, hasLiveInteractiveAccess]);
 
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
-    if (!isQnATabActive) return;
+    if (!isQnATabActive || !hasLiveInteractiveAccess) return;
 
     setQnaUnreadCount(0);   // ✅ clear dot when user opens Q&A
     loadQuestions();
-  }, [tab, isPanelOpen, loadQuestions]);
+  }, [hasLiveInteractiveAccess, tab, isPanelOpen, loadQuestions]);
 
   // Cleanup Q&A modal prompt and icon pulse timer on event change or unmount
   useEffect(() => {
@@ -15970,19 +16009,7 @@ export default function NewLiveMeeting() {
   // WS live updates while Q&A tab open
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
-    if (!eventId || !isQnATabActive) return; // Wait for eventId and active Q&A UI
-    // Optimization: Only connect if tab is active OR if backend supports background updates?
-    // Current logic connects always? No, let's check.
-    // The previous code didn't check isQnATabActive for connection start?
-    // Wait, line 8645 defined isQnATabActive but didn't use it to return early?
-    // Ah, it didn't return early! It connected even if tab closed?
-    // "const isQnATabActive = (tab === 1) && (isPanelOpen === true);" was unused in previous code block?
-    // No, checking previous code: 
-    // 8645: const isQnATabActive = ...
-    // 8646: if (!eventId) return;
-    // It proceeded to connect!
-    // But `setQnaUnreadCount` logic relies on `isQnATabActive` ref (isQnaActiveRef.current).
-    // So we KEEP the connection open to receive unread counts. Correct.
+    if (!eventId || !isQnATabActive || !hasLiveInteractiveAccess) return;
 
     const API_RAW = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
     const WS_ROOT = API_RAW.replace(/^http/, "ws").replace(/\/api\/?$/, "");
@@ -16407,7 +16434,7 @@ export default function NewLiveMeeting() {
       qnaThrottleRef.current = 0;
       setTypingUsers({});
     };
-  }, [tab, isPanelOpen, eventId, activeTableId, isGuest]); // Re-connect when activeTableId changes
+  }, [tab, isPanelOpen, eventId, activeTableId, hasLiveInteractiveAccess, isGuest]); // Re-connect when activeTableId changes
 
   // Keyboard shortcuts for moderation panel (A=approve, R=reject, arrows=navigate)
   useEffect(() => {
