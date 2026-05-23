@@ -2409,6 +2409,29 @@ export default function NewLiveMeeting() {
   const pageUnloadRef = useRef(false);
   const [mainSocketReconnectKey, setMainSocketReconnectKey] = useState(0);
 
+  const clearReconnectTimer = () => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  };
+
+  const resetReconnectState = ({ message = "", clearMessageAfterMs = 0 } = {}) => {
+    setIsReconnecting(false);
+    setReconnectMessage(message);
+    reconnectLocked.current = false;
+    isReconnectingRef.current = false;
+    shouldPausePollingRef.current = false;
+    reconnectAttemptRef.current = 0;
+    clearReconnectTimer();
+
+    if (message && clearMessageAfterMs > 0) {
+      setTimeout(() => {
+        setReconnectMessage("");
+      }, clearMessageAfterMs);
+    }
+  };
+
   // ✅ Fullscreen support
   const rootRef = useRef(null);
   const stageViewportRef = useRef(null);
@@ -7383,23 +7406,21 @@ export default function NewLiveMeeting() {
           if (res.status === 401) {
             console.warn("[Reconnect] Auth token expired (401)");
             // Redirect to login - will require re-authentication
-            setIsReconnecting(false);
-            // ✅ GUARD: Clear the flag when auth fails
-            isReconnectingRef.current = false;
-            console.log("[Reconnect] Set isReconnectingRef = false, auth failed");
+            resetReconnectState();
+            console.log("[Reconnect] Reset reconnect state, auth failed");
             showSnackbar("Your session has expired. Please log in again.", "error");
             navigate("/login", { replace: true });
-            return null;
+            return { success: false, reason: "auth_expired", detail: "Authentication expired", terminal: true };
           }
 
           const reason = data?.reason || "unknown";
+          const terminal =
+            data?.retryable === false ||
+            data?.can_rejoin === false ||
+            (res.status >= 400 && res.status < 500 && res.status !== 429);
+
           console.warn("[Reconnect] Rejoin failed:", reason, data?.detail);
-          // ✅ GUARD: If backend says can't rejoin, stop reconnecting
-          if (data?.can_rejoin === false) {
-            isReconnectingRef.current = false;
-            console.log("[Reconnect] Set isReconnectingRef = false, backend says can't rejoin");
-          }
-          return { success: false, reason, detail: data?.detail };
+          return { success: false, reason, detail: data?.detail, terminal };
         }
 
         console.log("[Reconnect] Rejoin successful:", data);
@@ -7477,18 +7498,7 @@ export default function NewLiveMeeting() {
     const attemptReconnect = async () => {
       if (reconnectAttemptRef.current >= MAX_ATTEMPTS) {
         console.error(`[Reconnect] Max reconnection attempts reached (${MAX_ATTEMPTS})`);
-        // ✅ CLEANUP: Clear UI and state
-        setIsReconnecting(false);
-        setReconnectMessage("");
-        reconnectLocked.current = false;
-        isReconnectingRef.current = false;
-        shouldPausePollingRef.current = false;
-
-        // ✅ CLEANUP: Clear any pending timers
-        if (reconnectTimerRef.current) {
-          clearTimeout(reconnectTimerRef.current);
-          reconnectTimerRef.current = null;
-        }
+        resetReconnectState();
 
         console.log("[Reconnect] Cleanup complete, navigating away from meeting");
         showSnackbar("Could not reconnect. Returning to event page.", "error");
@@ -7511,29 +7521,39 @@ export default function NewLiveMeeting() {
         // Restore state from rejoin response
         restoreUserStateFromRejoin(rejoinResult);
 
-        // Recreate the main socket after a successful rejoin.
-        console.log("[Reconnect] Rejoin succeeded, reconnecting WebSocket");
-        setIsReconnecting(false);
-        setReconnectMessage("Reconnected");
-        reconnectLocked.current = false;
-        // ✅ GUARD: Clear the flag when successfully reconnected
-        isReconnectingRef.current = false;
-        shouldPausePollingRef.current = false;
-        console.log("[Reconnect] Set isReconnectingRef = false, rejoin succeeded");
-        setMainSocketReconnectKey((value) => value + 1);
+        const socketState = mainSocketRef.current?.readyState;
+        const socketHealthy =
+          socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING;
 
-        // Show brief success message then clear
-        setTimeout(() => {
-          setReconnectMessage("");
-        }, 2000);
+        console.log("[Reconnect] Rejoin succeeded");
+        resetReconnectState({ message: "Reconnected", clearMessageAfterMs: 2000 });
+        console.log("[Reconnect] Reset reconnect state after successful rejoin");
+
+        if (!socketHealthy) {
+          console.log("[Reconnect] Main socket is not healthy, forcing WebSocket reconnect");
+          setMainSocketReconnectKey((value) => value + 1);
+        } else {
+          console.log("[Reconnect] Main socket already healthy, skipping forced WebSocket reconnect");
+        }
 
         return;
       }
 
-      // Schedule next retry
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
+      if (rejoinResult?.terminal) {
+        console.warn("[Reconnect] Terminal rejoin failure, stopping retry loop:", rejoinResult.reason);
+        resetReconnectState();
+        showSnackbar(
+          rejoinResult.detail || "You can no longer join this live session.",
+          "error"
+        );
+        setTimeout(() => {
+          navigate(`/community/${slug}/events`, { replace: true });
+        }, 500);
+        return;
       }
+
+      // Schedule next retry
+      clearReconnectTimer();
       reconnectTimerRef.current = setTimeout(attemptReconnect, RETRY_INTERVAL);
     };
 
@@ -7592,24 +7612,27 @@ export default function NewLiveMeeting() {
         if (rejoinResult?.success) {
           console.log("[OfflineDetector] Rejoin succeeded on online event");
           restoreUserStateFromRejoin(rejoinResult);
-          setIsReconnecting(false);
-          setReconnectMessage("Reconnected");
-          reconnectLocked.current = false;
-          isReconnectingRef.current = false;  // ✅ Allow leave now that reconnect succeeded
-          shouldPausePollingRef.current = false;  // ✅ POLLING RESUME: Resume non-essential APIs
+          const socketState = mainSocketRef.current?.readyState;
+          const socketHealthy =
+            socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING;
 
-          // Clear message after 2 seconds
-          setTimeout(() => {
-            setReconnectMessage("");
-          }, 2000);
+          resetReconnectState({ message: "Reconnected", clearMessageAfterMs: 2000 });
 
-          // Clear any pending reconnect timers
-          if (reconnectTimerRef.current) {
-            clearTimeout(reconnectTimerRef.current);
-            reconnectTimerRef.current = null;
+          if (!socketHealthy) {
+            setMainSocketReconnectKey((value) => value + 1);
+          } else {
+            console.log("[OfflineDetector] Main socket already healthy, skipping forced reconnect");
           }
-          reconnectAttemptRef.current = 0;
-          setMainSocketReconnectKey((value) => value + 1);
+        } else if (rejoinResult?.terminal) {
+          console.warn("[OfflineDetector] Terminal rejoin failure on online event:", rejoinResult.reason);
+          resetReconnectState();
+          showSnackbar(
+            rejoinResult.detail || "You can no longer join this live session.",
+            "error"
+          );
+          setTimeout(() => {
+            navigate(`/community/${slug}/events`, { replace: true });
+          }, 500);
         } else {
           console.log("[OfflineDetector] Rejoin failed on online event, continuing reconnect loop");
           // If rejoin fails, keep trying with existing loop
