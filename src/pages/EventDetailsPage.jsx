@@ -1,5 +1,5 @@
 // src/pages/EventDetailsPage.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -27,6 +27,7 @@ import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import PreEventQnaManager from "../components/PreEventQnaManager.jsx";
+import { LeadGenModal } from "../components/LeadGenModal.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
@@ -400,6 +401,12 @@ export default function EventDetailsPage() {
   const [preEventQnaModalOpen, setPreEventQnaModalOpen] = useState(false);
   const [preEventQnaRefreshTrigger, setPreEventQnaRefreshTrigger] = useState(0);
 
+  // Lead Gen Modal
+  const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
+  const [missingLeadGenFields, setMissingLeadGenFields] = useState({});
+  const [leadGenUser, setLeadGenUser] = useState(null);
+  const leadGenCallbackRef = useRef(null);
+
   // Participant Preview
   const [previewParticipants, setPreviewParticipants] = useState([]);
   const [previewParticipantsForbidden, setPreviewParticipantsForbidden] = useState(false);
@@ -765,7 +772,7 @@ export default function EventDetailsPage() {
     if (!event?.id || !token) return;
 
     try {
-      // First, fetch user profile to get their name and email
+      // Fetch user profile to get their data for the application
       const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -776,32 +783,18 @@ export default function EventDetailsPage() {
       }
 
       const profile = await profileRes.json();
-      console.log("Profile fetched:", profile);
-
-      // Check if profile has required data
-      const missingFields = [];
-      if (!profile.first_name) missingFields.push("First Name");
-      if (!profile.last_name) missingFields.push("Last Name");
-      if (!profile.email) missingFields.push("Email");
-      if (!profile.job_title) missingFields.push("Job Title");
-      if (!profile.company) missingFields.push("Company");
-
-      if (missingFields.length > 0) {
-        toast.error(`Please complete your profile: ${missingFields.join(", ")}`);
-        return;
-      }
-
-      const applicationData = {
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        email: profile.email,
-        job_title: profile.job_title,
-        company_name: profile.company,
-        linkedin_url: "",
-      };
-      console.log("Submitting application with data:", applicationData);
 
       // Submit application with user's profile data
+      // Backend will validate lead-gen fields and return error if incomplete
+      const applicationData = {
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+        email: profile.email || "",
+        job_title: profile.job_title || "",
+        company_name: profile.company || "",
+        linkedin_url: "",
+      };
+
       const res = await fetch(`${API_BASE}/events/${event.id}/apply/`, {
         method: "POST",
         headers: {
@@ -815,12 +808,22 @@ export default function EventDetailsPage() {
         const data = await res.json();
         setMyApplication(data);
         toast.success("Application submitted successfully!");
+      } else if (res.status === 400) {
+        // Check for backend missing_lead_gen_fields response
+        const errData = await res.json().catch(() => ({}));
+        if (errData.status === "missing_lead_gen_fields") {
+          // Backend validation found missing fields - show modal, no toast
+          leadGenCallbackRef.current = () => handleApplyDirect();
+          setMissingLeadGenFields(errData.missing_fields || {});
+          setLeadGenModalOpen(true);
+          return;
+        }
+        toast.error(errData.detail || "Failed to submit application. Please try again.");
       } else if (res.status === 409) {
         toast.error("You have already applied to this event.");
       } else {
         const errData = await res.json().catch(() => ({}));
-        console.error("Application submission error:", errData);
-        toast.error(errData.detail || JSON.stringify(errData) || "Failed to submit application. Please try again.");
+        toast.error(errData.detail || "Failed to submit application. Please try again.");
       }
     } catch (err) {
       toast.error("Error submitting application: " + err.message);
@@ -851,7 +854,21 @@ export default function EventDetailsPage() {
         body: JSON.stringify({}),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+
+        // Handle missing lead-gen fields (do NOT show toast for this error)
+        if (data?.status === "missing_lead_gen_fields") {
+          leadGenCallbackRef.current = () => handleRegister();
+          setMissingLeadGenFields(data?.missing_fields || {});
+          setLeadGenModalOpen(true);
+          return;
+        }
+
+        // Show error toast for other errors
+        toast.error(data?.detail || "Registration failed. Please try again.");
+        return;
+      }
 
       const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -886,6 +903,20 @@ export default function EventDetailsPage() {
         } catch (_) {}
       }
     } catch (_) { }
+  };
+
+  const handleLeadGenSuccess = async () => {
+    // After user saves profile, close modal and retry the original action (register or apply)
+    setLeadGenModalOpen(false);
+    setMissingLeadGenFields({});
+
+    // Retry the action after a short delay to allow profile data to propagate
+    setTimeout(() => {
+      if (leadGenCallbackRef.current) {
+        leadGenCallbackRef.current();
+        leadGenCallbackRef.current = null;
+      }
+    }, 500);
   };
 
   useEffect(() => {
@@ -2660,6 +2691,17 @@ export default function EventDetailsPage() {
             onClose={() => setGuestApplyModalOpen(false)}
             event={event}
             livePath={livePath}
+          />
+
+          <LeadGenModal
+            open={leadGenModalOpen}
+            onClose={() => {
+              setLeadGenModalOpen(false);
+              setMissingLeadGenFields({});
+            }}
+            onSuccess={handleLeadGenSuccess}
+            user={leadGenUser}
+            missingFields={missingLeadGenFields}
           />
         </>
       )}
