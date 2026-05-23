@@ -2406,6 +2406,7 @@ export default function NewLiveMeeting() {
   const shouldPausePollingRef = useRef(false); // ✅ POLLING PAUSE: Pause non-essential APIs when offline
   const rejoinRequestRef = useRef(null);
   const intentionalMainSocketCloseRef = useRef(false);
+  const pageUnloadRef = useRef(false);
   const [mainSocketReconnectKey, setMainSocketReconnectKey] = useState(0);
 
   // ✅ Fullscreen support
@@ -7573,6 +7574,16 @@ export default function NewLiveMeeting() {
       console.log("[OfflineDetector] Window online event triggered. navigator.onLine:", navigator.onLine);
 
       if (eventId) {
+        const socketState = mainSocketRef.current?.readyState;
+        if (socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING) {
+          console.log("[OfflineDetector] Main socket already healthy, skipping online rejoin");
+          return;
+        }
+        if (!reconnectLocked.current && !isReconnectingRef.current) {
+          console.log("[OfflineDetector] No reconnect in progress, skipping online rejoin");
+          return;
+        }
+
         console.log("[OfflineDetector] Network restored, attempting rejoin...");
 
         // Immediately try to rejoin on online event
@@ -7620,6 +7631,21 @@ export default function NewLiveMeeting() {
     };
   }, [eventId]);
 
+  useEffect(() => {
+    const markPageUnloading = () => {
+      pageUnloadRef.current = true;
+      intentionalMainSocketCloseRef.current = true;
+    };
+
+    window.addEventListener("pagehide", markPageUnloading);
+    window.addEventListener("beforeunload", markPageUnloading);
+
+    return () => {
+      window.removeEventListener("pagehide", markPageUnloading);
+      window.removeEventListener("beforeunload", markPageUnloading);
+    };
+  }, []);
+
   // ✅ AUTO-RECONNECT: Store rejoin data for RTK reconnect
   const rejoinDataRef = useRef({
     rtk_token: null,
@@ -7630,6 +7656,7 @@ export default function NewLiveMeeting() {
   // ---------- Persistent Main Event WebSocket (for Force Join, Timer, Broadcast) ----------
   useEffect(() => {
     if (!eventId) return;
+    pageUnloadRef.current = false;
 
     const token = getToken();
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
@@ -8759,8 +8786,12 @@ export default function NewLiveMeeting() {
       });
       mainSocketRef.current = null;
       mainSocketReadyRef.current = false;
-      if (intentionalMainSocketCloseRef.current || manualLeaveRef.current) {
+      if (pageUnloadRef.current || intentionalMainSocketCloseRef.current || manualLeaveRef.current) {
         console.log("[MainSocket] Close was intentional; skipping auto-reconnect");
+        return;
+      }
+      if (!getToken()) {
+        console.log("[MainSocket] Missing auth token after close; skipping auto-reconnect");
         return;
       }
       // ✅ IMPORTANT: Keep pending actions so they can be sent when socket reconnects
@@ -14698,7 +14729,7 @@ export default function NewLiveMeeting() {
 
   const fetchChatUnread = useCallback(async () => {
     try {
-      const cid = activeChatConversationId || (await ensureActiveConversation());
+      const cid = activeChatConversationId;
       if (!cid) return 0;
 
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/`), {
@@ -14712,7 +14743,7 @@ export default function NewLiveMeeting() {
     } catch {
       return 0;
     }
-  }, [activeChatConversationId, ensureActiveConversation]);
+  }, [activeChatConversationId]);
 
   const MARK_ALL_READ_COOLDOWN_MS = 7000;
   const markAllReadPendingRef = useRef(new Set());
@@ -14785,6 +14816,7 @@ export default function NewLiveMeeting() {
   const privateChatBottomRef = useRef(null); // To auto-scroll
   const openPrivateChatRef = useRef(null);
   const [privateEventMetaById, setPrivateEventMetaById] = useState({});
+  const privateChatWsRef = useRef(null);
 
   const handleOpenPrivateChat = async (member) => {
     setPrivateChatUser(member);
@@ -15030,7 +15062,7 @@ export default function NewLiveMeeting() {
     };
 
     tick();
-    const t = setInterval(tick, 3000);
+    const t = setInterval(tick, 15000);
 
     return () => {
       alive = false;
@@ -15059,6 +15091,10 @@ export default function NewLiveMeeting() {
       }
 
       try {
+        if (privateChatWsRef.current?.readyState === WebSocket.OPEN) {
+          return;
+        }
+
         // 1) Check unread for THIS DM
         const res = await fetch(
           toApiUrl(`messaging/conversations/${privateConversationId}/`),
@@ -15088,7 +15124,7 @@ export default function NewLiveMeeting() {
     };
 
     tick();
-    const t = setInterval(tick, 2000);
+    const t = setInterval(tick, 10000);
 
     return () => {
       alive = false;
@@ -15107,6 +15143,7 @@ export default function NewLiveMeeting() {
       const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${wsProtocol}//${window.location.host}/ws/messaging/conversations/${privateConversationId}/?token=${getToken()}`;
       const ws = new WebSocket(wsUrl);
+      privateChatWsRef.current = ws;
 
       ws.onmessage = (event) => {
         try {
@@ -15143,10 +15180,14 @@ export default function NewLiveMeeting() {
 
       return () => {
         alive = false;
+        if (privateChatWsRef.current === ws) {
+          privateChatWsRef.current = null;
+        }
         ws.close();
       };
     } catch (e) {
       console.warn("[PrivateChat WS] Failed to connect:", e);
+      privateChatWsRef.current = null;
     }
   }, [privateChatUser, privateConversationId, isGuest]);
 
@@ -15194,7 +15235,7 @@ export default function NewLiveMeeting() {
     };
 
     tick();
-    const t = setInterval(tick, 3000);
+    const t = setInterval(tick, isChatActive ? 3000 : 15000);
 
     return () => {
       alive = false;
@@ -15906,7 +15947,7 @@ export default function NewLiveMeeting() {
   // WS live updates while Q&A tab open
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
-    if (!eventId) return; // Wait for eventId
+    if (!eventId || !isQnATabActive) return; // Wait for eventId and active Q&A UI
     // Optimization: Only connect if tab is active OR if backend supports background updates?
     // Current logic connects always? No, let's check.
     // The previous code didn't check isQnATabActive for connection start?
