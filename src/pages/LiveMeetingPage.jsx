@@ -171,6 +171,7 @@ import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import WaitingRoomQnaPanel from "../components/WaitingRoomQnaPanel.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
+import { fetchEventSummaryCached, fetchUserDetailCached } from "../utils/entityCache.js";
 import { getUserName } from "../utils/authStorage.js";
 import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
@@ -2816,34 +2817,63 @@ export default function NewLiveMeeting() {
   const moodUpdateInFlightRef = useRef(false);
   const lastMoodSentAtRef = useRef(0);
 
-  const fetchAndCacheKycStatus = useCallback((userId) => {
-    if (!userId || participantKycCache[userId] !== undefined) return; // Already cached
+  const fetchAndCacheKycStatus = useCallback((userId, seededStatus = "") => {
+    if (!userId) return;
+    if (seededStatus && participantKycCache[userId] === undefined) {
+      setParticipantKycCache(prev => ({ ...prev, [userId]: seededStatus }));
+      return;
+    }
+    if (participantKycCache[userId] !== undefined) return;
     if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
       setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
       return;
     }
 
     const headers = { accept: "application/json", ...authHeader() };
-    const url = toApiUrl(`users/${userId}/`);
 
     let isMounted = true;
     (async () => {
       try {
-        const res = await fetch(url, { headers });
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
+        const data = await fetchUserDetailCached({
+          baseUrl: API_ROOT,
+          userId,
+          headers,
+        });
         if (!isMounted || !data) return;
 
         const kycStatus = data?.kyc_status || data?.profile?.kyc_status || "";
-        if (isMounted && kycStatus) {
-          setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus }));
+        if (isMounted) {
+          setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus || "" }));
         }
       } catch (e) {
-        // User not found or not accessible
+        if (isMounted) {
+          setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
+        }
       }
     })();
 
     return () => { isMounted = false; };
+  }, [participantKycCache]);
+
+  const getKnownKycStatus = useCallback((entity) => {
+    if (!entity) return "";
+    const raw = entity?._raw || entity;
+    const userId =
+      raw?.customParticipantId ??
+      raw?.clientSpecificId ??
+      raw?.client_specific_id ??
+      raw?.user_id ??
+      entity?.id ??
+      entity?.sender_id ??
+      "";
+    return (
+      raw?.kyc_status ||
+      raw?.sender_kyc_status ||
+      entity?.kyc_status ||
+      entity?.sender_kyc_status ||
+      participantKycCache[userId] ||
+      ""
+    );
   }, [participantKycCache]);
 
   const openMemberInfo = useCallback((member) => {
@@ -11041,18 +11071,14 @@ export default function NewLiveMeeting() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
-        const res = await fetch(toApiUrl(`events/${eventId}/`), {
+        const data = await fetchEventSummaryCached({
+          baseUrl: API_ROOT,
+          eventId,
           headers: authHeader(),
-          signal: controller.signal,
+          ttlMs: 5_000,
+          fetcher: (url, options) => fetch(url, { ...options, signal: controller.signal }),
         });
         clearTimeout(timeoutId);
-        if (!res.ok) {
-          console.warn("[LiveMeeting] Status poll failed:", res.status);
-          failureCount++;
-          scheduleNext();
-          return;
-        }
-        const data = await res.json();
         if (cancelled) return;
         failureCount = 0;
 
@@ -15214,16 +15240,10 @@ export default function NewLiveMeeting() {
       await Promise.all(
         missing.map(async (id) => {
           try {
-            const res = await fetch(toApiUrl(`events/${id}/`), {
+            const data = await fetchEventSummaryCached({
+              baseUrl: API_ROOT,
+              eventId: id,
               headers: { Accept: "application/json", ...authHeader() },
-            });
-            if (!res.ok) {
-              console.warn(`Failed to fetch event ${id}: HTTP ${res.status}`);
-              return;
-            }
-            const data = await res.json().catch((err) => {
-              console.warn(`Failed to parse event ${id} JSON:`, err);
-              return null;
             });
             if (data) {
               fetched[id] = data;
@@ -18429,13 +18449,13 @@ export default function NewLiveMeeting() {
                                     {(() => {
                                       const participant = getParticipantFromMessage(m);
                                       const userId = participant?._raw?.customParticipantId || participant?.id;
+                                      const knownKycStatus = getKnownKycStatus(participant || m);
 
-                                      // Fetch kyc_status if not cached
-                                      if (userId && !participantKycCache[userId]) {
+                                      if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
                                         fetchAndCacheKycStatus(userId);
                                       }
 
-                                      const isVerified = participantKycCache[userId] === "approved";
+                                      const isVerified = knownKycStatus === "approved";
                                       return isVerified ? (
                                         <VerifiedRoundedIcon
                                           sx={{
@@ -21995,10 +22015,11 @@ export default function NewLiveMeeting() {
                                       </Tooltip>
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
-                                        if (userId && !participantKycCache[userId]) {
-                                          fetchAndCacheKycStatus(userId);
+                                        const knownKycStatus = getKnownKycStatus(m);
+                                        if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                          fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                         }
-                                        const isVerified = participantKycCache[userId] === "approved";
+                                        const isVerified = knownKycStatus === "approved";
                                         return isVerified ? (
                                           <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
                                         ) : null;
@@ -22437,10 +22458,11 @@ export default function NewLiveMeeting() {
                                       </Tooltip>
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
-                                        if (userId && !participantKycCache[userId]) {
-                                          fetchAndCacheKycStatus(userId);
+                                        const knownKycStatus = getKnownKycStatus(m);
+                                        if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                          fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                         }
-                                        const isVerified = participantKycCache[userId] === "approved";
+                                        const isVerified = knownKycStatus === "approved";
                                         return isVerified ? (
                                           <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
                                         ) : null;
@@ -22749,10 +22771,11 @@ export default function NewLiveMeeting() {
                                     )}
                                     {(() => {
                                       const userId = m._raw?.customParticipantId || m.id;
-                                      if (userId && !participantKycCache[userId]) {
-                                        fetchAndCacheKycStatus(userId);
+                                      const knownKycStatus = getKnownKycStatus(m);
+                                      if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                        fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                       }
-                                      const isVerified = participantKycCache[userId] === "approved";
+                                      const isVerified = knownKycStatus === "approved";
                                       return isVerified ? (
                                         <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
                                       ) : null;
@@ -28116,15 +28139,13 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
     const fetchProfile = async () => {
       if (alive) setProfileLoading(true);
       const headers = { accept: "application/json", ...authHeader() };
-      const url = toApiUrl(`users/${userId}/`);
 
       try {
-        const res = await fetch(url, { headers });
-        if (!res.ok) {
-          if (alive) setProfileLoading(false);
-          return;
-        }
-        const data = await res.json().catch(() => null);
+        const data = await fetchUserDetailCached({
+          baseUrl: API_ROOT,
+          userId,
+          headers,
+        });
         if (!alive || !data) return;
 
         const base = pickJobAndCompany(data);
