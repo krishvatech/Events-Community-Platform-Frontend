@@ -61,10 +61,6 @@ const ReviewQueueApplicationDetail = ({
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
 
-  if (!application) {
-    return null;
-  }
-
   // Load origins when application detail opens and application is accepted
   useEffect(() => {
     if (open && application.status === 'accepted' && application.registration_id) {
@@ -82,6 +78,8 @@ const ReviewQueueApplicationDetail = ({
 
   // Determine preselected tier for accept action
   const preselectedTier = useMemo(() => {
+    if (!application) return '';
+
     if (application.tier_preference_id) {
       return application.tier_preference_id;
     }
@@ -221,7 +219,17 @@ const ReviewQueueApplicationDetail = ({
     </Box>
   );
 
-  const canSendEmail = !application.opt_out_automated_communication;
+  const canSendEmail = !application?.opt_out_automated_communication;
+
+  if (!application) {
+    return (
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <DialogContent>
+          <CircularProgress />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>

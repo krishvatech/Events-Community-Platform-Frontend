@@ -14,6 +14,7 @@ import {
   Alert,
   TablePagination,
   Typography,
+  Button,
 } from '@mui/material';
 import { getStatusColor, formatDate, getSubmissionModeLabel } from '../utils/reviewQueue';
 
@@ -116,6 +117,7 @@ const ReviewQueueTable = ({
               <TableCell>Status</TableCell>
               <TableCell>Tier</TableCell>
               <TableCell>Reviewed At</TableCell>
+              <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -158,10 +160,25 @@ const ReviewQueueTable = ({
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{app.tier_label || '-'}</Typography>
+                  <Typography variant="body2">
+                    {app.status === 'accepted' ? (app.accepted_tier_label || '-') : (app.tier_label || '-')}
+                  </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">{formatDate(app.reviewed_at)}</Typography>
+                </TableCell>
+                <TableCell align="center">
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRowClick?.(app);
+                    }}
+                  >
+                    Review
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

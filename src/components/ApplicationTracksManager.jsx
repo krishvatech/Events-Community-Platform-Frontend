@@ -13,6 +13,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   TextField,
   CircularProgress,
   Alert,
@@ -34,6 +35,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CheckIcon from "@mui/icons-material/Check";
 import { apiClient } from "../utils/api";
 
 /**
@@ -55,6 +57,25 @@ export default function ApplicationTracksManager({ eventId, token }) {
   const [eventRoles, setEventRoles] = useState([]);
   const [newTierName, setNewTierName] = useState("");
   const [newTierPrice, setNewTierPrice] = useState("");
+  const [editingTier, setEditingTier] = useState(null);
+  const [showTierEditor, setShowTierEditor] = useState(false);
+  const [tierFormData, setTierFormData] = useState({
+    key: "",
+    label: "",
+    price: "0.00",
+    currency: "USD",
+    visibility: "public",
+    is_default: false,
+    is_active: true,
+    sort_order: 0,
+  });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    action: null,
+    data: null,
+  });
   const [formData, setFormData] = useState({
     key: "",
     label: "",
@@ -78,7 +99,24 @@ export default function ApplicationTracksManager({ eventId, token }) {
       const { data } = await apiClient.get(`/events/${eventId}/application-tracks/`);
       // Handle both array and paginated responses
       const tracksArray = Array.isArray(data) ? data : (data.results || []);
-      setTracks(tracksArray);
+
+      // Load pricing tier counts for each track
+      const tracksWithTiers = await Promise.all(
+        tracksArray.map(async (track) => {
+          try {
+            const { data: tiersData } = await apiClient.get(
+              `/events/${eventId}/application-tracks/${track.id}/pricing-tiers/`
+            );
+            const tiersArray = Array.isArray(tiersData) ? tiersData : (tiersData?.results || []);
+            return { ...track, pricing_tiers: tiersArray };
+          } catch (err) {
+            console.error(`Failed to load tiers for track ${track.id}:`, err);
+            return { ...track, pricing_tiers: [] };
+          }
+        })
+      );
+
+      setTracks(tracksWithTiers);
       setError(null);
     } catch (err) {
       console.error("Failed to load tracks:", err);
@@ -106,10 +144,14 @@ export default function ApplicationTracksManager({ eventId, token }) {
       const { data } = await apiClient.get(
         `/events/${eventId}/application-tracks/${trackId}/pricing-tiers/`
       );
-      setPricingTiers(data || []);
+      // Handle both paginated and array responses
+      const tiersArray = Array.isArray(data) ? data : (data?.results || []);
+      setPricingTiers(tiersArray);
+      return tiersArray;
     } catch (err) {
       console.error("Failed to load pricing tiers:", err);
       setPricingTiers([]);
+      return [];
     }
   };
 
@@ -168,24 +210,160 @@ export default function ApplicationTracksManager({ eventId, token }) {
       setError(null);
     } catch (err) {
       console.error("Failed to add pricing tier:", err);
-      setError(err.response?.data?.detail || "Failed to add pricing tier");
+      // Extract error message from various response formats
+      const errorData = err.response?.data;
+      let errorMessage = "Failed to add pricing tier";
+
+      if (errorData) {
+        // Try detail field first
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        }
+        // Try key field (from ValidationError on 'key')
+        else if (errorData.key) {
+          errorMessage = Array.isArray(errorData.key) ? errorData.key[0] : errorData.key;
+        }
+        // Try non_field_errors
+        else if (errorData.non_field_errors) {
+          errorMessage = Array.isArray(errorData.non_field_errors) ? errorData.non_field_errors[0] : errorData.non_field_errors;
+        }
+      }
+
+      setError(errorMessage);
     }
   };
 
-  const handleDeletePricingTier = async (tierId) => {
-    if (!window.confirm("Are you sure you want to delete this pricing tier?")) {
+  const handleDeletePricingTier = (tierId) => {
+    const tier = pricingTiers.find(t => t.id === tierId);
+    setConfirmDialog({
+      open: true,
+      title: "Delete Pricing Tier",
+      message: `Are you sure you want to delete "${tier?.label}"? This action cannot be undone.`,
+      action: "delete_tier",
+      data: tierId,
+    });
+  };
+
+  const handleDeleteTrack = (trackId) => {
+    const track = tracks.find(t => t.id === trackId);
+    setConfirmDialog({
+      open: true,
+      title: "Delete Application Track",
+      message: `Are you sure you want to delete the track "${track?.label}"? All associated applications will also be deleted.`,
+      action: "delete_track",
+      data: trackId,
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    const { action, data } = confirmDialog;
+
+    try {
+      if (action === "delete_tier") {
+        await apiClient.delete(
+          `/events/${eventId}/application-tracks/${editingTrack.id}/pricing-tiers/${data}/`
+        );
+        await loadPricingTiers(editingTrack.id);
+      } else if (action === "delete_track") {
+        await apiClient.delete(`/events/${eventId}/application-tracks/${data}/`);
+        await loadTracks();
+      }
+
+      setError(null);
+      setConfirmDialog({ ...confirmDialog, open: false });
+    } catch (err) {
+      console.error("Failed to execute action:", err);
+      setError(err.response?.data?.detail || "Operation failed");
+    }
+  };
+
+  const handleOpenTierEditor = (tier = null) => {
+    if (tier) {
+      // Edit existing tier
+      setEditingTier(tier);
+      setTierFormData({
+        key: tier.key || "",
+        label: tier.label || "",
+        price: tier.price || "0.00",
+        currency: tier.currency || "USD",
+        visibility: tier.visibility || "public",
+        is_default: tier.is_default || false,
+        is_active: tier.is_active !== false,
+        sort_order: tier.sort_order || 0,
+      });
+    } else {
+      // New tier
+      setEditingTier(null);
+      setTierFormData({
+        key: "",
+        label: "",
+        price: "0.00",
+        currency: "USD",
+        visibility: "public",
+        is_default: false,
+        is_active: true,
+        sort_order: 0,
+      });
+    }
+    setShowTierEditor(true);
+  };
+
+  const handleSaveTierEdit = async () => {
+    if (!tierFormData.label.trim() || !tierFormData.key.trim()) {
+      setError("Tier label and key are required");
       return;
     }
 
     try {
-      await apiClient.delete(
-        `/events/${eventId}/application-tracks/${editingTrack.id}/pricing-tiers/${tierId}/`
+      if (editingTier) {
+        // Update existing tier
+        await apiClient.patch(
+          `/events/${eventId}/application-tracks/${editingTrack.id}/pricing-tiers/${editingTier.id}/`,
+          tierFormData
+        );
+      } else {
+        // Create new tier
+        await apiClient.post(
+          `/events/${eventId}/application-tracks/${editingTrack.id}/pricing-tiers/`,
+          tierFormData
+        );
+      }
+
+      // Refetch tiers and update table
+      await loadPricingTiers(editingTrack.id);
+      await loadTracks();
+      setShowTierEditor(false);
+      setEditingTier(null);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to save tier:", err);
+      const errorData = err.response?.data;
+      let errorMessage = "Failed to save tier";
+
+      if (errorData?.detail) {
+        errorMessage = errorData.detail;
+      } else if (errorData?.key) {
+        errorMessage = Array.isArray(errorData.key) ? errorData.key[0] : errorData.key;
+      }
+
+      setError(errorMessage);
+    }
+  };
+
+  const handleSetDefaultTier = async (tierId) => {
+    try {
+      // Set this tier as default
+      await apiClient.patch(
+        `/events/${eventId}/application-tracks/${editingTrack.id}/pricing-tiers/${tierId}/`,
+        { is_default: true }
       );
+
+      // Refetch to see updated state
       await loadPricingTiers(editingTrack.id);
       setError(null);
     } catch (err) {
-      console.error("Failed to delete pricing tier:", err);
-      setError("Failed to delete pricing tier");
+      console.error("Failed to set default tier:", err);
+      setError("Failed to set default tier");
     }
   };
 
@@ -241,23 +419,6 @@ export default function ApplicationTracksManager({ eventId, token }) {
     } catch (err) {
       console.error("Failed to save track:", err);
       setError(err.response?.data?.detail || "Failed to save track");
-    }
-  };
-
-  const handleDeleteTrack = async (trackId) => {
-    if (!window.confirm("Are you sure you want to delete this track?")) {
-      return;
-    }
-
-    try {
-      await apiClient.delete(
-        `/events/${eventId}/application-tracks/${trackId}/`
-      );
-      await loadTracks();
-      setError(null);
-    } catch (err) {
-      console.error("Failed to delete track:", err);
-      setError("Failed to delete track");
     }
   };
 
@@ -410,10 +571,15 @@ export default function ApplicationTracksManager({ eventId, token }) {
 
       {/* Edit/Create Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>
+        <DialogTitle sx={{ fontSize: "1.25rem", fontWeight: 600, pb: 1 }}>
           {editingTrack ? "Edit Application Track" : "Create Application Track"}
         </DialogTitle>
         <DialogContent sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+          {error && (
+            <Alert severity="error" onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
           <TextField
             label="Track Key"
             name="key"
@@ -533,10 +699,12 @@ export default function ApplicationTracksManager({ eventId, token }) {
           </Stack>
 
           {/* FIX 4: Pricing Tiers UI */}
-          {editingTrack && (
-            <Accordion sx={{ mt: 2 }}>
+          {editingTrack ? (
+            <Accordion sx={{ mt: 2 }} defaultExpanded={pricingTiers.length > 0}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Pricing Tiers ({pricingTiers.length})</Typography>
+                <Typography>
+                  Pricing Tiers {pricingTiers.length > 0 ? `(${pricingTiers.length})` : "(No tiers yet)"}
+                </Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Stack spacing={2} sx={{ width: "100%" }}>
@@ -549,24 +717,61 @@ export default function ApplicationTracksManager({ eventId, token }) {
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
-                            p: 1,
-                            border: "1px solid #eee",
+                            p: 2,
+                            border: "1px solid #ddd",
                             borderRadius: 1,
                             mb: 1,
+                            backgroundColor: tier.is_active ? "#fff" : "#f9f9f9",
+                            opacity: tier.is_active ? 1 : 0.7,
                           }}
                         >
-                          <Box>
-                            {/* FIX 1: Use tier.label instead of tier.name */}
-                            <strong>{tier.label || tier.name}</strong>
-                            {tier.price && <small> — ${parseFloat(tier.price).toFixed(2)}</small>}
+                          <Box sx={{ flex: 1 }}>
+                            <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 0.5 }}>
+                              <strong>{tier.label}</strong>
+                              {tier.is_default && (
+                                <Chip label="DEFAULT" size="small" color="primary" variant="outlined" />
+                              )}
+                              {!tier.is_active && (
+                                <Chip label="INACTIVE" size="small" variant="outlined" />
+                              )}
+                            </Box>
+                            <Box sx={{ fontSize: "0.875rem", color: "#666" }}>
+                              <span>{tier.key}</span>
+                              {tier.price && (
+                                <span> • ${parseFloat(tier.price).toFixed(2)} {tier.currency || "USD"}</span>
+                              )}
+                              {tier.visibility && (
+                                <span> • {tier.visibility}</span>
+                              )}
+                            </Box>
                           </Box>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDeletePricingTier(tier.id)}
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
+                          <Stack direction="row" spacing={0.5}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenTierEditor(tier)}
+                              color="primary"
+                              title="Edit tier"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            {!tier.is_default && (
+                              <IconButton
+                                size="small"
+                                onClick={() => handleSetDefaultTier(tier.id)}
+                                title="Set as default"
+                              >
+                                <CheckIcon fontSize="small" />
+                              </IconButton>
+                            )}
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeletePricingTier(tier.id)}
+                              color="error"
+                              title="Delete tier"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Stack>
                         </Box>
                       ))}
                     </Box>
@@ -604,14 +809,174 @@ export default function ApplicationTracksManager({ eventId, token }) {
                 </Stack>
               </AccordionDetails>
             </Accordion>
+          ) : (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Pricing tiers can be added after creating the track. Click "Create Track" first, then edit to add tiers.
+            </Alert>
           )}
         </DialogContent>
-        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 2 }}>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveTrack}>
+        <DialogActions sx={{ gap: 1, p: 2 }}>
+          <Button onClick={handleCloseDialog} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveTrack}
+            sx={{ textTransform: "none" }}
+          >
             {editingTrack ? "Update" : "Create"} Track
           </Button>
-        </Box>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontSize: "1.25rem", fontWeight: 600, pb: 1 }}>
+          {confirmDialog.title}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mt: 2, mb: 1, color: "#666" }}>
+            {confirmDialog.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ gap: 1, p: 2 }}>
+          <Button
+            onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}
+            sx={{ textTransform: "none" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmAction}
+            variant="contained"
+            color="error"
+            sx={{ textTransform: "none" }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Tier Editor Dialog */}
+      <Dialog open={showTierEditor} onClose={() => setShowTierEditor(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontSize: "1.25rem", fontWeight: 600, pb: 1 }}>
+          {editingTier ? "Edit Pricing Tier" : "Add New Pricing Tier"}
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
+          {error && (
+            <Alert severity="error" onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            label="Tier Key"
+            value={tierFormData.key}
+            onChange={(e) =>
+              setTierFormData({
+                ...tierFormData,
+                key: e.target.value.toLowerCase().replace(/\s+/g, "_"),
+              })
+            }
+            placeholder="e.g., standard, premium"
+            disabled={!!editingTier}
+            helperText="Unique identifier for this tier (cannot change after creation)"
+            fullWidth
+          />
+
+          <TextField
+            label="Tier Label"
+            value={tierFormData.label}
+            onChange={(e) =>
+              setTierFormData({ ...tierFormData, label: e.target.value })
+            }
+            placeholder="e.g., Standard, Premium"
+            fullWidth
+          />
+
+          <TextField
+            label="Price"
+            type="number"
+            inputProps={{ step: "0.01", min: "0" }}
+            value={tierFormData.price}
+            onChange={(e) =>
+              setTierFormData({ ...tierFormData, price: e.target.value })
+            }
+            fullWidth
+          />
+
+          <FormControl fullWidth>
+            <InputLabel>Currency</InputLabel>
+            <Select
+              value={tierFormData.currency}
+              label="Currency"
+              onChange={(e) =>
+                setTierFormData({ ...tierFormData, currency: e.target.value })
+              }
+            >
+              <MenuItem value="USD">USD</MenuItem>
+              <MenuItem value="EUR">EUR</MenuItem>
+              <MenuItem value="GBP">GBP</MenuItem>
+              <MenuItem value="INR">INR</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel>Visibility</InputLabel>
+            <Select
+              value={tierFormData.visibility}
+              label="Visibility"
+              onChange={(e) =>
+                setTierFormData({ ...tierFormData, visibility: e.target.value })
+              }
+            >
+              <MenuItem value="public">Public</MenuItem>
+              <MenuItem value="private">Private</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Stack direction="row" spacing={2}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={tierFormData.is_active}
+                  onChange={(e) =>
+                    setTierFormData({ ...tierFormData, is_active: e.target.checked })
+                  }
+                />
+              }
+              label="Active"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={tierFormData.is_default}
+                  onChange={(e) =>
+                    setTierFormData({ ...tierFormData, is_default: e.target.checked })
+                  }
+                />
+              }
+              label="Set as Default"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ gap: 1, p: 2 }}>
+          <Button onClick={() => setShowTierEditor(false)} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveTierEdit}
+            sx={{ textTransform: "none" }}
+          >
+            {editingTier ? "Update" : "Add"} Tier
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

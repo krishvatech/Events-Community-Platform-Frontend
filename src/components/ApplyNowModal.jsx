@@ -13,6 +13,12 @@ import {
   Box,
   Checkbox,
   FormControlLabel,
+  Radio,
+  RadioGroup,
+  FormControlLabel as MuiFormControlLabel,
+  Card,
+  CardContent,
+  FormLabel,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useNavigate } from "react-router-dom";
@@ -29,6 +35,14 @@ const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path
  */
 export default function ApplyNowModal({ open, onClose, event, token, onSuccess, guestOnly = false }) {
   const navigate = useNavigate();
+
+  // Track selection state
+  const [tracks, setTracks] = useState([]);
+  const [selectedTrackId, setSelectedTrackId] = useState(null);
+  const [loadingTracks, setLoadingTracks] = useState(false);
+  const [tracksError, setTracksError] = useState("");
+  const [showTrackSelector, setShowTrackSelector] = useState(false);
+
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -50,6 +64,50 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
   const [emailPreapproved, setEmailPreapproved] = useState(false);
   const [codeError, setCodeError] = useState("");
   const preApproved = codePreapproved || emailPreapproved;
+
+  // Load application tracks when modal opens
+  useEffect(() => {
+    if (!open || !event?.id) {
+      return;
+    }
+
+    const loadApplicationTracks = async () => {
+      try {
+        setLoadingTracks(true);
+        setTracksError("");
+        const response = await fetch(
+          urlJoin(API_BASE, `/events/${event.id}/application-tracks/?status=open`),
+          { method: "GET" }
+        );
+        const data = await response.json();
+
+        // Handle both array and paginated response
+        const tracksList = Array.isArray(data) ? data : (data.results || []);
+        const activeTracks = tracksList.filter((t) => t.is_active);
+
+        setTracks(activeTracks);
+
+        // If multiple tracks exist, show track selector; if single track, auto-select
+        if (activeTracks.length > 1) {
+          setShowTrackSelector(true);
+          setSelectedTrackId(null);
+        } else if (activeTracks.length === 1) {
+          setSelectedTrackId(activeTracks[0].id);
+          setShowTrackSelector(false);
+        } else {
+          setShowTrackSelector(false);
+        }
+      } catch (err) {
+        console.error("Failed to load application tracks:", err);
+        setTracksError("Failed to load tracks");
+        setShowTrackSelector(false);
+      } finally {
+        setLoadingTracks(false);
+      }
+    };
+
+    loadApplicationTracks();
+  }, [open, event?.id]);
 
   // Pre-fill form for authenticated users on modal open
   useEffect(() => {
@@ -203,6 +261,12 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
     setError("");
     if (!validateForm()) return;
 
+    // Validate track selection
+    if (!selectedTrackId) {
+      setError("Please select an application track");
+      return;
+    }
+
     setLoading(true);
     try {
       const url = urlJoin(API_BASE, `/events/${event.id}/apply/`);
@@ -215,20 +279,24 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
         headers.Authorization = `Bearer ${token}`;
       }
 
+      const payload = {
+        track_id: selectedTrackId,
+        submission_mode: "self_submission",
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        email: form.email.trim().toLowerCase(),
+        job_title: form.job_title.trim(),
+        company_name: form.company_name.trim(),
+        linkedin_url: form.linkedin_url.trim(),
+        attendee_marker_value: !!form.attendee_marker_value,
+        comments: form.comments?.trim() || "",
+        preapproved_code: form.preapproved_code?.trim() || "",
+      };
+
       const res = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          first_name: form.first_name.trim(),
-          last_name: form.last_name.trim(),
-          email: form.email.trim().toLowerCase(),
-          job_title: form.job_title.trim(),
-          company_name: form.company_name.trim(),
-          linkedin_url: form.linkedin_url.trim(),
-          attendee_marker_value: !!form.attendee_marker_value,
-          comments: form.comments?.trim() || "",
-          preapproved_code: form.preapproved_code?.trim() || "",
-        }),
+        body: JSON.stringify(payload),
       });
 
       const text = await res.text();
@@ -306,6 +374,10 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
     setCodePreapproved(false);
     setEmailPreapproved(false);
     setCodeError("");
+    setSelectedTrackId(null);
+    setShowTrackSelector(false);
+    setTracks([]);
+    setTracksError("");
     setForm({
       first_name: "",
       last_name: "",
@@ -357,203 +429,272 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
           </Stack>
         ) : (
           <Stack spacing={2} sx={{ pt: 1 }}>
+            {/* Track Selector - Show if multiple tracks available and not yet selected */}
+            {loadingTracks ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                <CircularProgress size={32} />
+              </Box>
+            ) : tracksError ? (
+              <Alert severity="error">{tracksError}</Alert>
+            ) : showTrackSelector && !selectedTrackId ? (
+              <Card sx={{ mb: 2, bgcolor: "#f5f5f5" }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    Select Application Track
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                    Choose which track you'd like to apply for:
+                  </Typography>
+                  <RadioGroup
+                    value={selectedTrackId || ""}
+                    onChange={(e) => setSelectedTrackId(e.target.value)}
+                  >
+                    <Stack spacing={1}>
+                      {tracks.map((track) => (
+                        <MuiFormControlLabel
+                          key={track.id}
+                          value={track.id}
+                          control={<Radio />}
+                          label={
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {track.label}
+                              </Typography>
+                              {track.description && (
+                                <Typography variant="caption" color="textSecondary">
+                                  {track.description}
+                                </Typography>
+                              )}
+                            </Box>
+                          }
+                        />
+                      ))}
+                    </Stack>
+                  </RadioGroup>
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    sx={{ mt: 2 }}
+                    disabled={!selectedTrackId}
+                    onClick={() => {
+                      if (selectedTrackId) {
+                        setShowTrackSelector(false);
+                      }
+                    }}
+                  >
+                    Continue
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : selectedTrackId && (
+              <Alert severity="info" sx={{ mb: 1 }}>
+                <Typography variant="body2">
+                  <strong>Selected Track:</strong> {tracks.find((t) => t.id === selectedTrackId)?.label}
+                </Typography>
+              </Alert>
+            )}
             {error && (
               <Alert severity="error" onClose={() => setError("")}>
                 {error}
               </Alert>
             )}
 
-            {showAuthOptions && !token && !guestOnly && (
+            {/* Show form only if track is selected or no tracks exist */}
+            {(selectedTrackId || (!showTrackSelector && tracks.length === 0)) && (
               <>
-                <Alert severity="info" sx={{ py: 1 }}>
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    Already have an account?
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={handleSignInClick}
-                    disabled={loading}
-                    fullWidth
-                    sx={{ mb: 1 }}
-                  >
-                    Sign In to Apply
-                  </Button>
-                </Alert>
-                <Divider>or continue without account</Divider>
-              </>
-            )}
+                {showAuthOptions && !token && !guestOnly && (
+                  <>
+                    <Alert severity="info" sx={{ py: 1 }}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        Already have an account?
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleSignInClick}
+                        disabled={loading}
+                        fullWidth
+                        sx={{ mb: 1 }}
+                      >
+                        Sign In to Apply
+                      </Button>
+                    </Alert>
+                    <Divider>or continue without account</Divider>
+                  </>
+                )}
 
-            <Typography variant="body2" color="textSecondary">
-              {token
-                ? "Complete your professional details below."
-                : "Fill in your information to apply. You can also sign in or create an account to continue."}
-            </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {token
+                    ? "Complete your professional details below."
+                    : "Fill in your information to apply. You can also sign in or create an account to continue."}
+                </Typography>
 
-            {/* For authenticated users: show summary of personal info */}
-            {token && (
-              <Box sx={{
-                p: 2,
-                bgcolor: '#f5f5f5',
-                borderRadius: 1,
-                border: '1px solid #e0e0e0'
-              }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', mb: 1 }}>
-                  Your Information
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  <strong>{form.first_name} {form.last_name}</strong>
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  {form.email}
-                </Typography>
-              </Box>
-            )}
+                {/* For authenticated users: show summary of personal info */}
+                {token && (
+                  <Box sx={{
+                    p: 2,
+                    bgcolor: '#f5f5f5',
+                    borderRadius: 1,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', mb: 1 }}>
+                      Your Information
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      <strong>{form.first_name} {form.last_name}</strong>
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      {form.email}
+                    </Typography>
+                  </Box>
+                )}
 
-            {/* For unauthenticated users: show all fields */}
-            {!token && (
-              <>
-                <Stack direction="row" spacing={1}>
+                {/* For unauthenticated users: show all fields */}
+                {!token && (
+                  <>
+                    <Stack direction="row" spacing={1}>
+                      <TextField
+                        label="First Name"
+                        required
+                        fullWidth
+                        size="small"
+                        value={form.first_name}
+                        onChange={handleInputChange("first_name")}
+                        disabled={loading}
+                      />
+                      <TextField
+                        label="Last Name"
+                        required
+                        fullWidth
+                        size="small"
+                        value={form.last_name}
+                        onChange={handleInputChange("last_name")}
+                        disabled={loading}
+                      />
+                    </Stack>
+
+                    <TextField
+                      label="Email Address"
+                      type="email"
+                      required
+                      fullWidth
+                      size="small"
+                      value={form.email}
+                      onChange={handleInputChange("email")}
+                      onBlur={() => checkPreapprovalEmail(form.email)}
+                      disabled={loading}
+                    />
+                  </>
+                )}
+
+                {event?.preapproval_code_enabled && (
                   <TextField
-                    label="First Name"
-                    required
+                    label="Pre-approved code"
                     fullWidth
                     size="small"
-                    value={form.first_name}
-                    onChange={handleInputChange("first_name")}
+                    value={form.preapproved_code}
+                    onChange={handleInputChange("preapproved_code")}
+                    onBlur={() => checkPreapprovalCode(form.preapproved_code)}
                     disabled={loading}
+                    helperText={codeError || ""}
+                    error={!!codeError}
                   />
-                  <TextField
-                    label="Last Name"
-                    required
-                    fullWidth
-                    size="small"
-                    value={form.last_name}
-                    onChange={handleInputChange("last_name")}
-                    disabled={loading}
-                  />
-                </Stack>
+                )}
 
                 <TextField
-                  label="Email Address"
-                  type="email"
+                  label="Job Title"
                   required
                   fullWidth
                   size="small"
-                  value={form.email}
-                  onChange={handleInputChange("email")}
-                  onBlur={() => checkPreapprovalEmail(form.email)}
+                  placeholder="e.g., Product Manager"
+                  value={form.job_title}
+                  onChange={handleInputChange("job_title")}
                   disabled={loading}
                 />
-              </>
-            )}
 
-            {event?.preapproval_code_enabled && (
-              <TextField
-                label="Pre-approved code"
-                fullWidth
-                size="small"
-                value={form.preapproved_code}
-                onChange={handleInputChange("preapproved_code")}
-                onBlur={() => checkPreapprovalCode(form.preapproved_code)}
-                disabled={loading}
-                helperText={codeError || ""}
-                error={!!codeError}
-              />
-            )}
+                <TextField
+                  label="Company Name"
+                  required
+                  fullWidth
+                  size="small"
+                  placeholder="e.g., TechCorp Inc."
+                  value={form.company_name}
+                  onChange={handleInputChange("company_name")}
+                  disabled={loading}
+                />
 
-            <TextField
-              label="Job Title"
-              required
-              fullWidth
-              size="small"
-              placeholder="e.g., Product Manager"
-              value={form.job_title}
-              onChange={handleInputChange("job_title")}
-              disabled={loading}
-            />
-
-            <TextField
-              label="Company Name"
-              required
-              fullWidth
-              size="small"
-              placeholder="e.g., TechCorp Inc."
-              value={form.company_name}
-              onChange={handleInputChange("company_name")}
-              disabled={loading}
-            />
-
-            <TextField
-              label="LinkedIn URL"
-              fullWidth
-              size="small"
-              placeholder="https://linkedin.com/in/yourprofile (optional)"
-              value={form.linkedin_url}
-              onChange={handleInputChange("linkedin_url")}
-              disabled={loading}
-            />
-            {event?.attendee_marker_enabled && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={!!form.attendee_marker_value}
-                    onChange={handleCheckboxChange("attendee_marker_value")}
-                    disabled={loading}
+                <TextField
+                  label="LinkedIn URL"
+                  fullWidth
+                  size="small"
+                  placeholder="https://linkedin.com/in/yourprofile (optional)"
+                  value={form.linkedin_url}
+                  onChange={handleInputChange("linkedin_url")}
+                  disabled={loading}
+                />
+                {event?.attendee_marker_enabled && (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={!!form.attendee_marker_value}
+                        onChange={handleCheckboxChange("attendee_marker_value")}
+                        disabled={loading}
+                      />
+                    }
+                    label={event?.attendee_marker_label || "Attendee marker"}
                   />
-                }
-                label={event?.attendee_marker_label || "Attendee marker"}
-              />
-            )}
-            <TextField
-              label="Comments"
-              fullWidth
-              size="small"
-              multiline
-              minRows={3}
-              value={form.comments}
-              onChange={handleInputChange("comments")}
-              disabled={loading}
-            />
-            {preApproved && (
-              <Alert severity="success" sx={{ backgroundColor: "#e0f2f1" }}>
-                You are pre-approved.
-              </Alert>
-            )}
+                )}
+                <TextField
+                  label="Comments"
+                  fullWidth
+                  size="small"
+                  multiline
+                  minRows={3}
+                  value={form.comments}
+                  onChange={handleInputChange("comments")}
+                  disabled={loading}
+                />
+                {preApproved && (
+                  <Alert severity="success" sx={{ backgroundColor: "#e0f2f1" }}>
+                    You are pre-approved.
+                  </Alert>
+                )}
 
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={handleSubmitApplication}
-              disabled={
-                loading ||
-                !form.first_name ||
-                !form.last_name ||
-                !form.email ||
-                !form.job_title ||
-                !form.company_name
-              }
-              sx={{ py: 1 }}
-            >
-              {loading ? <CircularProgress size={20} color="inherit" /> : (preApproved ? "Register" : "Submit Application")}
-            </Button>
-
-            {!token && (
-              <Typography variant="caption" align="center" sx={{ display: "block", mt: 1 }}>
-                Want to sign up instead?{" "}
-                <Box
-                  component="span"
-                  onClick={handleSignUpClick}
-                  sx={{
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    color: "primary.main",
-                    "&:hover": { fontWeight: 500 },
-                  }}
+                <Button
+                  variant="contained"
+                  fullWidth
+                  onClick={handleSubmitApplication}
+                  disabled={
+                    loading ||
+                    !form.first_name ||
+                    !form.last_name ||
+                    !form.email ||
+                    !form.job_title ||
+                    !form.company_name
+                  }
+                  sx={{ py: 1 }}
                 >
-                  Create Account
-                </Box>
-              </Typography>
+                  {loading ? <CircularProgress size={20} color="inherit" /> : (preApproved ? "Register" : "Submit Application")}
+                </Button>
+
+                {!token && (
+                  <Typography variant="caption" align="center" sx={{ display: "block", mt: 1 }}>
+                    Want to sign up instead?{" "}
+                    <Box
+                      component="span"
+                      onClick={handleSignUpClick}
+                      sx={{
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        color: "primary.main",
+                        "&:hover": { fontWeight: 500 },
+                      }}
+                    >
+                      Create Account
+                    </Box>
+                  </Typography>
+                )}
+              </>
             )}
           </Stack>
         )}

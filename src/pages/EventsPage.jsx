@@ -11,6 +11,8 @@ import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
+import EventApplicationForm from "../components/EventApplicationForm.jsx";
+import { Dialog, DialogContent } from "@mui/material";
 import {
   Box,
   Avatar,
@@ -500,6 +502,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
   const [myApplication, setMyApplication] = React.useState(null);
   const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
+  const [showAuthenticatedApplyForm, setShowAuthenticatedApplyForm] = React.useState(false);
 
   // Timezone logic
   const organizerTimezone = normalizeTimezoneName(ev.timezone);
@@ -568,11 +571,30 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     return () => { cancelled = true; };
   }, [ev?.id, ev?.registration_type, token]);
 
-  // For authenticated users, submit application directly without dialog
+  // For authenticated users, show track selector if available
   const handleApplyCardDirect = async () => {
     if (!token || !ev?.id) return;
 
     try {
+      // First, fetch application tracks to see if event has Application Tracks feature
+      const tracksRes = await fetch(`${API_BASE}/events/${ev.id}/application-tracks/?status=open`);
+      let tracks = [];
+
+      if (tracksRes.ok) {
+        const tracksData = await tracksRes.json();
+        tracks = Array.isArray(tracksData) ? tracksData : (tracksData.results || []);
+        tracks = tracks.filter((t) => t.is_active);
+      }
+
+      // If event has tracks, show track selector; otherwise use old direct submission
+      if (tracks.length > 0) {
+        // Event uses Application Tracks feature
+        // Show EventApplicationForm with track selector in modal
+        setShowAuthenticatedApplyForm(true);
+        return;
+      }
+
+      // Old behavior: direct submission for events without Application Tracks
       // First, fetch user profile to get their name and email
       const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -1315,6 +1337,23 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         event={ev}
         livePath={`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`}
       />
+      <Dialog
+        open={showAuthenticatedApplyForm}
+        onClose={() => setShowAuthenticatedApplyForm(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogContent sx={{ pt: 3 }}>
+          <EventApplicationForm
+            eventId={ev.id}
+            onSuccess={(data) => {
+              setMyApplication(data);
+              setShowAuthenticatedApplyForm(false);
+              toast.success("Application submitted successfully!");
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </MUICard>
   );
 }

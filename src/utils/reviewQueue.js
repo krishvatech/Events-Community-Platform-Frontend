@@ -117,7 +117,7 @@ export const exportReviewQueue = async (eventId, filters = {}, format = 'csv') =
 
     // FIX 6: Use responseType: 'blob' for direct binary file download
     const response = await apiClient.get(
-      `/events/${eventId}/review-queue/export/?${params.toString()}&format=${format}`,
+      `/events/${eventId}/review-queue/export/?${params.toString()}&export_format=${format}`,
       { responseType: 'blob' }
     );
 

@@ -59,10 +59,29 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
     preapproved_code: "",
   });
 
-  // Load available tracks
+  // Load available tracks and pre-fill user profile for authenticated users
   useEffect(() => {
     loadTracks();
+    loadUserProfile();
   }, [eventId]);
+
+  const loadUserProfile = async () => {
+    try {
+      const { data } = await apiClient.get('/auth/me/profile/');
+      setFormData((prev) => ({
+        ...prev,
+        first_name: data.first_name || "",
+        last_name: data.last_name || "",
+        email: data.email || "",
+        job_title: data.job_title || "",
+        company_name: data.company || "",
+        linkedin_url: data.linkedin_url || "",
+      }));
+    } catch (err) {
+      console.error("Failed to load user profile:", err);
+      // Not a fatal error - form can still be filled manually
+    }
+  };
 
   const loadTracks = async () => {
     try {
@@ -70,12 +89,15 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
       const { data } = await apiClient.get(
         `/events/${eventId}/application-tracks/?status=open`
       );
-      setTracks(data.filter((t) => t.is_active));
+      // Handle both array and paginated response
+      const tracksList = Array.isArray(data) ? data : (data.results || []);
+      const activeTracks = tracksList.filter((t) => t.is_active);
+      setTracks(activeTracks);
       setError(null);
 
       // Auto-select track if only one
-      if (data.length === 1) {
-        selectTrack(data[0]);
+      if (activeTracks.length === 1) {
+        selectTrack(activeTracks[0]);
       }
     } catch (err) {
       console.error("Failed to load tracks:", err);
