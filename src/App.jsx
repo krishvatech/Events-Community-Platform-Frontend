@@ -67,6 +67,7 @@ import CoursePlayerPage from "./pages/CoursePlayerPage.jsx";
 import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
 import VirtualSpeakersPage from "./pages/VirtualSpeakersPage.jsx";
 import SaleorManager from "./pages/SaleorManager.jsx";
+import EmailTemplatesPage from "./pages/admin/EmailTemplatesPage.jsx";
 import EventLandingPage_Marketing from "./pages/EventLandingPage_Marketing.jsx";
 import SingleEventMarketingPage from "./pages/SingleEventMarketingPage.jsx";
 import { CircularProgress } from "@mui/material";
@@ -267,6 +268,7 @@ const AppShell = () => {
             <Route path="users/:userId/edit-profile" element={<AdminUserProfileEditPage />} />
             <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
             <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
+            <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />

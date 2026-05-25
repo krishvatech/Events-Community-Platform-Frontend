@@ -48,6 +48,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
 import MicRoundedIcon from "@mui/icons-material/MicRounded";
+import MarkEmailReadRoundedIcon from "@mui/icons-material/MarkEmailReadRounded";
 // import ForumRoundedIcon from "@mui/icons-material/ForumRounded"; // TODO: Re-enable when Discussion Forum is ready
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
@@ -218,6 +219,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Identity Verification", to: "/admin/name-requests", icon: BadgeRoundedIcon },
             { label: "Users", to: "/admin/users", icon: AdminPanelSettingsRoundedIcon },
             { label: "Saleor Manager", to: "/admin/saleor", icon: ShoppingCartRoundedIcon },
+            { label: "Email Templates", to: "/admin/email-templates", icon: MarkEmailReadRoundedIcon },
             { label: "CMS", action: "cms", icon: ArticleRoundedIcon },
         ];
     } else if (isStaffOnly) {
