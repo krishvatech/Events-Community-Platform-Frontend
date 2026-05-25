@@ -15,6 +15,12 @@ import {
   Chip,
 } from '@mui/material';
 import { apiClient } from '../utils/api';
+import {
+  formatSubmissionMode,
+  getAcceptanceMessage,
+  getApplicationIntroText,
+  getTrackDescription,
+} from '../utils/trackFormatting';
 
 /**
  * TrackPicker Component
@@ -125,20 +131,30 @@ const TrackPicker = ({ eventId, onTracksSelected, onCancel, multiple = true }) =
                   }
                   label={
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="subtitle1" fontWeight={600}>
-                        {track.label}
+                      <Typography variant="subtitle1" fontWeight={700}>
+                        {getApplicationIntroText(track)}
                       </Typography>
-                      {track.short_description && (
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-                          {track.short_description}
+
+                      {getTrackDescription(track) && (
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5, mb: 1 }}>
+                          {getTrackDescription(track)}
                         </Typography>
                       )}
+
+                      {track.role_mappings_on_acceptance && track.role_mappings_on_acceptance.length > 0 && (
+                        <Box sx={{ mt: 0.5, mb: 1, p: 1, backgroundColor: '#e3f2fd', borderRadius: 0.5 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                            {getAcceptanceMessage(track.role_mappings_on_acceptance)}
+                          </Typography>
+                        </Box>
+                      )}
+
                       {track.enabled_submission_modes && track.enabled_submission_modes.length > 0 && (
                         <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                           {track.enabled_submission_modes.map((mode) => (
                             <Chip
                               key={mode}
-                              label={mode.replace(/_/g, ' ')}
+                              label={formatSubmissionMode(mode)}
                               size="small"
                               variant="outlined"
                             />

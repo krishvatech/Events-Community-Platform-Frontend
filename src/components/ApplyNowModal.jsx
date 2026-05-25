@@ -22,6 +22,11 @@ import {
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useNavigate } from "react-router-dom";
+import {
+  getAcceptanceMessage,
+  getApplicationIntroText,
+  getTrackDescription,
+} from "../utils/trackFormatting";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.replace(/\/+$/, "");
@@ -460,11 +465,16 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
                           label={
                             <Box>
                               <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {track.label}
+                                {getApplicationIntroText(track)}
                               </Typography>
-                              {track.description && (
+                              {getTrackDescription(track) && (
                                 <Typography variant="caption" color="textSecondary">
-                                  {track.description}
+                                  {getTrackDescription(track)}
+                                </Typography>
+                              )}
+                              {track.role_mappings_on_acceptance?.length > 0 && (
+                                <Typography variant="caption" color="primary" sx={{ display: "block", mt: 0.5, fontWeight: 600 }}>
+                                  {getAcceptanceMessage(track.role_mappings_on_acceptance)}
                                 </Typography>
                               )}
                             </Box>
@@ -490,9 +500,26 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
               </Card>
             ) : selectedTrackId && (
               <Alert severity="info" sx={{ mb: 1 }}>
-                <Typography variant="body2">
-                  <strong>Selected Track:</strong> {tracks.find((t) => t.id === selectedTrackId)?.label}
-                </Typography>
+                {(() => {
+                  const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
+                  return (
+                    <>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {getApplicationIntroText(selectedTrack)}
+                      </Typography>
+                      {getTrackDescription(selectedTrack) && (
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+                          {getTrackDescription(selectedTrack)}
+                        </Typography>
+                      )}
+                      {selectedTrack?.role_mappings_on_acceptance?.length > 0 && (
+                        <Typography variant="body2" color="primary" sx={{ mt: 0.5, fontWeight: 600 }}>
+                          {getAcceptanceMessage(selectedTrack.role_mappings_on_acceptance)}
+                        </Typography>
+                      )}
+                    </>
+                  );
+                })()}
               </Alert>
             )}
             {error && (

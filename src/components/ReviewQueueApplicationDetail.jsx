@@ -477,7 +477,7 @@ const ReviewQueueApplicationDetail = ({
                     {tiers.map((tier) => (
                       <MenuItem key={tier.id} value={tier.id}>
                         {tier.label}
-                        {tier.price > 0 ? ` - $${tier.price.toFixed(2)}` : ' (Free)'}
+                        {tier.price && parseFloat(tier.price) > 0 ? ` - $${parseFloat(tier.price).toFixed(2)}` : ' (Free)'}
                         {preselectedTier === String(tier.id) && ' ✓ (Recommended)'}
                       </MenuItem>
                     ))}

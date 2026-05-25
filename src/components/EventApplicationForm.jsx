@@ -15,8 +15,18 @@ import {
   Select,
   MenuItem,
   Grid,
+  Typography,
+  Divider,
 } from "@mui/material";
 import { apiClient } from "../utils/api";
+import {
+  formatSubmissionMode,
+  getSubmissionModeDescription,
+  getTrackDisplayName,
+  getTrackDescription,
+  getApplicationIntroText,
+  getAcceptanceMessage,
+} from "../utils/trackFormatting";
 
 /**
  * EventApplicationForm
@@ -235,19 +245,7 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
     );
   }
 
-  const modeLabels = {
-    self_submission: "Apply for Yourself",
-    confirmed: "Confirmed Participation",
-    self_nomination: "Self-Nominate",
-    third_party_nomination: "Nominate Someone",
-  };
-
-  const modeDescriptions = {
-    self_submission: "Submit your own application",
-    confirmed: "Already confirmed by sponsor/partner organization",
-    self_nomination: "Nominate yourself for this opportunity",
-    third_party_nomination: "Nominate another person for this opportunity",
-  };
+  // Using formatSubmissionMode from trackFormatting utils instead of hardcoded labels
 
   const availableModes = selectedTrack?.enabled_submission_modes || [];
 
@@ -313,9 +311,9 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
                     }}
                   >
                     <Box>
-                      <strong>{modeLabels[mode]}</strong>
+                      <strong>{formatSubmissionMode(mode)}</strong>
                       <Box sx={{ fontSize: "0.9rem", color: "#666" }}>
-                        {modeDescriptions[mode]}
+                        {getSubmissionModeDescription(mode)}
                       </Box>
                     </Box>
                   </Button>
@@ -340,12 +338,37 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
         <Card>
           <CardContent>
             <h2>Application Form</h2>
-            <p>
-              <strong>Track:</strong> {selectedTrack?.label}
-            </p>
-            <p>
-              <strong>Mode:</strong> {modeLabels[formData.submission_mode]}
-            </p>
+
+            {/* Track Info Section - User Friendly Display */}
+            <Box sx={{ mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+              <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>
+                APPLICATION TRACK
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1976d2' }}>
+                {getApplicationIntroText(selectedTrack)}
+              </Typography>
+
+              {/* Track description */}
+              {getTrackDescription(selectedTrack) && (
+                <Typography variant="body2" color="textSecondary" sx={{ mb: 1.5 }}>
+                  {getTrackDescription(selectedTrack)}
+                </Typography>
+              )}
+
+              {/* Show what role they'll receive */}
+              {selectedTrack?.role_mappings_on_acceptance && selectedTrack.role_mappings_on_acceptance.length > 0 && (
+                <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#fff3e0', borderRadius: 0.5, borderLeft: '4px solid #ff9800' }}>
+                  <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+                    {getAcceptanceMessage(selectedTrack.role_mappings_on_acceptance)}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Submission mode */}
+              <Typography variant="caption" color="textSecondary" display="block">
+                <strong>Application Method:</strong> {formatSubmissionMode(formData.submission_mode)}
+              </Typography>
+            </Box>
 
             {/* Self-submission and self-nomination fields */}
             {["self_submission", "self_nomination"].includes(

@@ -19,6 +19,14 @@ import {
   Chip,
 } from '@mui/material';
 import { apiClient } from '../utils/api';
+import {
+  formatSubmissionMode,
+  getSubmissionModeDescription,
+  getTrackDisplayName,
+  getTrackDescription,
+  getApplicationIntroText,
+  getAcceptanceMessage,
+} from '../utils/trackFormatting';
 import SubmissionModePicker from './SubmissionModePicker';
 import ApplicationConfirmation from './ApplicationConfirmation';
 
@@ -554,14 +562,36 @@ const MultiTrackApplicationForm = ({
             <Box>
               {currentTrackId && tracks[currentTrackId] && (
                 <>
-                  <Typography variant="h6" gutterBottom>
-                    {tracks[currentTrackId].label}
-                  </Typography>
-                  {tracks[currentTrackId].short_description && (
-                    <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                      {tracks[currentTrackId].short_description}
+                  {/* Track Info Section - User Friendly Display */}
+                  <Box sx={{ mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>
+                      APPLICATION TRACK
                     </Typography>
-                  )}
+                    <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1976d2' }}>
+                      {getApplicationIntroText(tracks[currentTrackId])}
+                    </Typography>
+
+                    {/* Track description */}
+                    {getTrackDescription(tracks[currentTrackId]) && (
+                      <Typography variant="body2" color="textSecondary" sx={{ mb: 1.5 }}>
+                        {getTrackDescription(tracks[currentTrackId])}
+                      </Typography>
+                    )}
+
+                    {/* Show what role they'll receive */}
+                    {tracks[currentTrackId]?.role_mappings_on_acceptance && tracks[currentTrackId].role_mappings_on_acceptance.length > 0 && (
+                      <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#fff3e0', borderRadius: 0.5, borderLeft: '4px solid #ff9800' }}>
+                        <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
+                          {getAcceptanceMessage(tracks[currentTrackId].role_mappings_on_acceptance)}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {/* Submission mode */}
+                    <Typography variant="caption" color="textSecondary" display="block">
+                      <strong>Application Method:</strong> {formatSubmissionMode(submissionModes[currentTrackId] || 'self_submission')}
+                    </Typography>
+                  </Box>
 
                   {/* Form header notice from Phase 6 */}
                   {tracks[currentTrackId].form_header_notice && (
@@ -569,10 +599,6 @@ const MultiTrackApplicationForm = ({
                       {tracks[currentTrackId].form_header_notice}
                     </Alert>
                   )}
-
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                    Submission Mode: <strong>{submissionModes[currentTrackId]}</strong>
-                  </Typography>
 
                   <Typography variant="body2" color="textSecondary">
                     Additional fields for this track would appear here.
