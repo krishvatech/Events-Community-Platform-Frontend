@@ -127,6 +127,8 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess, 
             first_name: data.first_name || "",
             last_name: data.last_name || "",
             email: data.email || "",
+            job_title: data.job_title || prev.job_title || "",
+            company_name: data.company_name || data.company || prev.company_name || "",
           }));
         })
         .catch((err) => {

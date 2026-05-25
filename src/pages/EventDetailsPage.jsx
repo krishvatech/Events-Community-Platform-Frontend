@@ -166,6 +166,45 @@ function canViewParticipants(event, owner, staff) {
   if (isAfter) return event.show_participants_after_event !== false;
   return true;
 }
+
+// FIX: Check if event has open application tracks
+function hasOpenApplicationTracks(event) {
+  // Check if event is application-required
+  if (event?.registration_type !== 'apply') {
+    return true; // Non-apply events always allow apply
+  }
+
+  // If an older/preloaded event object does not include tracks, let the backend be the source of truth.
+  if (!Array.isArray(event?.application_tracks)) {
+    return true;
+  }
+
+  const tracks = event.application_tracks;
+  return tracks.length > 0 && tracks.some(track => track.is_active && track.status === 'open');
+}
+
+// FIX: Get message for when no tracks are available
+function getNoTracksMessage(event) {
+  if (event?.registration_type !== 'apply') {
+    return null; // Non-apply events don't need message
+  }
+
+  if (!Array.isArray(event?.application_tracks)) {
+    return null;
+  }
+
+  const tracks = event.application_tracks;
+  if (tracks.length === 0) {
+    return "Applications are not open yet.";
+  }
+
+  if (!tracks.some(track => track.is_active && track.status === 'open')) {
+    return "Applications are not open yet.";
+  }
+
+  return null;
+}
+
 // in computeStatus
 function computeStatus(ev) {
   const now = Date.now();
@@ -1758,15 +1797,16 @@ export default function EventDetailsPage() {
                           </Button>
                         ) : !isEventOwner && event.registration_type === 'apply' && !canJoinEventNow && !isPast ? (
                           // --- APPLY FLOW ---
-                          (<>
+                          // FIX: Check if open application tracks exist
+                          hasOpenApplicationTracks(event) ? (
+                          <>
                             {(!myApplication || myApplication.status === 'none') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
                               ? (
                                 <>
                                   <Button
                                     onClick={() => {
-                                      // For authenticated users, submit directly
                                       if (token) {
-                                        handleApplyDirect();
+                                        setApplyModalOpen(true);
                                       } else {
                                         // For guests, open guest apply modal
                                         setGuestApplyModalOpen(true);
@@ -1876,7 +1916,13 @@ export default function EventDetailsPage() {
                                     )
                                     : null
                             }
-                          </>)
+                          </>
+                          ) : (
+                            // FIX: No open application tracks available
+                            <Alert severity="info" sx={{ width: '100%' }}>
+                              {getNoTracksMessage(event)}
+                            </Alert>
+                          )
                         ) : !isEventOwner && !canJoinEventNow && !isPast ? (
                           <>
                             <Button
