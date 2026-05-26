@@ -31,7 +31,7 @@ const SubmissionModePicker = ({ track, onModeSelected, onCancel }) => {
       'Apply with confirmation from a sponsor or partner organization',
     self_nomination: 'Nominate yourself for this opportunity',
     third_party_nomination:
-      'Have someone nominate you for this opportunity',
+      'Nominate someone else for this opportunity',
   };
 
   useEffect(() => {

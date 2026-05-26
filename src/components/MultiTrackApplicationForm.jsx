@@ -377,8 +377,62 @@ const MultiTrackApplicationForm = ({
     return Boolean(first_name?.trim() && last_name?.trim() && email?.trim());
   };
 
+  const extractFieldsFromFormSchema = (track, submissionMode) => {
+    if (!track?.form_schema) return [];
+
+    const modeSchema = track.form_schema[submissionMode];
+    if (!modeSchema) return [];
+
+    const fields = [];
+    (modeSchema.sections || []).forEach((section) => {
+      (section.fields || []).forEach((field) => {
+        fields.push({
+          id: field.id,
+          label: field.label,
+          required: field.required || false,
+          type: field.type || 'text',
+          field_type: field.type || 'text',
+          help_text: field.help_text || '',
+          placeholder: field.placeholder || '',
+          options: field.options || [],
+        });
+      });
+    });
+
+    return fields;
+  };
+
+  const getSubmissionModeForTrack = (trackId) => (
+    submissionModes[trackId] || trackData[trackId]?.submission_mode || 'self_submission'
+  );
+
+  const getTrackModeData = (trackId, field) => (
+    trackData[trackId]?.[field] || ''
+  );
+
+  const getNomineeDetails = (trackId) => (
+    trackData[trackId]?.nominee_details || {}
+  );
+
+  const handleNomineeDetailChange = (trackId, field, value) => {
+    handleTrackDataChange(trackId, 'nominee_details', {
+      ...getNomineeDetails(trackId),
+      [field]: value,
+    });
+  };
+
   const getVisibleFieldsForTrack = (trackId) => {
-    const mode = submissionModes[trackId] || 'self_submission';
+    const mode = getSubmissionModeForTrack(trackId);
+    const track = tracks[trackId];
+
+    // First try to get fields from form_schema
+    const schemaFields = extractFieldsFromFormSchema(track, mode);
+
+    if (schemaFields.length > 0) {
+      return schemaFields;
+    }
+
+    // Fallback to custom form fields
     return (formFields[trackId] || []).filter((field) => {
       if (!field?.visibility_per_mode || Object.keys(field.visibility_per_mode).length === 0) {
         return true;
@@ -434,6 +488,14 @@ const MultiTrackApplicationForm = ({
       }
     }
 
+    return true;
+  };
+
+  const validateTrackStep = (trackId) => {
+    if (!validateModeSpecificFields(trackId)) {
+      return false;
+    }
+
     const requiredMissing = getVisibleFieldsForTrack(trackId).find(
       (field) => field.required && isEmptyAnswer(getFieldAnswer(trackId, field))
     );
@@ -451,6 +513,12 @@ const MultiTrackApplicationForm = ({
     if (!validateApplicantData()) {
       return;
     }
+    const invalidTrack = selectedTracks.find((trackId) => !validateTrackStep(trackId));
+    if (invalidTrack) {
+      const invalidTrackIndex = selectedTracks.indexOf(invalidTrack);
+      setActiveStep(invalidTrackIndex + 1);
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -463,13 +531,43 @@ const MultiTrackApplicationForm = ({
         return {
           ...safeTrackData,
           track_id: trackId,
-          submission_mode: submissionModes[trackId] || ignoredSubmissionMode || 'self_submission',
+          submission_mode: getSubmissionModeForTrack(trackId) || ignoredSubmissionMode,
           pre_approved_via: trackPreapprovalState[trackId]?.source || null,
         };
       });
 
+      // Extract form_schema fields and include them as top-level payload for validation
+      const payloadFields = { ...applicantData };
+      selectedTracks.forEach((trackId) => {
+        const mode = getSubmissionModeForTrack(trackId);
+        const track = tracks[trackId];
+        const schemaFields = extractFieldsFromFormSchema(track, mode);
+
+        // Include form_schema fields in payload for ALL modes (not just third_party_nomination)
+        schemaFields.forEach((field) => {
+          const answer = trackData[trackId]?.form_answers?.[field.id];
+          // Include even if empty/undefined for validation to catch missing required fields
+          payloadFields[field.id] = answer || '';
+        });
+      });
+
+      const nominationTrackId = selectedTracks.find(
+        (trackId) => getSubmissionModeForTrack(trackId) === 'third_party_nomination'
+      );
+      const confirmedTrackId = selectedTracks.find(
+        (trackId) => getSubmissionModeForTrack(trackId) === 'confirmed'
+      );
+      const nominationData = nominationTrackId ? trackData[nominationTrackId] || {} : {};
+      const confirmedData = confirmedTrackId ? trackData[confirmedTrackId] || {} : {};
+
       const payload = {
-        ...applicantData,
+        ...payloadFields,
+        nominator_name: nominationData.nominator_name || '',
+        nominator_email: nominationData.nominator_email || '',
+        nominee_name: nominationData.nominee_name || '',
+        nominee_email: nominationData.nominee_email || '',
+        nominee_details: nominationData.nominee_details || {},
+        sponsor_organization: confirmedData.sponsor_organization || '',
         // Phase 8: Include pre-approval code if provided
         preapproved_code: preapprovalCode.trim() || undefined,
         track_applications,
@@ -724,6 +822,103 @@ const MultiTrackApplicationForm = ({
     }
   };
 
+  const renderModeSpecificFields = (trackId) => {
+    const mode = getSubmissionModeForTrack(trackId);
+
+    if (mode === 'confirmed') {
+      return (
+        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+            Sponsor / Partner Confirmation
+          </Typography>
+          <TextField
+            fullWidth
+            required
+            label="Sponsor or Partner Organization *"
+            value={getTrackModeData(trackId, 'sponsor_organization')}
+            onChange={(event) => handleTrackDataChange(trackId, 'sponsor_organization', event.target.value)}
+            helperText="Enter the organization confirming this application."
+          />
+        </Box>
+      );
+    }
+
+    if (mode === 'third_party_nomination') {
+      return (
+        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Third-party Nomination
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Tell us who is making the nomination and who they recommend for this track.
+          </Typography>
+
+          <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+            NOMINATOR
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                label="Nominator Name *"
+                value={getTrackModeData(trackId, 'nominator_name')}
+                onChange={(event) => handleTrackDataChange(trackId, 'nominator_name', event.target.value)}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                type="email"
+                label="Nominator Email *"
+                value={getTrackModeData(trackId, 'nominator_email')}
+                onChange={(event) => handleTrackDataChange(trackId, 'nominator_email', event.target.value)}
+              />
+            </Grid>
+          </Grid>
+
+          <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+            THE RECOMMENDED EXPERT
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                label="Recommended Expert Name *"
+                value={getTrackModeData(trackId, 'nominee_name')}
+                onChange={(event) => handleTrackDataChange(trackId, 'nominee_name', event.target.value)}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                type="email"
+                label="Recommended Expert Email *"
+                value={getTrackModeData(trackId, 'nominee_email')}
+                onChange={(event) => handleTrackDataChange(trackId, 'nominee_email', event.target.value)}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Why are you recommending this expert?"
+                value={getNomineeDetails(trackId).recommendation || ''}
+                onChange={(event) => handleNomineeDetailChange(trackId, 'recommendation', event.target.value)}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+      );
+    }
+
+    return null;
+  };
+
   const reviewStep = selectedTracks.length + 1;
 
   // Render confirmation
@@ -926,9 +1121,11 @@ const MultiTrackApplicationForm = ({
 
                     {/* Submission mode */}
                     <Typography variant="caption" color="textSecondary" display="block">
-                      <strong>Application Method:</strong> {formatSubmissionMode(submissionModes[currentTrackId] || 'self_submission')}
+                      <strong>Application Method:</strong> {formatSubmissionMode(getSubmissionModeForTrack(currentTrackId))}
                     </Typography>
                   </Box>
+
+                  {renderModeSpecificFields(currentTrackId)}
 
                   {/* Tier Selection - if track has pricing tiers */}
                   {pricingTiers[currentTrackId] && pricingTiers[currentTrackId].length > 0 && (
@@ -1045,6 +1242,7 @@ const MultiTrackApplicationForm = ({
                 </Typography>
                   {selectedTracks.map((trackId) => {
                   const trackState = trackPreapprovalState[trackId];
+                  const mode = getSubmissionModeForTrack(trackId);
                   const isPreapproved = trackState && (trackState.codePreapproved || trackState.emailPreapproved);
                   const mode = submissionModes[trackId] || 'self_submission';
                   return (
