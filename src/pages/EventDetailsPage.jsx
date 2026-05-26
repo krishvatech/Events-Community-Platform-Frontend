@@ -1841,9 +1841,6 @@ export default function EventDetailsPage() {
                               ? "You are registered for this event."
                               : getDisplayPrice(event)}
                       </Typography>
-                      {paymentPending && (
-                        <PaymentPendingDetails registration={registration} event={event} />
-                      )}
                       <div className="mt-3 flex flex-col gap-2">
                         {/* Replay Info Badge */}
                         {event.replay_available && (

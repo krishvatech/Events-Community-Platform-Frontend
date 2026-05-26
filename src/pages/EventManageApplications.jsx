@@ -113,6 +113,7 @@ const EventManageApplications = () => {
 
       const result = await fetchReviewQueue(eventId, currentFilters, page + 1, pageSize);
       if (result.success) {
+        // Backend now provides origin_status directly, so no enrichment needed
         setApplications(result.data);
         setTotalCount(result.count);
       } else {
@@ -286,6 +287,7 @@ const EventManageApplications = () => {
           totalCount={totalCount}
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
+          tiers={event?.pricing_tiers || []}
         />
 
         {/* Detail Dialog */}

@@ -76,6 +76,14 @@ const ReviewQueueApplicationDetail = ({
     }
   }, [open, application, event?.id]);
 
+  // Filter tiers by track
+  const filteredTiers = useMemo(() => {
+    if (!application?.track_id || !tiers || tiers.length === 0) {
+      return tiers;
+    }
+    return tiers.filter(tier => tier.track_id === application.track_id);
+  }, [application?.track_id, tiers]);
+
   // Determine preselected tier for accept action
   const preselectedTier = useMemo(() => {
     if (!application) return '';
@@ -480,22 +488,26 @@ const ReviewQueueApplicationDetail = ({
               {/* Tier Selection for Accept */}
               {selectedAction === 'accept' && (
                 <FormControl fullWidth>
-                  <InputLabel>Tier *</InputLabel>
-                  <Select
-                    value={selectedTier}
-                    label="Tier *"
-                    onChange={handleTierChange}
-                    disabled={loading}
-                  >
-                    <MenuItem value="">Select a tier...</MenuItem>
-                    {tiers.map((tier) => (
-                      <MenuItem key={tier.id} value={tier.id}>
-                        {tier.label}
-                        {tier.price && parseFloat(tier.price) > 0 ? ` - $${parseFloat(tier.price).toFixed(2)}` : ' (Free)'}
-                        {preselectedTier === String(tier.id) && ' ✓ (Recommended)'}
-                      </MenuItem>
-                    ))}
-                  </Select>
+                  <InputLabel>Tier * (for {application.track_label || 'this track'})</InputLabel>
+                  {filteredTiers.length === 0 ? (
+                    <Alert severity="warning">No tiers available for this track</Alert>
+                  ) : (
+                    <Select
+                      value={selectedTier}
+                      label={`Tier * (for ${application.track_label || 'this track'})`}
+                      onChange={handleTierChange}
+                      disabled={loading}
+                    >
+                      <MenuItem value="">Select a tier...</MenuItem>
+                      {filteredTiers.map((tier) => (
+                        <MenuItem key={tier.id} value={tier.id}>
+                          {tier.label}
+                          {tier.price && parseFloat(tier.price) > 0 ? ` - $${parseFloat(tier.price).toFixed(2)}` : ' (Free)'}
+                          {preselectedTier === String(tier.id) && ' ✓ (Recommended)'}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  )}
                 </FormControl>
               )}
 

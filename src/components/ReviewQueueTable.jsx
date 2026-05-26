@@ -30,6 +30,7 @@ const ReviewQueueTable = ({
   totalCount = 0,
   onPageChange,
   onPageSizeChange,
+  tiers = [],
 }) => {
   const handleSelectAll = (event) => {
     if (event.target.checked) {
@@ -89,6 +90,21 @@ const ReviewQueueTable = ({
     return labels[status] || status;
   };
 
+  const getPaymentStatus = (app) => {
+    if (app.status !== 'accepted') {
+      return null; // Only show payment status for accepted applications
+    }
+
+    // Use actual origin_status from backend (true source of truth)
+    if (app.origin_status === 'confirmed') {
+      return { label: 'Confirmed', color: 'success' };  // Green ✅
+    } else if (app.origin_status === 'payment_pending') {
+      return { label: 'Payment Pending', color: 'warning' };  // Orange 🔶
+    }
+
+    return null;
+  };
+
   return (
     <Box>
       {selectedIds.length > 0 && (
@@ -116,6 +132,7 @@ const ReviewQueueTable = ({
               <TableCell>Mode</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Tier</TableCell>
+              <TableCell>Payment Status</TableCell>
               <TableCell>Reviewed At</TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
@@ -163,6 +180,21 @@ const ReviewQueueTable = ({
                   <Typography variant="body2">
                     {app.status === 'accepted' ? (app.accepted_tier_label || '-') : (app.tier_label || '-')}
                   </Typography>
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const paymentStatus = getPaymentStatus(app);
+                    return paymentStatus ? (
+                      <Chip
+                        label={paymentStatus.label}
+                        size="small"
+                        color={paymentStatus.color}
+                        variant="outlined"
+                      />
+                    ) : (
+                      <Typography variant="body2">-</Typography>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">{formatDate(app.reviewed_at)}</Typography>
