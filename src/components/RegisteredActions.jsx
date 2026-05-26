@@ -88,7 +88,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                 });
                 if (!res.ok) throw new Error(await res.text());
 
-                toast.info("You have unregistered from the event.");
+                toast.info("You have cancelled your registration.");
                 if (onUnregistered) onUnregistered(ev.id);
 
             } else if (actionType === 'cancel_request') {

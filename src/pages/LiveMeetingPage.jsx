@@ -171,7 +171,12 @@ import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import WaitingRoomQnaPanel from "../components/WaitingRoomQnaPanel.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
-import { fetchEventSummaryCached, fetchUserDetailCached } from "../utils/entityCache.js";
+import {
+  fetchCurrentUserPreferencesCached,
+  fetchEventSummaryCached,
+  fetchUserDetailCached,
+  fetchUserKycStatusCached,
+} from "../utils/entityCache.js";
 import { getUserName } from "../utils/authStorage.js";
 import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
@@ -2858,7 +2863,7 @@ export default function NewLiveMeeting() {
     let isMounted = true;
     (async () => {
       try {
-        const data = await fetchUserDetailCached({
+        const data = await fetchUserKycStatusCached({
           baseUrl: API_ROOT,
           userId,
           headers,
@@ -11263,13 +11268,31 @@ export default function NewLiveMeeting() {
         console.log("[HandleRoomLeft] Ignoring roomLeft during reconnect. state:", state);
         return;
       }
-      if (["left", "ended", "kicked", "rejected", "disconnected", "failed"].includes(state)) {
+      if (["disconnected", "failed"].includes(state)) {
+        console.warn("[HandleRoomLeft] RTK roomLeft treated as transient. Starting reconnect.", {
+          state,
+          eventId,
+          reconnectLocked: reconnectLocked.current,
+          isBreakout,
+        });
+        if (!reconnectLocked.current && eventId) {
+          reconnectLocked.current = true;
+          reconnectAttemptRef.current = 0;
+          isReconnectingRef.current = true;
+          shouldPausePollingRef.current = true;
+          setIsReconnecting(true);
+          setReconnectMessage("Connection lost. Reconnecting...");
+          initiateAutoReconnect();
+        }
+        return;
+      }
+      if (["left", "ended", "kicked", "rejected"].includes(state)) {
         if (!isBreakout) handleMeetingEnd(state);
       }
     };
     rtkMeeting.self.on("roomLeft", handleRoomLeft);
     return () => rtkMeeting.self.off?.("roomLeft", handleRoomLeft);
-  }, [rtkMeeting, handleMeetingEnd, isBreakout]);
+  }, [rtkMeeting, handleMeetingEnd, isBreakout, eventId]);
 
   // ---------- Detect host for audience (pin + waiting screen) ----------
   useEffect(() => {
@@ -15914,11 +15937,11 @@ export default function NewLiveMeeting() {
     if (!accessToken) return;  // Only for authenticated users, not guests
     (async () => {
       try {
-        const r = await fetch(toApiUrl("users/me/"), { headers: authHeader() });
-        if (r.ok) {
-          const d = await r.json();
-          setUserQnaAnonymousDefault(d?.profile?.default_qna_anonymous || false);
-        }
+        const d = await fetchCurrentUserPreferencesCached({
+          baseUrl: API_ROOT,
+          headers: authHeader(),
+        });
+        setUserQnaAnonymousDefault(d?.profile?.default_qna_anonymous || false);
       } catch (e) {
         console.warn("Failed to load user profile for Q&A default", e);
       }

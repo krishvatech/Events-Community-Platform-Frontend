@@ -292,6 +292,45 @@ function VerifyBanner({ onDismiss }) {
   );
 }
 
+// ── Pending Forms Banner ──────────────────────────────────────────────────────
+function PendingFormsBanner({ forms }) {
+  const navigate = useNavigate();
+  if (!forms || forms.length === 0) return null;
+
+  const form = forms[0];
+  const formTitle = form.form_template?.title || (form.form_type === 'promotional_profile' ? 'Promotional Profile' : 'Participant Information');
+  const eventTitle = form.event?.title || 'Your Event';
+
+  return (
+    <div style={{
+      margin: "0 40px 20px",
+      background: `linear-gradient(135deg, ${O}08 0%, ${O}14 100%)`,
+      border: `1px solid ${O}28`, borderRadius: 12,
+      padding: "14px 20px", display: "flex", alignItems: "center", gap: 16,
+      fontFamily: FONT, position: "relative",
+    }}>
+      <div style={{
+        width: 48, height: 48, borderRadius: 10, background: `${O}15`,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      }}>
+        <EventNoteIcon sx={{ color: O, fontSize: 22 }} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: N, marginBottom: 2, fontFamily: FONT }}>Pending Form: {formTitle}</div>
+        <div style={{ fontSize: 12, color: "#777", lineHeight: 1.5, fontFamily: FONT }}>
+          {eventTitle} — Due {form.deadline ? new Date(form.deadline).toLocaleDateString() : 'soon'}
+          {forms.length > 1 && ` (+${forms.length - 1} more)`}
+        </div>
+      </div>
+      <button
+        onClick={() => navigate(`/forms/${form.id}`)}
+        style={{ fontSize: 12, fontWeight: 700, color: O, textDecoration: "none", whiteSpace: "nowrap", background: `${O}14`, padding: "6px 14px", borderRadius: 7, fontFamily: FONT, border: "none", cursor: "pointer" }}>
+        Complete →
+      </button>
+    </div>
+  );
+}
+
 // ── Featured Event Hero ───────────────────────────────────────────────────────
 function FeaturedHero({ event }) {
   const accent = getAccent(event?.event_type);
@@ -519,6 +558,7 @@ export default function DashboardPage() {
   const [messageCount, setMessageCount] = useState(0);
   const [showProfileBanner, setShowProfileBanner] = useState(true);
   const [showVerifyBanner, setShowVerifyBanner] = useState(true);
+  const [pendingForms, setPendingForms] = useState([]);
   const isAdminUser = isOwnerUser() || isStaffUser();
 
   useEffect(() => {
@@ -532,7 +572,10 @@ export default function DashboardPage() {
       apiClient.get("/groups/?page_size=3").then(r => {
         const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
       }).catch(() => []),
-    ]).then(([userData, landingData, postsData, groupsData]) => {
+      apiClient.get("/post-acceptance-form-assignments/?status=not_started,in_progress&page_size=10").then(r => {
+        const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
+      }).catch(() => []),
+    ]).then(([userData, eventsData, postsData, groupsData, formsData]) => {
       if (!active) return;
       setUser(userData);
       // Build events array: hero first, then upcoming events
@@ -546,6 +589,7 @@ export default function DashboardPage() {
       setEvents(allEvents.slice(0, 10)); // Store up to 10 for flexibility
       // setDiscussions(postsData.length ? postsData.slice(0, 3) : STATIC_DISCUSSIONS); // COMMENTED OUT
       // setGroups(groupsData.length ? groupsData.slice(0, 3) : STATIC_GROUPS); // COMMENTED OUT
+      setPendingForms(formsData.slice(0, 3)); // Show max 3 pending forms
       setLoading(false);
     });
 
@@ -686,6 +730,11 @@ export default function DashboardPage() {
         {showVerifyBanner && !loading && !kycApproved && (
           <FadeIn delay={160}>
             <VerifyBanner onDismiss={() => setShowVerifyBanner(false)} />
+          </FadeIn>
+        )}
+        {pendingForms.length > 0 && !loading && (
+          <FadeIn delay={240}>
+            <PendingFormsBanner forms={pendingForms} />
           </FadeIn>
         )}
       </div>

@@ -59,6 +59,11 @@ import EditEventForm from "../components/EditEventForm.jsx";
 import EventPreApprovalManager from "../components/admin/EventPreApprovalManager.jsx";
 import EventQnAManager from "../components/admin/EventQnAManager.jsx";
 import EventEmailTemplatesManager from "../components/admin/EventEmailTemplatesManager.jsx";
+import EventConfirmationEmailManager from "../components/admin/EventConfirmationEmailManager.jsx";
+import ParticipantInformationManager from "../components/admin/ParticipantInformationManager.jsx";
+import PromotionalProfilesManager from "../components/admin/PromotionalProfilesManager.jsx";
+import ApplicationTracksManager from "../components/ApplicationTracksManager.jsx";
+import EventManageApplications from "./EventManageApplications.jsx";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
@@ -205,16 +210,17 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Participants", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Application Tracks", "Registered Members", "Participants", "Participant Information", "Promotional Profiles", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications", "Confirmation Email"];
+
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
 const getTabLabels = (event, isOwner) => {
   if (!isOwner) return STAFF_EVENT_TAB_LABELS;
   let labels = [...EVENT_TAB_LABELS];
-  // Remove Applications tab if it's not an 'apply' type event
+  // Remove Applications and Application Tracks tabs if it's not an 'apply' type event
   if (event?.registration_type !== 'apply') {
-    labels = labels.filter(label => label !== "Applications");
+    labels = labels.filter(label => label !== "Applications" && label !== "Application Tracks");
   }
   // Only show Product Management tab for paid events (is_free === false strictly)
   if (event?.is_free !== false) {
@@ -8311,9 +8317,11 @@ export default function EventManagePage() {
                   {tab === tabLabels.indexOf("Overview") && renderOverview()}
                   {event?.registration_type === 'apply' ? (
                     <>
-                      {tab === tabLabels.indexOf("Applications") && renderApplications()}
+                      {tab === tabLabels.indexOf("Applications") && <EventManageApplications />}
+                      {tab === tabLabels.indexOf("Application Tracks") && <ApplicationTracksManager eventId={eventId} token={getToken()} />}
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
-                      {tab === tabLabels.indexOf("Participants") && renderParticipants()}
+                      {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
+                      {tab === tabLabels.indexOf("Promotional Profiles") && <PromotionalProfilesManager eventId={eventId} />}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
                       {tab === tabLabels.indexOf("Session") && renderSessions()}
                       {tab === tabLabels.indexOf("Resources") && renderResources()}
@@ -8330,7 +8338,8 @@ export default function EventManagePage() {
                   ) : (
                     <>
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
-                      {tab === tabLabels.indexOf("Participants") && renderParticipants()}
+                      {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
+                      {tab === tabLabels.indexOf("Promotional Profiles") && <PromotionalProfilesManager eventId={eventId} />}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
                       {tab === tabLabels.indexOf("Session") && renderSessions()}
                       {tab === tabLabels.indexOf("Resources") && renderResources()}

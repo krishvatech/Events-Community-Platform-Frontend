@@ -122,10 +122,14 @@ export default function GuestApplyModal({ open, onClose, event, livePath }) {
     const email = (emailInput || "").trim().toLowerCase();
     if (!event?.preapproval_allowlist_enabled || !email) return;
     try {
+      // Phase 8: Support track_id and submission_mode (optional for backward compatibility)
+      const payload = { email };
+      // For single-track applications, track info can be added if available
+
       const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/preapproval/check-email/`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (data?.preapproved && data?.source === "email") {
@@ -151,10 +155,15 @@ export default function GuestApplyModal({ open, onClose, event, livePath }) {
       return;
     }
     try {
+      // Phase 8: Include track_id and submission_mode if available
+      const payload = { code };
+      // For single-track applications, include track info if available
+      // This supports backward compatibility (optional parameters)
+
       const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/preapproval/check-code/`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (data?.preapproved && data?.source === "code") {
@@ -274,7 +283,11 @@ export default function GuestApplyModal({ open, onClose, event, livePath }) {
 
       if (!res.ok) {
         if (res.status === 409) {
-          setError("You have already applied to this event with this email.");
+          setError(data.detail || "You have already applied to this event with this email.");
+          return;
+        }
+        if (res.status === 400) {
+          setError(data.detail || "Unable to submit application. Please check your information.");
           return;
         }
         throw new Error(

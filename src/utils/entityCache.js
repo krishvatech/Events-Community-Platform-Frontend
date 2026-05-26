@@ -4,6 +4,10 @@ const IN_FLIGHT = new Map();
 const now = () => Date.now();
 const normalizeBase = (baseUrl = "") => String(baseUrl || "").replace(/\/+$/, "");
 const cacheKey = (kind, id) => `${kind}:${id}`;
+const authCacheKey = (headers = {}) => {
+  const auth = headers.Authorization || headers.authorization || "";
+  return auth ? auth.slice(-24) : "anon";
+};
 
 function readFresh(key) {
   const hit = CACHE.get(key);
@@ -73,6 +77,43 @@ export async function fetchUserDetailCached({
       credentials: 'include',
     });
     if (!res.ok) throw new Error(`User detail ${id} failed: HTTP ${res.status}`);
+    return res.json();
+  }, ttlMs);
+}
+
+export async function fetchCurrentUserPreferencesCached({
+  baseUrl,
+  headers = {},
+  ttlMs = 300_000,
+  fetcher = fetch,
+} = {}) {
+  const root = normalizeBase(baseUrl);
+  return fetchJsonCached(cacheKey('current-user-preferences', authCacheKey(headers)), async () => {
+    const res = await fetcher(`${root}/users/me/?ecp_lite=qna`, {
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`Current user preferences failed: HTTP ${res.status}`);
+    return res.json();
+  }, ttlMs);
+}
+
+export async function fetchUserKycStatusCached({
+  baseUrl,
+  userId,
+  headers = {},
+  ttlMs = 300_000,
+  fetcher = fetch,
+} = {}) {
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('Missing userId');
+  const root = normalizeBase(baseUrl);
+  return fetchJsonCached(cacheKey('user-kyc', id), async () => {
+    const res = await fetcher(`${root}/users/${id}/?ecp_lite=kyc`, {
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`User KYC ${id} failed: HTTP ${res.status}`);
     return res.json();
   }, ttlMs);
 }
