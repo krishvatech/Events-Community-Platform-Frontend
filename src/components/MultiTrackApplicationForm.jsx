@@ -14,15 +14,17 @@ import {
   Alert,
   Divider,
   Checkbox,
+  FormControl,
   FormControlLabel,
   Grid,
+  InputLabel,
+  MenuItem,
+  Select,
   Chip,
 } from '@mui/material';
 import { apiClient } from '../utils/api';
 import {
   formatSubmissionMode,
-  getSubmissionModeDescription,
-  getTrackDisplayName,
   getTrackDescription,
   getApplicationIntroText,
   getAcceptanceMessage,
@@ -50,6 +52,7 @@ const MultiTrackApplicationForm = ({
   const [activeStep, setActiveStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [submittedApplication, setSubmittedApplication] = useState(null);
 
   // Applicant data (shared)
   const [applicantData, setApplicantData] = useState({
@@ -67,6 +70,7 @@ const MultiTrackApplicationForm = ({
   const [submissionModes, setSubmissionModes] = useState({});
   const [tracks, setTracks] = useState({});
   const [pricingTiers, setPricingTiers] = useState({});
+  const [formFields, setFormFields] = useState({});
   const [modeSelectionStep, setModeSelectionStep] = useState(null);
 
   // Phase 8: Pre-approval state
@@ -77,17 +81,37 @@ const MultiTrackApplicationForm = ({
 
   // Load user data if authenticated
   useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      const { data } = await apiClient.get('/auth/me/profile/');
       setApplicantData((prev) => ({
         ...prev,
-        email: user.email || prev.email,
-        first_name: user.first_name || prev.first_name,
-        last_name: user.last_name || prev.last_name,
+        first_name: data.first_name || prev.first_name,
+        last_name: data.last_name || prev.last_name,
+        email: data.email || prev.email,
+        job_title: data.job_title || prev.job_title,
+        company_name: data.company_name || data.company || prev.company_name,
+        linkedin_url: data.linkedin_url || prev.linkedin_url,
       }));
+    } catch {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+      try {
+        const user = JSON.parse(userStr);
+        setApplicantData((prev) => ({
+          ...prev,
+          email: user.email || prev.email,
+          first_name: user.first_name || prev.first_name,
+          last_name: user.last_name || prev.last_name,
+        }));
+      } catch {
+        // Non-fatal: user can fill the form manually.
+      }
     }
-  }, []);
+  };
 
   // Load track details
   useEffect(() => {
@@ -103,13 +127,9 @@ const MultiTrackApplicationForm = ({
 
   const loadTracks = async () => {
     try {
-      const headers = {
-        Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`,
-      };
-
       const trackMap = {};
-      const modeMap = {};
       const tiersMap = {};
+      const fieldsMap = {};
 
       for (const trackId of selectedTracks) {
         try {
@@ -141,8 +161,6 @@ const MultiTrackApplicationForm = ({
 
           // Set available modes
           if (track.enabled_submission_modes) {
-            modeMap[trackId] = track.enabled_submission_modes;
-
             // Auto-select single mode
             if (track.enabled_submission_modes.length === 1) {
               setSubmissionModes((prev) => ({
@@ -176,6 +194,19 @@ const MultiTrackApplicationForm = ({
             console.debug(`No pricing tiers for track ${trackId}`);
             tiersMap[trackId] = [];
           }
+
+          // Load dynamic per-track application fields.
+          try {
+            const fieldsResponse = await apiClient.get(
+              `/events/${eventId}/application-tracks/${trackId}/form-fields/`
+            );
+            fieldsMap[trackId] = Array.isArray(fieldsResponse.data)
+              ? fieldsResponse.data
+              : fieldsResponse.data.results || [];
+          } catch (error) {
+            console.debug(`No form fields for track ${trackId}`);
+            fieldsMap[trackId] = [];
+          }
         } catch (error) {
           console.error(`Error loading track ${trackId}:`, error);
         }
@@ -183,6 +214,7 @@ const MultiTrackApplicationForm = ({
 
       setTracks(trackMap);
       setPricingTiers(tiersMap);
+      setFormFields(fieldsMap);
     } catch (error) {
       setSubmitError('Failed to load tracks');
       console.error('Error loading tracks:', error);
@@ -329,15 +361,72 @@ const MultiTrackApplicationForm = ({
     }));
     setModeSelectionStep(null);
     handleTrackDataChange(trackId, 'submission_mode', mode);
-    moveToNextStep();
   };
 
   const validateApplicantData = () => {
-    const { first_name, last_name, email } = applicantData;
-    if (!first_name || !last_name || !email) {
+    if (!isApplicantDataValid()) {
       setSubmitError('Please fill in all required fields');
       return false;
     }
+    setSubmitError(null);
+    return true;
+  };
+
+  const isApplicantDataValid = () => {
+    const { first_name, last_name, email } = applicantData;
+    return Boolean(first_name?.trim() && last_name?.trim() && email?.trim());
+  };
+
+  const getVisibleFieldsForTrack = (trackId) => {
+    const mode = submissionModes[trackId] || 'self_submission';
+    return (formFields[trackId] || []).filter((field) => {
+      if (!field?.visibility_per_mode || Object.keys(field.visibility_per_mode).length === 0) {
+        return true;
+      }
+      return field.visibility_per_mode[mode] !== false;
+    });
+  };
+
+  const getFieldAnswer = (trackId, field) => {
+    const key = String(field.id);
+    return trackData[trackId]?.form_answers?.[key] ?? (
+      field.field_type === 'checkbox' ? false : field.field_type === 'multi_select' || field.field_type === 'checkbox_group' ? [] : ''
+    );
+  };
+
+  const handleFieldAnswerChange = (trackId, field, value) => {
+    const key = String(field.id);
+    setTrackData((prev) => ({
+      ...prev,
+      [trackId]: {
+        ...prev[trackId],
+        form_answers: {
+          ...(prev[trackId]?.form_answers || {}),
+          [key]: value,
+        },
+      },
+    }));
+  };
+
+  const isEmptyAnswer = (value) => (
+    value === undefined ||
+    value === null ||
+    value === '' ||
+    (Array.isArray(value) && value.length === 0) ||
+    value === false
+  );
+
+  const validateTrackStep = (trackId) => {
+    const requiredMissing = getVisibleFieldsForTrack(trackId).find(
+      (field) => field.required && isEmptyAnswer(getFieldAnswer(trackId, field))
+    );
+
+    if (requiredMissing) {
+      setSubmitError(`Please complete required field: ${requiredMissing.label}`);
+      return false;
+    }
+
+    setSubmitError(null);
     return true;
   };
 
@@ -351,12 +440,16 @@ const MultiTrackApplicationForm = ({
       setSubmitError(null);
 
       // Build track_applications array with Phase 8 pre-approval info
-      const track_applications = selectedTracks.map((trackId) => ({
-        track_id: trackId,
-        submission_mode: submissionModes[trackId] || 'self_submission',
-        pre_approved_via: trackPreapprovalState[trackId]?.source || null,
-        ...trackData[trackId],
-      }));
+      const track_applications = selectedTracks.map((trackId) => {
+        const perTrackData = trackData[trackId] || {};
+        const { submission_mode: ignoredSubmissionMode, ...safeTrackData } = perTrackData;
+        return {
+          ...safeTrackData,
+          track_id: trackId,
+          submission_mode: submissionModes[trackId] || ignoredSubmissionMode || 'self_submission',
+          pre_approved_via: trackPreapprovalState[trackId]?.source || null,
+        };
+      });
 
       const payload = {
         ...applicantData,
@@ -373,11 +466,14 @@ const MultiTrackApplicationForm = ({
       if (onSuccess) {
         onSuccess(response.data);
       } else {
-        // Show confirmation page
-        setActiveStep(selectedTracks.length + 2); // Skip to confirmation
+        setSubmittedApplication(response.data);
       }
     } catch (error) {
+      const status = error.response?.status;
       setSubmitError(
+        status === 409
+          ? 'You have already applied to this event. Please check your application status instead of submitting again.'
+          :
         error.response?.data?.detail ||
           'Failed to submit application. Please try again.'
       );
@@ -388,6 +484,12 @@ const MultiTrackApplicationForm = ({
   };
 
   const moveToNextStep = () => {
+    if (activeStep === 0 && !validateApplicantData()) {
+      return;
+    }
+    if (currentTrackId && !validateTrackStep(currentTrackId)) {
+      return;
+    }
     setActiveStep((prev) => prev + 1);
   };
 
@@ -417,8 +519,136 @@ const MultiTrackApplicationForm = ({
     );
   }
 
+  const renderTrackField = (trackId, field) => {
+    const value = getFieldAnswer(trackId, field);
+    const commonProps = {
+      fullWidth: true,
+      label: `${field.label}${field.required ? ' *' : ''}`,
+      helperText: field.help_text || '',
+      placeholder: field.placeholder || '',
+      value,
+      required: field.required,
+      onChange: (event) => handleFieldAnswerChange(trackId, field, event.target.value),
+    };
+
+    const normalizedOptions = Array.isArray(field.options) ? field.options : [];
+    const options = normalizedOptions.map((option) => (
+      typeof option === 'string'
+        ? { label: option, value: option }
+        : { label: option.label ?? option.value, value: option.value ?? option.label }
+    ));
+
+    switch (field.field_type) {
+      case 'long_text':
+        return <TextField {...commonProps} multiline rows={4} />;
+      case 'number':
+        return <TextField {...commonProps} type="number" />;
+      case 'email':
+        return <TextField {...commonProps} type="email" />;
+      case 'url':
+        return <TextField {...commonProps} type="url" />;
+      case 'phone':
+        return <TextField {...commonProps} type="tel" />;
+      case 'date':
+        return <TextField {...commonProps} type="date" InputLabelProps={{ shrink: true }} />;
+      case 'select':
+      case 'radio_group':
+        return (
+          <FormControl fullWidth required={field.required} size="small">
+            <InputLabel>{field.label}</InputLabel>
+            <Select
+              value={value || ''}
+              label={field.label}
+              onChange={(event) => handleFieldAnswerChange(trackId, field, event.target.value)}
+            >
+              {options.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+            {field.help_text && (
+              <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5 }}>
+                {field.help_text}
+              </Typography>
+            )}
+          </FormControl>
+        );
+      case 'multi_select':
+      case 'checkbox_group':
+        return (
+          <FormControl fullWidth required={field.required} size="small">
+            <InputLabel>{field.label}</InputLabel>
+            <Select
+              multiple
+              value={Array.isArray(value) ? value : []}
+              label={field.label}
+              onChange={(event) => handleFieldAnswerChange(trackId, field, event.target.value)}
+            >
+              {options.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+            {field.help_text && (
+              <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5 }}>
+                {field.help_text}
+              </Typography>
+            )}
+          </FormControl>
+        );
+      case 'checkbox':
+        return (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={Boolean(value)}
+                onChange={(event) => handleFieldAnswerChange(trackId, field, event.target.checked)}
+              />
+            }
+            label={`${field.label}${field.required ? ' *' : ''}`}
+          />
+        );
+      case 'file_upload':
+        return (
+          <Box>
+            <Typography variant="body2" fontWeight={600} sx={{ mb: 0.75 }}>
+              {field.label}{field.required ? ' *' : ''}
+            </Typography>
+            <Button variant="outlined" component="label">
+              Choose File
+              <input
+                type="file"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  handleFieldAnswerChange(trackId, field, file ? file.name : '');
+                }}
+              />
+            </Button>
+            {value && (
+              <Typography variant="caption" color="textSecondary" sx={{ ml: 1 }}>
+                {value}
+              </Typography>
+            )}
+            {field.help_text && (
+              <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>
+                {field.help_text}
+              </Typography>
+            )}
+          </Box>
+        );
+      case 'text':
+      default:
+        return <TextField {...commonProps} />;
+    }
+  };
+
+  const reviewStep = selectedTracks.length + 1;
+
   // Render confirmation
-  if (activeStep >= selectedTracks.length + 1) {
+  if (submittedApplication) {
     return (
       <ApplicationConfirmation
         application={applicantData}
@@ -654,13 +884,23 @@ const MultiTrackApplicationForm = ({
                     </Alert>
                   )}
 
-                  <Typography variant="body2" color="textSecondary">
-                    Additional fields for this track would appear here.
-                  </Typography>
+                  {getVisibleFieldsForTrack(currentTrackId).length > 0 ? (
+                    <Grid container spacing={2}>
+                      {getVisibleFieldsForTrack(currentTrackId).map((field) => (
+                        <Grid item xs={12} key={field.id}>
+                          {renderTrackField(currentTrackId, field)}
+                        </Grid>
+                      ))}
+                    </Grid>
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      No additional questions are configured for this track.
+                    </Typography>
+                  )}
                 </>
               )}
             </Box>
-          ) : (
+          ) : activeStep === reviewStep ? (
             // Review and Submit
             <Box>
               <Typography variant="h6" gutterBottom>
@@ -688,7 +928,7 @@ const MultiTrackApplicationForm = ({
                 <Typography variant="subtitle2" fontWeight={600} gutterBottom>
                   Applied Tracks
                 </Typography>
-                {selectedTracks.map((trackId) => {
+                  {selectedTracks.map((trackId) => {
                   const trackState = trackPreapprovalState[trackId];
                   const isPreapproved = trackState && (trackState.codePreapproved || trackState.emailPreapproved);
                   return (
@@ -697,9 +937,18 @@ const MultiTrackApplicationForm = ({
                         <Typography variant="body2" fontWeight={600}>
                           {tracks[trackId]?.label}
                         </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          Mode: {submissionModes[trackId] || 'Not selected'}
+                        <Typography variant="caption" color="textSecondary" display="block">
+                          Mode: {formatSubmissionMode(submissionModes[trackId] || 'self_submission')}
                         </Typography>
+                        {pricingTiers[trackId]?.length > 0 && (
+                          <Typography variant="caption" color="textSecondary" display="block">
+                            Tier: {
+                              pricingTiers[trackId].find(
+                                (tier) => Number(tier.id) === Number(trackData[trackId]?.tier_preference_id)
+                              )?.label || 'No preference'
+                            }
+                          </Typography>
+                        )}
                       </Box>
                       {/* Phase 8: Pre-approval badge */}
                       {isPreapproved && (
@@ -715,7 +964,7 @@ const MultiTrackApplicationForm = ({
                 })}
               </Box>
             </Box>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -728,21 +977,13 @@ const MultiTrackApplicationForm = ({
           Back
         </Button>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          {activeStep < selectedTracks.length ? (
+          {activeStep < reviewStep ? (
             <Button
               variant="contained"
               onClick={moveToNextStep}
-              disabled={isSubmitting}
+              disabled={(activeStep === 0 && !isApplicantDataValid()) || isSubmitting}
             >
               Next
-            </Button>
-          ) : activeStep === selectedTracks.length ? (
-            <Button
-              variant="contained"
-              onClick={moveToNextStep}
-              disabled={!validateApplicantData() || isSubmitting}
-            >
-              Review
             </Button>
           ) : (
             <Button

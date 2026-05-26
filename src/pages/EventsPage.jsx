@@ -11,8 +11,6 @@ import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
-import EventApplicationForm from "../components/EventApplicationForm.jsx";
-import { Dialog, DialogContent } from "@mui/material";
 import {
   Box,
   Avatar,
@@ -562,7 +560,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
   const [myApplication, setMyApplication] = React.useState(null);
   const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
-  const [showAuthenticatedApplyForm, setShowAuthenticatedApplyForm] = React.useState(false);
 
   // Timezone logic
   const organizerTimezone = normalizeTimezoneName(ev.timezone);
@@ -630,87 +627,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     })();
     return () => { cancelled = true; };
   }, [ev?.id, ev?.registration_type, token]);
-
-  // For authenticated users, show track selector if available
-  const handleApplyCardDirect = async () => {
-    if (!token || !ev?.id) return;
-
-    try {
-      // First, fetch application tracks to see if event has Application Tracks feature
-      const tracksRes = await fetch(`${API_BASE}/events/${ev.id}/application-tracks/?status=open`);
-      let tracks = [];
-
-      if (tracksRes.ok) {
-        const tracksData = await tracksRes.json();
-        tracks = Array.isArray(tracksData) ? tracksData : (tracksData.results || []);
-        tracks = tracks.filter((t) => t.is_active);
-      }
-
-      // If event has tracks, show track selector; otherwise use old direct submission
-      if (tracks.length > 0) {
-        // Event uses Application Tracks feature
-        // Show EventApplicationForm with track selector in modal
-        setShowAuthenticatedApplyForm(true);
-        return;
-      }
-
-      // Old behavior: direct submission for events without Application Tracks
-      // First, fetch user profile to get their name and email
-      const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!profileRes.ok) {
-        toast.error("Unable to fetch your profile. Please try again.");
-        return;
-      }
-
-      const profile = await profileRes.json();
-
-      // Check if profile has required data
-      const missingFields = [];
-      if (!profile.first_name) missingFields.push("First Name");
-      if (!profile.last_name) missingFields.push("Last Name");
-      if (!profile.email) missingFields.push("Email");
-      if (!profile.job_title) missingFields.push("Job Title");
-      if (!profile.company) missingFields.push("Company");
-
-      if (missingFields.length > 0) {
-        toast.error(`Please complete your profile: ${missingFields.join(", ")}`);
-        return;
-      }
-
-      // Submit application with user's profile data
-      const res = await fetch(`${API_BASE}/events/${ev.id}/apply/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          email: profile.email,
-          job_title: profile.job_title,
-          company_name: profile.company,
-          linkedin_url: "",
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setMyApplication(data);
-        toast.success("Application submitted successfully!");
-      } else if (res.status === 409) {
-        toast.error("You have already applied to this event.");
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        toast.error(errData.detail || "Failed to submit application. Please try again.");
-      }
-    } catch (err) {
-      toast.error("Error submitting application: " + err.message);
-    }
-  };
 
   const handleRegisterCard = async () => {
     if (!token) {
@@ -1227,11 +1143,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         color="primary"
                         onClick={() => {
                           if (token) {
-                            // For authenticated users, submit directly
-                            handleApplyCardDirect();
-                          } else {
-                            // For guests, open modal
                             setApplyModalOpen(true);
+                          } else {
+                            setGuestApplyModalOpen(true);
                           }
                         }}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
@@ -1403,23 +1317,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         event={ev}
         livePath={`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`}
       />
-      <Dialog
-        open={showAuthenticatedApplyForm}
-        onClose={() => setShowAuthenticatedApplyForm(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogContent sx={{ pt: 3 }}>
-          <EventApplicationForm
-            eventId={ev.id}
-            onSuccess={(data) => {
-              setMyApplication(data);
-              setShowAuthenticatedApplyForm(false);
-              toast.success("Application submitted successfully!");
-            }}
-          />
-        </DialogContent>
-      </Dialog>
     </MUICard>
   );
 }
@@ -1872,11 +1769,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                         color="primary"
                         onClick={() => {
                           if (token) {
-                            // For authenticated users, submit directly
-                            handleApplyCardDirect();
-                          } else {
-                            // For guests, open modal
                             setApplyModalOpen(true);
+                          } else {
+                            setGuestApplyModalOpen(true);
                           }
                         }}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
