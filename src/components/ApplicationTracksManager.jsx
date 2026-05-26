@@ -76,6 +76,23 @@ export default function ApplicationTracksManager({ eventId, token }) {
     action: null,
     data: null,
   });
+
+  // Pre-Approval Management State
+  const [preapprovalCodes, setPreapprovalCodes] = useState([]);
+  const [preapprovalAllowlist, setPreapprovalAllowlist] = useState([]);
+  const [preapprovalTab, setPreapprovalTab] = useState("codes");
+  const [newCodeValue, setNewCodeValue] = useState("");
+  const [newCodeNotes, setNewCodeNotes] = useState("");
+  const [batchCodeCount, setBatchCodeCount] = useState(10);
+  const [batchCodePrefix, setBatchCodePrefix] = useState("");
+  const [selectedCodeMode, setSelectedCodeMode] = useState("self_submission");
+  const [newAllowlistEmail, setNewAllowlistEmail] = useState("");
+  const [newAllowlistFirstName, setNewAllowlistFirstName] = useState("");
+  const [newAllowlistLastName, setNewAllowlistLastName] = useState("");
+  const [selectedAllowlistMode, setSelectedAllowlistMode] = useState("self_submission");
+  const [loadingPreapproval, setLoadingPreapproval] = useState(false);
+  const [showRevokedCodes, setShowRevokedCodes] = useState(false);
+
   const [formData, setFormData] = useState({
     key: "",
     label: "",
@@ -139,6 +156,129 @@ export default function ApplicationTracksManager({ eventId, token }) {
     }
   };
 
+  const loadPreapprovalCodes = async (includeRevoked = false) => {
+    try {
+      setLoadingPreapproval(true);
+      const url = includeRevoked
+        ? `/events/${eventId}/preapproval/codes/?include_revoked=true`
+        : `/events/${eventId}/preapproval/codes/`;
+      const { data } = await apiClient.get(url);
+      const codesArray = Array.isArray(data) ? data : (data?.results || []);
+      setPreapprovalCodes(codesArray);
+    } catch (err) {
+      console.error("Failed to load pre-approval codes:", err);
+      setPreapprovalCodes([]);
+    } finally {
+      setLoadingPreapproval(false);
+    }
+  };
+
+  const loadPreapprovalAllowlist = async () => {
+    try {
+      setLoadingPreapproval(true);
+      const { data } = await apiClient.get(`/events/${eventId}/preapproval/allowlist/`);
+      const allowlistArray = Array.isArray(data) ? data : (data?.results || []);
+      setPreapprovalAllowlist(allowlistArray);
+    } catch (err) {
+      console.error("Failed to load pre-approval allowlist:", err);
+      setPreapprovalAllowlist([]);
+    } finally {
+      setLoadingPreapproval(false);
+    }
+  };
+
+  const handleCreateCode = async () => {
+    if (!editingTrack) return;
+    try {
+      setLoadingPreapproval(true);
+      await apiClient.post(`/events/${eventId}/preapproval/codes/`, {
+        code: newCodeValue || undefined,
+        notes: newCodeNotes,
+        track_id: editingTrack.id,
+        submission_mode: selectedCodeMode,
+      });
+      setNewCodeValue("");
+      setNewCodeNotes("");
+      await loadPreapprovalCodes();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to create pre-approval code");
+    } finally {
+      setLoadingPreapproval(false);
+    }
+  };
+
+  const handleBatchCreateCodes = async () => {
+    if (!editingTrack || batchCodeCount <= 0) return;
+    try {
+      setLoadingPreapproval(true);
+      await apiClient.post(`/events/${eventId}/preapproval/codes/batch/`, {
+        count: parseInt(batchCodeCount),
+        prefix: batchCodePrefix,
+        track_id: editingTrack.id,
+        submission_mode: selectedCodeMode,
+      });
+      setBatchCodeCount(10);
+      setBatchCodePrefix("");
+      await loadPreapprovalCodes();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to create batch codes");
+    } finally {
+      setLoadingPreapproval(false);
+    }
+  };
+
+  const handleRevokeCode = async (codeId) => {
+    try {
+      setLoadingPreapproval(true);
+      await apiClient.post(`/events/${eventId}/preapproval/codes/${codeId}/revoke/`);
+      setShowRevokedCodes(false);
+      await loadPreapprovalCodes(false);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to revoke code");
+    } finally {
+      setLoadingPreapproval(false);
+    }
+  };
+
+  const handleAddToAllowlist = async () => {
+    if (!editingTrack || !newAllowlistEmail.trim()) return;
+    try {
+      setLoadingPreapproval(true);
+      await apiClient.post(`/events/${eventId}/preapproval/allowlist/`, {
+        first_name: newAllowlistFirstName,
+        last_name: newAllowlistLastName,
+        email: newAllowlistEmail,
+        track_id: editingTrack.id,
+        submission_mode: selectedAllowlistMode,
+      });
+      setNewAllowlistEmail("");
+      setNewAllowlistFirstName("");
+      setNewAllowlistLastName("");
+      await loadPreapprovalAllowlist();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to add email to allowlist");
+    } finally {
+      setLoadingPreapproval(false);
+    }
+  };
+
+  const handleRemoveFromAllowlist = async (entryId) => {
+    try {
+      setLoadingPreapproval(true);
+      await apiClient.delete(`/events/${eventId}/preapproval/allowlist/${entryId}/`);
+      await loadPreapprovalAllowlist();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to remove from allowlist");
+    } finally {
+      setLoadingPreapproval(false);
+    }
+  };
+
+  const handleToggleRevokedCodes = async (newValue) => {
+    setShowRevokedCodes(newValue);
+    await loadPreapprovalCodes(newValue);
+  };
+
   const loadPricingTiers = async (trackId) => {
     try {
       const { data } = await apiClient.get(
@@ -160,6 +300,9 @@ export default function ApplicationTracksManager({ eventId, token }) {
       setEditingTrack(track);
       setFormData({ ...track });
       await loadPricingTiers(track.id);
+      await loadPreapprovalCodes(showRevokedCodes);
+      await loadPreapprovalAllowlist();
+      setPreapprovalTab("codes");
     } else {
       setEditingTrack(null);
       setFormData({
@@ -173,6 +316,8 @@ export default function ApplicationTracksManager({ eventId, token }) {
         role_mappings_on_acceptance: [],
       });
       setPricingTiers([]);
+      setPreapprovalCodes([]);
+      setPreapprovalAllowlist([]);
     }
     setNewTierName("");
     setNewTierPrice("");
@@ -183,6 +328,8 @@ export default function ApplicationTracksManager({ eventId, token }) {
     setOpenDialog(false);
     setEditingTrack(null);
     setPricingTiers([]);
+    setPreapprovalCodes([]);
+    setPreapprovalAllowlist([]);
   };
 
   const handleAddPricingTier = async () => {
@@ -812,6 +959,322 @@ export default function ApplicationTracksManager({ eventId, token }) {
           ) : (
             <Alert severity="info" sx={{ mt: 2 }}>
               Pricing tiers can be added after creating the track. Click "Create Track" first, then edit to add tiers.
+            </Alert>
+          )}
+
+          {/* Pre-Approval Codes & Allowlist Management */}
+          {editingTrack ? (
+            <Accordion sx={{ mt: 2 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>Pre-Approval Codes & Allowlist</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={2} sx={{ width: "100%" }}>
+                  {/* Submission Mode Tabs */}
+                  <Box sx={{ display: "flex", gap: 1, borderBottom: "1px solid #ddd", mb: 2 }}>
+                    <Button
+                      variant={preapprovalTab === "codes" ? "contained" : "text"}
+                      size="small"
+                      onClick={() => setPreapprovalTab("codes")}
+                    >
+                      Pre-Approval Codes
+                    </Button>
+                    <Button
+                      variant={preapprovalTab === "allowlist" ? "contained" : "text"}
+                      size="small"
+                      onClick={() => setPreapprovalTab("allowlist")}
+                    >
+                      Email Allowlist
+                    </Button>
+                  </Box>
+
+                  {/* Pre-Approval Codes Tab */}
+                  {preapprovalTab === "codes" && (
+                    <Stack spacing={2}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          Manage Pre-Approval Codes
+                        </Typography>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={showRevokedCodes}
+                              onChange={(e) => handleToggleRevokedCodes(e.target.checked)}
+                              size="small"
+                            />
+                          }
+                          label={<Typography variant="caption">Show revoked codes</Typography>}
+                        />
+                      </Box>
+
+                      {/* Filter by Submission Mode */}
+                      <FormControl size="small" fullWidth>
+                        <InputLabel>Submission Mode</InputLabel>
+                        <Select
+                          value={selectedCodeMode}
+                          label="Submission Mode"
+                          onChange={(e) => setSelectedCodeMode(e.target.value)}
+                        >
+                          {formData.enabled_submission_modes?.map((mode) => (
+                            <MenuItem key={mode} value={mode}>
+                              {mode === "self_submission"
+                                ? "Self Submission"
+                                : mode === "confirmed"
+                                ? "Confirmed"
+                                : mode === "self_nomination"
+                                ? "Self Nomination"
+                                : "Third Party Nomination"}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      {/* Existing Codes List */}
+                      {loadingPreapproval ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+                          <CircularProgress size={24} />
+                        </Box>
+                      ) : preapprovalCodes.length > 0 ? (
+                        <Box sx={{ maxHeight: 300, overflowY: "auto", border: "1px solid #ddd", borderRadius: 1, p: 1 }}>
+                          {preapprovalCodes
+                            .filter(
+                              (code) =>
+                                (code.track_id === editingTrack.id || code.track_id === null) &&
+                                (code.submission_mode === selectedCodeMode || code.submission_mode === "")
+                            )
+                            .map((code) => (
+                              <Box
+                                key={code.id}
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  p: 1.5,
+                                  borderBottom: "1px solid #eee",
+                                  "&:last-child": { borderBottom: "none" },
+                                }}
+                              >
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 600 }}>
+                                    {code.code}
+                                  </Typography>
+                                  <Typography variant="caption" color="textSecondary">
+                                    {code.status === "active" && "Active"}
+                                    {code.status === "used" && `Used by ${code.used_by_email || "unknown"}`}
+                                    {code.status === "revoked" && "Revoked"}
+                                  </Typography>
+                                </Box>
+                                <Chip
+                                  label={code.status}
+                                  size="small"
+                                  color={
+                                    code.status === "active"
+                                      ? "success"
+                                      : code.status === "used"
+                                      ? "default"
+                                      : "error"
+                                  }
+                                  sx={{ mr: 1 }}
+                                />
+                                {code.status === "active" && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleRevokeCode(code.id)}
+                                    color="error"
+                                    disabled={loadingPreapproval}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="caption" color="textSecondary">
+                          No codes for this mode yet
+                        </Typography>
+                      )}
+
+                      {/* Create Single Code */}
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        <TextField
+                          label="Code (auto-generated if empty)"
+                          size="small"
+                          value={newCodeValue}
+                          onChange={(e) => setNewCodeValue(e.target.value)}
+                          placeholder="e.g., SPEAKER123"
+                          fullWidth
+                        />
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={handleCreateCode}
+                          disabled={loadingPreapproval}
+                          sx={{ whiteSpace: "nowrap" }}
+                        >
+                          Create Code
+                        </Button>
+                      </Box>
+
+                      {/* Batch Create */}
+                      <Accordion>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                          <Typography variant="body2">Batch Create Codes</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          <Stack spacing={1} sx={{ width: "100%" }}>
+                            <TextField
+                              label="Prefix (optional)"
+                              size="small"
+                              value={batchCodePrefix}
+                              onChange={(e) => setBatchCodePrefix(e.target.value)}
+                              placeholder="e.g., SPEAKER"
+                              fullWidth
+                            />
+                            <TextField
+                              label="Count"
+                              type="number"
+                              size="small"
+                              value={batchCodeCount}
+                              onChange={(e) => setBatchCodeCount(e.target.value)}
+                              inputProps={{ min: 1, max: 1000 }}
+                              fullWidth
+                            />
+                            <Button
+                              variant="contained"
+                              size="small"
+                              onClick={handleBatchCreateCodes}
+                              disabled={loadingPreapproval || batchCodeCount <= 0}
+                            >
+                              Create Batch
+                            </Button>
+                          </Stack>
+                        </AccordionDetails>
+                      </Accordion>
+                    </Stack>
+                  )}
+
+                  {/* Email Allowlist Tab */}
+                  {preapprovalTab === "allowlist" && (
+                    <Stack spacing={2}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        Manage Email Allowlist
+                      </Typography>
+
+                      {/* Filter by Submission Mode */}
+                      <FormControl size="small" fullWidth>
+                        <InputLabel>Submission Mode</InputLabel>
+                        <Select
+                          value={selectedAllowlistMode}
+                          label="Submission Mode"
+                          onChange={(e) => setSelectedAllowlistMode(e.target.value)}
+                        >
+                          {formData.enabled_submission_modes?.map((mode) => (
+                            <MenuItem key={mode} value={mode}>
+                              {mode === "self_submission"
+                                ? "Self Submission"
+                                : mode === "confirmed"
+                                ? "Confirmed"
+                                : mode === "self_nomination"
+                                ? "Self Nomination"
+                                : "Third Party Nomination"}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      {/* Existing Allowlist */}
+                      {loadingPreapproval ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+                          <CircularProgress size={24} />
+                        </Box>
+                      ) : preapprovalAllowlist.length > 0 ? (
+                        <Box sx={{ maxHeight: 300, overflowY: "auto", border: "1px solid #ddd", borderRadius: 1, p: 1 }}>
+                          {preapprovalAllowlist
+                            .filter(
+                              (entry) =>
+                                entry.is_active &&
+                                (entry.track_id === editingTrack.id || entry.track_id === null) &&
+                                (entry.submission_mode === selectedAllowlistMode || entry.submission_mode === "")
+                            )
+                            .map((entry) => (
+                              <Box
+                                key={entry.id}
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  p: 1.5,
+                                  borderBottom: "1px solid #eee",
+                                  "&:last-child": { borderBottom: "none" },
+                                }}
+                              >
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="body2">
+                                    {entry.first_name} {entry.last_name}
+                                  </Typography>
+                                  <Typography variant="caption" color="textSecondary">
+                                    {entry.email}
+                                  </Typography>
+                                </Box>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleRemoveFromAllowlist(entry.id)}
+                                  color="error"
+                                  disabled={loadingPreapproval}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="caption" color="textSecondary">
+                          No emails in allowlist for this mode yet
+                        </Typography>
+                      )}
+
+                      {/* Add to Allowlist */}
+                      <Stack spacing={1}>
+                        <TextField
+                          label="First Name"
+                          size="small"
+                          value={newAllowlistFirstName}
+                          onChange={(e) => setNewAllowlistFirstName(e.target.value)}
+                          fullWidth
+                        />
+                        <TextField
+                          label="Last Name"
+                          size="small"
+                          value={newAllowlistLastName}
+                          onChange={(e) => setNewAllowlistLastName(e.target.value)}
+                          fullWidth
+                        />
+                        <TextField
+                          label="Email"
+                          size="small"
+                          type="email"
+                          value={newAllowlistEmail}
+                          onChange={(e) => setNewAllowlistEmail(e.target.value)}
+                          fullWidth
+                        />
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={handleAddToAllowlist}
+                          disabled={loadingPreapproval || !newAllowlistEmail.trim()}
+                        >
+                          Add to Allowlist
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  )}
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          ) : (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Pre-approval codes and allowlist can be configured after creating the track. Click "Create Track" first, then edit to add codes/allowlist.
             </Alert>
           )}
         </DialogContent>

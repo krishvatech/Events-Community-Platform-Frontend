@@ -417,6 +417,23 @@ const MultiTrackApplicationForm = ({
   );
 
   const validateTrackStep = (trackId) => {
+    const mode = submissionModes[trackId] || 'self_submission';
+
+    // Validate confirmed mode required fields
+    if (mode === 'confirmed') {
+      const preApprovalCode = (trackData[trackId]?.pre_approval_code || '').trim();
+      const sponsorOrg = (trackData[trackId]?.sponsor_organization || '').trim();
+
+      if (!preApprovalCode) {
+        setSubmitError('Pre-Approval Code is required for sponsor staff applications');
+        return false;
+      }
+      if (!sponsorOrg) {
+        setSubmitError('Sponsor / Partner Organisation is required for sponsor staff applications');
+        return false;
+      }
+    }
+
     const requiredMissing = getVisibleFieldsForTrack(trackId).find(
       (field) => field.required && isEmptyAnswer(getFieldAnswer(trackId, field))
     );
@@ -458,10 +475,29 @@ const MultiTrackApplicationForm = ({
         track_applications,
       };
 
+      // Debug: Log payload to verify sponsor_organization and pre_approval_code are included
+      console.log('📋 Submitting application payload:', {
+        applicant: {
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          email: payload.email,
+        },
+        preapproved_code: payload.preapproved_code,
+        track_applications: payload.track_applications.map((ta) => ({
+          track_id: ta.track_id,
+          submission_mode: ta.submission_mode,
+          sponsor_organization: ta.sponsor_organization,
+          pre_approval_code: ta.pre_approval_code,
+          form_answers_count: Object.keys(ta.form_answers || {}).length,
+        })),
+      });
+
       const response = await apiClient.post(
         `/events/${eventId}/apply/`,
         payload
       );
+
+      console.log('✅ Application submitted successfully:', response.data);
 
       if (onSuccess) {
         onSuccess(response.data);
@@ -471,10 +507,34 @@ const MultiTrackApplicationForm = ({
     } catch (error) {
       const status = error.response?.status;
       const detail = error.response?.data?.detail;
+      const codeError = error.response?.data?.code_error;
+      const missingFields = error.response?.data?.missing_fields;
 
       let errorMessage = 'Failed to submit application. Please try again.';
 
-      if (detail) {
+      if (codeError) {
+        // Handle pre-approval code validation errors
+        switch (codeError) {
+          case 'invalid':
+            errorMessage = 'The pre-approval code you entered is invalid.';
+            break;
+          case 'revoked':
+            errorMessage = 'The pre-approval code has been revoked and can no longer be used.';
+            break;
+          case 'already_used':
+            errorMessage = 'This pre-approval code has already been used.';
+            break;
+          case 'wrong_track_mode':
+            errorMessage = 'The pre-approval code is not valid for this track or submission mode.';
+            break;
+          default:
+            errorMessage = detail || 'Pre-approval code validation failed.';
+        }
+      } else if (missingFields && missingFields.length > 0) {
+        // Handle missing field errors
+        const fieldList = missingFields.join(', ');
+        errorMessage = `Missing required fields: ${fieldList}`;
+      } else if (detail) {
         // Use backend error message if available
         errorMessage = detail;
       } else if (status === 409) {
@@ -490,7 +550,13 @@ const MultiTrackApplicationForm = ({
       }
 
       setSubmitError(errorMessage);
-      console.error('Error submitting application:', error);
+      console.error('❌ Error submitting application:', {
+        status,
+        detail,
+        missingFields,
+        payload,
+        error: error.response?.data,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -897,6 +963,42 @@ const MultiTrackApplicationForm = ({
                     </Alert>
                   )}
 
+                  {/* Confirmed mode required fields */}
+                  {submissionModes[currentTrackId] === 'confirmed' && (
+                    <Box sx={{ mb: 3, p: 2, backgroundColor: '#fff3e0', borderRadius: 1, border: '1px solid #ff9800' }}>
+                      <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                        Sponsor Staff Application
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                        The following information is required for your sponsor staff application.
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Pre-Approval Code *"
+                            value={trackData[currentTrackId]?.pre_approval_code || ''}
+                            onChange={(e) => handleTrackDataChange(currentTrackId, 'pre_approval_code', e.target.value)}
+                            placeholder="Enter your pre-approval code"
+                            required
+                            helperText="You need a valid pre-approval code to apply as a sponsor staff member."
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            fullWidth
+                            label="Sponsor / Partner Organisation *"
+                            value={trackData[currentTrackId]?.sponsor_organization || ''}
+                            onChange={(e) => handleTrackDataChange(currentTrackId, 'sponsor_organization', e.target.value)}
+                            placeholder="Name of your organization"
+                            required
+                            helperText="The organization you represent"
+                          />
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  )}
+
                   {getVisibleFieldsForTrack(currentTrackId).length > 0 ? (
                     <Grid container spacing={2}>
                       {getVisibleFieldsForTrack(currentTrackId).map((field) => (
@@ -944,33 +1046,45 @@ const MultiTrackApplicationForm = ({
                   {selectedTracks.map((trackId) => {
                   const trackState = trackPreapprovalState[trackId];
                   const isPreapproved = trackState && (trackState.codePreapproved || trackState.emailPreapproved);
+                  const mode = submissionModes[trackId] || 'self_submission';
                   return (
-                    <Box key={trackId} sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={600}>
-                          {tracks[trackId]?.label}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary" display="block">
-                          Mode: {formatSubmissionMode(submissionModes[trackId] || 'self_submission')}
-                        </Typography>
-                        {pricingTiers[trackId]?.length > 0 && (
-                          <Typography variant="caption" color="textSecondary" display="block">
-                            Tier: {
-                              pricingTiers[trackId].find(
-                                (tier) => Number(tier.id) === Number(trackData[trackId]?.tier_preference_id)
-                              )?.label || 'No preference'
-                            }
+                    <Box key={trackId} sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            {tracks[trackId]?.label}
                           </Typography>
+                        </Box>
+                        {isPreapproved && (
+                          <Chip
+                            label="Pre-Approved"
+                            color="success"
+                            variant="outlined"
+                            size="small"
+                          />
                         )}
                       </Box>
-                      {/* Phase 8: Pre-approval badge */}
-                      {isPreapproved && (
-                        <Chip
-                          label="Pre-Approved"
-                          color="success"
-                          variant="outlined"
-                          size="small"
-                        />
+                      <Typography variant="caption" color="textSecondary" display="block">
+                        Mode: {formatSubmissionMode(mode)}
+                      </Typography>
+                      {pricingTiers[trackId]?.length > 0 && (
+                        <Typography variant="caption" color="textSecondary" display="block">
+                          Tier: {
+                            pricingTiers[trackId].find(
+                              (tier) => Number(tier.id) === Number(trackData[trackId]?.tier_preference_id)
+                            )?.label || 'No preference'
+                          }
+                        </Typography>
+                      )}
+                      {mode === 'confirmed' && (
+                        <>
+                          <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
+                            Pre-Approval Code: {trackData[trackId]?.pre_approval_code || '(not provided)'}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary" display="block">
+                            Sponsor Organization: {trackData[trackId]?.sponsor_organization || '(not provided)'}
+                          </Typography>
+                        </>
                       )}
                     </Box>
                   );
