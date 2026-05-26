@@ -292,11 +292,58 @@ function normalizeSession(session = {}) {
 
 function getTotalRegisteredCount(ev = {}) {
   return Number(
+    ev.confirmed_registered_count ??
     ev.total_registered ??
     (
       Number(ev.public_registered_count ?? ev.registrations_count ?? ev.total_registered_count ?? ev.attending_count ?? 0) +
       Number(ev.public_guest_count ?? 0)
     )
+  );
+}
+
+function getPaymentPendingOrigins(reg = {}) {
+  const origins = Array.isArray(reg?.origins) ? reg.origins : [];
+  return origins.filter((origin) => origin.origin_status === "payment_pending");
+}
+
+function isPaymentPendingRegistration(reg) {
+  return Boolean(reg?.attendee_status === "payment_pending" || getPaymentPendingOrigins(reg).length > 0);
+}
+
+function isConfirmedRegistration(reg) {
+  if (!reg) return false;
+  if (isPaymentPendingRegistration(reg)) return false;
+  return !reg.attendee_status || reg.attendee_status === "confirmed";
+}
+
+function formatTierAmount(price, currency = "USD") {
+  const amount = Number(price || 0);
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `${currency || ""} ${amount}`.trim();
+  }
+}
+
+function PaymentPendingSummary({ reg, align = "left" }) {
+  const origins = getPaymentPendingOrigins(reg);
+  const origin = origins[0];
+  const tierLabel = origin?.tier_label || origin?.accepted_tier_label;
+  const price = origin?.price ?? origin?.tier_price;
+  const currency = origin?.currency;
+
+  return (
+    <div className={`text-sm ${align === "right" ? "text-right" : ""}`}>
+      <div className="font-semibold text-amber-700">Application approved — payment pending</div>
+      {tierLabel && <div className="text-neutral-700">Assigned tier: {tierLabel}</div>}
+      {price !== undefined && price !== null && (
+        <div className="text-neutral-700">Amount due: {formatTierAmount(price, currency)}</div>
+      )}
+    </div>
   );
 }
 
@@ -318,6 +365,12 @@ function toCard(ev, isPinnedTopCopy = false) {
     location: ev.location,
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
     attendees: Math.max(0, Number.isFinite(totalRegisteredCount) ? totalRegisteredCount : 0),
+    confirmed_registered_count: ev.confirmed_registered_count,
+    user_status: ev.user_status || null,
+    payment_pending: !!ev.payment_pending,
+    is_confirmed_registered: !!ev.is_confirmed_registered,
+    assigned_tier: ev.assigned_tier || null,
+    origins: Array.isArray(ev.origins) ? ev.origins : [],
     price: ev.price,
     price_label: ev.price_label,
     is_free: ev.is_free || false,
@@ -472,6 +525,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const isEventOwner = isSuperUser || Number(ev.created_by_id) === Number(currentUserId);
 
   const reg = myRegistrations?.[ev.id];
+  const isPaymentPending = isPaymentPendingRegistration(reg) || ev.isPaymentPending;
+  const isConfirmedRegistered = isConfirmedRegistration(reg) || (ev.isRegistered && !isPaymentPending);
   const isHost = isEventOwner || Boolean(reg?.is_host);
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
@@ -1055,7 +1110,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       {/* Footer */}
       <div className="flex items-center justify-between border-t p-6">
         <div className="text-base font-semibold text-neutral-900">
-          {(isEventOwner || ev.isRegistered) ? (
+          {isPaymentPending ? (
+            <PaymentPendingSummary reg={reg} />
+          ) : (isEventOwner || isConfirmedRegistered) ? (
             <span className="text-teal-600">You are registered for this event.</span>
           ) : (
             displayPrice(ev)
@@ -1066,7 +1123,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         {!isEventOwner && (
           status === "cancelled" ? (
             <span className="text-red-600 font-medium bg-red-50 px-3 py-1.5 rounded-full text-sm">Event Cancelled</span>
-          ) : ev.isRegistered ? (
+          ) : isPaymentPending ? (
+            <div className="flex flex-col items-start gap-2">
+              <Chip label="Payment Pending" color="warning" variant="outlined" />
+              <PaymentPendingSummary reg={reg} />
+            </div>
+          ) : isConfirmedRegistered ? (
             <div className="flex items-center gap-2">
               {/* Show Join button for virtual/hybrid events */}
               {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
@@ -1371,6 +1433,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const isEventOwner = isSuperUser || Number(ev.created_by_id) === Number(currentUserId);
 
   const reg = myRegistrations?.[ev.id];
+  const isPaymentPending = isPaymentPendingRegistration(reg) || ev.isPaymentPending;
+  const isConfirmedRegistered = isConfirmedRegistration(reg) || (ev.isRegistered && !isPaymentPending);
   const isHost = isEventOwner || Boolean(reg?.is_host);
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
@@ -1697,7 +1761,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               </div>
 
               <div className="mt-3 text-base font-semibold text-neutral-900">
-                {(isEventOwner || ev.isRegistered) ? (
+                {isPaymentPending ? (
+                  <PaymentPendingSummary reg={reg} />
+                ) : (isEventOwner || isConfirmedRegistered) ? (
                   <span className="text-teal-600">You are registered for this event.</span>
                 ) : (
                   displayPrice(ev)
@@ -1707,7 +1773,12 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
 
             <div className="shrink-0">
               {/* Show Join button for owner OR registered user, but hide register/apply for owner */}
-              {isEventOwner || ev.isRegistered ?
+              {isPaymentPending ? (
+                <div className="flex flex-col items-end gap-2">
+                  <Chip label="Payment Pending" color="warning" variant="outlined" />
+                  <PaymentPendingSummary reg={reg} align="right" />
+                </div>
+              ) : isEventOwner || isConfirmedRegistered ?
                 <div className="flex flex-col items-end gap-2">
                     {/* Show Join button for virtual/hybrid events */}
                     {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
@@ -2201,7 +2272,12 @@ export default function EventsPage() {
     setEvents(
       (rawEvents || []).map(ev => {
         const ui = toCard(ev);
-        return { ...ui, isRegistered: !!myRegistrations[ev.id] };
+        const reg = myRegistrations[ev.id];
+        return {
+          ...ui,
+          isRegistered: isConfirmedRegistration(reg) || ui.is_confirmed_registered,
+          isPaymentPending: isPaymentPendingRegistration(reg) || ui.payment_pending,
+        };
       })
     );
   }, [rawEvents, myRegistrations]);

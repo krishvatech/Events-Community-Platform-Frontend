@@ -378,6 +378,7 @@ const ReviewQueueApplicationDetail = ({
                     <TableCell>Track</TableCell>
                     <TableCell>Role</TableCell>
                     <TableCell>Tier</TableCell>
+                    <TableCell>Amount</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Action</TableCell>
                   </TableRow>
@@ -388,6 +389,11 @@ const ReviewQueueApplicationDetail = ({
                       <TableCell>{origin.track_label || 'N/A'}</TableCell>
                       <TableCell>{origin.role_label || 'N/A'}</TableCell>
                       <TableCell>{origin.accepted_tier_label || 'N/A'}</TableCell>
+                      <TableCell>
+                        {origin.price || origin.tier_price
+                          ? `${origin.currency || ''} ${origin.price || origin.tier_price}`.trim()
+                          : 'N/A'}
+                      </TableCell>
                       <TableCell>
                         <Chip
                           label={origin.origin_status}

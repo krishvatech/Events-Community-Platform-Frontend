@@ -168,6 +168,18 @@ function canViewParticipants(event, owner, staff) {
 }
 
 // FIX: Check if event has open application tracks
+function getPaymentStatus(event) {
+  // Get payment pending status from event.user_status
+  if (!event?.user_status) return null;
+
+  const { origins, pending_origins_count } = event.user_status;
+  if (!origins || pending_origins_count === 0) return null;
+
+  // Get first pending origin for display
+  const pendingOrigin = origins.find(o => o.origin_status === 'payment_pending');
+  return pendingOrigin;
+}
+
 function hasOpenApplicationTracks(event) {
   // Check if event is application-required
   if (event?.registration_type !== 'apply') {
@@ -203,6 +215,60 @@ function getNoTracksMessage(event) {
   }
 
   return null;
+}
+
+function getPaymentPendingOrigins(registration = {}, event = {}) {
+  const origins = Array.isArray(registration?.origins)
+    ? registration.origins
+    : (Array.isArray(event?.origins) ? event.origins : []);
+  return origins.filter((origin) => origin.origin_status === "payment_pending");
+}
+
+function isPaymentPendingRegistration(registration, event) {
+  return Boolean(
+    registration?.attendee_status === "payment_pending" ||
+    event?.payment_pending ||
+    getPaymentPendingOrigins(registration, event).length > 0
+  );
+}
+
+function isConfirmedRegistration(registration, event) {
+  if (isPaymentPendingRegistration(registration, event)) return false;
+  if (event?.is_confirmed_registered) return true;
+  return Boolean(registration && (!registration.attendee_status || registration.attendee_status === "confirmed"));
+}
+
+function formatTierAmount(price, currency = "USD") {
+  const amount = Number(price || 0);
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `${currency || ""} ${amount}`.trim();
+  }
+}
+
+function PaymentPendingDetails({ registration, event }) {
+  const origin = getPaymentPendingOrigins(registration, event)[0];
+  const assignedTier = event?.assigned_tier || null;
+  const tierLabel = origin?.tier_label || origin?.accepted_tier_label || assignedTier?.label;
+  const price = origin?.price ?? origin?.tier_price ?? assignedTier?.price;
+  const currency = origin?.currency || assignedTier?.currency;
+
+  return (
+    <Alert severity="warning" sx={{ my: 1.5 }}>
+      <Typography variant="subtitle2" fontWeight={800}>
+        Application approved — payment pending
+      </Typography>
+      {tierLabel && <Typography variant="body2">Assigned tier: {tierLabel}</Typography>}
+      {price !== undefined && price !== null && (
+        <Typography variant="body2">Amount due: {formatTierAmount(price, currency)}</Typography>
+      )}
+    </Alert>
+  );
 }
 
 // in computeStatus
@@ -946,6 +1012,21 @@ export default function EventDetailsPage() {
           if (cancelled) return;
           if (res.ok) {
             const data = await res.json();
+            // DEBUG: Log payment pending data
+            console.log('🔵 EventDetailsPage loaded event from API (by ID):', {
+              eventId: data.id,
+              eventTitle: data.title,
+              hasUserStatus: !!data.user_status,
+              userStatus: data.user_status,
+              paymentPending: data.user_status?.payment_pending,
+              originStatus: data.user_status?.origin_status,
+              origins: data.user_status?.origins?.map(o => ({
+                id: o.id,
+                track: o.track_label,
+                status: o.origin_status,
+                price: o.price
+              }))
+            });
             setEvent(data);
             fetchQaGroups(data.id);
             setLoading(false);
@@ -969,6 +1050,21 @@ export default function EventDetailsPage() {
         if (cancelled) return;
         if (resSlug.ok) {
           const data = await resSlug.json();
+          // DEBUG: Log payment pending data
+          console.log('🔵 EventDetailsPage loaded event from API:', {
+            eventId: data.id,
+            eventTitle: data.title,
+            hasUserStatus: !!data.user_status,
+            userStatus: data.user_status,
+            paymentPending: data.user_status?.payment_pending,
+            originStatus: data.user_status?.origin_status,
+            origins: data.user_status?.origins?.map(o => ({
+              id: o.id,
+              track: o.track_label,
+              status: o.origin_status,
+              price: o.price
+            }))
+          });
           setEvent(data);
           fetchQaGroups(data.id);
           setLoading(false);
@@ -1184,6 +1280,21 @@ export default function EventDetailsPage() {
   const isEventOwner = isOwnerUser() || Number(event.created_by_id) === Number(currentUserId);
 
   const isHost = isEventOwner || Boolean(registration?.is_host);
+  const paymentPending = isPaymentPendingRegistration(registration, event);
+  const confirmedRegistered = isConfirmedRegistration(registration, event);
+
+  // DEBUG: Log payment status calculation
+  if (event?.id) {
+    console.log('🟢 Payment status calculated:', {
+      eventId: event.id,
+      paymentPending,
+      confirmedRegistered,
+      registrationAttendeeStatus: registration?.attendee_status,
+      eventPaymentPending: event.payment_pending,
+      pendingOrigins: event?.origins?.filter(o => o.origin_status === 'payment_pending')?.length || 0,
+      totalOrigins: event?.origins?.length || 0
+    });
+  }
   const livePath = `/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
 
   // Declare isLive and multiDayJoinLabel before they're used in primaryActionLabel
@@ -1206,7 +1317,7 @@ export default function EventDetailsPage() {
     : (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge);
   const canJoinEventNow = event.is_multi_day
     ? (joinState?.enabled || isPreEventLounge || isPostEventLounge || isHost)
-    : (isHost || Boolean(registration));
+    : (isHost || confirmedRegistered);
   const canWatch = isPast && !!event.recording_url;
 
   // Replay access variables
@@ -1722,8 +1833,17 @@ export default function EventDetailsPage() {
                     <Box className="p-5">
                       <Typography variant="h6" className="font-extrabold">Attend</Typography>
                       <Typography variant="h5" className="font-bold text-teal-600 mt-1 mb-2">
-                        {isEventOwner || registration ? "You are registered for this event." : getDisplayPrice(event)}
+                        {isEventOwner
+                          ? "You are the event host."
+                          : paymentPending
+                            ? "Application approved — payment pending"
+                            : confirmedRegistered
+                              ? "You are registered for this event."
+                              : getDisplayPrice(event)}
                       </Typography>
+                      {paymentPending && (
+                        <PaymentPendingDetails registration={registration} event={event} />
+                      )}
                       <div className="mt-3 flex flex-col gap-2">
                         {/* Replay Info Badge */}
                         {event.replay_available && (
@@ -1800,7 +1920,14 @@ export default function EventDetailsPage() {
                           // FIX: Check if open application tracks exist
                           hasOpenApplicationTracks(event) ? (
                           <>
-                            {(!myApplication || myApplication.status === 'none') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
+                            {paymentPending
+                              ? (
+                                <Stack spacing={1} alignItems="flex-start">
+                                  <Chip label="Payment Pending" color="warning" variant="outlined" sx={{ py: 2.5 }} />
+                                  <PaymentPendingDetails registration={registration} event={event} />
+                                </Stack>
+                              )
+                              : (!myApplication || myApplication.status === 'none') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
                               ? (
                                 <>
                                   <Button
@@ -1916,6 +2043,35 @@ export default function EventDetailsPage() {
                                     )
                                     : null
                             }
+                            {/* Payment Pending Status */}
+                            {(() => {
+                              const pendingStatus = getPaymentStatus(event);
+                              return pendingStatus && !paymentPending ? (
+                                <Box sx={{ mt: 2, p: 2, backgroundColor: '#fff3e0', borderRadius: 1, border: '1px solid #ffe0b2' }}>
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#e65100', mb: 1 }}>
+                                    Application Approved — Payment Pending
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ mb: 1 }}>
+                                    <strong>Assigned Tier:</strong> {pendingStatus.tier_label}
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ mb: 2 }}>
+                                    <strong>Amount Due:</strong> {pendingStatus.currency} {pendingStatus.price}
+                                  </Typography>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ color: '#e65100', borderColor: '#e65100' }}
+                                    onClick={() => {
+                                      // TODO: Implement payment flow (redirect to payment processor)
+                                      toast.info("Payment feature coming soon");
+                                    }}
+                                  >
+                                    Complete Payment
+                                  </Button>
+                                </Box>
+                              ) : null;
+                            })()
+                            }
                           </>
                           ) : (
                             // FIX: No open application tracks available
@@ -2030,7 +2186,7 @@ export default function EventDetailsPage() {
 
                         )}
 
-                        {(isEventOwner || registration) && status !== "cancelled" && (
+                        {(isEventOwner || confirmedRegistered) && status !== "cancelled" && (
                           <Box className="flex justify-center py-2">
                             <RegisteredActions
                               ev={event}

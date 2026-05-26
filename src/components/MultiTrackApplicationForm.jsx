@@ -66,6 +66,7 @@ const MultiTrackApplicationForm = ({
   const [trackData, setTrackData] = useState({});
   const [submissionModes, setSubmissionModes] = useState({});
   const [tracks, setTracks] = useState({});
+  const [pricingTiers, setPricingTiers] = useState({});
   const [modeSelectionStep, setModeSelectionStep] = useState(null);
 
   // Phase 8: Pre-approval state
@@ -108,6 +109,7 @@ const MultiTrackApplicationForm = ({
 
       const trackMap = {};
       const modeMap = {};
+      const tiersMap = {};
 
       for (const trackId of selectedTracks) {
         try {
@@ -149,12 +151,38 @@ const MultiTrackApplicationForm = ({
               }));
             }
           }
+
+          // Load pricing tiers for this track
+          try {
+            const tiersResponse = await apiClient.get(
+              `/events/${eventId}/application-tracks/${trackId}/pricing-tiers/`
+            );
+            const tiersList = Array.isArray(tiersResponse.data)
+              ? tiersResponse.data
+              : tiersResponse.data.results || [];
+            tiersMap[trackId] = tiersList;
+
+            // Auto-select single tier
+            if (tiersList.length === 1) {
+              setTrackData((prev) => ({
+                ...prev,
+                [trackId]: {
+                  ...prev[trackId],
+                  tier_preference_id: tiersList[0].id,
+                },
+              }));
+            }
+          } catch (error) {
+            console.debug(`No pricing tiers for track ${trackId}`);
+            tiersMap[trackId] = [];
+          }
         } catch (error) {
           console.error(`Error loading track ${trackId}:`, error);
         }
       }
 
       setTracks(trackMap);
+      setPricingTiers(tiersMap);
     } catch (error) {
       setSubmitError('Failed to load tracks');
       console.error('Error loading tracks:', error);
@@ -592,6 +620,32 @@ const MultiTrackApplicationForm = ({
                       <strong>Application Method:</strong> {formatSubmissionMode(submissionModes[currentTrackId] || 'self_submission')}
                     </Typography>
                   </Box>
+
+                  {/* Tier Selection - if track has pricing tiers */}
+                  {pricingTiers[currentTrackId] && pricingTiers[currentTrackId].length > 0 && (
+                    <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                        Pricing Tier Selection
+                      </Typography>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Select Tier {pricingTiers[currentTrackId].length === 1 ? '(Auto-selected)' : ''}</InputLabel>
+                        <Select
+                          value={trackData[currentTrackId]?.tier_preference_id || ''}
+                          label="Select Tier"
+                          onChange={(e) =>
+                            handleTrackDataChange(currentTrackId, 'tier_preference_id', e.target.value ? parseInt(e.target.value) : null)
+                          }
+                        >
+                          {pricingTiers[currentTrackId].map((tier) => (
+                            <MenuItem key={tier.id} value={tier.id}>
+                              {tier.label}
+                              {tier.price && tier.price > 0 ? ` - ${tier.currency || 'USD'} ${tier.price}` : ' (Free)'}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Box>
+                  )}
 
                   {/* Form header notice from Phase 6 */}
                   {tracks[currentTrackId].form_header_notice && (

@@ -42,6 +42,7 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
   const [step, setStep] = useState(0); // 0: track selection, 1: mode selection, 2: form
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
+  const [pricingTiers, setPricingTiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -51,6 +52,7 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
     track_id: null,
     track_key: null,
     submission_mode: "self_submission",
+    tier_preference_id: null,
     first_name: "",
     last_name: "",
     email: "",
@@ -117,13 +119,38 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
     }
   };
 
+  const loadPricingTiers = async (trackId) => {
+    try {
+      const { data } = await apiClient.get(
+        `/events/${eventId}/application-tracks/${trackId}/pricing-tiers/`
+      );
+      const tiersList = Array.isArray(data) ? data : (data.results || []);
+      setPricingTiers(tiersList);
+
+      // Auto-select first tier if only one
+      if (tiersList.length === 1) {
+        setFormData((prev) => ({
+          ...prev,
+          tier_preference_id: tiersList[0].id,
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to load pricing tiers:", err);
+      setPricingTiers([]);
+    }
+  };
+
   const selectTrack = (track) => {
     setSelectedTrack(track);
     setFormData((prev) => ({
       ...prev,
       track_id: track.id,
       track_key: track.key,
+      tier_preference_id: null, // Reset tier when track changes
     }));
+
+    // Load pricing tiers for this track
+    loadPricingTiers(track.id);
 
     // Determine next step
     const modes = track.enabled_submission_modes || [];
@@ -498,6 +525,36 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
                   />
                 </Grid>
               </Grid>
+            )}
+
+            {/* Tier Selection - if track has multiple tiers */}
+            {pricingTiers.length > 0 && (
+              <Box sx={{ mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                  Pricing Tier Selection
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Select Tier {pricingTiers.length === 1 ? '(Auto-selected)' : ''}</InputLabel>
+                  <Select
+                    value={formData.tier_preference_id || ''}
+                    label="Select Tier"
+                    name="tier_preference_id"
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        tier_preference_id: e.target.value ? parseInt(e.target.value) : null,
+                      }))
+                    }
+                  >
+                    {pricingTiers.map((tier) => (
+                      <MenuItem key={tier.id} value={tier.id}>
+                        {tier.label}
+                        {tier.price && tier.price > 0 ? ` - ${tier.currency || 'USD'} ${tier.price}` : ' (Free)'}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
             )}
 
             {/* Common fields for all modes */}
