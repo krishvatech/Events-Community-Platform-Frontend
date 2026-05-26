@@ -446,6 +446,11 @@ function canJoinEarly(ev, minutes = 15) {
   return diff > 0 && diff <= windowMs;
 }
 
+function shouldShowJoinAction(ev) {
+  const format = ev?.event_format || ev?.format;
+  return format === "virtual" || format === "hybrid" || ev?.registration_type === "apply";
+}
+
 function isWithinGuestJoinWindow(eventStartTime) {
   if (!eventStartTime) return false;
 
@@ -1126,12 +1131,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           ) : isPaymentPending ? (
             <div className="flex flex-col items-start gap-2">
               <Chip label="Payment Pending" color="warning" variant="outlined" />
-              <PaymentPendingSummary reg={reg} />
             </div>
           ) : isConfirmedRegistered ? (
             <div className="flex items-center gap-2">
-              {/* Show Join button for virtual/hybrid events */}
-              {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
+              {/* Application-required events can also enter the hosted live room after acceptance. */}
+              {shouldShowJoinAction(ev) && (
                 !isEventOwner && joinButtonLabel === "Join (Not Live Yet)" ? (
                   <Button
                     size="small"
@@ -1776,12 +1780,11 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               {isPaymentPending ? (
                 <div className="flex flex-col items-end gap-2">
                   <Chip label="Payment Pending" color="warning" variant="outlined" />
-                  <PaymentPendingSummary reg={reg} align="right" />
                 </div>
               ) : isEventOwner || isConfirmedRegistered ?
                 <div className="flex flex-col items-end gap-2">
-                    {/* Show Join button for virtual/hybrid events */}
-                    {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
+                    {/* Application-required events can also enter the hosted live room after acceptance. */}
+                    {shouldShowJoinAction(ev) && (
                       !isEventOwner && joinButtonLabel === "Join (Not Live Yet)" ? (
                         <Button
                           size="small"
