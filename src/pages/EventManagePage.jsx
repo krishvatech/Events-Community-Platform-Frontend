@@ -58,7 +58,7 @@ import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import EditEventForm from "../components/EditEventForm.jsx";
 import EventPreApprovalManager from "../components/admin/EventPreApprovalManager.jsx";
 import EventQnAManager from "../components/admin/EventQnAManager.jsx";
-import EventConfirmationEmailManager from "../components/admin/EventConfirmationEmailManager.jsx";
+import EventEmailTemplatesManager from "../components/admin/EventEmailTemplatesManager.jsx";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
@@ -205,7 +205,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Participants", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Confirmation Email"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Registered Members", "Participants", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
 // Helper to get dynamic tab labels based on event registration type
@@ -8322,7 +8322,7 @@ export default function EventManagePage() {
                       {tab === tabLabels.indexOf("Breakout Rooms Tables") && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
                       {tab === tabLabels.indexOf("Social Lounge") && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                       {tab === tabLabels.indexOf("Lounge Settings") && renderLoungeSettings()}
-                      {tab === tabLabels.indexOf("Confirmation Email") && <EventConfirmationEmailManager event={event} />}
+                      {tab === tabLabels.indexOf("Email Notifications") && <EventEmailTemplatesManager event={event} />}
                       {tab === tabLabels.indexOf("Companion") && renderCompanion()}
                       {tabLabels.indexOf("Product Management") !== -1 && tab === tabLabels.indexOf("Product Management") && renderProductManagement()}
                       {tab === tabLabels.indexOf("Edit") && renderEdit()}
@@ -8339,7 +8339,7 @@ export default function EventManagePage() {
                       {tab === tabLabels.indexOf("Breakout Rooms Tables") && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
                       {tab === tabLabels.indexOf("Social Lounge") && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                       {tab === tabLabels.indexOf("Lounge Settings") && renderLoungeSettings()}
-                      {tab === tabLabels.indexOf("Confirmation Email") && <EventConfirmationEmailManager event={event} />}
+                      {tab === tabLabels.indexOf("Email Notifications") && <EventEmailTemplatesManager event={event} />}
                       {tab === tabLabels.indexOf("Companion") && renderCompanion()}
                       {tabLabels.indexOf("Product Management") !== -1 && tab === tabLabels.indexOf("Product Management") && renderProductManagement()}
                       {tab === tabLabels.indexOf("Edit") && renderEdit()}
