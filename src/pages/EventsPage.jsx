@@ -1135,23 +1135,28 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               {ev.registration_type === 'apply' ? (
                 // APPLY FLOW
                 (<>
-                  {!myApplication || myApplication.status === 'none'
+                  {!myApplication || myApplication.status === 'none' || myApplication.status === 'cancelled'
                     ? (
-                      <Button
-                        variant="contained"
-                        size="medium"
-                        color="primary"
-                        onClick={() => {
-                          if (token) {
-                            setApplyModalOpen(true);
-                          } else {
-                            setGuestApplyModalOpen(true);
-                          }
-                        }}
-                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-                      >
-                        Apply Now
-                      </Button>
+                      <div className="flex flex-col items-start gap-1">
+                        <Button
+                          variant="contained"
+                          size="medium"
+                          color="primary"
+                          onClick={() => {
+                            if (token) {
+                              setApplyModalOpen(true);
+                            } else {
+                              setGuestApplyModalOpen(true);
+                            }
+                          }}
+                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                        >
+                          Apply Now
+                        </Button>
+                        {myApplication?.status === 'cancelled' && (
+                          <span className="text-sm text-gray-600">You previously cancelled this application</span>
+                        )}
+                      </div>
                     )
                     : myApplication.status === 'approved'
                     ? (() => {
@@ -1761,23 +1766,28 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     )}
                   </div>
                  : ev.registration_type === 'apply' ? (
-                  <div className="flex items-center gap-2">
-                    {!myApplication || myApplication.status === 'none' ? (
-                      <Button
-                        variant="contained"
-                        size="medium"
-                        color="primary"
-                        onClick={() => {
-                          if (token) {
-                            setApplyModalOpen(true);
-                          } else {
-                            setGuestApplyModalOpen(true);
-                          }
-                        }}
-                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-                      >
-                        Apply Now
-                      </Button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {!myApplication || myApplication.status === 'none' || myApplication.status === 'cancelled' ? (
+                      <div className="flex flex-col items-start gap-1">
+                        <Button
+                          variant="contained"
+                          size="medium"
+                          color="primary"
+                          onClick={() => {
+                            if (token) {
+                              setApplyModalOpen(true);
+                            } else {
+                              setGuestApplyModalOpen(true);
+                            }
+                          }}
+                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                        >
+                          Apply Now
+                        </Button>
+                        {myApplication?.status === 'cancelled' && (
+                          <span className="text-xs text-gray-600">You previously cancelled this application</span>
+                        )}
+                      </div>
                     ) : myApplication.status === 'approved' ? (() => {
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
                       if (guestToken) {

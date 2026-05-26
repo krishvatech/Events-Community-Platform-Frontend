@@ -221,6 +221,10 @@ const ReviewQueueApplicationDetail = ({
 
   const canSendEmail = !application?.opt_out_automated_communication;
 
+  // Terminal states - no further action allowed
+  const terminalStatuses = ['accepted', 'declined', 'cancelled', 'waitlisted'];
+  const isTerminalStatus = terminalStatuses.includes(application?.status);
+
   if (!application) {
     return (
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -426,12 +430,16 @@ const ReviewQueueApplicationDetail = ({
 
         {/* Phase 10: Decision Actions */}
         <Divider sx={{ my: 2 }} />
-        <Paper sx={{ p: 2, backgroundColor: '#fff3e0' }}>
+        <Paper sx={{ p: 2, backgroundColor: isTerminalStatus ? '#f5f5f5' : '#fff3e0' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>
             Application Decision
           </Typography>
 
-          {!selectedAction ? (
+          {isTerminalStatus ? (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              This application has already been <strong>{application.status_display}</strong>. No further action is allowed.
+            </Alert>
+          ) : !selectedAction ? (
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
               <Button
                 variant="contained"
@@ -540,7 +548,7 @@ const ReviewQueueApplicationDetail = ({
         <Button onClick={onClose} disabled={loading}>
           Close
         </Button>
-        {selectedAction && (
+        {selectedAction && !isTerminalStatus && (
           <>
             <Button onClick={() => setSelectedAction(null)} disabled={loading}>
               Cancel Decision

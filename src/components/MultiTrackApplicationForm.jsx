@@ -470,13 +470,26 @@ const MultiTrackApplicationForm = ({
       }
     } catch (error) {
       const status = error.response?.status;
-      setSubmitError(
-        status === 409
-          ? 'You have already applied to this event. Please check your application status instead of submitting again.'
-          :
-        error.response?.data?.detail ||
-          'Failed to submit application. Please try again.'
-      );
+      const detail = error.response?.data?.detail;
+
+      let errorMessage = 'Failed to submit application. Please try again.';
+
+      if (detail) {
+        // Use backend error message if available
+        errorMessage = detail;
+      } else if (status === 409) {
+        // Fallback for 409 Conflict (deprecated, using 400 now)
+        errorMessage = 'You have already applied to this event. Please check your application status.';
+      } else if (status === 400) {
+        // Handle 400 errors - could be validation or duplicate application
+        errorMessage = 'Unable to submit application. ' + (detail || 'Please check your information and try again.');
+      } else if (status === 401) {
+        errorMessage = 'You must be logged in to apply for this event.';
+      } else if (status === 404) {
+        errorMessage = 'Event or application track not found.';
+      }
+
+      setSubmitError(errorMessage);
       console.error('Error submitting application:', error);
     } finally {
       setIsSubmitting(false);

@@ -283,7 +283,11 @@ export default function GuestApplyModal({ open, onClose, event, livePath }) {
 
       if (!res.ok) {
         if (res.status === 409) {
-          setError("You have already applied to this event with this email.");
+          setError(data.detail || "You have already applied to this event with this email.");
+          return;
+        }
+        if (res.status === 400) {
+          setError(data.detail || "Unable to submit application. Please check your information.");
           return;
         }
         throw new Error(

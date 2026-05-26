@@ -1927,7 +1927,7 @@ export default function EventDetailsPage() {
                                   <PaymentPendingDetails registration={registration} event={event} />
                                 </Stack>
                               )
-                              : (!myApplication || myApplication.status === 'none') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
+                              : (!myApplication || myApplication.status === 'none' || myApplication.status === 'cancelled') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
                               ? (
                                 <>
                                   <Button
@@ -2041,7 +2041,33 @@ export default function EventDetailsPage() {
                                         sx={{ py: 2.5 }}
                                       />
                                     )
-                                    : null
+                                    : myApplication?.status === 'cancelled'
+                                      ? (
+                                        <>
+                                          <Button
+                                            onClick={() => {
+                                              if (token) {
+                                                setApplyModalOpen(true);
+                                              } else {
+                                                setGuestApplyModalOpen(true);
+                                              }
+                                            }}
+                                            variant="contained"
+                                            sx={{
+                                              textTransform: "none",
+                                              backgroundColor: "#10b8a6",
+                                              "&:hover": { backgroundColor: "#0ea5a4" },
+                                            }}
+                                            className="rounded-xl"
+                                          >
+                                            {token ? "Apply Now" : "Apply as Guest"}
+                                          </Button>
+                                          <Typography variant="caption" sx={{ color: "#666", mt: 1 }}>
+                                            You previously cancelled this application
+                                          </Typography>
+                                        </>
+                                      )
+                                      : null
                             }
                             {/* Payment Pending Status */}
                             {(() => {
@@ -2191,7 +2217,24 @@ export default function EventDetailsPage() {
                             <RegisteredActions
                               ev={event}
                               reg={registration}
-                              onUnregistered={() => setRegistration(null)}
+                              onUnregistered={() => {
+                                // Refresh both registration and application status after cancellation
+                                setRegistration(null);
+                                // Trigger refresh of application status
+                                (async () => {
+                                  try {
+                                    const headers = { "Content-Type": "application/json" };
+                                    if (token) headers.Authorization = `Bearer ${token}`;
+                                    const res = await fetch(`${API_BASE}/events/${event.id}/apply/`, { headers });
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      setMyApplication(data);
+                                    }
+                                  } catch (err) {
+                                    console.error("Failed to refresh application status:", err);
+                                  }
+                                })();
+                              }}
                               onCancelRequested={(_, updated) => setRegistration(updated)}
                             />
                           </Box>
