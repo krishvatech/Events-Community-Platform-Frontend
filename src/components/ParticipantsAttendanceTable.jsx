@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import {
   Box,
@@ -42,6 +42,12 @@ export default function ParticipantsAttendanceTable({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [exportLoading, setExportLoading] = useState(false);
+  const [attendanceStats, setAttendanceStats] = useState({
+    total: 0,
+    joinedLive: 0,
+    watchedReplay: 0,
+    didNotAttend: 0,
+  });
 
   const tabFilterMap = {
     0: null, // All
@@ -50,27 +56,59 @@ export default function ParticipantsAttendanceTable({
     3: "did_not_attend",
   };
 
-  const computeStats = useMemo(() => {
-    const stats = {
-      total: 0,
-      joinedLive: 0,
-      watchedReplay: 0,
-      didNotAttend: 0,
+  const getResponseCount = (data) => {
+    if (typeof data?.count === "number") return data.count;
+    if (Array.isArray(data?.results)) return data.results.length;
+    if (Array.isArray(data)) return data.length;
+    return 0;
+  };
+
+  useEffect(() => {
+    const fetchAttendanceStats = async () => {
+      if (!token || !eventId) return;
+
+      try {
+        const buildUrl = (statusFilter) => {
+          const params = new URLSearchParams({
+            event: String(eventId),
+            page: "1",
+          });
+          if (statusFilter) {
+            params.set("attendance_status", statusFilter);
+          }
+          return `${apiRoot}/event-registrations/?${params.toString()}`;
+        };
+
+        const [allRes, joinedRes, replayRes, noShowRes] = await Promise.all([
+          fetch(buildUrl(null), { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(buildUrl("joined_live"), { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(buildUrl("watched_replay"), { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(buildUrl("did_not_attend"), { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+
+        const responses = [allRes, joinedRes, replayRes, noShowRes];
+        const failedResponse = responses.find((res) => !res.ok);
+        if (failedResponse) {
+          throw new Error(`Failed to fetch attendance stats: ${failedResponse.status}`);
+        }
+
+        const [allData, joinedData, replayData, noShowData] = await Promise.all(
+          responses.map((res) => res.json())
+        );
+
+        setAttendanceStats({
+          total: getResponseCount(allData),
+          joinedLive: getResponseCount(joinedData),
+          watchedReplay: getResponseCount(replayData),
+          didNotAttend: getResponseCount(noShowData),
+        });
+      } catch (err) {
+        console.error("Error fetching attendance stats:", err);
+      }
     };
 
-    registrations.forEach((reg) => {
-      stats.total += 1;
-      if (reg.joined_live) {
-        stats.joinedLive += 1;
-      } else if (reg.watched_replay) {
-        stats.watchedReplay += 1;
-      } else {
-        stats.didNotAttend += 1;
-      }
-    });
-
-    return stats;
-  }, [registrations]);
+    fetchAttendanceStats();
+  }, [eventId, token, apiRoot]);
 
   useEffect(() => {
     const fetchRegistrations = async () => {
@@ -186,7 +224,7 @@ export default function ParticipantsAttendanceTable({
         <Box className="flex gap-4">
           <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
             <Typography variant="h4" className="font-bold text-slate-700">
-              {computeStats.total}
+              {attendanceStats.total}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Total
@@ -194,7 +232,7 @@ export default function ParticipantsAttendanceTable({
           </Paper>
           <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
             <Typography variant="h4" className="font-bold text-green-600">
-              {computeStats.joinedLive}
+              {attendanceStats.joinedLive}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Joined Live
@@ -202,7 +240,7 @@ export default function ParticipantsAttendanceTable({
           </Paper>
           <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
             <Typography variant="h4" className="font-bold text-blue-600">
-              {computeStats.watchedReplay}
+              {attendanceStats.watchedReplay}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Watched Replay
@@ -210,7 +248,7 @@ export default function ParticipantsAttendanceTable({
           </Paper>
           <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
             <Typography variant="h4" className="font-bold text-slate-500">
-              {computeStats.didNotAttend}
+              {attendanceStats.didNotAttend}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Did Not Attend
