@@ -20,6 +20,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { LeadGenModal } from '../components/LeadGenModal.jsx';
 import EventCompanionDirectoryPage from './EventCompanionDirectoryPage';
 
 dayjs.extend(utc);
@@ -48,6 +49,8 @@ function EventCompanionAccessPage() {
   const [isEventManager, setIsEventManager] = useState(false);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [eventStarted, setEventStarted] = useState(false);
+  const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
+  const [missingLeadGenFields, setMissingLeadGenFields] = useState({});
 
   useEffect(() => {
     // Extract invite_token from URL and call checkAccess with it
@@ -344,6 +347,15 @@ function EventCompanionAccessPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+
+        // Handle missing lead-gen fields
+        if (data?.status === "missing_lead_gen_fields") {
+          setMissingLeadGenFields(data?.missing_fields || {});
+          setLeadGenModalOpen(true);
+          setRegistering(false);
+          return;
+        }
+
         throw new Error(data?.detail || data?.error || 'Registration failed');
       }
 
@@ -367,6 +379,17 @@ function EventCompanionAccessPage() {
     } finally {
       setRegistering(false);
     }
+  };
+
+  const handleLeadGenSuccess = () => {
+    // After user saves profile, close modal and retry registration
+    setLeadGenModalOpen(false);
+    setMissingLeadGenFields({});
+
+    // Retry registration after a short delay to allow profile data to propagate
+    setTimeout(() => {
+      handleRegisterClick();
+    }, 500);
   };
 
   if (loading || processingInvite) {
@@ -714,6 +737,17 @@ function EventCompanionAccessPage() {
             </Box>
           </Container>
         </Box>
+
+        <LeadGenModal
+          open={leadGenModalOpen}
+          onClose={() => {
+            setLeadGenModalOpen(false);
+            setMissingLeadGenFields({});
+          }}
+          onSuccess={handleLeadGenSuccess}
+          user={userData}
+          missingFields={missingLeadGenFields}
+        />
       </>
     );
   }

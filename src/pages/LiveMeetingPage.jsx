@@ -171,6 +171,12 @@ import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import WaitingRoomQnaPanel from "../components/WaitingRoomQnaPanel.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
+import {
+  fetchCurrentUserPreferencesCached,
+  fetchEventSummaryCached,
+  fetchUserDetailCached,
+  fetchUserKycStatusCached,
+} from "../utils/entityCache.js";
 import { getUserName } from "../utils/authStorage.js";
 import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
@@ -2405,7 +2411,31 @@ export default function NewLiveMeeting() {
   const shouldPausePollingRef = useRef(false); // ✅ POLLING PAUSE: Pause non-essential APIs when offline
   const rejoinRequestRef = useRef(null);
   const intentionalMainSocketCloseRef = useRef(false);
+  const pageUnloadRef = useRef(false);
   const [mainSocketReconnectKey, setMainSocketReconnectKey] = useState(0);
+
+  const clearReconnectTimer = () => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  };
+
+  const resetReconnectState = ({ message = "", clearMessageAfterMs = 0 } = {}) => {
+    setIsReconnecting(false);
+    setReconnectMessage(message);
+    reconnectLocked.current = false;
+    isReconnectingRef.current = false;
+    shouldPausePollingRef.current = false;
+    reconnectAttemptRef.current = 0;
+    clearReconnectTimer();
+
+    if (message && clearMessageAfterMs > 0) {
+      setTimeout(() => {
+        setReconnectMessage("");
+      }, clearMessageAfterMs);
+    }
+  };
 
   // ✅ Fullscreen support
   const rootRef = useRef(null);
@@ -2816,34 +2846,63 @@ export default function NewLiveMeeting() {
   const moodUpdateInFlightRef = useRef(false);
   const lastMoodSentAtRef = useRef(0);
 
-  const fetchAndCacheKycStatus = useCallback((userId) => {
-    if (!userId || participantKycCache[userId] !== undefined) return; // Already cached
+  const fetchAndCacheKycStatus = useCallback((userId, seededStatus = "") => {
+    if (!userId) return;
+    if (seededStatus && participantKycCache[userId] === undefined) {
+      setParticipantKycCache(prev => ({ ...prev, [userId]: seededStatus }));
+      return;
+    }
+    if (participantKycCache[userId] !== undefined) return;
     if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
       setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
       return;
     }
 
     const headers = { accept: "application/json", ...authHeader() };
-    const url = toApiUrl(`users/${userId}/`);
 
     let isMounted = true;
     (async () => {
       try {
-        const res = await fetch(url, { headers });
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
+        const data = await fetchUserKycStatusCached({
+          baseUrl: API_ROOT,
+          userId,
+          headers,
+        });
         if (!isMounted || !data) return;
 
         const kycStatus = data?.kyc_status || data?.profile?.kyc_status || "";
-        if (isMounted && kycStatus) {
-          setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus }));
+        if (isMounted) {
+          setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus || "" }));
         }
       } catch (e) {
-        // User not found or not accessible
+        if (isMounted) {
+          setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
+        }
       }
     })();
 
     return () => { isMounted = false; };
+  }, [participantKycCache]);
+
+  const getKnownKycStatus = useCallback((entity) => {
+    if (!entity) return "";
+    const raw = entity?._raw || entity;
+    const userId =
+      raw?.customParticipantId ??
+      raw?.clientSpecificId ??
+      raw?.client_specific_id ??
+      raw?.user_id ??
+      entity?.id ??
+      entity?.sender_id ??
+      "";
+    return (
+      raw?.kyc_status ||
+      raw?.sender_kyc_status ||
+      entity?.kyc_status ||
+      entity?.sender_kyc_status ||
+      participantKycCache[userId] ||
+      ""
+    );
   }, [participantKycCache]);
 
   const openMemberInfo = useCallback((member) => {
@@ -2915,6 +2974,36 @@ export default function NewLiveMeeting() {
   const waitingRoomQueueRef = useRef([]);
 
   const [authToken, setAuthToken] = useState("");
+  const guestAttendeePayload = useMemo(() => {
+    if (!isGuest) return null;
+    try {
+      return JSON.parse(localStorage.getItem("guest_attendee") || "null");
+    } catch {
+      return null;
+    }
+  }, [eventId, isGuest]);
+  const guestSessionEventId =
+    guestAttendeePayload?.event_id ??
+    guestAttendeePayload?.event?.id ??
+    null;
+  const guestSessionMatchesEvent = Boolean(
+    isGuest &&
+    eventId &&
+    localStorage.getItem("guest_token") &&
+    (!guestSessionEventId || String(guestSessionEventId) === String(eventId))
+  );
+  const hasLiveInteractiveAccess = Boolean(
+    eventId &&
+    (
+      isHost ||
+      guestSessionMatchesEvent ||
+      waitingRoomActive ||
+      waitingRoomStatus === "admitted" ||
+      Boolean(authToken) ||
+      roomJoined
+    )
+  );
+
   const mainAuthTokenRef = useRef("");
   const joinRoomRetryRef = useRef(0);
   const tokenFetchInFlightRef = useRef(false);
@@ -7352,23 +7441,21 @@ export default function NewLiveMeeting() {
           if (res.status === 401) {
             console.warn("[Reconnect] Auth token expired (401)");
             // Redirect to login - will require re-authentication
-            setIsReconnecting(false);
-            // ✅ GUARD: Clear the flag when auth fails
-            isReconnectingRef.current = false;
-            console.log("[Reconnect] Set isReconnectingRef = false, auth failed");
+            resetReconnectState();
+            console.log("[Reconnect] Reset reconnect state, auth failed");
             showSnackbar("Your session has expired. Please log in again.", "error");
             navigate("/login", { replace: true });
-            return null;
+            return { success: false, reason: "auth_expired", detail: "Authentication expired", terminal: true };
           }
 
           const reason = data?.reason || "unknown";
+          const terminal =
+            data?.retryable === false ||
+            data?.can_rejoin === false ||
+            (res.status >= 400 && res.status < 500 && res.status !== 429);
+
           console.warn("[Reconnect] Rejoin failed:", reason, data?.detail);
-          // ✅ GUARD: If backend says can't rejoin, stop reconnecting
-          if (data?.can_rejoin === false) {
-            isReconnectingRef.current = false;
-            console.log("[Reconnect] Set isReconnectingRef = false, backend says can't rejoin");
-          }
-          return { success: false, reason, detail: data?.detail };
+          return { success: false, reason, detail: data?.detail, terminal };
         }
 
         console.log("[Reconnect] Rejoin successful:", data);
@@ -7446,18 +7533,7 @@ export default function NewLiveMeeting() {
     const attemptReconnect = async () => {
       if (reconnectAttemptRef.current >= MAX_ATTEMPTS) {
         console.error(`[Reconnect] Max reconnection attempts reached (${MAX_ATTEMPTS})`);
-        // ✅ CLEANUP: Clear UI and state
-        setIsReconnecting(false);
-        setReconnectMessage("");
-        reconnectLocked.current = false;
-        isReconnectingRef.current = false;
-        shouldPausePollingRef.current = false;
-
-        // ✅ CLEANUP: Clear any pending timers
-        if (reconnectTimerRef.current) {
-          clearTimeout(reconnectTimerRef.current);
-          reconnectTimerRef.current = null;
-        }
+        resetReconnectState();
 
         console.log("[Reconnect] Cleanup complete, navigating away from meeting");
         showSnackbar("Could not reconnect. Returning to event page.", "error");
@@ -7480,29 +7556,39 @@ export default function NewLiveMeeting() {
         // Restore state from rejoin response
         restoreUserStateFromRejoin(rejoinResult);
 
-        // Recreate the main socket after a successful rejoin.
-        console.log("[Reconnect] Rejoin succeeded, reconnecting WebSocket");
-        setIsReconnecting(false);
-        setReconnectMessage("Reconnected");
-        reconnectLocked.current = false;
-        // ✅ GUARD: Clear the flag when successfully reconnected
-        isReconnectingRef.current = false;
-        shouldPausePollingRef.current = false;
-        console.log("[Reconnect] Set isReconnectingRef = false, rejoin succeeded");
-        setMainSocketReconnectKey((value) => value + 1);
+        const socketState = mainSocketRef.current?.readyState;
+        const socketHealthy =
+          socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING;
 
-        // Show brief success message then clear
-        setTimeout(() => {
-          setReconnectMessage("");
-        }, 2000);
+        console.log("[Reconnect] Rejoin succeeded");
+        resetReconnectState({ message: "Reconnected", clearMessageAfterMs: 2000 });
+        console.log("[Reconnect] Reset reconnect state after successful rejoin");
+
+        if (!socketHealthy) {
+          console.log("[Reconnect] Main socket is not healthy, forcing WebSocket reconnect");
+          setMainSocketReconnectKey((value) => value + 1);
+        } else {
+          console.log("[Reconnect] Main socket already healthy, skipping forced WebSocket reconnect");
+        }
 
         return;
       }
 
-      // Schedule next retry
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
+      if (rejoinResult?.terminal) {
+        console.warn("[Reconnect] Terminal rejoin failure, stopping retry loop:", rejoinResult.reason);
+        resetReconnectState();
+        showSnackbar(
+          rejoinResult.detail || "You can no longer join this live session.",
+          "error"
+        );
+        setTimeout(() => {
+          navigate(`/community/${slug}/events`, { replace: true });
+        }, 500);
+        return;
       }
+
+      // Schedule next retry
+      clearReconnectTimer();
       reconnectTimerRef.current = setTimeout(attemptReconnect, RETRY_INTERVAL);
     };
 
@@ -7543,6 +7629,16 @@ export default function NewLiveMeeting() {
       console.log("[OfflineDetector] Window online event triggered. navigator.onLine:", navigator.onLine);
 
       if (eventId) {
+        const socketState = mainSocketRef.current?.readyState;
+        if (socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING) {
+          console.log("[OfflineDetector] Main socket already healthy, skipping online rejoin");
+          return;
+        }
+        if (!reconnectLocked.current && !isReconnectingRef.current) {
+          console.log("[OfflineDetector] No reconnect in progress, skipping online rejoin");
+          return;
+        }
+
         console.log("[OfflineDetector] Network restored, attempting rejoin...");
 
         // Immediately try to rejoin on online event
@@ -7551,24 +7647,27 @@ export default function NewLiveMeeting() {
         if (rejoinResult?.success) {
           console.log("[OfflineDetector] Rejoin succeeded on online event");
           restoreUserStateFromRejoin(rejoinResult);
-          setIsReconnecting(false);
-          setReconnectMessage("Reconnected");
-          reconnectLocked.current = false;
-          isReconnectingRef.current = false;  // ✅ Allow leave now that reconnect succeeded
-          shouldPausePollingRef.current = false;  // ✅ POLLING RESUME: Resume non-essential APIs
+          const socketState = mainSocketRef.current?.readyState;
+          const socketHealthy =
+            socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING;
 
-          // Clear message after 2 seconds
-          setTimeout(() => {
-            setReconnectMessage("");
-          }, 2000);
+          resetReconnectState({ message: "Reconnected", clearMessageAfterMs: 2000 });
 
-          // Clear any pending reconnect timers
-          if (reconnectTimerRef.current) {
-            clearTimeout(reconnectTimerRef.current);
-            reconnectTimerRef.current = null;
+          if (!socketHealthy) {
+            setMainSocketReconnectKey((value) => value + 1);
+          } else {
+            console.log("[OfflineDetector] Main socket already healthy, skipping forced reconnect");
           }
-          reconnectAttemptRef.current = 0;
-          setMainSocketReconnectKey((value) => value + 1);
+        } else if (rejoinResult?.terminal) {
+          console.warn("[OfflineDetector] Terminal rejoin failure on online event:", rejoinResult.reason);
+          resetReconnectState();
+          showSnackbar(
+            rejoinResult.detail || "You can no longer join this live session.",
+            "error"
+          );
+          setTimeout(() => {
+            navigate(`/community/${slug}/events`, { replace: true });
+          }, 500);
         } else {
           console.log("[OfflineDetector] Rejoin failed on online event, continuing reconnect loop");
           // If rejoin fails, keep trying with existing loop
@@ -7590,6 +7689,21 @@ export default function NewLiveMeeting() {
     };
   }, [eventId]);
 
+  useEffect(() => {
+    const markPageUnloading = () => {
+      pageUnloadRef.current = true;
+      intentionalMainSocketCloseRef.current = true;
+    };
+
+    window.addEventListener("pagehide", markPageUnloading);
+    window.addEventListener("beforeunload", markPageUnloading);
+
+    return () => {
+      window.removeEventListener("pagehide", markPageUnloading);
+      window.removeEventListener("beforeunload", markPageUnloading);
+    };
+  }, []);
+
   // ✅ AUTO-RECONNECT: Store rejoin data for RTK reconnect
   const rejoinDataRef = useRef({
     rtk_token: null,
@@ -7600,6 +7714,7 @@ export default function NewLiveMeeting() {
   // ---------- Persistent Main Event WebSocket (for Force Join, Timer, Broadcast) ----------
   useEffect(() => {
     if (!eventId) return;
+    pageUnloadRef.current = false;
 
     const token = getToken();
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
@@ -8729,8 +8844,12 @@ export default function NewLiveMeeting() {
       });
       mainSocketRef.current = null;
       mainSocketReadyRef.current = false;
-      if (intentionalMainSocketCloseRef.current || manualLeaveRef.current) {
+      if (pageUnloadRef.current || intentionalMainSocketCloseRef.current || manualLeaveRef.current) {
         console.log("[MainSocket] Close was intentional; skipping auto-reconnect");
+        return;
+      }
+      if (!getToken()) {
+        console.log("[MainSocket] Missing auth token after close; skipping auto-reconnect");
         return;
       }
       // ✅ IMPORTANT: Keep pending actions so they can be sent when socket reconnects
@@ -11041,18 +11160,14 @@ export default function NewLiveMeeting() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
-        const res = await fetch(toApiUrl(`events/${eventId}/`), {
+        const data = await fetchEventSummaryCached({
+          baseUrl: API_ROOT,
+          eventId,
           headers: authHeader(),
-          signal: controller.signal,
+          ttlMs: 5_000,
+          fetcher: (url, options) => fetch(url, { ...options, signal: controller.signal }),
         });
         clearTimeout(timeoutId);
-        if (!res.ok) {
-          console.warn("[LiveMeeting] Status poll failed:", res.status);
-          failureCount++;
-          scheduleNext();
-          return;
-        }
-        const data = await res.json();
         if (cancelled) return;
         failureCount = 0;
 
@@ -11153,13 +11268,31 @@ export default function NewLiveMeeting() {
         console.log("[HandleRoomLeft] Ignoring roomLeft during reconnect. state:", state);
         return;
       }
-      if (["left", "ended", "kicked", "rejected", "disconnected", "failed"].includes(state)) {
+      if (["disconnected", "failed"].includes(state)) {
+        console.warn("[HandleRoomLeft] RTK roomLeft treated as transient. Starting reconnect.", {
+          state,
+          eventId,
+          reconnectLocked: reconnectLocked.current,
+          isBreakout,
+        });
+        if (!reconnectLocked.current && eventId) {
+          reconnectLocked.current = true;
+          reconnectAttemptRef.current = 0;
+          isReconnectingRef.current = true;
+          shouldPausePollingRef.current = true;
+          setIsReconnecting(true);
+          setReconnectMessage("Connection lost. Reconnecting...");
+          initiateAutoReconnect();
+        }
+        return;
+      }
+      if (["left", "ended", "kicked", "rejected"].includes(state)) {
         if (!isBreakout) handleMeetingEnd(state);
       }
     };
     rtkMeeting.self.on("roomLeft", handleRoomLeft);
     return () => rtkMeeting.self.off?.("roomLeft", handleRoomLeft);
-  }, [rtkMeeting, handleMeetingEnd, isBreakout]);
+  }, [rtkMeeting, handleMeetingEnd, isBreakout, eventId]);
 
   // ---------- Detect host for audience (pin + waiting screen) ----------
   useEffect(() => {
@@ -14555,6 +14688,9 @@ export default function NewLiveMeeting() {
 
   const ensureEventConversation = useCallback(async () => {
     if (!eventId) return null;
+    if (!hasLiveInteractiveAccess) {
+      throw new Error("Chat becomes available after you join the live event.");
+    }
     if (chatConversationId) return chatConversationId;
     if (ensureEventConversationPromiseRef.current) {
       return ensureEventConversationPromiseRef.current;
@@ -14584,7 +14720,7 @@ export default function NewLiveMeeting() {
         ensureEventConversationPromiseRef.current = null;
       }
     }
-  }, [chatConversationId, eventId]);
+  }, [chatConversationId, eventId, hasLiveInteractiveAccess]);
 
   const ensureSeatedInLounge = useCallback(async () => {
     if (!eventId) return null;
@@ -14672,7 +14808,8 @@ export default function NewLiveMeeting() {
 
   const fetchChatUnread = useCallback(async () => {
     try {
-      const cid = activeChatConversationId || (await ensureActiveConversation());
+      if (!hasLiveInteractiveAccess) return 0;
+      const cid = activeChatConversationId;
       if (!cid) return 0;
 
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/`), {
@@ -14686,7 +14823,7 @@ export default function NewLiveMeeting() {
     } catch {
       return 0;
     }
-  }, [activeChatConversationId, ensureActiveConversation]);
+  }, [activeChatConversationId, hasLiveInteractiveAccess]);
 
   const MARK_ALL_READ_COOLDOWN_MS = 7000;
   const markAllReadPendingRef = useRef(new Set());
@@ -14759,6 +14896,7 @@ export default function NewLiveMeeting() {
   const privateChatBottomRef = useRef(null); // To auto-scroll
   const openPrivateChatRef = useRef(null);
   const [privateEventMetaById, setPrivateEventMetaById] = useState({});
+  const privateChatWsRef = useRef(null);
 
   const handleOpenPrivateChat = async (member) => {
     setPrivateChatUser(member);
@@ -15004,7 +15142,7 @@ export default function NewLiveMeeting() {
     };
 
     tick();
-    const t = setInterval(tick, 3000);
+    const t = setInterval(tick, 15000);
 
     return () => {
       alive = false;
@@ -15033,6 +15171,10 @@ export default function NewLiveMeeting() {
       }
 
       try {
+        if (privateChatWsRef.current?.readyState === WebSocket.OPEN) {
+          return;
+        }
+
         // 1) Check unread for THIS DM
         const res = await fetch(
           toApiUrl(`messaging/conversations/${privateConversationId}/`),
@@ -15062,7 +15204,7 @@ export default function NewLiveMeeting() {
     };
 
     tick();
-    const t = setInterval(tick, 2000);
+    const t = setInterval(tick, 10000);
 
     return () => {
       alive = false;
@@ -15081,6 +15223,7 @@ export default function NewLiveMeeting() {
       const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${wsProtocol}//${window.location.host}/ws/messaging/conversations/${privateConversationId}/?token=${getToken()}`;
       const ws = new WebSocket(wsUrl);
+      privateChatWsRef.current = ws;
 
       ws.onmessage = (event) => {
         try {
@@ -15117,21 +15260,28 @@ export default function NewLiveMeeting() {
 
       return () => {
         alive = false;
+        if (privateChatWsRef.current === ws) {
+          privateChatWsRef.current = null;
+        }
         ws.close();
       };
     } catch (e) {
       console.warn("[PrivateChat WS] Failed to connect:", e);
+      privateChatWsRef.current = null;
     }
   }, [privateChatUser, privateConversationId, isGuest]);
 
   useEffect(() => {
     if (!hostPerms.chat) return;
     if (!eventId && !activeTableId) return;
+    if (!hasLiveInteractiveAccess) return;
 
     let alive = true;
+    let tickInFlight = false;
 
     const tick = async () => {
       if (!alive) return;
+      if (tickInFlight) return;
       if (!getToken()) return;
       if (!isDocumentVisible()) return;
       // ✅ POLLING PAUSE: Skip if offline/reconnecting
@@ -15139,18 +15289,14 @@ export default function NewLiveMeeting() {
         return;
       }
 
+      tickInFlight = true;
       try {
-        const unread = await fetchChatUnread();
-
-        // If user is actively viewing chat, auto-refresh and clear unread
         if (isChatActive) {
           try {
             const cid = activeChatConversationId || (await ensureActiveConversation());
             if (cid) {
               await fetchChatMessages(cid);
-              if (unread > 0) {
-                await markChatAllRead(cid);
-              }
+              await markChatAllRead(cid);
             }
           } catch (error) {
             // Handle "not seated in room" error gracefully - user may still be joining the lounge
@@ -15161,14 +15307,19 @@ export default function NewLiveMeeting() {
             // Log other errors but don't crash
             console.warn("[ChatSync] Failed to ensure conversation:", error?.message || error);
           }
+          return;
         }
+
+        await fetchChatUnread();
       } catch (error) {
         console.warn("[ChatSync] Tick failed:", error?.message || error);
+      } finally {
+        tickInFlight = false;
       }
     };
 
     tick();
-    const t = setInterval(tick, 3000);
+    const t = setInterval(tick, isChatActive ? 10000 : 30000);
 
     return () => {
       alive = false;
@@ -15179,6 +15330,7 @@ export default function NewLiveMeeting() {
     activeTableId,
     isDocumentVisible,
     isGuest,
+    hasLiveInteractiveAccess,
     hostPerms.chat,
     isChatActive,
     activeChatConversationId,
@@ -15214,16 +15366,10 @@ export default function NewLiveMeeting() {
       await Promise.all(
         missing.map(async (id) => {
           try {
-            const res = await fetch(toApiUrl(`events/${id}/`), {
+            const data = await fetchEventSummaryCached({
+              baseUrl: API_ROOT,
+              eventId: id,
               headers: { Accept: "application/json", ...authHeader() },
-            });
-            if (!res.ok) {
-              console.warn(`Failed to fetch event ${id}: HTTP ${res.status}`);
-              return;
-            }
-            const data = await res.json().catch((err) => {
-              console.warn(`Failed to parse event ${id} JSON:`, err);
-              return null;
             });
             if (data) {
               fetched[id] = data;
@@ -15651,7 +15797,7 @@ export default function NewLiveMeeting() {
 
   const [groups, setGroups] = useState([]);
   const loadGroups = useCallback(async () => {
-    if (!eventId) return;
+    if (!eventId || !hasLiveInteractiveAccess) return;
     try {
       const res = await fetch(toApiUrl(`interactions/qna-groups/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
       if (res.ok) {
@@ -15661,10 +15807,10 @@ export default function NewLiveMeeting() {
     } catch (e) {
       console.error(e);
     }
-  }, [eventId]);
+  }, [eventId, hasLiveInteractiveAccess]);
 
   const loadAiSuggestions = useCallback(async () => {
-    if (!eventId || !isHost) return;
+    if (!eventId || !isHost || !hasLiveInteractiveAccess) return;
     try {
       const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
       if (res.ok) {
@@ -15678,25 +15824,25 @@ export default function NewLiveMeeting() {
         }
       }
     } catch (e) { console.error(e); }
-  }, [eventId, isHost]);
+  }, [eventId, hasLiveInteractiveAccess, isHost]);
 
   useEffect(() => {
-    if (eventId) {
+    if (eventId && isQnaActive && hasLiveInteractiveAccess) {
       loadGroups();
       if (isHost) loadAiSuggestions();
     }
-  }, [eventId, isHost, activeTableId, loadAiSuggestions, loadGroups]);
+  }, [activeTableId, eventId, hasLiveInteractiveAccess, isHost, isQnaActive, loadAiSuggestions, loadGroups]);
 
-  // Poll for new AI suggestions every 5 seconds (host only) - more aggressive for faster feedback
+  // Keep host suggestion refresh active only while Q&A is open.
   useEffect(() => {
-    if (!isHost || !eventId) return;
+    if (!isHost || !eventId || !isQnaActive || !hasLiveInteractiveAccess) return;
 
     const interval = setInterval(() => {
       loadAiSuggestions();
-    }, 5000); // 5 seconds for faster detection
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [eventId, isHost, loadAiSuggestions]);
+  }, [eventId, hasLiveInteractiveAccess, isHost, isQnaActive, loadAiSuggestions]);
   const [qnaLoading, setQnaLoading] = useState(false);
   const [qnaSubmitting, setQnaSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
@@ -15791,11 +15937,11 @@ export default function NewLiveMeeting() {
     if (!accessToken) return;  // Only for authenticated users, not guests
     (async () => {
       try {
-        const r = await fetch(toApiUrl("users/me/"), { headers: authHeader() });
-        if (r.ok) {
-          const d = await r.json();
-          setUserQnaAnonymousDefault(d?.profile?.default_qna_anonymous || false);
-        }
+        const d = await fetchCurrentUserPreferencesCached({
+          baseUrl: API_ROOT,
+          headers: authHeader(),
+        });
+        setUserQnaAnonymousDefault(d?.profile?.default_qna_anonymous || false);
       } catch (e) {
         console.warn("Failed to load user profile for Q&A default", e);
       }
@@ -15810,7 +15956,7 @@ export default function NewLiveMeeting() {
   }, [userQnaAnonymousDefault, qnaAnonymousModeEnabled]);
 
   const loadQuestions = useCallback(async (opts = {}) => {
-    if (!eventId) return;
+    if (!eventId || !hasLiveInteractiveAccess) return;
     const { silent = false } = opts;
     if (!silent) setQnaLoading(true);
     setQnaError("");
@@ -15858,15 +16004,15 @@ export default function NewLiveMeeting() {
     } finally {
       if (!silent) setQnaLoading(false);
     }
-  }, [eventId, activeTableId]);
+  }, [activeTableId, eventId, hasLiveInteractiveAccess]);
 
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
-    if (!isQnATabActive) return;
+    if (!isQnATabActive || !hasLiveInteractiveAccess) return;
 
     setQnaUnreadCount(0);   // ✅ clear dot when user opens Q&A
     loadQuestions();
-  }, [tab, isPanelOpen, loadQuestions]);
+  }, [hasLiveInteractiveAccess, tab, isPanelOpen, loadQuestions]);
 
   // Cleanup Q&A modal prompt and icon pulse timer on event change or unmount
   useEffect(() => {
@@ -15886,19 +16032,7 @@ export default function NewLiveMeeting() {
   // WS live updates while Q&A tab open
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
-    if (!eventId) return; // Wait for eventId
-    // Optimization: Only connect if tab is active OR if backend supports background updates?
-    // Current logic connects always? No, let's check.
-    // The previous code didn't check isQnATabActive for connection start?
-    // Wait, line 8645 defined isQnATabActive but didn't use it to return early?
-    // Ah, it didn't return early! It connected even if tab closed?
-    // "const isQnATabActive = (tab === 1) && (isPanelOpen === true);" was unused in previous code block?
-    // No, checking previous code: 
-    // 8645: const isQnATabActive = ...
-    // 8646: if (!eventId) return;
-    // It proceeded to connect!
-    // But `setQnaUnreadCount` logic relies on `isQnATabActive` ref (isQnaActiveRef.current).
-    // So we KEEP the connection open to receive unread counts. Correct.
+    if (!eventId || !isQnATabActive || !hasLiveInteractiveAccess) return;
 
     const API_RAW = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
     const WS_ROOT = API_RAW.replace(/^http/, "ws").replace(/\/api\/?$/, "");
@@ -16323,7 +16457,7 @@ export default function NewLiveMeeting() {
       qnaThrottleRef.current = 0;
       setTypingUsers({});
     };
-  }, [tab, isPanelOpen, eventId, activeTableId, isGuest]); // Re-connect when activeTableId changes
+  }, [tab, isPanelOpen, eventId, activeTableId, hasLiveInteractiveAccess, isGuest]); // Re-connect when activeTableId changes
 
   // Keyboard shortcuts for moderation panel (A=approve, R=reject, arrows=navigate)
   useEffect(() => {
@@ -18429,13 +18563,13 @@ export default function NewLiveMeeting() {
                                     {(() => {
                                       const participant = getParticipantFromMessage(m);
                                       const userId = participant?._raw?.customParticipantId || participant?.id;
+                                      const knownKycStatus = getKnownKycStatus(participant || m);
 
-                                      // Fetch kyc_status if not cached
-                                      if (userId && !participantKycCache[userId]) {
+                                      if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
                                         fetchAndCacheKycStatus(userId);
                                       }
 
-                                      const isVerified = participantKycCache[userId] === "approved";
+                                      const isVerified = knownKycStatus === "approved";
                                       return isVerified ? (
                                         <VerifiedRoundedIcon
                                           sx={{
@@ -21995,10 +22129,11 @@ export default function NewLiveMeeting() {
                                       </Tooltip>
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
-                                        if (userId && !participantKycCache[userId]) {
-                                          fetchAndCacheKycStatus(userId);
+                                        const knownKycStatus = getKnownKycStatus(m);
+                                        if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                          fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                         }
-                                        const isVerified = participantKycCache[userId] === "approved";
+                                        const isVerified = knownKycStatus === "approved";
                                         return isVerified ? (
                                           <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
                                         ) : null;
@@ -22437,10 +22572,11 @@ export default function NewLiveMeeting() {
                                       </Tooltip>
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
-                                        if (userId && !participantKycCache[userId]) {
-                                          fetchAndCacheKycStatus(userId);
+                                        const knownKycStatus = getKnownKycStatus(m);
+                                        if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                          fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                         }
-                                        const isVerified = participantKycCache[userId] === "approved";
+                                        const isVerified = knownKycStatus === "approved";
                                         return isVerified ? (
                                           <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
                                         ) : null;
@@ -22749,10 +22885,11 @@ export default function NewLiveMeeting() {
                                     )}
                                     {(() => {
                                       const userId = m._raw?.customParticipantId || m.id;
-                                      if (userId && !participantKycCache[userId]) {
-                                        fetchAndCacheKycStatus(userId);
+                                      const knownKycStatus = getKnownKycStatus(m);
+                                      if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                        fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                       }
-                                      const isVerified = participantKycCache[userId] === "approved";
+                                      const isVerified = knownKycStatus === "approved";
                                       return isVerified ? (
                                         <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
                                       ) : null;
@@ -28116,15 +28253,13 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
     const fetchProfile = async () => {
       if (alive) setProfileLoading(true);
       const headers = { accept: "application/json", ...authHeader() };
-      const url = toApiUrl(`users/${userId}/`);
 
       try {
-        const res = await fetch(url, { headers });
-        if (!res.ok) {
-          if (alive) setProfileLoading(false);
-          return;
-        }
-        const data = await res.json().catch(() => null);
+        const data = await fetchUserDetailCached({
+          baseUrl: API_ROOT,
+          userId,
+          headers,
+        });
         if (!alive || !data) return;
 
         const base = pickJobAndCompany(data);

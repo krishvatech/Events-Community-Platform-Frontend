@@ -11,6 +11,7 @@ import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
+import { LeadGenModal } from "../components/LeadGenModal.jsx";
 import {
   Box,
   Avatar,
@@ -83,6 +84,24 @@ function EventFullToast() {
       </Box>
     </Box>
   );
+}
+
+function isMissingLeadGenRegisterError(errorData) {
+  return errorData?.status === "missing_lead_gen_fields";
+}
+
+function normalizeMissingLeadGenFields(errorData) {
+  const raw = errorData?.missing_fields;
+  if (!raw) return {};
+  if (Array.isArray(raw)) {
+    return raw.reduce((acc, field) => {
+      const key = String(field || "").trim();
+      if (key) acc[key] = key;
+      return acc;
+    }, {});
+  }
+  if (typeof raw === "object") return raw;
+  return {};
 }
 
 function priceStr(p) {
@@ -462,7 +481,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 // ————————————————————————————————————————
 // Card (thumbnail view)
 // ————————————————————————————————————————
-function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent }) {
+function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef }) {
   const navigate = useNavigate();
   const currentUser = getBackendUserFromStorage();
   const currentUserId = currentUser?.id;
@@ -569,11 +588,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   }, [ev?.id, ev?.registration_type, token]);
 
   // For authenticated users, submit application directly without dialog
-  const handleApplyCardDirect = async () => {
+  const handleApplyCardDirect = async (retrying = false) => {
     if (!token || !ev?.id) return;
 
     try {
-      // First, fetch user profile to get their name and email
+      // Fetch user profile to get their data for the application
       const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -585,20 +604,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
       const profile = await profileRes.json();
 
-      // Check if profile has required data
-      const missingFields = [];
-      if (!profile.first_name) missingFields.push("First Name");
-      if (!profile.last_name) missingFields.push("Last Name");
-      if (!profile.email) missingFields.push("Email");
-      if (!profile.job_title) missingFields.push("Job Title");
-      if (!profile.company) missingFields.push("Company");
-
-      if (missingFields.length > 0) {
-        toast.error(`Please complete your profile: ${missingFields.join(", ")}`);
-        return;
-      }
-
       // Submit application with user's profile data
+      // Backend will validate lead-gen fields and return error if incomplete
       const res = await fetch(`${API_BASE}/events/${ev.id}/apply/`, {
         method: "POST",
         headers: {
@@ -606,11 +613,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          email: profile.email,
-          job_title: profile.job_title,
-          company_name: profile.company,
+          first_name: profile.first_name || "",
+          last_name: profile.last_name || "",
+          email: profile.email || "",
+          job_title: profile.job_title || "",
+          company_name: profile.company || "",
           linkedin_url: "",
         }),
       });
@@ -619,6 +626,18 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         const data = await res.json();
         setMyApplication(data);
         toast.success("Application submitted successfully!");
+      } else if (res.status === 400) {
+        // Check for backend missing_lead_gen_fields response
+        const errData = await res.json().catch(() => ({}));
+        if (errData.status === "missing_lead_gen_fields" && !retrying) {
+          // Backend validation found missing fields - show modal, no toast
+          leadGenCallbackRef.current = () => handleApplyCardDirect(true);
+          if (onLeadGenNeeded) {
+            onLeadGenNeeded(errData.missing_fields || {});
+          }
+          return;
+        }
+        toast.error(errData.detail || "Failed to submit application. Please try again.");
       } else if (res.status === 409) {
         toast.error("You have already applied to this event.");
       } else {
@@ -630,7 +649,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     }
   };
 
-  const handleRegisterCard = async () => {
+  const handleRegisterCard = async (retrying = false) => {
+    // Safety guard: if first argument is a click event/object, treat retrying as false
+    if (retrying && typeof retrying === 'object' && !('length' in retrying)) {
+      retrying = false;
+    }
+
     if (!token) {
       navigate("/signin");
       return;
@@ -643,6 +667,19 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         headers: { "Content-Type": "application/json", ...authHeaders() },
       });
       if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+
+        // For this specific status, show centered profile modal only (no toast).
+        if (isMissingLeadGenRegisterError(errorData) && !retrying) {
+          // Set callback to retry after user fills form
+          // eslint-disable-next-line no-func-assign
+          leadGenCallbackRef.current = () => handleRegisterCard(true);
+          if (onLeadGenNeeded) {
+            onLeadGenNeeded(normalizeMissingLeadGenFields(errorData));
+          }
+          return;
+        }
+
         if (res.status === 409) {
           toast.error(<EventFullToast />, {
             position: "top-center",
@@ -658,8 +695,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           });
           return;
         }
-        const msg = await res.text();
-        toast.error(`Registration failed (${res.status}): ${msg}`);
+
+        toast.error(errorData.detail || `Registration failed (${res.status})`);
         return;
       }
 
@@ -1259,7 +1296,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           variant="contained"
                           size="medium"
                           color="primary"
-                          onClick={handleRegisterCard}
+                          onClick={(e) => { e.stopPropagation(); handleRegisterCard(false); }}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
                           {ev.replay_cta_text || "Sign up to watch full replay"}
@@ -1278,7 +1315,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         variant="contained"
                         size="medium"
                         color="primary"
-                        onClick={handleRegisterCard}
+                        onClick={(e) => { e.stopPropagation(); handleRegisterCard(false); }}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                       >
                         Register Now
@@ -1324,7 +1361,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 // ————————————————————————————————————————
 // Row (details/list view)
 // ————————————————————————————————————————
-function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent }) {
+function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef }) {
   const navigate = useNavigate();
   const currentUser = getBackendUserFromStorage();
   const currentUserId = currentUser?.id;
@@ -1427,7 +1464,12 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
     return () => { cancelled = true; };
   }, [ev?.id, ev?.registration_type, token]);
 
-  const handleRegisterRow = async () => {
+  const handleRegisterRow = async (retrying = false) => {
+    // Safety guard: if first argument is a click event/object, treat retrying as false
+    if (retrying && typeof retrying === 'object' && !('length' in retrying)) {
+      retrying = false;
+    }
+
     if (!token) {
       navigate("/signin");
       return;
@@ -1439,6 +1481,19 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
         headers: { "Content-Type": "application/json", ...authHeaders() },
       });
       if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+
+        // For this specific status, show centered profile modal only (no toast).
+        if (isMissingLeadGenRegisterError(errorData) && !retrying) {
+          // Set callback to retry after user fills form
+          // eslint-disable-next-line no-func-assign
+          leadGenCallbackRef.current = () => handleRegisterRow(true);
+          if (onLeadGenNeeded) {
+            onLeadGenNeeded(normalizeMissingLeadGenFields(errorData));
+          }
+          return;
+        }
+
         if (res.status === 409) {
           toast.error(<EventFullToast />, {
             position: "top-center",
@@ -1454,8 +1509,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
           });
           return;
         }
-        const msg = await res.text();
-        toast.error(`Registration failed (${res.status}): ${msg}`);
+
+        toast.error(errorData.detail || `Registration failed (${res.status})`);
         return;
       }
 
@@ -1835,7 +1890,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             variant="contained"
                             size="medium"
                             color="primary"
-                            onClick={handleRegisterRow}
+                            onClick={(e) => { e.stopPropagation(); handleRegisterRow(false); }}
                             className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                           >
                             {ev.replay_cta_text || "Sign up to watch full replay"}
@@ -1854,7 +1909,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           variant="contained"
                           size="medium"
                           color="primary"
-                          onClick={handleRegisterRow}
+                          onClick={(e) => { e.stopPropagation(); handleRegisterRow(false); }}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
                           Register Now
@@ -2001,6 +2056,9 @@ export default function EventsPage() {
   const [participantTotalRegisteredCount, setParticipantTotalRegisteredCount] = useState(0);
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestJoinEvent, setGuestJoinEvent] = useState(null);
+  const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
+  const [leadGenMissingFields, setLeadGenMissingFields] = useState({});
+  const leadGenCallbackRef = React.useRef(null);
   const [seriesData, setSeriesData] = useState(new Map()); // Map of seriesId -> series data
   const seriesFetchTimeoutRef = React.useRef(null);
   const seriesCacheRef = React.useRef(new Map());
@@ -2083,6 +2141,23 @@ export default function EventsPage() {
       }
     } catch (error) {
       toast.error('Failed to register for series');
+    }
+  };
+
+  // Handler for lead-gen field validation
+  const handleLeadGenNeeded = (missingFields = {}) => {
+    setLeadGenMissingFields(
+      typeof missingFields === "object" && missingFields !== null ? missingFields : {}
+    );
+    setLeadGenModalOpen(true);
+    // Callback will be set by the EventCard when it needs to retry registration
+  };
+
+  const handleLeadGenSuccess = () => {
+    // After saving lead-gen fields, retry the registration
+    if (leadGenCallbackRef.current) {
+      leadGenCallbackRef.current();
+      leadGenCallbackRef.current = null;
     }
   };
 
@@ -3512,6 +3587,8 @@ export default function EventsPage() {
                                 setRawEvents={setRawEvents}
                                 onShowParticipants={handleShowParticipants}
                                 onGuestJoinRequested={handleGuestJoinRequested}
+                                onLeadGenNeeded={handleLeadGenNeeded}
+                                leadGenCallbackRef={leadGenCallbackRef}
                               />
                             </Box>
                           );
@@ -3616,6 +3693,8 @@ export default function EventsPage() {
                           setRawEvents={setRawEvents}
                           onShowParticipants={handleShowParticipants}
                           onGuestJoinRequested={handleGuestJoinRequested}
+                          onLeadGenNeeded={handleLeadGenNeeded}
+                          leadGenCallbackRef={leadGenCallbackRef}
                         />
                       </Box>
                     ))}
@@ -3650,6 +3729,8 @@ export default function EventsPage() {
                                 setRawEvents={setRawEvents}
                                 onShowParticipants={handleShowParticipants}
                                 onGuestJoinRequested={handleGuestJoinRequested}
+                                onLeadGenNeeded={handleLeadGenNeeded}
+                                leadGenCallbackRef={leadGenCallbackRef}
                               />
                             </Grid>
                           );
@@ -3739,6 +3820,8 @@ export default function EventsPage() {
                           setRawEvents={setRawEvents}
                           onShowParticipants={handleShowParticipants}
                           onGuestJoinRequested={handleGuestJoinRequested}
+                          onLeadGenNeeded={handleLeadGenNeeded}
+                          leadGenCallbackRef={leadGenCallbackRef}
                         />
                       </Grid>
                     ))}
@@ -4022,6 +4105,8 @@ export default function EventsPage() {
                           onShowParticipants={handleShowParticipants}
                           onGuestJoinRequested={handleGuestJoinRequested}
                           isReplayEvent={true}
+                          onLeadGenNeeded={handleLeadGenNeeded}
+                          leadGenCallbackRef={leadGenCallbackRef}
                         />
                       </Box>
                     );
@@ -4047,6 +4132,8 @@ export default function EventsPage() {
                           onShowParticipants={handleShowParticipants}
                           onGuestJoinRequested={handleGuestJoinRequested}
                           isReplayEvent={true}
+                          onLeadGenNeeded={handleLeadGenNeeded}
+                          leadGenCallbackRef={leadGenCallbackRef}
                         />
                       </Grid>
                     );
@@ -4094,6 +4181,16 @@ export default function EventsPage() {
           livePath={`/live/${guestJoinEvent.slug || guestJoinEvent.id}?id=${guestJoinEvent.id}&role=audience`}
         />
       )}
+      <LeadGenModal
+        open={leadGenModalOpen}
+        onClose={() => {
+          setLeadGenModalOpen(false);
+          setLeadGenMissingFields({});
+        }}
+        onSuccess={handleLeadGenSuccess}
+        user={getBackendUserFromStorage()}
+        missingFields={leadGenMissingFields}
+      />
       <ToastContainer
         position="top-center"
         autoClose={2000}

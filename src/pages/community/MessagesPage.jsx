@@ -59,6 +59,7 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
 import { useNavigate, useLocation } from "react-router-dom";
+import { fetchEventSummaryCached } from "../../utils/entityCache.js";
 
 
 const BORDER = "#e2e8f0";
@@ -1401,9 +1402,18 @@ async function hydrateMissingAvatars(items, type) {
     const url = endpoint(type, item.id);
     if (!url) return item;
     try {
-      const res = await apiFetch(url);
-      if (!res.ok) return item;
-      const j = await res.json();
+      const j = type === "event"
+        ? await fetchEventSummaryCached({
+          baseUrl: API_ROOT,
+          eventId: item.id,
+          headers: { Accept: "application/json", ...authHeader() },
+        })
+        : await (async () => {
+          const res = await apiFetch(url);
+          if (!res.ok) return null;
+          return res.json();
+        })();
+      if (!j) return item;
       const av = mapper(type, j);
       return av ? { ...item, avatar: av } : item;
     } catch {
@@ -2139,14 +2149,10 @@ export default function MessagesPage() {
       await Promise.all(
         missing.map(async (id) => {
           try {
-            const res = await apiFetch(`${API_ROOT}/events/${id}/`);
-            if (!res.ok) {
-              console.warn(`Failed to fetch event ${id}: HTTP ${res.status}`);
-              return;
-            }
-            const data = await res.json().catch((err) => {
-              console.warn(`Failed to parse event ${id} JSON:`, err);
-              return null;
+            const data = await fetchEventSummaryCached({
+              baseUrl: API_ROOT,
+              eventId: id,
+              headers: { Accept: "application/json", ...authHeader() },
             });
             if (data) {
               fetched[id] = data;
