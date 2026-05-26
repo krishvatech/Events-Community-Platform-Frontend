@@ -210,7 +210,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Application Tracks", "Registered Members", "Participants", "Participant Information", "Promotional Profiles", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications", "Confirmation Email"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Application Tracks", "Registered Members", "Participants", "Participant Information", "Promotional Profiles", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications"];
 
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
@@ -8320,6 +8320,7 @@ export default function EventManagePage() {
                       {tab === tabLabels.indexOf("Applications") && <EventManageApplications />}
                       {tab === tabLabels.indexOf("Application Tracks") && <ApplicationTracksManager eventId={eventId} token={getToken()} />}
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
+                      {tab === tabLabels.indexOf("Participants") && renderParticipants()}
                       {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
                       {tab === tabLabels.indexOf("Promotional Profiles") && <PromotionalProfilesManager eventId={eventId} />}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
@@ -8338,6 +8339,7 @@ export default function EventManagePage() {
                   ) : (
                     <>
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
+                      {tab === tabLabels.indexOf("Participants") && renderParticipants()}
                       {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
                       {tab === tabLabels.indexOf("Promotional Profiles") && <PromotionalProfilesManager eventId={eventId} />}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
