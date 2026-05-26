@@ -3,8 +3,9 @@ import { Box, CircularProgress, Alert } from "@mui/material";
 import { init } from "@templatical/editor";
 import "@templatical/editor/style.css";
 
-const STARTER_VERSION = 3;
+const STARTER_VERSION = 5;
 const EMAIL_GREEN = "#28a745";
+const EMAIL_TEAL = "#10b8a6";
 const EMAIL_BLUE = "#007bff";
 const EMAIL_DARK = "#2c3e50";
 const EMAIL_TEXT = "#333333";
@@ -150,6 +151,24 @@ const createInfoPanelBlock = (title, items, titleColor = EMAIL_GREEN) =>
     spacing(14, 24, 14, 24)
   );
 
+const createPanelBlock = ({ title, body, background = "#ffffff", border = "#dee2e6", titleColor = EMAIL_DARK }) =>
+  createParagraphBlock(
+    `<div style="background-color:${background};border:1px solid ${border};padding:20px;border-radius:5px;">` +
+      `<h3 style="margin:0 0 10px 0;color:${titleColor};font-size:17px;">${title}</h3>` +
+      body +
+    `</div>`,
+    spacing(14, 24, 14, 24)
+  );
+
+const createAccentPanelBlock = ({ title, body, color, background }) =>
+  createParagraphBlock(
+    `<div style="background-color:${background};border-left:4px solid ${color};padding:20px;border-radius:5px;">` +
+      `<h3 style="margin:0 0 10px 0;color:${color};font-size:17px;">${title}</h3>` +
+      `<p style="margin:5px 0;color:${EMAIL_TEXT};">${body}</p>` +
+    `</div>`,
+    spacing(14, 24, 14, 24)
+  );
+
 const createStarterVisualContent = (template) => {
   const firstName = mergeTagHtml(template, "{{ first_name }}", "First Name");
   const guestName = mergeTagHtml(template, "{{ guest_name }}", "Guest Name");
@@ -251,11 +270,11 @@ const createStarterVisualContent = (template) => {
     intro = `${eventTitle} starts in 1 hour.`;
     buttonLabel = "Join Event";
   } else if (key === "event_join_confirmation") {
-    heading = "You're in!";
-    headingColor = EMAIL_GREEN;
-    intro = `You've joined ${eventTitle}.`;
+    heading = "✅ You're Now Attending!";
+    headingColor = EMAIL_TEAL;
+    intro = `Thank you for joining <strong>${eventTitle}</strong>! We're excited to have you here. Your participation and engagement make our community stronger.`;
     buttonLabel = "View Event Details";
-    buttonColor = "#10b8a6";
+    buttonColor = EMAIL_TEAL;
   } else if (requiredValues.has("{{ event_title }}")) {
     heading = `${eventTitle}`;
     intro = `Here is an update for ${eventTitle}.`;
@@ -297,7 +316,6 @@ const createStarterVisualContent = (template) => {
       "event_confirmation",
       "event_cancelled",
       "event_starting_soon",
-      "event_join_confirmation",
       "application_acknowledgement",
       "application_approved",
       "user_registration_acknowledgement",
@@ -330,8 +348,41 @@ const createStarterVisualContent = (template) => {
     );
   }
 
+  if (key === "event_join_confirmation") {
+    blocks.push(
+      createAccentPanelBlock({
+        title: "You're all set!",
+        body: "Your live session connection has been confirmed. You can now enjoy the event and connect with other participants.",
+        color: EMAIL_TEAL,
+        background: "#e8f7f5",
+      }),
+      createPanelBlock({
+        title: "During the Event",
+        body:
+          `<ul style="margin:10px 0;padding-left:20px;color:${EMAIL_TEXT};">` +
+            "<li>Engage in discussions with other participants</li>" +
+            "<li>Use the networking lounge to make connections</li>" +
+            "<li>Ask questions in the Q&A session</li>" +
+            "<li>Take notes on key insights shared</li>" +
+          "</ul>",
+      })
+    );
+  }
+
   if (primaryUrl) {
     blocks.push(createButtonBlock(buttonLabel, urlValue, buttonColor));
+  }
+
+  if (key === "event_join_confirmation") {
+    blocks.push(
+      createPanelBlock({
+        title: "Feedback Welcome",
+        body: `<p style="margin:5px 0;color:#004085;">We'd love to hear about your experience! After the event ends, you'll have the opportunity to share your feedback and help us improve.</p>`,
+        background: "#f0f8ff",
+        border: "#f0f8ff",
+        titleColor: "#004085",
+      })
+    );
   }
 
   blocks.push(createDividerBlock(), createFooterBlock(template));
@@ -371,19 +422,98 @@ const createLegacyHtmlContent = (template) => ({
   },
 });
 
+const stripDjangoBlocks = (html = "") =>
+  String(html)
+    .replace(/{#.*?#}/gs, "")
+    .replace(/{%\s*(?:if|elif|else|endif|for|endfor|with|endwith|block|endblock|extends|include)[^%]*%}/g, "");
+
+const extractBodyMarkup = (html = "") => {
+  if (typeof DOMParser === "undefined") return stripDjangoBlocks(html);
+
+  const cleaned = stripDjangoBlocks(html);
+  const parsed = new DOMParser().parseFromString(cleaned, "text/html");
+  const body = parsed.body;
+  const outerContainer = Array.from(body.children).find((child) => child.tagName?.toLowerCase() === "div");
+
+  return outerContainer?.innerHTML || body.innerHTML || cleaned;
+};
+
+const createHtmlDerivedVisualContent = (template) => {
+  if (!template?.html_body || typeof DOMParser === "undefined") return null;
+
+  const markup = extractBodyMarkup(template.html_body);
+  const parsed = new DOMParser().parseFromString(`<div>${markup}</div>`, "text/html");
+  const root = parsed.body.firstElementChild;
+  const blocks = [];
+
+  Array.from(root?.children || []).forEach((node) => {
+    const tagName = node.tagName?.toLowerCase();
+    const html = node.outerHTML;
+    const inner = node.innerHTML;
+    const link = node.querySelector?.("a[href]");
+    const onlyButtonLink =
+      tagName === "div" &&
+      link &&
+      node.textContent?.trim() === link.textContent?.trim() &&
+      /text-align:\s*center/i.test(node.getAttribute("style") || "");
+
+    if (tagName === "h1" || tagName === "h2" || tagName === "h3") {
+      const colorMatch = (node.getAttribute("style") || "").match(/color:\s*([^;]+)/i);
+      blocks.push(
+        createTitleBlock(inner, {
+          level: tagName === "h1" ? 1 : tagName === "h2" ? 2 : 3,
+          color: colorMatch?.[1]?.trim() || EMAIL_DARK,
+        })
+      );
+    } else if (tagName === "p") {
+      blocks.push(createParagraphBlock(inner));
+    } else if (tagName === "hr") {
+      blocks.push(createDividerBlock());
+    } else if (onlyButtonLink) {
+      const backgroundMatch = (link.getAttribute("style") || "").match(/background-color:\s*([^;]+)/i);
+      blocks.push(createButtonBlock(link.textContent?.trim() || "Open", link.getAttribute("href") || "#", backgroundMatch?.[1]?.trim() || EMAIL_BLUE));
+    } else if (tagName === "ul" || tagName === "ol") {
+      blocks.push(createParagraphBlock(html));
+    } else if (html?.trim()) {
+      blocks.push(createParagraphBlock(html, spacing(12, 24, 12, 24)));
+    }
+  });
+
+  return {
+    blocks: blocks.length ? blocks : createLegacyHtmlContent(template).blocks,
+    settings: {
+      width: 600,
+      backgroundColor: EMAIL_PANEL,
+      fontFamily: "Arial",
+      locale: "en",
+      templaticalTemplateKey: template.template_key || "",
+      templaticalStarterVersion: STARTER_VERSION,
+      templaticalSource: "html_template",
+    },
+  };
+};
+
 const getInitialContent = (template) => {
   if (template?.editor_json) {
     const savedTemplateKey = template.editor_json?.settings?.templaticalTemplateKey;
     const starterVersion = template.editor_json?.settings?.templaticalStarterVersion || 0;
+    const source = template.editor_json?.settings?.templaticalSource;
     const serialized = JSON.stringify(template.editor_json || {});
     const hasRequiredTags = (template.required_placeholders || []).every((placeholder) =>
       serialized.includes(placeholder)
     );
 
-    if ((!savedTemplateKey || savedTemplateKey === template.template_key) && hasRequiredTags && starterVersion >= STARTER_VERSION) {
+    if (
+      (!savedTemplateKey || savedTemplateKey === template.template_key) &&
+      hasRequiredTags &&
+      starterVersion >= STARTER_VERSION &&
+      source === "html_template"
+    ) {
       return template.editor_json;
     }
   }
+  const htmlDerived = createHtmlDerivedVisualContent(template);
+  if (htmlDerived) return htmlDerived;
   if (template?.merge_tags?.length) return createStarterVisualContent(template);
   if (template?.html_body || template?.text_body) return createLegacyHtmlContent(template);
   return undefined;

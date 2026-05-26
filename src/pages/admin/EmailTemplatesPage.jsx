@@ -130,6 +130,7 @@ export default function EmailTemplatesPage() {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [error, setError] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
+  const [editorRevision, setEditorRevision] = useState(0);
 
   const showSnack = (message, severity = "success") => {
     setSnackbar({ open: true, message, severity });
@@ -171,6 +172,7 @@ export default function EmailTemplatesPage() {
       });
       setEditorContent(data.editor_json || null);
       setEditorDirty(false);
+      setEditorRevision((revision) => revision + 1);
       setInlinePreview(null);
       loadInlinePreview(data, key);
     } catch (err) {
@@ -328,8 +330,9 @@ export default function EmailTemplatesPage() {
       });
       setEditorContent(reset.editor_json || null);
       setEditorDirty(false);
+      setEditorRevision((revision) => revision + 1);
       refreshSelectedInList(reset);
-      loadInlinePreview(reset);
+      loadInlinePreview(reset, reset.template_key);
       showSnack("Template reset to file default.");
     } catch (err) {
       showSnack(extractError(err), "error");
@@ -537,7 +540,7 @@ export default function EmailTemplatesPage() {
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: { xs: "1fr", xl: "minmax(420px, 0.9fr) minmax(560px, 1.1fr)" },
+                  gridTemplateColumns: "1fr",
                   gap: 2,
                   alignItems: "start",
                 }}
@@ -549,6 +552,48 @@ export default function EmailTemplatesPage() {
                     borderRadius: 1,
                     overflow: "hidden",
                     bgcolor: "#ffffff",
+                    minWidth: 0,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      px: 1.75,
+                      py: 1.25,
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                      bgcolor: "#f8fafc",
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                      Visual editor
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Edit the email visually. The rendered preview is shown below.
+                    </Typography>
+                  </Box>
+                  <TemplaticalEmailEditor
+                    key={`${selected.template_key}-${editorRevision}`}
+                    ref={editorRef}
+                    template={selected}
+                    onReady={(content) => {
+                      setEditorContent(content);
+                      setEditorDirty(false);
+                    }}
+                    onContentChange={(content, meta) => {
+                      setEditorContent(content);
+                      if (!meta?.initial) setEditorDirty(true);
+                    }}
+                  />
+                </Box>
+
+                <Box
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 1,
+                    overflow: "hidden",
+                    bgcolor: "#ffffff",
+                    minWidth: 0,
                   }}
                 >
                   <Stack
@@ -593,47 +638,6 @@ export default function EmailTemplatesPage() {
                       border: 0,
                       bgcolor: "#f4f7fb",
                       display: "block",
-                    }}
-                  />
-                </Box>
-
-                <Box
-                  sx={{
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: 1,
-                    overflow: "hidden",
-                    bgcolor: "#ffffff",
-                    minWidth: 0,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      px: 1.75,
-                      py: 1.25,
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                      bgcolor: "#f8fafc",
-                    }}
-                  >
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                      Visual editor
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Edit the starter layout visually. The email view shows the currently saved/rendered template.
-                    </Typography>
-                  </Box>
-                  <TemplaticalEmailEditor
-                    key={selected.template_key}
-                    ref={editorRef}
-                    template={selected}
-                    onReady={(content) => {
-                      setEditorContent(content);
-                      setEditorDirty(false);
-                    }}
-                    onContentChange={(content, meta) => {
-                      setEditorContent(content);
-                      if (!meta?.initial) setEditorDirty(true);
                     }}
                   />
                 </Box>
