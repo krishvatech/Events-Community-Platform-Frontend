@@ -2033,6 +2033,13 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                 <MenuItem value="open">Open Registration</MenuItem>
                                 <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
                             </TextField>
+                            {registrationType === 'apply' && (
+                                <Box sx={{ mt: 1, p: 1.5, bgcolor: '#e3f2fd', border: '1px solid #90caf9', borderRadius: 1 }}>
+                                    <Typography variant="caption" sx={{ color: '#1565c0', fontWeight: 500 }}>
+                                        💡 This event will remain in Draft until at least one application track is created.
+                                    </Typography>
+                                </Box>
+                            )}
                         </Box>
 
                         <Box sx={{ mt: 3, mb: 2, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fafafa" }}>

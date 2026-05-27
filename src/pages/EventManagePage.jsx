@@ -2471,6 +2471,35 @@ export default function EventManagePage() {
                 </Paper>
               )}
 
+              {/* Application Required Warning */}
+              {event.registration_type === 'apply' && event.status === 'draft' && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    bgcolor: '#e3f2fd',
+                    border: '2px solid #1976d2',
+                    borderRadius: 2,
+                    p: 2,
+                    mb: 2.5,
+                  }}
+                >
+                  <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                    <InfoRoundedIcon sx={{ color: '#1565c0', mt: 0.5, flexShrink: 0 }} />
+                    <Box>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1565c0', mb: 0.5 }}>
+                        Application Tracks Required
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#1565c0', mb: 1 }}>
+                        This event requires at least one valid application track before publishing. Go to the "Application Tracks" tab to create one.
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#0d47a1', fontStyle: 'italic' }}>
+                        Each track needs: label, submission mode(s), pricing tier(s), and role mapping(s).
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              )}
+
               {/* date / time / location */}
               <Stack spacing={0.75} sx={{ mb: 2.5 }}>
                 <Stack direction="row" spacing={1.2} alignItems="center">
