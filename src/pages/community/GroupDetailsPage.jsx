@@ -20,7 +20,7 @@ import IosShareIcon from "@mui/icons-material/IosShare";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import SearchIcon from "@mui/icons-material/Search";
-import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
+import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -2839,7 +2839,7 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
               <Button
                 variant="outlined"
                 onClick={() => setRequestMembersOpen(true)}
-                startIcon={<PeopleOutlineRoundedIcon />}
+                startIcon={<PeopleOutlineIcon />}
               >
                 Request Add Members
               </Button>
@@ -3972,7 +3972,7 @@ export default function GroupDetailsPage() {
     const items = [
       { label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> },
       {
-        label: "MEMBERS", icon: <PeopleOutlineRoundedIcon />, render: () => (
+        label: "MEMBERS", icon: <PeopleOutlineIcon />, render: () => (
           <MembersTab
             groupId={groupId}
             group={group}
@@ -3988,7 +3988,7 @@ export default function GroupDetailsPage() {
     if (canSeeRequests) {
       items.push({
         label: "REQUESTS",
-        icon: <PeopleOutlineRoundedIcon />,
+        icon: <PeopleOutlineIcon />,
         render: () => (
           <RequestsTab
             groupId={groupId}

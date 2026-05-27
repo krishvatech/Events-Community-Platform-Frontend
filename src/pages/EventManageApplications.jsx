@@ -48,6 +48,7 @@ const EventManageApplications = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [bulkActionOpen, setBulkActionOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   // Load event and tracks/tiers on mount
   useEffect(() => {
@@ -123,7 +124,7 @@ const EventManageApplications = () => {
     };
 
     loadApplications();
-  }, [eventId, filters, page, pageSize, searchText]);
+  }, [eventId, filters, page, pageSize, searchText, refetchTrigger]);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -168,10 +169,11 @@ const EventManageApplications = () => {
   };
 
   const handleDetailUpdate = (updatedApp) => {
-    // Refresh the list
+    // Refresh the list by incrementing refetch trigger
     setSuccessMessage('Application updated successfully');
     handleDetailClose();
-    setPage(0); // Reload first page to see updated data
+    setPage(0); // Reset to first page
+    setRefetchTrigger(prev => prev + 1); // Force reload
   };
 
   const handleBulkActionSuccess = (result) => {

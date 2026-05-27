@@ -474,13 +474,17 @@ const MultiTrackApplicationForm = ({
     const mode = getSubmissionModeForTrack(trackId);
     const trackLabel = tracks[trackId]?.label || 'selected track';
 
+    // Validate mode-specific required fields
     if (mode === 'confirmed') {
-      if (!getTrackModeData(trackId, 'pre_approval_code').trim() && !preapprovalCode.trim()) {
-        setSubmitError(`Please enter the pre-approval code for ${trackLabel}.`);
+      const preApprovalCode = (trackData[trackId]?.pre_approval_code || '').trim();
+      const sponsorOrg = (trackData[trackId]?.sponsor_organization || '').trim();
+
+      if (!preApprovalCode) {
+        setSubmitError('Pre-Approval Code is required for sponsor staff applications');
         return false;
       }
-      if (!getTrackModeData(trackId, 'sponsor_organization').trim()) {
-        setSubmitError(`Please enter the sponsor or partner organization for ${trackLabel}.`);
+      if (!sponsorOrg) {
+        setSubmitError('Sponsor / Partner Organisation is required for sponsor staff applications');
         return false;
       }
     }
@@ -586,14 +590,33 @@ const MultiTrackApplicationForm = ({
           sponsor_organization: confirmedData.sponsor_organization || '',
         }),
         // Phase 8: Include pre-approval code if provided
-        preapproved_code: preapprovalCode.trim() || confirmedData.pre_approval_code || undefined,
+        preapproved_code: preapprovalCode.trim() || undefined,
         track_applications,
       };
+
+      // Debug: Log payload to verify sponsor_organization and pre_approval_code are included
+      console.log('📋 Submitting application payload:', {
+        applicant: {
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          email: payload.email,
+        },
+        preapproved_code: payload.preapproved_code,
+        track_applications: payload.track_applications.map((ta) => ({
+          track_id: ta.track_id,
+          submission_mode: ta.submission_mode,
+          sponsor_organization: ta.sponsor_organization,
+          pre_approval_code: ta.pre_approval_code,
+          form_answers_count: Object.keys(ta.form_answers || {}).length,
+        })),
+      });
 
       const response = await apiClient.post(
         `/events/${eventId}/apply/`,
         payload
       );
+
+      console.log('✅ Application submitted successfully:', response.data);
 
       if (onSuccess) {
         onSuccess(response.data);
@@ -646,10 +669,11 @@ const MultiTrackApplicationForm = ({
       }
 
       setSubmitError(errorMessage);
-      console.error('Error submitting application:', {
+      console.error('❌ Error submitting application:', {
         status,
         detail,
         missingFields,
+        payload,
         error: error.response?.data,
       });
     } finally {
@@ -821,6 +845,24 @@ const MultiTrackApplicationForm = ({
 
   const renderModeSpecificFields = (trackId) => {
     const mode = getSubmissionModeForTrack(trackId);
+
+    if (mode === 'confirmed') {
+      return (
+        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+            Sponsor / Partner Confirmation
+          </Typography>
+          <TextField
+            fullWidth
+            required
+            label="Sponsor or Partner Organization *"
+            value={getTrackModeData(trackId, 'sponsor_organization')}
+            onChange={(event) => handleTrackDataChange(trackId, 'sponsor_organization', event.target.value)}
+            helperText="Enter the organization confirming this application."
+          />
+        </Box>
+      );
+    }
 
     if (mode === 'third_party_nomination') {
       return (
@@ -1221,7 +1263,7 @@ const MultiTrackApplicationForm = ({
                 </Typography>
                   {selectedTracks.map((trackId) => {
                   const trackState = trackPreapprovalState[trackId];
-                  const mode = getSubmissionModeForTrack(trackId);
+                  const mode = submissionModes[trackId] || 'self_submission';
                   const isPreapproved = trackState && (trackState.codePreapproved || trackState.emailPreapproved);
                   return (
                     <Box key={trackId} sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>

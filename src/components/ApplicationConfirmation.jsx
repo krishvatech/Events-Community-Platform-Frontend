@@ -62,6 +62,11 @@ const ApplicationConfirmation = ({
     );
   };
 
+  // Check if any track is pre-approved
+  const hasPreApprovedTracks = trackApplications && trackApplications.some(
+    (ta) => ta.status === 'pre_approved'
+  );
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Card sx={{ mb: 4 }}>
@@ -74,11 +79,14 @@ const ApplicationConfirmation = ({
             }}
           />
           <Typography variant="h4" fontWeight={700} gutterBottom>
-            Application Submitted Successfully!
+            {hasPreApprovedTracks
+              ? 'You Are Pre-Approved! 🎉'
+              : 'Application Submitted Successfully!'}
           </Typography>
           <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
-            Thank you for applying to {eventTitle}. We've received your application
-            and will review it shortly.
+            {hasPreApprovedTracks
+              ? `Thank you for applying to ${eventTitle}. Your application has been pre-approved and automatically accepted!`
+              : `Thank you for applying to ${eventTitle}. We've received your application and will review it shortly.`}
           </Typography>
 
           <Alert severity="info" sx={{ mt: 3, textAlign: 'left' }}>

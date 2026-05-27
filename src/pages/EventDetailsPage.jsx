@@ -808,9 +808,9 @@ export default function EventDetailsPage() {
     return () => { cancelled = true; };
   }, [event?.id, event?.registration_type, token]);
 
-  // When application is approved, generate guest JWT if not already in localStorage
+  // When application is accepted, generate guest JWT if not already in localStorage
   useEffect(() => {
-    if (myApplication?.status !== 'approved' || !event?.id) return;
+    if (myApplication?.application_status !== 'accepted' || !event?.id) return;
 
     const guestToken = localStorage.getItem("guest_token");
     // Only generate if no guest token exists
@@ -848,11 +848,11 @@ export default function EventDetailsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [myApplication?.status, myApplication?.email, event?.id]);
+  }, [myApplication?.application_status, myApplication?.email, event?.id]);
 
-  // When application is approved, refresh registration status (for authenticated users)
+  // When application is accepted, refresh registration status (for authenticated users)
   useEffect(() => {
-    if (myApplication?.status !== 'approved' || !event?.id || !token) return;
+    if (myApplication?.application_status !== 'accepted' || !event?.id || !token) return;
 
     let cancelled = false;
     (async () => {
@@ -870,14 +870,14 @@ export default function EventDetailsPage() {
       } catch { }
     })();
     return () => { cancelled = true; };
-  }, [myApplication?.status, event?.id, token]);
+  }, [myApplication?.application_status, event?.id, token]);
 
   // For authenticated users, submit application directly without dialog
   const handleApplyDirect = async () => {
     if (!event?.id || !token) return;
 
     try {
-      // Fetch user profile to get their data for the application
+      // First, fetch user profile to get their name and email
       const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -888,18 +888,32 @@ export default function EventDetailsPage() {
       }
 
       const profile = await profileRes.json();
+      console.log("Profile fetched:", profile);
 
-      // Submit application with user's profile data
-      // Backend will validate lead-gen fields and return error if incomplete
+      // Check if profile has required data
+      const missingFields = [];
+      if (!profile.first_name) missingFields.push("First Name");
+      if (!profile.last_name) missingFields.push("Last Name");
+      if (!profile.email) missingFields.push("Email");
+      if (!profile.job_title) missingFields.push("Job Title");
+      if (!profile.company) missingFields.push("Company");
+
+      if (missingFields.length > 0) {
+        toast.error(`Please complete your profile: ${missingFields.join(", ")}`);
+        return;
+      }
+
       const applicationData = {
-        first_name: profile.first_name || "",
-        last_name: profile.last_name || "",
-        email: profile.email || "",
-        job_title: profile.job_title || "",
-        company_name: profile.company || "",
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        job_title: profile.job_title,
+        company_name: profile.company,
         linkedin_url: "",
       };
+      console.log("Submitting application with data:", applicationData);
 
+      // Submit application with user's profile data
       const res = await fetch(`${API_BASE}/events/${event.id}/apply/`, {
         method: "POST",
         headers: {
@@ -928,7 +942,8 @@ export default function EventDetailsPage() {
         toast.error("You have already applied to this event.");
       } else {
         const errData = await res.json().catch(() => ({}));
-        toast.error(errData.detail || "Failed to submit application. Please try again.");
+        console.error("Application submission error:", errData);
+        toast.error(errData.detail || JSON.stringify(errData) || "Failed to submit application. Please try again.");
       }
     } catch (err) {
       toast.error("Error submitting application: " + err.message);
@@ -1955,7 +1970,7 @@ export default function EventDetailsPage() {
                                   <PaymentPendingDetails registration={registration} event={event} />
                                 </Stack>
                               )
-                              : (!myApplication || myApplication.status === 'none' || myApplication.status === 'cancelled') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
+                              : (!myApplication || myApplication.application_status === 'none' || myApplication.application_status === 'cancelled' || myApplication.application_status === 'declined') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
                               ? (
                                 <>
                                   <Button
@@ -1975,11 +1990,16 @@ export default function EventDetailsPage() {
                                     }}
                                     className="rounded-xl"
                                   >
-                                    {token ? "Apply Now" : "Apply as Guest"}
+                                    {myApplication?.application_status === 'declined' ? (token ? 'Apply Again' : 'Apply Again as Guest') : (token ? 'Apply Now' : 'Apply as Guest')}
                                   </Button>
+                                  {myApplication?.application_status === 'declined' && (
+                                    <Typography variant="caption" sx={{ color: "#666" }}>
+                                      Your previous application was declined. You can apply again.
+                                    </Typography>
+                                  )}
                                 </>
                               )
-                              : myApplication?.status === 'approved'
+                              : myApplication?.application_status === 'accepted'
                                 ? (() => {
                                   // After approval, check if user can join with guest token or is registered
                                   const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
@@ -2051,7 +2071,7 @@ export default function EventDetailsPage() {
                                     );
                                   }
                                 })()
-                                : myApplication?.status === 'pending'
+                                : myApplication?.application_status === 'pending'
                                   ? (
                                     <Chip
                                       label="Application Pending"
@@ -2060,7 +2080,7 @@ export default function EventDetailsPage() {
                                       sx={{ py: 2.5 }}
                                     />
                                   )
-                                  : myApplication?.status === 'declined'
+                                  : myApplication?.application_status === 'declined'
                                     ? (
                                       <Chip
                                         label="Application Declined"
@@ -2069,7 +2089,7 @@ export default function EventDetailsPage() {
                                         sx={{ py: 2.5 }}
                                       />
                                     )
-                                    : myApplication?.status === 'cancelled'
+                                    : myApplication?.application_status === 'cancelled'
                                       ? (
                                         <>
                                           <Button
@@ -2914,7 +2934,46 @@ export default function EventDetailsPage() {
             onClose={() => setApplyModalOpen(false)}
             event={event}
             token={token}
-            onSuccess={(app) => setMyApplication(app)}
+            onSuccess={(app) => {
+              console.log('📝 EventDetailsPage received application success:', {
+                applicationId: app.id,
+                applicationStatus: app.application_status,
+                status: app.status,
+              });
+
+              setMyApplication(app);
+              console.log('✅ Updated myApplication state');
+
+              // Refetch event to update user_status with latest application status
+              // This ensures the event detail reflects the new pending application instead of old declined one
+              (async () => {
+                try {
+                  const url = fallbackId
+                    ? urlJoin(API_BASE, `/events/${fallbackId}/?include=questions&include_ended=true`)
+                    : urlJoin(API_BASE, `/events/${encodeURIComponent(slug)}/?include=questions&include_ended=true`);
+                  console.log('🔄 Refetching event from:', url);
+                  const res = await fetch(url, {
+                    headers: {
+                      "Content-Type": "application/json",
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    }
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    console.log('✅ Event refetched successfully:', {
+                      eventId: data.id,
+                      applicationStatus: data.application_status,
+                      userStatus: data.user_status?.application_status,
+                    });
+                    setEvent(data);
+                  } else {
+                    console.error('⚠️ Event refetch returned non-OK status:', res.status);
+                  }
+                } catch (err) {
+                  console.error("❌ Failed to refetch event after reapply:", err);
+                }
+              })();
+            }}
           />
 
           <PreEventQnAModal

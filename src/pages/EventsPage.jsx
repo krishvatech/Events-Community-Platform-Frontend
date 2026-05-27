@@ -645,7 +645,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       } catch { }
     })();
     return () => { cancelled = true; };
-  }, [ev?.id, ev?.registration_type, token]);
+  }, [ev?.id, ev?.registration_type, token,applyModalOpen]);
 
   // For authenticated users, submit application directly without dialog
   const handleApplyCardDirect = async (retrying = false) => {
@@ -1234,7 +1234,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               {ev.registration_type === 'apply' ? (
                 // APPLY FLOW
                 (<>
-                  {!myApplication || myApplication.status === 'none' || myApplication.status === 'cancelled'
+                  {!myApplication || myApplication.application_status === 'none' || myApplication.application_status === 'cancelled' || myApplication.application_status === 'declined'
                     ? (
                       <div className="flex flex-col items-start gap-1">
                         <Button
@@ -1250,14 +1250,17 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           }}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
-                          Apply Now
+                          {myApplication?.application_status === 'declined' ? 'Apply Again' : 'Apply Now'}
                         </Button>
-                        {myApplication?.status === 'cancelled' && (
+                        {myApplication?.application_status === 'cancelled' && (
                           <span className="text-sm text-gray-600">You previously cancelled this application</span>
+                        )}
+                        {myApplication?.application_status === 'declined' && (
+                          <span className="text-sm text-red-600">Your previous application was declined. You can apply again.</span>
                         )}
                       </div>
                     )
-                    : myApplication.status === 'approved'
+                    : myApplication.application_status === 'accepted'
                     ? (() => {
                       // After approval, check if user can join with guest token or is registered
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
@@ -1320,7 +1323,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         );
                       }
                     })()
-                    : myApplication.status === 'pending'
+                    : myApplication.application_status === 'pending'
                     ? (
                       <Chip
                         label="Application Pending"
@@ -1328,7 +1331,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         variant="outlined"
                       />
                     )
-                    : myApplication.status === 'declined'
+                    : myApplication.application_status === 'declined'
                     ? (
                       <Chip
                         label="Application Declined"
@@ -1338,7 +1341,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     )
                     : null
                   }
-                  {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.status !== 'approved') && isWithinGuestJoinWindow(ev.start) && (
+                  {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.application_status !== 'accepted') && isWithinGuestJoinWindow(ev.start) && (
                     <Button
                       variant="outlined"
                       size="medium"
@@ -1533,7 +1536,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
       } catch { }
     })();
     return () => { cancelled = true; };
-  }, [ev?.id, ev?.registration_type, token]);
+  }, [ev?.id, ev?.registration_type, token, applyModalOpen]);
 
   const handleRegisterRow = async (retrying = false) => {
     // Safety guard: if first argument is a click event/object, treat retrying as false
@@ -1884,7 +1887,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                   </div>
                  : ev.registration_type === 'apply' ? (
                   <div className="flex items-center gap-2 flex-wrap">
-                    {!myApplication || myApplication.status === 'none' || myApplication.status === 'cancelled' ? (
+                    {!myApplication || myApplication.application_status === 'none' || myApplication.application_status === 'cancelled' || myApplication.application_status === 'declined' ? (
                       <div className="flex flex-col items-start gap-1">
                         <Button
                           variant="contained"
@@ -1899,13 +1902,16 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           }}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
-                          Apply Now
+                          {myApplication?.application_status === 'declined' ? 'Apply Again' : 'Apply Now'}
                         </Button>
-                        {myApplication?.status === 'cancelled' && (
+                        {myApplication?.application_status === 'cancelled' && (
                           <span className="text-xs text-gray-600">You previously cancelled this application</span>
                         )}
+                        {myApplication?.application_status === 'declined' && (
+                          <span className="text-xs text-red-600">Your previous application was declined. You can apply again.</span>
+                        )}
                       </div>
-                    ) : myApplication.status === 'approved' ? (() => {
+                    ) : myApplication.application_status === 'accepted' ? (() => {
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
                       if (guestToken) {
                         if (isLive) {
@@ -1937,14 +1943,14 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                       } else if (myRegistrations?.[ev.id]) {
                         return <Chip label="Registered" color="success" variant="outlined" />;
                       } else {
-                        return <Chip label="Approved" color="success" variant="outlined" />;
+                        return <Chip label="Accepted" color="success" variant="outlined" />;
                       }
-                    })() : myApplication.status === 'pending' ? (
+                    })() : myApplication.application_status === 'pending' ? (
                       <Chip label="Application Pending" color="warning" variant="outlined" />
-                    ) : myApplication.status === 'declined' ? (
+                    ) : myApplication.application_status === 'declined' ? (
                       <Chip label="Application Declined" color="error" variant="outlined" />
                     ) : null}
-                    {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.status !== 'approved') && (
+                    {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.application_status !== 'accepted') && (
                       <Button
                         variant="outlined"
                         size="medium"

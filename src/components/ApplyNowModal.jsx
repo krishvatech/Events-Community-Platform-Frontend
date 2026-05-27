@@ -97,8 +97,25 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
   };
 
   const handleApplicationSuccess = (data) => {
+    console.log('✅ ApplyNowModal received success data:', {
+      applicationId: data.id,
+      applicationStatus: data.application_status,
+      status: data.status,
+      email: data.email,
+    });
+
     setSubmittedApplication(data);
-    if (onSuccess) onSuccess(data);
+    if (onSuccess) {
+      console.log('📤 Calling parent onSuccess callback with application data');
+      onSuccess(data);
+    }
+
+    // Auto-close modal after 2.5 seconds to show success message,
+    // allowing state updates to complete before modal closes
+    setTimeout(() => {
+      console.log('🔒 Auto-closing apply modal');
+      handleModalClose();
+    }, 2500);
   };
 
   const renderTrackSelector = () => (
@@ -224,7 +241,7 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
               </Box>
             )}
             <MultiTrackApplicationForm
-              key={`${event?.id}-${selectedTrackIds.join("-")}`}
+              key={`${event?.id}-${selectedTrackIds.join("-")}-${open}`}
               eventId={event.id}
               event={event}
               selectedTracks={selectedTrackIds}
