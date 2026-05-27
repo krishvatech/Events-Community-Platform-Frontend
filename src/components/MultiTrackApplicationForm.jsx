@@ -75,11 +75,10 @@ const MultiTrackApplicationForm = ({
   const [formFields, setFormFields] = useState({});
   const [modeSelectionStep, setModeSelectionStep] = useState(null);
 
-  // Phase 8: Pre-approval state
-  const [preapprovalCode, setPreapprovalCode] = useState('');
-  const [codeCheckError, setCodeCheckError] = useState(null);
+  // Phase 8: Pre-approval state (per-track for confirmed mode, global for backward compatibility)
   const [trackPreapprovalState, setTrackPreapprovalState] = useState({});
   const [isCheckingPreapproval, setIsCheckingPreapproval] = useState(false);
+  const [trackCodeErrors, setTrackCodeErrors] = useState({});
 
   // Load user data if authenticated
   useEffect(() => {
@@ -228,45 +227,35 @@ const MultiTrackApplicationForm = ({
     }
   };
 
-  // Phase 8: Check pre-approval code for all tracks
-  const checkPreapprovalCodeForAllTracks = async () => {
-    if (!preapprovalCode.trim()) {
-      setCodeCheckError('Please enter a pre-approval code');
+  // Phase 8: Check pre-approval code for a specific track (called on blur/verify)
+  const checkPreapprovalCodeForTrack = async (trackId, code) => {
+    if (!code.trim()) {
       return;
     }
 
     try {
-      setIsCheckingPreapproval(true);
-      setCodeCheckError(null);
-
-      for (const trackId of selectedTracks) {
-        const mode = submissionModes[trackId] || 'self_submission';
-        try {
-          const response = await apiClient.post(
-            `/events/${eventId}/preapproval/check-code/`,
-            {
-              code: preapprovalCode.trim(),
-              track_id: trackId,
-              submission_mode: mode,
-            }
-          );
-
-          if (response.data.preapproved) {
-            setTrackPreapprovalState((prev) => ({
-              ...prev,
-              [trackId]: {
-                codePreapproved: true,
-                emailPreapproved: prev[trackId]?.emailPreapproved || false,
-                source: 'code',
-              },
-            }));
-          }
-        } catch (error) {
-          console.error(`Code check failed for track ${trackId}:`, error);
+      const mode = submissionModes[trackId] || 'self_submission';
+      const response = await apiClient.post(
+        `/events/${eventId}/preapproval/check-code/`,
+        {
+          code: code.trim(),
+          track_id: trackId,
+          submission_mode: mode,
         }
+      );
+
+      if (response.data.preapproved) {
+        setTrackPreapprovalState((prev) => ({
+          ...prev,
+          [trackId]: {
+            codePreapproved: true,
+            emailPreapproved: prev[trackId]?.emailPreapproved || false,
+            source: 'code',
+          },
+        }));
       }
-    } finally {
-      setIsCheckingPreapproval(false);
+    } catch (error) {
+      console.debug(`Code check failed for track ${trackId}:`, error);
     }
   };
 
@@ -372,7 +361,7 @@ const MultiTrackApplicationForm = ({
 
   const validateApplicantData = () => {
     if (!isApplicantDataValid()) {
-      setSubmitError('Please fill in all required applicant fields.');
+      setSubmitError('Please fill in all required fields');
       return false;
     }
     setSubmitError(null);
@@ -568,20 +557,25 @@ const MultiTrackApplicationForm = ({
       setIsSubmitting(true);
       setSubmitError(null);
 
-      // Build track_applications array with Phase 8 pre-approval info
+      // Build track_applications array with per-track pre-approval code
       const track_applications = selectedTracks.map((trackId) => {
         const perTrackData = trackData[trackId] || {};
         const { submission_mode: ignoredSubmissionMode, ...safeTrackData } = perTrackData;
-        return {
+        const submissionMode = getSubmissionModeForTrack(trackId) || ignoredSubmissionMode;
+
+        // For confirmed mode, include the per-track pre_approval_code
+        const trackPayload = {
           ...safeTrackData,
           track_id: trackId,
-          submission_mode: getSubmissionModeForTrack(trackId) || ignoredSubmissionMode,
-          pre_approved_via: trackPreapprovalState[trackId]?.source || null,
+          submission_mode: submissionMode,
         };
-      });
 
-      // Backend validates lead-gen fields from the user's profile before accepting applications.
-      await saveRegistrationProfile();
+        if (submissionMode === 'confirmed' && perTrackData.pre_approval_code) {
+          trackPayload.pre_approval_code = perTrackData.pre_approval_code;
+        }
+
+        return trackPayload;
+      });
 
       // Extract form_schema fields and include them as top-level payload for validation.
       // Keep the /apply/ payload limited to EventApplication fields; profile-only
@@ -629,15 +623,32 @@ const MultiTrackApplicationForm = ({
         ...(confirmedTrackId && {
           sponsor_organization: confirmedData.sponsor_organization || '',
         }),
-        // Phase 8: Include pre-approval code if provided
-        preapproved_code: preapprovalCode.trim() || confirmedData.pre_approval_code || undefined,
         track_applications,
       };
+
+      // Debug: Log payload to verify sponsor_organization and pre_approval_code are included
+      console.log('📋 Submitting application payload:', {
+        applicant: {
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          email: payload.email,
+        },
+        preapproved_code: payload.preapproved_code,
+        track_applications: payload.track_applications.map((ta) => ({
+          track_id: ta.track_id,
+          submission_mode: ta.submission_mode,
+          sponsor_organization: ta.sponsor_organization,
+          pre_approval_code: ta.pre_approval_code,
+          form_answers_count: Object.keys(ta.form_answers || {}).length,
+        })),
+      });
 
       const response = await apiClient.post(
         `/events/${eventId}/apply/`,
         payload
       );
+
+      console.log('✅ Application submitted successfully:', response.data);
 
       if (onSuccess) {
         onSuccess(response.data);
@@ -648,28 +659,35 @@ const MultiTrackApplicationForm = ({
       const status = error.response?.status;
       const detail = error.response?.data?.detail;
       const codeError = error.response?.data?.code_error;
+      const trackId = error.response?.data?.track_id;
       const missingFields = error.response?.data?.missing_fields;
       const responseData = error.response?.data;
 
       let errorMessage = 'Failed to submit application. Please try again.';
 
-      if (codeError) {
-        // Handle pre-approval code validation errors
-        switch (codeError) {
-          case 'invalid':
-            errorMessage = 'The pre-approval code you entered is invalid.';
-            break;
-          case 'revoked':
-            errorMessage = 'The pre-approval code has been revoked and can no longer be used.';
-            break;
-          case 'already_used':
-            errorMessage = 'This pre-approval code has already been used.';
-            break;
-          case 'wrong_track_mode':
-            errorMessage = 'The pre-approval code is not valid for this track or submission mode.';
-            break;
-          default:
-            errorMessage = detail || 'Pre-approval code validation failed.';
+      if (codeError && trackId) {
+        // Pre-approval code error for a specific track - show near the field
+        const userFriendlyError = {
+          'invalid': 'The pre-approval code you entered is invalid.',
+          'revoked': 'The pre-approval code has been revoked and can no longer be used.',
+          'used': 'This pre-approval code has already been used.',
+          'missing': 'Pre-approval code is required for this submission mode.',
+          'wrong_track_mode': 'The pre-approval code is not valid for this track or submission mode.',
+        }[codeError] || detail;
+
+        // Store error per track so it shows near the code field
+        setTrackCodeErrors((prev) => ({
+          ...prev,
+          [trackId]: userFriendlyError,
+        }));
+
+        // Also set form-level error
+        errorMessage = userFriendlyError;
+
+        // Keep user on the current track step
+        const trackIndex = selectedTracks.indexOf(trackId);
+        if (trackIndex >= 0) {
+          setActiveStep(trackIndex + 1); // +1 because step 0 is applicant info
         }
       } else if (Array.isArray(missingFields) && missingFields.length > 0) {
         // Handle missing field errors
@@ -681,16 +699,6 @@ const MultiTrackApplicationForm = ({
       } else if (detail) {
         // Use backend error message if available
         errorMessage = detail;
-      } else if (responseData && typeof responseData === 'object') {
-        const fieldErrors = Object.entries(responseData)
-          .filter(([field]) => !['status', 'code', 'code_error'].includes(field))
-          .map(([field, messages]) => {
-            const text = Array.isArray(messages) ? messages.join(', ') : String(messages);
-            return `${field}: ${text}`;
-          });
-        if (fieldErrors.length > 0) {
-          errorMessage = fieldErrors.join(' ');
-        }
       } else if (status === 409) {
         // Fallback for 409 Conflict (deprecated, using 400 now)
         errorMessage = 'You have already applied to this event. Please check your application status.';
@@ -704,11 +712,12 @@ const MultiTrackApplicationForm = ({
       }
 
       setSubmitError(errorMessage);
-      console.error('Error submitting application:', {
+      console.error('❌ Error submitting application:', {
         status,
         detail,
         missingFields,
-        error: responseData,
+        payload,
+        error: error.response?.data,
       });
     } finally {
       setIsSubmitting(false);
@@ -722,10 +731,28 @@ const MultiTrackApplicationForm = ({
     if (currentTrackId && !validateTrackStep(currentTrackId)) {
       return;
     }
+    // Clear errors when navigating away
+    setSubmitError(null);
+    if (currentTrackId) {
+      setTrackCodeErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[currentTrackId];
+        return updated;
+      });
+    }
     setActiveStep((prev) => prev + 1);
   };
 
   const moveToPreviousStep = () => {
+    // Clear errors when navigating away
+    setSubmitError(null);
+    if (currentTrackId) {
+      setTrackCodeErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[currentTrackId];
+        return updated;
+      });
+    }
     setActiveStep((prev) => prev - 1);
   };
 
@@ -879,21 +906,60 @@ const MultiTrackApplicationForm = ({
 
   const renderModeSpecificFields = (trackId) => {
     const mode = getSubmissionModeForTrack(trackId);
+    const track = tracks[trackId];
+    const trackLabel = track?.label || 'selected track';
 
     if (mode === 'confirmed') {
+      const codeError = trackCodeErrors[trackId];
+
       return (
-        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-            Sponsor / Partner Confirmation
+        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#fff3e0', borderRadius: 1, border: '1px solid #ff9800' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+            Confirmed {trackLabel} Application
           </Typography>
-          <TextField
-            fullWidth
-            required
-            label="Sponsor or Partner Organization *"
-            value={getTrackModeData(trackId, 'sponsor_organization')}
-            onChange={(event) => handleTrackDataChange(trackId, 'sponsor_organization', event.target.value)}
-            helperText="Enter the organization confirming this application."
-          />
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Pre-approval code and organization confirmation are required.
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Pre-Approval Code *"
+                value={getTrackModeData(trackId, 'pre_approval_code') || ''}
+                onChange={(event) => {
+                  handleTrackDataChange(trackId, 'pre_approval_code', event.target.value);
+                  // Clear error when user changes the field
+                  if (codeError) {
+                    setTrackCodeErrors((prev) => {
+                      const updated = { ...prev };
+                      delete updated[trackId];
+                      return updated;
+                    });
+                  }
+                }}
+                onBlur={(event) => {
+                  if (event.target.value.trim()) {
+                    checkPreapprovalCodeForTrack(trackId, event.target.value);
+                  }
+                }}
+                placeholder="Enter your pre-approval code"
+                required
+                error={!!codeError}
+                helperText={codeError || 'You need a valid pre-approval code to apply as confirmed staff.'}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Sponsor / Partner Organization *"
+                value={getTrackModeData(trackId, 'sponsor_organization') || ''}
+                onChange={(event) => handleTrackDataChange(trackId, 'sponsor_organization', event.target.value)}
+                placeholder="Name of your organization"
+                required
+                helperText="The organization you represent"
+              />
+            </Grid>
+          </Grid>
         </Box>
       );
     }
@@ -1109,60 +1175,6 @@ const MultiTrackApplicationForm = ({
                     onChange={(e) => handleApplicantChange('comments', e.target.value)}
                   />
                 </Grid>
-
-                {/* Phase 8: Pre-approval Code Input */}
-                {event?.preapproval_code_enabled && (
-                  <>
-                    <Grid item xs={12}>
-                      <Divider sx={{ my: 1 }} />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                        Pre-Approval Code (Optional)
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary" display="block" sx={{ mb: 1 }}>
-                        If you have a pre-approval code, enter it below.
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="Pre-Approval Code"
-                        value={preapprovalCode}
-                        onChange={(e) => setPreapprovalCode(e.target.value)}
-                        disabled={isCheckingPreapproval}
-                        error={!!codeCheckError}
-                        helperText={codeCheckError}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Button
-                        variant="outlined"
-                        onClick={checkPreapprovalCodeForAllTracks}
-                        disabled={!preapprovalCode.trim() || isCheckingPreapproval}
-                        startIcon={isCheckingPreapproval ? <CircularProgress size={20} /> : null}
-                      >
-                        {isCheckingPreapproval ? 'Checking...' : 'Verify Code'}
-                      </Button>
-                    </Grid>
-
-                    {/* Pre-approval Status Alerts */}
-                    {allTracksPreapproved() && (
-                      <Grid item xs={12}>
-                        <Alert severity="success">
-                          ✅ All tracks are pre-approved! You can register directly.
-                        </Alert>
-                      </Grid>
-                    )}
-                    {someTracksPreapproved() && !allTracksPreapproved() && (
-                      <Grid item xs={12}>
-                        <Alert severity="info">
-                          ℹ️ Some of your selected tracks are pre-approved.
-                        </Alert>
-                      </Grid>
-                    )}
-                  </>
-                )}
               </Grid>
             </Box>
           ) : activeStep <= selectedTracks.length ? (
@@ -1236,41 +1248,6 @@ const MultiTrackApplicationForm = ({
                     </Alert>
                   )}
 
-                  {/* Confirmed mode required fields */}
-                  {submissionModes[currentTrackId] === 'confirmed' && (
-                    <Box sx={{ mb: 3, p: 2, backgroundColor: '#fff3e0', borderRadius: 1, border: '1px solid #ff9800' }}>
-                      <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                        Sponsor Staff Application
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                        The following information is required for your sponsor staff application.
-                      </Typography>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            label="Pre-Approval Code *"
-                            value={trackData[currentTrackId]?.pre_approval_code || ''}
-                            onChange={(e) => handleTrackDataChange(currentTrackId, 'pre_approval_code', e.target.value)}
-                            placeholder="Enter your pre-approval code"
-                            required
-                            helperText="You need a valid pre-approval code to apply as a sponsor staff member."
-                          />
-                        </Grid>
-                        <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            label="Sponsor / Partner Organisation *"
-                            value={trackData[currentTrackId]?.sponsor_organization || ''}
-                            onChange={(e) => handleTrackDataChange(currentTrackId, 'sponsor_organization', e.target.value)}
-                            placeholder="Name of your organization"
-                            required
-                            helperText="The organization you represent"
-                          />
-                        </Grid>
-                      </Grid>
-                    </Box>
-                  )}
 
                   {getVisibleFieldsForTrack(currentTrackId).length > 0 ? (
                     <Grid container spacing={2}>
@@ -1358,11 +1335,17 @@ const MultiTrackApplicationForm = ({
                       {mode === 'confirmed' && (
                         <>
                           <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
-                            Pre-Approval Code: {trackData[trackId]?.pre_approval_code || '(not provided)'}
+                            Organization: {trackData[trackId]?.sponsor_organization || '(not provided)'}
                           </Typography>
-                          <Typography variant="caption" color="textSecondary" display="block">
-                            Sponsor Organization: {trackData[trackId]?.sponsor_organization || '(not provided)'}
-                          </Typography>
+                          {trackPreapprovalState[trackId]?.codePreapproved && (
+                            <Chip
+                              label="Code Verified"
+                              size="small"
+                              variant="outlined"
+                              color="success"
+                              sx={{ mt: 1 }}
+                            />
+                          )}
                         </>
                       )}
                     </Box>

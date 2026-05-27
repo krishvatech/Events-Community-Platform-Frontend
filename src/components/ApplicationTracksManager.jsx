@@ -77,6 +77,13 @@ export default function ApplicationTracksManager({ eventId, token }) {
     data: null,
   });
 
+  // Event Settings State
+  const [eventSettings, setEventSettings] = useState({
+    preapproval_code_enabled: false,
+    preapproval_allowlist_enabled: false,
+  });
+  const [savingEventSettings, setSavingEventSettings] = useState(false);
+
   // Pre-Approval Management State
   const [preapprovalCodes, setPreapprovalCodes] = useState([]);
   const [preapprovalAllowlist, setPreapprovalAllowlist] = useState([]);
@@ -104,10 +111,11 @@ export default function ApplicationTracksManager({ eventId, token }) {
     role_mappings_on_acceptance: [],
   });
 
-  // Load tracks and event roles on mount
+  // Load tracks, roles, and event settings on mount
   useEffect(() => {
     loadTracks();
     loadEventRoles();
+    loadEventSettings();
   }, [eventId]);
 
   const loadTracks = async () => {
@@ -153,6 +161,36 @@ export default function ApplicationTracksManager({ eventId, token }) {
     } catch (err) {
       console.error("Failed to load event roles:", err);
       // Roles are optional, don't fail the whole component
+    }
+  };
+
+  const loadEventSettings = async () => {
+    try {
+      const { data } = await apiClient.get(`/events/${eventId}/`);
+      setEventSettings({
+        preapproval_code_enabled: data.preapproval_code_enabled || false,
+        preapproval_allowlist_enabled: data.preapproval_allowlist_enabled || false,
+      });
+    } catch (err) {
+      console.error("Failed to load event settings:", err);
+      // Settings are optional, use defaults
+    }
+  };
+
+  const updateEventSetting = async (settingKey, value) => {
+    try {
+      setSavingEventSettings(true);
+      const payload = { [settingKey]: value };
+      await apiClient.patch(`/events/${eventId}/`, payload);
+      setEventSettings((prev) => ({
+        ...prev,
+        [settingKey]: value,
+      }));
+    } catch (err) {
+      console.error(`Failed to update event setting ${settingKey}:`, err);
+      setError(`Failed to update setting: ${err.message}`);
+    } finally {
+      setSavingEventSettings(false);
     }
   };
 
@@ -970,6 +1008,62 @@ export default function ApplicationTracksManager({ eventId, token }) {
               </AccordionSummary>
               <AccordionDetails>
                 <Stack spacing={2} sx={{ width: "100%" }}>
+                  {/* Event-Level Feature Toggles */}
+                  <Alert severity="info">
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                      Pre-Approval Feature Settings
+                    </Typography>
+                    <Stack spacing={1}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={eventSettings.preapproval_code_enabled}
+                            onChange={(e) => updateEventSetting('preapproval_code_enabled', e.target.checked)}
+                            disabled={savingEventSettings}
+                          />
+                        }
+                        label={
+                          <Typography variant="body2">
+                            Enable Pre-Approval Codes
+                            {eventSettings.preapproval_code_enabled && (
+                              <Typography variant="caption" sx={{ display: "block", color: "#666" }}>
+                                Users can apply with pre-approval codes
+                              </Typography>
+                            )}
+                            {!eventSettings.preapproval_code_enabled && (
+                              <Typography variant="caption" sx={{ display: "block", color: "#f57c00" }}>
+                                Codes will be ignored if users try to use them
+                              </Typography>
+                            )}
+                          </Typography>
+                        }
+                      />
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={eventSettings.preapproval_allowlist_enabled}
+                            onChange={(e) => updateEventSetting('preapproval_allowlist_enabled', e.target.checked)}
+                            disabled={savingEventSettings}
+                          />
+                        }
+                        label={
+                          <Typography variant="body2">
+                            Enable Email Allowlist
+                            {eventSettings.preapproval_allowlist_enabled && (
+                              <Typography variant="caption" sx={{ display: "block", color: "#666" }}>
+                                Emails in the allowlist will be auto-approved
+                              </Typography>
+                            )}
+                            {!eventSettings.preapproval_allowlist_enabled && (
+                              <Typography variant="caption" sx={{ display: "block", color: "#f57c00" }}>
+                                Allowlist will be ignored
+                              </Typography>
+                            )}
+                          </Typography>
+                        }
+                      />
+                    </Stack>
+                  </Alert>
                   {/* Submission Mode Tabs */}
                   <Box sx={{ display: "flex", gap: 1, borderBottom: "1px solid #ddd", mb: 2 }}>
                     <Button
@@ -1029,66 +1123,84 @@ export default function ApplicationTracksManager({ eventId, token }) {
                         </Select>
                       </FormControl>
 
-                      {/* Existing Codes List */}
+                      {/* Existing Codes List - Table Format */}
                       {loadingPreapproval ? (
                         <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
                           <CircularProgress size={24} />
                         </Box>
                       ) : preapprovalCodes.length > 0 ? (
-                        <Box sx={{ maxHeight: 300, overflowY: "auto", border: "1px solid #ddd", borderRadius: 1, p: 1 }}>
-                          {preapprovalCodes
-                            .filter(
-                              (code) =>
-                                (code.track_id === editingTrack.id || code.track_id === null) &&
-                                (code.submission_mode === selectedCodeMode || code.submission_mode === "")
-                            )
-                            .map((code) => (
-                              <Box
-                                key={code.id}
-                                sx={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  p: 1.5,
-                                  borderBottom: "1px solid #eee",
-                                  "&:last-child": { borderBottom: "none" },
-                                }}
-                              >
-                                <Box sx={{ flex: 1 }}>
-                                  <Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 600 }}>
-                                    {code.code}
-                                  </Typography>
-                                  <Typography variant="caption" color="textSecondary">
-                                    {code.status === "active" && "Active"}
-                                    {code.status === "used" && `Used by ${code.used_by_email || "unknown"}`}
-                                    {code.status === "revoked" && "Revoked"}
-                                  </Typography>
-                                </Box>
-                                <Chip
-                                  label={code.status}
-                                  size="small"
-                                  color={
-                                    code.status === "active"
-                                      ? "success"
-                                      : code.status === "used"
-                                      ? "default"
-                                      : "error"
-                                  }
-                                  sx={{ mr: 1 }}
-                                />
-                                {code.status === "active" && (
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleRevokeCode(code.id)}
-                                    color="error"
-                                    disabled={loadingPreapproval}
-                                  >
-                                    <DeleteIcon fontSize="small" />
-                                  </IconButton>
-                                )}
-                              </Box>
-                            ))}
-                        </Box>
+                        <TableContainer sx={{ border: "1px solid #ddd", borderRadius: 1 }}>
+                          <Table size="small">
+                            <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 600 }}>Code</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Track</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Mode</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Used By</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Used At</TableCell>
+                                <TableCell sx={{ fontWeight: 600, textAlign: "center" }}>Action</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {preapprovalCodes
+                                .filter(
+                                  (code) =>
+                                    (code.track_id === editingTrack.id || code.track_id === null) &&
+                                    (code.submission_mode === selectedCodeMode || code.submission_mode === "")
+                                )
+                                .map((code) => (
+                                  <TableRow key={code.id} hover>
+                                    <TableCell sx={{ fontFamily: "monospace", fontWeight: 600 }}>
+                                      {code.code}
+                                    </TableCell>
+                                    <TableCell>
+                                      {code.track_id ? tracks?.find(t => t.id === code.track_id)?.label : "Event-wide"}
+                                    </TableCell>
+                                    <TableCell>
+                                      {code.submission_mode === "confirmed" ? "Confirmed" :
+                                       code.submission_mode === "self_submission" ? "Self Submission" :
+                                       code.submission_mode === "self_nomination" ? "Self Nomination" :
+                                       code.submission_mode === "third_party_nomination" ? "Third Party" :
+                                       code.submission_mode || "All Modes"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Chip
+                                        label={code.status}
+                                        size="small"
+                                        color={
+                                          code.status === "active"
+                                            ? "success"
+                                            : code.status === "used"
+                                            ? "default"
+                                            : "error"
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      {code.used_by_email || "—"}
+                                    </TableCell>
+                                    <TableCell>
+                                      {code.used_at ? new Date(code.used_at).toLocaleDateString() : "—"}
+                                    </TableCell>
+                                    <TableCell sx={{ textAlign: "center" }}>
+                                      {code.status === "active" && (
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => handleRevokeCode(code.id)}
+                                          color="error"
+                                          disabled={loadingPreapproval}
+                                          title="Revoke code"
+                                        >
+                                          <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
                       ) : (
                         <Typography variant="caption" color="textSecondary">
                           No codes for this mode yet
