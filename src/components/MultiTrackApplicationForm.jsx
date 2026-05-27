@@ -494,13 +494,15 @@ const MultiTrackApplicationForm = ({
     if (mode === 'confirmed') {
       const preApprovalCode = (trackData[trackId]?.pre_approval_code || '').trim();
       const sponsorOrg = (trackData[trackId]?.sponsor_organization || '').trim();
+      const isEmailPreapproved = trackPreapprovalState[trackId]?.emailPreapproved || false;
 
-      if (!preApprovalCode) {
-        setSubmitError('Pre-Approval Code is required for sponsor staff applications');
+      // Pre-approval code is required only if email is not allowlisted
+      if (!isEmailPreapproved && !preApprovalCode) {
+        setSubmitError(`Pre-Approval Code is required for Confirmed ${trackLabel} Application or your email must be pre-approved`);
         return false;
       }
       if (!sponsorOrg) {
-        setSubmitError('Sponsor / Partner Organisation is required for sponsor staff applications');
+        setSubmitError(`Sponsor / Partner Organisation is required for Confirmed ${trackLabel} Application`);
         return false;
       }
     }
@@ -911,6 +913,7 @@ const MultiTrackApplicationForm = ({
 
     if (mode === 'confirmed') {
       const codeError = trackCodeErrors[trackId];
+      const isEmailPreapproved = trackPreapprovalState[trackId]?.emailPreapproved || false;
 
       return (
         <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#fff3e0', borderRadius: 1, border: '1px solid #ff9800' }}>
@@ -918,13 +921,17 @@ const MultiTrackApplicationForm = ({
             Confirmed {trackLabel} Application
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Pre-approval code and organization confirmation are required.
+            {isEmailPreapproved ? (
+              <>Your email is pre-approved for this track. </>
+            ) : (
+              <>Pre-approval code and organization confirmation are required. </>
+            )}
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Pre-Approval Code *"
+                label={`Pre-Approval Code${!isEmailPreapproved ? ' *' : ''}`}
                 value={getTrackModeData(trackId, 'pre_approval_code') || ''}
                 onChange={(event) => {
                   handleTrackDataChange(trackId, 'pre_approval_code', event.target.value);
@@ -942,16 +949,16 @@ const MultiTrackApplicationForm = ({
                     checkPreapprovalCodeForTrack(trackId, event.target.value);
                   }
                 }}
-                placeholder="Enter your pre-approval code"
-                required
+                placeholder={isEmailPreapproved ? 'Optional - your email is pre-approved' : 'Enter your pre-approval code'}
+                required={!isEmailPreapproved}
                 error={!!codeError}
-                helperText={codeError || 'You need a valid pre-approval code to apply as confirmed staff.'}
+                helperText={codeError || (isEmailPreapproved ? 'Your email is pre-approved. Code is optional.' : 'Required for Confirmed staff application')}
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Sponsor / Partner Organization *"
+                label="Organization *"
                 value={getTrackModeData(trackId, 'sponsor_organization') || ''}
                 onChange={(event) => handleTrackDataChange(trackId, 'sponsor_organization', event.target.value)}
                 placeholder="Name of your organization"
