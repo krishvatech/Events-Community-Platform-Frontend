@@ -104,6 +104,66 @@ function normalizeMissingLeadGenFields(errorData) {
   return {};
 }
 
+function firstNonEmpty(...values) {
+  return values.find((value) => typeof value === "string" && value.trim())?.trim() || "";
+}
+
+function getProfilePayload(data = {}) {
+  return data.profile || data.user?.profile || data;
+}
+
+function getProfilePhone(data = {}) {
+  const profile = getProfilePayload(data);
+  const links = profile.links || data.links || {};
+  const phones = [
+    ...(Array.isArray(links?.contact?.phones) ? links.contact.phones : []),
+    ...(Array.isArray(profile.phones) ? profile.phones : []),
+    ...(Array.isArray(data.phones) ? data.phones : []),
+  ];
+  const primaryPhone = phones.find((phone) => phone?.primary && String(phone?.number || phone?.phone || "").trim()) || phones.find(
+    (phone) => String(phone?.number || phone?.phone || "").trim()
+  );
+
+  return firstNonEmpty(
+    primaryPhone?.number,
+    primaryPhone?.phone,
+    links.phone,
+    links.contact?.phone,
+    profile.phone,
+    profile.contact_number,
+    data.phone,
+    data.contact_number
+  );
+}
+
+function getMissingProfileFieldsForApplication(profileResponse = {}) {
+  const profile = getProfilePayload(profileResponse);
+  const missing = {};
+
+  if (!firstNonEmpty(profileResponse.first_name, profile.first_name)) missing.first_name = "First Name";
+  if (!firstNonEmpty(profileResponse.last_name, profile.last_name)) missing.last_name = "Last Name";
+  if (!firstNonEmpty(profileResponse.email, profile.email)) missing.email = "Email";
+  if (!firstNonEmpty(profile.job_title, profileResponse.job_title)) missing.job_title = "Job Title";
+  if (!firstNonEmpty(profile.company, profile.company_name, profileResponse.company, profileResponse.company_name)) missing.company = "Company";
+  if (!firstNonEmpty(profile.location, profile.country, profileResponse.location, profileResponse.country)) missing.location = "Country/Region";
+  if (!getProfilePhone(profileResponse)) missing.phone = "Contact Number";
+
+  return missing;
+}
+
+async function fetchMissingProfileFieldsForApplication(token) {
+  const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!profileRes.ok) {
+    throw new Error("Unable to fetch your profile. Please try again.");
+  }
+
+  const profile = await profileRes.json();
+  return getMissingProfileFieldsForApplication(profile);
+}
+
 function priceStr(p) {
   if (p === 0) return "Free";
   try {
@@ -585,6 +645,26 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const [myApplication, setMyApplication] = React.useState(null);
   const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
   const applicationStatus = getApplicationStatus(myApplication);
+
+  const openApplyModalAfterProfileCheck = async () => {
+    if (!token) {
+      setGuestApplyModalOpen(true);
+      return;
+    }
+
+    try {
+      const missingFields = await fetchMissingProfileFieldsForApplication(token);
+      if (Object.keys(missingFields).length > 0) {
+        if (onLeadGenNeeded) {
+          onLeadGenNeeded(missingFields);
+        }
+        return;
+      }
+      setApplyModalOpen(true);
+    } catch (err) {
+      toast.error(err.message || "Unable to check your profile. Please try again.");
+    }
+  };
 
   // Timezone logic
   const organizerTimezone = normalizeTimezoneName(ev.timezone);
@@ -1247,13 +1327,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           variant="contained"
                           size="medium"
                           color="primary"
-                          onClick={() => {
-                            if (token) {
-                              setApplyModalOpen(true);
-                            } else {
-                              setGuestApplyModalOpen(true);
-                            }
-                          }}
+                          onClick={openApplyModalAfterProfileCheck}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
                           {applicationStatus === 'declined' ? 'Apply Again' : 'Apply Now'}
@@ -1504,6 +1578,26 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const [myApplication, setMyApplication] = React.useState(null);
   const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
   const applicationStatus = getApplicationStatus(myApplication);
+
+  const openApplyModalAfterProfileCheck = async () => {
+    if (!token) {
+      setGuestApplyModalOpen(true);
+      return;
+    }
+
+    try {
+      const missingFields = await fetchMissingProfileFieldsForApplication(token);
+      if (Object.keys(missingFields).length > 0) {
+        if (onLeadGenNeeded) {
+          onLeadGenNeeded(missingFields);
+        }
+        return;
+      }
+      setApplyModalOpen(true);
+    } catch (err) {
+      toast.error(err.message || "Unable to check your profile. Please try again.");
+    }
+  };
 
   // Fetch application status for apply-type events
   React.useEffect(() => {
@@ -1900,13 +1994,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           variant="contained"
                           size="medium"
                           color="primary"
-                          onClick={() => {
-                            if (token) {
-                              setApplyModalOpen(true);
-                            } else {
-                              setGuestApplyModalOpen(true);
-                            }
-                          }}
+                          onClick={openApplyModalAfterProfileCheck}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
                           {applicationStatus === 'declined' ? 'Apply Again' : 'Apply Now'}

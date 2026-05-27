@@ -77,6 +77,53 @@ function getEventLocation(event) {
   return event?.location || "";
 }
 
+function firstNonEmpty(...values) {
+  return values.find((value) => typeof value === "string" && value.trim())?.trim() || "";
+}
+
+function getProfilePayload(data = {}) {
+  return data.profile || data.user?.profile || data;
+}
+
+function getProfilePhone(data = {}) {
+  const profile = getProfilePayload(data);
+  const links = profile.links || data.links || {};
+  const phones = [
+    ...(Array.isArray(links?.contact?.phones) ? links.contact.phones : []),
+    ...(Array.isArray(profile.phones) ? profile.phones : []),
+    ...(Array.isArray(data.phones) ? data.phones : []),
+  ];
+  const primaryPhone = phones.find((phone) => phone?.primary && String(phone?.number || phone?.phone || "").trim()) || phones.find(
+    (phone) => String(phone?.number || phone?.phone || "").trim()
+  );
+
+  return firstNonEmpty(
+    primaryPhone?.number,
+    primaryPhone?.phone,
+    links.phone,
+    links.contact?.phone,
+    profile.phone,
+    profile.contact_number,
+    data.phone,
+    data.contact_number
+  );
+}
+
+function getMissingProfileFieldsForApplication(profileResponse = {}) {
+  const profile = getProfilePayload(profileResponse);
+  const missing = {};
+
+  if (!firstNonEmpty(profileResponse.first_name, profile.first_name)) missing.first_name = "First Name";
+  if (!firstNonEmpty(profileResponse.last_name, profile.last_name)) missing.last_name = "Last Name";
+  if (!firstNonEmpty(profileResponse.email, profile.email)) missing.email = "Email";
+  if (!firstNonEmpty(profile.job_title, profileResponse.job_title)) missing.job_title = "Job Title";
+  if (!firstNonEmpty(profile.company, profile.company_name, profileResponse.company, profileResponse.company_name)) missing.company = "Company";
+  if (!firstNonEmpty(profile.location, profile.country, profileResponse.location, profileResponse.country)) missing.location = "Country/Region";
+  if (!getProfilePhone(profileResponse)) missing.phone = "Contact Number";
+
+  return missing;
+}
+
 function bumpCartCount(qty = 1) {
   const prev = Number(localStorage.getItem("cart_count") || "0");
   const next = prev + qty;
@@ -952,6 +999,36 @@ export default function EventDetailsPage() {
       }
     } catch (err) {
       toast.error("Error submitting application: " + err.message);
+    }
+  };
+
+  const openApplyModalAfterProfileCheck = async () => {
+    if (!token) {
+      setGuestApplyModalOpen(true);
+      return;
+    }
+
+    try {
+      const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!profileRes.ok) {
+        toast.error("Unable to fetch your profile. Please try again.");
+        return;
+      }
+
+      const profile = await profileRes.json();
+      const missingFields = getMissingProfileFieldsForApplication(profile);
+      if (Object.keys(missingFields).length > 0) {
+        setMissingLeadGenFields(missingFields);
+        setLeadGenModalOpen(true);
+        return;
+      }
+
+      setApplyModalOpen(true);
+    } catch (err) {
+      toast.error(err.message || "Unable to check your profile. Please try again.");
     }
   };
 
@@ -1979,14 +2056,7 @@ export default function EventDetailsPage() {
                               ? (
                                 <>
                                   <Button
-                                    onClick={() => {
-                                      if (token) {
-                                        setApplyModalOpen(true);
-                                      } else {
-                                        // For guests, open guest apply modal
-                                        setGuestApplyModalOpen(true);
-                                      }
-                                    }}
+                                    onClick={openApplyModalAfterProfileCheck}
                                     variant="contained"
                                     sx={{
                                       textTransform: "none",
@@ -2098,13 +2168,7 @@ export default function EventDetailsPage() {
                                       ? (
                                         <>
                                           <Button
-                                            onClick={() => {
-                                              if (token) {
-                                                setApplyModalOpen(true);
-                                              } else {
-                                                setGuestApplyModalOpen(true);
-                                              }
-                                            }}
+                                            onClick={openApplyModalAfterProfileCheck}
                                             variant="contained"
                                             sx={{
                                               textTransform: "none",
