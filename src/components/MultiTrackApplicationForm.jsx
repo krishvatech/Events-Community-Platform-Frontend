@@ -365,7 +365,7 @@ const MultiTrackApplicationForm = ({
 
   const validateApplicantData = () => {
     if (!isApplicantDataValid()) {
-      setSubmitError('Please fill in all required fields');
+      setSubmitError('Please fill in all required applicant fields.');
       return false;
     }
     setSubmitError(null);
@@ -373,8 +373,14 @@ const MultiTrackApplicationForm = ({
   };
 
   const isApplicantDataValid = () => {
-    const { first_name, last_name, email } = applicantData;
-    return Boolean(first_name?.trim() && last_name?.trim() && email?.trim());
+    const { first_name, last_name, email, job_title, company_name } = applicantData;
+    return Boolean(
+      first_name?.trim() &&
+      last_name?.trim() &&
+      email?.trim() &&
+      job_title?.trim() &&
+      company_name?.trim()
+    );
   };
 
   const extractFieldsFromFormSchema = (track, submissionMode) => {
@@ -590,33 +596,14 @@ const MultiTrackApplicationForm = ({
           sponsor_organization: confirmedData.sponsor_organization || '',
         }),
         // Phase 8: Include pre-approval code if provided
-        preapproved_code: preapprovalCode.trim() || undefined,
+        preapproved_code: preapprovalCode.trim() || confirmedData.pre_approval_code || undefined,
         track_applications,
       };
-
-      // Debug: Log payload to verify sponsor_organization and pre_approval_code are included
-      console.log('📋 Submitting application payload:', {
-        applicant: {
-          first_name: payload.first_name,
-          last_name: payload.last_name,
-          email: payload.email,
-        },
-        preapproved_code: payload.preapproved_code,
-        track_applications: payload.track_applications.map((ta) => ({
-          track_id: ta.track_id,
-          submission_mode: ta.submission_mode,
-          sponsor_organization: ta.sponsor_organization,
-          pre_approval_code: ta.pre_approval_code,
-          form_answers_count: Object.keys(ta.form_answers || {}).length,
-        })),
-      });
 
       const response = await apiClient.post(
         `/events/${eventId}/apply/`,
         payload
       );
-
-      console.log('✅ Application submitted successfully:', response.data);
 
       if (onSuccess) {
         onSuccess(response.data);
@@ -628,6 +615,7 @@ const MultiTrackApplicationForm = ({
       const detail = error.response?.data?.detail;
       const codeError = error.response?.data?.code_error;
       const missingFields = error.response?.data?.missing_fields;
+      const responseData = error.response?.data;
 
       let errorMessage = 'Failed to submit application. Please try again.';
 
@@ -656,6 +644,16 @@ const MultiTrackApplicationForm = ({
       } else if (detail) {
         // Use backend error message if available
         errorMessage = detail;
+      } else if (responseData && typeof responseData === 'object') {
+        const fieldErrors = Object.entries(responseData)
+          .filter(([field]) => !['status', 'code', 'code_error'].includes(field))
+          .map(([field, messages]) => {
+            const text = Array.isArray(messages) ? messages.join(', ') : String(messages);
+            return `${field}: ${text}`;
+          });
+        if (fieldErrors.length > 0) {
+          errorMessage = fieldErrors.join(' ');
+        }
       } else if (status === 409) {
         // Fallback for 409 Conflict (deprecated, using 400 now)
         errorMessage = 'You have already applied to this event. Please check your application status.';
@@ -669,12 +667,11 @@ const MultiTrackApplicationForm = ({
       }
 
       setSubmitError(errorMessage);
-      console.error('❌ Error submitting application:', {
+      console.error('Error submitting application:', {
         status,
         detail,
         missingFields,
-        payload,
-        error: error.response?.data,
+        error: responseData,
       });
     } finally {
       setIsSubmitting(false);
@@ -1022,17 +1019,19 @@ const MultiTrackApplicationForm = ({
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="Job Title"
+                    label="Job Title *"
                     value={applicantData.job_title}
                     onChange={(e) => handleApplicantChange('job_title', e.target.value)}
+                    required
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="Company"
+                    label="Company *"
                     value={applicantData.company_name}
                     onChange={(e) => handleApplicantChange('company_name', e.target.value)}
+                    required
                   />
                 </Grid>
                 <Grid item xs={12}>
