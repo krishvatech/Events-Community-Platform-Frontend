@@ -61,6 +61,8 @@ const MultiTrackApplicationForm = ({
     email: '',
     job_title: '',
     company_name: '',
+    location: '',
+    phone: '',
     linkedin_url: '',
     comments: '',
   });
@@ -87,6 +89,9 @@ const MultiTrackApplicationForm = ({
   const loadUserProfile = async () => {
     try {
       const { data } = await apiClient.get('/auth/me/profile/');
+      const primaryPhone = data.links?.contact?.phones?.find(
+        (phone) => phone?.number && String(phone.number).trim()
+      )?.number;
       setApplicantData((prev) => ({
         ...prev,
         first_name: data.first_name || prev.first_name,
@@ -94,6 +99,8 @@ const MultiTrackApplicationForm = ({
         email: data.email || prev.email,
         job_title: data.job_title || prev.job_title,
         company_name: data.company_name || data.company || prev.company_name,
+        location: data.location || prev.location,
+        phone: primaryPhone || prev.phone,
         linkedin_url: data.linkedin_url || prev.linkedin_url,
       }));
     } catch {
@@ -373,14 +380,28 @@ const MultiTrackApplicationForm = ({
   };
 
   const isApplicantDataValid = () => {
-    const { first_name, last_name, email, job_title, company_name } = applicantData;
+    const { first_name, last_name, email, job_title, company_name, location, phone } = applicantData;
     return Boolean(
       first_name?.trim() &&
       last_name?.trim() &&
       email?.trim() &&
       job_title?.trim() &&
-      company_name?.trim()
+      company_name?.trim() &&
+      location?.trim() &&
+      phone?.trim()
     );
+  };
+
+  const saveRegistrationProfile = async () => {
+    await apiClient.post('/events/save-lead-gen-fields/', {
+      first_name: applicantData.first_name.trim(),
+      last_name: applicantData.last_name.trim(),
+      email: applicantData.email.trim(),
+      job_title: applicantData.job_title.trim(),
+      company: applicantData.company_name.trim(),
+      location: applicantData.location.trim(),
+      phone: applicantData.phone.trim(),
+    });
   };
 
   const extractFieldsFromFormSchema = (track, submissionMode) => {
@@ -559,8 +580,21 @@ const MultiTrackApplicationForm = ({
         };
       });
 
-      // Extract form_schema fields and include them as top-level payload for validation
-      const payloadFields = { ...applicantData };
+      // Backend validates lead-gen fields from the user's profile before accepting applications.
+      await saveRegistrationProfile();
+
+      // Extract form_schema fields and include them as top-level payload for validation.
+      // Keep the /apply/ payload limited to EventApplication fields; profile-only
+      // fields such as location and phone are saved through save-lead-gen-fields.
+      const payloadFields = {
+        first_name: applicantData.first_name,
+        last_name: applicantData.last_name,
+        email: applicantData.email,
+        job_title: applicantData.job_title,
+        company_name: applicantData.company_name,
+        linkedin_url: applicantData.linkedin_url,
+        comments: applicantData.comments,
+      };
       selectedTracks.forEach((trackId) => {
         const mode = getSubmissionModeForTrack(trackId);
         const track = tracks[trackId];
@@ -637,10 +671,13 @@ const MultiTrackApplicationForm = ({
           default:
             errorMessage = detail || 'Pre-approval code validation failed.';
         }
-      } else if (missingFields && missingFields.length > 0) {
+      } else if (Array.isArray(missingFields) && missingFields.length > 0) {
         // Handle missing field errors
         const fieldList = missingFields.join(', ');
         errorMessage = `Missing required fields: ${fieldList}`;
+      } else if (missingFields && typeof missingFields === 'object' && Object.keys(missingFields).length > 0) {
+        const fieldList = Object.values(missingFields).join(', ');
+        errorMessage = `Please complete your registration profile: ${fieldList}`;
       } else if (detail) {
         // Use backend error message if available
         errorMessage = detail;
@@ -1034,6 +1071,25 @@ const MultiTrackApplicationForm = ({
                     required
                   />
                 </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Country/Region *"
+                    value={applicantData.location}
+                    onChange={(e) => handleApplicantChange('location', e.target.value)}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Contact Number *"
+                    type="tel"
+                    value={applicantData.phone}
+                    onChange={(e) => handleApplicantChange('phone', e.target.value)}
+                    required
+                  />
+                </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
@@ -1251,6 +1307,12 @@ const MultiTrackApplicationForm = ({
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
                   {applicantData.email}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {[applicantData.job_title, applicantData.company_name].filter(Boolean).join(' at ')}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {[applicantData.location, applicantData.phone].filter(Boolean).join(' · ')}
                 </Typography>
               </Box>
 
