@@ -580,11 +580,11 @@ export default function DashboardPage() {
       setUser(userData);
       // Build events array: hero first, then upcoming events
       const allEvents = [];
-      if (landingData.hero_event) {
-        allEvents.push(landingData.hero_event);
+      if (eventsData.hero_event) {
+        allEvents.push(eventsData.hero_event);
       }
-      if (landingData.upcoming_events && Array.isArray(landingData.upcoming_events)) {
-        allEvents.push(...landingData.upcoming_events);
+      if (eventsData.upcoming_events && Array.isArray(eventsData.upcoming_events)) {
+        allEvents.push(...eventsData.upcoming_events);
       }
       setEvents(allEvents.slice(0, 10)); // Store up to 10 for flexibility
       // setDiscussions(postsData.length ? postsData.slice(0, 3) : STATIC_DISCUSSIONS); // COMMENTED OUT
