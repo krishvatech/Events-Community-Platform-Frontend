@@ -181,6 +181,10 @@ function getPaymentStatus(event) {
   return pendingOrigin;
 }
 
+function getApplicationStatus(application) {
+  return application?.application_status || application?.status || "none";
+}
+
 function hasOpenApplicationTracks(event) {
   // Check if event is application-required
   if (event?.registration_type !== 'apply') {
@@ -501,6 +505,7 @@ export default function EventDetailsPage() {
   // Apply Modal
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [myApplication, setMyApplication] = useState(null);
+  const applicationStatus = getApplicationStatus(myApplication);
 
   // Pre-Event Q&A Modal
   const [preEventQnaModalOpen, setPreEventQnaModalOpen] = useState(false);
@@ -810,7 +815,7 @@ export default function EventDetailsPage() {
 
   // When application is accepted, generate guest JWT if not already in localStorage
   useEffect(() => {
-    if (myApplication?.application_status !== 'accepted' || !event?.id) return;
+    if (applicationStatus !== 'accepted' || !event?.id) return;
 
     const guestToken = localStorage.getItem("guest_token");
     // Only generate if no guest token exists
@@ -848,11 +853,11 @@ export default function EventDetailsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [myApplication?.application_status, myApplication?.email, event?.id]);
+  }, [applicationStatus, myApplication?.email, event?.id]);
 
   // When application is accepted, refresh registration status (for authenticated users)
   useEffect(() => {
-    if (myApplication?.application_status !== 'accepted' || !event?.id || !token) return;
+    if (applicationStatus !== 'accepted' || !event?.id || !token) return;
 
     let cancelled = false;
     (async () => {
@@ -870,7 +875,7 @@ export default function EventDetailsPage() {
       } catch { }
     })();
     return () => { cancelled = true; };
-  }, [myApplication?.application_status, event?.id, token]);
+  }, [applicationStatus, event?.id, token]);
 
   // For authenticated users, submit application directly without dialog
   const handleApplyDirect = async () => {
@@ -1970,7 +1975,7 @@ export default function EventDetailsPage() {
                                   <PaymentPendingDetails registration={registration} event={event} />
                                 </Stack>
                               )
-                              : (!myApplication || myApplication.application_status === 'none' || myApplication.application_status === 'cancelled' || myApplication.application_status === 'declined') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
+                              : (!myApplication || applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
                               ? (
                                 <>
                                   <Button
@@ -1990,16 +1995,16 @@ export default function EventDetailsPage() {
                                     }}
                                     className="rounded-xl"
                                   >
-                                    {myApplication?.application_status === 'declined' ? (token ? 'Apply Again' : 'Apply Again as Guest') : (token ? 'Apply Now' : 'Apply as Guest')}
+                                    {applicationStatus === 'declined' ? (token ? 'Apply Again' : 'Apply Again as Guest') : (token ? 'Apply Now' : 'Apply as Guest')}
                                   </Button>
-                                  {myApplication?.application_status === 'declined' && (
+                                  {applicationStatus === 'declined' && (
                                     <Typography variant="caption" sx={{ color: "#666" }}>
                                       Your previous application was declined. You can apply again.
                                     </Typography>
                                   )}
                                 </>
                               )
-                              : myApplication?.application_status === 'accepted'
+                              : applicationStatus === 'accepted'
                                 ? (() => {
                                   // After approval, check if user can join with guest token or is registered
                                   const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
@@ -2071,7 +2076,7 @@ export default function EventDetailsPage() {
                                     );
                                   }
                                 })()
-                                : myApplication?.application_status === 'pending'
+                                : applicationStatus === 'pending'
                                   ? (
                                     <Chip
                                       label="Application Pending"
@@ -2080,7 +2085,7 @@ export default function EventDetailsPage() {
                                       sx={{ py: 2.5 }}
                                     />
                                   )
-                                  : myApplication?.application_status === 'declined'
+                                  : applicationStatus === 'declined'
                                     ? (
                                       <Chip
                                         label="Application Declined"
@@ -2089,7 +2094,7 @@ export default function EventDetailsPage() {
                                         sx={{ py: 2.5 }}
                                       />
                                     )
-                                    : myApplication?.application_status === 'cancelled'
+                                    : applicationStatus === 'cancelled'
                                       ? (
                                         <>
                                           <Button

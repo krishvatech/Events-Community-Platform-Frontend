@@ -364,6 +364,10 @@ function PaymentPendingSummary({ reg, align = "left" }) {
   );
 }
 
+function getApplicationStatus(application) {
+  return application?.application_status || application?.status || "none";
+}
+
 function toCard(ev, isPinnedTopCopy = false) {
   const totalRegisteredCount = getTotalRegisteredCount(ev);
 
@@ -394,7 +398,8 @@ function toCard(ev, isPinnedTopCopy = false) {
     status: ev.status,
     is_live: ev.is_live,
     event_format: ev.event_format || ev.format, // virtual, hybrid, in_person
-    registration_type: ev.registration_type || 'open', // ✅ NEW: 'open' or 'apply'
+    application_tracks: Array.isArray(ev.application_tracks) ? ev.application_tracks : [],
+    registration_type: ev.registration_type || (Array.isArray(ev.application_tracks) && ev.application_tracks.length > 0 ? 'apply' : 'open'),
     preapproval_code_enabled: !!ev.preapproval_code_enabled,
     preapproval_allowlist_enabled: !!ev.preapproval_allowlist_enabled,
     attendee_marker_enabled: !!ev.attendee_marker_enabled,
@@ -579,6 +584,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
   const [myApplication, setMyApplication] = React.useState(null);
   const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
+  const applicationStatus = getApplicationStatus(myApplication);
 
   // Timezone logic
   const organizerTimezone = normalizeTimezoneName(ev.timezone);
@@ -1234,7 +1240,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               {ev.registration_type === 'apply' ? (
                 // APPLY FLOW
                 (<>
-                  {!myApplication || myApplication.application_status === 'none' || myApplication.application_status === 'cancelled' || myApplication.application_status === 'declined'
+                  {applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined'
                     ? (
                       <div className="flex flex-col items-start gap-1">
                         <Button
@@ -1250,17 +1256,17 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           }}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
-                          {myApplication?.application_status === 'declined' ? 'Apply Again' : 'Apply Now'}
+                          {applicationStatus === 'declined' ? 'Apply Again' : 'Apply Now'}
                         </Button>
-                        {myApplication?.application_status === 'cancelled' && (
+                        {applicationStatus === 'cancelled' && (
                           <span className="text-sm text-gray-600">You previously cancelled this application</span>
                         )}
-                        {myApplication?.application_status === 'declined' && (
+                        {applicationStatus === 'declined' && (
                           <span className="text-sm text-red-600">Your previous application was declined. You can apply again.</span>
                         )}
                       </div>
                     )
-                    : myApplication.application_status === 'accepted'
+                    : applicationStatus === 'accepted'
                     ? (() => {
                       // After approval, check if user can join with guest token or is registered
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
@@ -1323,7 +1329,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         );
                       }
                     })()
-                    : myApplication.application_status === 'pending'
+                    : applicationStatus === 'pending'
                     ? (
                       <Chip
                         label="Application Pending"
@@ -1331,7 +1337,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         variant="outlined"
                       />
                     )
-                    : myApplication.application_status === 'declined'
+                    : applicationStatus === 'declined'
                     ? (
                       <Chip
                         label="Application Declined"
@@ -1341,7 +1347,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     )
                     : null
                   }
-                  {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.application_status !== 'accepted') && isWithinGuestJoinWindow(ev.start) && (
+                  {!isAuthenticatedUser && isFreeEvent && applicationStatus !== 'accepted' && isWithinGuestJoinWindow(ev.start) && (
                     <Button
                       variant="outlined"
                       size="medium"
@@ -1497,6 +1503,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
   const [myApplication, setMyApplication] = React.useState(null);
   const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
+  const applicationStatus = getApplicationStatus(myApplication);
 
   // Fetch application status for apply-type events
   React.useEffect(() => {
@@ -1887,7 +1894,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                   </div>
                  : ev.registration_type === 'apply' ? (
                   <div className="flex items-center gap-2 flex-wrap">
-                    {!myApplication || myApplication.application_status === 'none' || myApplication.application_status === 'cancelled' || myApplication.application_status === 'declined' ? (
+                    {applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined' ? (
                       <div className="flex flex-col items-start gap-1">
                         <Button
                           variant="contained"
@@ -1902,16 +1909,16 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           }}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
-                          {myApplication?.application_status === 'declined' ? 'Apply Again' : 'Apply Now'}
+                          {applicationStatus === 'declined' ? 'Apply Again' : 'Apply Now'}
                         </Button>
-                        {myApplication?.application_status === 'cancelled' && (
+                        {applicationStatus === 'cancelled' && (
                           <span className="text-xs text-gray-600">You previously cancelled this application</span>
                         )}
-                        {myApplication?.application_status === 'declined' && (
+                        {applicationStatus === 'declined' && (
                           <span className="text-xs text-red-600">Your previous application was declined. You can apply again.</span>
                         )}
                       </div>
-                    ) : myApplication.application_status === 'accepted' ? (() => {
+                    ) : applicationStatus === 'accepted' ? (() => {
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
                       if (guestToken) {
                         if (isLive) {
@@ -1945,12 +1952,12 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                       } else {
                         return <Chip label="Accepted" color="success" variant="outlined" />;
                       }
-                    })() : myApplication.application_status === 'pending' ? (
+                    })() : applicationStatus === 'pending' ? (
                       <Chip label="Application Pending" color="warning" variant="outlined" />
-                    ) : myApplication.application_status === 'declined' ? (
+                    ) : applicationStatus === 'declined' ? (
                       <Chip label="Application Declined" color="error" variant="outlined" />
                     ) : null}
-                    {!isAuthenticatedUser && isFreeEvent && (!myApplication || myApplication.application_status !== 'accepted') && (
+                    {!isAuthenticatedUser && isFreeEvent && applicationStatus !== 'accepted' && (
                       <Button
                         variant="outlined"
                         size="medium"
