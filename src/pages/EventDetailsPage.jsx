@@ -568,6 +568,9 @@ export default function EventDetailsPage() {
   const [previewParticipants, setPreviewParticipants] = useState([]);
   const [previewParticipantsForbidden, setPreviewParticipantsForbidden] = useState(false);
 
+  // Post-Acceptance Forms
+  const [postAcceptanceForms, setPostAcceptanceForms] = useState([]);
+
   // Q&A Expand/Collapse
   const [expandedQaItems, setExpandedQaItems] = useState({});
 
@@ -809,6 +812,26 @@ export default function EventDetailsPage() {
           const results = Array.isArray(data) ? data : (data.results || []);
           const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
           setRegistration(mineForEvent || null);
+        }
+      } catch { }
+    })();
+    return () => { cancelled = true; };
+  }, [event?.id, token]);
+
+  // Fetch post-acceptance forms
+  useEffect(() => {
+    if (!event?.id || !token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/post-acceptance-form-assignments/?event=${event.id}&status=not_started,in_progress`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          const results = Array.isArray(data) ? data : (data.results || []);
+          setPostAcceptanceForms(results);
         }
       } catch { }
     })();
@@ -2354,6 +2377,63 @@ export default function EventDetailsPage() {
                               }}
                               onCancelRequested={(_, updated) => setRegistration(updated)}
                             />
+                          </Box>
+                        )}
+
+                        {/* Required Forms Section */}
+                        {postAcceptanceForms.length > 0 && (confirmedRegistered || applicationStatus === 'accepted') && (
+                          <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e5e7eb' }}>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2, color: '#1f2937' }}>
+                              📋 Required Forms
+                            </Typography>
+                            <Stack spacing={1.5}>
+                              {postAcceptanceForms.map((form) => {
+                                const formTitle = form.form_template?.title || (form.form_type === 'promotional_profile' ? 'Promotional Profile' : 'Participant Information');
+                                const statusLabel = form.status === 'not_started' ? 'Not Started' : 'In Progress';
+                                const statusColor = form.status === 'not_started' ? 'error' : 'warning';
+                                return (
+                                  <Paper
+                                    key={form.id}
+                                    elevation={0}
+                                    sx={{
+                                      p: 2,
+                                      border: '1px solid #e5e7eb',
+                                      borderRadius: 1.5,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: 2
+                                    }}
+                                  >
+                                    <Box sx={{ flex: 1 }}>
+                                      <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                        {formTitle}
+                                      </Typography>
+                                      <Chip
+                                        label={statusLabel}
+                                        size="small"
+                                        color={statusColor}
+                                        variant="outlined"
+                                        sx={{ height: 22, fontSize: '0.75rem' }}
+                                      />
+                                    </Box>
+                                    <Link to={`/forms/${form.id}`} style={{ textDecoration: 'none' }}>
+                                      <Button
+                                        variant="contained"
+                                        size="small"
+                                        sx={{
+                                          textTransform: 'none',
+                                          backgroundColor: '#10b8a6',
+                                          '&:hover': { backgroundColor: '#0ea5a4' }
+                                        }}
+                                      >
+                                        {form.status === 'not_started' ? 'Complete' : 'Continue'}
+                                      </Button>
+                                    </Link>
+                                  </Paper>
+                                );
+                              })}
+                            </Stack>
                           </Box>
                         )}
 
