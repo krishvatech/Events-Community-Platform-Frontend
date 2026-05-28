@@ -136,8 +136,24 @@ export default function SignInPage() {
           headers: { Authorization: `Bearer ${accessTokenForBackend}` }
         });
         if (checkRes.status === 403) {
-          console.error("Backend blocked login (Suspended user).");
-          toast.error("Your account has been suspended. Please contact support.");
+          let errorCode = null;
+          try {
+            const errorData = await checkRes.json();
+            errorCode = errorData?.code;
+          } catch (e) {
+            // Ignore JSON parse errors
+          }
+
+          // Show suspension-specific message only for account status codes
+          const suspensionCodes = ["account_suspended", "account_disabled", "account_memorialized"];
+          if (suspensionCodes.includes(errorCode)) {
+            console.error("Backend blocked login (Account status issue).", errorCode);
+            toast.error("Your account has been suspended. Please contact support.");
+          } else {
+            console.error("Backend blocked login (403 Forbidden).", errorCode);
+            toast.error("Authentication failed. Please try again or contact support.");
+          }
+
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
           localStorage.removeItem("id_token");
