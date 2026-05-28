@@ -47,10 +47,11 @@ import { apiClient } from "../utils/api";
  * - Edit existing tracks
  * - Disable/delete tracks
  */
-export default function ApplicationTracksManager({ eventId, token }) {
+export default function ApplicationTracksManager({ eventId, token, event, onEventUpdated }) {
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [publishMessage, setPublishMessage] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editingTrack, setEditingTrack] = useState(null);
   const [pricingTiers, setPricingTiers] = useState([]);
@@ -118,6 +119,49 @@ export default function ApplicationTracksManager({ eventId, token }) {
     loadEventSettings();
   }, [eventId]);
 
+  const isTrackPublishable = (track) => {
+    const activeTierCount = (track.pricing_tiers || []).filter((tier) => tier.is_active !== false).length;
+    return (
+      track.is_active &&
+      track.status === "open" &&
+      Boolean((track.key || "").trim()) &&
+      Boolean((track.label || "").trim()) &&
+      Array.isArray(track.enabled_submission_modes) &&
+      track.enabled_submission_modes.length > 0 &&
+      Array.isArray(track.role_mappings_on_acceptance) &&
+      track.role_mappings_on_acceptance.length > 0 &&
+      activeTierCount > 0
+    );
+  };
+
+  const refreshEvent = async () => {
+    if (typeof onEventUpdated !== "function") return null;
+    const { data } = await apiClient.get(`/events/${eventId}/`);
+    onEventUpdated(data);
+    return data;
+  };
+
+  const autoPublishIfReady = async (tracksToCheck) => {
+    if (event?.status !== "draft" || !tracksToCheck.some(isTrackPublishable)) return;
+
+    try {
+      const currentEvent = await refreshEvent();
+      if (currentEvent?.status === "published") {
+        setPublishMessage("Event published automatically after application track setup.");
+        return;
+      }
+      if (currentEvent?.status !== "draft") return;
+
+      const { data } = await apiClient.post(`/events/${eventId}/publish/`);
+      if (data?.event && typeof onEventUpdated === "function") {
+        onEventUpdated(data.event);
+      }
+      setPublishMessage("Event published automatically after application track setup.");
+    } catch (err) {
+      setError(err.response?.data?.error || err.response?.data?.detail || "Failed to auto-publish event");
+    }
+  };
+
   const loadTracks = async () => {
     try {
       setLoading(true);
@@ -143,6 +187,7 @@ export default function ApplicationTracksManager({ eventId, token }) {
 
       setTracks(tracksWithTiers);
       setError(null);
+      await autoPublishIfReady(tracksWithTiers);
     } catch (err) {
       console.error("Failed to load tracks:", err);
       setError("Failed to load application tracks");
@@ -392,6 +437,7 @@ export default function ApplicationTracksManager({ eventId, token }) {
       setNewTierName("");
       setNewTierPrice("");
       await loadPricingTiers(editingTrack.id);
+      await loadTracks();
       setError(null);
     } catch (err) {
       console.error("Failed to add pricing tier:", err);
@@ -607,6 +653,8 @@ export default function ApplicationTracksManager({ eventId, token }) {
     }
   };
 
+  const hasPublishableTrack = tracks.some(isTrackPublishable);
+
   const getStatusColor = (status) => {
     switch (status) {
       case "open":
@@ -646,6 +694,22 @@ export default function ApplicationTracksManager({ eventId, token }) {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+      {publishMessage && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {publishMessage}
+        </Alert>
+      )}
+
+      {event?.status === "draft" && (
+        <Alert
+          severity={hasPublishableTrack ? "info" : "warning"}
+          sx={{ mb: 2 }}
+        >
+          {hasPublishableTrack
+            ? "This event has a valid open application track and will be published automatically."
+            : "This event will remain in draft until at least one active open track has a label, key, submission mode, pricing tier, and role mapping."}
         </Alert>
       )}
 

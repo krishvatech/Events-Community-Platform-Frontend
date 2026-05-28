@@ -1116,14 +1116,16 @@ export default function EventManagePage() {
       setRegistrationsLoading(true);
       setRegistrationsError("");
       try {
-        const offset = (pageNum - 1) * MEMBERS_PER_PAGE;
+        const MEMBERS_PER_PAGE = 10;
         const headers = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         };
 
+        // Fetch all members (or a large batch) to enable proper sorting across all data
+        // Frontend will sort all records, then display paginated results
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/registrations/?limit=${MEMBERS_PER_PAGE}&offset=${offset}`,
+          `${API_ROOT}/events/${eventId}/registrations/?limit=200`,
           { headers, signal: controller.signal }
         );
         const json = await res.json().catch(() => ({}));
@@ -2136,6 +2138,7 @@ export default function EventManagePage() {
       });
     }
 
+    // Sort by registered_at based on memberSort selection
     if (memberSort === "newest") {
       rows.sort((a, b) => {
         const da = a.registered_at ? new Date(a.registered_at).getTime() : 0;
@@ -2153,15 +2156,16 @@ export default function EventManagePage() {
     return rows;
   }, [registrations, memberSearch, memberSort]);
 
+  const MEMBERS_PER_PAGE = 10;
   const totalMembers = totalMembersCount;
   const memberPageCount = Math.max(
     1,
-    Math.ceil(totalMembers / MEMBERS_PER_PAGE || 1)
+    Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE || 1)
   );
-  const memberStart = totalMembers === 0 ? 0 : (memberPage - 1) * MEMBERS_PER_PAGE + 1;
-  const memberEnd = Math.min(memberStart + filteredMembers.length - 1, totalMembers);
-  // With lazy loading, registrations already contains only current page data
-  const pagedMembers = filteredMembers;
+  const memberStart = filteredMembers.length === 0 ? 0 : (memberPage - 1) * MEMBERS_PER_PAGE + 1;
+  const memberEnd = Math.min(memberStart + MEMBERS_PER_PAGE - 1, filteredMembers.length);
+  // Slice filtered members to show only current page (10 per page)
+  const pagedMembers = filteredMembers.slice((memberPage - 1) * MEMBERS_PER_PAGE, memberPage * MEMBERS_PER_PAGE);
 
   // Load friend statuses for visible members
   useEffect(() => {
@@ -8347,7 +8351,14 @@ export default function EventManagePage() {
                   {event?.registration_type === 'apply' ? (
                     <>
                       {tab === tabLabels.indexOf("Applications") && <EventManageApplications />}
-                      {tab === tabLabels.indexOf("Application Tracks") && <ApplicationTracksManager eventId={eventId} token={getToken()} />}
+                      {tab === tabLabels.indexOf("Application Tracks") && (
+                        <ApplicationTracksManager
+                          eventId={eventId}
+                          token={getToken()}
+                          event={event}
+                          onEventUpdated={setEvent}
+                        />
+                      )}
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
                       {tab === tabLabels.indexOf("Participants") && renderParticipants()}
                       {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
