@@ -1100,8 +1100,10 @@ export default function MembersPage() {
 
   // state
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
+  const [rosterTotal, setRosterTotal] = useState(0);
   const [q, setQ] = useState("");
 
   const [selectedCompanies, setSelectedCompanies] = useState([]);
@@ -1329,7 +1331,7 @@ export default function MembersPage() {
     };
   }, []);
 
-  // data load
+  // Load roster members with server-side pagination and search
   useEffect(() => {
     const ctrl = new AbortController();
     let alive = true;
@@ -1340,34 +1342,45 @@ export default function MembersPage() {
         setLoading(true);
         setError("");
 
-        const fetchUsers = async (url) => {
-          const res = await fetch(url, {
-            headers: tokenHeader(),
-            signal: ctrl.signal,
-            credentials: "include",
-          });
-          const text = await res.text();
-          const json = text ? JSON.parse(text) : [];
-          if (!res.ok) {
-            throw new Error((json && json.detail) || `HTTP ${res.status} while fetching users`);
-          }
-          return Array.isArray(json) ? json : json?.results ?? [];
-        };
+        // Build URL with search, page, and page_size parameters
+        const params = new URLSearchParams();
+        if (q && q.trim()) {
+          params.append('search', q.trim());
+        }
+        params.append('page', page);
+        params.append('page_size', ROWS_PER_PAGE);
 
-        let list = [];
-        try { list = await fetchUsers(`${API_BASE}/users/roster/`); }
-        catch (e) {
-          if (isAbort(e)) return;
-          try { list = await fetchUsers(`${API_BASE}/users/?limit=500`); }
-          catch (e2) { if (isAbort(e2)) return; throw e2; }
+        const url = `${API_BASE}/users/roster/?${params.toString()}`;
+
+        const res = await fetch(url, {
+          headers: tokenHeader(),
+          signal: ctrl.signal,
+          credentials: "include",
+        });
+
+        const text = await res.text();
+        const json = text ? JSON.parse(text) : null;
+
+        if (!res.ok) {
+          throw new Error((json && json.detail) || `HTTP ${res.status} while fetching users`);
         }
 
         if (!alive) return;
-        setUsers(
-          (list || []).filter(
-            (u) => !u.is_superuser
-          )
-        );
+
+        // Handle paginated response format: { count, next, previous, results }
+        let list = [];
+        let total = 0;
+
+        if (json && typeof json === 'object' && 'results' in json) {
+          list = json.results || [];
+          total = json.count || 0;
+        } else if (Array.isArray(json)) {
+          list = json;
+          total = json.length;
+        }
+
+        setUsers((list || []).filter(u => !u.is_superuser));
+        setRosterTotal(total || (list || []).length);
       } catch (e) {
         if (isAbort(e)) return;
         console.error(e);
@@ -1378,7 +1391,7 @@ export default function MembersPage() {
     })();
 
     return () => { alive = false; ctrl.abort(); };
-  }, [me?.id]);
+  }, [q, page, ROWS_PER_PAGE, me?.id]);
 
 
   const filtered = useMemo(() => {
@@ -1432,67 +1445,9 @@ export default function MembersPage() {
       sourceList = sourceList.filter((u) => selectedCompanySizes.includes(getCompanySizeFromUser(u)));
     }
 
-    const s = (q || "").toLowerCase().trim();
-    if (!s) return sourceList;
-
-    // Text search (name, email, company, title, skills, city, country)
-    return sourceList.filter((u) => {
-      const fn = (u.first_name || "").toLowerCase();
-      const ln = (u.last_name || "").toLowerCase();
-      const em = (u.email || "").toLowerCase();
-      const full = (u.profile?.full_name || "").toLowerCase();
-      const company = (u.company_from_experience || "").toLowerCase();
-      const title = (
-        u.position_from_experience ||
-        u.profile?.job_title ||
-        u.job_title ||
-        ""
-      ).toLowerCase();
-      const role = (u.profile?.role || u.role || "").toLowerCase();
-      let skills = [];
-      const rawSkills =
-        (u.profile && u.profile.skills) ||
-        u.skills ||
-        [];
-      if (Array.isArray(rawSkills)) {
-        skills = rawSkills.map((x) => String(x).toLowerCase());
-      } else if (typeof rawSkills === "string") {
-        skills = rawSkills
-          .split(/,|;|\n/)
-          .map((x) => x.trim().toLowerCase())
-          .filter(Boolean);
-      }
-      const countryName = (displayCountry(u) || "").toLowerCase();
-      const city = (
-        u.profile?.location_city ||
-        u.profile?.city ||
-        u.city ||
-        u.profile?.location ||
-        ""
-      ).toLowerCase();
-
-      // ✅ Add Industry to text search haystack
-      const ind = getIndustryFromUser(u).toLowerCase();
-
-      const haystack = [
-        fn,
-        ln,
-        full,
-        em,
-        company,
-        title,
-        role,
-        countryName,
-        city,
-        ind, // Added
-        ...skills,
-      ];
-
-      return haystack.some((v) => v && v.includes(s));
-    });
+    return sourceList;
   }, [
     users,
-    q,
     tabValue,
     friendStatusByUser,
     selectedCompanies,
@@ -1500,8 +1455,8 @@ export default function MembersPage() {
     selectedTitles,
     selectedIndustries,
     selectedCompanySizes,
-    me?.id,           // Added for privacy filter
-    viewerIsStaff,    // Added for privacy filter
+    me?.id,
+    viewerIsStaff,
   ]);
 
 
@@ -1653,16 +1608,17 @@ export default function MembersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [q, tabValue, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]); // ✅ Added deps
-
+  }, [q, tabValue, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
-  const startIdx = (page - 1) * ROWS_PER_PAGE;
-  const current = filtered.slice(startIdx, startIdx + ROWS_PER_PAGE);
+  // Calculate page count from total visible members
+  const pageCount = Math.max(1, Math.ceil(rosterTotal / ROWS_PER_PAGE));
+
+  // Current page items (from backend, may be filtered further by local filters below)
+  const current = filtered;
 
   useEffect(() => {
     let alive = true;
@@ -1807,7 +1763,7 @@ export default function MembersPage() {
 	              {/* Tab pills */}
 	              <Box sx={{ display: "flex", gap: "4px", mb: 1.5, pb: 1.5, borderBottom: "1px solid #EEECEA" }}>
                 {[
-                  { label: "All Members", count: users.length },
+                  { label: "All Members", count: rosterTotal || users.length },
                   { label: "My Contacts", count: Object.values(friendStatusByUser).filter((s) => s === "friends").length },
                 ].map((tab, i) => (
                   <Box
@@ -2147,12 +2103,12 @@ export default function MembersPage() {
                 >
                   <Typography variant="body2" color="text.secondary">
                     Showing{" "}
-                    {filtered.length === 0
+                    {rosterTotal === 0
                       ? "0"
-                      : `${startIdx + 1}–${Math.min(
-                        startIdx + ROWS_PER_PAGE,
-                        filtered.length
-                      )} of ${filtered.length}`}
+                      : `${(page - 1) * ROWS_PER_PAGE + 1}–${Math.min(
+                        page * ROWS_PER_PAGE,
+                        rosterTotal
+                      )} of ${rosterTotal}`}
                   </Typography>
                   <Pagination
                     count={pageCount}
