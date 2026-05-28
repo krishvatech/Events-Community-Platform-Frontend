@@ -19,8 +19,10 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
-import { listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deleteAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff } from "../utils/api";
+import { apiClient, listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deleteAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff } from "../utils/api";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
@@ -652,6 +654,11 @@ export default function AdminStaffPage() {
         setCurrentUser(u);
     }, []);
 
+    const isCurrentUserRow = React.useCallback((user) => {
+        const currentUserId = currentUser?.id ?? currentUser?.user_id;
+        return currentUserId !== undefined && currentUserId !== null && String(currentUserId) === String(user?.id);
+    }, [currentUser]);
+
     const [selected, setSelected] = React.useState(new Set());
 
     // Pagination & Filtering
@@ -666,6 +673,7 @@ export default function AdminStaffPage() {
     const [manualCreateDialogOpen, setManualCreateDialogOpen] = React.useState(false);
     const [actionLoading, setActionLoading] = React.useState(false);
     const [toggleBusyId, setToggleBusyId] = React.useState(null);
+    const [connectingUserId, setConnectingUserId] = React.useState(null);
     const [snack, setSnack] = React.useState({ open: false, message: "", severity: "warning" });
 
     // Filter State - "all" | "superuser" | "staff" | "normal"
@@ -840,6 +848,36 @@ export default function AdminStaffPage() {
             });
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleConnectWithUser = async (targetUser) => {
+        if (isCurrentUserRow(targetUser)) {
+            setSnack({
+                open: true,
+                severity: "warning",
+                message: "You cannot connect with yourself.",
+            });
+            return;
+        }
+        setConnectingUserId(targetUser.id);
+        try {
+            await apiClient.post("/friend-requests/", { to_user: targetUser.id });
+            setSnack({
+                open: true,
+                severity: "success",
+                message: `✅ Connection request sent to ${targetUser.first_name || targetUser.username}`,
+            });
+        } catch (err) {
+            const detail = err.response?.data?.detail;
+            const message = Array.isArray(detail) ? detail[0] : detail;
+            setSnack({
+                open: true,
+                severity: "error",
+                message: "Failed to send connection request: " + (message || err.message),
+            });
+        } finally {
+            setConnectingUserId(null);
         }
     };
 
@@ -1147,6 +1185,9 @@ export default function AdminStaffPage() {
                                     <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
                                         Last Login
                                     </TableCell>
+                                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                                        Signup Date
+                                    </TableCell>
                                     {owner && <TableCell align="center">Can Edit Profiles</TableCell>}
                                     <TableCell align="center">Status</TableCell>
                                     <TableCell align="right">Actions</TableCell>
@@ -1156,7 +1197,7 @@ export default function AdminStaffPage() {
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, idx) => (
                                         <TableRow key={idx}>
-                                            <TableCell colSpan={owner ? 8 : 7}>
+                                            <TableCell colSpan={owner ? 9 : 8}>
                                                 <Skeleton height={40} />
                                             </TableCell>
                                         </TableRow>
@@ -1170,13 +1211,19 @@ export default function AdminStaffPage() {
                                                 <Checkbox
                                                     checked={selected.has(u.id)}
                                                     onChange={() => handleSelectRow(u.id)}
-                                                    disabled={currentUser && currentUser.id === u.id}
+                                                    disabled={isCurrentUserRow(u)}
                                                 />
                                             </TableCell>
 
                                             {/* User */}
                                             <TableCell>
-                                                <Stack direction="row" spacing={2} alignItems="center">
+                                                <Stack
+                                                    direction="row"
+                                                    spacing={2}
+                                                    alignItems="center"
+                                                    onClick={() => window.open(`/community/rich-profile/${u.id}`, "_blank", "noopener,noreferrer")}
+                                                    sx={{ cursor: "pointer" }}
+                                                >
                                                     <Avatar
                                                         src={u.avatar_url}
                                                         alt={u.username}
@@ -1186,7 +1233,7 @@ export default function AdminStaffPage() {
                                                     </Avatar>
                                                     <Box>
                                                         <Stack direction="row" spacing={0.5} alignItems="center">
-                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "primary.main" }}>
                                                                 {(u.first_name || u.last_name) ? `${u.first_name} ${u.last_name}`.trim() : u.username}
                                                             </Typography>
                                                             {u.profile?.kyc_status === "approved" && (
@@ -1215,6 +1262,13 @@ export default function AdminStaffPage() {
                                             {/* Last login */}
                                             <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
                                                 {u.last_login ? new Date(u.last_login).toLocaleString() : "—"}
+                                            </TableCell>
+
+                                            {/* Signup Date — WordPress registration date for WP users, else platform date_joined */}
+                                            <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                                                {(u.wordpress_registered_at || u.date_joined)
+                                                    ? new Date(u.wordpress_registered_at || u.date_joined).toLocaleString()
+                                                    : "—"}
                                             </TableCell>
 
                                             {owner && (
@@ -1250,7 +1304,7 @@ export default function AdminStaffPage() {
                                                                 <IconButton 
                                                                     size="small" 
                                                                     onClick={() => handleOpenEdit(u)}
-                                                                    disabled={!owner || (currentUser && currentUser.id === u.id)}
+                                                                    disabled={!owner || isCurrentUserRow(u)}
                                                                 >
                                                                     <EditIcon fontSize="small" />
                                                                 </IconButton>
@@ -1267,13 +1321,35 @@ export default function AdminStaffPage() {
                                                                 </IconButton>
                                                             </span>
                                                         </Tooltip>
+                                                        <Tooltip title="View Profile">
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => window.open(`/community/rich-profile/${u.id}`, "_blank", "noopener,noreferrer")}
+                                                                >
+                                                                    <OpenInNewIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                        <Tooltip title="Connect with User">
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="success"
+                                                                    onClick={() => handleConnectWithUser(u)}
+                                                                    disabled={connectingUserId === u.id || isCurrentUserRow(u)}
+                                                                >
+                                                                    <PersonAddIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
                                                         <Tooltip title="Delete User">
                                                             <span>
                                                                 <IconButton 
                                                                     size="small" 
                                                                     color="error" 
                                                                     onClick={() => confirmDeleteUser(u)}
-                                                                    disabled={!owner || (currentUser && currentUser.id === u.id)}
+                                                                    disabled={!owner || isCurrentUserRow(u)}
                                                                 >
                                                                     <DeleteIcon fontSize="small" />
                                                                 </IconButton>
@@ -1286,7 +1362,7 @@ export default function AdminStaffPage() {
                                 )}
                                 {!loading && paginatedRows.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={owner ? 8 : 7} align="center" sx={{ py: 4 }}>
+                                        <TableCell colSpan={owner ? 9 : 8} align="center" sx={{ py: 4 }}>
                                             <Typography color="text.secondary">No users found.</Typography>
                                         </TableCell>
                                     </TableRow>
