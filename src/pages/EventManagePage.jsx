@@ -8347,7 +8347,14 @@ export default function EventManagePage() {
                   {event?.registration_type === 'apply' ? (
                     <>
                       {tab === tabLabels.indexOf("Applications") && <EventManageApplications />}
-                      {tab === tabLabels.indexOf("Application Tracks") && <ApplicationTracksManager eventId={eventId} token={getToken()} />}
+                      {tab === tabLabels.indexOf("Application Tracks") && (
+                        <ApplicationTracksManager
+                          eventId={eventId}
+                          token={getToken()}
+                          event={event}
+                          onEventUpdated={setEvent}
+                        />
+                      )}
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
                       {tab === tabLabels.indexOf("Participants") && renderParticipants()}
                       {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
