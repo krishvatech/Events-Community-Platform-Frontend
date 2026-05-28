@@ -3021,6 +3021,56 @@ export default function NewLiveMeeting() {
   const [loadingJoin, setLoadingJoin] = useState(true);
   const [joinError, setJoinError] = useState("");
   const [joinRequestTick, setJoinRequestTick] = useState(0);
+  const sleep = useCallback((ms) => new Promise((resolve) => setTimeout(resolve, ms)), []);
+
+  const fetchRtkJoinWithQueueRetry = useCallback(
+    async ({ eventId, body = undefined, signal = undefined, logPrefix = "[RTKJoin]" }) => {
+      const maxQueuedAttempts = 60;
+      let queuedAttempts = 0;
+
+      while (true) {
+        if (signal?.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
+
+        const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+          signal,
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 202 && data?.queued) {
+          queuedAttempts += 1;
+
+          const retryAfterMs = Math.max(
+            1000,
+            Number(data.retry_after || 2) * 1000
+          );
+
+          console.log(
+            `${logPrefix} Join queued. Retry ${queuedAttempts}/${maxQueuedAttempts} in ${retryAfterMs}ms`,
+            data
+          );
+
+          setJoinError("");
+          setLoadingJoin(true);
+
+          if (queuedAttempts >= maxQueuedAttempts) {
+            throw new Error(data?.message || "Joining is busy. Please try again.");
+          }
+
+          await sleep(retryAfterMs);
+          continue;
+        }
+
+        return { res, data };
+      }
+    },
+    [sleep]
+  );
   const [dbStatus, setDbStatus] = useState("draft");
   const [eventTitle, setEventTitle] = useState("Live Meeting");
   const [isBreakout, setIsBreakout] = useState(false);
@@ -3128,6 +3178,36 @@ export default function NewLiveMeeting() {
   );
   const assignedRoleByIdentity = useMemo(() => {
     const map = new Map();
+    const compactRoles = Array.isArray(eventData?.event_participant_roles)
+      ? eventData.event_participant_roles
+      : [];
+
+    compactRoles.forEach((participant) => {
+      const role = participant?.role;
+      if (!role) return;
+
+      const userId = participant?.user_id || participant?.id || participant?.user?.id;
+      const email = participant?.email || participant?.guest_email || participant?.user?.email;
+      const name =
+        participant?.name ||
+        participant?.full_name ||
+        participant?.display_name ||
+        participant?.guest_name ||
+        participant?.user?.full_name;
+
+      if (userId) {
+        map.set(`id:${String(userId)}`, role);
+      }
+
+      if (email) {
+        map.set(`email:${String(email).toLowerCase()}`, role);
+      }
+
+      if (name) {
+        map.set(`name:${String(name).trim().toLowerCase()}`, role);
+      }
+    });
+
     const groups = eventData?.event_participants || {};
 
     const add = (key, role) => {
@@ -3152,26 +3232,68 @@ export default function NewLiveMeeting() {
     ingest(groups.moderators || groups.moderator || [], "Moderator");
 
     return map;
-  }, [eventData?.event_participants]);
-  const selfAssignedRole = useMemo(
-    () => assignedRoleByIdentity.get(`id:${String(currentUserId)}`) || "",
-    [assignedRoleByIdentity, currentUserId]
-  );
-  const canReceiveSupportRequests = useMemo(
-    () => isHost || ["Host", "Moderator"].includes(selfAssignedRole),
-    [isHost, selfAssignedRole]
-  );
+  }, [eventData?.event_participants, eventData?.event_participant_roles]);
+  const selfAssignedRole = useMemo(() => {
+    const serverRoleRaw = String(
+      eventData?.current_user_live_role ||
+      eventData?.current_user_role ||
+      ""
+    ).trim().toLowerCase();
+
+    const serverRole =
+      serverRoleRaw === "host"
+        ? "Host"
+        : serverRoleRaw === "moderator"
+          ? "Moderator"
+          : serverRoleRaw === "speaker"
+            ? "Speaker"
+            : "";
+
+    if (serverRole) return serverRole;
+
+    return assignedRoleByIdentity.get(`id:${String(currentUserId)}`) || "";
+  }, [
+    assignedRoleByIdentity,
+    currentUserId,
+    eventData?.current_user_live_role,
+    eventData?.current_user_role,
+  ]);
+  const currentUserPermissions = eventData?.current_user_permissions || null;
+  const hasServerLivePermissions = Boolean(currentUserPermissions);
+  const canReceiveSupportRequests = useMemo(() => {
+    if (hasServerLivePermissions) {
+      return Boolean(currentUserPermissions?.can_receive_support_requests);
+    }
+
+    return isHost || ["Host", "Moderator"].includes(selfAssignedRole);
+  }, [
+    hasServerLivePermissions,
+    currentUserPermissions,
+    isHost,
+    selfAssignedRole,
+  ]);
   useEffect(() => {
     canReceiveSupportRequestsRef.current = canReceiveSupportRequests;
   }, [canReceiveSupportRequests]);
   const isSupportPanelActive = isPanelOpen && tab === SUPPORT_TAB_INDEX && canReceiveSupportRequests;
-  const canManageParticipantMic = useMemo(
-    () =>
+  const canManageParticipantMic = useMemo(() => {
+    if (hasServerLivePermissions) {
+      return Boolean(currentUserPermissions?.can_manage_participant_mic);
+    }
+
+    return (
       isHost ||
       (currentUserId && eventData?.created_by_id && String(currentUserId) === String(eventData.created_by_id)) ||
-      ["Host", "Moderator", "Speaker"].includes(selfAssignedRole),
-    [currentUserId, eventData?.created_by_id, isHost, selfAssignedRole]
-  );
+      ["Host", "Moderator", "Speaker"].includes(selfAssignedRole)
+    );
+  }, [
+    hasServerLivePermissions,
+    currentUserPermissions,
+    currentUserId,
+    eventData?.created_by_id,
+    isHost,
+    selfAssignedRole,
+  ]);
 
   const [loungeTables, setLoungeTables] = useState([]);
   const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
@@ -7047,12 +7169,22 @@ export default function NewLiveMeeting() {
     // Fetch DB status + title
     (async () => {
       try {
-        const res = await fetch(toApiUrl(`events/${idFromQuery}/`), { headers: authHeader() });
+        let res = await fetch(toApiUrl(`events/${idFromQuery}/live-context/`), {
+          headers: authHeader(),
+        });
+
+        if (res.status === 404) {
+          console.warn("[LiveMeeting] live-context endpoint not found. Falling back to full event detail.");
+          res = await fetch(toApiUrl(`events/${idFromQuery}/`), {
+            headers: authHeader(),
+          });
+        }
+
         if (res.ok) {
           const data = await res.json();
-          console.log("[DEBUG] Event data fetched from API:", data);
+          console.log("[DEBUG] Event live context fetched from API:", data);
           console.log("[DEBUG] pre_event_qna_enabled value:", data?.pre_event_qna_enabled);
-          setEventData(data); // ✅ Store full event data for access to images and timezone
+          setEventData(data); // ✅ Store live context for images, timezone, flags, roles, and permissions
           if (data?.qna_moderation_enabled !== undefined) {
             setQnaModerationEnabled(data.qna_moderation_enabled);
           }
@@ -7204,17 +7336,17 @@ export default function NewLiveMeeting() {
         console.log("[RTKJoin] Auth header:", authHeaders);
         console.log("[RTKJoin] Token type:", authHeaders.Authorization ? authHeaders.Authorization.split(' ')[1]?.substring(0, 30) + "..." : "None");
 
-        const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders },
-          body: JSON.stringify({ role }),
-          signal: abortController.signal, // ✅ Add abort signal
+        const { res, data } = await fetchRtkJoinWithQueueRetry({
+          eventId,
+          body: { role },
+          signal: abortController.signal,
+          logPrefix: "[RTKJoin]",
         });
 
         console.log("[RTKJoin] Response status:", res.status);
 
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
+          const errData = data || {};
           console.error("[RTKJoin] Join failed! Status:", res.status);
           console.error("[RTKJoin] Error data:", errData);
 
@@ -7226,8 +7358,6 @@ export default function NewLiveMeeting() {
           }
           throw new Error(errData.detail || "Failed to join live meeting.");
         }
-
-        const data = await res.json();
         console.log("[RTKJoin] Join successful! Response:", data);
         console.log("[RTKJoin] AuthToken received:", data.authToken ? "Yes" : "No");
         console.log("[RTKJoin] IsGuest:", data.isGuest);
@@ -7280,7 +7410,7 @@ export default function NewLiveMeeting() {
         }
       }
     })();
-  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, attendeeWaitingRoomOverridesPreEventLounge, shouldHonorOpenLoungeFromState, isPostEventWindowOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly, networkingSessionId, loungeOpen, activeTableId]);
+  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, attendeeWaitingRoomOverridesPreEventLounge, shouldHonorOpenLoungeFromState, isPostEventWindowOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly, networkingSessionId, loungeOpen, activeTableId, fetchRtkJoinWithQueueRetry]);
 
   useEffect(() => {
     if (!eventId || !waitingRoomActive) return;
@@ -7785,16 +7915,15 @@ export default function NewLiveMeeting() {
             (async () => {
               try {
                 console.log("[MainSocket] Getting main room token for peek view restoration");
-                const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", ...authHeader() },
-                  body: JSON.stringify({ is_host: false }),
+                const { res, data } = await fetchRtkJoinWithQueueRetry({
+                  eventId,
+                  body: { is_host: false },
+                  logPrefix: "[MainSocket]",
                 });
                 if (!res.ok) {
-                  console.warn("[MainSocket] Failed to get main room token:", res.status);
+                  console.warn("[MainSocket] Failed to get main room token:", res.status, data);
                   return;
                 }
-                const data = await res.json();
                 if (data.authToken) {
                   mainAuthTokenRef.current = data.authToken;
                   console.log("[MainSocket] ✅ Main room token obtained, initializing peek");
@@ -10317,15 +10446,13 @@ export default function NewLiveMeeting() {
         // ✅ CRITICAL FIX: Use /rtk/join/ endpoint (same as main RTK token fetch) to get a valid token
         // The endpoint auto-detects if user is host based on event permissions
         // Token will be used for receive-only main room peek
-        const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
+        const { res, data } = await fetchRtkJoinWithQueueRetry({
+          eventId,
+          logPrefix: "[MainRoomPeek]",
         });
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `HTTP ${res.status}`);
+          throw new Error(data?.detail || `HTTP ${res.status}`);
         }
-        const data = await res.json().catch(() => null);
         if (data?.authToken) {
           mainAuthTokenRef.current = data.authToken;
           setMainRoomAuthToken(data.authToken);
@@ -10339,7 +10466,7 @@ export default function NewLiveMeeting() {
         mainPeekTokenFetchInFlightRef.current = false;
       }
     })();
-  }, [eventId, isBreakout, mainRoomAuthToken]);
+  }, [eventId, isBreakout, mainRoomAuthToken, fetchRtkJoinWithQueueRetry]);
 
   // ---------- Join timer (shows how long THIS user has been in the meeting) ----------
   useEffect(() => {
@@ -10862,16 +10989,14 @@ export default function NewLiveMeeting() {
     joinedOnceRef.current = false;
     setJoinMainRequested(true);
 
-    const res = await fetch(toApiUrl(`events/${eventId}/rtk/join/`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeader() },
-      body: JSON.stringify({ role }),
+    const { res, data } = await fetchRtkJoinWithQueueRetry({
+      eventId,
+      body: { role },
+      logPrefix: `[StopFlow:${tag}]`,
     });
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData?.detail || `HTTP ${res.status}`);
+      throw new Error(data?.detail || `HTTP ${res.status}`);
     }
-    const data = await res.json();
 
     if (data?.waiting) {
       setWaitingRoomActive(true);
