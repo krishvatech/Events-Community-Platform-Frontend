@@ -1098,6 +1098,84 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
   );
 }
 
+// ── Mergers.AI Video Search Widget ────────────────────────────────────────────
+function MergersAIWidget({ courseId, courseName }) {
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!courseId) return;
+
+    let cancelled = false;
+
+    const fetchToken = async () => {
+      try {
+        const data = await apiFetch(`/courses/${courseId}/mergersai/token/`);
+        if (!cancelled) {
+          setToken(data);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error("Failed to fetch Mergers.AI token:", e);
+          setError("Could not load AI search");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchToken();
+    return () => { cancelled = true; };
+  }, [courseId]);
+
+  if (loading) {
+    return (
+      <Box sx={{ p: 2, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
+        <CircularProgress size={20} sx={{ color: "#1bbbb3" }} />
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+          Loading AI search…
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (error || !token) {
+    return null;  // Silently fail — don't block course player if widget unavailable
+  }
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", bgcolor: "#ffffff" }}>
+      {/* Header */}
+      <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid #e5e7eb", bgcolor: "#f9fafb", flexShrink: 0 }}>
+        <Typography variant="caption" fontWeight={700} sx={{ color: "#374151", textTransform: "uppercase", letterSpacing: "0.08em", display: "block" }}>
+          🤖 Ask AI
+        </Typography>
+        <Typography variant="caption" color="text.disabled" sx={{ fontSize: "11px", display: "block", mt: 0.5 }}>
+          Search course videos
+        </Typography>
+      </Box>
+
+      {/* Widget iframe */}
+      <Box sx={{ flex: 1, overflow: "hidden", p: 1.5 }}>
+        <iframe
+          src={token.widget_url}
+          sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
+          allow="autoplay; fullscreen; picture-in-picture"
+          style={{
+            width: "100%",
+            height: "100%",
+            border: 0,
+            borderRadius: "8px",
+          }}
+          title="IMAA Video Search"
+        />
+      </Box>
+    </Box>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CoursePlayerPage() {
   const { courseId } = useParams();
@@ -1329,7 +1407,7 @@ export default function CoursePlayerPage() {
       {/* Body */}
       <Box sx={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
-        {/* Sidebar */}
+        {/* Sidebar - Left (Course Content) */}
         <Box
           sx={{
             width: 280,
@@ -1341,6 +1419,7 @@ export default function CoursePlayerPage() {
             overflow: "hidden",
           }}
         >
+          {/* Course Content */}
           <Box sx={{ px: 2, py: 1.25, borderBottom: "1px solid #e5e7eb" }}>
             <Typography variant="caption" fontWeight={700} sx={{ color: "#374151", textTransform: "uppercase", letterSpacing: "0.08em" }}>
               Course Content
@@ -1373,6 +1452,22 @@ export default function CoursePlayerPage() {
               onSelectModule={handleSelectModule}
             />
           </Box>
+        </Box>
+
+        {/* Sidebar - Right (Mergers.AI AI Widget) */}
+        <Box
+          sx={{
+            width: 340,
+            flexShrink: 0,
+            bgcolor: "#ffffff",
+            borderLeft: "1px solid #e5e7eb",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          {/* Mergers.AI Video Search Widget */}
+          <MergersAIWidget courseId={courseId} courseName={course?.full_name} />
         </Box>
       </Box>
 
