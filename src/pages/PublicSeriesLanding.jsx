@@ -13,6 +13,7 @@ const PublicSeriesLanding = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -46,12 +47,18 @@ const PublicSeriesLanding = () => {
   };
 
   const handleRegisterForSeries = async () => {
+    if (series?.is_registered) {
+      return;
+    }
+
     if (!getToken()) {
       navigate('/signin');
       return;
     }
 
     setRegistering(true);
+    setError('');
+    setSuccess('');
     try {
       const response = await fetch(
         `${API_BASE}/series/${series.id}/register/`,
@@ -62,6 +69,13 @@ const PublicSeriesLanding = () => {
       );
 
       if (response.ok) {
+        setSeries((prev) => prev ? {
+          ...prev,
+          is_registered: true,
+          registrations_count: prev.is_registered
+            ? prev.registrations_count
+            : Number(prev.registrations_count || 0) + 1,
+        } : prev);
         setSuccess('Successfully registered for series!');
         setTimeout(() => navigate('/'), 2000);
       } else {
@@ -73,6 +87,53 @@ const PublicSeriesLanding = () => {
       setError('Failed to register for series');
     } finally {
       setRegistering(false);
+    }
+  };
+
+  const handleCancelSeriesRegistration = async () => {
+    if (!series || series.registration_mode !== 'full_series_only') {
+      return;
+    }
+
+    if (!getToken()) {
+      navigate('/signin');
+      return;
+    }
+
+    if (!window.confirm(`Cancel your registration for "${series.title}"?`)) {
+      return;
+    }
+
+    setCancelling(true);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch(
+        `${API_BASE}/series/${series.id}/unregister/`,
+        {
+          method: 'POST',
+          headers: { ...authConfig().headers, 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (response.ok) {
+        setSeries((prev) => prev ? {
+          ...prev,
+          is_registered: false,
+          registrations_count: prev.is_registered
+            ? Math.max(0, Number(prev.registrations_count || 0) - 1)
+            : prev.registrations_count,
+        } : prev);
+        setSuccess('Series registration cancelled.');
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setError(data.detail || data.error || 'Failed to cancel series registration');
+      }
+    } catch (err) {
+      console.error('Error cancelling series registration:', err);
+      setError('Failed to cancel series registration');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -99,6 +160,10 @@ const PublicSeriesLanding = () => {
       </div>
     );
   }
+
+  const isSeriesRegistered = series?.is_registered === true;
+  const canCancelSeriesRegistration =
+    isSeriesRegistered && series?.registration_mode === 'full_series_only';
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -177,11 +242,21 @@ const PublicSeriesLanding = () => {
             {/* CTA Button */}
             <div className="flex gap-3 flex-wrap">
               <button
-                onClick={handleRegisterForSeries}
-                disabled={registering}
-                className="rounded-lg bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white font-semibold py-3 px-8 transition-colors text-lg"
+                onClick={canCancelSeriesRegistration ? handleCancelSeriesRegistration : handleRegisterForSeries}
+                disabled={registering || cancelling || (isSeriesRegistered && !canCancelSeriesRegistration)}
+                className={`rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-8 transition-colors text-lg ${
+                  canCancelSeriesRegistration
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-teal-600 hover:bg-teal-700'
+                }`}
               >
-                {registering ? 'Registering...' : 'Register for Series'}
+                {cancelling
+                  ? 'Cancelling...'
+                  : canCancelSeriesRegistration
+                    ? 'Cancel Registration'
+                    : isSeriesRegistered
+                      ? 'Registered'
+                      : (registering ? 'Registering...' : 'Register for Series')}
               </button>
               <button
                 onClick={() => navigate('/')}

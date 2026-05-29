@@ -14,11 +14,8 @@ const EventSeriesDisplay = ({ event, onSeriesRegister }) => {
   const navigate = useNavigate();
   const [series, setSeries] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  // If event doesn't have a series, return null (let parent handle individual event display)
-  if (!event.series) {
-    return null;
-  }
+  const [cancelling, setCancelling] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   // Check if we need to fetch series data
   useEffect(() => {
@@ -45,6 +42,11 @@ const EventSeriesDisplay = ({ event, onSeriesRegister }) => {
     }
   };
 
+  // If event doesn't have a series, return null (let parent handle individual event display)
+  if (!event.series) {
+    return null;
+  }
+
   // If registration_mode is not "full_series_only", return null to show individual event
   if (series && series.registration_mode !== 'full_series_only') {
     return null;
@@ -56,6 +58,48 @@ const EventSeriesDisplay = ({ event, onSeriesRegister }) => {
 
   const handleViewSeries = () => {
     navigate(`/series/${series.slug}`);
+  };
+
+  const isRegistered = series?.is_registered === true;
+
+  const handleCancelRegistration = async () => {
+    if (!getToken()) {
+      navigate('/signin');
+      return;
+    }
+
+    if (!window.confirm(`Cancel your registration for "${series.title}"?`)) {
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      setActionError('');
+      const response = await fetch(
+        `${API_BASE}/series/${series.id}/unregister/`,
+        {
+          method: 'POST',
+          headers: { ...authConfig().headers, 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (response.ok) {
+        setSeries((prev) => prev ? {
+          ...prev,
+          is_registered: false,
+          registrations_count: prev.is_registered
+            ? Math.max(0, Number(prev.registrations_count || 0) - 1)
+            : prev.registrations_count,
+        } : prev);
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setActionError(data.detail || data.error || 'Failed to cancel series registration');
+      }
+    } catch (error) {
+      setActionError('Failed to cancel series registration');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -137,7 +181,13 @@ const EventSeriesDisplay = ({ event, onSeriesRegister }) => {
           variant="outlined"
           size="small"
           fullWidth
+          color={isRegistered ? 'error' : 'primary'}
+          disabled={cancelling}
           onClick={() => {
+            if (isRegistered) {
+              handleCancelRegistration();
+              return;
+            }
             if (!getToken()) {
               navigate('/signin');
               return;
@@ -145,9 +195,14 @@ const EventSeriesDisplay = ({ event, onSeriesRegister }) => {
             onSeriesRegister(series.id);
           }}
         >
-          Register
+          {cancelling ? 'Cancelling...' : (isRegistered ? 'Cancel Registration' : 'Register')}
         </Button>
       </Box>
+      {actionError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error">{actionError}</Alert>
+        </Box>
+      )}
     </Card>
   );
 };
