@@ -2451,6 +2451,7 @@ export default function NewLiveMeeting() {
   const [allowDeferredLiveData, setAllowDeferredLiveData] = useState(false);
   const deferNonCriticalLiveApi = !liveCriticalReady && !allowDeferredLiveData;
   const deferredLiveApiLogRef = useRef(false);
+  const [eventId, setEventId] = useState(null);
 
   useEffect(() => {
     setLiveCriticalReady(false);
@@ -2995,7 +2996,6 @@ export default function NewLiveMeeting() {
 
   // ---------- Old logic states (real) ----------
   const [loungeSettingsOpen, setLoungeSettingsOpen] = useState(false);
-  const [eventId, setEventId] = useState(null);
   const [role, setRole] = useState("audience"); // 'publisher' | 'audience'
   const isHost = role === "publisher";
   const roleRef = useRef(role);

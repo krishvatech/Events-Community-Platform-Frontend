@@ -1,5 +1,4 @@
 // src/main.jsx
-import './utils/fetchInterceptor';
 import './setupPolyfills';
 
 // Suppress internal RealtimeKit SDK unhandled promise rejections (request timeout noise).
@@ -71,6 +70,9 @@ import theme from './muiTheme';
 
 // SEO provider
 import { HelmetProvider } from 'react-helmet-async';
+
+// Initialize fetch interceptor after all dependencies are loaded
+import './utils/fetchInterceptor';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
