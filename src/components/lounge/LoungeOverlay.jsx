@@ -27,6 +27,7 @@ const LoungeOverlay = ({
     onOpenSettings,
     eventSocketMessage = null,
     sendEventAction = null,
+    deferNonCriticalLiveApi = false,
 }) => {
     const [tables, setTables] = useState([]);
     const [breakoutTables, setBreakoutTables] = useState([]);
@@ -61,6 +62,7 @@ const LoungeOverlay = ({
     const socketRef = useRef(null);
     const leftBreakoutAtRef = useRef(null); // ✅ Track when user leaves breakout to suppress waiting message
     const userIntentionallyOpenedLoungeRef = useRef(false); // ✅ Track if user intentionally opened lounge
+    const deferredLiveApiLogRef = useRef(false);
 
     useEffect(() => {
         const token = getToken();
@@ -145,6 +147,13 @@ const LoungeOverlay = ({
 
     const fetchLoungeState = useCallback(async () => {
         if (!eventId) return;
+        if (deferNonCriticalLiveApi) {
+            if (import.meta.env?.DEV && !deferredLiveApiLogRef.current) {
+                deferredLiveApiLogRef.current = true;
+                console.debug("[LiveMeeting] Deferred non-critical API until liveCriticalReady");
+            }
+            return;
+        }
         try {
             const url = `${API_RAW}/events/${eventId}/lounge-state/`.replace(/([^:]\/)\/+/g, "$1");
             const res = await fetch(url, {
@@ -165,15 +174,16 @@ const LoungeOverlay = ({
         } catch (err) {
             console.error("[Lounge] Fetch error:", err);
         }
-    }, [eventId, normalizeTables]);
+    }, [deferNonCriticalLiveApi, eventId, normalizeTables]);
 
     useEffect(() => {
         if (open) {
+            if (deferNonCriticalLiveApi) return;
             fetchLoungeState();
             const interval = setInterval(fetchLoungeState, 5000); // 5s auto-sync (socket handles instant updates)
             return () => clearInterval(interval);
         }
-    }, [open, fetchLoungeState]);
+    }, [deferNonCriticalLiveApi, fetchLoungeState, open]);
 
     // ✅ CLEAR STALE WAITING STATE: Reset isWaitingForAssignment when overlay opens
     // This prevents showing "Waiting for room assignment" after user leaves breakout room
@@ -1000,6 +1010,7 @@ const LoungeOverlay = ({
                                 onDeleteTable={handleOpenDeleteTable}
                                 onParticipantClick={onParticipantClick}
                                 loungeOpenStatus={loungeOpenStatus}
+                                deferKycLookup={deferNonCriticalLiveApi}
                             />
 
                             {breakoutTables.length > 0 && (
@@ -1025,6 +1036,7 @@ const LoungeOverlay = ({
                                         onDeleteTable={handleOpenDeleteTable}
                                         onParticipantClick={onParticipantClick}
                                         loungeOpenStatus={loungeOpenStatus}
+                                        deferKycLookup={deferNonCriticalLiveApi}
                                     />
                                 </Box>
                             )}

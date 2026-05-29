@@ -17,6 +17,7 @@ const LoungeTable = ({
     onDeleteTable,
     onParticipantClick,
     loungeOpenStatus, // ✅ NEW: lounge availability status
+    deferKycLookup = false,
 }) => {
     const isUserAtThisTable = Object.values(table.participants || {}).some((p) => {
         return String(p.user_id) === String(currentUserId) || p.username === myUsername;
@@ -265,6 +266,7 @@ const LoungeTable = ({
                                     seatSize={tableDimensions.seatSize}
                                     participant={slot.participant}
                                     onParticipantClick={slot.participant ? onParticipantClick : undefined}
+                                    deferKycLookup={deferKycLookup}
                                 />
                             </Box>
                         ));
