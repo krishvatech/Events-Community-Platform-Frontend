@@ -2447,6 +2447,28 @@ export default function NewLiveMeeting() {
   const askedMediaPermRef = useRef(false);
   const [roomJoined, setRoomJoined] = useState(false);
   const roomJoinedRef = useRef(false); // ✅ Track roomJoined state for async contexts (e.g., breakout rejoin)
+  const [liveCriticalReady, setLiveCriticalReady] = useState(false);
+  const [allowDeferredLiveData, setAllowDeferredLiveData] = useState(false);
+  const deferNonCriticalLiveApi = !liveCriticalReady && !allowDeferredLiveData;
+  const deferredLiveApiLogRef = useRef(false);
+
+  useEffect(() => {
+    setLiveCriticalReady(false);
+    setAllowDeferredLiveData(false);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (roomJoined) {
+      setLiveCriticalReady(true);
+    }
+  }, [roomJoined]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAllowDeferredLiveData(true);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [eventId]);
 
   // ✅ Local join timer (per user)
   const joinedAtRef = useRef(null);
@@ -2857,6 +2879,14 @@ export default function NewLiveMeeting() {
       setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
       return;
     }
+    // Defer non-critical API during mass live join to reduce DB/API storm
+    if (deferNonCriticalLiveApi) {
+      if (import.meta.env?.DEV && !deferredLiveApiLogRef.current) {
+        deferredLiveApiLogRef.current = true;
+        console.debug("[LiveMeeting] Deferred non-critical API until liveCriticalReady");
+      }
+      return;
+    }
 
     const headers = { accept: "application/json", ...authHeader() };
 
@@ -2882,7 +2912,7 @@ export default function NewLiveMeeting() {
     })();
 
     return () => { isMounted = false; };
-  }, [participantKycCache]);
+  }, [deferNonCriticalLiveApi, participantKycCache]);
 
   const getKnownKycStatus = useCallback((entity) => {
     if (!entity) return "";
@@ -7465,6 +7495,7 @@ export default function NewLiveMeeting() {
       return;
     }
     if (!eventId) return;
+    if (deferNonCriticalLiveApi) return;
 
     // ✅ CRITICAL FOR PARTICIPANTS: Stop polling once meeting ends
     // On server, polling can reset lounge status before backend catches up
@@ -7489,10 +7520,11 @@ export default function NewLiveMeeting() {
     } catch (e) {
       // ignore transient errors
     }
-  }, [eventId, role]);
+  }, [deferNonCriticalLiveApi, eventId, role]);
 
   useEffect(() => {
     if (!eventId) return;
+    if (deferNonCriticalLiveApi) return;
     fetchLoungeState();
     const interval = setInterval(() => {
       // Avoid too-frequent fetches if other updates already happened
@@ -7501,7 +7533,7 @@ export default function NewLiveMeeting() {
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [eventId, fetchLoungeState]);
+  }, [deferNonCriticalLiveApi, eventId, fetchLoungeState]);
 
   useEffect(() => {
     if (
@@ -7565,6 +7597,25 @@ export default function NewLiveMeeting() {
         });
 
         const data = await res.json().catch(() => null);
+
+        if (res.status === 202 && data?.queued) {
+          const retryAfter = Number.parseInt(data?.retry_after, 10);
+          const normalizedRetryAfter = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 2;
+
+          console.warn(
+            "[Reconnect] Live rejoin queued:",
+            data?.reason || "live_rejoin_busy",
+            data?.message || "Restoring live session, please wait..."
+          );
+          return {
+            success: false,
+            busy: true,
+            reason: data?.reason || "live_rejoin_busy",
+            detail: data?.message || "Restoring live session, please wait...",
+            retryAfter: normalizedRetryAfter,
+            terminal: false,
+          };
+        }
 
         if (!res.ok) {
           // Check if auth token expired (401)
@@ -7653,12 +7704,18 @@ export default function NewLiveMeeting() {
 
   // ✅ AUTO-RECONNECT: Main function to attempt reconnect
   const initiateAutoReconnect = async () => {
-    const MAX_ATTEMPTS = 30; // 30 attempts × 2 seconds = 60 seconds max
+    const MAX_ATTEMPTS = 60; // bounded retry loop
     const RETRY_INTERVAL = 2000; // 2 seconds
 
     // ✅ GUARD: Mark as reconnecting to prevent automatic leave handlers
     isReconnectingRef.current = true;
     console.log("[Reconnect] Set isReconnectingRef = true, will not auto-leave during reconnect");
+
+    const scheduleNextAttempt = (delaySeconds = RETRY_INTERVAL / 1000) => {
+      clearReconnectTimer();
+      const delayMs = Math.max(1000, Math.round(delaySeconds * 1000));
+      reconnectTimerRef.current = setTimeout(attemptReconnect, delayMs);
+    };
 
     const attemptReconnect = async () => {
       if (reconnectAttemptRef.current >= MAX_ATTEMPTS) {
@@ -7717,9 +7774,18 @@ export default function NewLiveMeeting() {
         return;
       }
 
+      if (rejoinResult?.busy) {
+        const retryAfter = Number.isFinite(rejoinResult.retryAfter) && rejoinResult.retryAfter > 0
+          ? rejoinResult.retryAfter
+          : RETRY_INTERVAL / 1000;
+        console.log(`[Reconnect] Live rejoin busy, retrying in ${retryAfter}s`);
+        setReconnectMessage(`Restoring live session, please wait... (${reconnectAttemptRef.current}/${MAX_ATTEMPTS})`);
+        scheduleNextAttempt(retryAfter);
+        return;
+      }
+
       // Schedule next retry
-      clearReconnectTimer();
-      reconnectTimerRef.current = setTimeout(attemptReconnect, RETRY_INTERVAL);
+      scheduleNextAttempt(RETRY_INTERVAL / 1000);
     };
 
     // Start attempting
@@ -10182,6 +10248,7 @@ export default function NewLiveMeeting() {
 
       console.log("[LiveMeeting] ✅ roomJoined event received!");
       setRoomJoined(true);
+      setLiveCriticalReady(true);
       // Clear stale departed tracking after successful rejoin so host tiles are not incorrectly filtered.
       departedParticipantIdsRef.current.clear();
       if (isBreakoutRef.current) {
@@ -10260,7 +10327,10 @@ export default function NewLiveMeeting() {
     rtkMeeting.self.on?.("roomJoined", onRoomJoined);
 
     // refresh case
-    if (rtkMeeting.self.roomJoined) setRoomJoined(true);
+    if (rtkMeeting.self.roomJoined) {
+      setRoomJoined(true);
+      setLiveCriticalReady(true);
+    }
 
     (async () => {
       // ✅ Multiple guards against concurrent join calls
@@ -14799,6 +14869,7 @@ export default function NewLiveMeeting() {
 
   const fetchChatMessages = useCallback(
     async (conversationId) => {
+      if (deferNonCriticalLiveApi) return;
       const cid = conversationId || activeChatConversationId;
       if (!cid) return;
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
@@ -14808,10 +14879,11 @@ export default function NewLiveMeeting() {
       if (!res.ok) throw new Error(data?.detail || "Failed to load chat.");
       setChatMessages(Array.isArray(data) ? data : []);
     },
-    [activeChatConversationId]
+    [activeChatConversationId, deferNonCriticalLiveApi]
   );
 
   const ensureEventConversation = useCallback(async () => {
+    if (deferNonCriticalLiveApi) return null;
     if (!eventId) return null;
     if (!hasLiveInteractiveAccess) {
       throw new Error("Chat becomes available after you join the live event.");
@@ -14845,9 +14917,10 @@ export default function NewLiveMeeting() {
         ensureEventConversationPromiseRef.current = null;
       }
     }
-  }, [chatConversationId, eventId, hasLiveInteractiveAccess]);
+  }, [chatConversationId, deferNonCriticalLiveApi, eventId, hasLiveInteractiveAccess]);
 
   const ensureSeatedInLounge = useCallback(async () => {
+    if (deferNonCriticalLiveApi) return null;
     if (!eventId) return null;
     try {
       const res = await fetch(toApiUrl(`events/${eventId}/lounge/ensure-seated/`), {
@@ -14866,9 +14939,10 @@ export default function NewLiveMeeting() {
       console.warn("[LoungeSeat] Error ensuring seated:", error?.message || error);
       throw error;
     }
-  }, [eventId, activeTableId]);
+  }, [activeTableId, deferNonCriticalLiveApi, eventId]);
 
   const ensureLoungeConversation = useCallback(async () => {
+    if (deferNonCriticalLiveApi) return null;
     if (!activeTableId) return null;
     if (roomChatConversationId) return roomChatConversationId;
     if (ensureLoungeConversationPromiseRef.current) {
@@ -14924,7 +14998,7 @@ export default function NewLiveMeeting() {
         ensureLoungeConversationPromiseRef.current = null;
       }
     }
-  }, [activeRoomLabel, activeTableId, ensureSeatedInLounge, roomChatConversationId]);
+  }, [activeRoomLabel, activeTableId, deferNonCriticalLiveApi, ensureSeatedInLounge, roomChatConversationId]);
 
   const ensureActiveConversation = useCallback(async () => {
     if (isRoomChatActive) return ensureLoungeConversation();
@@ -14933,6 +15007,7 @@ export default function NewLiveMeeting() {
 
   const fetchChatUnread = useCallback(async () => {
     try {
+      if (deferNonCriticalLiveApi) return 0;
       if (!hasLiveInteractiveAccess) return 0;
       const cid = activeChatConversationId;
       if (!cid) return 0;
@@ -14948,7 +15023,7 @@ export default function NewLiveMeeting() {
     } catch {
       return 0;
     }
-  }, [activeChatConversationId, hasLiveInteractiveAccess]);
+  }, [activeChatConversationId, deferNonCriticalLiveApi, hasLiveInteractiveAccess]);
 
   const MARK_ALL_READ_COOLDOWN_MS = 7000;
   const markAllReadPendingRef = useRef(new Set());
@@ -14963,6 +15038,7 @@ export default function NewLiveMeeting() {
     conversationId,
     { force = false, clearEventUnread = false, clearPrivateRecipientId = null } = {}
   ) => {
+    if (deferNonCriticalLiveApi) return false;
     const cid = conversationId ? String(conversationId) : "";
     if (!cid) return false;
     if (!isDocumentVisible()) return false;
@@ -15002,7 +15078,7 @@ export default function NewLiveMeeting() {
     } finally {
       markAllReadPendingRef.current.delete(cid);
     }
-  }, [isDocumentVisible]);
+  }, [deferNonCriticalLiveApi, isDocumentVisible]);
 
   const markChatAllRead = useCallback(async (conversationId) => {
     const cid = conversationId || activeChatConversationId;
@@ -15024,6 +15100,7 @@ export default function NewLiveMeeting() {
   const privateChatWsRef = useRef(null);
 
   const handleOpenPrivateChat = async (member) => {
+    if (deferNonCriticalLiveApi) return null;
     setPrivateChatUser(member);
     if (isMdUp) setRightPanelOpen(true);
     else setRightOpen(true);
@@ -15279,6 +15356,7 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (isGuest) return;
     if (!privateChatUser || !privateConversationId) return;
+    if (deferNonCriticalLiveApi) return;
 
     let alive = true;
 
@@ -15335,12 +15413,13 @@ export default function NewLiveMeeting() {
       alive = false;
       clearInterval(t);
     };
-  }, [isDocumentVisible, isGuest, markConversationAllRead, privateChatUser, privateConversationId]);
+  }, [deferNonCriticalLiveApi, isDocumentVisible, isGuest, markConversationAllRead, privateChatUser, privateConversationId]);
 
   // ✅ WebSocket listener for real-time edit/delete updates on private messages
   useEffect(() => {
     if (isGuest) return;
     if (!privateChatUser || !privateConversationId) return;
+    if (deferNonCriticalLiveApi) return;
 
     let alive = true;
 
@@ -15394,12 +15473,13 @@ export default function NewLiveMeeting() {
       console.warn("[PrivateChat WS] Failed to connect:", e);
       privateChatWsRef.current = null;
     }
-  }, [privateChatUser, privateConversationId, isGuest]);
+  }, [deferNonCriticalLiveApi, privateChatUser, privateConversationId, isGuest]);
 
   useEffect(() => {
     if (!hostPerms.chat) return;
     if (!eventId && !activeTableId) return;
     if (!hasLiveInteractiveAccess) return;
+    if (deferNonCriticalLiveApi) return;
 
     let alive = true;
     let tickInFlight = false;
@@ -15463,6 +15543,7 @@ export default function NewLiveMeeting() {
     fetchChatMessages,
     fetchChatUnread,
     markChatAllRead,
+    deferNonCriticalLiveApi,
   ]);
 
   // Auto-scroll private chat
@@ -15685,6 +15766,7 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!eventId || !activeTableId) return;
     if (activeTableName) return;
+    if (deferNonCriticalLiveApi) return;
 
     let alive = true;
     const loadTableName = async () => {
@@ -15708,13 +15790,14 @@ export default function NewLiveMeeting() {
     return () => {
       alive = false;
     };
-  }, [eventId, activeTableId, activeTableName]);
+  }, [deferNonCriticalLiveApi, eventId, activeTableId, activeTableName]);
 
   useEffect(() => {
     const chatActive = hostPerms.chat && tab === 0 && isPanelOpen;
     if (!chatActive || (!eventId && !activeTableId)) return;
+    if (deferNonCriticalLiveApi) return;
     loadChatThread();
-  }, [hostPerms.chat, tab, isPanelOpen, eventId, activeTableId, loadChatThread]);
+  }, [deferNonCriticalLiveApi, hostPerms.chat, tab, isPanelOpen, eventId, activeTableId, loadChatThread]);
 
   useEffect(() => {
     if (!isChatActive) return;
@@ -16060,6 +16143,7 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     const accessToken = localStorage.getItem("access_token");
     if (!accessToken) return;  // Only for authenticated users, not guests
+    if (deferNonCriticalLiveApi) return;
     (async () => {
       try {
         const d = await fetchCurrentUserPreferencesCached({
@@ -16071,7 +16155,7 @@ export default function NewLiveMeeting() {
         console.warn("Failed to load user profile for Q&A default", e);
       }
     })();
-  }, []);
+  }, [deferNonCriticalLiveApi]);
 
   // Initialize Q&A anonymous toggle from user preference
   useEffect(() => {
@@ -23179,11 +23263,13 @@ export default function NewLiveMeeting() {
             </TabPanel>
 
             <TabPanel value={tab} index={SUPPORT_TAB_INDEX}>
-              <HostSupportInbox
-                requests={supportRequests}
-                onMessage={handleMessageSupportRequester}
-                onResolve={handleResolveSupportRequest}
-              />
+              {!deferNonCriticalLiveApi ? (
+                <HostSupportInbox
+                  requests={supportRequests}
+                  onMessage={handleMessageSupportRequester}
+                  onResolve={handleResolveSupportRequest}
+                />
+              ) : null}
             </TabPanel>
           </Box>
         </>)
@@ -23452,6 +23538,7 @@ export default function NewLiveMeeting() {
         onJoinMain={forceRejoinMainFromLounge}
         eventSocketMessage={lastMessage}
         sendEventAction={sendMainSocketAction}
+        deferNonCriticalLiveApi={deferNonCriticalLiveApi}
       />
     ) : (
       <PreEventLoungeGate
@@ -23486,6 +23573,7 @@ export default function NewLiveMeeting() {
       <PostEventLoungeScreen
         closingTime={postEventLoungeClosingTime}
         loungeTables={loungeOnlyTables}
+        deferNonCriticalLiveApi={deferNonCriticalLiveApi}
         onJoinTable={(tableId, seatIndex) => {
           // ✅ Join lounge table - same as main lounge overlay
           mainSocketRef.current?.send(
@@ -23693,6 +23781,7 @@ export default function NewLiveMeeting() {
           onJoinMain={forceRejoinMainFromLounge}
           eventSocketMessage={lastMessage}
           sendEventAction={sendMainSocketAction}
+          deferNonCriticalLiveApi={deferNonCriticalLiveApi}
         />
         <PreEventQnAModal
           open={preEventQnaModalOpen}
@@ -27390,6 +27479,7 @@ export default function NewLiveMeeting() {
           onJoinMain={forceRejoinMainFromLounge}
           eventSocketMessage={lastMessage}
           sendEventAction={sendMainSocketAction}
+          deferNonCriticalLiveApi={deferNonCriticalLiveApi}
         />
         <LoungeSettingsDialog
           open={loungeSettingsOpen}
@@ -27609,32 +27699,34 @@ export default function NewLiveMeeting() {
         </Snackbar>
 
         {/* ✅ Notification History Popover */}
-        <Popover
-          open={Boolean(notifAnchorEl)}
-          anchorEl={notifAnchorEl}
-          onClose={() => setNotifAnchorEl(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          PaperProps={{
-            sx: {
-              bgcolor: '#111827',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 2,
-              width: 460,
-              maxWidth: 'calc(100vw - 24px)',
-              maxHeight: 480,
-            },
-          }}
-        >
-          <NotificationHistoryPanel
-            notifications={notificationHistory}
-            onClearAll={() => setNotificationHistory([])}
+        {!deferNonCriticalLiveApi ? (
+          <Popover
+            open={Boolean(notifAnchorEl)}
+            anchorEl={notifAnchorEl}
             onClose={() => setNotifAnchorEl(null)}
-            breakoutRooms={breakoutOnlyTables}
-            onAssign={handleAssignFromHistory}
-            assigningParticipantId={assigningParticipantId}
-          />
-        </Popover>
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            PaperProps={{
+              sx: {
+                bgcolor: '#111827',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 2,
+                width: 460,
+                maxWidth: 'calc(100vw - 24px)',
+                maxHeight: 480,
+              },
+            }}
+          >
+            <NotificationHistoryPanel
+              notifications={notificationHistory}
+              onClearAll={() => setNotificationHistory([])}
+              onClose={() => setNotifAnchorEl(null)}
+              breakoutRooms={breakoutOnlyTables}
+              onAssign={handleAssignFromHistory}
+              assigningParticipantId={assigningParticipantId}
+            />
+          </Popover>
+        ) : null}
 
         <Popover
           open={moodPickerOpen}

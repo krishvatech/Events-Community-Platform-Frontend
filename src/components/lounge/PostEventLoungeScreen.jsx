@@ -28,6 +28,7 @@ const PostEventLoungeScreen = ({
   onParticipantClick,
   loungeOpenStatus, // ✅ NEW: lounge availability status
   isHost = false, // ✅ NEW: whether user is the host
+  deferNonCriticalLiveApi = false,
 }) => {
   useTheme();
 
@@ -208,6 +209,7 @@ const PostEventLoungeScreen = ({
                   onDeleteTable={() => {}} // No delete in post-event mode
                   onParticipantClick={onParticipantClick}
                   loungeOpenStatus={loungeOpenStatus}
+                  deferKycLookup={deferNonCriticalLiveApi}
                 />
               </Grid>
             ))}

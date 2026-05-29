@@ -19,12 +19,13 @@ const toApiUrl = (pathOrUrl) => {
     }
 };
 
-const LoungeSeat = ({ participant, index, maxSeats, radius = 60, seatSize = { empty: 32, occupied: 36 }, onParticipantClick }) => {
+const LoungeSeat = ({ participant, index, maxSeats, radius = 60, seatSize = { empty: 32, occupied: 36 }, onParticipantClick, deferKycLookup = false }) => {
     const [isVerified, setIsVerified] = useState(false);
 
     // Fetch kyc_status if not available in participant data
     useEffect(() => {
         if (!participant) return;
+        if (deferKycLookup) return;
 
         // Check if kyc_status is already available in participant data
         if (participant?.kyc_status === "approved") {
@@ -62,7 +63,7 @@ const LoungeSeat = ({ participant, index, maxSeats, radius = 60, seatSize = { em
 
         fetchKycStatus();
         return () => { isMounted = false; };
-    }, [participant]);
+    }, [deferKycLookup, participant]);
 
     // ✅ PRODUCTION-READY DYNAMIC SEAT POSITIONING
     // Calculates seat positions for any table size (4, 6, 8, 10, 12, 15, 20, 40+)
