@@ -26,7 +26,12 @@ import {
   Skeleton,
   Tabs,
   Tab,
-  Paper
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions
 } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
@@ -391,6 +396,16 @@ function isConfirmedRegistration(reg) {
   if (!reg) return false;
   if (isPaymentPendingRegistration(reg)) return false;
   return !reg.attendee_status || reg.attendee_status === "confirmed";
+}
+
+function isSeriesRegisteredForCurrentUser(series, registrations = {}) {
+  if (typeof series?.is_registered === "boolean") return series.is_registered;
+
+  const seriesEvents = Array.isArray(series?.events) ? series.events : [];
+  return seriesEvents.some((event) => {
+    const eventId = event?.id ?? event;
+    return isConfirmedRegistration(registrations?.[eventId]);
+  });
 }
 
 function formatTierAmount(price, currency = "USD") {
@@ -2298,6 +2313,51 @@ export default function EventsPage() {
     }
   }, []);
 
+  const updateSeriesRegistrationFlag = (seriesId, isRegistered) => {
+    const updateSeries = (item) => {
+      if (!item) return item;
+      const wasRegistered = item.is_registered === true;
+      let registrationsCount = Number(item.registrations_count || 0);
+
+      if (isRegistered && !wasRegistered) {
+        registrationsCount += 1;
+      } else if (!isRegistered && wasRegistered) {
+        registrationsCount = Math.max(0, registrationsCount - 1);
+      }
+
+      return {
+        ...item,
+        is_registered: isRegistered,
+        registrations_count: registrationsCount,
+      };
+    };
+    const findKey = (map) => {
+      if (map.has(seriesId)) return seriesId;
+      return Array.from(map.keys()).find((key) => String(key) === String(seriesId));
+    };
+
+    setSeriesData((prev) => {
+      const key = findKey(prev);
+      if (typeof key === "undefined") return prev;
+      const next = new Map(prev);
+      next.set(key, updateSeries(next.get(key)));
+      return next;
+    });
+
+    const cacheKey = findKey(seriesCacheRef.current);
+    const cached = typeof cacheKey === "undefined" ? null : seriesCacheRef.current.get(cacheKey);
+    if (cached) {
+      seriesCacheRef.current.set(cacheKey, updateSeries(cached));
+    }
+  };
+
+  const markSeriesRegistered = (seriesId) => updateSeriesRegistrationFlag(seriesId, true);
+  const markSeriesUnregistered = (seriesId) => updateSeriesRegistrationFlag(seriesId, false);
+
+  // Modern confirmation dialog state for cancelling a series registration
+  const [seriesCancelTarget, setSeriesCancelTarget] = useState(null);
+  const [seriesCancelLoading, setSeriesCancelLoading] = useState(false);
+
   // Handler for series registration
   const handleSeriesRegister = async (seriesId) => {
     if (!getToken()) {
@@ -2315,6 +2375,7 @@ export default function EventsPage() {
       );
 
       if (response.ok) {
+        markSeriesRegistered(seriesId);
         toast.success('Successfully registered for series!');
       } else {
         const data = await response.json();
@@ -2322,6 +2383,57 @@ export default function EventsPage() {
       }
     } catch (error) {
       toast.error('Failed to register for series');
+    }
+  };
+
+  const handleSeriesCancelRegistration = async (series) => {
+    if (!series || series.registration_mode !== 'full_series_only') {
+      return;
+    }
+
+    if (!getToken()) {
+      navigate('/signin');
+      return;
+    }
+
+    // Open modern confirmation dialog instead of native window.confirm
+    setSeriesCancelTarget(series);
+  };
+
+  const confirmSeriesCancel = async () => {
+    const series = seriesCancelTarget;
+    if (!series) return;
+
+    try {
+      setSeriesCancelLoading(true);
+      const response = await fetch(
+        `${API_BASE}/series/${series.id}/unregister/`,
+        {
+          method: 'POST',
+          headers: { ...authConfig().headers, 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (response.ok) {
+        markSeriesUnregistered(series.id);
+        setMyRegistrations((prev) => {
+          const next = { ...prev };
+          (series.events || []).forEach((event) => {
+            const eventId = event?.id ?? event;
+            delete next[eventId];
+          });
+          return next;
+        });
+        toast.success('Series registration cancelled.');
+        setSeriesCancelTarget(null);
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.detail || data.error || 'Failed to cancel series registration');
+      }
+    } catch (error) {
+      toast.error('Failed to cancel series registration');
+    } finally {
+      setSeriesCancelLoading(false);
     }
   };
 
@@ -3783,91 +3895,99 @@ export default function EventsPage() {
                     )}
 
                     {/* Display Series Cards (full_series_only) */}
-                    {Array.from(seriesToDisplay.values()).map((series) => (
-                      <div
-                        key={`series-${series.id}`}
-                        className="rounded-lg border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full"
-                      >
-                        {/* Cover Image */}
-                        {series.cover_image && (
-                          <div className="relative w-full h-64 overflow-hidden bg-neutral-100">
-                            <img
-                              src={series.cover_image}
-                              alt={series.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
+                    {Array.from(seriesToDisplay.values()).map((series) => {
+                      const isSeriesRegistered = isSeriesRegisteredForCurrentUser(series, myRegistrations);
 
-                        {/* Content */}
-                        <div className="p-4 flex flex-col flex-grow">
-                          {/* Badges */}
-                          <div className="flex gap-2 mb-3">
-                            <Chip
-                              label="SERIES"
-                              size="small"
-                              color="primary"
-                              sx={{ fontWeight: 600, height: 24 }}
-                            />
-                            <Chip
-                              label={series.status?.toUpperCase() || 'DRAFT'}
-                              size="small"
-                              color={series.status === 'published' ? 'success' : 'default'}
-                              sx={{ fontWeight: 600, height: 24 }}
-                            />
-                          </div>
-
-                          {/* Title */}
-                          <h3 className="text-lg font-bold text-neutral-900 mb-2 leading-tight">
-                            {series.title}
-                          </h3>
-
-                          {/* Description */}
-                          <p className="text-sm text-neutral-600 mb-4 line-clamp-2">
-                            {series.description || 'No description available'}
-                          </p>
-
-                          {/* Events Count */}
-                          <div className="flex items-center gap-4 mb-4 pb-4 border-b border-neutral-100">
-                            <div className="flex items-center gap-2">
-                              <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                              <span className="text-xs font-medium text-neutral-700">
-                                {series.events_count || 0} {series.events_count === 1 ? 'Event' : 'Events'}
-                              </span>
+                      return (
+                        <div
+                          key={`series-${series.id}`}
+                          className="rounded-lg border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full"
+                        >
+                          {/* Cover Image */}
+                          {series.cover_image && (
+                            <div className="relative w-full h-64 overflow-hidden bg-neutral-100">
+                              <img
+                                src={series.cover_image}
+                                alt={series.title}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
-                            <div className="flex items-center gap-2">
-                              <GroupsIcon fontSize="small" className="text-teal-700" />
-                              <span className="text-xs font-medium text-neutral-700">
-                                {series.registrations_count || 0} Registered
-                              </span>
-                            </div>
-                          </div>
+                          )}
 
-                          {/* Price */}
-                          <div className="mb-4">
-                            <p className="text-sm font-semibold text-teal-700">
-                              {series.is_free ? 'Free to Join' : `$${series.price}`}
+                          {/* Content */}
+                          <div className="p-4 flex flex-col flex-grow">
+                            {/* Badges */}
+                            <div className="flex gap-2 mb-3">
+                              <Chip
+                                label="SERIES"
+                                size="small"
+                                color="primary"
+                                sx={{ fontWeight: 600, height: 24 }}
+                              />
+                              <Chip
+                                label={series.status?.toUpperCase() || 'DRAFT'}
+                                size="small"
+                                color={series.status === 'published' ? 'success' : 'default'}
+                                sx={{ fontWeight: 600, height: 24 }}
+                              />
+                            </div>
+
+                            {/* Title */}
+                            <h3 className="text-lg font-bold text-neutral-900 mb-2 leading-tight">
+                              {series.title}
+                            </h3>
+
+                            {/* Description */}
+                            <p className="text-sm text-neutral-600 mb-4 line-clamp-2">
+                              {series.description || 'No description available'}
                             </p>
-                          </div>
 
-                          {/* Buttons */}
-                          <div className="flex gap-2 mt-auto pt-2">
-                            <button
-                              onClick={() => navigate(`/series/${series.slug}`)}
-                              className="flex-1 rounded-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 text-sm transition-colors"
-                            >
-                              View Series
-                            </button>
-                            <button
-                              onClick={() => handleSeriesRegister(series.id)}
-                              className="flex-1 rounded-full border-2 border-teal-600 text-teal-600 hover:bg-teal-50 font-semibold py-2 px-4 text-sm transition-colors"
-                            >
-                              Register
-                            </button>
+                            {/* Events Count */}
+                            <div className="flex items-center gap-4 mb-4 pb-4 border-b border-neutral-100">
+                              <div className="flex items-center gap-2">
+                                <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                                <span className="text-xs font-medium text-neutral-700">
+                                  {series.events_count || 0} {series.events_count === 1 ? 'Event' : 'Events'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <GroupsIcon fontSize="small" className="text-teal-700" />
+                                <span className="text-xs font-medium text-neutral-700">
+                                  {series.registrations_count || 0} Registered
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Price */}
+                            <div className="mb-4">
+                              <p className="text-sm font-semibold text-teal-700">
+                                {series.is_free ? 'Free to Join' : `$${series.price}`}
+                              </p>
+                            </div>
+
+                            {/* Buttons */}
+                            <div className="flex gap-2 mt-auto pt-2">
+                              <button
+                                onClick={() => navigate(`/series/${series.slug}`)}
+                                className="rounded-full bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                              >
+                                View Series
+                              </button>
+                              <button
+                                onClick={() => isSeriesRegistered ? handleSeriesCancelRegistration(series) : handleSeriesRegister(series.id)}
+                                className={`rounded-full border-2 text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors ${
+                                  isSeriesRegistered
+                                    ? 'border-red-600 text-red-600 hover:bg-red-50'
+                                    : 'border-teal-600 text-teal-600 hover:bg-teal-50'
+                                }`}
+                              >
+                                {isSeriesRegistered ? 'Cancel Registration' : 'Register'}
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {/* Display Individual Event Cards */}
                     {eventsToDisplay.map((ev) => (
@@ -3925,76 +4045,84 @@ export default function EventsPage() {
                     )}
 
                     {/* Display Series Cards (list view) */}
-                    {Array.from(seriesToDisplay.values()).map((series) => (
-                      <Grid item key={`series-${series.id}`} xs={12}>
-                        <div className="rounded-lg border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex gap-4 p-4">
-                          {/* Cover Image */}
-                          {series.cover_image && (
-                            <div className="w-32 h-32 flex-shrink-0">
-                              <img
-                                src={series.cover_image}
-                                alt={series.title}
-                                className="w-full h-full object-cover rounded-lg"
-                              />
-                            </div>
-                          )}
+                    {Array.from(seriesToDisplay.values()).map((series) => {
+                      const isSeriesRegistered = isSeriesRegisteredForCurrentUser(series, myRegistrations);
 
-                          {/* Content */}
-                          <div className="flex-1 flex flex-col justify-between">
-                            <div>
-                              {/* Badges */}
-                              <div className="flex gap-2 mb-2">
-                                <Chip
-                                  label="SERIES"
-                                  size="small"
-                                  color="primary"
-                                  sx={{ fontWeight: 600, height: 24 }}
-                                />
-                                <Chip
-                                  label={series.status?.toUpperCase() || 'DRAFT'}
-                                  size="small"
-                                  color={series.status === 'published' ? 'success' : 'default'}
-                                  sx={{ fontWeight: 600, height: 24 }}
+                      return (
+                        <Grid item key={`series-${series.id}`} xs={12}>
+                          <div className="rounded-lg border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex gap-4 p-4">
+                            {/* Cover Image */}
+                            {series.cover_image && (
+                              <div className="w-32 h-32 flex-shrink-0">
+                                <img
+                                  src={series.cover_image}
+                                  alt={series.title}
+                                  className="w-full h-full object-cover rounded-lg"
                                 />
                               </div>
+                            )}
 
-                              {/* Title */}
-                              <h3 className="text-base font-bold text-neutral-900 mb-1">
-                                {series.title}
-                              </h3>
+                            {/* Content */}
+                            <div className="flex-1 flex flex-col justify-between">
+                              <div>
+                                {/* Badges */}
+                                <div className="flex gap-2 mb-2">
+                                  <Chip
+                                    label="SERIES"
+                                    size="small"
+                                    color="primary"
+                                    sx={{ fontWeight: 600, height: 24 }}
+                                  />
+                                  <Chip
+                                    label={series.status?.toUpperCase() || 'DRAFT'}
+                                    size="small"
+                                    color={series.status === 'published' ? 'success' : 'default'}
+                                    sx={{ fontWeight: 600, height: 24 }}
+                                  />
+                                </div>
 
-                              {/* Metadata */}
-                              <div className="flex gap-4 text-sm text-neutral-600">
-                                <span className="flex items-center gap-1">
-                                  <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                                  {series.events_count || 0} {series.events_count === 1 ? 'Event' : 'Events'}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <GroupsIcon fontSize="small" className="text-teal-700" />
-                                  {series.registrations_count || 0} Registered
-                                </span>
+                                {/* Title */}
+                                <h3 className="text-base font-bold text-neutral-900 mb-1">
+                                  {series.title}
+                                </h3>
+
+                                {/* Metadata */}
+                                <div className="flex gap-4 text-sm text-neutral-600">
+                                  <span className="flex items-center gap-1">
+                                    <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                                    {series.events_count || 0} {series.events_count === 1 ? 'Event' : 'Events'}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <GroupsIcon fontSize="small" className="text-teal-700" />
+                                    {series.registrations_count || 0} Registered
+                                  </span>
+                                </div>
                               </div>
-                            </div>
 
-                            {/* Buttons */}
-                            <div className="flex gap-2 mt-3 pt-3 border-t border-neutral-100">
-                              <button
-                                onClick={() => navigate(`/series/${series.slug}`)}
-                                className="flex-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 text-sm transition-colors"
-                              >
-                                View Series
-                              </button>
-                              <button
-                                onClick={() => handleSeriesRegister(series.id)}
-                                className="flex-1 rounded-lg border-2 border-teal-600 text-teal-600 hover:bg-teal-50 font-semibold py-2 px-4 text-sm transition-colors"
-                              >
-                                Register
-                              </button>
+                              {/* Buttons */}
+                              <div className="flex gap-2 mt-3 pt-3 border-t border-neutral-100">
+                                <button
+                                  onClick={() => navigate(`/series/${series.slug}`)}
+                                  className="rounded-full bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                                >
+                                  View Series
+                                </button>
+                                <button
+                                  onClick={() => isSeriesRegistered ? handleSeriesCancelRegistration(series) : handleSeriesRegister(series.id)}
+                                  className={`rounded-full border-2 text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors ${
+                                    isSeriesRegistered
+                                      ? 'border-red-600 text-red-600 hover:bg-red-50'
+                                      : 'border-teal-600 text-teal-600 hover:bg-teal-50'
+                                  }`}
+                                >
+                                  {isSeriesRegistered ? 'Cancel Registration' : 'Register'}
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </Grid>
-                    ))}
+                        </Grid>
+                      );
+                    })}
 
                     {/* Display Individual Event Cards (list view) */}
                     {eventsToDisplay.map((ev) => (
@@ -4254,6 +4382,41 @@ export default function EventsPage() {
             </div>
           </Drawer>
         )}
+
+        {/* Series cancel registration confirmation dialog */}
+        <Dialog
+          open={!!seriesCancelTarget}
+          onClose={() => { if (!seriesCancelLoading) setSeriesCancelTarget(null); }}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 2 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Cancel series registration?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to cancel your registration for{' '}
+              <strong>{seriesCancelTarget?.title}</strong>? This will remove you from all events in this series.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => setSeriesCancelTarget(null)}
+              disabled={seriesCancelLoading}
+              sx={{ textTransform: 'none' }}
+            >
+              Keep Registration
+            </Button>
+            <Button
+              onClick={confirmSeriesCancel}
+              color="error"
+              variant="contained"
+              disabled={seriesCancelLoading}
+              sx={{ textTransform: 'none' }}
+            >
+              {seriesCancelLoading ? 'Cancelling…' : 'Cancel Registration'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
 
             {/* Available Replays Tab */}
