@@ -921,13 +921,15 @@ function Speakers({ eventData = {} }) {
 
       // Extract professional info (job_title from profile or bio text)
       const professionalInfo = participant.professional_info?.split('\n')[0] || participant.participant_type_label || '';
+      // For expanded view, use bio field if available, otherwise fallback to professional_info
+      const bioText = participant.bio || participant.professional_info || '';
 
       return {
         name: participant.display_name || 'Participant',
         role: participant.role_label || '', // Role label (Speaker, Host, Moderator, etc.)
         org: professionalInfo, // Professional info / experience from job_title or bio
         initials,
-        bio: participant.professional_info || '', // Full info for bio panel
+        bio: bioText, // Full info for bio panel
         image: participant.avatar_url,
       };
     });
