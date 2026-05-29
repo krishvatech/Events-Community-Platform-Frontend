@@ -1103,6 +1103,7 @@ export default function MembersPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
+  const [mapUsers, setMapUsers] = useState([]);
   const [rosterTotal, setRosterTotal] = useState(0);
   const [q, setQ] = useState("");
 
@@ -1393,6 +1394,54 @@ export default function MembersPage() {
     return () => { alive = false; ctrl.abort(); };
   }, [q, page, ROWS_PER_PAGE, me?.id]);
 
+  // Fetch map users separately (all members, no pagination)
+  useEffect(() => {
+    const ctrl = new AbortController();
+    let alive = true;
+
+    (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (q && q.trim()) {
+          params.append('search', q.trim());
+        }
+
+        const url = `${API_BASE}/users/roster-map/?${params.toString()}`;
+
+        const res = await fetch(url, {
+          headers: tokenHeader(),
+          signal: ctrl.signal,
+          credentials: "include",
+        });
+
+        const text = await res.text();
+        const json = text ? JSON.parse(text) : null;
+
+        if (!res.ok) {
+          console.error("Failed to load map users");
+          return;
+        }
+
+        if (!alive) return;
+
+        let list = [];
+        if (Array.isArray(json)) {
+          list = json;
+        } else if (json && json.results && Array.isArray(json.results)) {
+          list = json.results;
+        }
+
+        setMapUsers((list || []).filter(u => !u.is_superuser));
+      } catch (e) {
+        if (!isAbort(e)) {
+          console.error("Error fetching map users:", e);
+        }
+      }
+    })();
+
+    return () => { alive = false; ctrl.abort(); };
+  }, [q]);
+
 
   const filtered = useMemo(() => {
     let sourceList = users;
@@ -1459,6 +1508,73 @@ export default function MembersPage() {
     viewerIsStaff,
   ]);
 
+  // Apply same filters to mapUsers as filtered list
+  const filteredMapUsers = useMemo(() => {
+    let sourceList = mapUsers;
+
+    // 🔒 PRIVACY FILTER: Remove hidden users (unless current user or admin viewing)
+    sourceList = sourceList.filter((u) => {
+      const isHidden = !!u.profile?.directory_hidden;
+      const isCurrentUser = me?.id && String(me.id) === String(u.id);
+      const isAdmin = viewerIsStaff;
+
+      // Show if: NOT hidden OR is current user OR is admin
+      return !isHidden || isCurrentUser || isAdmin;
+    });
+
+    // Tab filter (All Members / My Contacts)
+    if (tabValue === 1) {
+      sourceList = sourceList.filter((u) => {
+        const status = (friendStatusByUser[u.id] || "").toLowerCase();
+        return status === "friends";
+      });
+    }
+
+    // Company filter
+    if (selectedCompanies.length) {
+      sourceList = sourceList.filter((u) =>
+        selectedCompanies.includes(getCompanyFromUser(u))
+      );
+    }
+
+    // Country filter
+    if (selectedCountries.length) {
+      sourceList = sourceList.filter((u) =>
+        selectedCountries.includes(getCountryFromUser(u))
+      );
+    }
+
+    // Job title filter
+    if (selectedTitles.length) {
+      sourceList = sourceList.filter((u) =>
+        selectedTitles.includes(getJobTitleFromUser(u))
+      );
+    }
+
+    // Industry filter
+    if (selectedIndustries.length) {
+      sourceList = sourceList.filter((u) => selectedIndustries.includes(getIndustryFromUser(u)));
+    }
+
+    // Company size filter
+    if (selectedCompanySizes.length) {
+      sourceList = sourceList.filter((u) => selectedCompanySizes.includes(getCompanySizeFromUser(u)));
+    }
+
+    return sourceList;
+  }, [
+    mapUsers,
+    tabValue,
+    friendStatusByUser,
+    selectedCompanies,
+    selectedCountries,
+    selectedTitles,
+    selectedIndustries,
+    selectedCompanySizes,
+    me?.id,
+    viewerIsStaff,
+  ]);
+
 
   useEffect(() => {
     let alive = true;
@@ -1483,7 +1599,7 @@ export default function MembersPage() {
 
   const cityKeyEntries = useMemo(() => {
     const map = new Map();
-    for (const u of filtered) {
+    for (const u of filteredMapUsers) {
       const city = resolveCityName(u);
       if (!city) continue;
       const code = resolveCountryCode(u);
@@ -1491,7 +1607,7 @@ export default function MembersPage() {
       if (!map.has(key)) map.set(key, { city, countryCode: code });
     }
     return Array.from(map.entries()).map(([key, val]) => ({ key, ...val }));
-  }, [filtered]);
+  }, [filteredMapUsers]);
 
   useEffect(() => {
     let alive = true;
@@ -1536,7 +1652,7 @@ export default function MembersPage() {
 
   const liveMarkers = useMemo(() => {
     const byCity = {};
-    for (const u of filtered) {
+    for (const u of filteredMapUsers) {
       const code = resolveCountryCode(u).toLowerCase();
       const city = resolveCityName(u);
       const key = city
@@ -1580,11 +1696,11 @@ export default function MembersPage() {
       });
     });
     return out;
-  }, [filtered, friendStatusByUser, cityCenters, getCenterForISO2]);
+  }, [filteredMapUsers, friendStatusByUser, cityCenters, getCenterForISO2]);
 
   const countryAgg = useMemo(() => {
     const map = {};
-    for (const u of filtered) {
+    for (const u of filteredMapUsers) {
       const code = resolveCountryCode(u).toLowerCase();
       const center = getCenterForISO2(code);
       if (!center) continue;
@@ -1602,7 +1718,7 @@ export default function MembersPage() {
       if (isFriend) map[code].friends += 1;
     }
     return Object.values(map).map((e) => ({ ...e, total: e.users.length }));
-  }, [filtered, friendStatusByUser]);
+  }, [filteredMapUsers, friendStatusByUser]);
 
   const markers = liveMarkers;
 
@@ -1637,6 +1753,26 @@ export default function MembersPage() {
     })();
     return () => { alive = false; };
   }, [current.map((u) => u.id).join(",")]);
+
+  // Load friend status for map users only when on "My Contacts" tab
+  useEffect(() => {
+    if (tabValue !== 1) return; // Only load for "My Contacts" tab
+    let alive = true;
+    const idsToLoad = mapUsers.map((u) => u.id).filter((id) => friendStatusByUser[id] === undefined);
+    if (!idsToLoad.length) return;
+    (async () => {
+      try {
+        const entries = await Promise.all(
+          idsToLoad.map(async (id) => {
+            try { const s = await fetchFriendStatus(id); return [id, s]; }
+            catch { return [id, "none"]; }
+          })
+        );
+        if (alive) setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
+      } catch { }
+    })();
+    return () => { alive = false; };
+  }, [tabValue, mapUsers.map((u) => u.id).join("|")]);
 
   const handleOpenProfile = (m) => {
     const id = m?.id;
