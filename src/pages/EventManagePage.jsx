@@ -4320,7 +4320,7 @@ export default function EventManagePage() {
           />
         </Stack>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mb: 2 }}>
           <TextField
             fullWidth
             size="small"
@@ -4335,7 +4335,7 @@ export default function EventManagePage() {
               ),
             }}
           />
-          <FormControl size="small" sx={{ minWidth: 180 }}>
+          <FormControl size="small" sx={{ width: { xs: "100%", md: 180 } }}>
             <Select
               value={guestAuditSort}
               onChange={(e) => setGuestAuditSort(e.target.value)}
@@ -4364,12 +4364,16 @@ export default function EventManagePage() {
               borderRadius: 2,
               border: "1px solid",
               borderColor: "divider",
-              overflow: "hidden",
+              overflowX: "auto",
+              overflowY: "hidden",
+              width: "100%",
+              maxWidth: "100%",
+              WebkitOverflowScrolling: "touch",
             }}
           >
-            <Table size="small">
+            <Table size="small" sx={{ minWidth: 1150 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "grey.50", "& th": { fontSize: 13, color: "text.secondary" } }}>
+                <TableRow sx={{ bgcolor: "grey.50", "& th": { fontSize: 13, color: "text.secondary", whiteSpace: "nowrap", verticalAlign: "top" } }}>
                   <TableCell>Guest</TableCell>
                   <TableCell>Guest Email</TableCell>
                   <TableCell>Registered Account</TableCell>
@@ -4381,7 +4385,7 @@ export default function EventManagePage() {
               </TableHead>
               <TableBody>
                 {filteredGuestAuditRows.map((row) => (
-                  <TableRow key={row.guest_id} hover>
+                  <TableRow key={row.guest_id} hover sx={{ "& td": { whiteSpace: "nowrap", verticalAlign: "top" } }}>
                     <TableCell sx={{ minWidth: 180 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {row.name || "Guest"}
