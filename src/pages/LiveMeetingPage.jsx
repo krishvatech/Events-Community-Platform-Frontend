@@ -3079,9 +3079,12 @@ export default function NewLiveMeeting() {
             1000,
             Number(data.retry_after || 2) * 1000
           );
+          // ✅ PHASE 1: Add jitter to prevent thundering herd
+          const jitterMs = Math.floor(Math.random() * 1000);
+          const delayWithJitterMs = retryAfterMs + jitterMs;
 
           console.log(
-            `${logPrefix} Join queued. Retry ${queuedAttempts}/${maxQueuedAttempts} in ${retryAfterMs}ms`,
+            `${logPrefix} Join queued. Retry ${queuedAttempts}/${maxQueuedAttempts} in ${delayWithJitterMs}ms (base ${retryAfterMs}ms + jitter ${jitterMs}ms)`,
             data
           );
 
@@ -3092,7 +3095,7 @@ export default function NewLiveMeeting() {
             throw new Error(data?.message || "Joining is busy. Please try again.");
           }
 
-          await sleep(retryAfterMs);
+          await sleep(delayWithJitterMs);
           continue;
         }
 
@@ -7445,9 +7448,24 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!eventId || !waitingRoomActive) return;
     let alive = true;
+    let isPolling = false; // ✅ PHASE 1: Prevent overlapping polling calls
 
     const poll = async () => {
+      // ✅ PHASE 1: Skip if tab is hidden (reduce wasted API calls)
+      if (document.hidden) {
+        console.log("[LiveMeeting] Skipping waiting room poll - tab is hidden");
+        return;
+      }
+
+      // ✅ PHASE 1: Prevent overlapping calls
+      if (isPolling) {
+        console.log("[LiveMeeting] Skipping waiting room poll - already in flight");
+        return;
+      }
+
       if (!alive) return;
+
+      isPolling = true;
       try {
         const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/status/`), {
           headers: { ...authHeader() },
@@ -7478,10 +7496,16 @@ export default function NewLiveMeeting() {
           setWaitingRoomNetworkingAllowed(Boolean(data?.networking_allowed));
         }
       } catch { }
+      finally {
+        isPolling = false;
+      }
     };
 
     poll();
-    const t = setInterval(poll, 3000);
+    // ✅ PHASE 1: Reduce polling from 3s to 10s + random 5s (10-15s range)
+    const pollDelayMs = 10000 + Math.floor(Math.random() * 5000);
+    const t = setInterval(poll, pollDelayMs);
+    console.log(`[LiveMeeting] Waiting room polling scheduled every ${pollDelayMs}ms`);
     return () => {
       alive = false;
       clearInterval(t);
@@ -7714,7 +7738,10 @@ export default function NewLiveMeeting() {
     const scheduleNextAttempt = (delaySeconds = RETRY_INTERVAL / 1000) => {
       clearReconnectTimer();
       const delayMs = Math.max(1000, Math.round(delaySeconds * 1000));
-      reconnectTimerRef.current = setTimeout(attemptReconnect, delayMs);
+      // ✅ PHASE 1: Add jitter to prevent thundering herd on rejoin
+      const jitterMs = Math.floor(Math.random() * 1500);
+      const delayWithJitterMs = delayMs + jitterMs;
+      reconnectTimerRef.current = setTimeout(attemptReconnect, delayWithJitterMs);
     };
 
     const attemptReconnect = async () => {
@@ -9077,9 +9104,22 @@ export default function NewLiveMeeting() {
     if (!isBreakout) return; // Only while in breakout
 
     let alive = true;
+    let isPolling = false; // ✅ PHASE 1: Prevent overlapping polling calls
 
     const pollLoungeStatus = async () => {
+      // ✅ PHASE 1: Skip if tab is hidden (reduce wasted API calls)
+      if (document.hidden) {
+        return;
+      }
+
+      // ✅ PHASE 1: Prevent overlapping calls
+      if (isPolling) {
+        return;
+      }
+
       if (!alive) return;
+
+      isPolling = true;
       try {
         const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
           headers: { ...authHeader() },
@@ -9098,6 +9138,9 @@ export default function NewLiveMeeting() {
         }
       } catch (e) {
         console.warn("[LiveMeeting] Error polling lounge status:", e);
+      }
+      finally {
+        isPolling = false;
       }
     };
 
@@ -9630,8 +9673,21 @@ export default function NewLiveMeeting() {
     fetchSentAnnouncements();
 
     let alive = true;
+    let isPolling = false; // ✅ PHASE 1: Prevent overlapping polling calls
     const poll = async () => {
+      // ✅ PHASE 1: Skip if tab is hidden (reduce wasted API calls)
+      if (document.hidden) {
+        return;
+      }
+
+      // ✅ PHASE 1: Prevent overlapping calls
+      if (isPolling) {
+        return;
+      }
+
       if (!alive) return;
+
+      isPolling = true;
       try {
         const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/queue/`), {
           headers: { ...authHeader() },
@@ -9650,6 +9706,9 @@ export default function NewLiveMeeting() {
           }
         }
       } catch { }
+      finally {
+        isPolling = false;
+      }
     };
     poll();
     const t = setInterval(poll, 5000);
@@ -9709,8 +9768,21 @@ export default function NewLiveMeeting() {
     if (!isHost || !eventData?.lounge_enabled_waiting_room) return;
 
     let alive = true;
+    let isPolling = false; // ✅ PHASE 1: Prevent overlapping polling calls
     const poll = async () => {
+      // ✅ PHASE 1: Skip if tab is hidden (reduce wasted API calls)
+      if (document.hidden) {
+        return;
+      }
+
+      // ✅ PHASE 1: Prevent overlapping calls
+      if (isPolling) {
+        return;
+      }
+
       if (!alive) return;
+
+      isPolling = true;
       try {
         const res = await fetch(toApiUrl(`events/${eventId}/lounge-participants/`), {
           headers: { ...authHeader() },
@@ -9729,6 +9801,9 @@ export default function NewLiveMeeting() {
           );
         }
       } catch { }
+      finally {
+        isPolling = false;
+      }
     };
     poll();
     const t = setInterval(poll, 5000);
