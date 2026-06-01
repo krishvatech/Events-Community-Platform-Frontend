@@ -7608,7 +7608,8 @@ export default function NewLiveMeeting() {
     const request = (async () => {
       // ✅ TIMEOUT: 3-second AbortController for rejoin API
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      // ✅ PHASE 3: Increase frontend timeout from 3s to 8s (backend timeout 5s + buffer)
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       try {
         const res = await fetch(toApiUrl(`events/${eventId}/live/rejoin/`), {
