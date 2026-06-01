@@ -1714,6 +1714,10 @@ export default function AdminSettings() {
   // 2. Fetch ESCO Options (Autocomplete)
   async function fetchSkillOptions(query) {
     const q = (query || "").trim();
+    if (!q) {
+      setSkillOptions([]);
+      return;
+    }
     try {
       const r = await fetch(
         `${API_ROOT}/auth/skills/search?q=${encodeURIComponent(q)}`,
@@ -1804,12 +1808,14 @@ export default function AdminSettings() {
 
     const q = (skillSearch || "").trim();
     if (!q) {
-      fetchSkillOptions(""); // Load defaults if empty
-    } else {
-      skillSearchTimeout.current = setTimeout(() => {
-        fetchSkillOptions(q);
-      }, 300);
+      setSkillOptions([]);
+      return;
     }
+
+    skillSearchTimeout.current = setTimeout(() => {
+      fetchSkillOptions(q);
+    }, 300);
+
     return () => { if (skillSearchTimeout.current) clearTimeout(skillSearchTimeout.current); };
   }, [skillSearch]);
 

@@ -2040,11 +2040,11 @@ export default function AdminUserProfileEditPage() {
   useEffect(() => { loadMeExtras(); loadUserSkills(); }, []);
 
   async function fetchSkillOptions(query) {
-    // REMOVED: The check that returns early if !q
-    // const q = (query || "").trim();
-    // if (!q) { setSkillOptions([]); return; }
-
-    const q = (query || "").trim(); // Allow empty string
+    const q = (query || "").trim();
+    if (!q) {
+      setSkillOptions([]);
+      return;
+    }
 
     try {
       const resp = await fetch(
@@ -2080,34 +2080,7 @@ export default function AdminUserProfileEditPage() {
     }
   }
 
-  // ------------------------------------------------------
-  // 2. Update useEffect to fetch defaults on mount/empty
-  // ------------------------------------------------------
-  useEffect(() => {
-    if (skillSearchTimeout.current) {
-      clearTimeout(skillSearchTimeout.current);
-    }
 
-    const q = (skillSearch || "").trim();
-
-    // REMOVED: if (!q) { setSkillOptions([]); return; }
-
-    // If empty, fetch immediately (local DB). 
-    // If typing, debounce the API call.
-    if (!q) {
-      fetchSkillOptions("");
-    } else {
-      skillSearchTimeout.current = setTimeout(() => {
-        fetchSkillOptions(q);
-      }, 100);
-    }
-
-    return () => {
-      if (skillSearchTimeout.current) {
-        clearTimeout(skillSearchTimeout.current);
-      }
-    };
-  }, [skillSearch]);
 
   useEffect(() => {
     if (skillSearchTimeout.current) {
