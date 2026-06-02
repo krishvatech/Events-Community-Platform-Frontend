@@ -2463,38 +2463,48 @@ export default function NewLiveMeeting() {
   const liveMinimalMode = isLiveMeetingRoute() && !roomJoined;
 
   // Log Phase 1 status once on initial load
+  // ✅ PHASE 5: Comprehensive deferred features logging
   useEffect(() => {
     if (liveMinimalMode && !import.meta.env.DEV) return; // Only log in dev
     if (isLiveMeetingRoute() && import.meta.env?.DEV) {
       console.log(
-        "[LiveMeeting] PHASE 1-4 Status",
+        "[LiveMeeting] PHASE 1-5 Optimization Status",
         {
           liveMinimalMode,
           roomJoined,
-          deferred: [
-            "notifications",
-            "messaging/conversations",
-            "group-notifications",
-            "users/skills",
-            "users/languages",
-            "users/<id>/?ecp_lite=kyc (replaced by participants-lite batch call)",
-            "events/summary",
-            "speed-networking",
-            "events/moods",
-          ],
-          batched: [
-            "events/{id}/participants-lite/ (replaces individual user/<id> calls)",
-          ],
-          allowed: [
+          phase1_critical_apis_only: [
             "events/live-context",
             "events/rtk/join",
             "events/live/rejoin",
             "WebSocket",
           ],
+          phase2_403_prevention: [
+            "No token refresh on 403 (permission denied)",
+            "5-min forbidden cache TTL per URL",
+          ],
+          phase3_backend_caching: [
+            "user:skills (5min TTL)",
+            "user:languages (5min TTL)",
+            "event:speed_networking_state (20sec TTL)",
+            "user:notifications:unread:count (20sec TTL)",
+            "Skills search early-return if q<2 chars",
+          ],
+          phase4_batched_endpoint: [
+            "events/{id}/participants-lite/ (single call for all participants)",
+            "Replaces 50+ individual /api/users/<id>/ calls",
+          ],
+          phase5_deferred_until_action: {
+            "speed-networking": "deferred until panel opens or WebSocket event",
+            "messaging": "deferred until chat tab opens",
+            "notifications-polling": liveMinimalMode ? "disabled during join" : "enabled",
+            "mood-sync": "deferred until mood menu opens or feature enabled",
+            "lounge-state": "deferred until lounge panel opens",
+            "full-profiles": "on-demand via click (use Phase 4 batch)",
+          },
         }
       );
     }
-  }, [liveMinimalMode]);
+  }, [liveMinimalMode, roomJoined]);
 
   useEffect(() => {
     setLiveCriticalReady(false);
@@ -7657,9 +7667,19 @@ export default function NewLiveMeeting() {
     }
   }, [liveMinimalMode, loungeOpen, isBreakout, deferNonCriticalLiveApi, eventId, role]);
 
+  // ✅ PHASE 5: Only fetch lounge state when lounge is open or user is in breakout
   useEffect(() => {
     if (!eventId) return;
     if (deferNonCriticalLiveApi) return;
+
+    // ✅ PHASE 5: Skip lounge state fetch unless lounge is open or user in breakout
+    if (!loungeOpen && !isBreakout) {
+      if (import.meta.env?.DEV) {
+        console.debug("[LiveMeeting] PHASE 5: Lounge not open, deferring state fetch");
+      }
+      return;
+    }
+
     fetchLoungeState();
     const interval = setInterval(() => {
       // Avoid too-frequent fetches if other updates already happened
@@ -7668,7 +7688,7 @@ export default function NewLiveMeeting() {
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [deferNonCriticalLiveApi, eventId, fetchLoungeState]);
+  }, [deferNonCriticalLiveApi, eventId, loungeOpen, isBreakout, fetchLoungeState]);
 
   useEffect(() => {
     if (
@@ -12365,12 +12385,31 @@ export default function NewLiveMeeting() {
     return () => clearTimeout(timerId);
   }, [pendingSpotlightInvite, showSnackbar]);
 
+  // ✅ PHASE 5: Defer mood polling until mood UI is opened or after join is stable
   useEffect(() => {
     if (!eventId || !roomJoined) return;
+
+    // ✅ PHASE 5: Skip mood polling during join burst
+    if (liveMinimalMode) {
+      if (import.meta.env?.DEV) {
+        console.debug("[LiveMeeting] PHASE 5: Deferring mood polling during join burst");
+      }
+      return;
+    }
+
+    // ✅ PHASE 5: Only sync moods if mood menu is open or feature is enabled
+    const isMoodMenuOpen = Boolean(moodAnchorEl);
+    if (!isMoodMenuOpen && !eventData?.show_moods) {
+      if (import.meta.env?.DEV) {
+        console.debug("[LiveMeeting] PHASE 5: Mood UI not active, skipping mood polling");
+      }
+      return;
+    }
+
     syncMoodMapFromApi();
     const t = setInterval(syncMoodMapFromApi, 20000);
     return () => clearInterval(t);
-  }, [eventId, roomJoined, syncMoodMapFromApi]);
+  }, [eventId, roomJoined, liveMinimalMode, moodAnchorEl, eventData?.show_moods, syncMoodMapFromApi]);
 
   // ✅ If Host leaves MAIN MEETING, show waiting state for audience
   // NOTE: This should NOT trigger when host leaves a breakout room
