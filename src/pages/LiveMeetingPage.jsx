@@ -2453,6 +2453,46 @@ export default function NewLiveMeeting() {
   const deferredLiveApiLogRef = useRef(false);
   const [eventId, setEventId] = useState(null);
 
+  // ✅ PHASE 1: Live Minimal Mode - Block non-critical APIs during join burst
+  // Only critical APIs (/rtk/join/, /live/rejoin/, WebSocket) should run immediately
+  // Non-critical APIs defer until panels open or WebSocket events indicate they're needed
+  const isLiveMeetingRoute = () => {
+    const path = window.location.pathname;
+    return path.includes("/live") || path.includes("/meeting") || path.includes("/rtk");
+  };
+  const liveMinimalMode = isLiveMeetingRoute() && !roomJoined;
+
+  // Log Phase 1 status once on initial load
+  useEffect(() => {
+    if (liveMinimalMode && !import.meta.env.DEV) return; // Only log in dev
+    if (isLiveMeetingRoute() && import.meta.env?.DEV) {
+      console.log(
+        "[LiveMeeting] PHASE 1: Live Minimal Mode",
+        {
+          liveMinimalMode,
+          roomJoined,
+          deferred: [
+            "notifications",
+            "messaging/conversations",
+            "group-notifications",
+            "users/skills",
+            "users/languages",
+            "users/<id>/?ecp_lite=kyc",
+            "events/summary",
+            "speed-networking",
+            "events/moods",
+          ],
+          allowed: [
+            "events/live-context",
+            "events/rtk/join",
+            "events/live/rejoin",
+            "WebSocket",
+          ],
+        }
+      );
+    }
+  }, [liveMinimalMode]);
+
   useEffect(() => {
     setLiveCriticalReady(false);
     setAllowDeferredLiveData(false);
@@ -2464,11 +2504,12 @@ export default function NewLiveMeeting() {
     }
   }, [roomJoined]);
 
+  // ✅ PHASE 1: Only enable deferred data after user explicitly opens relevant panels
+  // Do NOT auto-unlock after 8 seconds - require user action (e.g., open chat tab)
+  // This prevents unnecessary API calls during join burst
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setAllowDeferredLiveData(true);
-    }, 8000);
-    return () => clearTimeout(timer);
+    // Removed 8-second auto-unlock to prevent API storm
+    // Panels will trigger their own data loads via lazy-load callbacks
   }, [eventId]);
 
   // ✅ Local join timer (per user)
@@ -2880,7 +2921,16 @@ export default function NewLiveMeeting() {
       setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
       return;
     }
-    // Defer non-critical API during mass live join to reduce DB/API storm
+    // ✅ PHASE 1: Defer non-critical API during live minimal mode (join burst)
+    // KYC status is only used for badge display and can wait until user profile is opened
+    if (liveMinimalMode) {
+      if (import.meta.env?.DEV && !deferredLiveApiLogRef.current) {
+        deferredLiveApiLogRef.current = true;
+        console.debug("[LiveMeeting] Deferred KYC status fetch until user opens profile");
+      }
+      return;
+    }
+    // Also respect the older deferNonCriticalLiveApi flag for backwards compatibility
     if (deferNonCriticalLiveApi) {
       if (import.meta.env?.DEV && !deferredLiveApiLogRef.current) {
         deferredLiveApiLogRef.current = true;
@@ -2913,7 +2963,7 @@ export default function NewLiveMeeting() {
     })();
 
     return () => { isMounted = false; };
-  }, [deferNonCriticalLiveApi, participantKycCache]);
+  }, [liveMinimalMode, deferNonCriticalLiveApi, participantKycCache]);
 
   const getKnownKycStatus = useCallback((entity) => {
     if (!entity) return "";
@@ -3493,6 +3543,10 @@ export default function NewLiveMeeting() {
   }, [rtkMeeting?.self, role, selfAssignedRole]);
 
   const syncMoodMapFromApi = useCallback(async () => {
+    // ✅ PHASE 1: Skip moods API during live minimal mode
+    if (liveMinimalMode) {
+      return;
+    }
     // ✅ POLLING PAUSE: Skip if offline/reconnecting
     if (shouldPausePollingRef.current || !navigator.onLine) {
       return;
@@ -3517,7 +3571,7 @@ export default function NewLiveMeeting() {
     } catch {
       // best-effort sync
     }
-  }, [eventId]);
+  }, [eventId, liveMinimalMode]);
 
   const persistRecentMood = useCallback((mood) => {
     if (!mood) return;
@@ -7519,6 +7573,11 @@ export default function NewLiveMeeting() {
       return;
     }
     if (!eventId) return;
+    // ✅ PHASE 1: Only fetch lounge state if lounge is actually visible or user is in it
+    // Don't fetch during join burst if lounge is not open
+    if (liveMinimalMode && !loungeOpen && !isBreakout) {
+      return;
+    }
     if (deferNonCriticalLiveApi) return;
 
     // ✅ CRITICAL FOR PARTICIPANTS: Stop polling once meeting ends
@@ -7544,7 +7603,7 @@ export default function NewLiveMeeting() {
     } catch (e) {
       // ignore transient errors
     }
-  }, [deferNonCriticalLiveApi, eventId, role]);
+  }, [liveMinimalMode, loungeOpen, isBreakout, deferNonCriticalLiveApi, eventId, role]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -14945,7 +15004,8 @@ export default function NewLiveMeeting() {
 
   const fetchChatMessages = useCallback(
     async (conversationId) => {
-      if (deferNonCriticalLiveApi) return;
+      // ✅ PHASE 1: Defer messaging API during join burst
+      if (liveMinimalMode || deferNonCriticalLiveApi) return;
       const cid = conversationId || activeChatConversationId;
       if (!cid) return;
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
@@ -14955,11 +15015,12 @@ export default function NewLiveMeeting() {
       if (!res.ok) throw new Error(data?.detail || "Failed to load chat.");
       setChatMessages(Array.isArray(data) ? data : []);
     },
-    [activeChatConversationId, deferNonCriticalLiveApi]
+    [activeChatConversationId, liveMinimalMode, deferNonCriticalLiveApi]
   );
 
   const ensureEventConversation = useCallback(async () => {
-    if (deferNonCriticalLiveApi) return null;
+    // ✅ PHASE 1: Defer messaging API during join burst
+    if (liveMinimalMode || deferNonCriticalLiveApi) return null;
     if (!eventId) return null;
     if (!hasLiveInteractiveAccess) {
       throw new Error("Chat becomes available after you join the live event.");
@@ -14993,7 +15054,7 @@ export default function NewLiveMeeting() {
         ensureEventConversationPromiseRef.current = null;
       }
     }
-  }, [chatConversationId, deferNonCriticalLiveApi, eventId, hasLiveInteractiveAccess]);
+  }, [chatConversationId, liveMinimalMode, deferNonCriticalLiveApi, eventId, hasLiveInteractiveAccess]);
 
   const ensureSeatedInLounge = useCallback(async () => {
     if (deferNonCriticalLiveApi) return null;
@@ -15018,7 +15079,8 @@ export default function NewLiveMeeting() {
   }, [activeTableId, deferNonCriticalLiveApi, eventId]);
 
   const ensureLoungeConversation = useCallback(async () => {
-    if (deferNonCriticalLiveApi) return null;
+    // ✅ PHASE 1: Defer messaging API during join burst
+    if (liveMinimalMode || deferNonCriticalLiveApi) return null;
     if (!activeTableId) return null;
     if (roomChatConversationId) return roomChatConversationId;
     if (ensureLoungeConversationPromiseRef.current) {
@@ -15074,7 +15136,7 @@ export default function NewLiveMeeting() {
         ensureLoungeConversationPromiseRef.current = null;
       }
     }
-  }, [activeRoomLabel, activeTableId, deferNonCriticalLiveApi, ensureSeatedInLounge, roomChatConversationId]);
+  }, [activeRoomLabel, activeTableId, liveMinimalMode, deferNonCriticalLiveApi, ensureSeatedInLounge, roomChatConversationId]);
 
   const ensureActiveConversation = useCallback(async () => {
     if (isRoomChatActive) return ensureLoungeConversation();
@@ -15083,7 +15145,8 @@ export default function NewLiveMeeting() {
 
   const fetchChatUnread = useCallback(async () => {
     try {
-      if (deferNonCriticalLiveApi) return 0;
+      // ✅ PHASE 1: Defer messaging API during join burst
+      if (liveMinimalMode || deferNonCriticalLiveApi) return 0;
       if (!hasLiveInteractiveAccess) return 0;
       const cid = activeChatConversationId;
       if (!cid) return 0;
@@ -15099,7 +15162,7 @@ export default function NewLiveMeeting() {
     } catch {
       return 0;
     }
-  }, [activeChatConversationId, deferNonCriticalLiveApi, hasLiveInteractiveAccess]);
+  }, [activeChatConversationId, liveMinimalMode, deferNonCriticalLiveApi, hasLiveInteractiveAccess]);
 
   const MARK_ALL_READ_COOLDOWN_MS = 7000;
   const markAllReadPendingRef = useRef(new Set());
@@ -15114,7 +15177,8 @@ export default function NewLiveMeeting() {
     conversationId,
     { force = false, clearEventUnread = false, clearPrivateRecipientId = null } = {}
   ) => {
-    if (deferNonCriticalLiveApi) return false;
+    // ✅ PHASE 1: Defer messaging API during join burst
+    if (liveMinimalMode || deferNonCriticalLiveApi) return false;
     const cid = conversationId ? String(conversationId) : "";
     if (!cid) return false;
     if (!isDocumentVisible()) return false;
@@ -15154,7 +15218,7 @@ export default function NewLiveMeeting() {
     } finally {
       markAllReadPendingRef.current.delete(cid);
     }
-  }, [deferNonCriticalLiveApi, isDocumentVisible]);
+  }, [liveMinimalMode, deferNonCriticalLiveApi, isDocumentVisible]);
 
   const markChatAllRead = useCallback(async (conversationId) => {
     const cid = conversationId || activeChatConversationId;
@@ -15176,7 +15240,8 @@ export default function NewLiveMeeting() {
   const privateChatWsRef = useRef(null);
 
   const handleOpenPrivateChat = async (member) => {
-    if (deferNonCriticalLiveApi) return null;
+    // ✅ PHASE 1: Defer messaging API during join burst
+    if (liveMinimalMode || deferNonCriticalLiveApi) return null;
     setPrivateChatUser(member);
     if (isMdUp) setRightPanelOpen(true);
     else setRightOpen(true);
@@ -27627,6 +27692,7 @@ export default function NewLiveMeeting() {
             lastMessage={lastMessage}
             onMemberInfo={openMemberInfo}
             loungeEnabledSpeedNetworking={eventData?.lounge_enabled_speed_networking}
+            liveMinimalMode={liveMinimalMode}
           />
         </Dialog>
 

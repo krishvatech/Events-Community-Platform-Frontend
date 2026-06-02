@@ -256,6 +256,19 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     // --- Effects for Badges ---
     useEffect(() => {
         let off = false;
+
+        // ✅ PHASE 1: Skip badge fetches during live meeting join burst
+        // Badge counts are non-critical and can wait until user opens Messages/Notifications tabs
+        const isLiveMeetingRoute = () => {
+            const path = window.location.pathname;
+            return path.includes("/live") || path.includes("/meeting") || path.includes("/rtk");
+        };
+
+        if (isLiveMeetingRoute()) {
+            console.log("[UnifiedSidebar] Skipping badge fetches during live meeting (PHASE 1)");
+            return;
+        }
+
         const sync = async () => {
             let n = 0;
             let m = await getMessagesUnreadCount();
@@ -264,8 +277,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 n = await getAdminNotificationsBadgeCount();
             } else if (isStaffOnly) {
                 // Staff uses Community Notifications per prompt? "Community/NotificationsPage.jsx"
-                // BUT wait, typically staff might need admin notifications too? 
-                // Prompt says: "Notifications - Community/NotificationsPage.jsx" for Staff. 
+                // BUT wait, typically staff might need admin notifications too?
+                // Prompt says: "Notifications - Community/NotificationsPage.jsx" for Staff.
                 // So likely standard user notifications.
                 // However, AdminEvents etc might benefit from admin notifications?
                 // Sticking to Prompt: "Community/NotificationsPage.jsx" -> UserUnreadCount.

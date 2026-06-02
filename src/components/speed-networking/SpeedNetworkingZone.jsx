@@ -91,7 +91,8 @@ export default function SpeedNetworkingZone({
     onPrivateChat,
     autoJoinOnOpen = false,
     loungeEnabledSpeedNetworking = false, // ✅ NEW: Flag to show "Go to Social Lounge" button
-    onSessionStopping
+    onSessionStopping,
+    liveMinimalMode = false, // ✅ PHASE 1: Skip speed networking API during join burst
 }) {
     const [session, setSession] = useState(null);
     const [currentMatch, setCurrentMatch] = useState(null);
@@ -167,6 +168,12 @@ export default function SpeedNetworkingZone({
 
     // Fetch active session
     const fetchActiveSession = useCallback(async () => {
+        // ✅ PHASE 1: Skip speed networking API during live minimal mode (join burst)
+        if (liveMinimalMode) {
+            console.log("[SpeedNetworking] Deferring session fetch until speed networking panel opens");
+            return;
+        }
+
         setError(null); // Clear previous errors on retry
         try {
             let url = `${API_ROOT}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
@@ -187,7 +194,7 @@ export default function SpeedNetworkingZone({
             setError(err.message);
             setLoading(false);
         }
-    }, [eventId]);
+    }, [eventId, liveMinimalMode]);
 
     // Normalize message type: convert dots to underscores (Channels convention)
     const normalizeMessageType = (type) => {
