@@ -2467,7 +2467,7 @@ export default function NewLiveMeeting() {
     if (liveMinimalMode && !import.meta.env.DEV) return; // Only log in dev
     if (isLiveMeetingRoute() && import.meta.env?.DEV) {
       console.log(
-        "[LiveMeeting] PHASE 1: Live Minimal Mode",
+        "[LiveMeeting] PHASE 1-4 Status",
         {
           liveMinimalMode,
           roomJoined,
@@ -2477,10 +2477,13 @@ export default function NewLiveMeeting() {
             "group-notifications",
             "users/skills",
             "users/languages",
-            "users/<id>/?ecp_lite=kyc",
+            "users/<id>/?ecp_lite=kyc (replaced by participants-lite batch call)",
             "events/summary",
             "speed-networking",
             "events/moods",
+          ],
+          batched: [
+            "events/{id}/participants-lite/ (replaces individual user/<id> calls)",
           ],
           allowed: [
             "events/live-context",
@@ -2511,6 +2514,55 @@ export default function NewLiveMeeting() {
     // Removed 8-second auto-unlock to prevent API storm
     // Panels will trigger their own data loads via lazy-load callbacks
   }, [eventId]);
+
+  // ✅ PHASE 4: Fetch all participants at once instead of individual user/<id> calls
+  useEffect(() => {
+    if (!eventId) return;
+
+    // Allow fetching after critical data is ready or room has joined
+    if (liveMinimalMode && !roomJoined) {
+      if (import.meta.env?.DEV) {
+        console.debug("[LiveMeeting] PHASE 4: Deferring participants-lite fetch during join burst");
+      }
+      return;
+    }
+
+    let isMounted = true;
+
+    (async () => {
+      try {
+        const headers = { accept: "application/json", ...authHeader() };
+        const res = await fetch(`${API_ROOT}/events/${eventId}/participants-lite/`, { headers });
+
+        if (!res.ok) {
+          console.warn(`[LiveMeeting] PHASE 4: Failed to fetch participants-lite: ${res.status}`);
+          return;
+        }
+
+        const participants = await res.json();
+
+        if (!isMounted) return;
+
+        // Populate kyc cache with all participants at once
+        const newCache = {};
+        (Array.isArray(participants) ? participants : []).forEach(p => {
+          if (p?.id) {
+            newCache[p.id] = p.kyc_status || "";
+          }
+        });
+
+        setParticipantKycCache(prev => ({ ...prev, ...newCache }));
+
+        if (import.meta.env?.DEV) {
+          console.debug(`[LiveMeeting] PHASE 4: Loaded ${Object.keys(newCache).length} participants from batched endpoint`);
+        }
+      } catch (err) {
+        console.warn("[LiveMeeting] PHASE 4: Error fetching participants-lite:", err);
+      }
+    })();
+
+    return () => { isMounted = false; };
+  }, [eventId, roomJoined, liveMinimalMode]);
 
   // ✅ Local join timer (per user)
   const joinedAtRef = useRef(null);
