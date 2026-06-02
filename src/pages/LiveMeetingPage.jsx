@@ -7786,6 +7786,18 @@ export default function NewLiveMeeting() {
           }
 
           const reason = data?.reason || "unknown";
+
+          // Handle event_not_found (404) - event was deleted
+          if (res.status === 404 && reason === "event_not_found") {
+            console.warn("[Reconnect] Event not found (deleted or doesn't exist)");
+            resetReconnectState();
+            rejoinDataRef.current = { rtk_token: null, rtk_meeting_id: null, room_type: null };
+            showSnackbar("This event no longer exists.", "error");
+            const slug = window.location.pathname.split("/")[2];
+            navigate(`/community/${slug}/events`, { replace: true });
+            return { success: false, reason: "event_not_found", detail: "Event no longer exists", terminal: true };
+          }
+
           const terminal =
             data?.retryable === false ||
             data?.can_rejoin === false ||
@@ -8065,6 +8077,21 @@ export default function NewLiveMeeting() {
     rtk_meeting_id: null,
     room_type: null,
   });
+
+  // ✅ CLEANUP: Cancel rejoin requests and clear timers when eventId changes or component unmounts
+  useEffect(() => {
+    return () => {
+      // Cancel any pending rejoin request
+      if (rejoinRequestRef.current) {
+        console.log("[LiveMeeting] Cleanup: Canceling pending rejoin request");
+        rejoinRequestRef.current = null;
+      }
+      // Clear any scheduled reconnect attempt
+      clearReconnectTimer();
+      // Clear stale rejoin data
+      rejoinDataRef.current = { rtk_token: null, rtk_meeting_id: null, room_type: null };
+    };
+  }, [eventId]);
 
   // ---------- Persistent Main Event WebSocket (for Force Join, Timer, Broadcast) ----------
   useEffect(() => {
