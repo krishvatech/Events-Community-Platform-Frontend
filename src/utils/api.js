@@ -6,7 +6,7 @@ import { getUserName, clearAuth } from "./authStorage";
 let isRefreshing = false;
 let failedQueue = [];
 
-// ✅ PHASE 2: 403 Forbidden Cache - Prevent retry storms on permission denied
+//  403 Forbidden Cache - Prevent retry storms on permission denied
 // Maps URL -> { timestamp, status } to prevent repeated 403 calls
 const forbiddenCache = new Map();
 const FORBIDDEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -145,7 +145,7 @@ apiClient.interceptors.response.use(
     const original = error?.config;
     const url = original?.url || "";
 
-    // ✅ PHASE 2: Only refresh on 401 (token expired), NOT on 403 (permission denied)
+    //  Only refresh on 401 (token expired), NOT on 403 (permission denied)
     const status = error?.response?.status;
 
     // 403 (Forbidden) - Permission denied, not a token issue
@@ -175,7 +175,7 @@ apiClient.interceptors.response.use(
     }
     // ──── END GUEST BRANCH ────────────────────────────────────────────────────
 
-    // ✅ PHASE 2: Prevent infinite retry loop on 401
+    //  Prevent infinite retry loop on 401
     if (original._retry) {
       console.error("[Auth] Request already retried after 401. Giving up.");
       clearAuth();
@@ -238,11 +238,11 @@ apiClient.interceptors.response.use(
         processQueue(null, idToken);
         isRefreshing = false;
 
-        // ✅ PHASE 2: Retry original request with new token
+        //  Retry original request with new token
         original.headers.Authorization = `Bearer ${idToken}`;
         const retryResponse = await apiClient(original);
 
-        // ✅ PHASE 2: Check retry response
+        //  Check retry response
         // 401 after refresh = token still bad (user suspended/locked)
         // 403 after refresh = permission denied for this resource (not a token issue)
         if (retryResponse.status === 401) {

@@ -257,7 +257,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     useEffect(() => {
         let off = false;
 
-        // ✅ PHASE 1: Skip badge fetches during live meeting join burst
+        //  Skip badge fetches during live meeting join burst
         // Badge counts are non-critical and can wait until user opens Messages/Notifications tabs
         const isLiveMeetingRoute = () => {
             const path = window.location.pathname;

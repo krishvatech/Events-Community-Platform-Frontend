@@ -11,7 +11,7 @@ const inFlightGetRequests = new Map();
 const DEFAULT_FETCH_TIMEOUT_MS = 20000;
 const MUTATION_FETCH_TIMEOUT_MS = 120000;
 
-// ✅ PHASE 2: 403 Forbidden Cache - Prevent retry storms on permission denied
+//  403 Forbidden Cache - Prevent retry storms on permission denied
 const forbiddenCache = new Map();
 const FORBIDDEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -97,7 +97,7 @@ window.fetch = async (...args) => {
         return headers.Authorization || headers.authorization || "";
     };
 
-    // ✅ PHASE 2: Only refresh on 401 (token expired), NOT on 403 (permission denied)
+    //  Only refresh on 401 (token expired), NOT on 403 (permission denied)
     // 403 is permission denied and should never trigger a token refresh
     const authHeader = readAuthHeader(requestConfig?.headers);
     const requestToken = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -207,12 +207,12 @@ window.fetch = async (...args) => {
             processQueue(null, idToken);
             isRefreshing = false;
 
-            // ✅ PHASE 2: Retry original request with new token
+            //  Retry original request with new token
             const newConfig = { ...requestConfig, headers: { ...requestConfig?.headers } };
             newConfig.headers["Authorization"] = `Bearer ${idToken}`;
             const retryResponse = await originalFetch(resource, newConfig);
 
-            // ✅ PHASE 2: Check retry response
+            //  Check retry response
             // 401 after refresh = token still bad (user suspended/locked)
             // 403 after refresh = permission denied for this resource (not a token issue)
             if (retryResponse.status === 401) {
