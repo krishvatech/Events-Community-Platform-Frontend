@@ -2097,7 +2097,25 @@ export default function EventDetailsPage() {
                                   )}
                                 </>
                               )
-                              : applicationStatus === 'accepted'
+                              : applicationStatus === 'waitlisted'
+                                ? (
+                                  <>
+                                    <Chip
+                                      label="Application Waitlisted"
+                                      variant="outlined"
+                                      sx={{
+                                        py: 2.5,
+                                        borderColor: '#ff9800',
+                                        color: '#ff9800',
+                                        fontWeight: 600
+                                      }}
+                                    />
+                                    <Typography variant="caption" sx={{ color: "#666", mt: 1, display: 'block' }}>
+                                      Your application is currently on the waitlist. The event team will notify you if a place becomes available.
+                                    </Typography>
+                                  </>
+                                )
+                                : applicationStatus === 'accepted'
                                 ? (() => {
                                   // After approval, check if user can join with guest token or is registered
                                   const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
@@ -2380,8 +2398,8 @@ export default function EventDetailsPage() {
                           </Box>
                         )}
 
-                        {/* Required Forms Section */}
-                        {postAcceptanceForms.length > 0 && (confirmedRegistered || applicationStatus === 'accepted') && (
+                        {/* Required Forms Section - Only show after acceptance, not for waitlisted */}
+                        {postAcceptanceForms.length > 0 && (confirmedRegistered || applicationStatus === 'accepted') && applicationStatus !== 'waitlisted' && (
                           <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e5e7eb' }}>
                             <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2, color: '#1f2937' }}>
                               📋 Required Forms

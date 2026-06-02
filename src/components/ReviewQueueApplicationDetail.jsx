@@ -230,8 +230,10 @@ const ReviewQueueApplicationDetail = ({
   const canSendEmail = !application?.opt_out_automated_communication;
 
   // Terminal states - no further action allowed
-  const terminalStatuses = ['accepted', 'declined', 'cancelled', 'waitlisted'];
+  // FIXED: Waitlisted is NOT terminal - admin can still accept or decline
+  const terminalStatuses = ['accepted', 'declined', 'cancelled'];
   const isTerminalStatus = terminalStatuses.includes(application?.status);
+  const isWaitlisted = application?.status === 'waitlisted';
 
   if (!application) {
     return (
@@ -447,112 +449,126 @@ const ReviewQueueApplicationDetail = ({
             <Alert severity="info" sx={{ mb: 2 }}>
               This application has already been <strong>{application.status_display}</strong>. No further action is allowed.
             </Alert>
-          ) : !selectedAction ? (
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-              <Button
-                variant="contained"
-                color="success"
-                onClick={() => handleActionSelect('accept')}
-                disabled={loading}
-              >
-                Accept
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={() => handleActionSelect('decline')}
-                disabled={loading}
-              >
-                Decline
-              </Button>
-              <Button
-                variant="contained"
-                color="warning"
-                onClick={() => handleActionSelect('waitlist')}
-                disabled={loading}
-              >
-                Waitlist
-              </Button>
-            </Box>
           ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Chip
-                  label={`Action: ${selectedAction.charAt(0).toUpperCase() + selectedAction.slice(1)}`}
-                  onDelete={() => setSelectedAction(null)}
-                  color="primary"
-                  variant="outlined"
-                />
-              </Box>
+            <>
+              {isWaitlisted && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  This application is currently <strong>waitlisted</strong>. You can accept or decline it.
+                </Alert>
+              )}
 
-              {/* Tier Selection for Accept */}
-              {selectedAction === 'accept' && (
-                <FormControl fullWidth>
-                  <InputLabel>Tier * (for {application.track_label || 'this track'})</InputLabel>
-                  {filteredTiers.length === 0 ? (
-                    <Alert severity="warning">No tiers available for this track</Alert>
-                  ) : (
-                    <Select
-                      value={selectedTier}
-                      label={`Tier * (for ${application.track_label || 'this track'})`}
-                      onChange={handleTierChange}
+              {!selectedAction ? (
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={() => handleActionSelect('accept')}
+                    disabled={loading}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={() => handleActionSelect('decline')}
+                    disabled={loading}
+                  >
+                    Decline
+                  </Button>
+                  {!isWaitlisted && (
+                    <Button
+                      variant="contained"
+                      color="warning"
+                      onClick={() => handleActionSelect('waitlist')}
                       disabled={loading}
                     >
-                      <MenuItem value="">Select a tier...</MenuItem>
-                      {filteredTiers.map((tier) => (
-                        <MenuItem key={tier.id} value={tier.id}>
-                          {tier.label}
-                          {tier.price && parseFloat(tier.price) > 0 ? ` - $${parseFloat(tier.price).toFixed(2)}` : ' (Free)'}
-                          {preselectedTier === String(tier.id) && ' ✓ (Recommended)'}
-                        </MenuItem>
-                      ))}
-                    </Select>
+                      Waitlist
+                    </Button>
                   )}
-                </FormControl>
-              )}
-
-              {/* Email Notification Option */}
-              {(selectedAction === 'decline' || selectedAction === 'waitlist') && (
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={sendEmail && canSendEmail}
-                      onChange={handleEmailToggle}
-                      disabled={!canSendEmail || loading}
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Chip
+                      label={`Action: ${selectedAction.charAt(0).toUpperCase() + selectedAction.slice(1)}`}
+                      onDelete={() => setSelectedAction(null)}
+                      color="primary"
+                      variant="outlined"
                     />
-                  }
-                  label={
-                    canSendEmail
-                      ? `Send ${selectedAction} email to applicant`
-                      : 'Cannot send email (applicant opted out)'
-                  }
-                />
-              )}
+                  </Box>
 
-              {/* Notes */}
-              <FormControl fullWidth>
-                <InputLabel>Notes (Optional)</InputLabel>
-                <Select
-                  value="textarea"
-                  disabled={loading}
-                  renderValue={() => (
-                    <textarea
-                      style={{
-                        width: '100%',
-                        minHeight: '80px',
-                        padding: '8px',
-                        fontFamily: 'inherit',
-                        fontSize: 'inherit',
-                      }}
-                      placeholder="Add notes about this decision..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
+                  {/* Tier Selection for Accept */}
+                  {selectedAction === 'accept' && (
+                    <>
+                      {filteredTiers.length === 0 ? (
+                        <Alert severity="warning">No tiers available for this track</Alert>
+                      ) : (
+                        <FormControl fullWidth>
+                          <InputLabel>Tier * (for {application.track_label || 'this track'})</InputLabel>
+                          <Select
+                            value={selectedTier}
+                            label={`Tier * (for ${application.track_label || 'this track'})`}
+                            onChange={handleTierChange}
+                            disabled={loading}
+                          >
+                            <MenuItem value="">Select a tier...</MenuItem>
+                            {filteredTiers.map((tier) => (
+                              <MenuItem key={tier.id} value={tier.id}>
+                                {tier.label}
+                                {tier.price && parseFloat(tier.price) > 0 ? ` - $${parseFloat(tier.price).toFixed(2)}` : ' (Free)'}
+                                {preselectedTier === String(tier.id) && ' ✓ (Recommended)'}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                    </>
+                  )}
+
+                  {/* Email Notification Option */}
+                  {(selectedAction === 'decline' || selectedAction === 'waitlist') && (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={sendEmail && canSendEmail}
+                          onChange={handleEmailToggle}
+                          disabled={!canSendEmail || loading}
+                        />
+                      }
+                      label={
+                        canSendEmail
+                          ? `Send ${selectedAction} email to applicant`
+                          : 'Cannot send email (applicant opted out)'
+                      }
+                    />
+                  )}
+
+                  {/* Notes */}
+                  <FormControl fullWidth>
+                    <InputLabel>Notes (Optional)</InputLabel>
+                    <Select
+                      value="textarea"
                       disabled={loading}
+                      renderValue={() => (
+                        <textarea
+                          style={{
+                            width: '100%',
+                            minHeight: '80px',
+                            padding: '8px',
+                            fontFamily: 'inherit',
+                            fontSize: 'inherit',
+                          }}
+                          placeholder="Add notes about this decision..."
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          disabled={loading}
+                        />
+                      )}
                     />
-                  )}
-                />
-              </FormControl>
-            </Box>
+                  </FormControl>
+                </Box>
+              )}
+            </>
           )}
         </Paper>
       </DialogContent>
