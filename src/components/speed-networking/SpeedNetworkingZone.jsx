@@ -92,7 +92,7 @@ export default function SpeedNetworkingZone({
     autoJoinOnOpen = false,
     loungeEnabledSpeedNetworking = false, // ✅ NEW: Flag to show "Go to Social Lounge" button
     onSessionStopping,
-    liveMinimalMode = false, // ✅ PHASE 1: Skip speed networking API during join burst
+    liveMinimalMode = false, //  Skip speed networking API during join burst
 }) {
     const [session, setSession] = useState(null);
     const [currentMatch, setCurrentMatch] = useState(null);
@@ -168,7 +168,7 @@ export default function SpeedNetworkingZone({
 
     // Fetch active session
     const fetchActiveSession = useCallback(async () => {
-        // ✅ PHASE 1: Skip speed networking API during live minimal mode (join burst)
+        //  Skip speed networking API during live minimal mode (join burst)
         if (liveMinimalMode) {
             console.log("[SpeedNetworking] Deferring session fetch until speed networking panel opens");
             return;

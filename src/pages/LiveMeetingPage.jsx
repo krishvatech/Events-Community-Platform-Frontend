@@ -535,7 +535,7 @@ function matchesStageTarget(target, participant) {
   return (targetId && candidateId && targetId === candidateId) || (targetKey && candidateKey && targetKey === candidateKey);
 }
 
-// ✅ PHASE 1: Helper to extract backend user ID from participant
+//  Helper to extract backend user ID from participant
 function getBackendUserId(participant) {
   if (!participant) return null;
 
@@ -562,7 +562,7 @@ function getBackendUserId(participant) {
   );
 }
 
-// ✅ PHASE 1: Match RTK participant to backend user in lounge tables
+//  Match RTK participant to backend user in lounge tables
 function findUserIdForRtkParticipant(rtkParticipantId, loungeTables, participantIdMapRef) {
   if (!rtkParticipantId || !loungeTables) return null;
   const key = String(rtkParticipantId);
@@ -2329,7 +2329,7 @@ export default function NewLiveMeeting() {
   const [showBreakoutAnnouncement, setShowBreakoutAnnouncement] = useState(false);
   const [isBreakoutEnding, setIsBreakoutEnding] = useState(false); // ✅ Track when host ends breakout to clear timer immediately
 
-  // ✅ PHASE 1: Dual-Timer Foundation for Breakout Room Sessions
+  //  Dual-Timer Foundation for Breakout Room Sessions
   // Separate tracking for main room and breakout room timers
   const [mainRoomElapsedSeconds, setMainRoomElapsedSeconds] = useState(0);
   const [breakoutRoomElapsedSeconds, setBreakoutRoomElapsedSeconds] = useState(0);
@@ -2453,7 +2453,7 @@ export default function NewLiveMeeting() {
   const deferredLiveApiLogRef = useRef(false);
   const [eventId, setEventId] = useState(null);
 
-  // ✅ PHASE 1: Live Minimal Mode - Block non-critical APIs during join burst
+  //  Live Minimal Mode - Block non-critical APIs during join burst
   // Only critical APIs (/rtk/join/, /live/rejoin/, WebSocket) should run immediately
   // Non-critical APIs defer until panels open or WebSocket events indicate they're needed
   const isLiveMeetingRoute = () => {
@@ -2463,7 +2463,7 @@ export default function NewLiveMeeting() {
   const liveMinimalMode = isLiveMeetingRoute() && !roomJoined;
 
   // Log Phase 1 status once on initial load
-  // ✅ PHASE 5: Comprehensive deferred features logging
+  //  Comprehensive deferred features logging
   useEffect(() => {
     if (liveMinimalMode && !import.meta.env.DEV) return; // Only log in dev
     if (isLiveMeetingRoute() && import.meta.env?.DEV) {
@@ -2517,7 +2517,7 @@ export default function NewLiveMeeting() {
     }
   }, [roomJoined]);
 
-  // ✅ PHASE 1: Only enable deferred data after user explicitly opens relevant panels
+  //  Only enable deferred data after user explicitly opens relevant panels
   // Do NOT auto-unlock after 8 seconds - require user action (e.g., open chat tab)
   // This prevents unnecessary API calls during join burst
   useEffect(() => {
@@ -2525,7 +2525,7 @@ export default function NewLiveMeeting() {
     // Panels will trigger their own data loads via lazy-load callbacks
   }, [eventId]);
 
-  // ✅ PHASE 4: Fetch all participants at once instead of individual user/<id> calls
+  //  Fetch all participants at once instead of individual user/<id> calls
   useEffect(() => {
     if (!eventId) return;
 
@@ -2983,7 +2983,7 @@ export default function NewLiveMeeting() {
       setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
       return;
     }
-    // ✅ PHASE 1: Defer non-critical API during live minimal mode (join burst)
+    //  Defer non-critical API during live minimal mode (join burst)
     // KYC status is only used for badge display and can wait until user profile is opened
     if (liveMinimalMode) {
       if (import.meta.env?.DEV && !deferredLiveApiLogRef.current) {
@@ -3191,7 +3191,7 @@ export default function NewLiveMeeting() {
             1000,
             Number(data.retry_after || 2) * 1000
           );
-          // ✅ PHASE 1: Add jitter to prevent thundering herd
+          //  Add jitter to prevent thundering herd
           const jitterMs = Math.floor(Math.random() * 1000);
           const delayWithJitterMs = retryAfterMs + jitterMs;
 
@@ -3239,7 +3239,7 @@ export default function NewLiveMeeting() {
   const [activeTableName, setActiveTableName] = useState("");
   const [activeTableLogoUrl, setActiveTableLogoUrl] = useState(""); // ✅ Store table logo
 
-  // ✅ PHASE 1: Participant Visibility - Room Location Tracking
+  //  Participant Visibility - Room Location Tracking
   const [participantRoomMap, setParticipantRoomMap] = useState(new Map());
   // Map<rtk_participant_id, { type: "main"|"breakout"|"lounge", roomId, roomName, roomCategory }>
 
@@ -3605,7 +3605,7 @@ export default function NewLiveMeeting() {
   }, [rtkMeeting?.self, role, selfAssignedRole]);
 
   const syncMoodMapFromApi = useCallback(async () => {
-    // ✅ PHASE 1: Skip moods API during live minimal mode
+    //  Skip moods API during live minimal mode
     if (liveMinimalMode) {
       return;
     }
@@ -3757,7 +3757,7 @@ export default function NewLiveMeeting() {
   }, []);
 
 
-  // ✅ PHASE 2: Presenter-aware audio management
+  //  Presenter-aware audio management
   const [activePresenterAudio, setActivePresenterAudio] = useState(null); // { participantId, audioManager, enabled, volume }
   const presenterAudioManagerRef = useRef(null); // Current presenter's audio manager
   const capturedPresenterStreamRef = useRef(null); // Screen capture stream for current presenter
@@ -4110,7 +4110,7 @@ export default function NewLiveMeeting() {
     setMicOn,
   ]);
 
-  // ✅ PHASE 2: Presenter audio toggle handler
+  //  Presenter audio toggle handler
   const handleTogglePresenterAudio = useCallback((enabled) => {
     if (!screenShareRawAudioTrackRef.current) {
       console.warn("[LiveMeeting] No audio track to toggle");
@@ -4127,7 +4127,7 @@ export default function NewLiveMeeting() {
     }
   }, [showSnackbar]);
 
-  // ✅ PHASE 2: Presenter volume change handler
+  //  Presenter volume change handler
   const handlePresenterVolumeChange = useCallback((value) => {
     const cleanValue = Math.max(0, Math.min(1, Number(value) || 0));
 
@@ -5415,7 +5415,7 @@ export default function NewLiveMeeting() {
   ]);
 
 
-  // ✅ PHASE 2: Handle presentation target changes (grant/revoke presentation)
+  //  Handle presentation target changes (grant/revoke presentation)
   useEffect(() => {
     if (!rtkMeeting?.participants) return;
 
@@ -5555,7 +5555,7 @@ export default function NewLiveMeeting() {
 
         console.log("[LiveMeeting] Applying new breakout token");
 
-        // ✅ PHASE 2: RESET BREAKOUT TIMER ON JOIN
+        //  RESET BREAKOUT TIMER ON JOIN
         // When user joins breakout room, start fresh timer from 0
         setBreakoutRoomElapsedSeconds(0);
         breakoutRoomElapsedRef.current = 0;
@@ -5619,7 +5619,7 @@ export default function NewLiveMeeting() {
         setRoomJoined(false);
         joinedOnceRef.current = false;
 
-        // ✅ PHASE 2: RESTORE MAIN ROOM TIMER ON RETURN
+        //  RESTORE MAIN ROOM TIMER ON RETURN
         // When user returns from breakout, restore the main room timer and switch active timer
         setActiveTimerType('main');
         mainRoomStartTimeRef.current = Date.now();
@@ -7564,16 +7564,16 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!eventId || !waitingRoomActive) return;
     let alive = true;
-    let isPolling = false; // ✅ PHASE 1: Prevent overlapping polling calls
+    let isPolling = false; //  Prevent overlapping polling calls
 
     const poll = async () => {
-      // ✅ PHASE 1: Skip if tab is hidden (reduce wasted API calls)
+      //  Skip if tab is hidden (reduce wasted API calls)
       if (document.hidden) {
         console.log("[LiveMeeting] Skipping waiting room poll - tab is hidden");
         return;
       }
 
-      // ✅ PHASE 1: Prevent overlapping calls
+      //  Prevent overlapping calls
       if (isPolling) {
         console.log("[LiveMeeting] Skipping waiting room poll - already in flight");
         return;
@@ -7618,7 +7618,7 @@ export default function NewLiveMeeting() {
     };
 
     poll();
-    // ✅ PHASE 1: Reduce polling from 3s to 10s + random 5s (10-15s range)
+    //  Reduce polling from 3s to 10s + random 5s (10-15s range)
     const pollDelayMs = 10000 + Math.floor(Math.random() * 5000);
     const t = setInterval(poll, pollDelayMs);
     console.log(`[LiveMeeting] Waiting room polling scheduled every ${pollDelayMs}ms`);
@@ -7635,7 +7635,7 @@ export default function NewLiveMeeting() {
       return;
     }
     if (!eventId) return;
-    // ✅ PHASE 1: Only fetch lounge state if lounge is actually visible or user is in it
+    //  Only fetch lounge state if lounge is actually visible or user is in it
     // Don't fetch during join burst if lounge is not open
     if (liveMinimalMode && !loungeOpen && !isBreakout) {
       return;
@@ -7667,12 +7667,12 @@ export default function NewLiveMeeting() {
     }
   }, [liveMinimalMode, loungeOpen, isBreakout, deferNonCriticalLiveApi, eventId, role]);
 
-  // ✅ PHASE 5: Only fetch lounge state when lounge is open or user is in breakout
+  //  Only fetch lounge state when lounge is open or user is in breakout
   useEffect(() => {
     if (!eventId) return;
     if (deferNonCriticalLiveApi) return;
 
-    // ✅ PHASE 5: Skip lounge state fetch unless lounge is open or user in breakout
+    //  Skip lounge state fetch unless lounge is open or user in breakout
     if (!loungeOpen && !isBreakout) {
       if (import.meta.env?.DEV) {
         console.debug("[LiveMeeting] PHASE 5: Lounge not open, deferring state fetch");
@@ -7739,7 +7739,7 @@ export default function NewLiveMeeting() {
     const request = (async () => {
       // ✅ TIMEOUT: 3-second AbortController for rejoin API
       const controller = new AbortController();
-      // ✅ PHASE 3: Increase frontend timeout from 3s to 8s (backend timeout 5s + buffer)
+      //  Increase frontend timeout from 3s to 8s (backend timeout 5s + buffer)
       const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       try {
@@ -7870,7 +7870,7 @@ export default function NewLiveMeeting() {
     const scheduleNextAttempt = (delaySeconds = RETRY_INTERVAL / 1000) => {
       clearReconnectTimer();
       const delayMs = Math.max(1000, Math.round(delaySeconds * 1000));
-      // ✅ PHASE 1: Add jitter to prevent thundering herd on rejoin
+      //  Add jitter to prevent thundering herd on rejoin
       const jitterMs = Math.floor(Math.random() * 1500);
       const delayWithJitterMs = delayMs + jitterMs;
       reconnectTimerRef.current = setTimeout(attemptReconnect, delayWithJitterMs);
@@ -8331,7 +8331,7 @@ export default function NewLiveMeeting() {
             showSnackbar("Unable to notify attendee about support chat yet.", "error");
           }
         } else if (msg.type === "breakout_timer") {
-          // ✅ PHASE 3: ENHANCED DUAL-TIMER WEBSOCKET PROTOCOL
+          //  ENHANCED DUAL-TIMER WEBSOCKET PROTOCOL
           // Support both legacy (msg.duration) and new dual-timer format
           const { duration, elapsedSeconds, activeRoom, mainRoomElapsed, startTime } = msg;
 
@@ -8610,7 +8610,7 @@ export default function NewLiveMeeting() {
           setJoinRequestTick((v) => v + 1);
 
         } else if (msg.type === "participant_location_update") {
-          // ✅ PHASE 2: Handle when a user joins/leaves/switches rooms
+          //  Handle when a user joins/leaves/switches rooms
           console.log("[MainSocket] Participant location update:", msg);
 
           if (!msg.updates || !Array.isArray(msg.updates)) return;
@@ -8695,7 +8695,7 @@ export default function NewLiveMeeting() {
           }
 
         } else if (msg.type === "participant_location_sync") {
-          // ✅ PHASE 2: Full sync (on reconnect or initial load)
+          //  Full sync (on reconnect or initial load)
           console.log("[MainSocket] Received participant location sync:", msg);
 
           if (!msg.participants || !Array.isArray(msg.participants)) return;
@@ -9236,15 +9236,15 @@ export default function NewLiveMeeting() {
     if (!isBreakout) return; // Only while in breakout
 
     let alive = true;
-    let isPolling = false; // ✅ PHASE 1: Prevent overlapping polling calls
+    let isPolling = false; //  Prevent overlapping polling calls
 
     const pollLoungeStatus = async () => {
-      // ✅ PHASE 1: Skip if tab is hidden (reduce wasted API calls)
+      //  Skip if tab is hidden (reduce wasted API calls)
       if (document.hidden) {
         return;
       }
 
-      // ✅ PHASE 1: Prevent overlapping calls
+      //  Prevent overlapping calls
       if (isPolling) {
         return;
       }
@@ -9805,14 +9805,14 @@ export default function NewLiveMeeting() {
     fetchSentAnnouncements();
 
     let alive = true;
-    let isPolling = false; // ✅ PHASE 1: Prevent overlapping polling calls
+    let isPolling = false; //  Prevent overlapping polling calls
     const poll = async () => {
-      // ✅ PHASE 1: Skip if tab is hidden (reduce wasted API calls)
+      //  Skip if tab is hidden (reduce wasted API calls)
       if (document.hidden) {
         return;
       }
 
-      // ✅ PHASE 1: Prevent overlapping calls
+      //  Prevent overlapping calls
       if (isPolling) {
         return;
       }
@@ -9875,7 +9875,7 @@ export default function NewLiveMeeting() {
 
   const filteredWaitingRoomCount = filteredWaitingRoomQueue.length;
 
-  // ✅ PHASE 3: Keep participantRoomMap in sync with loungeTables state
+  //  Keep participantRoomMap in sync with loungeTables state
 
   useEffect(() => {
     if (!isHost || !eventData?.waiting_room_enabled) return;
@@ -9900,14 +9900,14 @@ export default function NewLiveMeeting() {
     if (!isHost || !eventData?.lounge_enabled_waiting_room) return;
 
     let alive = true;
-    let isPolling = false; // ✅ PHASE 1: Prevent overlapping polling calls
+    let isPolling = false; //  Prevent overlapping polling calls
     const poll = async () => {
-      // ✅ PHASE 1: Skip if tab is hidden (reduce wasted API calls)
+      //  Skip if tab is hidden (reduce wasted API calls)
       if (document.hidden) {
         return;
       }
 
-      // ✅ PHASE 1: Prevent overlapping calls
+      //  Prevent overlapping calls
       if (isPolling) {
         return;
       }
@@ -10103,7 +10103,7 @@ export default function NewLiveMeeting() {
     };
   }, [isOnBreak]);
 
-  // ✅ PHASE 3: DUAL-TIMER COUNTDOWN EFFECT
+  //  DUAL-TIMER COUNTDOWN EFFECT
   // Handles continuous countdown for both main room and breakout room timers
   // Uses refs to track local elapsed time and syncs with server updates
   // ✅ TIMER STOP: Stops immediately when host ends breakout room
@@ -10136,7 +10136,7 @@ export default function NewLiveMeeting() {
     return () => clearInterval(interval);
   }, [activeTimerType, isInBreakoutRoom, roomJoined, isBreakoutEnding]);
 
-  // ✅ PHASE 3: RECONNECT SYNC EFFECT
+  //  RECONNECT SYNC EFFECT
   // Re-syncs timers with server after connection loss
   useEffect(() => {
     if (!mainSocketRef.current) return;
@@ -11300,7 +11300,7 @@ export default function NewLiveMeeting() {
     const transitionId = `sn-stop-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const timestamp = Date.now();
 
-    // ✅ PHASE 1: IMMEDIATELY set "stopping" state to show transition UI
+    //  IMMEDIATELY set "stopping" state to show transition UI
     setStopFlowTransitionId(transitionId);
     setStopFlowStartTimestamp(timestamp);
     setSpeedNetworkingState('stopping');
@@ -11311,14 +11311,14 @@ export default function NewLiveMeeting() {
     // Log start of stop flow
     console.log(`[StopFlow] ▶️ INITIATED ${transitionId}`);
 
-    // ✅ PHASE 2: Force immediate transition UI
+    //  Force immediate transition UI
     setShowSpeedNetworking(false);  // Close dialog
     setMainMeetingIsolationForSpeedNetworking(false);
     setLoungeOpen(false);
     setLoadingJoin(true);  // Force JoiningMeetingScreen to show
     setJoinError("");
 
-    // ✅ PHASE 3: Force explicit RTK room leave if in breakout
+    //  Force explicit RTK room leave if in breakout
     if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
       (async () => {
         try {
@@ -11334,7 +11334,7 @@ export default function NewLiveMeeting() {
         } finally {
           rtkLoungeRoomConnectingRef.current = false;
 
-          // ✅ PHASE 4: After lounge exit, IMMEDIATELY rejoin main room
+          //  After lounge exit, IMMEDIATELY rejoin main room
           speedNetworkingStopPhaseRef.current = 'requesting_main_join';
           console.log(`[StopFlow:${transitionId}] Requesting main room join...`);
           setSpeedNetworkingState('rejoining_main');
@@ -11344,7 +11344,7 @@ export default function NewLiveMeeting() {
             setJoinError(e?.message || "Failed to refresh meeting token");
           });
 
-          // ✅ PHASE 5: Set timeout for safety
+          //  Set timeout for safety
           if (stopFlowTimeoutRef.current) clearTimeout(stopFlowTimeoutRef.current);
           stopFlowTimeoutRef.current = setTimeout(() => {
             if (speedNetworkingStopPhaseRef.current !== 'joined_main') {
@@ -12385,11 +12385,11 @@ export default function NewLiveMeeting() {
     return () => clearTimeout(timerId);
   }, [pendingSpotlightInvite, showSnackbar]);
 
-  // ✅ PHASE 5: Defer mood polling until mood UI is opened or after join is stable
+  //  Defer mood polling until mood UI is opened or after join is stable
   useEffect(() => {
     if (!eventId || !roomJoined) return;
 
-    // ✅ PHASE 5: Skip mood polling during join burst
+    //  Skip mood polling during join burst
     if (liveMinimalMode) {
       if (import.meta.env?.DEV) {
         console.debug("[LiveMeeting] PHASE 5: Deferring mood polling during join burst");
@@ -12397,7 +12397,7 @@ export default function NewLiveMeeting() {
       return;
     }
 
-    // ✅ PHASE 5: Only sync moods if mood menu is open or feature is enabled
+    //  Only sync moods if mood menu is open or feature is enabled
     const isMoodMenuOpen = Boolean(moodAnchorEl);
     if (!isMoodMenuOpen && !eventData?.show_moods) {
       if (import.meta.env?.DEV) {
@@ -15095,7 +15095,7 @@ export default function NewLiveMeeting() {
 
   const fetchChatMessages = useCallback(
     async (conversationId) => {
-      // ✅ PHASE 1: Defer messaging API during join burst
+      //  Defer messaging API during join burst
       if (liveMinimalMode || deferNonCriticalLiveApi) return;
       const cid = conversationId || activeChatConversationId;
       if (!cid) return;
@@ -15110,7 +15110,7 @@ export default function NewLiveMeeting() {
   );
 
   const ensureEventConversation = useCallback(async () => {
-    // ✅ PHASE 1: Defer messaging API during join burst
+    //  Defer messaging API during join burst
     if (liveMinimalMode || deferNonCriticalLiveApi) return null;
     if (!eventId) return null;
     if (!hasLiveInteractiveAccess) {
@@ -15170,7 +15170,7 @@ export default function NewLiveMeeting() {
   }, [activeTableId, deferNonCriticalLiveApi, eventId]);
 
   const ensureLoungeConversation = useCallback(async () => {
-    // ✅ PHASE 1: Defer messaging API during join burst
+    //  Defer messaging API during join burst
     if (liveMinimalMode || deferNonCriticalLiveApi) return null;
     if (!activeTableId) return null;
     if (roomChatConversationId) return roomChatConversationId;
@@ -15236,7 +15236,7 @@ export default function NewLiveMeeting() {
 
   const fetchChatUnread = useCallback(async () => {
     try {
-      // ✅ PHASE 1: Defer messaging API during join burst
+      //  Defer messaging API during join burst
       if (liveMinimalMode || deferNonCriticalLiveApi) return 0;
       if (!hasLiveInteractiveAccess) return 0;
       const cid = activeChatConversationId;
@@ -15268,7 +15268,7 @@ export default function NewLiveMeeting() {
     conversationId,
     { force = false, clearEventUnread = false, clearPrivateRecipientId = null } = {}
   ) => {
-    // ✅ PHASE 1: Defer messaging API during join burst
+    //  Defer messaging API during join burst
     if (liveMinimalMode || deferNonCriticalLiveApi) return false;
     const cid = conversationId ? String(conversationId) : "";
     if (!cid) return false;
@@ -15331,7 +15331,7 @@ export default function NewLiveMeeting() {
   const privateChatWsRef = useRef(null);
 
   const handleOpenPrivateChat = async (member) => {
-    // ✅ PHASE 1: Defer messaging API during join burst
+    //  Defer messaging API during join burst
     if (liveMinimalMode || deferNonCriticalLiveApi) return null;
     setPrivateChatUser(member);
     if (isMdUp) setRightPanelOpen(true);
@@ -18163,7 +18163,7 @@ export default function NewLiveMeeting() {
     }
 
     const hostIdSet = new Set(host.map((p) => p.id));
-    // ✅ PHASE 4: Host in main room should see ALL participants (including those in breakout/lounge)
+    //  Host in main room should see ALL participants (including those in breakout/lounge)
     // ✅ CRITICAL FIX: Use assignedRoleByIdentity to determine speakers (not RTK role, which is "Host" for lounge participants)
     const speakers = scopedParticipants.filter((p) => {
       if (hostIdSet.has(p.id)) return false; // Skip hosts
@@ -18183,7 +18183,7 @@ export default function NewLiveMeeting() {
       return false;
     });
 
-    // ✅ PHASE 4: For host, enhance with room location
+    //  For host, enhance with room location
     if (isHost && !isBreakout) {
       const hostWithLocation = host.map(p => ({
         ...p,
@@ -18231,7 +18231,7 @@ export default function NewLiveMeeting() {
     eventData?.lounge_enabled_waiting_room,
     primaryHostUserId,
     isMainRoomSupportMissing,
-    participantRoomMap,  // ✅ PHASE 4: Added dependency
+    participantRoomMap,  //  Added dependency
     getParticipantRoomInfo,
     assignedRoleByIdentity,  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
     hostVirtualAudienceMembers
