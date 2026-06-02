@@ -1235,6 +1235,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             <PaymentPendingSummary reg={reg} />
           ) : (isEventOwner || isConfirmedRegistered) ? (
             <span className="text-teal-600">You are registered for this event.</span>
+          ) : ev.registration_type === 'apply' && (applicationStatus === 'pending' || applicationStatus === 'waitlisted') ? (
+            <span className="text-gray-600">Application {applicationStatus === 'pending' ? 'Pending' : 'Waitlisted'}</span>
           ) : (
             displayPrice(ev)
           )}
@@ -1422,6 +1424,14 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     ? (
                       <Chip
                         label="Application Pending"
+                        color="warning"
+                        variant="outlined"
+                      />
+                    )
+                    : applicationStatus === 'waitlisted'
+                    ? (
+                      <Chip
+                        label="Application Waitlisted"
                         color="warning"
                         variant="outlined"
                       />
