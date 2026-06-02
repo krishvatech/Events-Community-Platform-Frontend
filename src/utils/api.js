@@ -6,6 +6,27 @@ import { getUserName, clearAuth } from "./authStorage";
 let isRefreshing = false;
 let failedQueue = [];
 
+// ✅ PHASE 2: 403 Forbidden Cache - Prevent retry storms on permission denied
+// Maps URL -> { timestamp, status } to prevent repeated 403 calls
+const forbiddenCache = new Map();
+const FORBIDDEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+const isForbiddenCached = (url) => {
+  if (!forbiddenCache.has(url)) return false;
+  const cached = forbiddenCache.get(url);
+  const isExpired = Date.now() - cached.timestamp > FORBIDDEN_CACHE_TTL_MS;
+  if (isExpired) {
+    forbiddenCache.delete(url);
+    return false;
+  }
+  return true;
+};
+
+const cacheForbidden = (url) => {
+  forbiddenCache.set(url, { timestamp: Date.now(), status: 403 });
+  console.log(`[Auth] Cached 403 for ${url} (5min TTL)`);
+};
+
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
@@ -122,38 +143,46 @@ apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error?.config;
+    const url = original?.url || "";
 
-    // Handle 401 (Unauthorized Token) or 403 (Forbidden - might be expired token or actual ban)
-    // We attempt refresh for both statuses. If 403 persists after refresh, it's a real ban.
+    // ✅ PHASE 2: Only refresh on 401 (token expired), NOT on 403 (permission denied)
     const status = error?.response?.status;
-    if (!status || (status !== 401 && status !== 403)) {
+
+    // 403 (Forbidden) - Permission denied, not a token issue
+    if (status === 403) {
+      console.warn(`[Auth] 403 Forbidden for ${url}. This is permission denied, not token expiration.`);
+      // Cache to prevent repeated calls for the same forbidden endpoint
+      cacheForbidden(url);
+      return Promise.reject(error);
+    }
+
+    // Not a status we handle - pass through
+    if (!status || status !== 401) {
       return Promise.reject(error);
     }
 
     // ──── GUEST BRANCH: Skip Cognito refresh for guest tokens ────────────────
     const isGuest = localStorage.getItem("is_guest") === "true";
     if (isGuest) {
-      // Only clear guest session on 401 (Unauthorized/expired token)
-      // 403 is permission denied, which is normal for guest users on restricted endpoints
-      if (status === 401) {
-        console.warn("[Auth] Guest token expired (401). Clearing guest session.");
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("is_guest");
-        localStorage.removeItem("guest_email");
-        localStorage.removeItem("guest_name");
-        localStorage.removeItem("guest_id");
-        window.location.href = "/signin";
-      }
+      console.warn("[Auth] Guest token expired (401). Clearing guest session.");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("is_guest");
+      localStorage.removeItem("guest_email");
+      localStorage.removeItem("guest_name");
+      localStorage.removeItem("guest_id");
+      window.location.href = "/signin";
       return Promise.reject(error);
     }
     // ──── END GUEST BRANCH ────────────────────────────────────────────────────
 
-    // prevent infinite loop
+    // ✅ PHASE 2: Prevent infinite retry loop on 401
     if (original._retry) {
+      console.error("[Auth] Request already retried after 401. Giving up.");
+      clearAuth();
       return Promise.reject(error);
     }
 
-    // Try refresh
+    // Try refresh (ONLY on 401, not on 403)
     try {
       if (!isRefreshing) {
         isRefreshing = true;
@@ -162,7 +191,7 @@ apiClient.interceptors.response.use(
         const refreshToken = getRefreshToken();
         let username = getUserName();
 
-        console.log(`[Auth] ${status} detected. Attempting token refresh...`);
+        console.log(`[Auth] 401 Unauthorized detected. Attempting token refresh...`);
 
         // Fallback 1: Try getting username from localStorage 'user' object
         if (!username) {
@@ -187,14 +216,7 @@ apiClient.interceptors.response.use(
         }
 
         if (!refreshToken || !username) {
-          // If 403 (Forbidden) without refresh token, it's likely a permission error, not expired session.
-          // Do not logout, just fail the request.
-          if (status === 403) {
-            console.warn("[Auth] 403 Forbidden and no refresh token available. Treating as permission denied.");
-            return Promise.reject(error);
-          }
-
-          console.error("[Auth] Missing refresh token or username. Logging out.");
+          console.error("[Auth] Missing refresh token or username. Cannot refresh. Logging out.");
           throw new Error("No refresh token or username available");
         }
 
@@ -216,14 +238,20 @@ apiClient.interceptors.response.use(
         processQueue(null, idToken);
         isRefreshing = false;
 
-        // Retry original
+        // ✅ PHASE 2: Retry original request with new token
         original.headers.Authorization = `Bearer ${idToken}`;
         const retryResponse = await apiClient(original);
 
-        // Check retry response for persistent auth issues
-        if (retryResponse.status === 401 || retryResponse.status === 403) {
-          console.warn("[Auth] Request still failed with auth error after refresh. User access denied (banned/restricted).");
+        // ✅ PHASE 2: Check retry response
+        // 401 after refresh = token still bad (user suspended/locked)
+        // 403 after refresh = permission denied for this resource (not a token issue)
+        if (retryResponse.status === 401) {
+          console.error("[Auth] Retry still failed with 401 after refresh. User likely suspended or token invalid.");
           clearAuth();
+        } else if (retryResponse.status === 403) {
+          console.warn("[Auth] Retry returned 403 after refresh. User lacks permission for this resource.");
+          // Cache the forbidden result to prevent repeated calls
+          cacheForbidden(url);
         }
 
         return retryResponse;

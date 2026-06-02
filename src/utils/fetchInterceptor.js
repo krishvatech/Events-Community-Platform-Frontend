@@ -11,6 +11,26 @@ const inFlightGetRequests = new Map();
 const DEFAULT_FETCH_TIMEOUT_MS = 20000;
 const MUTATION_FETCH_TIMEOUT_MS = 120000;
 
+// ✅ PHASE 2: 403 Forbidden Cache - Prevent retry storms on permission denied
+const forbiddenCache = new Map();
+const FORBIDDEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+const isForbiddenCached = (url) => {
+    if (!forbiddenCache.has(url)) return false;
+    const cached = forbiddenCache.get(url);
+    const isExpired = Date.now() - cached.timestamp > FORBIDDEN_CACHE_TTL_MS;
+    if (isExpired) {
+        forbiddenCache.delete(url);
+        return false;
+    }
+    return true;
+};
+
+const cacheForbidden = (url) => {
+    forbiddenCache.set(url, { timestamp: Date.now(), status: 403 });
+    console.log(`[Global Fetch] Cached 403 for ${url} (5min TTL)`);
+};
+
 const processQueue = (error, token = null) => {
     failedQueue.forEach((prom) => {
         if (error) {
@@ -77,19 +97,29 @@ window.fetch = async (...args) => {
         return headers.Authorization || headers.authorization || "";
     };
 
-    // 2. Check for 401 (Unauthorized Token) or 403 (Forbidden - might be expired token or actual ban).
-    // Refresh should only run for authenticated, non-guest sessions.
+    // ✅ PHASE 2: Only refresh on 401 (token expired), NOT on 403 (permission denied)
+    // 403 is permission denied and should never trigger a token refresh
     const authHeader = readAuthHeader(requestConfig?.headers);
     const requestToken = authHeader.replace(/^Bearer\s+/i, "").trim();
     const storedAccessToken = getToken();
     const hasAuthenticatedSession = Boolean(requestToken || storedAccessToken);
 
-    // GUEST EXCEPTION: For guest users, treat both 401/403 as terminal for that request.
+    // GUEST EXCEPTION: For guest users, return forbidden response without refresh attempt
     const isGuest = localStorage.getItem("is_guest") === "true";
+
+    // 403 (Forbidden) - Permission denied, not a token issue. Do not refresh.
+    if (response.status === 403) {
+        console.warn(`[Global Fetch] 403 Forbidden for ${url}. This is permission denied, not token expiration.`);
+        // Cache to prevent repeated calls for the same forbidden endpoint
+        cacheForbidden(url);
+        return response;
+    }
+
+    // Only attempt refresh on 401 (token expired)
     const shouldAttemptRefresh =
+        response.status === 401 &&
         hasAuthenticatedSession &&
-        !isGuest &&
-        (response.status === 401 || response.status === 403);
+        !isGuest;
 
     if (shouldAttemptRefresh) {
         // Check if we are already refreshing
@@ -151,14 +181,11 @@ window.fetch = async (...args) => {
             }
 
             if (!refreshToken || !username) {
-                console.error("[Global Fetch] Missing refresh token or username. Cannot refresh.");
-                if (statusCode === 403) {
-                    // Missing refresh metadata on 403 means this is likely a true permission denial.
-                    processQueue(new Error("Forbidden"), null);
-                    isRefreshing = false;
-                    return response;
-                }
-                throw new Error("No refresh token or username");
+                console.error("[Global Fetch] Missing refresh token or username. Cannot refresh. Logging out.");
+                processQueue(new Error("Cannot refresh: missing credentials"), null);
+                isRefreshing = false;
+                clearAuth();
+                return response;
             }
 
             console.log(`[Global Fetch] Refreshing session for user: ${username}`);
@@ -180,20 +207,21 @@ window.fetch = async (...args) => {
             processQueue(null, idToken);
             isRefreshing = false;
 
-            // Retry Original Request with new token
+            // ✅ PHASE 2: Retry original request with new token
             const newConfig = { ...requestConfig, headers: { ...requestConfig?.headers } };
             newConfig.headers["Authorization"] = `Bearer ${idToken}`;
             const retryResponse = await originalFetch(resource, newConfig);
 
-            // Check retry response
+            // ✅ PHASE 2: Check retry response
+            // 401 after refresh = token still bad (user suspended/locked)
+            // 403 after refresh = permission denied for this resource (not a token issue)
             if (retryResponse.status === 401) {
-                // 401 after refresh = token is bad or user is suspended
-                console.error("[Global Fetch] Retry failed with 401 after refresh. User likely suspended.");
+                console.error("[Global Fetch] Retry still failed with 401 after refresh. User likely suspended or token invalid.");
                 clearAuth();
             } else if (retryResponse.status === 403) {
-                // 403 after refresh = permission denied for this specific resource, not a token issue
-                // Keep user logged in and let frontend handle the permission error
-                console.warn("[Global Fetch] Retry failed with 403 after refresh. User lacks permission for this resource.");
+                console.warn("[Global Fetch] Retry returned 403 after refresh. User lacks permission for this resource.");
+                // Cache the forbidden result to prevent repeated calls
+                cacheForbidden(url);
             }
 
             return retryResponse;
