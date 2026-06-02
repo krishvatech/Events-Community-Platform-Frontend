@@ -18240,7 +18240,7 @@ export default function NewLiveMeeting() {
       return {
         host: hostWithLocation,
         speakers: speakersWithLocation,
-        audience: [...audienceWithLocation, ...hostVirtualAudienceMembers]
+        audience: audienceWithLocation
       };
     }
 
@@ -18261,7 +18261,6 @@ export default function NewLiveMeeting() {
     participantRoomMap,  //  Added dependency
     getParticipantRoomInfo,
     assignedRoleByIdentity,  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
-    hostVirtualAudienceMembers
   ]);
 
 
