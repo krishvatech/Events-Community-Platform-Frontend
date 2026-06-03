@@ -619,7 +619,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 // ————————————————————————————————————————
 // Card (thumbnail view)
 // ————————————————————————————————————————
-function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef }) {
+function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef, isSecondaryDataReady = true }) {
   const navigate = useNavigate();
   const currentUser = getBackendUserFromStorage();
   const currentUserId = currentUser?.id;
@@ -1229,6 +1229,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         <div className="mt-auto" />
       </CardContent>
       {/* Footer */}
+      {!isSecondaryDataReady ? (
+        <CardFooterSkeleton />
+      ) : (
       <div className="flex items-center justify-between border-t p-6">
         <div className="text-base font-semibold text-neutral-900">
           {isPaymentPending ? (
@@ -1516,6 +1519,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           )
         )}
       </div>
+      )}
       <ApplyNowModal
         open={applyModalOpen}
         onClose={() => setApplyModalOpen(false)}
@@ -1538,7 +1542,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 // ————————————————————————————————————————
 // Row (details/list view)
 // ————————————————————————————————————————
-function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef }) {
+function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef, isSecondaryDataReady = true }) {
   const navigate = useNavigate();
   const currentUser = getBackendUserFromStorage();
   const currentUserId = currentUser?.id;
@@ -2159,6 +2163,16 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   );
 }
 
+// Skeleton for card footer status area (secondary data loading)
+function CardFooterSkeleton() {
+  return (
+    <div className="flex items-center justify-between border-t p-6">
+      <Skeleton variant="text" width={120} height={24} />
+      <Skeleton variant="rounded" height={40} width={100} />
+    </div>
+  );
+}
+
 function EventCardSkeleton() {
   return (
     <MUICard className="rounded-3xl border border-slate-200 overflow-hidden">
@@ -2536,6 +2550,7 @@ export default function EventsPage() {
   }, []);
 
   // ✅ TOP-LEVEL: build UI objects with the isRegistered flag
+  // Update immediately when rawEvents change, don't wait for myRegistrations
   useEffect(() => {
     setEvents(
       (rawEvents || []).map(ev => {
@@ -2549,6 +2564,14 @@ export default function EventsPage() {
       })
     );
   }, [rawEvents, myRegistrations]);
+
+  // Track when we have initial rawEvents to show (separate from initialLoading)
+  const [hasInitialEvents, setHasInitialEvents] = useState(false);
+  useEffect(() => {
+    if (rawEvents.length > 0 && !hasInitialEvents) {
+      setHasInitialEvents(true);
+    }
+  }, [rawEvents, hasInitialEvents]);
 
 
   useEffect(() => {
@@ -3869,7 +3892,7 @@ export default function EventsPage() {
                   },
                 }}
               >
-                {initialLoading
+                {rawEvents.length === 0 && initialLoading
                   ? skeletonItems.map((i) => (
                     <Box key={`sk-grid-${i}`}>
                       <EventCardSkeleton />
@@ -3897,6 +3920,7 @@ export default function EventsPage() {
                                 onGuestJoinRequested={handleGuestJoinRequested}
                                 onLeadGenNeeded={handleLeadGenNeeded}
                                 leadGenCallbackRef={leadGenCallbackRef}
+                                isSecondaryDataReady={!!myRegistrations[ev.id] || Object.keys(myRegistrations).length > 0}
                               />
                             </Box>
                           );
@@ -4011,6 +4035,7 @@ export default function EventsPage() {
                           onGuestJoinRequested={handleGuestJoinRequested}
                           onLeadGenNeeded={handleLeadGenNeeded}
                           leadGenCallbackRef={leadGenCallbackRef}
+                          isSecondaryDataReady={!!myRegistrations[ev.id] || Object.keys(myRegistrations).length > 0}
                         />
                       </Box>
                     ))}
@@ -4019,7 +4044,7 @@ export default function EventsPage() {
               </Box>
             ) : (
               <Grid container spacing={3} direction="column">
-                {initialLoading
+                {rawEvents.length === 0 && initialLoading
                   ? skeletonItems.map((i) => (
                     <Grid item key={`sk-list-${i}`} xs={12}>
                       <EventRowSkeleton />
@@ -4047,6 +4072,7 @@ export default function EventsPage() {
                                 onGuestJoinRequested={handleGuestJoinRequested}
                                 onLeadGenNeeded={handleLeadGenNeeded}
                                 leadGenCallbackRef={leadGenCallbackRef}
+                                isSecondaryDataReady={!!myRegistrations[ev.id] || Object.keys(myRegistrations).length > 0}
                               />
                             </Grid>
                           );
@@ -4146,6 +4172,7 @@ export default function EventsPage() {
                           onGuestJoinRequested={handleGuestJoinRequested}
                           onLeadGenNeeded={handleLeadGenNeeded}
                           leadGenCallbackRef={leadGenCallbackRef}
+                          isSecondaryDataReady={!!myRegistrations[ev.id] || Object.keys(myRegistrations).length > 0}
                         />
                       </Grid>
                     ))}
@@ -4157,7 +4184,7 @@ export default function EventsPage() {
             {/* Pagination */}
             <Box
               className="mt-8 flex items-center justify-center"
-              sx={{ opacity: initialLoading ? 0.6 : 1, pointerEvents: initialLoading ? "none" : "auto" }}
+              sx={{ opacity: rawEvents.length === 0 && initialLoading ? 0.6 : 1, pointerEvents: rawEvents.length === 0 && initialLoading ? "none" : "auto" }}
             >
               <Pagination
                 count={pageCount}
