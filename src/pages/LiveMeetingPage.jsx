@@ -15070,6 +15070,8 @@ export default function NewLiveMeeting() {
   const [chatError, setChatError] = useState("");
   const [chatInput, setChatInput] = useState("");
   const chatBottomRef = useRef(null);
+  const chatListRef = useRef(null);  // ✅ Scrollable chat container
+  const [newMessageCount, setNewMessageCount] = useState(0);  // ✅ "New message" indicator
   const [chatEditId, setChatEditId] = useState(null);
   const [chatEditBody, setChatEditBody] = useState("");
   const [chatEditSaving, setChatEditSaving] = useState(false);
@@ -15119,6 +15121,25 @@ export default function NewLiveMeeting() {
     : chatConversationId;
   const ensureEventConversationPromiseRef = useRef(null);
   const ensureLoungeConversationPromiseRef = useRef(null);
+
+  // ✅ Helper: Check if user is near bottom of chat
+  const isNearBottom = useCallback(() => {
+    if (!chatListRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = chatListRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    return distanceFromBottom < 80;  // within 80px of bottom
+  }, []);
+
+  // ✅ Helper: Scroll to bottom smoothly
+  const scrollToBottom = useCallback(() => {
+    if (!chatListRef.current) return;
+    requestAnimationFrame(() => {
+      if (chatListRef.current) {
+        chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+        console.debug("[ChatScroll] Scrolled to bottom");
+      }
+    });
+  }, []);
 
   const fetchChatMessages = useCallback(
     async (conversationId) => {
@@ -15356,6 +15377,11 @@ export default function NewLiveMeeting() {
   const openPrivateChatRef = useRef(null);
   const [privateEventMetaById, setPrivateEventMetaById] = useState({});
   const privateChatWsRef = useRef(null);
+
+  // Event/Lounge Chat WebSocket (real-time message delivery)
+  const eventChatWsRef = useRef(null);
+  const eventChatWsConnectedRef = useRef(false);
+  const wasNearBottomRef = useRef(true);  // ✅ Track scroll position for auto-scroll
 
   const handleOpenPrivateChat = async (member) => {
     //  Defer messaging API during join burst
@@ -15734,6 +15760,117 @@ export default function NewLiveMeeting() {
     }
   }, [deferNonCriticalLiveApi, privateChatUser, privateConversationId, isGuest]);
 
+  // ✅ Event/Lounge Chat WebSocket (Real-time message delivery)
+  useEffect(() => {
+    if (!hostPerms.chat) return;
+    if (!eventId && !activeTableId) return;
+    if (!hasLiveInteractiveAccess) return;
+    if (deferNonCriticalLiveApi) return;
+
+    const cid = isRoomChatActive ? roomChatConversationId : chatConversationId;
+    if (!cid) return;
+
+    let alive = true;
+
+    try {
+      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProtocol}//${window.location.host}/ws/messaging/conversations/${cid}/?token=${getToken()}`;
+      console.log("[EventChat WS] Connecting to:", wsUrl);
+      const ws = new WebSocket(wsUrl);
+      eventChatWsRef.current = ws;
+
+      ws.onopen = () => {
+        if (alive) {
+          eventChatWsConnectedRef.current = true;
+          console.log("[EventChat WS] ✅ Connected to conversation", cid);
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("[EventChat WS] Received event:", data.type, "message_id:", data.message?.id);
+
+          if (!alive) return;
+
+          if (data.type === "message.created") {
+            wasNearBottomRef.current = isNearBottom();
+            console.log("[EventChat WS] New message received, user near bottom?", wasNearBottomRef.current);
+
+            // Add new message, deduplicate by ID (sender gets message from API response + WebSocket)
+            setChatMessages((prev) => {
+              const isDuplicate = prev.some((m) => m.id === data.message.id);
+              console.log("[EventChat WS] Message ID:", data.message.id, "Duplicate?", isDuplicate);
+              return isDuplicate ? prev : [...prev, data.message];
+            });
+
+            // Auto-scroll after React re-renders if user was near bottom
+            requestAnimationFrame(() => {
+              if (wasNearBottomRef.current && alive) {
+                scrollToBottom();
+                setNewMessageCount(0);
+              } else if (alive) {
+                // Show "New message" indicator if user scrolled up
+                setNewMessageCount((prev) => prev + 1);
+              }
+            });
+          } else if (data.type === "message.edited") {
+            console.log("[EventChat WS] Message edited, id:", data.message.id);
+            // Update edited message
+            setChatMessages((prev) =>
+              prev.map((m) => (m.id === data.message.id ? data.message : m))
+            );
+          } else if (data.type === "message.deleted") {
+            console.log("[EventChat WS] Message deleted, id:", data.message.id);
+            // Update deleted message
+            setChatMessages((prev) =>
+              prev.map((m) => (m.id === data.message.id ? data.message : m))
+            );
+          }
+        } catch (e) {
+          console.error("[EventChat WS] Parse error:", e);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("[EventChat WS] ❌ WebSocket error:", error);
+        eventChatWsConnectedRef.current = false;
+      };
+
+      ws.onclose = () => {
+        if (eventChatWsRef.current === ws) {
+          eventChatWsRef.current = null;
+        }
+        eventChatWsConnectedRef.current = false;
+        console.log("[EventChat WS] ⚠️ Disconnected from conversation", cid);
+      };
+
+      return () => {
+        alive = false;
+        eventChatWsConnectedRef.current = false;
+        if (eventChatWsRef.current === ws) {
+          eventChatWsRef.current = null;
+        }
+        ws.close();
+      };
+    } catch (e) {
+      console.error("[EventChat WS] ❌ Failed to connect:", e);
+      eventChatWsRef.current = null;
+      eventChatWsConnectedRef.current = false;
+    }
+  }, [
+    hostPerms.chat,
+    eventId,
+    activeTableId,
+    hasLiveInteractiveAccess,
+    deferNonCriticalLiveApi,
+    isRoomChatActive,
+    roomChatConversationId,
+    chatConversationId,
+    isNearBottom,
+    scrollToBottom,
+  ]);
+
   useEffect(() => {
     if (!hostPerms.chat) return;
     if (!eventId && !activeTableId) return;
@@ -15783,7 +15920,13 @@ export default function NewLiveMeeting() {
     };
 
     tick();
-    const t = setInterval(tick, isChatActive ? 10000 : 30000);
+    // ✅ Optimize polling: Use longer interval when WebSocket is connected for real-time updates
+    // WebSocket active: 60s fallback polling (in case of missed messages during reconnect)
+    // WebSocket inactive: 10s active / 30s inactive polling (normal behavior)
+    const pollingInterval = eventChatWsConnectedRef.current
+      ? 60000  // 60 seconds when WebSocket is healthy
+      : (isChatActive ? 10000 : 30000);  // 10s active, 30s inactive
+    const t = setInterval(tick, pollingInterval);
 
     return () => {
       alive = false;
@@ -15889,6 +16032,7 @@ export default function NewLiveMeeting() {
     try {
       const cid = activeChatConversationId || (await ensureActiveConversation());
       if (!cid) throw new Error("Chat not ready.");
+      console.log("[SendChat] Sending message to conversation", cid);
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
@@ -15896,14 +16040,19 @@ export default function NewLiveMeeting() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.detail || "Failed to send message.");
+      console.log("[SendChat] ✅ Message sent, id:", data?.id);
       setChatMessages((prev) => [...prev, ...(data ? [data] : [])]);
       setChatInput("");
+      setNewMessageCount(0);  // ✅ Clear "new message" indicator when user sends
+      // ✅ Always scroll to bottom when sender sends a message
+      scrollToBottom();
     } catch (e) {
+      console.error("[SendChat] ❌ Failed to send message:", e);
       setChatError(e?.message || "Failed to send message.");
     } finally {
       setChatSending(false);
     }
-  }, [activeChatConversationId, chatInput, chatSending, ensureActiveConversation]);
+  }, [activeChatConversationId, chatInput, chatSending, ensureActiveConversation, scrollToBottom]);
 
   const updateChatMessage = useCallback(
     async (messageId, body) => {
@@ -16064,10 +16213,19 @@ export default function NewLiveMeeting() {
     if (el) el.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages.length, isChatActive]);
 
+  // ✅ Format chat message timestamp with seconds and AM/PM
+  // Example output: "11:29:10 AM"
   const formatChatTime = (ts) => {
     if (!ts) return "";
     try {
-      return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const date = new Date(ts);
+      if (Number.isNaN(date.getTime())) return "";
+      return date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
     } catch {
       return "";
     }
@@ -18946,7 +19104,30 @@ export default function NewLiveMeeting() {
                   onSignUp={() => setGuestRegModalOpen(true)}
                 >
                   <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-                    <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+                    <Box
+                      ref={chatListRef}
+                      sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}
+                    >
+                      {/* ✅ New message indicator */}
+                      {newMessageCount > 0 && (
+                        <Box sx={{ mb: 2, textAlign: "center" }}>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              scrollToBottom();
+                              setNewMessageCount(0);
+                            }}
+                            sx={{
+                              bgcolor: "rgba(59, 130, 246, 0.9)",
+                              color: "white",
+                              textTransform: "none",
+                              "&:hover": { bgcolor: "rgba(59, 130, 246, 1)" },
+                            }}
+                          >
+                            ↓ {newMessageCount} new message{newMessageCount > 1 ? "s" : ""}
+                          </Button>
+                        </Box>
+                      )}
                       {/* {isRoomChatActive && (
                         <Typography sx={{ fontSize: 12, opacity: 0.7, mb: 1 }}>
                           Room chat is limited to people seated in {activeRoomLabel || "this room"}.
