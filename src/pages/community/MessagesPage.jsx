@@ -60,6 +60,7 @@ import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchEventSummaryCached } from "../../utils/entityCache.js";
+import { connectToConversation } from "../../utils/websocketMessaging.js";
 
 
 const BORDER = "#e2e8f0";
@@ -1802,6 +1803,8 @@ export default function MessagesPage() {
   const canvasRef = React.useRef(null);
   const isFirstLoadRef = React.useRef(true);
   const shouldScrollOnOpenRef = React.useRef(false);
+  const wsRef = React.useRef(null); // WebSocket connection
+  const wsProcessedIdsRef = React.useRef(new Set()); // Deduplicate WebSocket events
   React.useEffect(() => {
     isFirstLoadRef.current = true;
   }, [activeId]);
@@ -2832,13 +2835,135 @@ export default function MessagesPage() {
   }, [activeId, me, markAllReadDebounced]);
 
 
-  // initial + polling
+  // WebSocket + polling for real-time message updates
   React.useEffect(() => {
-    if (!activeId) return;
-    loadMessages();                          // load now
-    const iv = setInterval(loadMessages, 4000); // then poll
-    return () => clearInterval(iv);
-  }, [activeId, loadMessages]);
+    if (!activeId) {
+      // Close WebSocket when switching conversations
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      wsProcessedIdsRef.current.clear();
+      return;
+    }
+
+    // Load messages immediately
+    loadMessages();
+
+    // Helper to normalize and add message to state (with deduplication)
+    const addOrUpdateMessage = (msg, action = 'create') => {
+      if (!msg) return;
+
+      const msgId = String(msg.id || msg.pk || msg.uuid);
+      if (!msgId) {
+        console.warn('[WS] Message missing ID, skipping:', msg);
+        return;
+      }
+
+      // Deduplicate: skip if we've already processed this message via WebSocket
+      if (wsProcessedIdsRef.current.has(msgId)) {
+        console.log('[WS] Message already processed, skipping:', msgId);
+        return;
+      }
+      wsProcessedIdsRef.current.add(msgId);
+
+      // Normalize the message like loadMessages does
+      const senderId =
+        msg.sender_id ??
+        msg.user_id ??
+        (typeof msg.sender === 'object' ? msg.sender?.id : msg.sender) ??
+        (typeof msg.user === 'object' ? msg.user?.id : msg.user);
+
+      const createdIso = msg.created_at ?? msg.created ?? msg.timestamp ?? msg.sent_at;
+
+      const isMine = me ? String(senderId) === String(me.id) : Boolean(msg.mine);
+
+      const normalized = {
+        id: msgId,
+        body: msg.body ?? msg.text ?? msg.message ?? '',
+        event_id:
+          msg.event_id ??
+          (typeof msg.event === 'object' ? msg.event?.id : msg.event) ??
+          null,
+        sender_id: senderId,
+        sender_name: msg.sender_name ?? msg.sender_display ?? msg.senderUsername ?? '',
+        sender_display: isMine
+          ? 'You'
+          : (msg.sender_display ?? msg.sender_name ?? msg.senderUsername ?? ''),
+        sender_avatar:
+          msg.sender_avatar ??
+          (typeof msg.sender === 'object' ? msg.sender?.avatar : undefined) ??
+          '',
+        attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
+        read_by_me: Boolean(msg.read_by_me ?? msg.seen ?? msg.is_read),
+        mine: isMine,
+        created_at: createdIso,
+        _time: createdIso
+          ? new Date(createdIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '',
+        is_edited: msg.is_edited || false,
+        is_deleted: msg.is_deleted || false,
+      };
+
+      setMessages((prev) => {
+        if (action === 'delete') {
+          // Mark message as deleted
+          return prev.map((m) => (String(m.id) === msgId ? { ...m, is_deleted: true, body: 'This message was deleted' } : m));
+        } else if (action === 'edit') {
+          // Update existing message
+          return prev.map((m) => (String(m.id) === msgId ? normalized : m));
+        } else {
+          // Create: add only if not already present
+          if (prev.some((m) => String(m.id) === msgId)) {
+            return prev.map((m) => (String(m.id) === msgId ? normalized : m));
+          }
+          return [...prev, normalized];
+        }
+      });
+
+      // Scroll to latest message if from WebSocket
+      shouldScrollOnOpenRef.current = true;
+      const el = document.getElementById('chat-scroll');
+      if (el) {
+        setTimeout(() => {
+          el.scrollTop = el.scrollHeight;
+        }, 0);
+      }
+    };
+
+    // Connect to WebSocket for real-time updates
+    wsRef.current = connectToConversation(activeId, {
+      onMessageCreated: (msg) => {
+        console.log('[WS] Message created:', msg.id);
+        addOrUpdateMessage(msg, 'create');
+      },
+      onMessageEdited: (msg) => {
+        console.log('[WS] Message edited:', msg.id);
+        addOrUpdateMessage(msg, 'edit');
+      },
+      onMessageDeleted: (msg) => {
+        console.log('[WS] Message deleted:', msg.id);
+        addOrUpdateMessage(msg, 'delete');
+      },
+      onError: (error) => {
+        console.error('[WS] Connection error, falling back to polling:', error);
+      },
+      onConnected: () => {
+        console.log('[WS] Connected to conversation', activeId);
+      },
+    });
+
+    // Fallback polling (slower than WebSocket frequency)
+    const pollInterval = setInterval(loadMessages, 8000); // Poll every 8 seconds (fallback)
+
+    return () => {
+      clearInterval(pollInterval);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [activeId, loadMessages, me]);
 
   React.useEffect(() => {
     if (!activeId || !shouldScrollOnOpenRef.current) return;
