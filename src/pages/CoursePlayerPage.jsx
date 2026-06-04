@@ -1108,6 +1108,7 @@ function MergersAIWidget({ courseId, courseName }) {
     if (!courseId) return;
 
     let cancelled = false;
+    let refreshInterval = null;
 
     const fetchToken = async () => {
       try {
@@ -1119,15 +1120,24 @@ function MergersAIWidget({ courseId, courseName }) {
       } catch (e) {
         if (!cancelled) {
           console.error("Failed to fetch Mergers.AI token:", e);
-          setError("Could not load AI search");
+          setError("AI search not available");
         }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
+    // Fetch token immediately
     fetchToken();
-    return () => { cancelled = true; };
+
+    // Refresh token every 13 minutes (token expires after 15 minutes)
+    // Use 13 minutes to provide buffer and avoid token expiry mid-session
+    refreshInterval = setInterval(fetchToken, 13 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      if (refreshInterval) clearInterval(refreshInterval);
+    };
   }, [courseId]);
 
   if (loading) {
@@ -1141,8 +1151,18 @@ function MergersAIWidget({ courseId, courseName }) {
     );
   }
 
-  if (error || !token) {
-    return null;  // Silently fail — don't block course player if widget unavailable
+  if (error) {
+    return (
+      <Box sx={{ p: 2, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
+        <Typography variant="caption" color="text.secondary" sx={{ fontSize: "12px" }}>
+          {error}
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (!token) {
+    return null;
   }
 
   return (
