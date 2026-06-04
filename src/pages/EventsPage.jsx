@@ -619,7 +619,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 // ————————————————————————————————————————
 // Card (thumbnail view)
 // ————————————————————————————————————————
-function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef, isSecondaryDataReady = true }) {
+function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef, isSecondaryDataReady = true, myApplication = null }) {
   const navigate = useNavigate();
   const currentUser = getBackendUserFromStorage();
   const currentUserId = currentUser?.id;
@@ -657,9 +657,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
-  const [myApplication, setMyApplication] = React.useState(null);
   const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
-  const applicationStatus = getApplicationStatus(myApplication);
+  const applicationStatus = getApplicationStatus(myApplication || {});
 
   const openApplyModalAfterProfileCheck = async () => {
     if (!token) {
@@ -708,45 +707,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const isAuthenticatedUser = Boolean(token) && !isGuest;
   const isFreeEvent = ev.is_free === true;
 
-  // Fetch application status for apply-type events
-  React.useEffect(() => {
-    if (ev?.registration_type !== 'apply' || !ev?.id) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const headers = { "Content-Type": "application/json" };
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
-
-        // For unauthenticated users, check localStorage for cached email
-        let url = `${API_BASE}/events/${ev.id}/apply/`;
-        if (!token) {
-          const cached = localStorage.getItem("application_cache");
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              if (parsed.email) {
-                url += `?email=${encodeURIComponent(parsed.email)}`;
-              }
-            } catch (err) {
-            }
-          }
-        }
-
-        const res = await fetch(url, {
-          headers,
-        });
-        if (cancelled) return;
-        if (res.ok) {
-          const data = await res.json();
-          setMyApplication(data);
-        }
-      } catch { }
-    })();
-    return () => { cancelled = true; };
-  }, [ev?.id, ev?.registration_type, token,applyModalOpen]);
 
   // For authenticated users, submit application directly without dialog
   const handleApplyCardDirect = async (retrying = false) => {
@@ -785,7 +745,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
       if (res.ok) {
         const data = await res.json();
-        setMyApplication(data);
         toast.success("Application submitted successfully!");
       } else if (res.status === 400) {
         // Check for backend missing_lead_gen_fields response
@@ -1525,7 +1484,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         onClose={() => setApplyModalOpen(false)}
         event={ev}
         token={token}
-        onSuccess={(app) => setMyApplication(app)}
+        onSuccess={() => setApplyModalOpen(false)}
       />
       <GuestApplyModal
         open={guestApplyModalOpen}
@@ -1542,7 +1501,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 // ————————————————————————————————————————
 // Row (details/list view)
 // ————————————————————————————————————————
-function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef, isSecondaryDataReady = true }) {
+function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants, onGuestJoinRequested, isReplayEvent, onLeadGenNeeded, leadGenCallbackRef, isSecondaryDataReady = true, myApplication = null }) {
   const navigate = useNavigate();
   const currentUser = getBackendUserFromStorage();
   const currentUserId = currentUser?.id;
@@ -1604,9 +1563,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
 
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
-  const [myApplication, setMyApplication] = React.useState(null);
   const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
-  const applicationStatus = getApplicationStatus(myApplication);
+  const applicationStatus = getApplicationStatus(myApplication || {});
 
   const openApplyModalAfterProfileCheck = async () => {
     if (!token) {
@@ -1627,46 +1585,6 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
       toast.error(err.message || "Unable to check your profile. Please try again.");
     }
   };
-
-  // Fetch application status for apply-type events
-  React.useEffect(() => {
-    if (ev?.registration_type !== 'apply' || !ev?.id) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const headers = { "Content-Type": "application/json" };
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
-
-        // For unauthenticated users, check localStorage for cached email
-        let url = `${API_BASE}/events/${ev.id}/apply/`;
-        if (!token) {
-          const cached = localStorage.getItem("application_cache");
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              if (parsed.email) {
-                url += `?email=${encodeURIComponent(parsed.email)}`;
-              }
-            } catch (err) {
-            }
-          }
-        }
-
-        const res = await fetch(url, {
-          headers,
-        });
-        if (cancelled) return;
-        if (res.ok) {
-          const data = await res.json();
-          setMyApplication(data);
-        }
-      } catch { }
-    })();
-    return () => { cancelled = true; };
-  }, [ev?.id, ev?.registration_type, token, applyModalOpen]);
 
   const handleRegisterRow = async (retrying = false) => {
     // Safety guard: if first argument is a click event/object, treat retrying as false
@@ -2151,7 +2069,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
         onClose={() => setApplyModalOpen(false)}
         event={ev}
         token={token}
-        onSuccess={(app) => setMyApplication(app)}
+        onSuccess={() => setApplyModalOpen(false)}
       />
       <GuestApplyModal
         open={guestApplyModalOpen}
@@ -2227,6 +2145,7 @@ export default function EventsPage() {
   // which events the logged-in user has registered for
   const [myRegistrations, setMyRegistrations] = useState({}); // { eventId: registrationObj }
   const [registrationsLoaded, setRegistrationsLoaded] = useState(false); // tracks if secondary registration API has completed
+  const [myApplications, setMyApplications] = useState({}); // { eventId: applicationObj } - batch fetched at page level
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)
   const [rawEvents, setRawEvents] = useState([]);
   const [pinnedEvents, setPinnedEvents] = useState([]);
@@ -2653,6 +2572,12 @@ export default function EventsPage() {
       try {
         const url = new URL(`${API_BASE}/event-registrations/mine/`);
         url.searchParams.set("limit", "1000"); // plenty for typical accounts
+
+        if (import.meta.env.DEV) {
+          console.log(`[EventsPage] Fetching /event-registrations/mine/`);
+        }
+        const fetchStart = performance.now();
+
         const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -2665,6 +2590,11 @@ export default function EventsPage() {
         }
         setMyRegistrations(map);
         setRegistrationsLoaded(true);
+
+        if (import.meta.env.DEV) {
+          const duration = (performance.now() - fetchStart).toFixed(2);
+          console.log(`[EventsPage] /event-registrations/mine/ loaded in ${duration}ms, got ${items.length} registrations`);
+        }
       } catch (err) {
         if (err?.name === "AbortError") return;
         setMyRegistrations({});
@@ -2673,6 +2603,69 @@ export default function EventsPage() {
     })();
     return () => ctrl.abort();
   }, []);
+
+  // Batch fetch application statuses for apply-type events
+  useEffect(() => {
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("access");
+
+    if (!token) {
+      setMyApplications({});
+      return;
+    }
+
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const applyTypeEvents = (rawEvents || []).filter(ev => ev.registration_type === 'apply');
+        if (applyTypeEvents.length === 0) {
+          setMyApplications({});
+          return;
+        }
+
+        if (import.meta.env.DEV) {
+          console.log(`[EventsPage] Batch fetching ${applyTypeEvents.length} apply-type event applications`);
+        }
+        const batchStart = performance.now();
+
+        const appMap = {};
+        const results = await Promise.allSettled(
+          applyTypeEvents.map(ev =>
+            fetch(`${API_BASE}/events/${ev.id}/apply/`, {
+              signal: ctrl.signal,
+              headers: { Authorization: `Bearer ${token}` },
+            }).then(res => {
+              if (res.ok) return res.json().then(data => ({ eventId: ev.id, data }));
+              return { eventId: ev.id, data: null };
+            })
+          )
+        );
+
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value) {
+            const { eventId, data } = result.value;
+            if (data) appMap[eventId] = data;
+          }
+        }
+
+        if (!ctrl.signal.aborted) {
+          setMyApplications(appMap);
+          if (import.meta.env.DEV) {
+            const duration = (performance.now() - batchStart).toFixed(2);
+            console.log(`[EventsPage] Batch application fetch completed in ${duration}ms, loaded ${Object.keys(appMap).length} applications`);
+          }
+        }
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          setMyApplications({});
+        }
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [rawEvents]);
 
   // ✅ NEW: Refresh registration status when page regains focus
   // This ensures button text updates when user returns from live meeting after admission
@@ -3925,6 +3918,7 @@ export default function EventsPage() {
                                 onLeadGenNeeded={handleLeadGenNeeded}
                                 leadGenCallbackRef={leadGenCallbackRef}
                                 isSecondaryDataReady={registrationsLoaded}
+                                myApplication={myApplications[ev.id]}
                               />
                             </Box>
                           );
@@ -4039,7 +4033,8 @@ export default function EventsPage() {
                           onGuestJoinRequested={handleGuestJoinRequested}
                           onLeadGenNeeded={handleLeadGenNeeded}
                           leadGenCallbackRef={leadGenCallbackRef}
-                          isSecondaryDataReady={!!myRegistrations[ev.id] || Object.keys(myRegistrations).length > 0}
+                          isSecondaryDataReady={registrationsLoaded}
+                          myApplication={myApplications[ev.id]}
                         />
                       </Box>
                     ))}
@@ -4077,6 +4072,7 @@ export default function EventsPage() {
                                 onLeadGenNeeded={handleLeadGenNeeded}
                                 leadGenCallbackRef={leadGenCallbackRef}
                                 isSecondaryDataReady={registrationsLoaded}
+                                myApplication={myApplications[ev.id]}
                               />
                             </Grid>
                           );
@@ -4176,7 +4172,8 @@ export default function EventsPage() {
                           onGuestJoinRequested={handleGuestJoinRequested}
                           onLeadGenNeeded={handleLeadGenNeeded}
                           leadGenCallbackRef={leadGenCallbackRef}
-                          isSecondaryDataReady={!!myRegistrations[ev.id] || Object.keys(myRegistrations).length > 0}
+                          isSecondaryDataReady={registrationsLoaded}
+                          myApplication={myApplications[ev.id]}
                         />
                       </Grid>
                     ))}
@@ -4497,6 +4494,8 @@ export default function EventsPage() {
                           isReplayEvent={true}
                           onLeadGenNeeded={handleLeadGenNeeded}
                           leadGenCallbackRef={leadGenCallbackRef}
+                          isSecondaryDataReady={registrationsLoaded}
+                          myApplication={myApplications[ev.id]}
                         />
                       </Box>
                     );
@@ -4524,6 +4523,8 @@ export default function EventsPage() {
                           isReplayEvent={true}
                           onLeadGenNeeded={handleLeadGenNeeded}
                           leadGenCallbackRef={leadGenCallbackRef}
+                          isSecondaryDataReady={registrationsLoaded}
+                          myApplication={myApplications[ev.id]}
                         />
                       </Grid>
                     );
