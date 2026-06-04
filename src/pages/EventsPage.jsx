@@ -2226,6 +2226,7 @@ export default function EventsPage() {
   const filterEventId = searchParams.get("id");
   // which events the logged-in user has registered for
   const [myRegistrations, setMyRegistrations] = useState({}); // { eventId: registrationObj }
+  const [registrationsLoaded, setRegistrationsLoaded] = useState(false); // tracks if secondary registration API has completed
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)
   const [rawEvents, setRawEvents] = useState([]);
   const [pinnedEvents, setPinnedEvents] = useState([]);
@@ -2640,9 +2641,10 @@ export default function EventsPage() {
       localStorage.getItem("access_token") ||
       localStorage.getItem("access");
 
-    // if not logged-in, clear any old state
+    // if not logged-in, mark as loaded and clear any old state
     if (!token) {
       setMyRegistrations({});
+      setRegistrationsLoaded(true);
       return;
     }
 
@@ -2662,9 +2664,11 @@ export default function EventsPage() {
           if (evid) map[evid] = item;
         }
         setMyRegistrations(map);
+        setRegistrationsLoaded(true);
       } catch (err) {
         if (err?.name === "AbortError") return;
         setMyRegistrations({});
+        setRegistrationsLoaded(true);
       }
     })();
     return () => ctrl.abort();
@@ -3920,7 +3924,7 @@ export default function EventsPage() {
                                 onGuestJoinRequested={handleGuestJoinRequested}
                                 onLeadGenNeeded={handleLeadGenNeeded}
                                 leadGenCallbackRef={leadGenCallbackRef}
-                                isSecondaryDataReady={!!myRegistrations[ev.id] || Object.keys(myRegistrations).length > 0}
+                                isSecondaryDataReady={registrationsLoaded}
                               />
                             </Box>
                           );
@@ -4072,7 +4076,7 @@ export default function EventsPage() {
                                 onGuestJoinRequested={handleGuestJoinRequested}
                                 onLeadGenNeeded={handleLeadGenNeeded}
                                 leadGenCallbackRef={leadGenCallbackRef}
-                                isSecondaryDataReady={!!myRegistrations[ev.id] || Object.keys(myRegistrations).length > 0}
+                                isSecondaryDataReady={registrationsLoaded}
                               />
                             </Grid>
                           );
