@@ -373,8 +373,10 @@ function normalizeSession(session = {}) {
 }
 
 function getTotalRegisteredCount(ev = {}) {
+  // For event cards: use the public participant count (excludes creator/host/hidden organizer roles)
+  // Check total_registered FIRST (= public_registered_count + public_guest_count)
+  // confirmed_registered_count is for internal tracking, not for public card display
   return Number(
-    ev.confirmed_registered_count ??
     ev.total_registered ??
     (
       Number(ev.public_registered_count ?? ev.registrations_count ?? ev.total_registered_count ?? ev.attending_count ?? 0) +
