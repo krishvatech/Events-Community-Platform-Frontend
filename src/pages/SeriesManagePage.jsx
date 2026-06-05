@@ -362,6 +362,8 @@ const OverviewTab = ({ series }) => (
 const EventsTab = ({ series, events, onUpdate }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [eventToRemove, setEventToRemove] = useState(null);
   const [availableEvents, setAvailableEvents] = useState([]);
   const [editingEvent, setEditingEvent] = useState(null);
   const [formData, setFormData] = useState({
@@ -479,13 +481,18 @@ const EventsTab = ({ series, events, onUpdate }) => {
     }
   };
 
-  const handleRemoveEvent = async (event) => {
-    if (!window.confirm(`Remove "${event.title}" from this series?`)) return;
+  const handleRemoveEvent = (event) => {
+    setEventToRemove(event);
+    setRemoveDialogOpen(true);
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!eventToRemove) return;
 
     setLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE}/series/${series.id}/events/${event.id}/`,
+        `${API_BASE}/series/${series.id}/events/${eventToRemove.id}/`,
         {
           method: 'DELETE',
           headers: authConfig().headers,
@@ -493,6 +500,8 @@ const EventsTab = ({ series, events, onUpdate }) => {
       );
 
       if (response.ok) {
+        setRemoveDialogOpen(false);
+        setEventToRemove(null);
         onUpdate();
       } else {
         alert('Failed to remove event');
@@ -643,6 +652,45 @@ const EventsTab = ({ series, events, onUpdate }) => {
           <Button onClick={() => setEditDialogOpen(false)} disabled={loading}>Cancel</Button>
           <Button variant="contained" onClick={handleSaveEdit} disabled={loading}>
             {loading ? <CircularProgress size={24} /> : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={removeDialogOpen}
+        onClose={() => {
+          setRemoveDialogOpen(false);
+          setEventToRemove(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Remove Event from Series</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography>
+            Are you sure you want to remove <strong>{eventToRemove?.title}</strong> from this series?
+          </Typography>
+          <Alert severity="info" sx={{ mt: 2 }}>
+            The event will be removed from the series, but the event itself will remain in the system.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setRemoveDialogOpen(false);
+              setEventToRemove(null);
+            }}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmRemove}
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Remove'}
           </Button>
         </DialogActions>
       </Dialog>
