@@ -26,6 +26,8 @@ const SeriesManagePage = () => {
   const [dialogType, setDialogType] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [errors, setErrors] = useState({});
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const tabLabels = ['Overview', 'Events', 'Registrations', 'Analytics', 'Edit'];
 
@@ -111,19 +113,28 @@ const SeriesManagePage = () => {
     }
   };
 
-  const handleDeleteSeries = async () => {
-    if (window.confirm('Delete this series permanently?')) {
-      try {
-        const response = await fetch(
-          `${API_BASE}/series/${seriesId}/`,
-          { method: 'DELETE', headers: authConfig().headers }
-        );
-        if (response.ok) {
-          navigate('/admin/series');
-        }
-      } catch (error) {
+  const handleDeleteSeries = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE}/series/${seriesId}/`,
+        { method: 'DELETE', headers: authConfig().headers }
+      );
+      if (response.ok) {
+        navigate('/admin/series');
+      } else {
         setErrors({ general: 'Failed to delete series' });
+        setDeleteDialogOpen(false);
       }
+    } catch (error) {
+      setErrors({ general: 'Failed to delete series' });
+      setDeleteDialogOpen(false);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -219,6 +230,37 @@ const SeriesManagePage = () => {
         {tab === 3 && <AnalyticsTab seriesId={seriesId} />}
         {tab === 4 && <EditTab series={series} onUpdate={fetchSeries} />}
       </Box>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Delete Series</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography>
+            Are you sure you want to delete <strong>{series?.title}</strong>?
+          </Typography>
+          <Alert severity="info" sx={{ mt: 2 }}>
+            The series will be deleted, but all linked events will be preserved and detached from this series.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDelete}
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? <CircularProgress size={24} /> : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
@@ -332,6 +374,7 @@ const EventsTab = ({ series, events, onUpdate }) => {
     series_session_label: '',
   });
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     if (dialogOpen) {
@@ -342,19 +385,27 @@ const EventsTab = ({ series, events, onUpdate }) => {
   const fetchAvailableEvents = async () => {
     try {
       const response = await fetch(
-        `${API_BASE}/events/?limit=100`,
+        `${API_BASE}/events/?limit=100&exclude_ended=true`,
         { headers: authConfig().headers }
       );
       const data = await response.json();
-      setAvailableEvents(Array.isArray(data) ? data : data.results || []);
+      const events = Array.isArray(data) ? data : data.results || [];
+
+      // Filter to show only published or live events
+      const validEvents = events.filter(
+        (event) => event.status === 'published' || event.status === 'live'
+      );
+      setAvailableEvents(validEvents);
     } catch (error) {
       console.error('Error fetching events:', error);
     }
   };
 
   const handleAddEvent = async () => {
+    setFormError('');
+
     if (!formData.event_id) {
-      alert('Please select an event');
+      setFormError('Please select an event');
       return;
     }
 
@@ -375,12 +426,17 @@ const EventsTab = ({ series, events, onUpdate }) => {
 
       if (response.ok) {
         setDialogOpen(false);
+        setFormError('');
         onUpdate();
         setFormData({ event_id: '', series_order: events.length + 1, series_session_label: '' });
+      } else {
+        const errorData = await response.json();
+        const errorMessage = errorData.error || 'Failed to add event';
+        setFormError(errorMessage);
       }
     } catch (error) {
       console.error('Error adding event:', error);
-      alert('Failed to add event');
+      setFormError('Failed to add event');
     } finally {
       setLoading(false);
     }
@@ -490,9 +546,23 @@ const EventsTab = ({ series, events, onUpdate }) => {
         </Table>
       </TableContainer>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setFormError('');
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Add Event to Series</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
+          {formError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {formError}
+            </Alert>
+          )}
+
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Select Event</InputLabel>
             <Select
@@ -529,7 +599,10 @@ const EventsTab = ({ series, events, onUpdate }) => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)} disabled={loading}>Cancel</Button>
+          <Button onClick={() => {
+            setDialogOpen(false);
+            setFormError('');
+          }} disabled={loading}>Cancel</Button>
           <Button variant="contained" onClick={handleAddEvent} disabled={loading}>
             {loading ? <CircularProgress size={24} /> : 'Add'}
           </Button>
