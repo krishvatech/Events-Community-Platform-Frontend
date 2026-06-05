@@ -1017,6 +1017,17 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
     fd.append("pre_event_qna_enabled", String(preEventQnaEnabled));
 
+    // ✅ CRITICAL FIX: Participant Visibility Defaults - must be sent on creation
+    // These ensure correct DB values when event is first created
+    fd.append("show_participants_before_event", "true");
+    fd.append("show_participants_after_event", "false");
+    fd.append("show_registered_participant_count", "true");
+    fd.append("show_guest_participant_count", "false");
+    fd.append("show_public_hosts", "false");
+    fd.append("show_public_speakers", "false");
+    fd.append("show_public_moderators", "false");
+    fd.append("show_speed_networking_match_history", "true");
+
     // External Streaming Configuration
     fd.append("use_external_streaming", String(useExternalStreaming));
     fd.append("external_streaming_platform", externalStreamingPlatform);

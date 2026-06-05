@@ -492,8 +492,9 @@ export default function EventManagePage() {
     show_participants_before_event: true,
     show_participants_after_event: false,
     show_registered_participant_count: true,
-    show_public_hosts: true,
-    show_public_speakers: true,
+    show_guest_participant_count: false,
+    show_public_hosts: false,
+    show_public_speakers: false,
     show_public_moderators: false,
     show_speed_networking_match_history: true,
   });
@@ -1088,16 +1089,17 @@ export default function EventManagePage() {
         lounge_enabled_after: event.lounge_enabled_after ?? false,
         lounge_after_buffer: event.lounge_after_buffer ?? 30,
       });
-      const visibilityUpdated = localStorage.getItem(`event_visibility_updated_${event.id}`);
-
+      // ✅ CRITICAL FIX: Always use backend values as source of truth, never override with localStorage
+      // The defaults are applied at event creation time in the backend, so backend values are always correct
       setParticipantVisibility({
-        show_participants_before_event: visibilityUpdated ? (event.show_participants_before_event ?? true) : true,
+        show_participants_before_event: event.show_participants_before_event ?? true,
         show_participants_after_event: event.show_participants_after_event ?? false,
         show_registered_participant_count: event.show_registered_participant_count ?? true,
+        show_guest_participant_count: event.show_guest_participant_count ?? false,
         show_public_hosts: event.show_public_hosts ?? true,
         show_public_speakers: event.show_public_speakers ?? true,
         show_public_moderators: event.show_public_moderators ?? false,
-        show_speed_networking_match_history: visibilityUpdated ? (event.show_speed_networking_match_history ?? true) : true,
+        show_speed_networking_match_history: event.show_speed_networking_match_history ?? true,
       });
     }
   }, [event]);
@@ -3246,7 +3248,6 @@ export default function EventManagePage() {
       }
       setEvent((prev) => ({ ...prev, ...newSettings }));
       setParticipantVisibility(prev => ({ ...prev, ...newSettings }));
-      localStorage.setItem(`event_visibility_updated_${eventId}`, String(Date.now()));
       toast.success("Visibility settings updated");
     } catch (e) {
       toast.error(e?.message || "Failed to save visibility settings");
