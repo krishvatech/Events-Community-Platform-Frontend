@@ -391,11 +391,14 @@ const EventsTab = ({ series, events, onUpdate }) => {
         { headers: authConfig().headers }
       );
       const data = await response.json();
-      const events = Array.isArray(data) ? data : data.results || [];
+      const allEvents = Array.isArray(data) ? data : data.results || [];
 
-      // Filter to show only published or live events
-      const validEvents = events.filter(
-        (event) => event.status === 'published' || event.status === 'live'
+      // Get IDs of events already in the series
+      const addedEventIds = new Set(events.map(e => e.id));
+
+      // Filter to show only published/live events that aren't already in the series
+      const validEvents = allEvents.filter(
+        (event) => (event.status === 'published' || event.status === 'live') && !addedEventIds.has(event.id)
       );
       setAvailableEvents(validEvents);
     } catch (error) {
