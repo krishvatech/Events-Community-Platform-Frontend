@@ -534,6 +534,9 @@ export default function EventDetailsPage() {
   const [expandedSessionDescriptions, setExpandedSessionDescriptions] = useState({});
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantError, setParticipantError] = useState(null);
+  const [participantLoadingMore, setParticipantLoadingMore] = useState(false);
+  const [participantNextOffset, setParticipantNextOffset] = useState(null);
+  const [participantHasMore, setParticipantHasMore] = useState(false);
 
   // Tabs & Speed Networking
   const [activeTab, setActiveTab] = useState(0);
@@ -759,10 +762,13 @@ export default function EventDetailsPage() {
     setParticipantHiddenRolesCount(0);
     setParticipantTotalRegisteredCount(0);
     setLoadingParticipants(true);
+    setParticipantLoadingMore(false);
     setParticipantError(null);
+    setParticipantNextOffset(null);
+    setParticipantHasMore(false);
 
     try {
-      const res = await fetch(`${API_BASE}/events/${event.id}/participants/`, {
+      const res = await fetch(`${API_BASE}/events/${event.id}/participants/?limit=10&offset=0`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.status === 403) {
@@ -782,10 +788,48 @@ export default function EventDetailsPage() {
           )
         )
       );
+      setParticipantNextOffset(data?.next_offset || null);
+      setParticipantHasMore(data?.has_next || false);
     } catch (err) {
       setParticipantError(err.message);
     } finally {
       setLoadingParticipants(false);
+    }
+  };
+
+  const loadMoreParticipants = async () => {
+    if (!event?.id || participantLoadingMore || !participantNextOffset || !participantHasMore) {
+      return;
+    }
+
+    setParticipantLoadingMore(true);
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/events/${event.id}/participants/?limit=10&offset=${participantNextOffset}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to load more participants");
+      const data = await res.json();
+      const newParticipants = Array.isArray(data) ? data : (data.participants || []);
+
+      setParticipantList((prev) => {
+        const existingIds = new Set(prev.map((p) => p.registration_id || p.user_id));
+        const uniqueNewParticipants = newParticipants.filter(
+          (p) => !existingIds.has(p.registration_id || p.user_id)
+        );
+        return [...prev, ...uniqueNewParticipants];
+      });
+
+      setParticipantNextOffset(data?.next_offset || null);
+      setParticipantHasMore(data?.has_next || false);
+    } catch (err) {
+      console.error("Error loading more participants:", err);
+    } finally {
+      setParticipantLoadingMore(false);
     }
   };
 
@@ -3085,6 +3129,9 @@ export default function EventDetailsPage() {
         error={participantError}
         hiddenRolesCount={participantHiddenRolesCount}
         totalRegisteredCount={participantTotalRegisteredCount}
+        loadingMore={participantLoadingMore}
+        hasMore={participantHasMore}
+        onLoadMore={loadMoreParticipants}
       />
       {/* Guest Join Modal */}
       {event && (

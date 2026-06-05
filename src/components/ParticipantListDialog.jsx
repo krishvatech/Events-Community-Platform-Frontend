@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -35,7 +35,33 @@ export default function ParticipantListDialog({
     error,
     hiddenRolesCount = 0,
     totalRegisteredCount = 0,
+    loadingMore = false,
+    hasMore = false,
+    onLoadMore = null,
 }) {
+    const contentRef = useRef(null);
+
+    useEffect(() => {
+        if (!open || !contentRef.current) return;
+
+        const handleScroll = () => {
+            const element = contentRef.current;
+            if (!element) return;
+
+            // Detect scroll near bottom (within 100px)
+            const isNearBottom =
+                element.scrollHeight - (element.scrollTop + element.clientHeight) < 100;
+
+            if (isNearBottom && hasMore && !loadingMore && !loading && onLoadMore) {
+                onLoadMore();
+            }
+        };
+
+        const element = contentRef.current;
+        element.addEventListener('scroll', handleScroll);
+        return () => element.removeEventListener('scroll', handleScroll);
+    }, [open, hasMore, loadingMore, loading, onLoadMore]);
+
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
             <DialogTitle sx={{ m: 0, p: 2, pr: 6 }}>
@@ -53,8 +79,8 @@ export default function ParticipantListDialog({
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
-            <DialogContent dividers>
-                {loading ? (
+            <DialogContent dividers ref={contentRef} sx={{ overflowY: 'auto', maxHeight: '60vh', height: '60vh' }}>
+                {loading && participants.length === 0 ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                         <CircularProgress />
                     </Box>
@@ -121,7 +147,6 @@ export default function ParticipantListDialog({
                                             >
                                                 {reg.display_name || "Unknown User"}
                                             </Typography>
-                                            {/* KYC Badge */}
                                             {['approved', 'verified'].includes((reg.kyc_status || '').toLowerCase()) && (
                                                 <Tooltip title="Verified Member">
                                                     <VerifiedIcon sx={{ fontSize: 16, color: '#22d3ee' }} />
@@ -141,6 +166,11 @@ export default function ParticipantListDialog({
                                 />
                             </ListItem>
                         ))}
+                        {loadingMore && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                                <CircularProgress size={24} />
+                            </Box>
+                        )}
                     </List>
                 )}
             </DialogContent>

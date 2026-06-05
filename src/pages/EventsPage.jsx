@@ -2192,10 +2192,14 @@ export default function EventsPage() {
   const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
   const [participantList, setParticipantList] = useState([]);
   const [participantListLoading, setParticipantListLoading] = useState(false);
+  const [participantListLoadingMore, setParticipantListLoadingMore] = useState(false);
   const [participantListError, setParticipantListError] = useState("");
   const [participantEventTitle, setParticipantEventTitle] = useState("");
+  const [participantEventId, setParticipantEventId] = useState(null);
   const [participantHiddenRolesCount, setParticipantHiddenRolesCount] = useState(0);
   const [participantTotalRegisteredCount, setParticipantTotalRegisteredCount] = useState(0);
+  const [participantNextOffset, setParticipantNextOffset] = useState(null);
+  const [participantHasMore, setParticipantHasMore] = useState(false);
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestJoinEvent, setGuestJoinEvent] = useState(null);
   const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
@@ -2227,16 +2231,20 @@ export default function EventsPage() {
     }
 
     setParticipantEventTitle(eventTitle);
+    setParticipantEventId(eventId);
     setParticipantDialogOpen(true);
     setParticipantListLoading(true);
+    setParticipantListLoadingMore(false);
     setParticipantListError("");
     setParticipantList([]);
     setParticipantHiddenRolesCount(0);
     setParticipantTotalRegisteredCount(0);
+    setParticipantNextOffset(null);
+    setParticipantHasMore(false);
 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`${EVENTS_URL}${eventId}/participants/`, { headers });
+      const res = await fetch(`${EVENTS_URL}${eventId}/participants/?limit=10&offset=0`, { headers });
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
@@ -2249,15 +2257,61 @@ export default function EventsPage() {
       const data = await res.json();
       setParticipantList(Array.isArray(data) ? data : (data.participants || []));
       setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
-      setParticipantTotalRegisteredCount(
-        getTotalRegisteredCount(data)
-      );
+      setParticipantTotalRegisteredCount(getTotalRegisteredCount(data));
+      setParticipantNextOffset(data?.next_offset || null);
+      setParticipantHasMore(data?.has_next || false);
     } catch (err) {
       setParticipantListError(err.message);
     } finally {
       setParticipantListLoading(false);
     }
   }, []);
+
+  const loadMoreParticipants = React.useCallback(async () => {
+    if (!participantEventId || participantListLoadingMore || !participantNextOffset || !participantHasMore) {
+      return;
+    }
+
+    const token = localStorage.getItem("access_token") ||
+      localStorage.getItem("access") ||
+      localStorage.getItem("access_token");
+
+    if (!token) {
+      return;
+    }
+
+    setParticipantListLoadingMore(true);
+
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(
+        `${EVENTS_URL}${participantEventId}/participants/?limit=10&offset=${participantNextOffset}`,
+        { headers }
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to load more participants");
+      }
+
+      const data = await res.json();
+      const newParticipants = Array.isArray(data) ? data : (data.participants || []);
+
+      setParticipantList((prev) => {
+        const existingIds = new Set(prev.map((p) => p.registration_id || p.user_id));
+        const uniqueNewParticipants = newParticipants.filter(
+          (p) => !existingIds.has(p.registration_id || p.user_id)
+        );
+        return [...prev, ...uniqueNewParticipants];
+      });
+
+      setParticipantNextOffset(data?.next_offset || null);
+      setParticipantHasMore(data?.has_next || false);
+    } catch (err) {
+      console.error("Error loading more participants:", err);
+    } finally {
+      setParticipantListLoadingMore(false);
+    }
+  }, [participantEventId, participantListLoadingMore, participantNextOffset, participantHasMore]);
 
   const updateSeriesRegistrationFlag = (seriesId, isRegistered) => {
     const updateSeries = (item) => {
@@ -4562,6 +4616,9 @@ export default function EventsPage() {
         error={participantListError}
         hiddenRolesCount={participantHiddenRolesCount}
         totalRegisteredCount={participantTotalRegisteredCount}
+        loadingMore={participantListLoadingMore}
+        hasMore={participantHasMore}
+        onLoadMore={loadMoreParticipants}
       />
       {guestJoinEvent && (
         <GuestJoinModal
