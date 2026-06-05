@@ -716,6 +716,12 @@ export default function MyEventsPage() {
           url.searchParams.set("bucket", bucket);
         }
 
+        // Ordering: pinned events first, then by status-specific ordering
+        const ordering = bucket === "upcoming"
+          ? "-is_pinned,pin_priority,-pinned_at,start_time"
+          : "-is_pinned,pin_priority,-pinned_at,-start_time";
+        url.searchParams.set("ordering", ordering);
+
         // Fetch paginated events with optimized card view
         const res = await fetch(url.toString(), {
           headers: {

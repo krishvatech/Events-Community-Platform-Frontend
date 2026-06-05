@@ -3761,13 +3761,13 @@ function EventsPage() {
           url.searchParams.set("is_hidden", "true");
         }
 
-        // Ordering defaults
-        // Upcoming -> start_time ascending (soonest first)
-        // Past/Live/All -> start_time descending (newest/active first)
+        // Ordering: pinned events first, then status-specific ordering
+        // Upcoming -> pinned first, then by start_time ascending (soonest first)
+        // Past/Live/All -> pinned first, then by start_time descending (newest/active first)
         if (bucket === "upcoming") {
-          url.searchParams.set("ordering", "start_time");
+          url.searchParams.set("ordering", "-is_pinned,pin_priority,-pinned_at,start_time");
         } else {
-          url.searchParams.set("ordering", "-start_time");
+          url.searchParams.set("ordering", "-is_pinned,pin_priority,-pinned_at,-start_time");
         }
 
         const res = await fetch(url.toString(), { headers });
