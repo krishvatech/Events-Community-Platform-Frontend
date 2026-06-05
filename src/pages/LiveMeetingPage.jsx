@@ -2408,6 +2408,10 @@ export default function NewLiveMeeting() {
   const reconnectLocked = useRef(false);
   const isReconnectingRef = useRef(false); // ✅ Guard: prevent leave during reconnect
   const manualLeaveRef = useRef(false); // ✅ Flag: allow leave even during reconnect if user clicks Leave
+
+  // ✅ Chat & Q&A reconnect sync tracking
+  const lastChatMessageIdRef = useRef(null); // Track last chat message ID for reconnect recovery
+  const lastQnASyncTimeRef = useRef(null); // Track last Q&A sync time for reconnect recovery
   const shouldPausePollingRef = useRef(false); // ✅ POLLING PAUSE: Pause non-essential APIs when offline
   const rejoinRequestRef = useRef(null);
   const intentionalMainSocketCloseRef = useRef(false);
@@ -2447,6 +2451,7 @@ export default function NewLiveMeeting() {
   const askedMediaPermRef = useRef(false);
   const [roomJoined, setRoomJoined] = useState(false);
   const roomJoinedRef = useRef(false); // ✅ Track roomJoined state for async contexts (e.g., breakout rejoin)
+  const confirmedJoinedRef = useRef(false); // ✅ Track if confirm-joined API was called (only once per join)
   const [liveCriticalReady, setLiveCriticalReady] = useState(false);
   const [allowDeferredLiveData, setAllowDeferredLiveData] = useState(false);
   const deferNonCriticalLiveApi = !liveCriticalReady && !allowDeferredLiveData;
@@ -2512,9 +2517,16 @@ export default function NewLiveMeeting() {
   }, [eventId]);
 
   useEffect(() => {
+    // ✅ Global flag: signal to all components that room is joined
+    // Used by polling/API hooks to skip non-critical calls during join burst
+    window.__ECP_ROOM_JOINED__ = roomJoined;
+
     if (roomJoined) {
       setLiveCriticalReady(true);
     }
+    return () => {
+      window.__ECP_ROOM_JOINED__ = false;
+    };
   }, [roomJoined]);
 
   //  Only enable deferred data after user explicitly opens relevant panels
@@ -7865,6 +7877,15 @@ export default function NewLiveMeeting() {
       console.log("[Reconnect] Restoring breakout room:", data.breakout_table_id);
       setActiveTableId(data.breakout_table_id);
       setActiveTableName(data.breakout_table_name || `Room ${data.breakout_table_id}`);
+
+      // ✅ Restore breakout state and re-enter the breakout room
+      setIsBreakout(true);
+      setTimeout(() => {
+        if (data.breakout_table_id && typeof handleEnterBreakout === "function") {
+          console.log("[Reconnect] Calling handleEnterBreakout for table:", data.breakout_table_id);
+          handleEnterBreakout(data.breakout_table_id, data.breakout_table_name);
+        }
+      }, 500);
     }
 
     return true;
@@ -7872,7 +7893,7 @@ export default function NewLiveMeeting() {
 
   // ✅ AUTO-RECONNECT: Main function to attempt reconnect
   const initiateAutoReconnect = async () => {
-    const MAX_ATTEMPTS = 60; // bounded retry loop
+    const MAX_ATTEMPTS = 120; // ~4–5 minutes with jitter for long meetings
     const RETRY_INTERVAL = 2000; // 2 seconds
 
     // ✅ GUARD: Mark as reconnecting to prevent automatic leave handlers
@@ -10168,8 +10189,8 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!mainSocketRef.current) return;
 
-    const handleReconnect = () => {
-      console.log('[LiveMeeting] ✅ Socket reconnected, syncing timers with server');
+    const handleReconnect = async () => {
+      console.log('[LiveMeeting] ✅ Socket reconnected, syncing timers/chat/Q&A with server');
 
       // Request timer sync from server
       if (activeTimerType === 'breakout' && isInBreakoutRoomRef.current) {
@@ -10184,6 +10205,56 @@ export default function NewLiveMeeting() {
           room_type: 'main',
           elapsed_seconds: mainRoomElapsedRef.current,
         });
+      }
+
+      // ✅ Reconnect sync: Recover missed chat messages
+      if (lastChatMessageIdRef.current && eventId) {
+        try {
+          // Get conversation ID (main room chat)
+          const conversationId = `event_${eventId}`;
+          const url = toApiUrl(
+            `messaging/conversations/${conversationId}/messages/?after_id=${lastChatMessageIdRef.current}`
+          );
+          const res = await fetch(url, { headers: authHeader() });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.results?.length > 0) {
+              console.log(`[LiveMeeting] ✅ Recovered ${data.results.length} missed chat messages`);
+              // Messages will be processed by existing message handler
+              // Emit event to trigger chat panel refresh
+              mainSocketRef.current?.emit('action', {
+                action: 'refresh_messages',
+                conversation_id: conversationId,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[LiveMeeting] Chat reconnect sync failed:', e?.message || e);
+        }
+      }
+
+      // ✅ Reconnect sync: Recover missed Q&A questions
+      if (lastQnASyncTimeRef.current && eventId) {
+        try {
+          const url = toApiUrl(
+            `interactions/questions/?event_id=${eventId}&updated_after=${lastQnASyncTimeRef.current}`
+          );
+          const res = await fetch(url, { headers: authHeader() });
+          if (res.ok) {
+            const data = await res.json();
+            const questions = data?.results || data || [];
+            if (questions.length > 0) {
+              console.log(`[LiveMeeting] ✅ Recovered ${questions.length} missed Q&A questions`);
+              // Emit event to trigger Q&A panel refresh
+              mainSocketRef.current?.emit('action', {
+                action: 'refresh_questions',
+                event_id: eventId,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[LiveMeeting] Q&A reconnect sync failed:', e?.message || e);
+        }
       }
     };
 
@@ -10483,6 +10554,28 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] ✅ roomJoined event received!");
       setRoomJoined(true);
       setLiveCriticalReady(true);
+
+      // ✅ Call confirm-joined API to mark user as truly joined in database
+      if (!confirmedJoinedRef.current) {
+        confirmedJoinedRef.current = true;
+        try {
+          await fetch(toApiUrl(`events/${eventId}/rtk/confirm-joined/`), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...authHeader(),
+            },
+            body: JSON.stringify({
+              room_type: isBreakoutRef.current ? "breakout_room" : "main_room",
+              table_id: activeTableIdRef.current || null,
+            }),
+          });
+          console.log("[LiveMeeting] ✅ Confirmed joined_live with backend");
+        } catch (e) {
+          console.warn("[LiveMeeting] confirm-joined failed:", e?.message || e);
+        }
+      }
+
       // Clear stale departed tracking after successful rejoin so host tiles are not incorrectly filtered.
       departedParticipantIdsRef.current.clear();
       if (isBreakoutRef.current) {
@@ -11463,6 +11556,10 @@ export default function NewLiveMeeting() {
         await rtkMeeting?.leaveRoom?.();
         await rtkMeeting?.leave?.();
         console.log("[LiveMeeting] Left RTK room");
+
+        // ✅ Reset confirm-joined flag when user truly leaves meeting
+        // This allows re-confirm if user rejoins the same event later
+        confirmedJoinedRef.current = false;
 
         // ✅ Clear guest session when leaving meeting
         // This ensures Events page shows all events, not filtered by guest token
