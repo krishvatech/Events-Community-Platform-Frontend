@@ -2541,10 +2541,9 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!eventId) return;
 
-    // Allow fetching after critical data is ready or room has joined
-    if (liveMinimalMode && !roomJoined) {
+    if (!roomJoined) {
       if (import.meta.env?.DEV) {
-        console.debug("[LiveMeeting] PHASE 4: Deferring participants-lite fetch during join burst");
+        console.debug("[LiveMeeting] Deferring participants-lite until roomJoined=true");
       }
       return;
     }
@@ -2584,7 +2583,7 @@ export default function NewLiveMeeting() {
     })();
 
     return () => { isMounted = false; };
-  }, [eventId, roomJoined, liveMinimalMode]);
+  }, [eventId, roomJoined]);
 
   // ✅ Local join timer (per user)
   const joinedAtRef = useRef(null);
@@ -2984,38 +2983,32 @@ export default function NewLiveMeeting() {
   const moodUpdateInFlightRef = useRef(false);
   const lastMoodSentAtRef = useRef(0);
 
-  const fetchAndCacheKycStatus = useCallback((userId, seededStatus = "") => {
+  const fetchAndCacheKycStatus = useCallback((userId, seededStatus = "", options = {}) => {
+    const force = Boolean(options.force);
+
     if (!userId) return;
+
     if (seededStatus && participantKycCache[userId] === undefined) {
       setParticipantKycCache(prev => ({ ...prev, [userId]: seededStatus }));
       return;
     }
+
     if (participantKycCache[userId] !== undefined) return;
+
     if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
       setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
       return;
     }
-    //  Defer non-critical API during live minimal mode (join burst)
-    // KYC status is only used for badge display and can wait until user profile is opened
-    if (liveMinimalMode) {
-      if (import.meta.env?.DEV && !deferredLiveApiLogRef.current) {
-        deferredLiveApiLogRef.current = true;
-        console.debug("[LiveMeeting] Deferred KYC status fetch until user opens profile");
-      }
-      return;
-    }
-    // Also respect the older deferNonCriticalLiveApi flag for backwards compatibility
-    if (deferNonCriticalLiveApi) {
-      if (import.meta.env?.DEV && !deferredLiveApiLogRef.current) {
-        deferredLiveApiLogRef.current = true;
-        console.debug("[LiveMeeting] Deferred non-critical API until liveCriticalReady");
-      }
+
+    // During live join, never fetch KYC unless user explicitly opened profile.
+    if (!force && (liveMinimalMode || deferNonCriticalLiveApi)) {
       return;
     }
 
     const headers = { accept: "application/json", ...authHeader() };
 
     let isMounted = true;
+
     (async () => {
       try {
         const data = await fetchUserKycStatusCached({
@@ -3023,12 +3016,11 @@ export default function NewLiveMeeting() {
           userId,
           headers,
         });
+
         if (!isMounted || !data) return;
 
         const kycStatus = data?.kyc_status || data?.profile?.kyc_status || "";
-        if (isMounted) {
-          setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus || "" }));
-        }
+        setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus || "" }));
       } catch (e) {
         if (isMounted) {
           setParticipantKycCache(prev => ({ ...prev, [userId]: "" }));
@@ -3036,7 +3028,9 @@ export default function NewLiveMeeting() {
       }
     })();
 
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [liveMinimalMode, deferNonCriticalLiveApi, participantKycCache]);
 
   const getKnownKycStatus = useCallback((entity) => {
@@ -3063,7 +3057,22 @@ export default function NewLiveMeeting() {
   const openMemberInfo = useCallback((member) => {
     setSelectedMember(member);
     setMemberInfoOpen(true);
-  }, []);
+
+    const raw = member?._raw || member;
+    const userId =
+      raw?.customParticipantId ??
+      raw?.clientSpecificId ??
+      raw?.client_specific_id ??
+      raw?.user_id ??
+      member?.id ??
+      "";
+
+    if (userId) {
+      fetchAndCacheKycStatus(userId, raw?.kyc_status || member?.kyc_status || "", {
+        force: true,
+      });
+    }
+  }, [fetchAndCacheKycStatus]);
 
   const closeMemberInfo = useCallback(() => {
     setMemberInfoOpen(false);
@@ -7861,15 +7870,17 @@ export default function NewLiveMeeting() {
       console.log("[Reconnect] Meeting is on break - restored break state");
     }
 
-    // Restore RTK token and meeting ID for reconnect
-    if (data.rtk_token) {
-      console.log("[Reconnect] Received RTK token, will rejoin meeting");
-      // Store for later use in RTK reconnect
-      rejoinDataRef.current = {
-        rtk_token: data.rtk_token,
-        rtk_meeting_id: data.rtk_meeting_id,
-        room_type: data.room_type,
-      };
+    // /live/rejoin/ is now lightweight and does not return RTK token.
+    // RTK token must come only from /rtk/join/.
+    rejoinDataRef.current = {
+      rtk_token: null,
+      rtk_meeting_id: data.rtk_meeting_id || null,
+      room_type: data.room_type || null,
+      needs_rtk_join: Boolean(data.needs_rtk_join),
+    };
+
+    if (data.needs_rtk_join) {
+      setJoinRequestTick((value) => value + 1);
     }
 
     // Restore breakout room state if needed
@@ -19310,9 +19321,9 @@ export default function NewLiveMeeting() {
                                       const userId = participant?._raw?.customParticipantId || participant?.id;
                                       const knownKycStatus = getKnownKycStatus(participant || m);
 
-                                      if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
-                                        fetchAndCacheKycStatus(userId);
-                                      }
+                                      // Do not trigger user/<id> KYC API from render.
+                                      // KYC cache is filled by participants-lite after roomJoined,
+                                      // or by opening the profile dialog.
 
                                       const isVerified = knownKycStatus === "approved";
                                       return isVerified ? (
@@ -22875,7 +22886,12 @@ export default function NewLiveMeeting() {
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
                                         const knownKycStatus = getKnownKycStatus(m);
-                                        if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                        if (
+                                          userId &&
+                                          !knownKycStatus &&
+                                          participantKycCache[userId] === undefined &&
+                                          (m?._raw?.kyc_status || m?.kyc_status)
+                                        ) {
                                           fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                         }
                                         const isVerified = knownKycStatus === "approved";
@@ -23318,7 +23334,12 @@ export default function NewLiveMeeting() {
                                       {(() => {
                                         const userId = m._raw?.customParticipantId || m.id;
                                         const knownKycStatus = getKnownKycStatus(m);
-                                        if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                        if (
+                                          userId &&
+                                          !knownKycStatus &&
+                                          participantKycCache[userId] === undefined &&
+                                          (m?._raw?.kyc_status || m?.kyc_status)
+                                        ) {
                                           fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                         }
                                         const isVerified = knownKycStatus === "approved";
@@ -23631,7 +23652,12 @@ export default function NewLiveMeeting() {
                                     {(() => {
                                       const userId = m._raw?.customParticipantId || m.id;
                                       const knownKycStatus = getKnownKycStatus(m);
-                                      if (userId && !knownKycStatus && participantKycCache[userId] === undefined) {
+                                      if (
+                                        userId &&
+                                        !knownKycStatus &&
+                                        participantKycCache[userId] === undefined &&
+                                        (m?._raw?.kyc_status || m?.kyc_status)
+                                      ) {
                                         fetchAndCacheKycStatus(userId, m?._raw?.kyc_status || m?.kyc_status || "");
                                       }
                                       const isVerified = knownKycStatus === "approved";
