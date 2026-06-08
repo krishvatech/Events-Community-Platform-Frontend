@@ -1332,7 +1332,7 @@ export default function MembersPage() {
     };
   }, []);
 
-  // Load roster members with server-side pagination and search
+  // Load roster members with server-side pagination, search, and filters
   useEffect(() => {
     const ctrl = new AbortController();
     let alive = true;
@@ -1343,11 +1343,17 @@ export default function MembersPage() {
         setLoading(true);
         setError("");
 
-        // Build URL with search, page, and page_size parameters
+        // Build URL with search, page, page_size, and filter parameters
         const params = new URLSearchParams();
         if (q && q.trim()) {
           params.append('search', q.trim());
         }
+        // ✅ Add filters to backend request
+        selectedCompanies.forEach(c => params.append('company', c));
+        selectedCountries.forEach(c => params.append('country', c));
+        selectedTitles.forEach(t => params.append('job_title', t));
+        selectedIndustries.forEach(i => params.append('industry', i));
+        selectedCompanySizes.forEach(s => params.append('company_size', s));
         params.append('page', page);
         params.append('page_size', ROWS_PER_PAGE);
 
@@ -1392,9 +1398,9 @@ export default function MembersPage() {
     })();
 
     return () => { alive = false; ctrl.abort(); };
-  }, [q, page, ROWS_PER_PAGE, me?.id]);
+  }, [q, page, ROWS_PER_PAGE, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes, me?.id]);
 
-  // Fetch map users separately (all members, no pagination)
+  // Fetch map users separately (all members, no pagination) with filters
   useEffect(() => {
     const ctrl = new AbortController();
     let alive = true;
@@ -1405,6 +1411,12 @@ export default function MembersPage() {
         if (q && q.trim()) {
           params.append('search', q.trim());
         }
+        // ✅ Add filters to backend request for map
+        selectedCompanies.forEach(c => params.append('company', c));
+        selectedCountries.forEach(c => params.append('country', c));
+        selectedTitles.forEach(t => params.append('job_title', t));
+        selectedIndustries.forEach(i => params.append('industry', i));
+        selectedCompanySizes.forEach(s => params.append('company_size', s));
 
         const url = `${API_BASE}/users/roster-map/?${params.toString()}`;
 
@@ -1440,7 +1452,7 @@ export default function MembersPage() {
     })();
 
     return () => { alive = false; ctrl.abort(); };
-  }, [q]);
+  }, [q, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]);
 
 
   const filtered = useMemo(() => {
@@ -1457,6 +1469,7 @@ export default function MembersPage() {
     });
 
     // Tab filter (All Members / My Contacts)
+    // ✅ NOTE: Company, country, job_title, industry, and company_size filtering is now done on backend
     if (tabValue === 1) {
       sourceList = sourceList.filter((u) => {
         const status = (friendStatusByUser[u.id] || "").toLowerCase();
@@ -1464,51 +1477,16 @@ export default function MembersPage() {
       });
     }
 
-    // Company filter
-    if (selectedCompanies.length) {
-      sourceList = sourceList.filter((u) =>
-        selectedCompanies.includes(getCompanyFromUser(u))
-      );
-    }
-
-    // Country filter
-    if (selectedCountries.length) {
-      sourceList = sourceList.filter((u) =>
-        selectedCountries.includes(getCountryFromUser(u))
-      );
-    }
-
-    // Job title filter
-    if (selectedTitles.length) {
-      sourceList = sourceList.filter((u) =>
-        selectedTitles.includes(getJobTitleFromUser(u))
-      );
-    }
-
-    // ✅ 4. FILTER BY INDUSTRY & SIZE
-    if (selectedIndustries.length) {
-      sourceList = sourceList.filter((u) => selectedIndustries.includes(getIndustryFromUser(u)));
-    }
-
-    if (selectedCompanySizes.length) {
-      sourceList = sourceList.filter((u) => selectedCompanySizes.includes(getCompanySizeFromUser(u)));
-    }
-
     return sourceList;
   }, [
     users,
     tabValue,
     friendStatusByUser,
-    selectedCompanies,
-    selectedCountries,
-    selectedTitles,
-    selectedIndustries,
-    selectedCompanySizes,
     me?.id,
     viewerIsStaff,
   ]);
 
-  // Apply same filters to mapUsers as filtered list
+  // Apply privacy/tab filters to mapUsers (backend filters already applied)
   const filteredMapUsers = useMemo(() => {
     let sourceList = mapUsers;
 
@@ -1523,6 +1501,7 @@ export default function MembersPage() {
     });
 
     // Tab filter (All Members / My Contacts)
+    // ✅ NOTE: Company, country, job_title, industry, and company_size filtering is now done on backend
     if (tabValue === 1) {
       sourceList = sourceList.filter((u) => {
         const status = (friendStatusByUser[u.id] || "").toLowerCase();
@@ -1530,47 +1509,11 @@ export default function MembersPage() {
       });
     }
 
-    // Company filter
-    if (selectedCompanies.length) {
-      sourceList = sourceList.filter((u) =>
-        selectedCompanies.includes(getCompanyFromUser(u))
-      );
-    }
-
-    // Country filter
-    if (selectedCountries.length) {
-      sourceList = sourceList.filter((u) =>
-        selectedCountries.includes(getCountryFromUser(u))
-      );
-    }
-
-    // Job title filter
-    if (selectedTitles.length) {
-      sourceList = sourceList.filter((u) =>
-        selectedTitles.includes(getJobTitleFromUser(u))
-      );
-    }
-
-    // Industry filter
-    if (selectedIndustries.length) {
-      sourceList = sourceList.filter((u) => selectedIndustries.includes(getIndustryFromUser(u)));
-    }
-
-    // Company size filter
-    if (selectedCompanySizes.length) {
-      sourceList = sourceList.filter((u) => selectedCompanySizes.includes(getCompanySizeFromUser(u)));
-    }
-
     return sourceList;
   }, [
     mapUsers,
     tabValue,
     friendStatusByUser,
-    selectedCompanies,
-    selectedCountries,
-    selectedTitles,
-    selectedIndustries,
-    selectedCompanySizes,
     me?.id,
     viewerIsStaff,
   ]);
