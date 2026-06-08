@@ -257,31 +257,24 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     useEffect(() => {
         let off = false;
 
-        //  Skip badge fetches during live meeting join burst
-        // Badge counts are non-critical and can wait until user opens Messages/Notifications tabs
         const isLiveMeetingRoute = () => {
             const path = window.location.pathname;
             return path.includes("/live") || path.includes("/meeting") || path.includes("/rtk");
         };
 
-        if (isLiveMeetingRoute()) {
-            console.log("[UnifiedSidebar] Skipping badge fetches during live meeting (PHASE 1)");
-            return;
-        }
+        const liveRoute = isLiveMeetingRoute();
 
         const sync = async () => {
             let n = 0;
-            let m = await getMessagesUnreadCount();
+            let m = 0;
+
+            // During live meeting, keep badges working but reduce backend pressure.
+            // Do not fetch very frequently for 200–500 users.
+            m = await getMessagesUnreadCount();
 
             if (isSuperUser) {
                 n = await getAdminNotificationsBadgeCount();
             } else if (isStaffOnly) {
-                // Staff uses Community Notifications per prompt? "Community/NotificationsPage.jsx"
-                // BUT wait, typically staff might need admin notifications too?
-                // Prompt says: "Notifications - Community/NotificationsPage.jsx" for Staff.
-                // So likely standard user notifications.
-                // However, AdminEvents etc might benefit from admin notifications?
-                // Sticking to Prompt: "Community/NotificationsPage.jsx" -> UserUnreadCount.
                 n = await getUserUnreadCount();
             } else {
                 n = await getUserUnreadCount();
@@ -294,18 +287,15 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         };
 
         sync();
-        const id = setInterval(sync, 30000);
 
-        // Listeners? 
-        // AdminSidebar listens to 'admin:notify:unread' and 'messages:unread'
-        // CommunitySideBar listens to 'notify:unread' and 'messages:unread'
+        const intervalMs = liveRoute ? 120000 : 30000;
+        const id = setInterval(sync, intervalMs);
 
         const onMsgUnread = (e) => setMessageCount(Math.max(0, e?.detail?.count ?? 0));
         const onNotifyUnread = (e) => setNotifCount(Math.max(0, e?.detail?.count ?? 0));
 
         window.addEventListener("messages:unread", onMsgUnread);
 
-        // For admin notifications: 
         if (isSuperUser) {
             window.addEventListener("admin:notify:unread", onNotifyUnread);
         } else {
@@ -316,6 +306,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             off = true;
             clearInterval(id);
             window.removeEventListener("messages:unread", onMsgUnread);
+
             if (isSuperUser) {
                 window.removeEventListener("admin:notify:unread", onNotifyUnread);
             } else {

@@ -2456,7 +2456,26 @@ export default function NewLiveMeeting() {
   const [allowDeferredLiveData, setAllowDeferredLiveData] = useState(false);
   const deferNonCriticalLiveApi = !liveCriticalReady && !allowDeferredLiveData;
   const deferredLiveApiLogRef = useRef(false);
+
+  // ✅ Production-safe live meeting polling intervals
+  // Keep features working, but avoid 200–500 users polling too fast.
+  const LIVE_PARTICIPANTS_REFRESH_MS = 120000; // 2 min, only when Participants panel is open
+  const LIVE_CHAT_ACTIVE_POLL_MS = 30000;      // 30 sec fallback when chat panel is open
+  const LIVE_CHAT_IDLE_POLL_MS = 90000;        // 90 sec unread check when chat panel is closed
+  const LIVE_CHAT_WS_FALLBACK_MS = 120000;     // 2 min when chat WebSocket is connected
+  const LIVE_PRIVATE_UNREAD_POLL_MS = 120000;  // 2 min for private unread badges
+  const LIVE_PRIVATE_ACTIVE_POLL_MS = 30000;   // 30 sec when private chat is open
+  const LIVE_SUMMARY_POLL_SOCKET_MS = 120000;  // 2 min when main WS is connected
+  const LIVE_SUMMARY_POLL_FALLBACK_MS = 60000; // 1 min if WS is not connected
+  const LIVE_SUMMARY_CACHE_TTL_MS = 60000;     // 1 min cache
+  const MARK_ALL_READ_COOLDOWN_MS = 30000;     // 30 sec, prevents mark-all-read storm
   const [eventId, setEventId] = useState(null);
+
+  // ✅ Participants-lite should load only when the Participants panel is open.
+  // This prevents every joined user from immediately calling a large participant API.
+  const [participantsPanelActive, setParticipantsPanelActive] = useState(false);
+  const participantsLiteInFlightRef = useRef(false);
+  const participantsLiteNotFoundRef = useRef(false);
 
   //  Live Minimal Mode - Block non-critical APIs during join burst
   // Only critical APIs (/rtk/join/, /live/rejoin/, WebSocket) should run immediately
@@ -2537,53 +2556,75 @@ export default function NewLiveMeeting() {
     // Panels will trigger their own data loads via lazy-load callbacks
   }, [eventId]);
 
-  //  Fetch all participants at once instead of individual user/<id> calls
+  // ✅ Production-safe participants-lite loading.
+  // Do not call this for every user immediately after roomJoined.
+  // Load only when Participants panel is open, then refresh slowly while open.
   useEffect(() => {
     if (!eventId) return;
+    if (!roomJoined) return;
+    if (!participantsPanelActive) return;
+    if (participantsLiteNotFoundRef.current) return;
 
-    if (!roomJoined) {
-      if (import.meta.env?.DEV) {
-        console.debug("[LiveMeeting] Deferring participants-lite until roomJoined=true");
-      }
-      return;
-    }
+    let alive = true;
 
-    let isMounted = true;
+    const fetchParticipantsLite = async () => {
+      if (!alive) return;
+      if (participantsLiteInFlightRef.current) return;
+      if (participantsLiteNotFoundRef.current) return;
 
-    (async () => {
+      participantsLiteInFlightRef.current = true;
+
       try {
         const headers = { accept: "application/json", ...authHeader() };
         const res = await fetch(`${API_ROOT}/events/${eventId}/participants-lite/`, { headers });
 
+        if (res.status === 404) {
+          participantsLiteNotFoundRef.current = true;
+          console.warn(
+            `[LiveMeeting] participants-lite returned 404 for event=${eventId}. Stopping participants-lite polling for this page.`
+          );
+          return;
+        }
+
         if (!res.ok) {
-          console.warn(`[LiveMeeting] PHASE 4: Failed to fetch participants-lite: ${res.status}`);
+          console.warn(`[LiveMeeting] Failed to fetch participants-lite: ${res.status}`);
           return;
         }
 
         const participants = await res.json();
+        if (!alive) return;
 
-        if (!isMounted) return;
-
-        // Populate kyc cache with all participants at once
         const newCache = {};
-        (Array.isArray(participants) ? participants : []).forEach(p => {
+        (Array.isArray(participants) ? participants : []).forEach((p) => {
           if (p?.id) {
             newCache[p.id] = p.kyc_status || "";
           }
         });
 
-        setParticipantKycCache(prev => ({ ...prev, ...newCache }));
+        if (Object.keys(newCache).length) {
+          setParticipantKycCache((prev) => ({ ...prev, ...newCache }));
+        }
 
         if (import.meta.env?.DEV) {
-          console.debug(`[LiveMeeting] PHASE 4: Loaded ${Object.keys(newCache).length} participants from batched endpoint`);
+          console.debug(
+            `[LiveMeeting] participants-lite loaded ${Object.keys(newCache).length} users`
+          );
         }
       } catch (err) {
-        console.warn("[LiveMeeting] PHASE 4: Error fetching participants-lite:", err);
+        console.warn("[LiveMeeting] participants-lite error:", err?.message || err);
+      } finally {
+        participantsLiteInFlightRef.current = false;
       }
-    })();
+    };
 
-    return () => { isMounted = false; };
-  }, [eventId, roomJoined]);
+    fetchParticipantsLite();
+    const timer = setInterval(fetchParticipantsLite, LIVE_PARTICIPANTS_REFRESH_MS);
+
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [eventId, roomJoined, participantsPanelActive]);
 
   // ✅ Local join timer (per user)
   const joinedAtRef = useRef(null);
@@ -10896,7 +10937,10 @@ export default function NewLiveMeeting() {
   const autoJoinCheckOnMountRef = useRef(false);
 
   // Helper function to check and auto-join Speed Networking
-  const checkAndAutoJoinSpeedNetworking = useCallback(async () => {
+  const checkAndAutoJoinSpeedNetworking = useCallback(async ({ force = false } = {}) => {
+    // Do not auto-poll speed networking for every participant.
+    // Only check when user opens the speed networking dialog or when WS event triggers it.
+    if (!force) return;
     if (isGuest) return;
     try {
       const token = getToken();
@@ -11011,29 +11055,11 @@ export default function NewLiveMeeting() {
     }
   }, [eventId, isGuest]);
 
-  // Trigger auto-join when user is in room - handles both new joins and refresh cases
+  // Production optimization:
+  // Do not auto-call /speed-networking/ for every joined participant.
+  // Speed networking should open from user action or WebSocket session-start event.
   useEffect(() => {
-    console.log('[LiveMeeting] Auto-join check:', { roomJoined, eventId, alreadyAutoJoined: speedNetworkingAutoJoinedRef.current });
-
-    // Skip if not ready
-    if (!roomJoined || !eventId || isGuest) {
-      console.log('[LiveMeeting] Auto-join skipped: roomJoined=' + roomJoined + ', eventId=' + eventId);
-      return;
-    }
-
-    // Skip if already auto-joined
-    if (speedNetworkingAutoJoinedRef.current) {
-      console.log('[LiveMeeting] Auto-join already executed, skipping');
-      return;
-    }
-
-    // Prevent duplicate checks from multiple effect triggers
-    if (!autoJoinCheckOnMountRef.current) {
-      autoJoinCheckOnMountRef.current = true;
-      console.log('[LiveMeeting] Triggering auto-join for roomJoined=true, eventId=' + eventId);
-      checkAndAutoJoinSpeedNetworking();
-    }
-  }, [roomJoined, eventId, isGuest, checkAndAutoJoinSpeedNetworking]);
+  }, []);
 
   // Keep local button state in sync with RTK actual state
 
@@ -11701,7 +11727,7 @@ export default function NewLiveMeeting() {
           baseUrl: API_ROOT,
           eventId,
           headers: authHeader(),
-          ttlMs: 5_000,
+          ttlMs: LIVE_SUMMARY_CACHE_TTL_MS,
           fetcher: (url, options) => fetch(url, { ...options, signal: controller.signal }),
         });
         clearTimeout(timeoutId);
@@ -11731,7 +11757,18 @@ export default function NewLiveMeeting() {
       } catch (err) {
         clearTimeout(timeoutId);
         if (err.name === 'AbortError') return; // expected on cleanup or timeout
-        console.error("[LiveMeeting] Status poll error:", err);
+
+        const message = String(err?.message || err || "");
+
+        if (message.includes("404")) {
+          console.warn(
+            `[LiveMeeting] Summary API returned 404 for event=${eventId}. Stopping summary polling for this page.`
+          );
+          cancelled = true;
+          return;
+        }
+
+        console.warn("[LiveMeeting] Status poll error:", err);
         failureCount++;
         scheduleNext();
       }
@@ -11740,7 +11777,9 @@ export default function NewLiveMeeting() {
     const scheduleNext = () => {
       if (cancelled) return;
       const socketReady = mainSocketRef.current?.readyState === WebSocket.OPEN;
-      const baseDelay = socketReady ? 30000 : 10000;
+      const baseDelay = socketReady
+        ? LIVE_SUMMARY_POLL_SOCKET_MS
+        : LIVE_SUMMARY_POLL_FALLBACK_MS;
       const delay =
         failureCount === 0
           ? baseDelay
@@ -15250,9 +15289,12 @@ export default function NewLiveMeeting() {
   }, []);
 
   const fetchChatMessages = useCallback(
-    async (conversationId) => {
-      //  Defer messaging API during join burst
+    async (conversationId, { force = false } = {}) => {
+      // Defer messaging API during join burst.
+      // In production, only poll chat when chat panel is open.
       if (liveMinimalMode || deferNonCriticalLiveApi) return;
+      if (!force && !isChatActive) return;
+
       const cid = conversationId || activeChatConversationId;
       if (!cid) return;
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
@@ -15262,7 +15304,7 @@ export default function NewLiveMeeting() {
       if (!res.ok) throw new Error(data?.detail || "Failed to load chat.");
       setChatMessages(Array.isArray(data) ? data : []);
     },
-    [activeChatConversationId, liveMinimalMode, deferNonCriticalLiveApi]
+    [activeChatConversationId, liveMinimalMode, deferNonCriticalLiveApi, isChatActive]
   );
 
   const ensureEventConversation = useCallback(async () => {
@@ -15411,7 +15453,6 @@ export default function NewLiveMeeting() {
     }
   }, [activeChatConversationId, liveMinimalMode, deferNonCriticalLiveApi, hasLiveInteractiveAccess]);
 
-  const MARK_ALL_READ_COOLDOWN_MS = 7000;
   const markAllReadPendingRef = useRef(new Set());
   const markAllReadLastSentRef = useRef(new Map());
 
@@ -15737,7 +15778,7 @@ export default function NewLiveMeeting() {
     };
 
     tick();
-    const t = setInterval(tick, 15000);
+    const t = setInterval(tick, LIVE_PRIVATE_UNREAD_POLL_MS);
 
     return () => {
       alive = false;
@@ -15800,7 +15841,7 @@ export default function NewLiveMeeting() {
     };
 
     tick();
-    const t = setInterval(tick, 10000);
+    const t = setInterval(tick, LIVE_PRIVATE_ACTIVE_POLL_MS);
 
     return () => {
       alive = false;
@@ -16029,11 +16070,11 @@ export default function NewLiveMeeting() {
 
     tick();
     // ✅ Optimize polling: Use longer interval when WebSocket is connected for real-time updates
-    // WebSocket active: 60s fallback polling (in case of missed messages during reconnect)
-    // WebSocket inactive: 10s active / 30s inactive polling (normal behavior)
+    // WebSocket active: 2min fallback polling (in case of missed messages during reconnect)
+    // WebSocket inactive: 30s active / 90s inactive polling (normal behavior)
     const pollingInterval = eventChatWsConnectedRef.current
-      ? 60000  // 60 seconds when WebSocket is healthy
-      : (isChatActive ? 10000 : 30000);  // 10s active, 30s inactive
+      ? LIVE_CHAT_WS_FALLBACK_MS
+      : (isChatActive ? LIVE_CHAT_ACTIVE_POLL_MS : LIVE_CHAT_IDLE_POLL_MS);
     const t = setInterval(tick, pollingInterval);
 
     return () => {
@@ -16117,7 +16158,7 @@ export default function NewLiveMeeting() {
     try {
       const cid = await ensureActiveConversation();
       if (cid) {
-        await fetchChatMessages(cid);
+        await fetchChatMessages(cid, { force: true });
         if (isChatActive && isDocumentVisible()) {
           await markChatAllRead(cid);
         }
@@ -16183,7 +16224,7 @@ export default function NewLiveMeeting() {
         setChatMessages((prev) =>
           prev.map((m) => (String(m.id) === String(messageId) ? { ...m, body: data.body } : m))
         );
-        await fetchChatMessages(cid);
+        await fetchChatMessages(cid, { force: true });
         setChatEditId(null);
         setChatEditBody("");
       } catch (e) {
@@ -23943,9 +23984,12 @@ export default function NewLiveMeeting() {
         <IconButton
           onClick={() => {
             if (rightPanelOpen && tab === 3) {
+              setParticipantsPanelActive(false);
               if (isMdUp) setRightPanelOpen(false);
               else setRightOpen(false);
             } else {
+              setParticipantsPanelActive(true);
+              setAllowDeferredLiveData(true);
               if (isMdUp) setRightPanelOpen(true);
               else setRightOpen(true);
               setTab(3);
@@ -24042,7 +24086,10 @@ export default function NewLiveMeeting() {
       ) : (
         <Tooltip title="Networking" placement="left" arrow>
           <IconButton
-            onClick={() => setShowSpeedNetworking(true)}
+            onClick={() => {
+              setShowSpeedNetworking(true);
+              checkAndAutoJoinSpeedNetworking({ force: true });
+            }}
             sx={{
               width: 44,
               height: 44,
@@ -26678,8 +26725,14 @@ export default function NewLiveMeeting() {
                     <IconButton
                       onClick={() => {
                         // toggle behavior: if Participants is open on tab=3, close panel
-                        if (isPanelOpen && tab === 3) closeRightPanel();
-                        else toggleRightPanel(3);
+                        if (isPanelOpen && tab === 3) {
+                          setParticipantsPanelActive(false);
+                          closeRightPanel();
+                        } else {
+                          setParticipantsPanelActive(true);
+                          setAllowDeferredLiveData(true);
+                          toggleRightPanel(3);
+                        }
                       }}
                       sx={{
                         bgcolor: (isPanelOpen && tab === 3) ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
@@ -28126,6 +28179,7 @@ export default function NewLiveMeeting() {
             setShowNetworkingPrompt(false);
             setSpeedNetworkingAutoJoinTrigger(Date.now());
             setShowSpeedNetworking(true);
+            checkAndAutoJoinSpeedNetworking({ force: true });
           }}
           onJoinLounge={() => {
             setShowNetworkingPrompt(false);
