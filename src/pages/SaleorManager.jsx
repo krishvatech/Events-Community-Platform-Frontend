@@ -1517,6 +1517,18 @@ export default function SaleorManager() {
     );
   }
 
+  if (saleorStatus?.enabled === false) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
+        <Container maxWidth="sm">
+          <Alert severity="warning" sx={{ borderRadius: 3 }}>
+            Saleor integration is currently disabled. Contact your administrator to enable it.
+          </Alert>
+        </Container>
+      </Box>
+    );
+  }
+
   if (!saleorStatus?.can_manage_staff) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>

@@ -166,12 +166,13 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const isStaffOnly = !isSuperUser && userIsStaff;
     const isNormalUser = !isSuperUser && !isStaffOnly;
 
-    // --- State for badges ---
+    // --- State for badges and Saleor status ---
     const [notifCount, setNotifCount] = useState(0);
     const [messageCount, setMessageCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState("");
     const [showMoreIndicator, setShowMoreIndicator] = useState(false);
     const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+    const [saleorEnabled, setSaleorEnabled] = useState(true); // Default true, will be set to false if disabled
     const menuScrollRef = useRef(null);
     const activeItemRef = useRef(null);
     const searchInputRef = useRef(null);
@@ -252,6 +253,20 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
     }
+
+    // --- Check Saleor Status ---
+    useEffect(() => {
+        const checkSaleorStatus = async () => {
+            try {
+                const response = await apiClient.get("/auth/saleor/status/");
+                setSaleorEnabled(response.data?.enabled !== false);
+            } catch {
+                // If the endpoint fails or is disabled, assume Saleor is disabled
+                setSaleorEnabled(false);
+            }
+        };
+        checkSaleorStatus();
+    }, []);
 
     // --- Effects for Badges ---
     useEffect(() => {
@@ -721,7 +736,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 {isNormalUser && renderList(trainingsItems, "TRAININGS & COURSES")}
                 {isNormalUser && renderList(resourcesItems, "RESOURCES")}
                 {renderList(manageItems, isNormalUser ? "PERSONAL" : "MY CONTENT")}
-                {adminItems.length > 0 && renderList(adminItems, "PLATFORM")}
+                {adminItems.length > 0 && renderList(adminItems.filter(item => item.label !== "Saleor Manager" || saleorEnabled), "PLATFORM")}
 
                 {/* More Indicator - sticky positioning */}
                 <Box sx={{
