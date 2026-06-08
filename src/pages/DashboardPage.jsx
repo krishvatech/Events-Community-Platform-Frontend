@@ -569,16 +569,10 @@ export default function DashboardPage() {
     Promise.all([
       apiClient.get("/users/me/").then(r => r.data).catch(() => null),
       apiClient.get("/events/landing/").then(r => r.data).catch(() => ({ hero_event: null, upcoming_events: [] })),
-      apiClient.get("/content/posts/?page_size=3").then(r => {
+      apiClient.get("/post-acceptance-form-assignments/my/").then(r => {
         const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
       }).catch(() => []),
-      apiClient.get("/groups/?page_size=3").then(r => {
-        const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
-      }).catch(() => []),
-      apiClient.get("/post-acceptance-form-assignments/?status=not_started,in_progress&page_size=100").then(r => {
-        const d = r.data; return Array.isArray(d) ? d : (d?.results || []);
-      }).catch(() => []),
-    ]).then(([userData, eventsData, postsData, groupsData, formsData]) => {
+    ]).then(([userData, eventsData, formsData]) => {
       if (!active) return;
       setUser(userData);
       // Build events array: hero first, then upcoming events
@@ -590,8 +584,6 @@ export default function DashboardPage() {
         allEvents.push(...eventsData.upcoming_events);
       }
       setEvents(allEvents.slice(0, 10)); // Store up to 10 for flexibility
-      // setDiscussions(postsData.length ? postsData.slice(0, 3) : STATIC_DISCUSSIONS); // COMMENTED OUT
-      // setGroups(groupsData.length ? groupsData.slice(0, 3) : STATIC_GROUPS); // COMMENTED OUT
       setPendingForms(formsData); // Show all pending forms
       setLoading(false);
     });
