@@ -27,6 +27,28 @@ const cacheForbidden = (url) => {
   console.log(`[Auth] Cached 403 for ${url} (5min TTL)`);
 };
 
+// Helper: Check if a 403 response is actually an expired token error
+const isExpiredTokenError = (status, responseData) => {
+  if (status !== 403) return false;
+
+  let text = "";
+  if (typeof responseData === "string") {
+    text = responseData;
+  } else if (responseData && typeof responseData === "object") {
+    text = JSON.stringify(responseData);
+  }
+
+  const lowerText = text.toLowerCase();
+  const expiredPatterns = [
+    "signature has expired",
+    "token expired",
+    "expired token",
+    "cognito auth failed"
+  ];
+
+  return expiredPatterns.some(pattern => lowerText.includes(pattern));
+};
+
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
@@ -147,17 +169,27 @@ apiClient.interceptors.response.use(
 
     //  Only refresh on 401 (token expired), NOT on 403 (permission denied)
     const status = error?.response?.status;
+    const responseData = error?.response?.data;
 
-    // 403 (Forbidden) - Permission denied, not a token issue
+    // 403 (Forbidden) - Check if it's actually an expired token error
     if (status === 403) {
-      console.warn(`[Auth] 403 Forbidden for ${url}. This is permission denied, not token expiration.`);
-      // Cache to prevent repeated calls for the same forbidden endpoint
-      cacheForbidden(url);
-      return Promise.reject(error);
+      const isExpiredToken = isExpiredTokenError(status, responseData);
+
+      if (!isExpiredToken) {
+        console.warn(`[Auth] 403 Forbidden for ${url}. This is permission denied, not token expiration.`);
+        // Cache to prevent repeated calls for the same forbidden endpoint
+        cacheForbidden(url);
+        return Promise.reject(error);
+      }
+
+      // If it IS an expired token error, fall through to refresh logic below
+      console.warn(`[Auth] 403 Forbidden for ${url} but detected as expired token error. Treating as 401.`);
+      // Treat as 401 so refresh logic kicks in
+      error.response.status = 401;
     }
 
     // Not a status we handle - pass through
-    if (!status || status !== 401) {
+    if (!status || (error?.response?.status !== 401 && status !== 401)) {
       return Promise.reject(error);
     }
 

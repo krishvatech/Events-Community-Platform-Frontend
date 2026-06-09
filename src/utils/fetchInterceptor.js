@@ -31,6 +31,21 @@ const cacheForbidden = (url) => {
     console.log(`[Global Fetch] Cached 403 for ${url} (5min TTL)`);
 };
 
+// Helper: Check if a 403 response is actually an expired token error
+const isExpiredTokenError = (status, responseBody) => {
+    if (status !== 403) return false;
+
+    const text = String(responseBody || "").toLowerCase();
+    const expiredPatterns = [
+        "signature has expired",
+        "token expired",
+        "expired token",
+        "cognito auth failed"
+    ];
+
+    return expiredPatterns.some(pattern => text.includes(pattern));
+};
+
 const processQueue = (error, token = null) => {
     failedQueue.forEach((prom) => {
         if (error) {
@@ -107,12 +122,29 @@ window.fetch = async (...args) => {
     // GUEST EXCEPTION: For guest users, return forbidden response without refresh attempt
     const isGuest = localStorage.getItem("is_guest") === "true";
 
-    // 403 (Forbidden) - Permission denied, not a token issue. Do not refresh.
+    // 403 (Forbidden) - Check if it's actually an expired token error
     if (response.status === 403) {
-        console.warn(`[Global Fetch] 403 Forbidden for ${url}. This is permission denied, not token expiration.`);
-        // Cache to prevent repeated calls for the same forbidden endpoint
-        cacheForbidden(url);
-        return response;
+        // Try to read response body safely to check for expired token error
+        let responseText = "";
+        try {
+            const clonedResponse = response.clone();
+            responseText = await clonedResponse.text();
+        } catch {
+            // If we can't read body, treat as real 403
+        }
+
+        const isExpiredToken = isExpiredTokenError(403, responseText);
+
+        if (!isExpiredToken) {
+            console.warn(`[Global Fetch] 403 Forbidden for ${url}. This is permission denied, not token expiration.`);
+            // Cache to prevent repeated calls for the same forbidden endpoint
+            cacheForbidden(url);
+            return response;
+        }
+
+        // If it IS an expired token error, fall through to refresh logic below
+        console.warn(`[Global Fetch] 403 Forbidden for ${url} but detected as expired token error. Treating as 401.`);
+        response.status = 401; // Treat as 401 so refresh logic kicks in
     }
 
     // Only attempt refresh on 401 (token expired)
