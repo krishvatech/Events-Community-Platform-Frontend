@@ -162,8 +162,14 @@ const PublicSeriesLanding = () => {
   }
 
   const isSeriesRegistered = series?.is_registered === true;
+  // The creator/admin is auto-registered in their own series and should not be
+  // able to cancel that registration. is_owner comes from the backend (covers
+  // the creator and superusers), so this is not a frontend-only role check.
+  const isSeriesOwner = series?.is_owner === true;
   const canCancelSeriesRegistration =
-    isSeriesRegistered && series?.registration_mode === 'full_series_only';
+    isSeriesRegistered &&
+    series?.registration_mode === 'full_series_only' &&
+    !isSeriesOwner;
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -224,7 +230,7 @@ const PublicSeriesLanding = () => {
                 <span className="font-medium">{series.registrations_count || 0} Registered</span>
               </div>
               <div className="font-medium">
-                {series.is_free ? (
+                {series.is_free || !series.price ? (
                   <span className="text-teal-600 font-semibold">Free</span>
                 ) : (
                   <span className="text-teal-600 font-semibold">${series.price}</span>
@@ -241,23 +247,28 @@ const PublicSeriesLanding = () => {
 
             {/* CTA Button */}
             <div className="flex gap-3 flex-wrap">
-              <button
-                onClick={canCancelSeriesRegistration ? handleCancelSeriesRegistration : handleRegisterForSeries}
-                disabled={registering || cancelling || (isSeriesRegistered && !canCancelSeriesRegistration)}
-                className={`rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-8 transition-colors text-lg ${
-                  canCancelSeriesRegistration
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-teal-600 hover:bg-teal-700'
-                }`}
-              >
-                {cancelling
-                  ? 'Cancelling...'
-                  : canCancelSeriesRegistration
-                    ? 'Cancel Registration'
-                    : isSeriesRegistered
-                      ? 'Registered'
-                      : (registering ? 'Registering...' : 'Register for Series')}
-              </button>
+              {/* Registered users (including the auto-registered creator/admin)
+                  do not see "Register for Series". Decision is based on
+                  is_registered, never on a frontend admin role. */}
+              {!isSeriesRegistered && (
+                <button
+                  onClick={handleRegisterForSeries}
+                  disabled={registering}
+                  className="rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-8 transition-colors text-lg"
+                >
+                  {registering ? 'Registering...' : 'Register for Series'}
+                </button>
+              )}
+              {/* Preserve existing cancel ability for full-series registrations. */}
+              {canCancelSeriesRegistration && (
+                <button
+                  onClick={handleCancelSeriesRegistration}
+                  disabled={cancelling}
+                  className="rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-8 transition-colors text-lg"
+                >
+                  {cancelling ? 'Cancelling...' : 'Cancel Registration'}
+                </button>
+              )}
               <button
                 onClick={() => navigate('/')}
                 className="rounded-lg border-2 border-teal-600 text-teal-600 hover:bg-teal-50 font-semibold py-3 px-8 transition-colors text-lg"
@@ -265,6 +276,12 @@ const PublicSeriesLanding = () => {
                 Back to Events
               </button>
             </div>
+            {/* Under "Back to Events": confirm the user is already registered. */}
+            {isSeriesRegistered && (
+              <p className="mt-3 text-teal-700 font-medium">
+                You are already registered for this Series
+              </p>
+            )}
           </div>
         </div>
 

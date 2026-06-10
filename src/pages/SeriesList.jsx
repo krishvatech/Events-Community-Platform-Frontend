@@ -149,11 +149,22 @@ const SeriesList = () => {
       {series.map((s) => (
         <Grid item xs={12} sm={6} md={4} key={s.id}>
           <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {s.cover_image_url && (
+            {/*
+              Series card image: derived from the first event (in series-added
+              order) that has an image. No separate series image / default
+              placeholder is used. Always reserve the same media height so cards
+              stay aligned; render an img only when a valid URL exists, otherwise
+              show a blank media area (no broken-image icon, no banner).
+            */}
+            {s.card_image_url ? (
               <CardMedia
-                sx={{ height: 200, bgcolor: 'grey.200', backgroundSize: 'cover' }}
-                image={s.cover_image_url}
+                component="img"
+                sx={{ height: 200, bgcolor: 'grey.200', objectFit: 'cover' }}
+                image={s.card_image_url}
+                alt={s.title}
               />
+            ) : (
+              <Box sx={{ height: 200, bgcolor: 'grey.100' }} />
             )}
             <CardContent sx={{ flexGrow: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>

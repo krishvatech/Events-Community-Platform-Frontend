@@ -3989,39 +3989,43 @@ export default function EventsPage() {
                       return (
                         <div
                           key={`series-${series.id}`}
-                          className="rounded-lg border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full"
+                          className="group h-full w-full flex flex-col rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
+                                     transition-all duration-300 hover:shadow-xl hover:-translate-y-2.5
+                                     hover:ring-1 hover:ring-teal-200 overflow-hidden"
                         >
-                          {/* Cover Image */}
-                          {series.cover_image && (
-                            <div className="relative w-full h-64 overflow-hidden bg-neutral-100">
+                          {/*
+                            Series card image: first available image from the
+                            series' events in series-added order (card_image_url,
+                            computed by the backend). No separate series image or
+                            default placeholder. Reserve the same height always;
+                            render img only when a valid URL exists, else a blank
+                            media area (no broken-image icon, no banner).
+                          */}
+                          <div className="relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px] overflow-hidden">
+                            {series.card_image_url ? (
                               <img
-                                src={series.cover_image}
+                                src={series.card_image_url}
                                 alt={series.title}
-                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                className="absolute inset-0 block w-full h-full object-cover object-center"
                               />
-                            </div>
-                          )}
+                            ) : (
+                              <div className="absolute inset-0 w-full h-full bg-slate-100" />
+                            )}
+
+                            {/* SERIES + status badges overlaid like event topic chips */}
+                            <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold shadow-sm">
+                              SERIES
+                            </span>
+                            <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-slate-200 text-slate-900 px-3 py-1 text-xs font-semibold shadow-sm">
+                              {series.status?.toUpperCase() || 'DRAFT'}
+                            </span>
+                          </div>
 
                           {/* Content */}
-                          <div className="p-4 flex flex-col flex-grow">
-                            {/* Badges */}
-                            <div className="flex gap-2 mb-3">
-                              <Chip
-                                label="SERIES"
-                                size="small"
-                                color="primary"
-                                sx={{ fontWeight: 600, height: 24 }}
-                              />
-                              <Chip
-                                label={series.status?.toUpperCase() || 'DRAFT'}
-                                size="small"
-                                color={series.status === 'published' ? 'success' : 'default'}
-                                sx={{ fontWeight: 600, height: 24 }}
-                              />
-                            </div>
-
+                          <div className="p-4 sm:p-5 md:p-6 flex flex-col flex-grow">
                             {/* Title */}
-                            <h3 className="text-lg font-bold text-neutral-900 mb-2 leading-tight">
+                            <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 mb-2 leading-snug">
                               {series.title}
                             </h3>
 
@@ -4053,7 +4057,10 @@ export default function EventsPage() {
                               </p>
                             </div>
 
-                            {/* Buttons */}
+                            {/* Buttons: registered users (incl. the auto-registered
+                                creator/admin) see only "View Series"; everyone else
+                                also sees "Register". Based on is_registered, never on
+                                frontend admin role. */}
                             <div className="flex gap-2 mt-auto pt-2">
                               <button
                                 onClick={() => navigate(`/series/${series.slug}`)}
@@ -4061,16 +4068,14 @@ export default function EventsPage() {
                               >
                                 View Series
                               </button>
-                              <button
-                                onClick={() => isSeriesRegistered ? handleSeriesCancelRegistration(series) : handleSeriesRegister(series.id)}
-                                className={`rounded-full border-2 text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors ${
-                                  isSeriesRegistered
-                                    ? 'border-red-600 text-red-600 hover:bg-red-50'
-                                    : 'border-teal-600 text-teal-600 hover:bg-teal-50'
-                                }`}
-                              >
-                                {isSeriesRegistered ? 'Cancel Registration' : 'Register'}
-                              </button>
+                              {!isSeriesRegistered && (
+                                <button
+                                  onClick={() => handleSeriesRegister(series.id)}
+                                  className="rounded-full border-2 border-teal-600 text-teal-600 hover:bg-teal-50 text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                                >
+                                  Register
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -4142,73 +4147,85 @@ export default function EventsPage() {
 
                       return (
                         <Grid item key={`series-${series.id}`} xs={12}>
-                          <div className="rounded-lg border border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden flex gap-4 p-4">
-                            {/* Cover Image */}
-                            {series.cover_image && (
-                              <div className="w-32 h-32 flex-shrink-0">
-                                <img
-                                  src={series.cover_image}
-                                  alt={series.title}
-                                  className="w-full h-full object-cover rounded-lg"
-                                />
-                              </div>
-                            )}
-
-                            {/* Content */}
-                            <div className="flex-1 flex flex-col justify-between">
-                              <div>
-                                {/* Badges */}
-                                <div className="flex gap-2 mb-2">
-                                  <Chip
-                                    label="SERIES"
-                                    size="small"
-                                    color="primary"
-                                    sx={{ fontWeight: 600, height: 24 }}
+                          <div className="group rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
+                                          transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5
+                                          hover:ring-1 hover:ring-teal-200 overflow-hidden">
+                            <div className="md:flex">
+                              {/*
+                                Image / badges — matches the event row layout.
+                                Series image is the first available image from the
+                                series' events in series-added order (card_image_url).
+                                No separate series image or default placeholder;
+                                render img only when a valid URL exists, else a blank
+                                media area (no broken-image icon, no banner).
+                              */}
+                              <div className="relative md:w-2/5">
+                                {series.card_image_url ? (
+                                  <img
+                                    src={series.card_image_url}
+                                    alt={series.title}
+                                    loading="lazy"
+                                    className="w-full h-44 md:h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105 will-change-transform"
                                   />
-                                  <Chip
-                                    label={series.status?.toUpperCase() || 'DRAFT'}
-                                    size="small"
-                                    color={series.status === 'published' ? 'success' : 'default'}
-                                    sx={{ fontWeight: 600, height: 24 }}
-                                  />
-                                </div>
+                                ) : (
+                                  <div className="w-full h-44 md:h-full bg-slate-100" />
+                                )}
 
-                                {/* Title */}
-                                <h3 className="text-base font-bold text-neutral-900 mb-1">
-                                  {series.title}
-                                </h3>
-
-                                {/* Metadata */}
-                                <div className="flex gap-4 text-sm text-neutral-600">
-                                  <span className="flex items-center gap-1">
-                                    <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                                    {series.events_count || 0} {series.events_count === 1 ? 'Event' : 'Events'}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <GroupsIcon fontSize="small" className="text-teal-700" />
-                                    {series.registrations_count || 0} Registered
-                                  </span>
-                                </div>
+                                <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold shadow-sm">
+                                  SERIES
+                                </span>
+                                <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-slate-200 text-slate-900 px-3 py-1 text-xs font-semibold shadow-sm">
+                                  {series.status?.toUpperCase() || 'DRAFT'}
+                                </span>
                               </div>
 
-                              {/* Buttons */}
-                              <div className="flex gap-2 mt-3 pt-3 border-t border-neutral-100">
-                                <button
-                                  onClick={() => navigate(`/series/${series.slug}`)}
-                                  className="rounded-full bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
-                                >
-                                  View Series
-                                </button>
-                                <button
-                                  onClick={() => isSeriesRegistered ? handleSeriesCancelRegistration(series) : handleSeriesRegister(series.id)}
-                                  className={`rounded-full border-2 text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors ${
-                                    isSeriesRegistered
-                                      ? 'border-red-600 text-red-600 hover:bg-red-50'
-                                      : 'border-teal-600 text-teal-600 hover:bg-teal-50'
-                                  }`}
-                                >
-                                  {isSeriesRegistered ? 'Cancel Registration' : 'Register'}
-                                </button>
+                              {/* Details */}
+                              <div className="p-6 md:w-3/5 flex flex-col">
+                                <div className="min-w-0">
+                                  <h3 className="text-xl md:text-2xl font-semibold text-neutral-900 leading-snug">
+                                    {series.title}
+                                  </h3>
+                                  {series.description && (
+                                    <p className="mt-2 text-neutral-600 text-sm md:text-base leading-relaxed line-clamp-2">
+                                      {series.description}
+                                    </p>
+                                  )}
+
+                                  <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-neutral-800 text-sm">
+                                    <span className="inline-flex items-center gap-2">
+                                      <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                                      {series.events_count || 0} {series.events_count === 1 ? 'Event' : 'Events'}
+                                    </span>
+                                    <span className="inline-flex items-center gap-2">
+                                      <GroupsIcon fontSize="small" className="text-teal-700" />
+                                      {series.registrations_count || 0} Registered
+                                    </span>
+                                    <span className="inline-flex items-center gap-2 font-semibold text-teal-700">
+                                      {series.is_free ? 'Free to Join' : `$${series.price}`}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Buttons: registered users (incl. the auto-registered
+                                    creator/admin) see only "View Series"; everyone else
+                                    also sees "Register". Based on is_registered, never on
+                                    frontend admin role. */}
+                                <div className="mt-6 flex flex-wrap gap-3">
+                                  <button
+                                    onClick={() => navigate(`/series/${series.slug}`)}
+                                    className="rounded-full bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                                  >
+                                    View Series
+                                  </button>
+                                  {!isSeriesRegistered && (
+                                    <button
+                                      onClick={() => handleSeriesRegister(series.id)}
+                                      className="rounded-full border-2 border-teal-600 text-teal-600 hover:bg-teal-50 text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                                    >
+                                      Register
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>

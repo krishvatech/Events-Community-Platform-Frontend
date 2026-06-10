@@ -113,13 +113,22 @@ const EventSeriesDisplay = ({ event, onSeriesRegister }) => {
         boxShadow: 3,
       }
     }}>
-      {series.cover_image && (
+      {/*
+        Series card image: first available image among the series' events, in
+        series-added order (computed by the backend as card_image_url). No
+        separate series image or default placeholder is used. Keep the media
+        height constant; render an img only when a valid URL exists, otherwise
+        a blank media area (no broken-image icon, no banner).
+      */}
+      {series.card_image_url ? (
         <CardMedia
           component="img"
           height="200"
-          image={series.cover_image}
+          image={series.card_image_url}
           alt={series.title}
         />
+      ) : (
+        <Box sx={{ height: 200, bgcolor: 'grey.100' }} />
       )}
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ mb: 1 }}>

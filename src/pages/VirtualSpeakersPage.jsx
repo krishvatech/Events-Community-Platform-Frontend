@@ -298,6 +298,7 @@ const VirtualSpeakersPage = () => {
                         </IconButton>
                         <IconButton
                           size="small"
+                          color="error"
                           onClick={() => handleDeleteClick(speaker)}
                           title="Delete"
                         >
