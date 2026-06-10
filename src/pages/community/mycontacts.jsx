@@ -839,11 +839,14 @@ export default function MyContacts() {
     const [visitorsLoading, setVisitorsLoading] = useState(false);
 
     const [users, setUsers] = useState([]);
+    const [usersTotal, setUsersTotal] = useState(0);
+    const [sentRequestsTotal, setSentRequestsTotal] = useState(0);
+    const [receivedRequestsTotal, setReceivedRequestsTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [q, setQ] = useState("");
     const [page, setPage] = useState(1);
-    const ROWS_PER_PAGE = 10;
+    const ROWS_PER_PAGE = 5;
 
     const [globalOptions, setGlobalOptions] = useState({
         companies: [],
@@ -980,29 +983,112 @@ export default function MyContacts() {
         } catch { setToast({ open: true, msg: "Failed to decline request", type: "error" }); }
     }
 
+    // Load requests (Sent/Received) with server-side pagination and filters
     useEffect(() => {
-        if (tabIndex === 0) return;
+        setPage(1);
+        if (tabIndex === 0 || tabIndex === 3) return;
         const ctrl = new AbortController();
         (async () => {
             try {
                 setLoadingRequests(true);
                 const isSent = tabIndex === 1;
                 const endpoint = isSent ? 'outgoing' : 'incoming';
-                const res = await fetch(`${API_BASE}/friend-requests/?type=${endpoint}&status=pending`, {
+
+                const params = new URLSearchParams();
+                params.append('type', endpoint);
+                params.append('status', 'pending');
+                if (q && q.trim()) {
+                    params.append('search', q.trim());
+                }
+                selectedCompanies.forEach(c => params.append('company', c));
+                selectedCountries.forEach(c => params.append('country', c));
+                selectedTitles.forEach(t => params.append('job_title', t));
+                selectedIndustries.forEach(i => params.append('industry', i));
+                selectedCompanySizes.forEach(s => params.append('company_size', s));
+                params.append('page', 1);
+                params.append('page_size', ROWS_PER_PAGE);
+
+                const res = await fetch(`${API_BASE}/friend-requests/?${params.toString()}`, {
                     headers: tokenHeader(),
                     signal: ctrl.signal,
                     credentials: "include",
                 });
-                const json = await res.json().catch(() => []);
-                const list = Array.isArray(json) ? json : json?.results ?? [];
-                if (isSent) setSentRequests(list);
-                else setReceivedRequests(list);
+                const json = await res.json().catch(() => ({}));
+                let list = [];
+                let total = 0;
+                if (Array.isArray(json)) {
+                    list = json;
+                    total = json.length;
+                } else if (json?.results && Array.isArray(json.results)) {
+                    list = json.results;
+                    total = json.count || 0;
+                }
+                if (isSent) {
+                    setSentRequests(list);
+                    setSentRequestsTotal(total);
+                } else {
+                    setReceivedRequests(list);
+                    setReceivedRequestsTotal(total);
+                }
             } catch (e) {
                 if (e.name !== "AbortError") console.error(e);
             } finally { setLoadingRequests(false); }
         })();
         return () => ctrl.abort();
-    }, [tabIndex, me?.id]);
+    }, [tabIndex, me?.id, q, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]);
+
+    // Load paginated requests when page changes (Sent/Received)
+    useEffect(() => {
+        if (tabIndex === 0 || tabIndex === 3 || page === 1) return;
+        const ctrl = new AbortController();
+        (async () => {
+            try {
+                setLoadingRequests(true);
+                const isSent = tabIndex === 1;
+                const endpoint = isSent ? 'outgoing' : 'incoming';
+
+                const params = new URLSearchParams();
+                params.append('type', endpoint);
+                params.append('status', 'pending');
+                if (q && q.trim()) {
+                    params.append('search', q.trim());
+                }
+                selectedCompanies.forEach(c => params.append('company', c));
+                selectedCountries.forEach(c => params.append('country', c));
+                selectedTitles.forEach(t => params.append('job_title', t));
+                selectedIndustries.forEach(i => params.append('industry', i));
+                selectedCompanySizes.forEach(s => params.append('company_size', s));
+                params.append('page', page);
+                params.append('page_size', ROWS_PER_PAGE);
+
+                const res = await fetch(`${API_BASE}/friend-requests/?${params.toString()}`, {
+                    headers: tokenHeader(),
+                    signal: ctrl.signal,
+                    credentials: "include",
+                });
+                const json = await res.json().catch(() => ({}));
+                let list = [];
+                let total = 0;
+                if (Array.isArray(json)) {
+                    list = json;
+                    total = json.length;
+                } else if (json?.results && Array.isArray(json.results)) {
+                    list = json.results;
+                    total = json.count || 0;
+                }
+                if (isSent) {
+                    setSentRequests(list);
+                    setSentRequestsTotal(total);
+                } else {
+                    setReceivedRequests(list);
+                    setReceivedRequestsTotal(total);
+                }
+            } catch (e) {
+                if (e.name !== "AbortError") console.error(e);
+            } finally { setLoadingRequests(false); }
+        })();
+        return () => ctrl.abort();
+    }, [page, tabIndex, me?.id, q, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]);
 
     // Load Filter Options
     useEffect(() => {
@@ -1031,19 +1117,50 @@ export default function MyContacts() {
         })();
     }, []);
 
-    // Load Users (contacts only)
+    // Load Users (contacts only) - server-side pagination with filters
     useEffect(() => {
+        if (tabIndex !== 0) return;
         const ctrl = new AbortController();
         (async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`${API_BASE}/users/roster/`, {
+                setError("");
+
+                const params = new URLSearchParams();
+                if (q && q.trim()) {
+                    params.append('search', q.trim());
+                }
+                // Add filters to backend request
+                selectedCompanies.forEach(c => params.append('company', c));
+                selectedCountries.forEach(c => params.append('country', c));
+                selectedTitles.forEach(t => params.append('job_title', t));
+                selectedIndustries.forEach(i => params.append('industry', i));
+                selectedCompanySizes.forEach(s => params.append('company_size', s));
+                // Load without pagination to filter on frontend
+                params.append('page_size', 1000);
+
+                const url = `${API_BASE}/users/roster/?${params.toString()}`;
+
+                const res = await fetch(url, {
                     headers: tokenHeader(),
                     signal: ctrl.signal,
                     credentials: "include",
                 });
-                const json = await res.json().catch(() => []);
-                const list = Array.isArray(json) ? json : json?.results ?? [];
+
+                const json = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    throw new Error(json?.detail || `HTTP ${res.status} while fetching users`);
+                }
+
+                let list = [];
+
+                if (json && typeof json === 'object' && 'results' in json) {
+                    list = json.results || [];
+                } else if (Array.isArray(json)) {
+                    list = json;
+                }
+
                 setUsers((list || []).filter((u) => !u.is_superuser));
             } catch (e) {
                 if (e.name !== "AbortError") {
@@ -1053,7 +1170,7 @@ export default function MyContacts() {
             } finally { setLoading(false); }
         })();
         return () => ctrl.abort();
-    }, [me?.id]);
+    }, [q, page, ROWS_PER_PAGE, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes, me?.id, tabIndex]);
 
     // Bulk Load Friend Status
     useEffect(() => {
@@ -1073,36 +1190,22 @@ export default function MyContacts() {
         return () => { alive = false; };
     }, [users, friendStatusByUser]);
 
-    const filtered = useMemo(() => {
-        // Only friends
-        let sourceList = users.filter((u) => (friendStatusByUser[u.id] || "").toLowerCase() === "friends");
+    // Filter to only friends on client-side
+    const allDisplayedUsers = useMemo(() => {
+        return users.filter((u) => (friendStatusByUser[u.id] || "").toLowerCase() === "friends");
+    }, [users, friendStatusByUser]);
 
-        if (selectedCompanies.length) sourceList = sourceList.filter((u) => selectedCompanies.includes(getCompanyFromUser(u)));
-        if (selectedCountries.length) sourceList = sourceList.filter((u) => selectedCountries.includes(getCountryFromUser(u)));
-        if (selectedTitles.length) sourceList = sourceList.filter((u) => selectedTitles.includes(getJobTitleFromUser(u)));
-        if (selectedIndustries.length) sourceList = sourceList.filter((u) => selectedIndustries.includes(getIndustryFromUser(u)));
-        if (selectedCompanySizes.length) sourceList = sourceList.filter((u) => selectedCompanySizes.includes(getCompanySizeFromUser(u)));
+    // Paginate the filtered friends
+    const displayedUsers = useMemo(() => {
+        const start = (page - 1) * ROWS_PER_PAGE;
+        return allDisplayedUsers.slice(start, start + ROWS_PER_PAGE);
+    }, [allDisplayedUsers, page, ROWS_PER_PAGE]);
 
-        const s = (q || "").toLowerCase().trim();
-        if (!s) return sourceList;
-
-        return sourceList.filter((u) => {
-            const fn = (u.first_name || "").toLowerCase();
-            const ln = (u.last_name || "").toLowerCase();
-            const em = (u.email || "").toLowerCase();
-            const full = (u.profile?.full_name || "").toLowerCase();
-            const company = (u.company_from_experience || "").toLowerCase();
-            const title = getJobTitleFromUser(u).toLowerCase();
-            const country = getCountryFromUser(u).toLowerCase();
-            const industry = getIndustryFromUser(u).toLowerCase();
-            const haystack = [fn, ln, full, em, company, title, country, industry];
-            return haystack.some((v) => v && v.includes(s));
-        });
-    }, [users, q, friendStatusByUser, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]);
+    const totalContacts = allDisplayedUsers.length;
 
     const cityKeyEntries = useMemo(() => {
         const map = new Map();
-        for (const u of filtered) {
+        for (const u of allDisplayedUsers) {
             const city = resolveCityName(u);
             if (!city) continue;
             const code = resolveCountryCode(u);
@@ -1110,7 +1213,7 @@ export default function MyContacts() {
             if (!map.has(key)) map.set(key, { city, countryCode: code });
         }
         return Array.from(map.entries()).map(([key, val]) => ({ key, ...val }));
-    }, [filtered]);
+    }, [allDisplayedUsers]);
 
     useEffect(() => {
         let alive = true;
@@ -1183,7 +1286,7 @@ export default function MyContacts() {
 
     const liveMarkers = useMemo(() => {
         const byCity = {};
-        for (const u of filtered) {
+        for (const u of allDisplayedUsers) {
             const code = resolveCountryCode(u).toLowerCase();
             const city = resolveCityName(u);
             const key = city
@@ -1226,11 +1329,11 @@ export default function MyContacts() {
             });
         });
         return out;
-    }, [filtered, cityCenters, getCenterForISO2]);
+    }, [allDisplayedUsers, cityCenters, getCenterForISO2]);
 
     const countryAgg = useMemo(() => {
         const map = {};
-        for (const u of filtered) {
+        for (const u of allDisplayedUsers) {
             const code = resolveCountryCode(u).toLowerCase();
             const center = getCenterForISO2(code);
             if (!center) continue;
@@ -1248,14 +1351,10 @@ export default function MyContacts() {
             if (isFriend) map[code].friends += 1;
         }
         return Object.values(map).map((e) => ({ ...e, total: e.users.length }));
-    }, [filtered]);
+    }, [allDisplayedUsers, getCenterForISO2]);
 
     const markers = liveMarkers;
     const hasSideMap = true;
-
-    const pageCount = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
-    const startIdx = (page - 1) * ROWS_PER_PAGE;
-    const current = filtered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
 
     const handleOpenProfile = (m) => {
         if (me?.id && String(me.id) === String(m.id)) navigate("/account/profile");
@@ -1300,7 +1399,7 @@ export default function MyContacts() {
                                     sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
                                 >
                                     <Tabs value={tabIndex} onChange={(e, v) => setTabIndex(v)} variant="scrollable" scrollButtons="auto">
-                                        <Tab label={`My Contacts ${tabIndex === 0 ? `(${filtered.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
+                                        <Tab label={`My Contacts ${tabIndex === 0 ? `(Page ${page})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
                                         <Tab label={`Requests Sent ${tabIndex === 1 && sentRequests.length ? `(${sentRequests.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
                                         <Tab label={`Requests Received ${tabIndex === 2 && receivedRequests.length ? `(${receivedRequests.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
                                         {viewerIsStaff && (
@@ -1495,7 +1594,7 @@ export default function MyContacts() {
                             <Stack spacing={1.5}>
                                 {tabIndex === 0 && (
                                     <>
-                                        {current.map((u) => (
+                                        {displayedUsers.map((u) => (
                                             <MemberCard
                                                 key={u.id}
                                                 u={u}
@@ -1507,17 +1606,23 @@ export default function MyContacts() {
                                                 viewerIsStaff={viewerIsStaff}
                                             />
                                         ))}
-                                        {filtered.length === 0 && (
+                                        {displayedUsers.length === 0 && (
                                             <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                                                No contacts found matching your filters.
+                                                {page === 1 ? "No contacts found." : "No more contacts."}
                                             </Typography>
                                         )}
-                                        {filtered.length > 0 && (
+                                        {totalContacts > 0 && (
                                             <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} sx={{ mt: 2 }}>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    Showing {filtered.length === 0 ? "0" : `${startIdx + 1}–${Math.min(startIdx + ROWS_PER_PAGE, filtered.length)} of ${filtered.length}`}
+                                                    Showing {displayedUsers.length === 0 ? "0" : `${(page - 1) * ROWS_PER_PAGE + 1}–${Math.min(page * ROWS_PER_PAGE, totalContacts)} of ${totalContacts}`}
                                                 </Typography>
-                                                <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" size="small" />
+                                                <Pagination
+                                                    count={Math.max(1, Math.ceil(totalContacts / ROWS_PER_PAGE))}
+                                                    page={page}
+                                                    onChange={(_, p) => setPage(p)}
+                                                    color="primary"
+                                                    size="small"
+                                                />
                                             </Stack>
                                         )}
                                     </>
@@ -1535,8 +1640,22 @@ export default function MyContacts() {
                                         ))}
                                         {sentRequests.length === 0 && (
                                             <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                                                No sent requests pending.
+                                                {page === 1 ? "No sent requests pending." : "No more requests."}
                                             </Typography>
+                                        )}
+                                        {sentRequestsTotal > 0 && (
+                                            <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} sx={{ mt: 2 }}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Showing {sentRequests.length === 0 ? "0" : `${(page - 1) * ROWS_PER_PAGE + 1}–${Math.min(page * ROWS_PER_PAGE, sentRequestsTotal)} of ${sentRequestsTotal}`}
+                                                </Typography>
+                                                <Pagination
+                                                    count={Math.max(1, Math.ceil(sentRequestsTotal / ROWS_PER_PAGE))}
+                                                    page={page}
+                                                    onChange={(_, p) => setPage(p)}
+                                                    color="primary"
+                                                    size="small"
+                                                />
+                                            </Stack>
                                         )}
                                     </>
                                 )}
@@ -1553,8 +1672,22 @@ export default function MyContacts() {
                                         ))}
                                         {receivedRequests.length === 0 && (
                                             <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                                                No pending requests received.
+                                                {page === 1 ? "No pending requests received." : "No more requests."}
                                             </Typography>
+                                        )}
+                                        {receivedRequestsTotal > 0 && (
+                                            <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} sx={{ mt: 2 }}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    Showing {receivedRequests.length === 0 ? "0" : `${(page - 1) * ROWS_PER_PAGE + 1}–${Math.min(page * ROWS_PER_PAGE, receivedRequestsTotal)} of ${receivedRequestsTotal}`}
+                                                </Typography>
+                                                <Pagination
+                                                    count={Math.max(1, Math.ceil(receivedRequestsTotal / ROWS_PER_PAGE))}
+                                                    page={page}
+                                                    onChange={(_, p) => setPage(p)}
+                                                    color="primary"
+                                                    size="small"
+                                                />
+                                            </Stack>
                                         )}
                                     </>
                                 )}
