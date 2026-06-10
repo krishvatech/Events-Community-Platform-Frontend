@@ -131,6 +131,12 @@ export default function AdminRecordingDetailsPage() {
 
     const [event, setEvent] = useState(null);
     const [registrations, setRegistrations] = useState([]);
+    const [registrationStats, setRegistrationStats] = useState({
+        total: 0,
+        joined_live: 0,
+        watched_replay: 0,
+        did_not_attend: 0,
+    });
     const [loading, setLoading] = useState(true);
     const [listLoading, setListLoading] = useState(false);
     const [error, setError] = useState("");
@@ -255,16 +261,19 @@ export default function AdminRecordingDetailsPage() {
 
                 let regData = [];
                 let totalCount = 0;
+                let statsData = null;
 
                 if (resReg.ok) {
                     const json = await resReg.json();
                     if (json.results) {
                         regData = json.results;
                         totalCount = json.count;
+                        statsData = json.stats;
                     } else {
                         // fallback if not paginated structure
                         regData = Array.isArray(json) ? json : [];
                         totalCount = regData.length;
+                        statsData = json.stats;
                     }
                 } else {
                     console.warn("Could not load registrations or permission denied");
@@ -280,6 +289,15 @@ export default function AdminRecordingDetailsPage() {
                     // Filtering is only done in Replay Notifications section
                     setRegistrations(regData);
                     setTotalPages(Math.ceil(totalCount / PER_PAGE));
+                    // Update full event stats from backend
+                    if (statsData) {
+                        setRegistrationStats({
+                            total: statsData.total || 0,
+                            joined_live: statsData.joined_live || 0,
+                            watched_replay: statsData.watched_replay || 0,
+                            did_not_attend: statsData.did_not_attend || 0,
+                        });
+                    }
                 }
             } catch (err) {
                 if (alive) setError(err.message);
@@ -629,14 +647,6 @@ export default function AdminRecordingDetailsPage() {
     }, [allRegistrations, notificationAttendanceFilter]);
 
 
-    const stats = useMemo(() => {
-        return {
-            total: registrations.length,
-            joinedLive: registrations.filter((r) => r.joined_live).length,
-            watchedReplay: registrations.filter((r) => r.watched_replay).length,
-            didNotAttend: registrations.filter((r) => !r.joined_live && !r.watched_replay).length,
-        };
-    }, [registrations]);
 
     const hasRec = !!event?.recording_url;
     const recordingSrc = hasRec
@@ -1166,19 +1176,19 @@ export default function AdminRecordingDetailsPage() {
                     <Box className="flex gap-4 mb-6">
                         {/* Stats Cards */}
                         <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
-                            <Typography variant="h4" color="primary" className="font-bold">{stats.total}</Typography>
+                            <Typography variant="h4" color="primary" className="font-bold">{registrationStats.total}</Typography>
                             <Typography variant="body2" color="text.secondary">Total Registrations</Typography>
                         </Paper>
                         <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
-                            <Typography variant="h4" className="font-bold text-green-600">{stats.joinedLive}</Typography>
+                            <Typography variant="h4" className="font-bold text-green-600">{registrationStats.joined_live}</Typography>
                             <Typography variant="body2" color="text.secondary">Joined Live</Typography>
                         </Paper>
                         <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
-                            <Typography variant="h4" className="font-bold text-blue-600">{stats.watchedReplay}</Typography>
+                            <Typography variant="h4" className="font-bold text-blue-600">{registrationStats.watched_replay}</Typography>
                             <Typography variant="body2" color="text.secondary">Watched Replay</Typography>
                         </Paper>
                         <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
-                            <Typography variant="h4" className="font-bold text-slate-500">{stats.didNotAttend}</Typography>
+                            <Typography variant="h4" className="font-bold text-slate-500">{registrationStats.did_not_attend}</Typography>
                             <Typography variant="body2" color="text.secondary">Did Not Attend</Typography>
                         </Paper>
                     </Box>
