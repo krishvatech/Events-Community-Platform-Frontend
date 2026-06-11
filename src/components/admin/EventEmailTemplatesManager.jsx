@@ -592,6 +592,10 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                 key={`${selected.template_key}-${editorRevision}`}
                 ref={editorRef}
                 template={selected}
+                editorContext={{
+                  template_key: selected?.template_key,
+                  is_multi_day: event?.is_multi_day,
+                }}
                 onReady={(content) => setEditorContent(content)}
                 onContentChange={(content) => setEditorContent(content)}
               />

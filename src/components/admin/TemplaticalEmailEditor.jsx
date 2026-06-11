@@ -422,15 +422,45 @@ const createLegacyHtmlContent = (template) => ({
   },
 });
 
-const stripDjangoBlocks = (html = "") =>
-  String(html)
+const parseBoolean = (value) => {
+  if (value === true || value === false) return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
+};
+
+const resolveKnownDjangoBlocksForEditor = (html = "", editorContext = {}) => {
+  let output = String(html || "");
+  const isMultiDay = parseBoolean(editorContext?.is_multi_day);
+  const templateKey = editorContext?.template_key || editorContext?.templateKey || "";
+
+  // The visual editor cannot preserve Django control blocks. Because this editor
+  // customizes a template for one event, resolve the known multi-day/single-day
+  // branch before removing Django tags. This keeps the saved HTML identical to
+  // what the recipient preview shows for that event.
+  //
+  // Keep this limited to the event reminder template so other templates with
+  // nested Django conditions are not changed by this parser.
+  if (templateKey === "event_starting_soon" && typeof isMultiDay === "boolean") {
+    output = output.replace(
+      /{%\s*if\s+is_multi_day\s*%}([\s\S]*?)(?:{%\s*else\s*%}([\s\S]*?))?{%\s*endif\s*%}/g,
+      (_match, multiDayContent = "", singleDayContent = "") =>
+        isMultiDay ? multiDayContent : singleDayContent
+    );
+  }
+
+  return output;
+};
+
+const stripDjangoBlocks = (html = "", editorContext = {}) =>
+  resolveKnownDjangoBlocksForEditor(html, editorContext)
     .replace(/{#.*?#}/gs, "")
     .replace(/{%\s*(?:if|elif|else|endif|for|endfor|with|endwith|block|endblock|extends|include)[^%]*%}/g, "");
 
-const extractBodyMarkup = (html = "") => {
-  if (typeof DOMParser === "undefined") return stripDjangoBlocks(html);
+const extractBodyMarkup = (html = "", editorContext = {}) => {
+  if (typeof DOMParser === "undefined") return stripDjangoBlocks(html, editorContext);
 
-  const cleaned = stripDjangoBlocks(html);
+  const cleaned = stripDjangoBlocks(html, editorContext);
   const parsed = new DOMParser().parseFromString(cleaned, "text/html");
   const body = parsed.body;
   const outerContainer = Array.from(body.children).find((child) => child.tagName?.toLowerCase() === "div");
@@ -438,10 +468,10 @@ const extractBodyMarkup = (html = "") => {
   return outerContainer?.innerHTML || body.innerHTML || cleaned;
 };
 
-const createHtmlDerivedVisualContent = (template) => {
+const createHtmlDerivedVisualContent = (template, editorContext = {}) => {
   if (!template?.html_body || typeof DOMParser === "undefined") return null;
 
-  const markup = extractBodyMarkup(template.html_body);
+  const markup = extractBodyMarkup(template.html_body, editorContext);
   const parsed = new DOMParser().parseFromString(`<div>${markup}</div>`, "text/html");
   const root = parsed.body.firstElementChild;
   const blocks = [];
@@ -493,7 +523,7 @@ const createHtmlDerivedVisualContent = (template) => {
   };
 };
 
-const getInitialContent = (template) => {
+const getInitialContent = (template, editorContext = {}) => {
   if (template?.editor_json) {
     const savedTemplateKey = template.editor_json?.settings?.templaticalTemplateKey;
     const starterVersion = template.editor_json?.settings?.templaticalStarterVersion || 0;
@@ -512,7 +542,7 @@ const getInitialContent = (template) => {
       return template.editor_json;
     }
   }
-  const htmlDerived = createHtmlDerivedVisualContent(template);
+  const htmlDerived = createHtmlDerivedVisualContent(template, editorContext);
   if (htmlDerived) return htmlDerived;
   if (template?.merge_tags?.length) return createStarterVisualContent(template);
   if (template?.html_body || template?.text_body) return createLegacyHtmlContent(template);
@@ -528,7 +558,7 @@ const normalizeMergeTags = (template) => ({
 });
 
 const TemplaticalEmailEditor = forwardRef(function TemplaticalEmailEditor(
-  { template, onContentChange, onReady },
+  { template, editorContext = {}, onContentChange, onReady },
   ref
 ) {
   const containerRef = useRef(null);
@@ -559,7 +589,7 @@ const TemplaticalEmailEditor = forwardRef(function TemplaticalEmailEditor(
         readyRef.current = false;
         const editor = await init({
           container: containerRef.current,
-          content: getInitialContent(template),
+          content: getInitialContent(template, editorContext),
           mergeTags: normalizeMergeTags(template),
           branding: false,
           uiTheme: "light",
@@ -596,7 +626,7 @@ const TemplaticalEmailEditor = forwardRef(function TemplaticalEmailEditor(
         editorRef.current = null;
       }
     };
-  }, [template?.template_key]);
+  }, [template?.template_key, editorContext?.is_multi_day]);
 
   return (
     <Box sx={{ position: "relative" }}>
