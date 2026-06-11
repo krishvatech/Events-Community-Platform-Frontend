@@ -2578,7 +2578,7 @@ export default function NewLiveMeeting() {
 
       try {
         const headers = { accept: "application/json", ...authHeader() };
-        const res = await fetch(`${API_ROOT}/events/${eventId}/participants-lite/`, { headers });
+        const res = await fetch(`${API_ROOT}/events/${eventId}/participants-lite/?cursor=1&limit=100`, { headers });
 
         if (res.status === 404) {
           participantsLiteNotFoundRef.current = true;
@@ -2593,11 +2593,12 @@ export default function NewLiveMeeting() {
           return;
         }
 
-        const participants = await res.json();
+        const payload = await res.json();
         if (!alive) return;
 
+        const participants = Array.isArray(payload) ? payload : (payload.results || []);
         const newCache = {};
-        (Array.isArray(participants) ? participants : []).forEach((p) => {
+        participants.forEach((p) => {
           if (p?.id) {
             newCache[p.id] = p.kyc_status || "";
           }
@@ -10291,7 +10292,7 @@ export default function NewLiveMeeting() {
       if (lastQnASyncTimeRef.current && eventId) {
         try {
           const url = toApiUrl(
-            `interactions/questions/?event_id=${eventId}&updated_after=${lastQnASyncTimeRef.current}`
+            `interactions/questions/?event_id=${eventId}&updated_after=${encodeURIComponent(lastQnASyncTimeRef.current)}&cursor=1&limit=50&sort=newest`
           );
           const res = await fetch(url, { headers: authHeader() });
           if (res.ok) {
@@ -15311,6 +15312,7 @@ export default function NewLiveMeeting() {
       oldestId: payload?.oldest_id ?? rows[0]?.id ?? null,
       newestId: payload?.newest_id ?? rows[rows.length - 1]?.id ?? null,
       nextBeforeId: payload?.next_before_id ?? payload?.oldest_id ?? rows[0]?.id ?? null,
+      nextOffset: payload?.next_offset ?? null,
     };
   }, []);
 
@@ -16741,6 +16743,7 @@ export default function NewLiveMeeting() {
   const [qnaError, setQnaError] = useState("");
   const qnaListRef = useRef(null);
   const [qnaHasOlder, setQnaHasOlder] = useState(false);
+  const [qnaNextOffset, setQnaNextOffset] = useState(null);
   const [qnaLoadingOlder, setQnaLoadingOlder] = useState(false);
   const qnaOlderInFlightRef = useRef(false);
 
@@ -16808,7 +16811,7 @@ export default function NewLiveMeeting() {
   const [qnaAnonymousModeEnabled, setQnaAnonymousModeEnabled] = useState(false);
   const [isAnonymousQuestion, setIsAnonymousQuestion] = useState(false);
   const [userQnaAnonymousDefault, setUserQnaAnonymousDefault] = useState(false);
-  const [qnaSortMode, setQnaSortMode] = useState("newest");
+  const [qnaSortMode, setQnaSortMode] = useState("hot");
   const [qnaReordering, setQnaReordering] = useState(false);
   const [qnaLinkPreviewCache, setQnaLinkPreviewCache] = useState({});
   const [pendingQuestions, setPendingQuestions] = useState([]);
@@ -16863,6 +16866,9 @@ export default function NewLiveMeeting() {
       speaker_note: q.speaker_note || "",
       answer_text: q.answer_text || null,
       answered_phase: q.answered_phase || null,
+      upvote_count: q.upvote_count ?? 0,
+      user_upvoted: Boolean(q.user_upvoted),
+      upvoters: q.upvoters ?? [],
       replies: q.replies ?? [],
       reply_count: q.reply_count ?? 0,
     }))
@@ -16871,30 +16877,23 @@ export default function NewLiveMeeting() {
   const loadQuestions = useCallback(async (opts = {}) => {
     if (!eventId || !hasLiveInteractiveAccess) return [];
 
-    const { silent = false, beforeId = null } = opts;
+    const { silent = false, append = false, offset = 0 } = opts;
 
-    if (!silent && !beforeId) setQnaLoading(true);
+    if (!silent && !append) setQnaLoading(true);
     setQnaError("");
 
     try {
       const params = new URLSearchParams({
         event_id: String(eventId),
-        sort: "newest",
+        sort: qnaSortMode || "hot",
         cursor: "1",
         limit: String(LIVE_QNA_PAGE_SIZE),
+        offset: String(Math.max(0, Number(offset) || 0)),
       });
 
       if (activeTableId) {
         params.set("lounge_table_id", String(activeTableId));
       }
-
-      if (beforeId) {
-        params.set("before_id", String(beforeId));
-      }
-
-      const listEl = qnaListRef.current;
-      const previousScrollHeight = beforeId && listEl ? listEl.scrollHeight : 0;
-      const previousScrollTop = beforeId && listEl ? listEl.scrollTop : 0;
 
       const res = await fetch(toApiUrl(`interactions/questions/?${params.toString()}`), {
         headers: { "Content-Type": "application/json", ...authHeader() },
@@ -16903,30 +16902,26 @@ export default function NewLiveMeeting() {
       if (!res.ok) throw new Error("Failed to load questions.");
 
       const payload = await res.json();
-      const { rows, hasMore } = normalizeCursorResponse(payload);
+      const { rows, hasMore, nextOffset } = normalizeCursorResponse(payload);
       const mapped = mapQnaRows(rows);
 
-      if (beforeId) {
+      if (append) {
         setQuestions((prev) => mergeById(prev, mapped));
-
-        requestAnimationFrame(() => {
-          const currentEl = qnaListRef.current;
-          if (currentEl) {
-            currentEl.scrollTop =
-              currentEl.scrollHeight - previousScrollHeight + previousScrollTop;
-          }
-        });
       } else {
         setQuestions(mapped);
+        requestAnimationFrame(() => {
+          if (qnaListRef.current) qnaListRef.current.scrollTop = 0;
+        });
       }
 
       setQnaHasOlder(hasMore);
+      setQnaNextOffset(hasMore ? (nextOffset ?? ((Number(offset) || 0) + mapped.length)) : null);
       return mapped;
     } catch (e) {
       setQnaError(e.message || "Failed to load questions.");
       return [];
     } finally {
-      if (!silent && !beforeId) setQnaLoading(false);
+      if (!silent && !append) setQnaLoading(false);
     }
   }, [
     activeTableId,
@@ -16935,30 +16930,32 @@ export default function NewLiveMeeting() {
     mapQnaRows,
     mergeById,
     normalizeCursorResponse,
+    qnaSortMode,
   ]);
 
   const loadOlderQuestions = useCallback(async () => {
     if (!qnaHasOlder || qnaLoadingOlder || qnaOlderInFlightRef.current) return;
 
-    const oldestId = questions[questions.length - 1]?.id;
-    if (!oldestId) return;
+    const nextOffset = qnaNextOffset ?? questions.length;
+    if (nextOffset == null) return;
 
     qnaOlderInFlightRef.current = true;
     setQnaLoadingOlder(true);
 
     try {
-      await loadQuestions({ silent: true, beforeId: oldestId });
+      await loadQuestions({ silent: true, append: true, offset: nextOffset });
     } finally {
       qnaOlderInFlightRef.current = false;
       setQnaLoadingOlder(false);
     }
-  }, [loadQuestions, qnaHasOlder, qnaLoadingOlder, questions]);
+  }, [loadQuestions, qnaHasOlder, qnaLoadingOlder, qnaNextOffset, questions.length]);
 
   const handleQnaScroll = useCallback(() => {
     const el = qnaListRef.current;
     if (!el) return;
 
-    if (el.scrollTop <= 80) {
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom <= 160) {
       loadOlderQuestions();
     }
   }, [loadOlderQuestions]);
@@ -17047,12 +17044,16 @@ export default function NewLiveMeeting() {
         }
 
         if (msg.type === "qna.upvote") {
+          const myId = String(myUserIdRef.current || "");
+          const actorId = String(msg.user_id ?? "");
+          const isMe = myId && actorId && actorId === myId;
           setQuestions((prev) =>
-            prev.map((q) =>
-              q.id === msg.question_id
-                ? { ...q, upvote_count: msg.upvote_count, upvoters: msg.upvoters ?? q.upvoters }
-                : q
-            )
+            prev.map((q) => {
+              if (q.id !== msg.question_id) return q;
+              const updated = { ...q, upvote_count: msg.upvote_count, upvoters: msg.upvoters ?? q.upvoters };
+              if (isMe) updated.user_upvoted = msg.upvoted;
+              return updated;
+            })
           );
           // Also update aggregated vote count for any group containing this question
           setGroups(prev => prev.map(g => {
@@ -21276,19 +21277,6 @@ export default function NewLiveMeeting() {
                   onScroll={handleQnaScroll}
                   sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}
                 >
-                  {(qnaHasOlder || qnaLoadingOlder) && (
-                    <Box sx={{ mb: 1.5, textAlign: "center" }}>
-                      <Button
-                        size="small"
-                        variant="text"
-                        disabled={qnaLoadingOlder}
-                        onClick={loadOlderQuestions}
-                        sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
-                      >
-                        {qnaLoadingOlder ? "Loading older questions…" : "Load older questions"}
-                      </Button>
-                    </Box>
-                  )}
                   {qnaError && (
                     <Typography color="error" sx={{ mb: 1 }}>
                       {qnaError}
@@ -22550,18 +22538,37 @@ export default function NewLiveMeeting() {
 
                           if (qToGroup[q.id]) {
                             const gId = qToGroup[q.id].id;
-                            if (!renderedGroups[gId]) renderedGroups[gId] = { group: qToGroup[q.id], nodes: [], questions: [] };
+                            if (!renderedGroups[gId]) {
+                              renderedGroups[gId] = { group: qToGroup[q.id], nodes: [], questions: [], firstSortIndex: idx };
+                            }
                             renderedGroups[gId].nodes.push(node);
                             renderedGroups[gId].questions.push(q);
                           } else {
-                            ungroupedNodes.push(node);
+                            ungroupedNodes.push({ node, firstSortIndex: idx });
                           }
                         });
 
+                        const orderedRenderedEntries = [
+                          ...Object.values(renderedGroups).map((rg) => ({
+                            type: "group",
+                            key: `group_${rg.group.id}`,
+                            firstSortIndex: rg.firstSortIndex ?? 0,
+                            rg,
+                          })),
+                          ...ungroupedNodes.map((entry) => ({
+                            type: "question",
+                            key: `question_${entry?.node?.key || entry.firstSortIndex}`,
+                            firstSortIndex: entry.firstSortIndex ?? 0,
+                            node: entry.node,
+                          })),
+                        ].sort((a, b) => a.firstSortIndex - b.firstSortIndex);
+
                         return (
                           <>
-                            {Object.values(renderedGroups).map(rg => (
-                              (() => {
+                            {orderedRenderedEntries.map((entry) => {
+                              if (entry.type === "question") return entry.node;
+                              const rg = entry.rg;
+                              return (() => {
                                 const groupedQuestions = (rg.group.memberships || [])
                                   .map((membership) => questionById.get(membership.question))
                                   .filter(Boolean);
@@ -22730,17 +22737,18 @@ export default function NewLiveMeeting() {
                                     </Collapse>
                                   </Paper>
                                 );
-                              })()
-                            ))}
-
-                            {ungroupedNodes.length > 0 && Object.values(renderedGroups).length > 0 && (
-                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1, mt: 2 }}>Other Questions</Typography>
-                            )}
-                            {ungroupedNodes.map(n => n)}
+                              })();
+                            })}
                           </>
                         );
                       })()}
                     </Stack>
+                  )}
+
+                  {qnaLoadingOlder && (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 1.5 }}>
+                      <CircularProgress size={18} />
+                    </Box>
                   )}
                 </Box>
 

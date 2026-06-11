@@ -82,7 +82,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
     try {
       const [preRes, allRes, postAnsRes, postUnansweredRes] = await Promise.all([
         fetch(`${API_ROOT}/interactions/questions/admin-pre-event/?event_id=${event.id}`, { headers: authHeaders }),
-        fetch(`${API_ROOT}/interactions/questions/?event_id=${event.id}`, { headers: authHeaders }),
+        fetch(`${API_ROOT}/interactions/questions/?event_id=${event.id}&cursor=1&limit=200&sort=newest`, { headers: authHeaders }),
         fetch(`${API_ROOT}/interactions/questions/post_event_answered/?event_id=${event.id}`, { headers: authHeaders }),
         fetch(`${API_ROOT}/interactions/questions/unanswered/?event_id=${event.id}`, { headers: authHeaders }),
       ]);
@@ -92,7 +92,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
       const postAnsData = postAnsRes.ok ? await postAnsRes.json() : [];
       const postUnansweredData = postUnansweredRes.ok ? await postUnansweredRes.json() : [];
       setQuestions(Array.isArray(preData) ? preData : []);
-      setAllQuestions(Array.isArray(allData) ? allData : []);
+      setAllQuestions(normalizeList(allData));
       setPostEventAnswered(normalizeList(postAnsData));
       setUnansweredPostEventQuestions(normalizeList(postUnansweredData));
     } catch (e) {

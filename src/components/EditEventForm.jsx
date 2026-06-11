@@ -728,12 +728,12 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setSeedLoading(true);
         try {
             const res = await fetch(
-                `${API_ROOT}/interactions/questions/?event_id=${event.id}&is_seed=1`,
+                `${API_ROOT}/interactions/questions/?event_id=${event.id}&is_seed=1&cursor=1&limit=50&sort=manual`,
                 { headers: seedHeaders() }
             );
             if (!res.ok) return;
             const data = await res.json();
-            setSeedQuestions(Array.isArray(data) ? data : []);
+            setSeedQuestions(Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : []));
         } catch (e) {
             // silently fail; seed section just stays empty
         } finally {
