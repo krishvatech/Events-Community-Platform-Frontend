@@ -8017,12 +8017,15 @@ export default function EventManagePage() {
       setPostEventQnaQuestions(withUpvotes);
 
       const resAll = await fetch(
-        `${API_ROOT}/interactions/questions/?event_id=${event.id}`,
+        `${API_ROOT}/interactions/questions/?event_id=${event.id}&cursor=1&limit=200&sort=newest`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (resAll.ok) {
         const allQuestions = await resAll.json();
-        const answeredWithText = (Array.isArray(allQuestions) ? allQuestions : [])
+        const allQuestionRows = Array.isArray(allQuestions)
+          ? allQuestions
+          : (Array.isArray(allQuestions?.results) ? allQuestions.results : []);
+        const answeredWithText = allQuestionRows
           .filter((q) => q.is_answered && (q.answer_text || "").trim().length > 0)
           .sort((a, b) => {
             const at = a.answered_at ? new Date(a.answered_at).getTime() : 0;

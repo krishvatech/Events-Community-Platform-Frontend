@@ -2469,6 +2469,8 @@ export default function NewLiveMeeting() {
   const LIVE_SUMMARY_POLL_FALLBACK_MS = 60000; // 1 min if WS is not connected
   const LIVE_SUMMARY_CACHE_TTL_MS = 60000;     // 1 min cache
   const MARK_ALL_READ_COOLDOWN_MS = 30000;     // 30 sec, prevents mark-all-read storm
+  const LIVE_CHAT_PAGE_SIZE = 10;
+  const LIVE_QNA_PAGE_SIZE = 10;
   const [eventId, setEventId] = useState(null);
 
   // ✅ Participants-lite should load only when the Participants panel is open.
@@ -2476,6 +2478,15 @@ export default function NewLiveMeeting() {
   const [participantsPanelActive, setParticipantsPanelActive] = useState(false);
   const participantsLiteInFlightRef = useRef(false);
   const participantsLiteNotFoundRef = useRef(false);
+  const participantsLiteNextAfterIdRef = useRef(0);
+  const participantsLiteHasMoreRef = useRef(true);
+  const participantsLiteLastFullRefreshRef = useRef(0);
+
+  useEffect(() => {
+    participantsLiteNextAfterIdRef.current = 0;
+    participantsLiteHasMoreRef.current = true;
+    participantsLiteLastFullRefreshRef.current = 0;
+  }, [eventId, participantsPanelActive]);
 
   //  Live Minimal Mode - Block non-critical APIs during join burst
   // Only critical APIs (/rtk/join/, /live/rejoin/, WebSocket) should run immediately
@@ -2575,8 +2586,22 @@ export default function NewLiveMeeting() {
       participantsLiteInFlightRef.current = true;
 
       try {
+        const now = Date.now();
+        if (!participantsLiteHasMoreRef.current) {
+          // Full cursor cycle completed. Refresh the first page only after a
+          // longer interval instead of repeatedly loading all pages.
+          if (now - participantsLiteLastFullRefreshRef.current < LIVE_PARTICIPANTS_REFRESH_MS) {
+            return;
+          }
+          participantsLiteNextAfterIdRef.current = 0;
+          participantsLiteHasMoreRef.current = true;
+        }
+
+        const afterId = Number(participantsLiteNextAfterIdRef.current || 0);
         const headers = { accept: "application/json", ...authHeader() };
-        const res = await fetch(`${API_ROOT}/events/${eventId}/participants-lite/`, { headers });
+        const qs = new URLSearchParams({ cursor: "1", limit: "100" });
+        if (afterId > 0) qs.set("after_id", String(afterId));
+        const res = await fetch(`${API_ROOT}/events/${eventId}/participants-lite/?${qs.toString()}`, { headers });
 
         if (res.status === 404) {
           participantsLiteNotFoundRef.current = true;
@@ -2591,15 +2616,24 @@ export default function NewLiveMeeting() {
           return;
         }
 
-        const participants = await res.json();
+        const payload = await res.json();
         if (!alive) return;
 
+        const participants = Array.isArray(payload) ? payload : (payload.results || []);
         const newCache = {};
-        (Array.isArray(participants) ? participants : []).forEach((p) => {
+        participants.forEach((p) => {
           if (p?.id) {
             newCache[p.id] = p.kyc_status || "";
           }
         });
+
+        if (!Array.isArray(payload)) {
+          participantsLiteHasMoreRef.current = Boolean(payload.has_more);
+          participantsLiteNextAfterIdRef.current = Number(payload.next_after_id || 0);
+          if (!payload.has_more) {
+            participantsLiteLastFullRefreshRef.current = Date.now();
+          }
+        }
 
         if (Object.keys(newCache).length) {
           setParticipantKycCache((prev) => ({ ...prev, ...newCache }));
@@ -2607,8 +2641,14 @@ export default function NewLiveMeeting() {
 
         if (import.meta.env?.DEV) {
           console.debug(
-            `[LiveMeeting] participants-lite loaded ${Object.keys(newCache).length} users`
+            `[LiveMeeting] participants-lite loaded ${Object.keys(newCache).length} users; has_more=${participantsLiteHasMoreRef.current}; next_after_id=${participantsLiteNextAfterIdRef.current}`
           );
+        }
+
+        // While the panel is open, walk additional cursor pages gradually.
+        // This avoids one large payload but still fills the participant cache.
+        if (alive && participantsLiteHasMoreRef.current) {
+          window.setTimeout(fetchParticipantsLite, 1200);
         }
       } catch (err) {
         console.warn("[LiveMeeting] participants-lite error:", err?.message || err);
@@ -10289,7 +10329,7 @@ export default function NewLiveMeeting() {
       if (lastQnASyncTimeRef.current && eventId) {
         try {
           const url = toApiUrl(
-            `interactions/questions/?event_id=${eventId}&updated_after=${lastQnASyncTimeRef.current}`
+            `interactions/questions/?event_id=${eventId}&updated_after=${encodeURIComponent(lastQnASyncTimeRef.current)}&cursor=1&limit=50&sort=newest`
           );
           const res = await fetch(url, { headers: authHeader() });
           if (res.ok) {
@@ -15215,7 +15255,15 @@ export default function NewLiveMeeting() {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState("");
+  const chatMessagesRef = useRef([]);
+  const [chatHasOlder, setChatHasOlder] = useState(false);
+  const [chatLoadingOlder, setChatLoadingOlder] = useState(false);
+  const chatOlderInFlightRef = useRef(false);
   const [chatInput, setChatInput] = useState("");
+
+  useEffect(() => {
+    chatMessagesRef.current = chatMessages;
+  }, [chatMessages]);
   const chatBottomRef = useRef(null);
   const chatListRef = useRef(null);  // ✅ Scrollable chat container
   const [newMessageCount, setNewMessageCount] = useState(0);  // ✅ "New message" indicator
@@ -15288,24 +15336,133 @@ export default function NewLiveMeeting() {
     });
   }, []);
 
+  const normalizeCursorResponse = useCallback((payload) => {
+    const rows = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.results)
+        ? payload.results
+        : [];
+
+    return {
+      rows,
+      hasMore: Boolean(payload?.has_more),
+      oldestId: payload?.oldest_id ?? rows[0]?.id ?? null,
+      newestId: payload?.newest_id ?? rows[rows.length - 1]?.id ?? null,
+      nextBeforeId: payload?.next_before_id ?? payload?.oldest_id ?? rows[0]?.id ?? null,
+      nextOffset: payload?.next_offset ?? null,
+    };
+  }, []);
+
+  const mergeById = useCallback((older, current) => {
+    const seen = new Set();
+
+    return [...older, ...current].filter((item) => {
+      const key = String(item?.id ?? "");
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, []);
+
   const fetchChatMessages = useCallback(
-    async (conversationId, { force = false } = {}) => {
-      // Defer messaging API during join burst.
-      // In production, only poll chat when chat panel is open.
-      if (liveMinimalMode || deferNonCriticalLiveApi) return;
-      if (!force && !isChatActive) return;
+    async (conversationId, { force = false, beforeId = null, afterId = null } = {}) => {
+      if (liveMinimalMode || deferNonCriticalLiveApi) return [];
+      if (!force && !isChatActive) return [];
 
       const cid = conversationId || activeChatConversationId;
-      if (!cid) return;
-      const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
-        headers: { Accept: "application/json", ...authHeader() },
+      if (!cid) return [];
+
+      const params = new URLSearchParams({
+        cursor: "1",
+        limit: String(afterId ? 50 : LIVE_CHAT_PAGE_SIZE),
       });
-      const data = await res.json().catch(() => []);
-      if (!res.ok) throw new Error(data?.detail || "Failed to load chat.");
-      setChatMessages(Array.isArray(data) ? data : []);
+
+      if (beforeId) params.set("before_id", String(beforeId));
+      if (afterId) params.set("after_id", String(afterId));
+
+      const listEl = chatListRef.current;
+      const previousScrollHeight = beforeId && listEl ? listEl.scrollHeight : 0;
+      const previousScrollTop = beforeId && listEl ? listEl.scrollTop : 0;
+
+      const res = await fetch(
+        toApiUrl(`messaging/conversations/${cid}/messages/?${params.toString()}`),
+        {
+          headers: { Accept: "application/json", ...authHeader() },
+        }
+      );
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.detail || "Failed to load chat.");
+
+      const { rows, hasMore } = normalizeCursorResponse(payload);
+
+      if (afterId) {
+        if (rows.length) {
+          setChatMessages((prev) => mergeById(prev, rows));
+        }
+        return rows;
+      }
+
+      if (beforeId) {
+        if (rows.length) {
+          setChatMessages((prev) => mergeById(rows, prev));
+
+          requestAnimationFrame(() => {
+            const currentEl = chatListRef.current;
+            if (currentEl) {
+              currentEl.scrollTop =
+                currentEl.scrollHeight - previousScrollHeight + previousScrollTop;
+            }
+          });
+        }
+
+        setChatHasOlder(hasMore);
+        return rows;
+      }
+
+      setChatMessages(rows);
+      setChatHasOlder(hasMore);
+      return rows;
     },
-    [activeChatConversationId, liveMinimalMode, deferNonCriticalLiveApi, isChatActive]
+    [
+      activeChatConversationId,
+      liveMinimalMode,
+      deferNonCriticalLiveApi,
+      isChatActive,
+      normalizeCursorResponse,
+      mergeById,
+    ]
   );
+
+  const loadOlderChatMessages = useCallback(async () => {
+    if (!chatHasOlder || chatLoadingOlder || chatOlderInFlightRef.current) return;
+
+    const cid = activeChatConversationId;
+    const beforeId = chatMessagesRef.current?.[0]?.id;
+
+    if (!cid || !beforeId) return;
+
+    chatOlderInFlightRef.current = true;
+    setChatLoadingOlder(true);
+
+    try {
+      await fetchChatMessages(cid, { force: true, beforeId });
+    } catch (e) {
+      setChatError(e?.message || "Failed to load older messages.");
+    } finally {
+      chatOlderInFlightRef.current = false;
+      setChatLoadingOlder(false);
+    }
+  }, [activeChatConversationId, chatHasOlder, chatLoadingOlder, fetchChatMessages]);
+
+  const handleChatScroll = useCallback(() => {
+    const el = chatListRef.current;
+    if (!el) return;
+
+    if (el.scrollTop <= 80) {
+      loadOlderChatMessages();
+    }
+  }, [loadOlderChatMessages]);
 
   const ensureEventConversation = useCallback(async () => {
     //  Defer messaging API during join burst
@@ -16621,6 +16778,11 @@ export default function NewLiveMeeting() {
   const [qnaSubmitting, setQnaSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
   const [qnaError, setQnaError] = useState("");
+  const qnaListRef = useRef(null);
+  const [qnaHasOlder, setQnaHasOlder] = useState(false);
+  const [qnaNextOffset, setQnaNextOffset] = useState(null);
+  const [qnaLoadingOlder, setQnaLoadingOlder] = useState(false);
+  const qnaOlderInFlightRef = useRef(false);
 
   // Polish-draft AI state
   const [qnaPolishLoading, setQnaPolishLoading] = useState(false);
@@ -16730,56 +16892,110 @@ export default function NewLiveMeeting() {
     }
   }, [userQnaAnonymousDefault, qnaAnonymousModeEnabled]);
 
+  const mapQnaRows = useCallback((rows) => (
+    (rows || []).map((q) => ({
+      ...q,
+      is_hidden: q.is_hidden || false,
+      hidden_by: q.hidden_by || null,
+      hidden_at: q.hidden_at || null,
+      is_seed: q.is_seed || false,
+      attribution_label: q.attribution_label || "",
+      speaker_note: q.speaker_note || "",
+      answer_text: q.answer_text || null,
+      answered_phase: q.answered_phase || null,
+      upvote_count: q.upvote_count ?? 0,
+      user_upvoted: Boolean(q.user_upvoted),
+      upvoters: q.upvoters ?? [],
+      replies: q.replies ?? [],
+      reply_count: q.reply_count ?? 0,
+    }))
+  ), []);
+
   const loadQuestions = useCallback(async (opts = {}) => {
-    if (!eventId || !hasLiveInteractiveAccess) return;
-    const { silent = false } = opts;
-    if (!silent) setQnaLoading(true);
+    if (!eventId || !hasLiveInteractiveAccess) return [];
+
+    const { silent = false, append = false, offset = 0 } = opts;
+
+    if (!silent && !append) setQnaLoading(true);
     setQnaError("");
 
     try {
-      let url = `interactions/questions/?event_id=${encodeURIComponent(eventId)}`;
-      // Check for active table (Social Lounge / Breakout)
-      // If activeTableId is present, we are in a specific room context
+      const params = new URLSearchParams({
+        event_id: String(eventId),
+        sort: qnaSortMode || "hot",
+        cursor: "1",
+        limit: String(LIVE_QNA_PAGE_SIZE),
+        offset: String(Math.max(0, Number(offset) || 0)),
+      });
+
       if (activeTableId) {
-        url += `&lounge_table_id=${activeTableId}`;
+        params.set("lounge_table_id", String(activeTableId));
       }
 
-      const res = await fetch(toApiUrl(url), {
+      const res = await fetch(toApiUrl(`interactions/questions/?${params.toString()}`), {
         headers: { "Content-Type": "application/json", ...authHeader() },
       });
+
       if (!res.ok) throw new Error("Failed to load questions.");
-      const data = await res.json();
 
-      // Map questions and ensure all fields are present
-      const mapped = (data || []).map(q => ({
-        ...q,
-        is_hidden: q.is_hidden || false,
-        hidden_by: q.hidden_by || null,
-        hidden_at: q.hidden_at || null,
-        is_seed: q.is_seed || false,
-        attribution_label: q.attribution_label || "",
-        speaker_note: q.speaker_note || "",
-        answer_text: q.answer_text || null,
-        answered_phase: q.answered_phase || null,
-        replies: q.replies ?? [],
-        reply_count: q.reply_count ?? 0,
-      }));
+      const payload = await res.json();
+      const { rows, hasMore, nextOffset } = normalizeCursorResponse(payload);
+      const mapped = mapQnaRows(rows);
 
-      console.log("[QNA] Loaded questions from API:", mapped.map(q => ({
-        id: q.id,
-        content: q.content,
-        is_answered: q.is_answered,
-        answer_text: q.answer_text,
-        answered_phase: q.answered_phase
-      })));
+      if (append) {
+        setQuestions((prev) => mergeById(prev, mapped));
+      } else {
+        setQuestions(mapped);
+        requestAnimationFrame(() => {
+          if (qnaListRef.current) qnaListRef.current.scrollTop = 0;
+        });
+      }
 
-      setQuestions(mapped);
+      setQnaHasOlder(hasMore);
+      setQnaNextOffset(hasMore ? (nextOffset ?? ((Number(offset) || 0) + mapped.length)) : null);
+      return mapped;
     } catch (e) {
       setQnaError(e.message || "Failed to load questions.");
+      return [];
     } finally {
-      if (!silent) setQnaLoading(false);
+      if (!silent && !append) setQnaLoading(false);
     }
-  }, [activeTableId, eventId, hasLiveInteractiveAccess]);
+  }, [
+    activeTableId,
+    eventId,
+    hasLiveInteractiveAccess,
+    mapQnaRows,
+    mergeById,
+    normalizeCursorResponse,
+    qnaSortMode,
+  ]);
+
+  const loadOlderQuestions = useCallback(async () => {
+    if (!qnaHasOlder || qnaLoadingOlder || qnaOlderInFlightRef.current) return;
+
+    const nextOffset = qnaNextOffset ?? questions.length;
+    if (nextOffset == null) return;
+
+    qnaOlderInFlightRef.current = true;
+    setQnaLoadingOlder(true);
+
+    try {
+      await loadQuestions({ silent: true, append: true, offset: nextOffset });
+    } finally {
+      qnaOlderInFlightRef.current = false;
+      setQnaLoadingOlder(false);
+    }
+  }, [loadQuestions, qnaHasOlder, qnaLoadingOlder, qnaNextOffset, questions.length]);
+
+  const handleQnaScroll = useCallback(() => {
+    const el = qnaListRef.current;
+    if (!el) return;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom <= 160) {
+      loadOlderQuestions();
+    }
+  }, [loadOlderQuestions]);
 
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
@@ -16865,12 +17081,16 @@ export default function NewLiveMeeting() {
         }
 
         if (msg.type === "qna.upvote") {
+          const myId = String(myUserIdRef.current || "");
+          const actorId = String(msg.user_id ?? "");
+          const isMe = myId && actorId && actorId === myId;
           setQuestions((prev) =>
-            prev.map((q) =>
-              q.id === msg.question_id
-                ? { ...q, upvote_count: msg.upvote_count, upvoters: msg.upvoters ?? q.upvoters }
-                : q
-            )
+            prev.map((q) => {
+              if (q.id !== msg.question_id) return q;
+              const updated = { ...q, upvote_count: msg.upvote_count, upvoters: msg.upvoters ?? q.upvoters };
+              if (isMe) updated.user_upvoted = msg.upvoted;
+              return updated;
+            })
           );
           // Also update aggregated vote count for any group containing this question
           setGroups(prev => prev.map(g => {
@@ -19255,8 +19475,22 @@ export default function NewLiveMeeting() {
                   <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                     <Box
                       ref={chatListRef}
+                      onScroll={handleChatScroll}
                       sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}
                     >
+                      {(chatHasOlder || chatLoadingOlder) && (
+                        <Box sx={{ mb: 1.5, textAlign: "center" }}>
+                          <Button
+                            size="small"
+                            variant="text"
+                            disabled={chatLoadingOlder}
+                            onClick={loadOlderChatMessages}
+                            sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                          >
+                            {chatLoadingOlder ? "Loading older messages…" : "Load older messages"}
+                          </Button>
+                        </Box>
+                      )}
                       {/* ✅ New message indicator */}
                       {newMessageCount > 0 && (
                         <Box sx={{ mb: 2, textAlign: "center" }}>
@@ -21075,7 +21309,11 @@ export default function NewLiveMeeting() {
                 )}
 
                 {/* Q&A Messages Area */}
-                <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
+                <Box
+                  ref={qnaListRef}
+                  onScroll={handleQnaScroll}
+                  sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}
+                >
                   {qnaError && (
                     <Typography color="error" sx={{ mb: 1 }}>
                       {qnaError}
@@ -22337,18 +22575,37 @@ export default function NewLiveMeeting() {
 
                           if (qToGroup[q.id]) {
                             const gId = qToGroup[q.id].id;
-                            if (!renderedGroups[gId]) renderedGroups[gId] = { group: qToGroup[q.id], nodes: [], questions: [] };
+                            if (!renderedGroups[gId]) {
+                              renderedGroups[gId] = { group: qToGroup[q.id], nodes: [], questions: [], firstSortIndex: idx };
+                            }
                             renderedGroups[gId].nodes.push(node);
                             renderedGroups[gId].questions.push(q);
                           } else {
-                            ungroupedNodes.push(node);
+                            ungroupedNodes.push({ node, firstSortIndex: idx });
                           }
                         });
 
+                        const orderedRenderedEntries = [
+                          ...Object.values(renderedGroups).map((rg) => ({
+                            type: "group",
+                            key: `group_${rg.group.id}`,
+                            firstSortIndex: rg.firstSortIndex ?? 0,
+                            rg,
+                          })),
+                          ...ungroupedNodes.map((entry) => ({
+                            type: "question",
+                            key: `question_${entry?.node?.key || entry.firstSortIndex}`,
+                            firstSortIndex: entry.firstSortIndex ?? 0,
+                            node: entry.node,
+                          })),
+                        ].sort((a, b) => a.firstSortIndex - b.firstSortIndex);
+
                         return (
                           <>
-                            {Object.values(renderedGroups).map(rg => (
-                              (() => {
+                            {orderedRenderedEntries.map((entry) => {
+                              if (entry.type === "question") return entry.node;
+                              const rg = entry.rg;
+                              return (() => {
                                 const groupedQuestions = (rg.group.memberships || [])
                                   .map((membership) => questionById.get(membership.question))
                                   .filter(Boolean);
@@ -22517,17 +22774,18 @@ export default function NewLiveMeeting() {
                                     </Collapse>
                                   </Paper>
                                 );
-                              })()
-                            ))}
-
-                            {ungroupedNodes.length > 0 && Object.values(renderedGroups).length > 0 && (
-                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1, mt: 2 }}>Other Questions</Typography>
-                            )}
-                            {ungroupedNodes.map(n => n)}
+                              })();
+                            })}
                           </>
                         );
                       })()}
                     </Stack>
+                  )}
+
+                  {qnaLoadingOlder && (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 1.5 }}>
+                      <CircularProgress size={18} />
+                    </Box>
                   )}
                 </Box>
 

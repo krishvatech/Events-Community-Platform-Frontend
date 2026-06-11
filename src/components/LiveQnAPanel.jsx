@@ -56,6 +56,7 @@ const API_ROOT = (
 ).replace(/\/$/, "");
 
 const REPLIES_COLLAPSED_COUNT = 3;
+const QNA_PAGE_SIZE = 10;
 
 function getToken() {
   return (
@@ -1352,6 +1353,9 @@ export default function LiveQnAPanel({
   const [newQuestion, setNewQuestion] = useState("");
   const [adoptedSuggestionId, setAdoptedSuggestionId] = useState(null); // A3: track source suggeston
   const [error, setError] = useState("");
+  const [hasOlderQuestions, setHasOlderQuestions] = useState(false);
+  const [loadingOlderQuestions, setLoadingOlderQuestions] = useState(false);
+  const questionListRef = useRef(null);
 
   // --- A3: Public AI Question Suggestions (Host + Participant) ---
   const [publicSuggestions, setPublicSuggestions] = useState([]);
@@ -1392,29 +1396,76 @@ export default function LiveQnAPanel({
   const typingThrottleRef = useRef(0);      // timestamp of last is_typing=true send
   const typingDebounceRef = useRef(null);   // setTimeout id for auto-send is_typing=false
 
-  // ── Load questions (includes replies) ───────────────────────────────────
-  const loadQuestions = useCallback(async () => {
-    if (!eventId) return;
-    setLoading(true);
+  // ── Load questions (cursor based; latest 10 first, older on demand) ─────
+  const mergeQuestionsById = useCallback((current, incoming) => {
+    const map = new Map();
+    [...current, ...incoming].forEach((q) => {
+      if (q?.id != null) map.set(q.id, { ...(map.get(q.id) || {}), ...q });
+    });
+    return Array.from(map.values()).sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+  }, []);
+
+  const loadQuestions = useCallback(async ({ silent = false, beforeId = null } = {}) => {
+    if (!eventId) return [];
+    if (!silent && !beforeId) setLoading(true);
     setError("");
     try {
+      const params = new URLSearchParams({
+        event_id: String(eventId),
+        sort: "newest",
+        cursor: "1",
+        limit: String(QNA_PAGE_SIZE),
+      });
+      if (beforeId) params.set("before_id", String(beforeId));
+
+      const listEl = questionListRef.current;
+      const previousScrollHeight = beforeId && listEl ? listEl.scrollHeight : 0;
+      const previousScrollTop = beforeId && listEl ? listEl.scrollTop : 0;
+
       const res = await fetch(
-        toApiUrl(`interactions/questions/?event_id=${encodeURIComponent(eventId)}`),
+        toApiUrl(`interactions/questions/?${params.toString()}`),
         { headers: { "Content-Type": "application/json", ...authHeader() } }
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || "Failed to load questions.");
       }
-      const data = await res.json();
-      // Ensure each question has a replies array
-      setQuestions(data.map((q) => ({ ...q, replies: q.replies ?? [] })));
+      const payload = await res.json();
+      const rows = Array.isArray(payload) ? payload : (payload.results || []);
+      const mapped = rows.map((q) => ({ ...q, replies: q.replies ?? [] }));
+
+      if (beforeId) {
+        setQuestions((prev) => mergeQuestionsById(prev, mapped));
+        requestAnimationFrame(() => {
+          const currentEl = questionListRef.current;
+          if (currentEl) {
+            currentEl.scrollTop = currentEl.scrollHeight - previousScrollHeight + previousScrollTop;
+          }
+        });
+      } else {
+        setQuestions(mapped);
+      }
+      setHasOlderQuestions(Boolean(payload?.has_more));
+      return mapped;
     } catch (e) {
       setError(e.message || "Failed to load questions.");
+      return [];
     } finally {
-      setLoading(false);
+      if (!silent && !beforeId) setLoading(false);
     }
-  }, [eventId]);
+  }, [eventId, mergeQuestionsById]);
+
+  const loadOlderQuestions = useCallback(async () => {
+    if (loadingOlderQuestions || !hasOlderQuestions) return;
+    const oldestId = questions[questions.length - 1]?.id;
+    if (!oldestId) return;
+    setLoadingOlderQuestions(true);
+    try {
+      await loadQuestions({ silent: true, beforeId: oldestId });
+    } finally {
+      setLoadingOlderQuestions(false);
+    }
+  }, [hasOlderQuestions, loadingOlderQuestions, loadQuestions, questions]);
 
   const loadGroups = useCallback(async () => {
     if (!eventId) return;
@@ -1486,12 +1537,16 @@ export default function LiveQnAPanel({
 
         // ── question events (existing) ──────────────────────────────────────
         if (msg.type === "qna.upvote") {
+          const actorId = String(msg.user_id ?? "");
+          const meId = currentGuestId ? `guest_${currentGuestId}` : String(currentUserId || "");
+          const isMe = actorId && meId && actorId === meId;
           setQuestions((prev) =>
-            prev.map((q) =>
-              q.id === msg.question_id
-                ? { ...q, upvote_count: msg.upvote_count, upvoters: msg.upvoters ?? q.upvoters }
-                : q
-            )
+            prev.map((q) => {
+              if (q.id !== msg.question_id) return q;
+              const updated = { ...q, upvote_count: msg.upvote_count, upvoters: msg.upvoters ?? q.upvoters };
+              if (isMe) updated.user_upvoted = msg.upvoted;
+              return updated;
+            })
           );
         } else if (msg.type === "qna.question") {
           setQuestions((prev) => {
@@ -1914,7 +1969,7 @@ export default function LiveQnAPanel({
       }
       setNewQuestion("");
       setAdoptedSuggestionId(null);
-      await loadQuestions();
+      await loadQuestions({ silent: true });
     } catch (e) {
       setError(e.message || "Failed to create question.");
     } finally {
@@ -2543,6 +2598,10 @@ export default function LiveQnAPanel({
             ) : (
               <List
                 dense
+                ref={questionListRef}
+                onScroll={(e) => {
+                  if (e.currentTarget.scrollTop <= 80) loadOlderQuestions();
+                }}
                 sx={{
                   height: "100%",
                   overflowY: "auto",
@@ -2558,6 +2617,19 @@ export default function LiveQnAPanel({
                   "&::-webkit-scrollbar-thumb:hover": { backgroundColor: "rgba(255,255,255,0.5)" },
                 }}
               >
+                {(hasOlderQuestions || loadingOlderQuestions) && (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 1 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={loadOlderQuestions}
+                      disabled={loadingOlderQuestions}
+                      sx={{ textTransform: "none", color: "rgba(255,255,255,0.85)", borderColor: "rgba(255,255,255,0.25)" }}
+                    >
+                      {loadingOlderQuestions ? "Loading older questions…" : "Load older questions"}
+                    </Button>
+                  </Box>
+                )}
                 {(() => {
                   const groupedQuestions = {};
                   const ungroupedQuestions = [];

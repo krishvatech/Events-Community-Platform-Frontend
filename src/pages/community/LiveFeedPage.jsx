@@ -70,7 +70,6 @@ function SuggestedConnections({ list = [] }) {
   // --- friend status (same idea as RichProfile) ---
   const [friendStatusByUser, setFriendStatusByUser] = React.useState({})
 
-
   // normalize backend statuses (incoming_pending/outgoing_pending → pending_incoming/pending_outgoing)
   function normalizeFriendStatus(s) {
     const map = { incoming_pending: "pending_incoming", outgoing_pending: "pending_outgoing" };
@@ -91,7 +90,6 @@ function SuggestedConnections({ list = [] }) {
     return () => { alive = false; };
   }, [list]);
 
-
   async function fetchFriendStatus(userId) {
     try {
       const r = await fetch(toApiUrl(`friends/status/?user_id=${userId}`), {
@@ -105,8 +103,16 @@ function SuggestedConnections({ list = [] }) {
     }
   }
 
-  // NEW: See-all dialog
+  // --- Modal state for pagination ---
   const [openAll, setOpenAll] = React.useState(false);
+  const [modalUsers, setModalUsers] = React.useState([]);
+  const [modalPage, setModalPage] = React.useState(1);
+  const [modalHasNext, setModalHasNext] = React.useState(false);
+  const [modalLoading, setModalLoading] = React.useState(false);
+  const [modalLoadingMore, setModalLoadingMore] = React.useState(false);
+  const [modalError, setModalError] = React.useState(null);
+  const [modalContentRef, setModalContentRef] = React.useState(null);
+  const [shouldFetchMoreRef, setShouldFetchMoreRef] = React.useState(true);
 
 
   // avatar + name helpers (match posts/profile fallbacks)
@@ -237,6 +243,94 @@ function SuggestedConnections({ list = [] }) {
       setMutualMap(prev => ({ ...prev, [userId]: [] }));
     }
   }
+
+  // Load modal page with pagination
+  async function loadModalPage(page = 1, append = false) {
+    if (page === 1 && !append) {
+      setModalLoading(true);
+      setModalError(null);
+    } else {
+      setModalLoadingMore(true);
+    }
+
+    try {
+      const r = await fetch(toApiUrl(`friends/suggested/?page=${page}&page_size=10`), {
+        headers: { Accept: "application/json", ...authHeaders() },
+        credentials: "include",
+      });
+
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+      const data = await r.json();
+      const results = data.results || [];
+      const hasNext = data.has_next || false;
+      const nextPage = data.next || null;
+
+      // Fetch friend status for all newly loaded users
+      const newUserIds = results.map(u => u.id).filter(id => friendStatusByUser[id] === undefined);
+      if (newUserIds.length > 0) {
+        const statuses = await Promise.all(newUserIds.map(async (id) => [id, await fetchFriendStatus(id)]));
+        setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(statuses) }));
+      }
+
+      if (append && modalUsers.length > 0) {
+        // Avoid duplicates by filtering out users that already exist
+        const existingIds = new Set(modalUsers.map(u => u.id));
+        const uniqueNewUsers = results.filter(u => !existingIds.has(u.id));
+        setModalUsers(prev => [...prev, ...uniqueNewUsers]);
+      } else {
+        setModalUsers(results);
+      }
+
+      setModalHasNext(hasNext);
+      setModalPage(page);
+      setShouldFetchMoreRef(true);
+    } catch (err) {
+      console.error("Failed to load modal page:", err);
+      setModalError("Failed to load suggestions");
+      if (!append) setModalUsers([]);
+    } finally {
+      if (page === 1) {
+        setModalLoading(false);
+      } else {
+        setModalLoadingMore(false);
+      }
+    }
+  }
+
+  // Open modal handler - reset and load first page
+  const handleOpenModal = React.useCallback(() => {
+    setOpenAll(true);
+    setModalPage(1);
+    setModalUsers([]);
+    setModalHasNext(false);
+    setModalError(null);
+    loadModalPage(1, false);
+  }, []);
+
+  // Close modal handler
+  const handleCloseModal = () => {
+    setOpenAll(false);
+    setModalUsers([]);
+    setModalPage(1);
+    setModalHasNext(false);
+    setModalError(null);
+  };
+
+  // Handle infinite scroll in modal
+  const handleModalScroll = React.useCallback((e) => {
+    if (!modalContentRef) return;
+
+    const element = e.target;
+    const isNearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 200;
+
+    if (isNearBottom && modalHasNext && !modalLoadingMore && shouldFetchMoreRef) {
+      setShouldFetchMoreRef(false);
+      const nextPage = modalPage + 1;
+      loadModalPage(nextPage, true);
+    }
+  }, [modalPage, modalHasNext, modalLoadingMore, shouldFetchMoreRef, modalContentRef]);
+
   function toggle(id) {
     setConnected(prev => {
       const next = new Set(prev);
@@ -263,7 +357,8 @@ function SuggestedConnections({ list = [] }) {
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
           Suggested connections
         </Typography>
-        <Button size="small" variant="text" onClick={() => setOpenAll(true)}>See all</Button>      </Stack>
+        <Button size="small" variant="text" onClick={handleOpenModal}>See all</Button>
+      </Stack>
 
       {/* Horizontal slider */}
       <Box
@@ -361,70 +456,111 @@ function SuggestedConnections({ list = [] }) {
                       </Button>
                     );
                   })()}
-                  <Dialog open={openAll} onClose={() => setOpenAll(false)} maxWidth="sm" fullWidth>
-                    <DialogTitle>Suggested connections</DialogTitle>
-                    <DialogContent dividers>
-                      <Stack spacing={1.25}>
-                        {list.map((u) => {
-                          const status = String(friendStatusByUser[u.id] || "").toLowerCase();
-                          return (
-                            <Paper key={u.id} variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer" }}>
-                                  <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>
-                                    {(userName(u) || "U").slice(0, 1)}
-                                  </Avatar>
-                                </Box>
-                                <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => navigate(`/community/rich-profile/${u.id}`)}>
-                                  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-                                    <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
-                                      {userName(u)}
-                                    </Typography>
-                                    {userIsVerified(u) && (
-                                      <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />
-                                    )}
-                                  </Stack>
-                                  {u.mutuals > 0 && (
-                                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.25 }}>
-                                      <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 18, height: 18, fontSize: 10 } }}>
-                                        {(mutualMap[u.id] || []).slice(0, 3).map((m) => (
-                                          <Avatar key={m.id} src={userAvatar(m)}>
-                                            {(m.name || "U").slice(0, 1)}
-                                          </Avatar>
-                                        ))}
-                                      </AvatarGroup>
-                                      <Typography variant="caption" color="text.secondary">
-                                        {u.mutuals} mutual{u.mutuals === 1 ? "" : "s"}
-                                      </Typography>
-                                    </Stack>
-                                  )}
-                                </Box>
-
-                                {status === "friends" ? (
-                                  <Button size="small" variant="outlined" disabled>Friends</Button>
-                                ) : status === "pending_outgoing" ? (
-                                  <Button size="small" variant="outlined" disabled>Request pending</Button>
-                                ) : (
-                                  <Button size="small" variant="contained" onClick={() => sendFriendRequest(u.id)}>
-                                    Connect
-                                  </Button>
-                                )}
-                              </Stack>
-                            </Paper>
-                          );
-                        })}
-                        {(!list || list.length === 0) && (
-                          <Typography color="text.secondary">No suggestions right now.</Typography>
-                        )}
-                      </Stack>
-                    </DialogContent>
-                  </Dialog>
                 </Paper>
               </Box>
             );
           })}
         </Stack>
       </Box>
+
+      {/* Modal Dialog - rendered outside list.map(), only once */}
+      <Dialog
+        open={openAll}
+        onClose={handleCloseModal}
+        maxWidth="sm"
+        fullWidth
+        BackdropProps={{
+          sx: {
+            bgcolor: "rgba(15, 23, 42, 0.35)",
+            backdropFilter: "blur(2px)",
+          },
+        }}
+      >
+        <DialogTitle>Suggested connections</DialogTitle>
+        <DialogContent
+          dividers
+          ref={setModalContentRef}
+          onScroll={handleModalScroll}
+          sx={{
+            maxHeight: "500px",
+            overflowY: "auto",
+            "&::-webkit-scrollbar": { width: 6 },
+            "&::-webkit-scrollbar-thumb": { bgcolor: "divider", borderRadius: 999 },
+          }}
+        >
+          {modalLoading ? (
+            <Stack alignItems="center" py={3}>
+              <CircularProgress />
+            </Stack>
+          ) : modalError ? (
+            <Stack spacing={1} alignItems="center" py={2}>
+              <Typography color="error">{modalError}</Typography>
+              <Button size="small" variant="outlined" onClick={() => loadModalPage(1, false)}>
+                Retry
+              </Button>
+            </Stack>
+          ) : modalUsers.length === 0 ? (
+            <Typography color="text.secondary">No suggestions right now.</Typography>
+          ) : (
+            <Stack spacing={1.25}>
+              {modalUsers.map((u) => {
+                const status = String(friendStatusByUser[u.id] || "").toLowerCase();
+                return (
+                  <Paper key={u.id} variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer" }}>
+                        <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>
+                          {(userName(u) || "U").slice(0, 1)}
+                        </Avatar>
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => navigate(`/community/rich-profile/${u.id}`)}>
+                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
+                            {userName(u)}
+                          </Typography>
+                          {userIsVerified(u) && (
+                            <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />
+                          )}
+                        </Stack>
+                        {u.mutuals > 0 && (
+                          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.25 }}>
+                            <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 18, height: 18, fontSize: 10 } }}>
+                              {(mutualMap[u.id] || []).slice(0, 3).map((m) => (
+                                <Avatar key={m.id} src={userAvatar(m)}>
+                                  {(m.name || "U").slice(0, 1)}
+                                </Avatar>
+                              ))}
+                            </AvatarGroup>
+                            <Typography variant="caption" color="text.secondary">
+                              {u.mutuals} mutual{u.mutuals === 1 ? "" : "s"}
+                            </Typography>
+                          </Stack>
+                        )}
+                      </Box>
+
+                      {status === "friends" ? (
+                        <Button size="small" variant="outlined" disabled>Friends</Button>
+                      ) : status === "pending_outgoing" ? (
+                        <Button size="small" variant="outlined" disabled>Request sent</Button>
+                      ) : (
+                        <Button size="small" variant="contained" onClick={() => sendFriendRequest(u.id)}>
+                          Connect
+                        </Button>
+                      )}
+                    </Stack>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          )}
+
+          {modalLoadingMore && (
+            <Stack alignItems="center" py={2}>
+              <CircularProgress size={24} />
+            </Stack>
+          )}
+        </DialogContent>
+      </Dialog>
     </Paper>
   );
 }
