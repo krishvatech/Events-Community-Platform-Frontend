@@ -1,4 +1,4 @@
-// src/pages/LiveMeetingPage.jsx
+﻿// src/pages/LiveMeetingPage.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppBar,
@@ -232,6 +232,25 @@ const SocialLoungeIcon = (props) => (
 );
 
 // ================ API Helper ================
+const LIVE_DEBUG_LOGS = import.meta.env.DEV || import.meta.env.VITE_LIVE_DEBUG === "1";
+const liveDebug = (...args) => {
+  if (LIVE_DEBUG_LOGS) console.debug(...args);
+};
+
+const mergeItemsByIdReplacing = (current, incoming) => {
+  const order = [];
+  const byId = new Map();
+
+  [...(current || []), ...(incoming || [])].forEach((item) => {
+    const key = String(item?.id ?? "");
+    if (!key) return;
+    if (!byId.has(key)) order.push(key);
+    byId.set(key, item);
+  });
+
+  return order.map((key) => byId.get(key));
+};
+
 const API_ROOT = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 ).replace(/\/$/, "");
@@ -278,6 +297,25 @@ function toApiUrl(pathOrUrl) {
     const rel = String(pathOrUrl).replace(/^\/+/, "");
     return `${API_ROOT}/${rel.replace(/^api\/+/, "")}`;
   }
+}
+
+function toWsUrl(pathOrUrl) {
+  const token = getToken();
+  const root = API_ROOT.replace(/^http/i, "ws").replace(/\/api\/?$/, "");
+
+  let url;
+  try {
+    const parsed = new URL(pathOrUrl);
+    parsed.protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
+    url = parsed.toString();
+  } catch {
+    const rel = String(pathOrUrl).replace(/^\/+/, "");
+    url = `${root}/${rel}`.replace(/([^:]\/)\/+/g, "$1");
+  }
+
+  if (!token) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}token=${encodeURIComponent(token)}`;
 }
 
 function resolveMediaUrl(url) {
@@ -1281,7 +1319,7 @@ function WaitingForHost({
         </Typography>
 
         <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.65)", mb: 2 }}>
-          The meeting will begin once the host joins. You’ll be automatically connected.
+          The meeting will begin once the host joins. You'll be automatically connected.
         </Typography>
 
         {/* Info box */}
@@ -2464,7 +2502,7 @@ export default function NewLiveMeeting() {
   const LIVE_CHAT_IDLE_POLL_MS = 90000;        // 90 sec unread check when chat panel is closed
   const LIVE_CHAT_WS_FALLBACK_MS = 120000;     // 2 min when chat WebSocket is connected
   const LIVE_PRIVATE_UNREAD_POLL_MS = 120000;  // 2 min for private unread badges
-  const LIVE_PRIVATE_ACTIVE_POLL_MS = 30000;   // 30 sec when private chat is open
+  const LIVE_PRIVATE_ACTIVE_POLL_MS = 5000;    // 5 sec fallback when private chat is open and WS is unavailable
   const LIVE_SUMMARY_POLL_SOCKET_MS = 120000;  // 2 min when main WS is connected
   const LIVE_SUMMARY_POLL_FALLBACK_MS = 60000; // 1 min if WS is not connected
   const LIVE_SUMMARY_CACHE_TTL_MS = 60000;     // 1 min cache
@@ -3032,6 +3070,11 @@ export default function NewLiveMeeting() {
   // ✅ Store local audio/video streams to stop them when needed
   const localAudioStreamRef = useRef(null);
   const localVideoStreamRef = useRef(null);
+
+  const virtualListItemSx = {
+    contentVisibility: "auto",
+    containIntrinsicSize: "0 96px",
+  };
 
   const scrollSx = {
     scrollbarWidth: "thin", // Firefox
@@ -4335,7 +4378,19 @@ export default function NewLiveMeeting() {
     }
   }, [detachSelfScreenShareEndedBinding, getSelfScreenShareVideoTrack, stopSelfScreenShareWithCleanup]);
 
-  const RIGHT_PANEL_W = 460;
+  // ✅ Responsive right panel width calculation
+  const ICON_RAIL_W = 70;
+  const RIGHT_PANEL_W_BASE = 460;
+  const getResponsiveRightPanelW = useCallback(() => {
+    if (!isMdUp) return window.innerWidth; // Mobile: full width for drawer
+    const vw = window.innerWidth;
+    if (vw >= 1600) return 460;
+    if (vw >= 1400) return 420;
+    if (vw >= 1200) return 390;
+    return Math.max(320, Math.min(360, vw * 0.25)); // min 320, max 360, or 25% of viewport
+  }, [isMdUp]);
+  const RIGHT_PANEL_W = rightPanelOpen ? getResponsiveRightPanelW() : ICON_RAIL_W;
+
   const APPBAR_H = 44;
   const GUEST_BANNER_H = guestBannerVisible ? 48 : 0;
   const LAYOUT_TOP_OFFSET = APPBAR_H + GUEST_BANNER_H;
@@ -4357,11 +4412,11 @@ export default function NewLiveMeeting() {
   const getMainRoomPeekDefaultPosition = useCallback(() => {
     const el = mainRoomPeekRef.current;
     const width = el?.offsetWidth || 280;
-    const reservedRight = isMdUp ? (rightPanelOpen ? RIGHT_PANEL_W : 70) : 8;
+    const reservedRight = isMdUp ? RIGHT_PANEL_W : 8;
     const x = window.innerWidth - reservedRight - width - 12;
     const y = APPBAR_H + 32;
     return clampMainRoomPeekPosition(x, y);
-  }, [APPBAR_H, RIGHT_PANEL_W, clampMainRoomPeekPosition, isMdUp, rightPanelOpen]);
+  }, [APPBAR_H, RIGHT_PANEL_W, clampMainRoomPeekPosition, isMdUp]);
 
   const handleMainRoomPeekDragStart = useCallback((event) => {
     const target = event.target;
@@ -14267,7 +14322,7 @@ export default function NewLiveMeeting() {
     }
   }, [rtkMeeting, getJoinedParticipants, participantsTick, loungeTables]);
 
-  // Pinned “host” view data
+  // Pinned "host" view data
   const latestPinnedHost = useMemo(() => {
     const isInCurrentBreakoutTable = (participant) => {
       if (!isBreakout || currentLoungeUserIds.size === 0) return true;
@@ -14775,7 +14830,7 @@ export default function NewLiveMeeting() {
     isParticipantInMainRoom,
   ]);
 
-  // Pinned “host” view data
+  // Pinned "host" view data
   const meetingMeta = useMemo(
     () => ({
       title: eventTitle,
@@ -15364,6 +15419,13 @@ export default function NewLiveMeeting() {
     });
   }, []);
 
+  const mergeByIdReplace = useCallback((current, newer) => {
+    const idMap = new Map(newer.map((item) => [String(item?.id ?? ""), item]));
+    return current
+      .map((item) => idMap.get(String(item?.id ?? "")) ?? item)
+      .concat(newer.filter((item) => !current.some((c) => c?.id === item?.id)));
+  }, []);
+
   const fetchChatMessages = useCallback(
     async (conversationId, { force = false, beforeId = null, afterId = null } = {}) => {
       if (liveMinimalMode || deferNonCriticalLiveApi) return [];
@@ -15680,8 +15742,13 @@ export default function NewLiveMeeting() {
   const [editingMsgId, setEditingMsgId] = useState(null);
   const [editText, setEditText] = useState("");
   const privateChatBottomRef = useRef(null); // To auto-scroll
+  const privateChatListRef = useRef(null);
   const openPrivateChatRef = useRef(null);
   const [privateEventMetaById, setPrivateEventMetaById] = useState({});
+  const [privateChatHasOlder, setPrivateChatHasOlder] = useState(false);
+  const [privateChatLoadingOlder, setPrivateChatLoadingOlder] = useState(false);
+  const privateChatOlderInFlightRef = useRef(false);
+  const privateChatSuppressAutoScrollRef = useRef(false);
   const privateChatWsRef = useRef(null);
 
   // Event/Lounge Chat WebSocket (real-time message delivery)
@@ -15712,7 +15779,10 @@ export default function NewLiveMeeting() {
       const res = await fetch(toApiUrl("messaging/conversations/ensure-direct/"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ recipient_id: recipientId }),
+        body: JSON.stringify({
+          recipient_id: recipientId,
+          event_id: eventId || event?.id || null,
+        }),
       });
 
       if (!res.ok) {
@@ -15758,8 +15828,59 @@ export default function NewLiveMeeting() {
     setPrivateChatUser(null);
     setPrivateInput("");
     setPrivateConversationId(null);
+    setPrivateChatHasOlder(false);
     setPrivateMessages([]);
   };
+
+  const loadOlderPrivateMessages = useCallback(async () => {
+    if (!privateConversationId || privateChatLoadingOlder || privateChatOlderInFlightRef.current || !privateChatHasOlder) return;
+    const oldestId = privateMessages[0]?.id;
+    if (!oldestId) return;
+
+    const listEl = privateChatListRef.current;
+    const previousScrollHeight = listEl ? listEl.scrollHeight : 0;
+    const previousScrollTop = listEl ? listEl.scrollTop : 0;
+
+    privateChatOlderInFlightRef.current = true;
+    setPrivateChatLoadingOlder(true);
+    try {
+      const params = new URLSearchParams({
+        cursor: "1",
+        limit: String(LIVE_CHAT_PAGE_SIZE),
+        before_id: String(oldestId),
+      });
+      const res = await fetch(toApiUrl(`messaging/conversations/${privateConversationId}/messages/?${params.toString()}`), {
+        headers: { Accept: "application/json", ...authHeader() },
+      });
+      if (!res.ok) return;
+      const payload = await res.json().catch(() => ({}));
+      const { rows, hasMore } = normalizeCursorResponse(payload);
+      if (rows.length) {
+        privateChatSuppressAutoScrollRef.current = true;
+        setPrivateMessages((prev) => mergeById(rows, prev));
+        requestAnimationFrame(() => {
+          const currentEl = privateChatListRef.current;
+          if (currentEl) {
+            currentEl.scrollTop = currentEl.scrollHeight - previousScrollHeight + previousScrollTop;
+          }
+        });
+      }
+      setPrivateChatHasOlder(hasMore);
+    } catch {
+      // ignore transient pagination errors
+    } finally {
+      privateChatOlderInFlightRef.current = false;
+      setPrivateChatLoadingOlder(false);
+    }
+  }, [mergeById, normalizeCursorResponse, privateChatHasOlder, privateChatLoadingOlder, privateConversationId, privateMessages]);
+
+  const handlePrivateChatScroll = useCallback(() => {
+    const el = privateChatListRef.current;
+    if (!el) return;
+    if (el.scrollTop <= 80) {
+      loadOlderPrivateMessages();
+    }
+  }, [loadOlderPrivateMessages]);
 
   const handleMessageSupportRequester = useCallback(async (request) => {
     if (!request?.requesterId) {
@@ -15812,7 +15933,7 @@ export default function NewLiveMeeting() {
 
       if (res.ok) {
         const newMsg = await res.json();
-        setPrivateMessages((prev) => [...prev, newMsg]);
+        setPrivateMessages((prev) => mergeByIdReplace(prev, [newMsg]));
         setPrivateInput("");
       } else {
         console.error("Failed to send message");
@@ -16015,8 +16136,7 @@ export default function NewLiveMeeting() {
     let alive = true;
 
     try {
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws/messaging/conversations/${privateConversationId}/?token=${getToken()}`;
+      const wsUrl = toWsUrl(`/ws/messaging/conversations/${privateConversationId}/`);
       const ws = new WebSocket(wsUrl);
       privateChatWsRef.current = ws;
 
@@ -16079,8 +16199,7 @@ export default function NewLiveMeeting() {
     let alive = true;
 
     try {
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws/messaging/conversations/${cid}/?token=${getToken()}`;
+      const wsUrl = toWsUrl(`/ws/messaging/conversations/${cid}/`);
       console.log("[EventChat WS] Connecting to:", wsUrl);
       const ws = new WebSocket(wsUrl);
       eventChatWsRef.current = ws;
@@ -16254,10 +16373,14 @@ export default function NewLiveMeeting() {
     deferNonCriticalLiveApi,
   ]);
 
-  // Auto-scroll private chat
+  // Auto-scroll private chat for new messages, but preserve scroll when older messages are prepended.
   useEffect(() => {
+    if (privateChatSuppressAutoScrollRef.current) {
+      privateChatSuppressAutoScrollRef.current = false;
+      return;
+    }
     if (privateChatBottomRef.current) {
-      privateChatBottomRef.current.scrollIntoView({ behavior: "smooth" });
+      privateChatBottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [privateMessages]);
 
@@ -19164,34 +19287,47 @@ export default function NewLiveMeeting() {
 
   // 1. Main Content Area (Left side)
   const SidebarMainContent = (
-    <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
+    <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden" }}>
       {privateChatUser ? (
-        <>
+        <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden", height: "100%" }}>
           {/* 1. Private Chat Header (User Name on Top) */}
           <Box
             sx={{
               px: 2, py: 2,
               display: "flex", alignItems: "center", gap: 1.5,
-              borderBottom: "1px solid", borderColor: "rgba(255,255,255,0.08)",
+              justifyContent: "space-between",
+              minWidth: 0,
+              flexShrink: 0,
+              borderBottom: "1px solid",
+              borderColor: "rgba(255,255,255,0.08)",
               bgcolor: "rgba(0,0,0,0.10)",
+              backdropFilter: "blur(10px)",
             }}
           >
             <IconButton onClick={handleClosePrivateChat} size="small" sx={{ color: "rgba(255,255,255,0.7)" }}>
               <ArrowBackIosNewIcon fontSize="small" />
             </IconButton>
 
-            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ cursor: "pointer" }} onClick={() => openMemberInfo(privateChatUser)}>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ cursor: "pointer", minWidth: 0, flex: 1 }} onClick={() => openMemberInfo(privateChatUser)}>
               <Avatar src={privateChatUser.picture} sx={{ width: 32, height: 32, bgcolor: "rgba(255,255,255,0.14)", fontSize: 13 }}>
                 {initialsFromName(privateChatUser.name)}
               </Avatar>
-              <Box>
-                <Typography sx={{ fontWeight: 700, fontSize: 14 }}>{privateChatUser.name}</Typography>
-                <Typography sx={{ fontSize: 11, opacity: 0.6 }}>Private Chat</Typography>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography
+                  noWrap
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: 14,
+                    maxWidth: "100%",
+                  }}
+                >
+                  {privateChatUser.name}
+                </Typography>
+                <Typography noWrap sx={{ fontSize: 11, opacity: 0.6 }}>Private Chat</Typography>
               </Box>
             </Stack>
 
-            <Box sx={{ flex: 1 }} />
-            <IconButton onClick={closeRightPanel} size="small"><CloseIcon fontSize="small" /></IconButton>
+            <IconButton onClick={closeRightPanel} size="small" sx={{ color: "rgba(255,255,255,0.75)", flexShrink: 0 }}><CloseIcon fontSize="small" /></IconButton>
           </Box>
 
           {/* 2. Private Chat Messages Area + 3. Input — wrapped for guest restriction */}
@@ -19201,7 +19337,18 @@ export default function NewLiveMeeting() {
             onSignUp={() => setGuestRegModalOpen(true)}
           >
             {/* Message scroll area */}
-            <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+            <Box
+              ref={privateChatListRef}
+              onScroll={handlePrivateChatScroll}
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                p: 2,
+                bgcolor: "transparent",
+                ...scrollSx,
+              }}
+            >
               {privateChatLoading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                   <CircularProgress size={24} />
@@ -19212,7 +19359,17 @@ export default function NewLiveMeeting() {
                   <Typography fontSize={13}>Start a private conversation</Typography>
                 </Box>
               ) : (
-                <Stack spacing={1.25}>
+                <Stack spacing={1.25} sx={{ minHeight: "100%", justifyContent: "flex-end" }}>
+                  {privateChatHasOlder && (
+                    <Button
+                      size="small"
+                      onClick={loadOlderPrivateMessages}
+                      disabled={privateChatLoadingOlder}
+                      sx={{ alignSelf: "center", textTransform: "none", fontSize: 12, color: "rgba(255,255,255,0.65)" }}
+                    >
+                      {privateChatLoadingOlder ? "Loading…" : "Load older messages"}
+                    </Button>
+                  )}
                   {privateTimelineItems.map((item) => {
                     if (item.type === "system") {
                       return (
@@ -19243,7 +19400,8 @@ export default function NewLiveMeeting() {
                             variant="outlined"
                             sx={{
                               p: 1.25,
-                              maxWidth: "85%",
+                              maxWidth: "82%",
+                              minWidth: 0,
                               bgcolor: "rgba(20,184,177,0.1)",
                               borderColor: "rgba(20,184,177,0.4)",
                               borderRadius: 2,
@@ -19341,11 +19499,16 @@ export default function NewLiveMeeting() {
                               variant="outlined"
                               sx={{
                                 p: 1.25,
-                                maxWidth: "85%",
-                                bgcolor: m.mine ? "rgba(20,184,177,0.15)" : "rgba(255,255,255,0.03)",
-                                borderColor: m.mine ? "rgba(20,184,177,0.3)" : "rgba(255,255,255,0.08)",
-                                borderRadius: 2,
+                                maxWidth: "82%",
+                                minWidth: 0,
+                                bgcolor: m.mine ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.055)",
+                                borderColor: m.mine ? "rgba(20,184,177,0.45)" : "rgba(255,255,255,0.12)",
+                                borderRadius: m.mine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
+                                boxShadow: "none",
+                                color: "rgba(255,255,255,0.92)",
                                 opacity: m.is_deleted ? 0.6 : 1,
+                                overflowWrap: "break-word",
+                                wordBreak: "break-word",
                               }}
                             >
                               {/* Message body with deleted/edited states */}
@@ -19355,6 +19518,8 @@ export default function NewLiveMeeting() {
                                   opacity: m.is_deleted ? 0.6 : 0.9,
                                   fontStyle: m.is_deleted ? "italic" : "normal",
                                   color: m.is_deleted ? "#999" : "inherit",
+                                  overflowWrap: "anywhere",
+                                  wordBreak: "break-word",
                                 }}
                               >
                                 {m.body}
@@ -19381,7 +19546,13 @@ export default function NewLiveMeeting() {
             </Box>
 
             {/* Input box */}
-            <Box sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <Box sx={{
+              p: 2,
+              flexShrink: 0,
+              borderTop: "1px solid rgba(255,255,255,0.08)",
+              bgcolor: "rgba(0,0,0,0.10)",
+              backdropFilter: "blur(10px)",
+            }}>
               <TextField
                 fullWidth
                 placeholder={`Message ${privateChatUser.name}...`}
@@ -19404,12 +19575,20 @@ export default function NewLiveMeeting() {
                   ),
                 }}
                 sx={{
-                  "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.03)", borderRadius: 2 },
+                  "& .MuiOutlinedInput-root": {
+                    bgcolor: "rgba(255,255,255,0.045)",
+                    borderRadius: 2,
+                    color: "rgba(255,255,255,0.92)",
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.10)" },
+                    "&:hover fieldset": { borderColor: "rgba(20,184,177,0.45)" },
+                    "&.Mui-focused fieldset": { borderColor: "#14b8b1" },
+                  },
+                  "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.55)", opacity: 1 },
                 }}
               />
             </Box>
           </GuestRestrictionOverlay>
-        </>
+        </Box>
       ) : (
         // ================= EXISTING TABS BODY (REUSED) =================
         (<>
@@ -24143,7 +24322,9 @@ export default function NewLiveMeeting() {
   const SidebarIconRail = (
     <Box
       sx={{
-        width: 70, // Fixed width for the rail
+        width: ICON_RAIL_W,
+        minWidth: ICON_RAIL_W,
+        maxWidth: ICON_RAIL_W,
         flexShrink: 0,
         display: "flex",
         flexDirection: "column",
@@ -24152,6 +24333,7 @@ export default function NewLiveMeeting() {
         gap: 2.5,
         bgcolor: "rgba(0,0,0,0.3)",
         borderLeft: "1px solid rgba(255,255,255,0.08)",
+        overflow: "hidden",
       }}
     >
       {/* Chat Icon */}
@@ -24366,9 +24548,45 @@ export default function NewLiveMeeting() {
   );
 
   const RightPanelContent = (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "row", overflow: "hidden" }}>
-      {SidebarMainContent}
-      {SidebarIconRail}
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "row",
+        flexWrap: "nowrap",
+        alignItems: "stretch",
+        overflow: "hidden",
+        minHeight: 0,
+        minWidth: 0,
+      }}
+    >
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          height: "100%",
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {SidebarMainContent}
+      </Box>
+      <Box
+        sx={{
+          width: ICON_RAIL_W,
+          minWidth: ICON_RAIL_W,
+          maxWidth: ICON_RAIL_W,
+          height: "100%",
+          minHeight: 0,
+          flexShrink: 0,
+          overflow: "hidden",
+        }}
+      >
+        {SidebarIconRail}
+      </Box>
     </Box>
   );
 
@@ -26746,14 +26964,18 @@ export default function NewLiveMeeting() {
                     borderColor: "rgba(255,255,255,0.08)",
                     bgcolor: "rgba(0,0,0,0.35)",
                     backdropFilter: "blur(10px)",
-                    px: 2,
+                    px: { xs: 1.5, sm: 2 },
                     py: 1,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 1.5,
+                    gap: { xs: 0.75, sm: 1.5 },
                     mx: "auto",
-                    width: { xs: "100%", sm: "auto" },
+                    maxWidth: { xs: "calc(100vw - 24px)", sm: "auto" },
+                    width: { xs: "auto", sm: "auto" },
+                    flexWrap: "wrap",
+                    rowGap: 1,
+                    overflow: "hidden",
                   }}
                 >
                   <Tooltip title={(isOnBreak && !isBreakout) ? "Disabled during break" : (!micOn && !selfCanProduceAudio ? "Request unmute" : (micOn ? "Mute" : "Unmute"))}>
@@ -27258,22 +27480,38 @@ export default function NewLiveMeeting() {
               </Box>
             </Box>
 
-            {/* Right Panel (Desktop) */}
+            {/* Right Panel (Desktop) - Fixed Horizontal Layout */}
             {isMdUp && (
-              <Box sx={{ display: "flex", flexDirection: "row", height: `calc(100vh - ${LAYOUT_TOP_OFFSET}px)`, position: "sticky", top: LAYOUT_TOP_OFFSET }}>
-                {/* Content Panel (Collapsible) */}
+              <Box sx={{
+                display: "flex",
+                flexDirection: "row",
+                height: `calc(100vh - ${LAYOUT_TOP_OFFSET}px)`,
+                position: "sticky",
+                top: LAYOUT_TOP_OFFSET,
+                width: rightPanelOpen ? RIGHT_PANEL_W : ICON_RAIL_W,
+                transition: "width 0.3s ease-out",
+                flexShrink: 0,
+                flexWrap: "nowrap",
+                overflow: "hidden",
+              }}>
+                {/* Content Panel (Collapsible) - Responsive Width */}
                 {rightPanelOpen && (
                   <Box
                     sx={{
-                      width: RIGHT_PANEL_W - 70, // 350px left for content
+                      width: `calc(${RIGHT_PANEL_W}px - ${ICON_RAIL_W}px)`,
                       borderLeft: "1px solid rgba(255,255,255,0.08)",
                       bgcolor: "rgba(0,0,0,0.25)",
                       backdropFilter: "blur(10px)",
                       height: "100%",
+                      minHeight: 0,
                       overflow: "hidden",
-                      // (optional) to match the “padded card” look:
+                      display: "flex",
+                      flexDirection: "column",
                       p: 2,
                       boxSizing: "border-box",
+                      minWidth: 0,
+                      maxWidth: `calc(${RIGHT_PANEL_W}px - ${ICON_RAIL_W}px)`,
+                      flexShrink: 0,
                     }}
                   >
                     <Paper
@@ -27285,6 +27523,8 @@ export default function NewLiveMeeting() {
                         borderColor: "rgba(255,255,255,0.08)",
                         bgcolor: "rgba(255,255,255,0.03)",
                         overflow: "hidden",
+                        display: "flex",
+                        flexDirection: "column",
                       }}
                     >
                       {SidebarMainContent}
@@ -27292,8 +27532,16 @@ export default function NewLiveMeeting() {
                   </Box>
                 )}
 
-                {/* Icon Rail (Always Visible) */}
-                <Box sx={{ height: "100%" }}>
+                {/* Icon Rail (Always Visible) - Fixed Width */}
+                <Box sx={{
+                  height: "100%",
+                  minHeight: 0,
+                  width: ICON_RAIL_W,
+                  minWidth: ICON_RAIL_W,
+                  maxWidth: ICON_RAIL_W,
+                  flexShrink: 0,
+                  overflow: "hidden",
+                }}>
                   {SidebarIconRail}
                 </Box>
               </Box>
@@ -27307,10 +27555,16 @@ export default function NewLiveMeeting() {
                 onClose={() => setRightOpen(false)}
                 PaperProps={{
                   sx: {
-                    width: { xs: "92vw", sm: 420 },
+                    width: { xs: "clamp(280px, 95vw, 100vw)", sm: "clamp(320px, 90vw, 420px)" },
+                    maxWidth: "100vw",
+                    height: "100vh",
                     bgcolor: "rgba(0,0,0,0.85)",
                     borderLeft: "1px solid rgba(255,255,255,0.08)",
-
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                    minWidth: 0,
+                    boxSizing: "border-box",
                     // ✅ FORCE WHITE TEXT ONLY IN MOBILE RIGHT PANEL
                     color: "#fff",
                     "&, & *": { color: "#fff" },

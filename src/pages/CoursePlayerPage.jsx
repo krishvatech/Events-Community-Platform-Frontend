@@ -1100,26 +1100,56 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
 
 // ── Mergers.AI Video Search Widget ────────────────────────────────────────────
 function MergersAIWidget({ courseId, courseName }) {
-  const [token, setToken] = useState(null);
+  // Courses & selection
+  const [courses, setCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+
+  // Search & results
+  const [searchQuery, setSearchQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [selectedResult, setSelectedResult] = useState(null);
+
+  // UI state
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState(null);
 
+  // Load available courses on mount
   useEffect(() => {
     if (!courseId) return;
 
     let cancelled = false;
-    let refreshInterval = null;
 
-    const fetchToken = async () => {
+    const fetchCourses = async () => {
       try {
-        const data = await apiFetch(`/courses/${courseId}/mergersai/token/`);
-        if (!cancelled) {
-          setToken(data);
-          setError(null);
+        const data = await apiFetch(`/courses/${courseId}/mergersai/my-courses/`);
+        if (cancelled) return;
+
+        const availableCourses = data.courses || [];
+        const currentCourse = data.current_course;
+
+        setCourses(availableCourses);
+        setError(null);
+
+        // Try to auto-select a course
+        let selectedCourseToSet = null;
+
+        if (availableCourses.length > 0) {
+          // If we have courses from Mergers.AI, try to match current course
+          selectedCourseToSet = availableCourses.find(
+            c => c.slug === currentCourse.slug || c.id === currentCourse.slug
+          ) || availableCourses[0];
+        } else if (currentCourse) {
+          // Fallback: use current course even if no Mergers.AI courses
+          selectedCourseToSet = currentCourse;
+        }
+
+        if (selectedCourseToSet) {
+          setSelectedCourse(selectedCourseToSet);
         }
       } catch (e) {
         if (!cancelled) {
-          console.error("Failed to fetch Mergers.AI token:", e);
+          console.error("Failed to load Mergers.AI courses:", e);
           setError("AI search not available");
         }
       } finally {
@@ -1127,19 +1157,52 @@ function MergersAIWidget({ courseId, courseName }) {
       }
     };
 
-    // Fetch token immediately
-    fetchToken();
-
-    // Refresh token every 13 minutes (token expires after 15 minutes)
-    // Use 13 minutes to provide buffer and avoid token expiry mid-session
-    refreshInterval = setInterval(fetchToken, 13 * 60 * 1000);
-
-    return () => {
-      cancelled = true;
-      if (refreshInterval) clearInterval(refreshInterval);
-    };
+    fetchCourses();
+    return () => { cancelled = true; };
   }, [courseId]);
 
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim() || !selectedCourse || searching) return;
+
+    setSearching(true);
+    setResults([]);
+    setSelectedResult(null);
+
+    try {
+      const data = await apiFetch(`/courses/${courseId}/mergersai/search/`, {
+        method: "POST",
+        body: JSON.stringify({
+          question: searchQuery,
+          course_slug: selectedCourse.slug || selectedCourse.id,
+          top_k: 3,
+        }),
+      });
+
+      const searchResults = data.results || [];
+
+      // Show empty state if no results or low confidence
+      if (searchResults.length === 0 || (searchResults[0]?.confidence_score || 0) < 0.55) {
+        setResults([]);
+      } else {
+        setResults(searchResults);
+      }
+    } catch (e) {
+      console.error("Search failed:", e);
+      setError("Search failed. Please try again.");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const formatTime = (seconds) => {
+    if (!seconds) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  // Loading state
   if (loading) {
     return (
       <Box sx={{ p: 2, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
@@ -1151,6 +1214,7 @@ function MergersAIWidget({ courseId, courseName }) {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <Box sx={{ p: 2, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
@@ -1161,10 +1225,7 @@ function MergersAIWidget({ courseId, courseName }) {
     );
   }
 
-  if (!token) {
-    return null;
-  }
-
+  // Render widget (even if no courses available, still allow search)
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", bgcolor: "#ffffff" }}>
       {/* Header */}
@@ -1177,20 +1238,205 @@ function MergersAIWidget({ courseId, courseName }) {
         </Typography>
       </Box>
 
-      {/* Widget iframe */}
-      <Box sx={{ flex: 1, overflow: "hidden", p: 1.5 }}>
-        <iframe
-          src={token.widget_url}
-          sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
-          allow="autoplay; fullscreen; picture-in-picture"
-          style={{
-            width: "100%",
-            height: "100%",
-            border: 0,
-            borderRadius: "8px",
-          }}
-          title="IMAA Video Search"
-        />
+      {/* Course selector or indicator */}
+      {(courses.length > 1 || selectedCourse) && (
+        <Box sx={{ px: 2, py: 1, borderBottom: "1px solid #e5e7eb", bgcolor: "#ffffff", flexShrink: 0 }}>
+          <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", fontWeight: 600, display: "block", mb: 0.5 }}>
+            Course:
+          </Typography>
+          {courses.length > 1 ? (
+            <select
+              value={selectedCourse?.slug || selectedCourse?.id || ""}
+              onChange={(e) => {
+                const course = courses.find(c => (c.slug || c.id) === e.target.value);
+                setSelectedCourse(course);
+                setResults([]);
+                setSelectedResult(null);
+              }}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                fontSize: "13px",
+                border: "1px solid #d1d5db",
+                borderRadius: "4px",
+                fontFamily: "inherit",
+              }}
+            >
+              {courses.map(c => (
+                <option key={c.slug || c.id} value={c.slug || c.id}>
+                  {c.name || c.slug || c.id}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <Typography variant="caption" sx={{ color: "#374151", fontSize: "12px", display: "block" }}>
+              {selectedCourse?.name || selectedCourse?.slug || "Current course"}
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {/* Search box */}
+      <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid #e5e7eb", bgcolor: "#ffffff", flexShrink: 0 }}>
+        <form onSubmit={handleSearch} style={{ display: "flex", gap: "8px" }}>
+          <input
+            type="text"
+            placeholder="Ask a question..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            disabled={searching}
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              fontSize: "13px",
+              border: "1px solid #d1d5db",
+              borderRadius: "4px",
+              fontFamily: "inherit",
+            }}
+          />
+          <Button
+            type="submit"
+            disabled={!searchQuery.trim() || searching}
+            size="small"
+            sx={{
+              bgcolor: "#1bbbb3",
+              color: "#ffffff",
+              textTransform: "none",
+              fontSize: "13px",
+              px: 1.5,
+              "&:hover": { bgcolor: "#1aa19a" },
+              "&:disabled": { bgcolor: "#d1d5db", color: "#9ca3af" },
+            }}
+          >
+            {searching ? <CircularProgress size={16} sx={{ color: "inherit", mr: 0.5 }} /> : "Search"}
+          </Button>
+        </form>
+      </Box>
+
+      {/* Results area */}
+      <Box sx={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+        {/* No search performed yet */}
+        {searchQuery && results.length === 0 && !searching && (
+          <Box sx={{ p: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "12px" }}>
+              No relevant clip found in this course's videos. Try rephrasing your question.
+            </Typography>
+          </Box>
+        )}
+
+        {/* Results list */}
+        {results.length > 0 && !selectedResult && (
+          <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1 }}>
+            {results.map((result, idx) => (
+              <Box
+                key={idx}
+                onClick={() => setSelectedResult(result)}
+                sx={{
+                  p: 1.5,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    bgcolor: "#f3f4f6",
+                    borderColor: "#1bbbb3",
+                    transform: "translateX(2px)",
+                  },
+                }}
+              >
+                <Typography variant="caption" fontWeight={600} sx={{ color: "#111827", fontSize: "12px", display: "block", mb: 0.5 }}>
+                  {result.title}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#9ca3af", fontSize: "11px", display: "block", mb: 0.5 }}>
+                  {result.course_name}
+                </Typography>
+                {result.confidence_score && (
+                  <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", display: "block", mb: 0.5 }}>
+                    Match: {Math.round(result.confidence_score * 100)}%
+                  </Typography>
+                )}
+                <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", display: "block", mb: 0.5, fontStyle: "italic" }}>
+                  {result.transcript_segment?.substring(0, 60)}...
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedResult(result);
+                  }}
+                  sx={{
+                    textTransform: "none",
+                    fontSize: "11px",
+                    color: "#1bbbb3",
+                    fontWeight: 600,
+                    p: 0,
+                    mt: 0.5,
+                    "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
+                  }}
+                >
+                  Watch from {formatTime(result.start_time)}
+                </Button>
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* Selected result with Vimeo player */}
+        {selectedResult && (
+          <Box sx={{ p: 1.5, flex: 1, display: "flex", flexDirection: "column" }}>
+            <Button
+              size="small"
+              onClick={() => setSelectedResult(null)}
+              sx={{
+                textTransform: "none",
+                fontSize: "12px",
+                color: "#6b7280",
+                p: 0,
+                mb: 1,
+                "&:hover": { color: "#111827" },
+              }}
+            >
+              ← Back to results
+            </Button>
+
+            <Typography variant="caption" fontWeight={600} sx={{ color: "#111827", fontSize: "13px", display: "block", mb: 0.5 }}>
+              {selectedResult.title}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#9ca3af", fontSize: "11px", display: "block", mb: 1 }}>
+              {selectedResult.course_name}
+            </Typography>
+
+            {selectedResult.vimeo_embed_url && (
+              <Box sx={{ flex: 1, overflow: "hidden", borderRadius: "6px", mb: 1 }}>
+                <iframe
+                  src={selectedResult.vimeo_embed_url}
+                  frameBorder="0"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  style={{ width: "100%", height: "100%", borderRadius: "6px" }}
+                  title={selectedResult.title}
+                />
+              </Box>
+            )}
+
+            {selectedResult.transcript_segment && (
+              <Box sx={{ p: 1, bgcolor: "#f9fafb", borderRadius: "4px", flex: 0 }}>
+                <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", fontStyle: "italic", display: "block" }}>
+                  "{selectedResult.transcript_segment.substring(0, 200)}"
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* Idle state */}
+        {!searchQuery && results.length === 0 && !selectedResult && (
+          <Box sx={{ p: 2, textAlign: "center", flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "12px" }}>
+              Ask a question about course topics
+            </Typography>
+          </Box>
+        )}
       </Box>
     </Box>
   );
