@@ -2478,6 +2478,15 @@ export default function NewLiveMeeting() {
   const [participantsPanelActive, setParticipantsPanelActive] = useState(false);
   const participantsLiteInFlightRef = useRef(false);
   const participantsLiteNotFoundRef = useRef(false);
+  const participantsLiteNextAfterIdRef = useRef(0);
+  const participantsLiteHasMoreRef = useRef(true);
+  const participantsLiteLastFullRefreshRef = useRef(0);
+
+  useEffect(() => {
+    participantsLiteNextAfterIdRef.current = 0;
+    participantsLiteHasMoreRef.current = true;
+    participantsLiteLastFullRefreshRef.current = 0;
+  }, [eventId, participantsPanelActive]);
 
   //  Live Minimal Mode - Block non-critical APIs during join burst
   // Only critical APIs (/rtk/join/, /live/rejoin/, WebSocket) should run immediately
@@ -2577,8 +2586,22 @@ export default function NewLiveMeeting() {
       participantsLiteInFlightRef.current = true;
 
       try {
+        const now = Date.now();
+        if (!participantsLiteHasMoreRef.current) {
+          // Full cursor cycle completed. Refresh the first page only after a
+          // longer interval instead of repeatedly loading all pages.
+          if (now - participantsLiteLastFullRefreshRef.current < LIVE_PARTICIPANTS_REFRESH_MS) {
+            return;
+          }
+          participantsLiteNextAfterIdRef.current = 0;
+          participantsLiteHasMoreRef.current = true;
+        }
+
+        const afterId = Number(participantsLiteNextAfterIdRef.current || 0);
         const headers = { accept: "application/json", ...authHeader() };
-        const res = await fetch(`${API_ROOT}/events/${eventId}/participants-lite/?cursor=1&limit=100`, { headers });
+        const qs = new URLSearchParams({ cursor: "1", limit: "100" });
+        if (afterId > 0) qs.set("after_id", String(afterId));
+        const res = await fetch(`${API_ROOT}/events/${eventId}/participants-lite/?${qs.toString()}`, { headers });
 
         if (res.status === 404) {
           participantsLiteNotFoundRef.current = true;
@@ -2604,14 +2627,28 @@ export default function NewLiveMeeting() {
           }
         });
 
+        if (!Array.isArray(payload)) {
+          participantsLiteHasMoreRef.current = Boolean(payload.has_more);
+          participantsLiteNextAfterIdRef.current = Number(payload.next_after_id || 0);
+          if (!payload.has_more) {
+            participantsLiteLastFullRefreshRef.current = Date.now();
+          }
+        }
+
         if (Object.keys(newCache).length) {
           setParticipantKycCache((prev) => ({ ...prev, ...newCache }));
         }
 
         if (import.meta.env?.DEV) {
           console.debug(
-            `[LiveMeeting] participants-lite loaded ${Object.keys(newCache).length} users`
+            `[LiveMeeting] participants-lite loaded ${Object.keys(newCache).length} users; has_more=${participantsLiteHasMoreRef.current}; next_after_id=${participantsLiteNextAfterIdRef.current}`
           );
+        }
+
+        // While the panel is open, walk additional cursor pages gradually.
+        // This avoids one large payload but still fills the participant cache.
+        if (alive && participantsLiteHasMoreRef.current) {
+          window.setTimeout(fetchParticipantsLite, 1200);
         }
       } catch (err) {
         console.warn("[LiveMeeting] participants-lite error:", err?.message || err);
