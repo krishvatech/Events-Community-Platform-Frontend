@@ -119,7 +119,6 @@ function getMissingProfileFieldsForApplication(profileResponse = {}) {
   if (!firstNonEmpty(profile.job_title, profileResponse.job_title)) missing.job_title = "Job Title";
   if (!firstNonEmpty(profile.company, profile.company_name, profileResponse.company, profileResponse.company_name)) missing.company = "Company";
   if (!firstNonEmpty(profile.location, profile.country, profileResponse.location, profileResponse.country)) missing.location = "Country/Region";
-  if (!getProfilePhone(profileResponse)) missing.phone = "Contact Number";
 
   return missing;
 }

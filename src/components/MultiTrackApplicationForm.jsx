@@ -369,15 +369,14 @@ const MultiTrackApplicationForm = ({
   };
 
   const isApplicantDataValid = () => {
-    const { first_name, last_name, email, job_title, company_name, location, phone } = applicantData;
+    const { first_name, last_name, email, job_title, company_name, location } = applicantData;
     return Boolean(
       first_name?.trim() &&
       last_name?.trim() &&
       email?.trim() &&
       job_title?.trim() &&
       company_name?.trim() &&
-      location?.trim() &&
-      phone?.trim()
+      location?.trim()
     );
   };
 
@@ -644,6 +643,11 @@ const MultiTrackApplicationForm = ({
           form_answers_count: Object.keys(ta.form_answers || {}).length,
         })),
       });
+
+      // Save shared profile fields first because the backend lead-gen validation
+      // checks request.user.profile, not only the /apply/ payload.
+      // Contact Number is optional, but location/job/company must be persisted before submit.
+      await saveRegistrationProfile();
 
       const response = await apiClient.post(
         `/events/${eventId}/apply/`,
@@ -1156,11 +1160,10 @@ const MultiTrackApplicationForm = ({
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="Contact Number *"
+                    label="Contact Number"
                     type="tel"
                     value={applicantData.phone}
                     onChange={(e) => handleApplicantChange('phone', e.target.value)}
-                    required
                   />
                 </Grid>
                 <Grid item xs={12}>
