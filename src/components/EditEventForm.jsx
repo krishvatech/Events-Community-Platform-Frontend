@@ -272,6 +272,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [isFree, setIsFree] = useState(event?.is_free || false);
     const [priceLabel, setPriceLabel] = useState(event?.price_label || "");
     const [registrationType, setRegistrationType] = useState(event?.registration_type || "open");
+    const [attendeeMarkerEnabled, setAttendeeMarkerEnabled] = useState(Boolean(event?.attendee_marker_enabled));
+    const [attendeeMarkerLabel, setAttendeeMarkerLabel] = useState(event?.attendee_marker_label || "");
     const [cpdCpeMinutes, setCpdCpeMinutes] = useState(
         event?.cpd_cpe_minutes === null || typeof event?.cpd_cpe_minutes === "undefined"
             ? ""
@@ -1337,6 +1339,11 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("price_label", priceLabel.trim());  // always send, never clear
         fd.append("is_free", String(isFree));
         fd.append("registration_type", registrationType);
+        // Event-level optional application checkbox. Only meaningful for apply-type events;
+        // disabling it (or switching away from apply) clears the saved label.
+        const markerEnabled = registrationType === "apply" && attendeeMarkerEnabled;
+        fd.append("attendee_marker_enabled", String(markerEnabled));
+        fd.append("attendee_marker_label", markerEnabled ? attendeeMarkerLabel.trim() : "");
         if (cpdCpeMinutes === "") {
             fd.append("cpd_cpe_minutes", "");
         } else {
@@ -2038,6 +2045,29 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                     <Typography variant="caption" sx={{ color: '#1565c0', fontWeight: 500 }}>
                                         💡 This event will remain in Draft until at least one application track is created.
                                     </Typography>
+                                </Box>
+                            )}
+                            {registrationType === 'apply' && (
+                                <Box sx={{ mt: 2 }}>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={attendeeMarkerEnabled}
+                                                onChange={(e) => setAttendeeMarkerEnabled(e.target.checked)}
+                                            />
+                                        }
+                                        label="Show extra checkbox in application form"
+                                    />
+                                    {attendeeMarkerEnabled && (
+                                        <TextField
+                                            fullWidth
+                                            label="Checkbox label"
+                                            value={attendeeMarkerLabel}
+                                            onChange={(e) => setAttendeeMarkerLabel(e.target.value)}
+                                            helperText="Example: I am an IMAA alumnus"
+                                            sx={{ mt: 1 }}
+                                        />
+                                    )}
                                 </Box>
                             )}
                         </Box>

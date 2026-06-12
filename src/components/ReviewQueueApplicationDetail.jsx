@@ -266,6 +266,12 @@ const ReviewQueueApplicationDetail = ({
           {application.applicant_linkedin && (
             <InfoRow label="LinkedIn" value={application.applicant_linkedin} />
           )}
+          {event?.attendee_marker_enabled && (
+            <InfoRow
+              label={event?.attendee_marker_label || 'Marker'}
+              value={application.attendee_marker_value ? 'Yes' : 'No'}
+            />
+          )}
           {application.opt_out_automated_communication && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               ⚠️ Applicant has opted out of automated communication

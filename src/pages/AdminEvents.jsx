@@ -436,6 +436,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [isFree, setIsFree] = React.useState(true);
   const [priceLabel, setPriceLabel] = React.useState("");
   const [registrationType, setRegistrationType] = React.useState("open");
+  const [attendeeMarkerEnabled, setAttendeeMarkerEnabled] = React.useState(false);
+  const [attendeeMarkerLabel, setAttendeeMarkerLabel] = React.useState("");
   const [maxParticipants, setMaxParticipants] = React.useState(""); // New state
   const [cpdCpeMinutes, setCpdCpeMinutes] = React.useState("");
   const [cpdCpeMinutesPerCredit, setCpdCpeMinutesPerCredit] = React.useState("60");
@@ -952,6 +954,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("price_label", priceLabel.trim());  // always send, never clear
     fd.append("is_free", String(isFree));
     fd.append("registration_type", registrationType);
+    // Event-level optional application checkbox. Only saved enabled for apply-type events;
+    // switching away from apply clears the saved label.
+    const markerEnabled = registrationType === "apply" && attendeeMarkerEnabled;
+    fd.append("attendee_marker_enabled", String(markerEnabled));
+    fd.append("attendee_marker_label", markerEnabled ? attendeeMarkerLabel.trim() : "");
     if (cpdCpeMinutes === "") {
       fd.append("cpd_cpe_minutes", "");
     } else {
@@ -1407,6 +1414,29 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <MenuItem value="open">Open Registration</MenuItem>
                 <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
               </TextField>
+              {registrationType === "apply" && (
+                <Box sx={{ mt: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={attendeeMarkerEnabled}
+                        onChange={(e) => setAttendeeMarkerEnabled(e.target.checked)}
+                      />
+                    }
+                    label="Show extra checkbox in application form"
+                  />
+                  {attendeeMarkerEnabled && (
+                    <TextField
+                      fullWidth
+                      label="Checkbox label"
+                      value={attendeeMarkerLabel}
+                      onChange={(e) => setAttendeeMarkerLabel(e.target.value)}
+                      helperText="Example: I am an IMAA alumnus"
+                      sx={{ mt: 1 }}
+                    />
+                  )}
+                </Box>
+              )}
             </Box>
           </Paper>
 

@@ -65,6 +65,7 @@ const MultiTrackApplicationForm = ({
     phone: '',
     linkedin_url: '',
     comments: '',
+    attendee_marker_value: false,
   });
 
   // Track-specific data
@@ -589,6 +590,9 @@ const MultiTrackApplicationForm = ({
         company_name: applicantData.company_name,
         linkedin_url: applicantData.linkedin_url,
         comments: applicantData.comments,
+        // Event-level optional checkbox. Backend re-gates this on the event's
+        // attendee_marker_enabled flag, so it is safe to always include.
+        attendee_marker_value: !!applicantData.attendee_marker_value,
       };
       selectedTracks.forEach((trackId) => {
         const mode = getSubmissionModeForTrack(trackId);
@@ -1185,6 +1189,21 @@ const MultiTrackApplicationForm = ({
                     onChange={(e) => handleApplicantChange('comments', e.target.value)}
                   />
                 </Grid>
+                {/* Event-level optional confirmation checkbox. Shown only when the
+                    organizer enabled it for this event. Answer is stored on the application. */}
+                {event?.attendee_marker_enabled && (
+                  <Grid item xs={12}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={!!applicantData.attendee_marker_value}
+                          onChange={(e) => handleApplicantChange('attendee_marker_value', e.target.checked)}
+                        />
+                      }
+                      label={event?.attendee_marker_label || 'Additional confirmation'}
+                    />
+                  </Grid>
+                )}
               </Grid>
             </Box>
           ) : activeStep <= selectedTracks.length ? (

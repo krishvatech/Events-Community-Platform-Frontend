@@ -3744,7 +3744,7 @@ export default function EventManagePage() {
                     <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Pre-Approval</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Marker</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>{event?.attendee_marker_label || 'Marker'}</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Comments</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Applied At</TableCell>
                     <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>Actions</TableCell>
