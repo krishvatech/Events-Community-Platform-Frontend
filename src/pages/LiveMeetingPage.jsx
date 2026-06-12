@@ -15419,11 +15419,29 @@ export default function NewLiveMeeting() {
     });
   }, []);
 
-  const mergeByIdReplace = useCallback((current, newer) => {
-    const idMap = new Map(newer.map((item) => [String(item?.id ?? ""), item]));
-    return current
-      .map((item) => idMap.get(String(item?.id ?? "")) ?? item)
-      .concat(newer.filter((item) => !current.some((c) => c?.id === item?.id)));
+  const mergeByIdReplace = useCallback((current = [], newer = []) => {
+    const replacementById = new Map();
+    (newer || []).forEach((item) => {
+      const key = String(item?.id ?? "");
+      if (key) replacementById.set(key, item);
+    });
+
+    const seen = new Set();
+    const merged = (current || []).map((item) => {
+      const key = String(item?.id ?? "");
+      if (!key) return item;
+      seen.add(key);
+      return replacementById.get(key) ?? item;
+    });
+
+    (newer || []).forEach((item) => {
+      const key = String(item?.id ?? "");
+      if (!key || seen.has(key)) return;
+      merged.push(item);
+      seen.add(key);
+    });
+
+    return merged;
   }, []);
 
   const fetchChatMessages = useCallback(
@@ -16224,9 +16242,9 @@ export default function NewLiveMeeting() {
 
             // Add new message, deduplicate by ID (sender gets message from API response + WebSocket)
             setChatMessages((prev) => {
-              const isDuplicate = prev.some((m) => m.id === data.message.id);
+              const isDuplicate = prev.some((m) => String(m?.id) === String(data.message?.id));
               console.log("[EventChat WS] Message ID:", data.message.id, "Duplicate?", isDuplicate);
-              return isDuplicate ? prev : [...prev, data.message];
+              return mergeByIdReplace(prev, [data.message]);
             });
 
             // Auto-scroll after React re-renders if user was near bottom
@@ -16242,15 +16260,11 @@ export default function NewLiveMeeting() {
           } else if (data.type === "message.edited") {
             console.log("[EventChat WS] Message edited, id:", data.message.id);
             // Update edited message
-            setChatMessages((prev) =>
-              prev.map((m) => (m.id === data.message.id ? data.message : m))
-            );
+            setChatMessages((prev) => mergeByIdReplace(prev, [data.message]));
           } else if (data.type === "message.deleted") {
             console.log("[EventChat WS] Message deleted, id:", data.message.id);
             // Update deleted message
-            setChatMessages((prev) =>
-              prev.map((m) => (m.id === data.message.id ? data.message : m))
-            );
+            setChatMessages((prev) => mergeByIdReplace(prev, [data.message]));
           }
         } catch (e) {
           console.error("[EventChat WS] Parse error:", e);
@@ -16294,6 +16308,7 @@ export default function NewLiveMeeting() {
     chatConversationId,
     isNearBottom,
     scrollToBottom,
+    mergeByIdReplace,
   ]);
 
   useEffect(() => {
@@ -16470,7 +16485,9 @@ export default function NewLiveMeeting() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.detail || "Failed to send message.");
       console.log("[SendChat] ✅ Message sent, id:", data?.id);
-      setChatMessages((prev) => [...prev, ...(data ? [data] : [])]);
+      if (data) {
+        setChatMessages((prev) => mergeByIdReplace(prev, [data]));
+      }
       setChatInput("");
       setNewMessageCount(0);  // ✅ Clear "new message" indicator when user sends
       // ✅ Always scroll to bottom when sender sends a message
@@ -16481,7 +16498,7 @@ export default function NewLiveMeeting() {
     } finally {
       setChatSending(false);
     }
-  }, [activeChatConversationId, chatInput, chatSending, ensureActiveConversation, scrollToBottom]);
+  }, [activeChatConversationId, chatInput, chatSending, ensureActiveConversation, scrollToBottom, mergeByIdReplace]);
 
   const updateChatMessage = useCallback(
     async (messageId, body) => {
