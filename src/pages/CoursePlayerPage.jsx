@@ -1170,11 +1170,12 @@ function MergersAIWidget({ courseId, courseName }) {
     setSelectedResult(null);
 
     try {
+      const mergersaiSlug = getMergersAISlug(selectedCourse);
       const data = await apiFetch(`/courses/${courseId}/mergersai/search/`, {
         method: "POST",
         body: JSON.stringify({
           question: searchQuery,
-          course_slug: selectedCourse.slug || selectedCourse.id,
+          course_slug: mergersaiSlug,
           top_k: 3,
         }),
       });
@@ -1200,6 +1201,25 @@ function MergersAIWidget({ courseId, courseName }) {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const getMergersAISlug = (course) => {
+    // If course has a slug from Mergers.AI API, use it (already correct format)
+    if (course.slug && !course.slug.includes(" ") && !course.slug.includes("(")) {
+      return course.slug;
+    }
+    // Fallback: convert local course slug to Mergers.AI format
+    // Decode HTML entities first: "&amp;" → "&"
+    // Then convert: "Essentials of Mergers & Acquisitions M&A" → "essentials-of-mergers-amp-acquisitions-m-amp-a"
+    if (course.slug) {
+      return decodeEntities(course.slug)
+        .toLowerCase()
+        .replace(/&/g, "-amp-")    // & to "-amp-" (Mergers.AI format with hyphens)
+        .replace(/\s+/g, "-")      // spaces to hyphens
+        .replace(/[()]/g, "")      // remove parentheses
+        .replace(/-+/g, "-");      // collapse multiple hyphens
+    }
+    return course.id || "";
   };
 
   // Loading state
@@ -1350,6 +1370,11 @@ function MergersAIWidget({ courseId, courseName }) {
                 <Typography variant="caption" sx={{ color: "#9ca3af", fontSize: "11px", display: "block", mb: 0.5 }}>
                   {result.course_name}
                 </Typography>
+                {result.video_id && (
+                  <Typography variant="caption" sx={{ color: "#d97706", fontSize: "10px", display: "block", mb: 0.5, fontWeight: 500 }}>
+                    Video: {result.video_id}
+                  </Typography>
+                )}
                 {result.confidence_score && (
                   <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", display: "block", mb: 0.5 }}>
                     Match: {Math.round(result.confidence_score * 100)}%
@@ -1402,9 +1427,14 @@ function MergersAIWidget({ courseId, courseName }) {
             <Typography variant="caption" fontWeight={600} sx={{ color: "#111827", fontSize: "13px", display: "block", mb: 0.5 }}>
               {selectedResult.title}
             </Typography>
-            <Typography variant="caption" sx={{ color: "#9ca3af", fontSize: "11px", display: "block", mb: 1 }}>
+            <Typography variant="caption" sx={{ color: "#9ca3af", fontSize: "11px", display: "block", mb: 0.5 }}>
               {selectedResult.course_name}
             </Typography>
+            {selectedResult.video_id && (
+              <Typography variant="caption" sx={{ color: "#d97706", fontSize: "10px", display: "block", mb: 1, fontWeight: 500 }}>
+                Video: {selectedResult.video_id}
+              </Typography>
+            )}
 
             {selectedResult.vimeo_embed_url && (
               <Box sx={{ flex: 1, overflow: "hidden", borderRadius: "6px", mb: 1 }}>
@@ -1720,21 +1750,23 @@ export default function CoursePlayerPage() {
           </Box>
         </Box>
 
-        {/* Sidebar - Right (Mergers.AI AI Widget) */}
-        <Box
-          sx={{
-            width: 340,
-            flexShrink: 0,
-            bgcolor: "#ffffff",
-            borderLeft: "1px solid #e5e7eb",
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          {/* Mergers.AI Video Search Widget */}
-          <MergersAIWidget courseId={courseId} courseName={course?.full_name} />
-        </Box>
+        {/* Sidebar - Right (Mergers.AI AI Widget) — Only show when viewing a video */}
+        {activeModule?.is_video && (
+          <Box
+            sx={{
+              width: 340,
+              flexShrink: 0,
+              bgcolor: "#ffffff",
+              borderLeft: "1px solid #e5e7eb",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            {/* Mergers.AI Video Search Widget */}
+            <MergersAIWidget courseId={courseId} courseName={course?.full_name} />
+          </Box>
+        )}
       </Box>
 
       <Snackbar
