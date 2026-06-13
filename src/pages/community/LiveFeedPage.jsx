@@ -2600,7 +2600,10 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
         : `reacted by ${primaryLiker.name} and ${othersCount} others`
       : `${(likeCount || 0).toLocaleString()} reactions`;
 
-  React.useEffect(() => { setLocal(post); }, [post]);
+  React.useEffect(() => {
+    setLocal(post);
+    setUserHasLiked(!!post.user_has_liked);
+  }, [post]);
   React.useEffect(() => {
     if (commentsEnabled === false) setCommentsOpen(false);
   }, [commentsEnabled]);
@@ -2629,7 +2632,6 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
       refreshBusy.current = false;
     }
   }
-  React.useEffect(() => { setLocal(post); refreshCounts(); }, [post]);
 
   async function toggleLike() {
     if (!canEngage) return;
@@ -3822,6 +3824,7 @@ export default function LiveFeedPage({
           likes: m.likes ?? m.like_count ?? p.metrics?.likes ?? 0,
           comments: m.comments ?? m.comment_count ?? p.metrics?.comments ?? 0,
           shares: m.shares ?? m.share_count ?? p.metrics?.shares ?? 0,
+          reaction_preview: m.reaction_preview ?? p.metrics?.reaction_preview ?? null,
         },
       };
     });
@@ -4034,30 +4037,9 @@ export default function LiveFeedPage({
   }, [posts, scope, dq, sortMode]);
 
 
-  React.useEffect(() => {
-    if (!displayPosts.length) return;
-    const ids = displayPosts.map(p => p.id);
-    let stop = false;
-
-    async function tick() {
-      try {
-        const map = await fetchBatchMetrics(ids);
-        if (stop) return;
-        setPosts(curr =>
-          curr.map(p => {
-            const m = map[p.id];
-            return m ? { ...p, user_has_liked: !!m.user_has_liked, metrics: { ...p.metrics, ...m } } : p;
-          })
-        );
-      } catch { }
-    }
-
-    const t = setInterval(() => {
-      if (document.visibilityState === "visible") tick();
-    }, 30000); // every 30s
-    tick(); // also once immediately
-    return () => { stop = true; clearInterval(t); };
-  }, [displayPosts]);
+  // Metrics are already hydrated during loadFeed() and after user actions (reactions, comments, shares, votes).
+  // Removed: continuous polling effect that was causing infinite re-renders.
+  // Each user action (handleReact, comment, share, vote) refreshes metrics for that specific post.
 
   // When navigated here from a shared message, scroll to the focused post once
   React.useEffect(() => {
@@ -4071,7 +4053,7 @@ export default function LiveFeedPage({
     } catch (e) {
       el.scrollIntoView();
     }
-  }, [focusPostId, displayPosts]);
+  }, [focusPostId]);
 
   // --- Derived data for Reactions popup (same idea as MyPostsPage) ---
   const likesFilteredUsers =
