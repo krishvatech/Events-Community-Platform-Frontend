@@ -3737,8 +3737,8 @@ export default function LiveFeedPage({
   }, [sharesOpen, sharesTarget]);
 
 
-  // Build initial URL based on scope + search
-  const buildFeedPath = React.useCallback((sc, q) => {
+  // Build initial URL based on scope + search + sort
+  const buildFeedPath = React.useCallback((sc, q, sort) => {
     const params = new URLSearchParams();
 
     if (sc === "mine") {
@@ -3748,7 +3748,12 @@ export default function LiveFeedPage({
       params.set("scope", "home"); // server does union: feed + events
     }
 
-    if (communityId) params.set("community_id", String(communityId)); // 👈 add this
+    if (communityId) params.set("community_id", String(communityId));
+
+    // Add sort parameter (backend default is 'recent' if omitted)
+    if (sort && sort !== "recent") {
+      params.set("sort", sort);
+    }
 
     const qTrim = (q || "").trim();
     if (qTrim) {
@@ -3879,14 +3884,14 @@ export default function LiveFeedPage({
     }
   }
 
-  // Initial + on scope/search change
+  // Initial + on scope/search/sort change
   React.useEffect(() => {
     setPosts([]);
     setHasMore(true);
     setNextUrl(null);
-    loadFeed(buildFeedPath(scope, dq), false);
+    loadFeed(buildFeedPath(scope, dq, sortMode), false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, dq]);
+  }, [scope, dq, sortMode]);
 
   // Realtime (optional)
   React.useEffect(() => {
@@ -4010,28 +4015,10 @@ export default function LiveFeedPage({
       });
     }
 
-    // 3) sort by mode
-    const sorted = [...arr];
-
-    if (sortMode === "popular") {
-      // 👍 Most popular = highest likes first (then newest)
-      sorted.sort((a, b) => {
-        const la = a.metrics?.likes ?? a.like_count ?? 0;
-        const lb = b.metrics?.likes ?? b.like_count ?? 0;
-        if (lb !== la) return lb - la; // more likes → higher
-        // tie-breaker: newer first
-        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-      });
-    } else {
-      // 🕒 Most recent (default)
-      sorted.sort(
-        (a, b) =>
-          new Date(b.created_at || 0) - new Date(a.created_at || 0)
-      );
-    }
-
-    return sorted;
-  }, [posts, scope, dq, sortMode]);
+    // Backend now handles sorting (sort=recent|popular via API)
+    // No client-side sorting needed; return as-is
+    return arr;
+  }, [posts, scope, dq]);
 
 
   // Metrics are already hydrated during loadFeed() and after user actions (reactions, comments, shares, votes).
@@ -4114,7 +4101,7 @@ export default function LiveFeedPage({
                 onChange={(e) => setQuery(e.target.value)} // debounced by dq
                 onKeyDown={(e) => {
                   if (e.key === "Enter")
-                    loadFeed(buildFeedPath(scope, query), false); // optional: immediate refresh
+                    loadFeed(buildFeedPath(scope, query, sortMode), false); // optional: immediate refresh
                 }}
                 InputProps={{
                   startAdornment: (
