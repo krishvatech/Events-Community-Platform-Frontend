@@ -204,8 +204,10 @@ function SuggestedConnections({ list = [] }) {
     );
   }
 
-  // cache resolved avatar by user id
+  // cache resolved avatar by user id (only populated on hover fallback, not on page load)
   const [avatarByUser, setAvatarByUser] = React.useState({});
+  // track which users we've already tried to hydrate (to avoid retrying failures)
+  const avatarTriedRef = React.useRef({});
 
   // extract avatar url from any user/profile JSON shape
   function pickAvatarFromJson(j) {
@@ -221,33 +223,28 @@ function SuggestedConnections({ list = [] }) {
     return toMediaUrl(cand);
   }
 
-  // try a few likely endpoints to fetch a user profile and grab avatar
-  async function hydrateAvatar(userId) {
-    if (!userId || avatarByUser[userId]) return;
-    const endpoints = [
-      `users/${userId}/`,
-      `profiles/${userId}/`,
-      `user-profiles/${userId}/`,
-      `accounts/${userId}/`,
-    ];
-    for (const path of endpoints) {
-      try {
-        const r = await fetch(toApiUrl(path), { headers: { Accept: "application/json", ...authHeaders() } });
-        if (!r.ok) continue;
-        const j = await r.json();
-        const url = pickAvatarFromJson(j);
-        if (url) {
-          setAvatarByUser((m) => ({ ...m, [userId]: url }));
-          return;
-        }
-      } catch { /* try next */ }
-    }
-  }
+  // only hydrate avatar on hover if no avatar exists from API response
+  // uses single fallback attempt; marks user as tried to avoid retry
+  async function hydrateAvatarOnHover(userId, user) {
+    if (!userId) return;
+    // do not fetch if userAvatar(user) already provides a valid url from API response
+    if (userAvatar(user)) return;
+    // do not retry if already attempted
+    if (avatarTriedRef.current[userId]) return;
 
-  // prefetch for first few visible suggestions
-  React.useEffect(() => {
-    (list || []).slice(0, 8).forEach(u => hydrateAvatar(u.id));
-  }, [list]);
+    avatarTriedRef.current[userId] = true;
+    try {
+      const r = await fetch(toApiUrl(`users/${userId}/`), {
+        headers: { Accept: "application/json", ...authHeaders() }
+      });
+      if (!r.ok) return;
+      const j = await r.json();
+      const url = pickAvatarFromJson(j);
+      if (url) {
+        setAvatarByUser((m) => ({ ...m, [userId]: url }));
+      }
+    } catch { /* silently fail */ }
+  }
 
 
   async function sendFriendRequest(id) {
@@ -461,11 +458,11 @@ function SuggestedConnections({ list = [] }) {
                   }}
                   onMouseEnter={() => {
                     if (u.mutuals > 0) loadMutuals(u.id);
-                    hydrateAvatar(u.id);
+                    hydrateAvatarOnHover(u.id, u);
                   }}
                 >
                   <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer", mb: 0.75 }}>
-                    <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto" }}>
+                    <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto" }} imgProps={{ loading: "lazy", decoding: "async" }}>
                       {(userName(u) || "U").slice(0, 1)}
                     </Avatar>
                   </Box>
@@ -584,7 +581,7 @@ function SuggestedConnections({ list = [] }) {
                   <Paper key={u.id} variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer" }}>
-                        <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>
+                        <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }} imgProps={{ loading: "lazy", decoding: "async" }}>
                           {(userName(u) || "U").slice(0, 1)}
                         </Avatar>
                       </Box>
