@@ -79,16 +79,66 @@ function SuggestedConnections({ list = [] }) {
   React.useEffect(() => {
     let alive = true;
     (async () => {
-      const first = (list || []).slice(0, 8).map(u => u.id).filter(Boolean);
-      const need = first.filter(id => friendStatusByUser[id] === undefined);
-      if (!need.length) return;
-      const entries = await Promise.all(need.map(async (id) => [id, await fetchFriendStatus(id)]));
-      if (alive && entries.length) {
-        setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
+      try {
+        const first = (list || []).slice(0, 8);
+        if (!first.length) return;
+
+        // Extract statuses from list if available
+        const statusesFromList = {};
+        const needBulkIds = [];
+
+        for (const user of first) {
+          if (user && user.id) {
+            if (user.friend_status && friendStatusByUser[user.id] === undefined) {
+              statusesFromList[user.id] = normalizeFriendStatus(user.friend_status);
+            } else if (friendStatusByUser[user.id] === undefined) {
+              needBulkIds.push(user.id);
+            }
+          }
+        }
+
+        // Update with statuses from list
+        if (Object.keys(statusesFromList).length > 0 && alive) {
+          setFriendStatusByUser((m) => ({ ...m, ...statusesFromList }));
+        }
+
+        // Only fetch bulk for users missing status
+        if (needBulkIds.length > 0) {
+          const statuses = await fetchFriendStatusBulk(needBulkIds);
+          if (alive && statuses) {
+            setFriendStatusByUser((m) => ({ ...m, ...statuses }));
+          }
+        }
+      } catch (err) {
+        console.error("Error loading friend status:", err);
+        // Continue anyway - component will still render
       }
     })();
     return () => { alive = false; };
   }, [list]);
+
+  // Bulk fetch friend status for multiple users
+  async function fetchFriendStatusBulk(userIds) {
+    if (!userIds || userIds.length === 0) return {};
+    try {
+      const ids = userIds.join(",");
+      const r = await fetch(toApiUrl(`friends/status-bulk/?user_ids=${ids}`), {
+        headers: { Accept: "application/json", ...authHeaders() },
+        credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      const results = d?.results || {};
+
+      // Normalize the statuses
+      const normalized = {};
+      for (const [userId, data] of Object.entries(results)) {
+        normalized[userId] = normalizeFriendStatus(data?.status);
+      }
+      return normalized;
+    } catch {
+      return {};
+    }
+  }
 
   async function fetchFriendStatus(userId) {
     try {
@@ -154,8 +204,10 @@ function SuggestedConnections({ list = [] }) {
     );
   }
 
-  // cache resolved avatar by user id
+  // cache resolved avatar by user id (only populated on hover fallback, not on page load)
   const [avatarByUser, setAvatarByUser] = React.useState({});
+  // track which users we've already tried to hydrate (to avoid retrying failures)
+  const avatarTriedRef = React.useRef({});
 
   // extract avatar url from any user/profile JSON shape
   function pickAvatarFromJson(j) {
@@ -171,33 +223,28 @@ function SuggestedConnections({ list = [] }) {
     return toMediaUrl(cand);
   }
 
-  // try a few likely endpoints to fetch a user profile and grab avatar
-  async function hydrateAvatar(userId) {
-    if (!userId || avatarByUser[userId]) return;
-    const endpoints = [
-      `users/${userId}/`,
-      `profiles/${userId}/`,
-      `user-profiles/${userId}/`,
-      `accounts/${userId}/`,
-    ];
-    for (const path of endpoints) {
-      try {
-        const r = await fetch(toApiUrl(path), { headers: { Accept: "application/json", ...authHeaders() } });
-        if (!r.ok) continue;
-        const j = await r.json();
-        const url = pickAvatarFromJson(j);
-        if (url) {
-          setAvatarByUser((m) => ({ ...m, [userId]: url }));
-          return;
-        }
-      } catch { /* try next */ }
-    }
-  }
+  // only hydrate avatar on hover if no avatar exists from API response
+  // uses single fallback attempt; marks user as tried to avoid retry
+  async function hydrateAvatarOnHover(userId, user) {
+    if (!userId) return;
+    // do not fetch if userAvatar(user) already provides a valid url from API response
+    if (userAvatar(user)) return;
+    // do not retry if already attempted
+    if (avatarTriedRef.current[userId]) return;
 
-  // prefetch for first few visible suggestions
-  React.useEffect(() => {
-    (list || []).slice(0, 8).forEach(u => hydrateAvatar(u.id));
-  }, [list]);
+    avatarTriedRef.current[userId] = true;
+    try {
+      const r = await fetch(toApiUrl(`users/${userId}/`), {
+        headers: { Accept: "application/json", ...authHeaders() }
+      });
+      if (!r.ok) return;
+      const j = await r.json();
+      const url = pickAvatarFromJson(j);
+      if (url) {
+        setAvatarByUser((m) => ({ ...m, [userId]: url }));
+      }
+    } catch { /* silently fail */ }
+  }
 
 
   async function sendFriendRequest(id) {
@@ -266,11 +313,31 @@ function SuggestedConnections({ list = [] }) {
       const hasNext = data.has_next || false;
       const nextPage = data.next || null;
 
-      // Fetch friend status for all newly loaded users
-      const newUserIds = results.map(u => u.id).filter(id => friendStatusByUser[id] === undefined);
-      if (newUserIds.length > 0) {
-        const statuses = await Promise.all(newUserIds.map(async (id) => [id, await fetchFriendStatus(id)]));
-        setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(statuses) }));
+      // Extract friend status from response if available, or fetch for missing users
+      const statusesFromResponse = {};
+      const missingIds = [];
+
+      for (const user of results) {
+        if (user && user.id) {
+          if (user.friend_status) {
+            statusesFromResponse[user.id] = normalizeFriendStatus(user.friend_status);
+          } else if (friendStatusByUser[user.id] === undefined) {
+            missingIds.push(user.id);
+          }
+        }
+      }
+
+      // Update with statuses from response
+      if (Object.keys(statusesFromResponse).length > 0) {
+        setFriendStatusByUser((m) => ({ ...m, ...statusesFromResponse }));
+      }
+
+      // Only fetch bulk for missing IDs (fallback)
+      if (missingIds.length > 0) {
+        const statuses = await fetchFriendStatusBulk(missingIds);
+        if (statuses) {
+          setFriendStatusByUser((m) => ({ ...m, ...statuses }));
+        }
       }
 
       if (append && modalUsers.length > 0) {
@@ -372,7 +439,12 @@ function SuggestedConnections({ list = [] }) {
         }}
       >
         <Stack direction="row" spacing={1.25}>
-          {list.map((u) => {
+          {!list || list.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 2, px: 1 }}>
+              No suggestions available
+            </Typography>
+          ) : list.map((u) => {
+            if (!u || !u.id) return null;
             const isConnected = connected.has(u.id);
             return (
               <Box key={u.id} sx={{ minWidth: 140, scrollSnapAlign: "start" }}>
@@ -386,11 +458,11 @@ function SuggestedConnections({ list = [] }) {
                   }}
                   onMouseEnter={() => {
                     if (u.mutuals > 0) loadMutuals(u.id);
-                    hydrateAvatar(u.id);
+                    hydrateAvatarOnHover(u.id, u);
                   }}
                 >
                   <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer", mb: 0.75 }}>
-                    <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto" }}>
+                    <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto" }} imgProps={{ loading: "lazy", decoding: "async" }}>
                       {(userName(u) || "U").slice(0, 1)}
                     </Avatar>
                   </Box>
@@ -426,21 +498,21 @@ function SuggestedConnections({ list = [] }) {
                     const status = String(friendStatusByUser[u.id] || "").toLowerCase();
                     if (status === "friends") {
                       return (
-                        <Button size="small" variant="outlined" sx={{ mt: 1 }} disabled>
+                        <Button size="small" variant="outlined" sx={{ mt: 1, minWidth: 124 }} disabled>
                           Friends
                         </Button>
                       );
                     }
                     if (status === "pending_outgoing") {
                       return (
-                        <Button size="small" variant="outlined" sx={{ mt: 1 }} disabled>
+                        <Button size="small" variant="outlined" sx={{ mt: 1, minWidth: 124 }} disabled>
                           Request sent
                         </Button>
                       );
                     }
                     if (status === "pending_incoming") {
                       return (
-                        <Button size="small" variant="outlined" sx={{ mt: 1 }} disabled>
+                        <Button size="small" variant="outlined" sx={{ mt: 1, minWidth: 124 }} disabled>
                           Pending your approval
                         </Button>
                       );
@@ -449,7 +521,7 @@ function SuggestedConnections({ list = [] }) {
                       <Button
                         size="small"
                         variant="contained"
-                        sx={{ mt: 1 }}
+                        sx={{ mt: 1, minWidth: 124 }}
                         onClick={() => sendFriendRequest(u.id)}
                       >
                         Connect
@@ -509,7 +581,7 @@ function SuggestedConnections({ list = [] }) {
                   <Paper key={u.id} variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer" }}>
-                        <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>
+                        <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }} imgProps={{ loading: "lazy", decoding: "async" }}>
                           {(userName(u) || "U").slice(0, 1)}
                         </Avatar>
                       </Box>
@@ -539,11 +611,11 @@ function SuggestedConnections({ list = [] }) {
                       </Box>
 
                       {status === "friends" ? (
-                        <Button size="small" variant="outlined" disabled>Friends</Button>
+                        <Button size="small" variant="outlined" disabled sx={{ minWidth: 124 }}>Friends</Button>
                       ) : status === "pending_outgoing" ? (
-                        <Button size="small" variant="outlined" disabled>Request sent</Button>
+                        <Button size="small" variant="outlined" disabled sx={{ minWidth: 124 }}>Request sent</Button>
                       ) : (
-                        <Button size="small" variant="contained" onClick={() => sendFriendRequest(u.id)}>
+                        <Button size="small" variant="contained" onClick={() => sendFriendRequest(u.id)} sx={{ minWidth: 124 }}>
                           Connect
                         </Button>
                       )}
@@ -2486,7 +2558,6 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
 
-  const [likers, setLikers] = React.useState([]);
   const likeCount = Number(local.metrics?.likes || 0);
   const shareCount = Number(local.metrics?.shares || 0);
 
@@ -2503,14 +2574,17 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
   const pickerOpen = Boolean(anchorEl);
   const handleOpenPicker = (event) => setAnchorEl(event.currentTarget);
   const handleClosePicker = () => setAnchorEl(null);
-  const primaryLiker = likers?.[0] || null;
+
+  // Get reaction preview from metrics (lightweight, loaded on page load)
+  const reactionPreview = local.metrics?.reaction_preview || null;
+  const primaryLiker = reactionPreview || null;
   const othersCount = Math.max(0, (likeCount || 0) - 1);
 
-  // Unique reaction types present on this post
+  // Unique reaction types present on this post (from preview + my reaction)
   const reactionIds = Array.from(
     new Set(
       [
-        ...likers.map((u) => u.reactionId).filter(Boolean),
+        reactionPreview?.reaction,
         myReactionId, // include my current reaction so bubbles update instantly
       ].filter(Boolean)
     )
@@ -2523,7 +2597,10 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
         : `reacted by ${primaryLiker.name} and ${othersCount} others`
       : `${(likeCount || 0).toLocaleString()} reactions`;
 
-  React.useEffect(() => { setLocal(post); }, [post]);
+  React.useEffect(() => {
+    setLocal(post);
+    setUserHasLiked(!!post.user_has_liked);
+  }, [post]);
   React.useEffect(() => {
     if (commentsEnabled === false) setCommentsOpen(false);
   }, [commentsEnabled]);
@@ -2552,45 +2629,6 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
       refreshBusy.current = false;
     }
   }
-  React.useEffect(() => { setLocal(post); refreshCounts(); }, [post]);
-  React.useEffect(() => {
-    const target = engageTargetOf(post);
-    let cancelled = false;
-    (async () => {
-      try {
-        const urls = [
-          toApiUrl(`engagements/reactions/who-liked/?${target.type ? `target_type=${encodeURIComponent(target.type)}&` : ""}target_id=${target.id}&page_size=5`),
-        ];
-        for (const url of urls) {
-          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
-          if (!r.ok) continue;
-          const j = await r.json();
-          const rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
-          const norm = rows.map((row) => {
-            const u = row.user || row.actor || row.profile || row;
-            const name =
-              u?.name || u?.full_name ||
-              (u?.first_name || u?.last_name ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : u?.username) ||
-              `User #${u?.id || row.user_id || row.id}`;
-            const avatar = toMediaUrl(
-              u?.avatar || u?.avatar_url || u?.user_image || u?.user_image_url ||
-              u?.image || u?.photo ||
-              u?.profile?.avatar || u?.profile?.avatar_url || u?.profile?.user_image || u?.profile?.user_image_url ||
-              row.actor_avatar || row.avatar || row.avatar_url || row.user_image || row.user_image_url || row.image || row.photo || ""
-            );
-            const id = u?.id || row.user_id || row.id;
-            const reactionId = row.reaction || row.reaction_type || row.kind || null;  // 👈 add this
-
-            return { id, name, avatar, reactionId };
-          }).filter(Boolean);
-
-          if (!cancelled) setLikers(norm);
-          if (norm.length) break;
-        }
-      } catch { if (!cancelled) setLikers([]); }
-    })();
-    return () => { cancelled = true; };
-  }, [post.id]);
 
   async function toggleLike() {
     if (!canEngage) return;
@@ -3073,91 +3111,70 @@ export default function LiveFeedPage({
   // Smart routing for "View Event" inside Live Feed:
   // - if user has registered/purchased the event -> /account/events
   // - else -> /events
-  const myRegisteredEventIdsRef = React.useRef(new Set());
-  const [myRegisteredLoaded, setMyRegisteredLoaded] = React.useState(false);
+  // Uses lazy registration check on event click (not on page load)
+  const registrationCacheRef = React.useRef(new Map()); // eventId -> boolean
+  const pendingCheckRef = React.useRef(new Map()); // eventId -> Promise
 
-  React.useEffect(() => {
-    let cancelled = false;
+  const checkEventRegistration = React.useCallback(async (eventId) => {
+    const key = Number(eventId);
+    if (!Number.isFinite(key)) return false;
 
-    (async () => {
+    // Check cache first
+    if (registrationCacheRef.current.has(key)) {
+      return registrationCacheRef.current.get(key);
+    }
+
+    // Check if request is already pending
+    if (pendingCheckRef.current.has(key)) {
+      return pendingCheckRef.current.get(key);
+    }
+
+    // Make new request
+    const checkPromise = (async () => {
       try {
         const headers = authHeaders?.() || {};
         const hasAuth = Boolean(headers.Authorization || headers.authorization);
-        if (!hasAuth) {
-          if (!cancelled) setMyRegisteredLoaded(true);
-          return;
-        }
+        if (!hasAuth) return false;
 
-        const candidatePaths = [
-          "event-registrations/mine/?page_size=1000",
-        ];
+        const res = await fetch(toApiUrl(`event-registrations/mine/?event=${key}&page_size=1`), {
+          headers: { Accept: "application/json", ...headers },
+        });
 
-        for (const path of candidatePaths) {
-          try {
-            const res = await fetch(toApiUrl(path), {
-              headers: { Accept: "application/json", ...headers },
-            });
-            if (!res.ok) continue;
+        if (!res.ok) return false;
+        const j = await res.json();
+        const rows = Array.isArray(j) ? j : (j.results || j.data || []);
+        const isRegistered = rows.length > 0;
 
-            const j = await res.json();
-            const rows = Array.isArray(j) ? j : (j.results || j.data || []);
-
-            const ids = [];
-            for (const row of rows) {
-              let id =
-                row?.event_id ??
-                row?.eventId ??
-                row?.event;
-
-              if (row?.event && typeof row.event === "object") id = row.event?.id;
-
-              // Some APIs might return the event objects directly
-              if (id == null && row?.id != null) id = row.id;
-
-              if (id != null) ids.push(id);
-            }
-
-            if (ids.length) {
-              myRegisteredEventIdsRef.current = new Set(
-                ids.map((x) => {
-                  const n = Number(x);
-                  return Number.isNaN(n) ? x : n;
-                }),
-              );
-            }
-            break;
-          } catch {
-            // try next endpoint
-          }
-        }
-      } finally {
-        if (!cancelled) setMyRegisteredLoaded(true);
+        registrationCacheRef.current.set(key, isRegistered);
+        pendingCheckRef.current.delete(key);
+        return isRegistered;
+      } catch {
+        pendingCheckRef.current.delete(key);
+        return false;
       }
     })();
 
-    return () => { cancelled = true; };
+    pendingCheckRef.current.set(key, checkPromise);
+    return checkPromise;
   }, []);
 
   const smartOpenEvent = React.useCallback((eventId) => {
-    const n = Number(eventId);
-    const key = Number.isNaN(n) ? eventId : n;
-
-    if (!myRegisteredLoaded || key == null) {
+    const key = Number(eventId);
+    if (!Number.isFinite(key)) {
       navigate("/events");
       return;
     }
 
-    const isRegistered = myRegisteredEventIdsRef.current.has(key);
+    checkEventRegistration(key).then((isRegistered) => {
+      const adminSide = isOwnerUser() || isStaffUser();
 
-    // ✅ staff OR superuser -> admin/events if registered
-    const adminSide = isOwnerUser() || isStaffUser();
-
-    if (isRegistered) {
-      navigate(adminSide ? "/admin/events" : "/account/events");
-    } else {
-      navigate("/events");
-    }
-  }, [navigate, myRegisteredLoaded]);
+      if (isRegistered) {
+        navigate(adminSide ? "/admin/events" : "/account/events");
+      } else {
+        navigate("/events");
+      }
+    });
+  }, [navigate, checkEventRegistration]);
 
   // If parent passes a handler, keep it. Otherwise use smart routing.
   const openEvent = onOpenEvent === NOOP ? smartOpenEvent : onOpenEvent;
@@ -3720,8 +3737,8 @@ export default function LiveFeedPage({
   }, [sharesOpen, sharesTarget]);
 
 
-  // Build initial URL based on scope + search
-  const buildFeedPath = React.useCallback((sc, q) => {
+  // Build initial URL based on scope + search + sort
+  const buildFeedPath = React.useCallback((sc, q, sort) => {
     const params = new URLSearchParams();
 
     if (sc === "mine") {
@@ -3731,7 +3748,12 @@ export default function LiveFeedPage({
       params.set("scope", "home"); // server does union: feed + events
     }
 
-    if (communityId) params.set("community_id", String(communityId)); // 👈 add this
+    if (communityId) params.set("community_id", String(communityId));
+
+    // Add sort parameter (backend default is 'recent' if omitted)
+    if (sort && sort !== "recent") {
+      params.set("sort", sort);
+    }
 
     const qTrim = (q || "").trim();
     if (qTrim) {
@@ -3804,6 +3826,7 @@ export default function LiveFeedPage({
           likes: m.likes ?? m.like_count ?? p.metrics?.likes ?? 0,
           comments: m.comments ?? m.comment_count ?? p.metrics?.comments ?? 0,
           shares: m.shares ?? m.share_count ?? p.metrics?.shares ?? 0,
+          reaction_preview: m.reaction_preview ?? p.metrics?.reaction_preview ?? null,
         },
       };
     });
@@ -3861,14 +3884,14 @@ export default function LiveFeedPage({
     }
   }
 
-  // Initial + on scope/search change
+  // Initial + on scope/search/sort change
   React.useEffect(() => {
     setPosts([]);
     setHasMore(true);
     setNextUrl(null);
-    loadFeed(buildFeedPath(scope, dq), false);
+    loadFeed(buildFeedPath(scope, dq, sortMode), false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, dq]);
+  }, [scope, dq, sortMode]);
 
   // Realtime (optional)
   React.useEffect(() => {
@@ -3992,54 +4015,15 @@ export default function LiveFeedPage({
       });
     }
 
-    // 3) sort by mode
-    const sorted = [...arr];
-
-    if (sortMode === "popular") {
-      // 👍 Most popular = highest likes first (then newest)
-      sorted.sort((a, b) => {
-        const la = a.metrics?.likes ?? a.like_count ?? 0;
-        const lb = b.metrics?.likes ?? b.like_count ?? 0;
-        if (lb !== la) return lb - la; // more likes → higher
-        // tie-breaker: newer first
-        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-      });
-    } else {
-      // 🕒 Most recent (default)
-      sorted.sort(
-        (a, b) =>
-          new Date(b.created_at || 0) - new Date(a.created_at || 0)
-      );
-    }
-
-    return sorted;
-  }, [posts, scope, dq, sortMode]);
+    // Backend now handles sorting (sort=recent|popular via API)
+    // No client-side sorting needed; return as-is
+    return arr;
+  }, [posts, scope, dq]);
 
 
-  React.useEffect(() => {
-    if (!displayPosts.length) return;
-    const ids = displayPosts.map(p => p.id);
-    let stop = false;
-
-    async function tick() {
-      try {
-        const map = await fetchBatchMetrics(ids);
-        if (stop) return;
-        setPosts(curr =>
-          curr.map(p => {
-            const m = map[p.id];
-            return m ? { ...p, user_has_liked: !!m.user_has_liked, metrics: { ...p.metrics, ...m } } : p;
-          })
-        );
-      } catch { }
-    }
-
-    const t = setInterval(() => {
-      if (document.visibilityState === "visible") tick();
-    }, 30000); // every 30s
-    tick(); // also once immediately
-    return () => { stop = true; clearInterval(t); };
-  }, [displayPosts]);
+  // Metrics are already hydrated during loadFeed() and after user actions (reactions, comments, shares, votes).
+  // Removed: continuous polling effect that was causing infinite re-renders.
+  // Each user action (handleReact, comment, share, vote) refreshes metrics for that specific post.
 
   // When navigated here from a shared message, scroll to the focused post once
   React.useEffect(() => {
@@ -4053,7 +4037,7 @@ export default function LiveFeedPage({
     } catch (e) {
       el.scrollIntoView();
     }
-  }, [focusPostId, displayPosts]);
+  }, [focusPostId]);
 
   // --- Derived data for Reactions popup (same idea as MyPostsPage) ---
   const likesFilteredUsers =
@@ -4117,7 +4101,7 @@ export default function LiveFeedPage({
                 onChange={(e) => setQuery(e.target.value)} // debounced by dq
                 onKeyDown={(e) => {
                   if (e.key === "Enter")
-                    loadFeed(buildFeedPath(scope, query), false); // optional: immediate refresh
+                    loadFeed(buildFeedPath(scope, query, sortMode), false); // optional: immediate refresh
                 }}
                 InputProps={{
                   startAdornment: (
@@ -4206,8 +4190,8 @@ export default function LiveFeedPage({
                       userTimezone={me?.timezone}
                     />
                   </Box>
-                  {/* After 4 posts: mutual connections */}
-                  {((idx + 1) % 8 === 4) && (
+                  {/* After first 4 posts: mutual connections (render once) */}
+                  {idx === 3 && (
                     <SuggestedConnections list={suggested} />
                   )}
 

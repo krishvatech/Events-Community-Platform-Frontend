@@ -5951,10 +5951,40 @@ export default function NewLiveMeeting() {
     applyBreakoutTokenRef.current = applyBreakoutToken;
   }, [applyBreakoutToken]);
 
-  const handleEnterBreakout = async (tableId, tableName = null) => {
+  const handleEnterBreakout = async (tableId, tableName = null, options = {}) => {
     if (!eventId || !tableId) {
       console.error("[BREAKOUT] ❌ Missing eventId or tableId");
       return;
+    }
+
+    const requestedTableId = String(tableId);
+
+    // ✅ Prevent duplicate join calls for same breakout room.
+    // This protects backend during force breakout + reconnect storms.
+    if (
+      breakoutJoinInProgressRef.current &&
+      String(activeTableIdRef.current || "") === requestedTableId
+    ) {
+      console.log("[BREAKOUT] Join already in progress for same table, skipping duplicate:", requestedTableId);
+      return;
+    }
+
+    // ✅ Already in same breakout table. No need to call backend again.
+    if (
+      isBreakoutRef.current &&
+      String(activeTableIdRef.current || "") === requestedTableId
+    ) {
+      console.log("[BREAKOUT] Already in requested breakout table, skipping:", requestedTableId);
+      return;
+    }
+
+    // ✅ Optional jitter for host-forced breakout/reconnect.
+    // This avoids 330 browsers hitting backend at the same millisecond.
+    const jitterMs = Number(options?.jitterMs || 0);
+    if (jitterMs > 0) {
+      const delay = Math.floor(Math.random() * jitterMs);
+      console.log("[BREAKOUT] Applying join jitter:", delay, "ms");
+      await sleep(delay);
     }
 
     // ✅ DEFENSIVE: Ensure we're NOT updating meeting status
@@ -6009,6 +6039,18 @@ export default function NewLiveMeeting() {
           breakoutJoinInProgressRef.current = false;
           breakoutJoinTimeoutRef.current = null;
         }, 8000);
+
+      } else if (res.status === 202) {
+        const data = await res.json().catch(() => ({}));
+        const retryAfter = Number(data.retry_after || 2);
+
+        console.log("[BREAKOUT] Join already in progress, retrying after", retryAfter, "seconds");
+
+        breakoutJoinInProgressRef.current = false;
+
+        setTimeout(() => {
+          handleEnterBreakout(tableId, tableName, { jitterMs: 2000 });
+        }, retryAfter * 1000);
 
       } else if (res.status === 403) {
         // ✅ FIX: Handle new waiting room and permission errors
@@ -7792,12 +7834,15 @@ export default function NewLiveMeeting() {
       return;
     }
     if (!eventId) return;
-    //  Only fetch lounge state if lounge is actually visible or user is in it
-    // Don't fetch during join burst if lounge is not open
+    // Only fetch full lounge-state when the lounge UI is visible.
+    // Normal breakout participants must not call /lounge-state/ because that endpoint
+    // returns full table/participant state and becomes expensive during 500+ user breakouts.
+    if (!loungeOpen && !(isBreakout && role === "publisher")) {
+      return;
+    }
     if (liveMinimalMode && !loungeOpen && !isBreakout) {
       return;
     }
-    if (deferNonCriticalLiveApi) return;
 
     // ✅ CRITICAL FOR PARTICIPANTS: Stop polling once meeting ends
     // On server, polling can reset lounge status before backend catches up
@@ -7807,6 +7852,9 @@ export default function NewLiveMeeting() {
     }
 
     try {
+      // Mark immediately to avoid multiple components triggering the same fallback fetch.
+      lastLoungeFetchRef.current = Date.now();
+
       const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
         headers: { ...authHeader() },
       });
@@ -7824,15 +7872,17 @@ export default function NewLiveMeeting() {
     }
   }, [liveMinimalMode, loungeOpen, isBreakout, deferNonCriticalLiveApi, eventId, role]);
 
-  //  Only fetch lounge state when lounge is open or user is in breakout
+  // Only fetch full lounge state when the lounge panel is open.
+  // Exception: publisher/host controls may need breakout room state. Normal breakout
+  // participants should rely on the force_join_breakout payload and should not poll it.
   useEffect(() => {
     if (!eventId) return;
     if (deferNonCriticalLiveApi) return;
 
-    //  Skip lounge state fetch unless lounge is open or user in breakout
-    if (!loungeOpen && !isBreakout) {
+    const shouldFetchLoungeState = loungeOpen || (isBreakout && role === "publisher");
+    if (!shouldFetchLoungeState) {
       if (import.meta.env?.DEV) {
-        console.debug("[LiveMeeting] PHASE 5: Lounge not open, deferring state fetch");
+        console.debug("[LiveMeeting] Lounge state deferred for normal participant");
       }
       return;
     }
@@ -7840,12 +7890,12 @@ export default function NewLiveMeeting() {
     fetchLoungeState();
     const interval = setInterval(() => {
       // Avoid too-frequent fetches if other updates already happened
-      if (Date.now() - lastLoungeFetchRef.current > 8000) {
+      if (Date.now() - lastLoungeFetchRef.current > 20000) {
         fetchLoungeState();
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [deferNonCriticalLiveApi, eventId, loungeOpen, isBreakout, fetchLoungeState]);
+  }, [deferNonCriticalLiveApi, eventId, loungeOpen, isBreakout, role, fetchLoungeState]);
 
   useEffect(() => {
     if (
@@ -8030,7 +8080,7 @@ export default function NewLiveMeeting() {
       setTimeout(() => {
         if (data.breakout_table_id && typeof handleEnterBreakout === "function") {
           console.log("[Reconnect] Calling handleEnterBreakout for table:", data.breakout_table_id);
-          handleEnterBreakout(data.breakout_table_id, data.breakout_table_name);
+          handleEnterBreakout(data.breakout_table_id, data.breakout_table_name, { jitterMs: 5000 });
         }
       }, 500);
     }
@@ -8312,9 +8362,10 @@ export default function NewLiveMeeting() {
         }
 
         if (msg.type === "force_join_breakout") {
-          // Host-initiated force join - enter the breakout room
+          // Host-initiated force join.
+          // Add jitter so 330 users do not hit lounge-join-table at the same millisecond.
           console.log("[MainSocket] Force join to breakout:", msg.table_id);
-          handleEnterBreakout(msg.table_id);
+          handleEnterBreakout(msg.table_id, msg.table_name || null, { jitterMs: 8000 });
         } else if (msg.type === "breakout_restored") {
           // ✅ NEW: Page reload/reconnect - user is being restored to their previous breakout room
           console.log("[MainSocket] Breakout restored to table", msg.table_id);
@@ -8360,7 +8411,7 @@ export default function NewLiveMeeting() {
           }
 
           // Join the breakout room (happens in parallel with main room init)
-          handleEnterBreakout(msg.table_id);
+          handleEnterBreakout(msg.table_id, msg.table_name || null, { jitterMs: 5000 });
 
           // ✅ NEW: After breakout rejoin, refresh RTK SDK participant list
           // When a participant rejoins a breakout room after page reload, the RTK SDK
@@ -8525,6 +8576,36 @@ export default function NewLiveMeeting() {
           if (!msg.ok) {
             showSnackbar("Unable to notify attendee about support chat yet.", "error");
           }
+        } else if (msg.type === "private_message_unread") {
+          // Lightweight realtime DM unread notification sent through the existing
+          // live-event socket. No extra polling or extra websocket is created.
+          const senderId = msg.sender_id != null ? String(msg.sender_id) : "";
+          const conversationId = msg.conversation_id != null ? String(msg.conversation_id) : "";
+
+          if (!senderId || senderId === String(myUserIdRef.current || "")) {
+            return;
+          }
+
+          const activeConversationId = privateConversationIdRef.current
+            ? String(privateConversationIdRef.current)
+            : "";
+          const activePrivateUserId = privateChatUserIdRef.current
+            ? String(privateChatUserIdRef.current)
+            : "";
+
+          // If that DM is already open, do not show a red dot. The private chat
+          // conversation websocket will render the message in the open thread.
+          if (
+            (conversationId && activeConversationId && conversationId === activeConversationId) ||
+            (activePrivateUserId && activePrivateUserId === senderId)
+          ) {
+            return;
+          }
+
+          setPrivateUnreadByUserId((prev) => ({
+            ...(prev || {}),
+            [senderId]: Number(prev?.[senderId] || 0) + 1,
+          }));
         } else if (msg.type === "breakout_timer") {
           //  ENHANCED DUAL-TIMER WEBSOCKET PROTOCOL
           // Support both legacy (msg.duration) and new dual-timer format
@@ -9423,57 +9504,52 @@ export default function NewLiveMeeting() {
     };
   }, [eventId, isGuest, mainSocketReconnectKey]);
 
-  // ✅ Additional polling for lounge status while in breakout (more frequent)
-  // Ensures lounge close is detected quickly even if WebSocket updates are delayed
+  // ✅ Lightweight status polling while in breakout.
+  // IMPORTANT:
+  // Do not call /lounge-state/ here. That endpoint returns full tables/participants
+  // and caused backend request storms during 330-user breakout tests.
   useEffect(() => {
-    if (role === "publisher") return; // Only non-publishers need to check
+    if (role === "publisher") return;
     if (!eventId) return;
-    if (!isBreakout) return; // Only while in breakout
+    if (!isBreakout) return;
 
     let alive = true;
-    let isPolling = false; //  Prevent overlapping polling calls
+    let isPolling = false;
 
     const pollLoungeStatus = async () => {
-      //  Skip if tab is hidden (reduce wasted API calls)
-      if (document.hidden) {
-        return;
-      }
-
-      //  Prevent overlapping calls
-      if (isPolling) {
-        return;
-      }
-
+      if (document.hidden) return;
+      if (isPolling) return;
       if (!alive) return;
 
       isPolling = true;
       try {
-        const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
+        const res = await fetch(toApiUrl(`events/${eventId}/lounge-status/`), {
           headers: { ...authHeader() },
         });
+
         if (!res.ok) return;
+
         const data = await res.json().catch(() => null);
         if (!data || !alive) return;
 
         if (data.lounge_open_status) {
           setLoungeOpenStatus(data.lounge_open_status);
 
-          // ✅ Log lounge status changes for debugging
           if (data.lounge_open_status.status === "CLOSED") {
-            console.log("[LiveMeeting] Lounge status update via polling: CLOSED (will trigger rejoin)");
+            console.log("[LiveMeeting] Lounge status via lightweight polling: CLOSED");
           }
         }
       } catch (e) {
-        console.warn("[LiveMeeting] Error polling lounge status:", e);
-      }
-      finally {
+        console.warn("[LiveMeeting] Error polling lightweight lounge status:", e);
+      } finally {
         isPolling = false;
       }
     };
 
-    // Poll immediately and every 5 seconds (more frequent than regular lounge polling)
+    // Poll once, then slow fallback only.
+    // WebSocket should be the primary source of breakout/lounge changes.
     pollLoungeStatus();
-    const interval = setInterval(pollLoungeStatus, 5000);
+    const interval = setInterval(pollLoungeStatus, 20000);
 
     return () => {
       alive = false;
@@ -15614,11 +15690,15 @@ export default function NewLiveMeeting() {
     }
 
     const request = (async () => {
-      // First ensure user is seated in the lounge
-      try {
-        await ensureSeatedInLounge();
-      } catch (error) {
-        throw new Error("Must be seated in lounge to access chat.");
+      // Social Lounge chat needs ensure-seated. Breakout users are already assigned
+      // by the backend before force_join_breakout, so do not add one more API call
+      // for every breakout participant.
+      if (!isBreakoutRef.current) {
+        try {
+          await ensureSeatedInLounge();
+        } catch (error) {
+          throw new Error("Must be seated in lounge to access chat.");
+        }
       }
 
       const attemptEnsure = async () => {
@@ -15644,10 +15724,13 @@ export default function NewLiveMeeting() {
         }
         lastError = data?.detail || "Failed to open room chat.";
         if (res.status !== 403) break;
-        // Seat creation can race join_table; re-ensure and retry briefly
-        try {
-          await ensureSeatedInLounge();
-        } catch { }
+        // Seat creation can race join_table for Social Lounge only. Breakout users
+        // should not call ensure-seated because assignment already exists.
+        if (!isBreakoutRef.current) {
+          try {
+            await ensureSeatedInLounge();
+          } catch { }
+        }
         await sleep(350);
       }
 
@@ -15729,11 +15812,26 @@ export default function NewLiveMeeting() {
       }
 
       if (clearPrivateRecipientId) {
+        const clearIds = (Array.isArray(clearPrivateRecipientId)
+          ? clearPrivateRecipientId
+          : [clearPrivateRecipientId]
+        )
+          .map((id) => String(id || ""))
+          .filter(Boolean);
+
         setPrivateUnreadByUserId((prev) => {
-          if (!prev?.[clearPrivateRecipientId]) return prev;
+          if (!prev || clearIds.length === 0) return prev;
+
+          let changed = false;
           const next = { ...prev };
-          delete next[clearPrivateRecipientId];
-          return next;
+          clearIds.forEach((id) => {
+            if (Object.prototype.hasOwnProperty.call(next, id)) {
+              delete next[id];
+              changed = true;
+            }
+          });
+
+          return changed ? next : prev;
         });
       }
 
@@ -15768,6 +15866,72 @@ export default function NewLiveMeeting() {
   const privateChatOlderInFlightRef = useRef(false);
   const privateChatSuppressAutoScrollRef = useRef(false);
   const privateChatWsRef = useRef(null);
+  const privateConversationIdRef = useRef(null);
+  const privateChatUserIdRef = useRef("");
+
+  const getPrivateUnreadCandidateIds = useCallback((member) => {
+    if (!member) return [];
+
+    const raw = member?._raw || member || {};
+    let meta =
+      raw?.customParticipantData ||
+      raw?.customParticipant ||
+      raw?.metadata ||
+      raw?.meta ||
+      raw?.user ||
+      null;
+
+    if (typeof meta === "string") {
+      try {
+        meta = JSON.parse(meta);
+      } catch {
+        meta = null;
+      }
+    }
+
+    const rtkId = raw?.id || member?.id || "";
+    const mappedUserId = rtkId ? participantIdMapRef.current?.get(String(rtkId)) : null;
+
+    return Array.from(new Set([
+      getBackendUserId(member),
+      getBackendUserId(raw),
+      mappedUserId,
+      raw?.customParticipantId,
+      raw?.customParticipant_id,
+      raw?.clientSpecificId,
+      raw?.client_specific_id,
+      raw?.user_id,
+      raw?.userId,
+      meta?.user_id,
+      meta?.userId,
+      meta?.id,
+      member?.customParticipantId,
+      member?.clientSpecificId,
+      member?.user_id,
+      member?.userId,
+      member?.id,
+    ]
+      .map((id) => String(id || ""))
+      .filter(Boolean)));
+  }, []);
+
+  const getPrivateChatRecipientId = useCallback((member) => {
+    const ids = getPrivateUnreadCandidateIds(member);
+    return ids[0] || "";
+  }, [getPrivateUnreadCandidateIds]);
+
+  const hasPrivateUnreadForMember = useCallback((member) => {
+    const ids = getPrivateUnreadCandidateIds(member);
+    return ids.some((id) => Boolean(privateUnreadByUserId?.[id]));
+  }, [getPrivateUnreadCandidateIds, privateUnreadByUserId]);
+
+  useEffect(() => {
+    privateConversationIdRef.current = privateConversationId;
+  }, [privateConversationId]);
+
+  useEffect(() => {
+    privateChatUserIdRef.current = privateChatUser ? getPrivateChatRecipientId(privateChatUser) : "";
+  }, [getPrivateChatRecipientId, privateChatUser]);
 
   // Event/Lounge Chat WebSocket (real-time message delivery)
   const eventChatWsRef = useRef(null);
@@ -15788,10 +15952,15 @@ export default function NewLiveMeeting() {
     setPrivateChatLoading(true);
 
     try {
-      // 1. Determine Recipient ID
-      // We assume RTK participant's `customParticipantId` holds the Django User ID.
-      // If not set, we fallback to `member.id` (though that might be an RTK UUID).
-      const recipientId = member._raw?.customParticipantId || member.id;
+      // 1. Determine Recipient ID. Prefer backend Django user id from RTK
+      // metadata, with the old member.id fallback preserved for legacy payloads.
+      const recipientId = getPrivateChatRecipientId(member);
+      const recipientUnreadKeys = getPrivateUnreadCandidateIds(member);
+
+      if (!recipientId) {
+        console.error("Failed to open private chat: missing recipient id", member);
+        return null;
+      }
 
       // 2. Ensure Conversation Exists
       const res = await fetch(toApiUrl("messaging/conversations/ensure-direct/"), {
@@ -15813,10 +15982,9 @@ export default function NewLiveMeeting() {
 
       // ✅ Clear unread for this DM as soon as it opens
       try {
-        const ridKey = String(recipientId);
         await markConversationAllRead(convData.id, {
           force: true,
-          clearPrivateRecipientId: ridKey,
+          clearPrivateRecipientId: recipientUnreadKeys.length ? recipientUnreadKeys : String(recipientId),
         });
       } catch { }
 
@@ -16050,7 +16218,7 @@ export default function NewLiveMeeting() {
 
         const next = {};
         const activeRid = privateChatUser
-          ? String(privateChatUser._raw?.customParticipantId || privateChatUser.id || "")
+          ? getPrivateChatRecipientId(privateChatUser)
           : "";
 
         for (const c of data) {
@@ -16080,7 +16248,7 @@ export default function NewLiveMeeting() {
       alive = false;
       clearInterval(t);
     };
-  }, [myUserId, privateChatUser]);
+  }, [getPrivateChatRecipientId, myUserId, privateChatUser]);
 
   // ✅ Auto-load new messages while Private Chat is OPEN (active DM)
   useEffect(() => {
@@ -16090,9 +16258,8 @@ export default function NewLiveMeeting() {
 
     let alive = true;
 
-    const recipientId = String(
-      privateChatUser?._raw?.customParticipantId || privateChatUser?.id || ""
-    );
+    const recipientId = getPrivateChatRecipientId(privateChatUser);
+    const recipientUnreadKeys = getPrivateUnreadCandidateIds(privateChatUser);
 
     const tick = async () => {
       if (!alive) return;
@@ -16130,7 +16297,7 @@ export default function NewLiveMeeting() {
         // 3) Mark read + clear dot
         if (unread > 0) {
           await markConversationAllRead(privateConversationId, {
-            clearPrivateRecipientId: recipientId || null,
+            clearPrivateRecipientId: recipientUnreadKeys.length ? recipientUnreadKeys : (recipientId || null),
           });
         }
       } catch { }
@@ -16143,7 +16310,7 @@ export default function NewLiveMeeting() {
       alive = false;
       clearInterval(t);
     };
-  }, [deferNonCriticalLiveApi, isDocumentVisible, isGuest, markConversationAllRead, privateChatUser, privateConversationId]);
+  }, [deferNonCriticalLiveApi, getPrivateChatRecipientId, getPrivateUnreadCandidateIds, isDocumentVisible, isGuest, markConversationAllRead, privateChatUser, privateConversationId]);
 
   // ✅ WebSocket listener for real-time edit/delete updates on private messages
   useEffect(() => {
@@ -16177,10 +16344,15 @@ export default function NewLiveMeeting() {
               )
             );
           } else if (data.type === "message.created") {
-            // Add new messages from WebSocket as well
-            setPrivateMessages((prev) =>
-              prev.some((m) => m.id === data.message.id) ? prev : [...prev, data.message]
-            );
+            // Add new messages from WebSocket as well, deduping against the REST
+            // response path for the sender.
+            setPrivateMessages((prev) => mergeByIdReplace(prev, [data.message]));
+
+            if (String(data.message?.sender_id || "") !== String(myUserIdRef.current || "")) {
+              markConversationAllRead(privateConversationId, {
+                clearPrivateRecipientId: getPrivateUnreadCandidateIds(privateChatUser),
+              });
+            }
           }
         } catch (e) {
           console.warn("[PrivateChat WS] Parse error:", e);
@@ -16202,7 +16374,7 @@ export default function NewLiveMeeting() {
       console.warn("[PrivateChat WS] Failed to connect:", e);
       privateChatWsRef.current = null;
     }
-  }, [deferNonCriticalLiveApi, privateChatUser, privateConversationId, isGuest]);
+  }, [deferNonCriticalLiveApi, getPrivateUnreadCandidateIds, isGuest, markConversationAllRead, mergeByIdReplace, privateChatUser, privateConversationId]);
 
   // ✅ Event/Lounge Chat WebSocket (Real-time message delivery)
   useEffect(() => {
@@ -23479,17 +23651,7 @@ export default function NewLiveMeeting() {
                                               variant="dot"
                                               color="error"
                                               overlap="circular"
-                                              invisible={
-                                                !privateUnreadByUserId[
-                                                String(
-                                                  m.clientSpecificId ||
-                                                  m._raw?.clientSpecificId ||
-                                                  m._raw?.client_specific_id ||
-                                                  m._raw?.customParticipantId ||
-                                                  m.id
-                                                )
-                                                ] && !privateUnreadByUserId[String(m.id)]
-                                              }
+                                              invisible={!hasPrivateUnreadForMember(m)}
                                             >
                                               <ChatBubbleOutlineIcon fontSize="small" />
                                             </Badge>
@@ -24258,17 +24420,7 @@ export default function NewLiveMeeting() {
                                             variant="dot"
                                             color="error"
                                             overlap="circular"
-                                            invisible={
-                                              !privateUnreadByUserId[
-                                              String(
-                                                m.clientSpecificId ||
-                                                m._raw?.clientSpecificId ||
-                                                m._raw?.client_specific_id ||
-                                                m._raw?.customParticipantId ||
-                                                m.id
-                                              )
-                                              ] && !privateUnreadByUserId[String(m.id)]
-                                            }
+                                            invisible={!hasPrivateUnreadForMember(m)}
                                           >
                                             <ChatBubbleOutlineIcon fontSize="small" />
                                           </Badge>
