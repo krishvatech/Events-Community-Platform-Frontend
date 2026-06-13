@@ -460,7 +460,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
                   fontFamily: F.body,
                 }}
               >
-                Register Interest
+                Apply
               </button>
             ) : (
               <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="small" />
@@ -542,7 +542,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
                   fontFamily: F.body,
                 }}
               >
-                Register Interest
+                Apply
               </button>
             ) : (
               <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="small" style={{ width: "100%" }} />
@@ -636,7 +636,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
                     fontFamily: F.body,
                   }}
                 >
-                  Register Interest
+                  Apply
                 </button>
               ) : (
                 <ApplyStatusDisplay status={myApplication.status} eventData={eventData} onJoinClick={onJoinClick} buttonSize="large" />
