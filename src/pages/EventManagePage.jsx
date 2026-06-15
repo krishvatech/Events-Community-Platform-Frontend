@@ -3937,9 +3937,9 @@ export default function EventManagePage() {
         }}
       >
         <Stack
-          direction="row"
+          direction={{ xs: "column", md: "row" }}
           justifyContent="space-between"
-          alignItems="center"
+          alignItems={{ xs: "flex-start", md: "center" }}
           sx={{ mb: 2 }}
           spacing={1.5}
         >
@@ -3954,7 +3954,14 @@ export default function EventManagePage() {
               People who have purchased this event.
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ justifyContent: { xs: "flex-start", sm: "flex-end" } }}
+          >
             <Chip
               size="small"
               label={totalMembersCount}
@@ -3984,7 +3991,7 @@ export default function EventManagePage() {
               color="secondary"
               startIcon={<EmailRoundedIcon />}
               onClick={() => setInviteEmailsOpen(true)}
-              sx={{ textTransform: "none", borderRadius: 999, ml: 1 }}
+              sx={{ textTransform: "none", borderRadius: 999 }}
             >
               Invite by Email
             </Button>
@@ -3994,7 +4001,7 @@ export default function EventManagePage() {
               startIcon={resendMailLoading ? <CircularProgress size={14} /> : <ForwardToInboxRoundedIcon />}
               onClick={() => setResendMailOpen(true)}
               disabled={resendMailLoading || registrations.length === 0}
-              sx={{ textTransform: "none", borderRadius: 999, ml: 1, borderColor: "warning.main", color: "warning.dark" }}
+              sx={{ textTransform: "none", borderRadius: 999, borderColor: "warning.main", color: "warning.dark" }}
             >
               {resendMailLoading ? "Sending..." : "Resend Mail to All"}
             </Button>
@@ -4004,7 +4011,7 @@ export default function EventManagePage() {
               startIcon={membersExportLoading ? <CircularProgress size={14} /> : <FileDownloadRoundedIcon />}
               onClick={handleMembersExport}
               disabled={membersExportLoading || registrations.length === 0}
-              sx={{ textTransform: "none", borderRadius: 999, ml: 1, borderColor: "success.main", color: "success.dark" }}
+              sx={{ textTransform: "none", borderRadius: 999, borderColor: "success.main", color: "success.dark" }}
             >
               {membersExportLoading ? "Exporting..." : "Export CSV"}
             </Button>
@@ -4060,10 +4067,26 @@ export default function EventManagePage() {
                 borderRadius: 2,
                 border: "1px solid",
                 borderColor: "divider",
-                overflow: "hidden",
+                overflowX: "auto",
+                overflowY: "hidden",
+                width: "100%",
+                maxWidth: "100%",
+                WebkitOverflowScrolling: "touch",
               }}
             >
-              <Table size="small">
+              <Table
+                size="small"
+                sx={{
+                  minWidth: 820,
+                  "& th": {
+                    whiteSpace: "nowrap",
+                  },
+                  "& td": {
+                    whiteSpace: "nowrap",
+                    verticalAlign: "middle",
+                  },
+                }}
+              >
                 <TableHead>
                   <TableRow
                     sx={{
@@ -4083,7 +4106,7 @@ export default function EventManagePage() {
                 <TableBody>
                   {pagedMembers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} align="center">
+                      <TableCell colSpan={5} align="center">
                         <Typography
                           variant="body2"
                           sx={{ color: "text.secondary", py: 2 }}
