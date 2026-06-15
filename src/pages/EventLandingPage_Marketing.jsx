@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button, Alert } from "@mui/material";
+import { Button, Alert, Snackbar } from "@mui/material";
 import { Helmet } from "react-helmet-async";
 import ApplyNowModal from "../components/ApplyNowModal";
+import { isOwnerUser } from "../utils/adminRole.js";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import heroImg from "../assets/oxford/Oxford_Jesus-College.png";
@@ -2095,6 +2096,7 @@ export default function OxfordSymposium2026() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [applyOpen, setApplyOpen] = useState(false);
+  const [adminApplyNoticeOpen, setAdminApplyNoticeOpen] = useState(false);
   const [eventData, setEventData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -2102,6 +2104,7 @@ export default function OxfordSymposium2026() {
   // Apply workflow state
   const token = localStorage.getItem("access_token") || localStorage.getItem("access");
   const isGuest = localStorage.getItem("is_guest") === "true";
+  const isAdminViewer = Boolean(token) && !isGuest && isOwnerUser();
   const [myApplication, setMyApplication] = useState(null);
 
   // Guest join modal state
@@ -2210,6 +2213,11 @@ export default function OxfordSymposium2026() {
   };
 
   const handleApplyClick = () => {
+    if (isAdminViewer) {
+      setAdminApplyNoticeOpen(true);
+      return;
+    }
+
     // For unauthenticated users on free events
     if (!token) {
       const isFreeEvent = !eventData?.price || Number(eventData?.price) === 0;
@@ -2280,6 +2288,22 @@ export default function OxfordSymposium2026() {
         event={eventData}
         livePath={eventData ? `/live/${eventData.slug || eventData.id}?id=${eventData.id}&role=audience` : ""}
       />
+
+      <Snackbar
+        open={adminApplyNoticeOpen}
+        autoHideDuration={5000}
+        onClose={() => setAdminApplyNoticeOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity="info"
+          variant="filled"
+          onClose={() => setAdminApplyNoticeOpen(false)}
+          sx={{ width: "100%" }}
+        >
+          You are an admin/superuser, so you can manage this event and do not need to register or apply.
+        </Alert>
+      </Snackbar>
     </div>
   );
 }
