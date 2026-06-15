@@ -25808,6 +25808,8 @@ export default function NewLiveMeeting() {
               px: 1.25,               // ✅ left/right padding
               py: 0.25,               // ✅ small vertical padding
               position: "relative",    // ✅ For absolute centering of timer
+              overflow: "hidden",
+              flexWrap: "nowrap",
             }}
           >
             {/* ✅ Breakout Timer Centered in Header - TIMER STOP: Hidden when host ends breakout */}
@@ -25846,13 +25848,14 @@ export default function NewLiveMeeting() {
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 flex: 1,
+                display: { xs: "none", sm: "block" },
               }}
             >
               {meeting.title}
             </Typography>
 
             {isHost && (
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mr: 0.5 }}>
+              <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} alignItems="center" sx={{ mr: 0.5, flexShrink: 0, minWidth: 0 }}>
                 <Chip
                   size="small"
                   label={`Room: ${currentRoomLabel}`}
@@ -25860,7 +25863,8 @@ export default function NewLiveMeeting() {
                     bgcolor: isBreakout ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.08)",
                     border: "1px solid rgba(255,255,255,0.12)",
                     "& .MuiChip-label": { fontWeight: 700, fontSize: 11 },
-                    maxWidth: 180,
+                    maxWidth: { xs: 120, sm: 180 },
+                    flexShrink: 0,
                   }}
                 />
 
@@ -25876,9 +25880,10 @@ export default function NewLiveMeeting() {
                     minWidth: 0,
                     px: 1.2,
                     "&:hover": { borderColor: "rgba(255,255,255,0.35)" },
+                    flexShrink: 0,
                   }}
                 >
-                  Quick Switch
+                  {isMdUp ? "Quick Switch" : "Rooms"}
                 </Button>
 
                 {isBreakout && (
@@ -25900,7 +25905,7 @@ export default function NewLiveMeeting() {
               </Stack>
             )}
 
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ pr: 0.5 }}>
+            <Stack direction="row" spacing={{ xs: 0.5, sm: 1 }} alignItems="center" sx={{ pr: 0.5, flexShrink: 0 }}>
               {meeting.live && (
                 <Chip
                   size="small"
@@ -25958,7 +25963,7 @@ export default function NewLiveMeeting() {
             )}
 
             {/* ✅ Notification History Bell Icon (Host Only) */}
-            {isHost && (
+            {isHost && isMdUp && (
               <Tooltip title="Notification History">
                 <IconButton
                   ref={notifButtonRef}
@@ -25979,29 +25984,40 @@ export default function NewLiveMeeting() {
               </Tooltip>
             )}
 
-            <Tooltip title={isHost ? "Host permissions" : "My controls"}>
-              <span>
-                <IconButton
-                  sx={headerIconBtnSx}
-                  aria-label={isHost ? "Host permissions" : "My controls"}
-                  onClick={openPermMenu}
-                  disabled={!rtkMeeting?.self}
-                >
-                  <SettingsIcon fontSize="small" />
-                </IconButton>
-              </span>
-            </Tooltip>
+            {isMdUp && (
+              <>
+                <Tooltip title={isHost ? "Host permissions" : "My controls"}>
+                  <span>
+                    <IconButton
+                      sx={headerIconBtnSx}
+                      aria-label={isHost ? "Host permissions" : "My controls"}
+                      onClick={openPermMenu}
+                      disabled={!rtkMeeting?.self}
+                    >
+                      <SettingsIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
 
-            <Tooltip title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
-              <IconButton sx={headerIconBtnSx} aria-label="Fullscreen" onClick={toggleFullscreen}>
-                {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
+                <Tooltip title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+                  <IconButton sx={headerIconBtnSx} aria-label="Fullscreen" onClick={toggleFullscreen}>
+                    {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
 
             {!isMdUp ? (
-              <Tooltip title="Open panel">
-                <IconButton sx={headerIconBtnSx} aria-label="Open right panel" onClick={() => toggleRightPanel(0)}>
-                  <MenuIcon />
+              <Tooltip title="More options">
+                <IconButton
+                  sx={headerIconBtnSx}
+                  aria-label="More options"
+                  onClick={handleOpenMoreMenu}
+                  aria-controls={moreMenuOpen ? "participant-more-menu" : undefined}
+                  aria-haspopup="true"
+                  aria-expanded={moreMenuOpen ? "true" : undefined}
+                >
+                  <MoreVertIcon />
                 </IconButton>
               </Tooltip>
             ) : (
@@ -27182,6 +27198,8 @@ export default function NewLiveMeeting() {
                   position: "relative",
                   width: "100%",
                   display: "flex",
+                  flexDirection: { xs: "column", sm: "row" },
+                  gap: { xs: 0.75, sm: 0 },
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -27189,12 +27207,13 @@ export default function NewLiveMeeting() {
                 {/* Role badge aligned with bottom controls (left) */}
                 <Box
                   sx={{
-                    position: "absolute",
-                    left: 0,         // change to 12 if you want same inset like stage chip
-                    top: 0,
-                    bottom: 0,
+                    position: { xs: "static", sm: "absolute" },
+                    left: { sm: 0 },         // change to 12 if you want same inset like stage chip
+                    top: { sm: 0 },
+                    bottom: { sm: 0 },
                     display: "flex",
                     alignItems: "center",
+                    alignSelf: { xs: "flex-start", sm: "auto" },
                     zIndex: 5,
                     pointerEvents: "none",
                   }}
@@ -27228,10 +27247,23 @@ export default function NewLiveMeeting() {
                     gap: { xs: 0.75, sm: 1.5 },
                     mx: "auto",
                     maxWidth: { xs: "calc(100vw - 24px)", sm: "auto" },
-                    width: { xs: "auto", sm: "auto" },
-                    flexWrap: "wrap",
+                    width: { xs: "100%", sm: "auto" },
+                    flexWrap: { xs: "nowrap", sm: "wrap" },
                     rowGap: 1,
-                    overflow: "hidden",
+                    overflowX: { xs: "auto", sm: "hidden" },
+                    overflowY: "hidden",
+                    justifyContent: { xs: "flex-start", sm: "center" },
+                    WebkitOverflowScrolling: "touch",
+                    scrollbarWidth: "thin",
+                    "&::-webkit-scrollbar": {
+                      height: 4,
+                    },
+                    "& .MuiIconButton-root": {
+                      flex: "0 0 auto",
+                    },
+                    "& .MuiButton-root": {
+                      flex: "0 0 auto",
+                    },
                   }}
                 >
                   <Tooltip title={(isOnBreak && !isBreakout) ? "Disabled during break" : (!micOn && !selfCanProduceAudio ? "Request unmute" : (micOn ? "Mute" : "Unmute"))}>
@@ -29645,6 +29677,72 @@ export default function NewLiveMeeting() {
             },
           }}
         >
+          {!isMdUp && (
+            <>
+              {isHost && (
+                <MenuItem
+                  onClick={() => {
+                    const anchor = moreMenuAnchor;
+                    handleCloseMoreMenu();
+                    openNotificationHistory(anchor);
+                  }}
+                >
+                  <ListItemIcon>
+                    {unreadNotifCount > 0 ? (
+                      <NotificationsIcon fontSize="small" />
+                    ) : (
+                      <NotificationsNoneIcon fontSize="small" />
+                    )}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Notification History"
+                    secondary={unreadNotifCount > 0 ? `${unreadNotifCount} unread` : null}
+                  />
+                </MenuItem>
+              )}
+
+              <MenuItem
+                disabled={!rtkMeeting?.self}
+                onClick={() => {
+                  const anchor = moreMenuAnchor;
+                  handleCloseMoreMenu();
+                  setPermAnchorEl(anchor);
+                }}
+              >
+                <ListItemIcon>
+                  <SettingsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary={isHost ? "Host Permissions" : "My Controls"} />
+              </MenuItem>
+
+              <MenuItem
+                onClick={() => {
+                  handleCloseMoreMenu();
+                  toggleFullscreen();
+                }}
+              >
+                <ListItemIcon>
+                  {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+                </ListItemIcon>
+                <ListItemText primary={isFullscreen ? "Exit Fullscreen" : "Fullscreen"} />
+              </MenuItem>
+
+              <MenuItem
+                onClick={() => {
+                  handleCloseMoreMenu();
+                  toggleRightPanel(tab);
+                }}
+              >
+                <ListItemIcon>
+                  <ViewSidebarIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Open Side Panel" />
+              </MenuItem>
+
+              <Divider />
+            </>
+          )}
+
           <MenuItem onClick={handleReportIssue}>
             <ListItemIcon>
               <ReportProblemIcon fontSize="small" />
