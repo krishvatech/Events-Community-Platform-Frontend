@@ -2507,6 +2507,15 @@ export default function NewLiveMeeting() {
   const LIVE_SUMMARY_POLL_FALLBACK_MS = 60000; // 1 min if WS is not connected
   const LIVE_SUMMARY_CACHE_TTL_MS = 60000;     // 1 min cache
   const MARK_ALL_READ_COOLDOWN_MS = 30000;     // 30 sec, prevents mark-all-read storm
+
+  // RTK fallback safety for large meetings. In 300–500+ user rooms, every client
+  // polling/broadcasting participant state creates an RTK/browser fan-out storm.
+  const LIVE_LARGE_MAIN_ROOM_LIMIT = Number(import.meta.env.VITE_LIVE_LARGE_MAIN_ROOM_LIMIT || 100);
+  const RTK_MAIN_PARTICIPANTS_POLL_MS = Number(import.meta.env.VITE_RTK_MAIN_PARTICIPANTS_POLL_MS || 30000);
+  const RTK_BREAKOUT_PARTICIPANTS_POLL_MS = Number(import.meta.env.VITE_RTK_BREAKOUT_PARTICIPANTS_POLL_MS || 8000);
+  const RTK_MAIN_PRESENCE_BROADCAST_MS = Number(import.meta.env.VITE_RTK_MAIN_PRESENCE_BROADCAST_MS || 30000);
+  const RTK_BREAKOUT_PRESENCE_BROADCAST_MS = Number(import.meta.env.VITE_RTK_BREAKOUT_PRESENCE_BROADCAST_MS || 10000);
+
   const LIVE_CHAT_PAGE_SIZE = 10;
   const LIVE_QNA_PAGE_SIZE = 10;
   const [eventId, setEventId] = useState(null);
@@ -3851,6 +3860,7 @@ export default function NewLiveMeeting() {
   const isInBreakoutRoomRef = useRef(false); // ✅ Ref for socket access
   const leaveBreakoutInFlightRef = useRef(false);
   const mainPeekTokenFetchInFlightRef = useRef(false);
+  const mainInitScheduledRef = useRef(false);
   const preEventLoungeWasOpenRef = useRef(false);
   const preEventLoungePhaseRef = useRef(false);
   const fetchLoungeStateRef = useRef(null); // ✅ Ref to store fetchLoungeState for calling from handleLeaveBreakout
@@ -5978,14 +5988,22 @@ export default function NewLiveMeeting() {
       return;
     }
 
-    // ✅ Optional jitter for host-forced breakout/reconnect.
-    // This avoids 330 browsers hitting backend at the same millisecond.
+    // Optional server/client stagger for host-forced breakout/reconnect.
+    const delayMs = Math.max(0, Number(options?.delayMs || 0));
     const jitterMs = Number(options?.jitterMs || 0);
-    if (jitterMs > 0) {
-      const delay = Math.floor(Math.random() * jitterMs);
-      console.log("[BREAKOUT] Applying join jitter:", delay, "ms");
-      await sleep(delay);
+    const jitterDelay = jitterMs > 0 ? Math.floor(Math.random() * jitterMs) : 0;
+    const totalDelay = delayMs + jitterDelay;
+    if (totalDelay > 0) {
+      console.log("[BREAKOUT] Applying join stagger:", totalDelay, "ms");
+      await sleep(totalDelay);
     }
+
+    // Pause non-critical polling while switching RTK rooms. This protects the
+    // backend during the heavy /lounge-join-table/ + websocket transition.
+    shouldPausePollingRef.current = true;
+    window.setTimeout(() => {
+      shouldPausePollingRef.current = false;
+    }, 20000);
 
     // ✅ DEFENSIVE: Ensure we're NOT updating meeting status
     // Joining a lounge should NEVER trigger updateLiveStatus or change meeting state
@@ -6109,6 +6127,7 @@ export default function NewLiveMeeting() {
       console.error("[BREAKOUT] ❌ Exception while entering breakout room:", err);
       showSnackbar(err.message || "Error joining room", "error");
       breakoutJoinInProgressRef.current = false;
+      shouldPausePollingRef.current = false;
       if (breakoutJoinTimeoutRef.current) {
         clearTimeout(breakoutJoinTimeoutRef.current);
         breakoutJoinTimeoutRef.current = null;
@@ -8362,10 +8381,11 @@ export default function NewLiveMeeting() {
         }
 
         if (msg.type === "force_join_breakout") {
-          // Host-initiated force join.
-          // Add jitter so 330 users do not hit lounge-join-table at the same millisecond.
-          console.log("[MainSocket] Force join to breakout:", msg.table_id);
-          handleEnterBreakout(msg.table_id, msg.table_name || null, { jitterMs: 8000 });
+          // Host-initiated force join. Backend batches these messages; the
+          // client still adds a small jitter inside each batch.
+          const jitterMs = Number(msg.join_jitter_ms || 2500);
+          console.log("[MainSocket] Force join to breakout:", msg.table_id, "jitterMs=", jitterMs);
+          handleEnterBreakout(msg.table_id, msg.table_name || null, { jitterMs });
         } else if (msg.type === "breakout_restored") {
           // ✅ NEW: Page reload/reconnect - user is being restored to their previous breakout room
           console.log("[MainSocket] Breakout restored to table", msg.table_id);
@@ -8380,37 +8400,11 @@ export default function NewLiveMeeting() {
 
           showSnackbar(`Restored to ${msg.table_name || "your breakout room"}`, "info");
 
-          // 🎥 Restore BOTH breakout room AND main room peek view after page reload
-          // The main room peek is essential for the dual-screen layout
-          if (msg.main_room_meeting_id && !mainRtkMeeting) {
-            (async () => {
-              try {
-                console.log("[MainSocket] Getting main room token for peek view restoration");
-                const { res, data } = await fetchRtkJoinWithQueueRetry({
-                  eventId,
-                  body: { is_host: false },
-                  logPrefix: "[MainSocket]",
-                });
-                if (!res.ok) {
-                  console.warn("[MainSocket] Failed to get main room token:", res.status, data);
-                  return;
-                }
-                if (data.authToken) {
-                  mainAuthTokenRef.current = data.authToken;
-                  console.log("[MainSocket] ✅ Main room token obtained, initializing peek");
-                  // Initialize main meeting for peek view (receive-only, no audio/video)
-                  await initMainMeeting({
-                    authToken: data.authToken,
-                    defaults: { audio: false, video: false },
-                  });
-                }
-              } catch (e) {
-                console.warn("[MainSocket] Error restoring main room for peek:", e);
-              }
-            })();
-          }
+          // Do not initialize the main-room peek connection in parallel with
+          // breakout restoration.  The delayed main-room-peek effect below will
+          // fetch/init it only after the breakout RTK room has joined.
+          // This avoids RTK SDK "preset undefined" / concurrent init failures.
 
-          // Join the breakout room (happens in parallel with main room init)
           handleEnterBreakout(msg.table_id, msg.table_name || null, { jitterMs: 5000 });
 
           // ✅ NEW: After breakout rejoin, refresh RTK SDK participant list
@@ -11020,21 +11014,32 @@ export default function NewLiveMeeting() {
     };
   }, [rtkMeeting, forceSelfAudioOffAtMediaLevel, isBreakout, mainMicHardMuted, roomJoined]);
 
-  // ✅ NEW: Initialize main room peek AFTER breakout is ready (not during breakout join)
-  // This prevents concurrent RTK init calls that cause "Unsupported concurrent calls" error
+  // Initialize main-room peek only AFTER the breakout RTK room is joined.
+  // During mass breakout moves this avoids two RTK init/join flows fighting each
+  // other and producing SDK errors like "Cannot read properties of undefined
+  // (reading 'preset')".
   useEffect(() => {
-    if (!isBreakout) return; // Only init main room peek when IN breakout
-    if (!mainRoomAuthToken) return; // Need main token
-    if (mainRtkMeeting) return; // Already initialized
-    if (mainInitInFlightRef.current) return; // Already in flight
-    // ✅ CRITICAL FIX: Do NOT check roomJoined for lounge flow
-    // The main room peek is read-only and doesn't need lounge join to complete first
-    // It initializes independently to show live main room activity
+    if (!isBreakout) return;
+    if (!roomJoined) return;
+    if (!mainRoomAuthToken) return;
+    if (mainRtkMeeting) return;
+    if (mainInitInFlightRef.current || mainInitScheduledRef.current) return;
 
-    console.log("[LiveMeeting] ✅ Initializing main room peek connection");
-    mainInitInFlightRef.current = true;
+    const joinedAt = loungeJoinTimestampRef.current || Date.now();
+    const elapsed = Date.now() - joinedAt;
+    const delay = Math.max(0, 12000 - elapsed);
 
-    (async () => {
+    console.log("[LiveMeeting] Scheduling main room peek init after breakout is stable:", delay, "ms");
+    mainInitScheduledRef.current = true;
+
+    const timer = window.setTimeout(async () => {
+      if (!isBreakoutRef.current || mainRtkMeeting || mainInitInFlightRef.current) {
+        mainInitScheduledRef.current = false;
+        return;
+      }
+
+      console.log("[LiveMeeting] ✅ Initializing delayed main room peek connection");
+      mainInitInFlightRef.current = true;
       try {
         await initMainMeeting({
           authToken: mainRoomAuthToken,
@@ -11048,9 +11053,15 @@ export default function NewLiveMeeting() {
         console.error("[LiveMeeting] ❌ Main room peek init failed:", e?.message || e);
       } finally {
         mainInitInFlightRef.current = false;
+        mainInitScheduledRef.current = false;
       }
-    })();
-  }, [isBreakout, mainRoomAuthToken, mainRtkMeeting, initMainMeeting]);
+    }, delay);
+
+    return () => {
+      window.clearTimeout(timer);
+      mainInitScheduledRef.current = false;
+    };
+  }, [isBreakout, roomJoined, mainRoomAuthToken, mainRtkMeeting, initMainMeeting]);
 
   // Ensure main-room token exists for Main Room Peek even when main token fetch is skipped in lounge flow.
   useEffect(() => {
@@ -13355,9 +13366,23 @@ export default function NewLiveMeeting() {
     return () => { mounted = false; };
   }, [isGuest, roomJoined, rtkMeeting, eventId]);
 
-  // Explicit poll via SDK helper (getAll) for SDK variants that don't expose collections
+  // Explicit poll via SDK helper (getAll) for SDK variants that don't expose collections.
+  // In large main rooms this can be extremely expensive: 500 clients polling a
+  // 500-participant list every few seconds creates browser/RTK pressure even if
+  // Django is healthy. Keep the fallback active for small rooms and breakouts.
   useEffect(() => {
     if (!rtkMeeting?.participants) return;
+
+    const isLargeMainRoom = () => {
+      if (isBreakoutRef.current) return false;
+      const knownCount = Math.max(
+        Array.isArray(onlineUsers) ? onlineUsers.length : 0,
+        observedParticipantsRef.current.size || 0
+      );
+      return knownCount >= LIVE_LARGE_MAIN_ROOM_LIMIT;
+    };
+
+    if (isLargeMainRoom()) return;
 
     const bump = () => setParticipantsTick((v) => v + 1);
     const upsert = (p) => {
@@ -13369,7 +13394,7 @@ export default function NewLiveMeeting() {
 
     let cancelled = false;
     const fetchAll = async () => {
-      if (cancelled) return;
+      if (cancelled || isLargeMainRoom()) return;
       try {
         let arr = [];
         if (typeof rtkMeeting.participants.getAll === "function") {
@@ -13386,18 +13411,34 @@ export default function NewLiveMeeting() {
     };
 
     fetchAll();
-    const interval = setInterval(fetchAll, 3000);
+    const intervalMs = isBreakoutRef.current
+      ? RTK_BREAKOUT_PARTICIPANTS_POLL_MS
+      : RTK_MAIN_PARTICIPANTS_POLL_MS;
+    const interval = setInterval(fetchAll, intervalMs);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [rtkMeeting]);
+  }, [rtkMeeting, onlineUsers.length]);
 
-  // Presence broadcast fallback: every client announces itself, listeners upsert into the fallback map
+  // Presence broadcast fallback: clients announce themselves when RTK participant
+  // collections are incomplete. Disable it in large main rooms because N clients
+  // broadcasting to N receivers creates an N² RTK/browser fan-out pattern.
   useEffect(() => {
     if (!rtkMeeting?.self) return;
     if (!rtkMeeting.self.roomJoined) return;
+
+    const isLargeMainRoom = () => {
+      if (isBreakoutRef.current) return false;
+      const knownCount = Math.max(
+        Array.isArray(onlineUsers) ? onlineUsers.length : 0,
+        observedParticipantsRef.current.size || 0
+      );
+      return knownCount >= LIVE_LARGE_MAIN_ROOM_LIMIT;
+    };
+
+    if (isLargeMainRoom()) return;
 
     const bump = () => setParticipantsTick((v) => v + 1);
     const upsertPresence = (payload) => {
@@ -13414,6 +13455,7 @@ export default function NewLiveMeeting() {
     };
 
     const broadcastPresence = () => {
+      if (isLargeMainRoom()) return;
       const self = rtkMeeting.self;
       if (!self?.id) return;
       rtkMeeting.participants?.broadcastMessage?.("presence", {
@@ -13442,14 +13484,17 @@ export default function NewLiveMeeting() {
     rtkMeeting.participants?.joined?.on?.("participantLeft", handleParticipantLeft);
 
     broadcastPresence();
-    const interval = setInterval(broadcastPresence, 4000);
+    const intervalMs = isBreakoutRef.current
+      ? RTK_BREAKOUT_PRESENCE_BROADCAST_MS
+      : RTK_MAIN_PRESENCE_BROADCAST_MS;
+    const interval = setInterval(broadcastPresence, intervalMs);
 
     return () => {
       rtkMeeting.participants?.off?.("broadcastedMessage", onBroadcast);
       rtkMeeting.participants?.joined?.off?.("participantLeft", handleParticipantLeft);
       clearInterval(interval);
     };
-  }, [rtkMeeting]);
+  }, [rtkMeeting, onlineUsers.length]);
 
   const participants = useMemo(() => {
     const loungeOccupantIds = new Set();
@@ -16419,6 +16464,17 @@ export default function NewLiveMeeting() {
               return mergeByIdReplace(prev, [data.message]);
             });
 
+            // When the chat panel is open and the user is already at the bottom,
+            // mark read from the websocket path instead of polling mark-all-read
+            // every 30 seconds for every participant.
+            if (
+              String(data.message?.sender_id || "") !== String(myUserIdRef.current || "") &&
+              wasNearBottomRef.current &&
+              isDocumentVisible()
+            ) {
+              markConversationAllRead(cid, { clearEventUnread: true });
+            }
+
             // Auto-scroll after React re-renders if user was near bottom
             requestAnimationFrame(() => {
               if (wasNearBottomRef.current && alive) {
@@ -16481,6 +16537,7 @@ export default function NewLiveMeeting() {
     isNearBottom,
     scrollToBottom,
     mergeByIdReplace,
+    markConversationAllRead,
   ]);
 
   useEffect(() => {
@@ -16505,6 +16562,13 @@ export default function NewLiveMeeting() {
       tickInFlight = true;
       try {
         if (isChatActive) {
+          // If the conversation websocket is connected, it is the source of
+          // truth for new messages. Do not make every user fetch messages and
+          // call mark-all-read every interval during breakout chat.
+          if (eventChatWsConnectedRef.current) {
+            return;
+          }
+
           try {
             const cid = activeChatConversationId || (await ensureActiveConversation());
             if (cid) {
@@ -17041,6 +17105,10 @@ export default function NewLiveMeeting() {
   const [groups, setGroups] = useState([]);
   const loadGroups = useCallback(async () => {
     if (!eventId || !hasLiveInteractiveAccess) return;
+    if (activeTableId) {
+      setGroups([]);
+      return;
+    }
     try {
       const res = await fetch(toApiUrl(`interactions/qna-groups/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
       if (res.ok) {
@@ -17050,10 +17118,14 @@ export default function NewLiveMeeting() {
     } catch (e) {
       console.error(e);
     }
-  }, [eventId, hasLiveInteractiveAccess]);
+  }, [activeTableId, eventId, hasLiveInteractiveAccess]);
 
   const loadAiSuggestions = useCallback(async () => {
     if (!eventId || !isHost || !hasLiveInteractiveAccess) return;
+    if (activeTableId) {
+      setAiSuggestions([]);
+      return;
+    }
     try {
       const res = await fetch(toApiUrl(`interactions/qna-groups/ai-suggestions/?event_id=${encodeURIComponent(eventId)}`), { headers: authHeader() });
       if (res.ok) {
@@ -17067,7 +17139,7 @@ export default function NewLiveMeeting() {
         }
       }
     } catch (e) { console.error(e); }
-  }, [eventId, hasLiveInteractiveAccess, isHost]);
+  }, [activeTableId, eventId, hasLiveInteractiveAccess, isHost]);
 
   useEffect(() => {
     if (eventId && isQnaActive && hasLiveInteractiveAccess) {
@@ -17078,14 +17150,14 @@ export default function NewLiveMeeting() {
 
   // Keep host suggestion refresh active only while Q&A is open.
   useEffect(() => {
-    if (!isHost || !eventId || !isQnaActive || !hasLiveInteractiveAccess) return;
+    if (!isHost || !eventId || !isQnaActive || !hasLiveInteractiveAccess || activeTableId) return;
 
     const interval = setInterval(() => {
       loadAiSuggestions();
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [eventId, hasLiveInteractiveAccess, isHost, isQnaActive, loadAiSuggestions]);
+  }, [activeTableId, eventId, hasLiveInteractiveAccess, isHost, isQnaActive, loadAiSuggestions]);
   const [qnaLoading, setQnaLoading] = useState(false);
   const [qnaSubmitting, setQnaSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
@@ -17803,12 +17875,21 @@ export default function NewLiveMeeting() {
   const sendQnaTyping = useCallback((isTyping) => {
     const ws = qnaWsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    // Typing indicators are useful inside 10-person breakout rooms, but in a
+    // 500-user main room they create high websocket fan-out. Disable them for
+    // large main rooms and keep Q&A submit itself unaffected.
+    const isLargeMainRoom = !activeTableIdRef.current &&
+      Array.isArray(onlineUsers) &&
+      onlineUsers.length >= LIVE_LARGE_MAIN_ROOM_LIMIT;
+    if (isLargeMainRoom) return;
+
     try {
       ws.send(JSON.stringify({ type: "qna.typing", is_typing: isTyping }));
     } catch (e) {
       console.warn("[QnA] typing send failed:", e);
     }
-  }, []);
+  }, [onlineUsers.length]);
 
   // ── Auto-expire stale typing users (1 s tick) ─────────────────────────────
   useEffect(() => {
@@ -17857,7 +17938,13 @@ export default function NewLiveMeeting() {
       setNewQuestion("");
       setIsAnonymousQuestion(qnaAnonymousModeEnabled ? true : userQnaAnonymousDefault);  // Reset to default after submit
       localStorage.removeItem(`adopted_suggestion_id_${eventId}`);
-      await loadQuestions();
+
+      // The Q&A websocket broadcasts the new question to this room. Avoid a
+      // duplicate GET /interactions/questions/ after every submit. Only refresh
+      // if the websocket is not open, as a fallback for reconnect cases.
+      if (qnaWsRef.current?.readyState !== WebSocket.OPEN) {
+        await loadQuestions({ silent: true });
+      }
     } catch (e) {
       setQnaError(e.message || "Failed to create question.");
     } finally {

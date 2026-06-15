@@ -71,6 +71,8 @@ import EmailTemplatesPage from "./pages/admin/EmailTemplatesPage.jsx";
 import EventLandingPage_Marketing from "./pages/EventLandingPage_Marketing.jsx";
 import SingleEventMarketingPage from "./pages/SingleEventMarketingPage.jsx";
 import AttendeeFormPage from "./pages/AttendeeFormPage.jsx";
+import TrainingProgramsPage from "./pages/TrainingProgramsPage.jsx";
+import RecognitionDirectoryPage from "./pages/RecognitionDirectoryPage.jsx";
 import { CircularProgress } from "@mui/material";
 
 
@@ -160,6 +162,14 @@ const AppShell = () => {
 
   // Hide header & footer on auth pages, live meeting routes, and public branded event pages
   // Also hide chrome on event marketing pages (single slug route or /landing/:slug)
+  // And hide on IMAA standalone public pages
+  const normalizedPath = location.pathname.replace(/\/$/, "");
+  const isImaaStandalonePublicPage =
+    normalizedPath === "/m-and-a-trainings" ||
+    normalizedPath.startsWith("/m-and-a-trainings/") ||
+    normalizedPath === "/recognition" ||
+    normalizedPath.startsWith("/recognition/");
+
   const isCompanionPage = location.pathname.includes("/companion");
   const isSingleEventPage = (location.pathname.startsWith("/landing/") && location.pathname !== "/landing") ||
                             (!location.pathname.startsWith("/events") &&
@@ -172,6 +182,7 @@ const AppShell = () => {
                             location.pathname !== "/cms" &&
                             location.pathname.match(/^\/[a-zA-Z0-9\-]+\/?$/));
   const hideChrome =
+    isImaaStandalonePublicPage ||
     location.pathname === "/signin" ||
     location.pathname === "/signup" ||
     location.pathname === "/forgot-password" ||
@@ -217,7 +228,7 @@ const AppShell = () => {
         </>
       )}
 
-      {!isCompanionPage && <KYCNotification />}
+      {!isCompanionPage && !isImaaStandalonePublicPage && <KYCNotification />}
 
       {/* Main Content Wrapper */}
       <Box
@@ -308,6 +319,13 @@ const AppShell = () => {
           {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
           <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
           <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
+
+          {/* IMAA Standalone Public Pages */}
+          <Route path="/m-and-a-trainings" element={<TrainingProgramsPage />} />
+          <Route path="/m-and-a-trainings/*" element={<TrainingProgramsPage />} />
+          <Route path="/recognition" element={<RecognitionDirectoryPage />} />
+          <Route path="/recognition/*" element={<RecognitionDirectoryPage />} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
           <Route path="/kyc/callback" element={<KYCCallbackPage />} />
         </Routes>
