@@ -865,14 +865,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       return;
     }
 
-    const before = Number(localStorage.getItem("cart_count") || "0");
-
     const item = await addToCart(ev.id);
     if (item) {
-      // addToCart() already tries to refresh /cart/count/ and dispatches "cart:update"
-      // Fallback: only bump if count didn't change (e.g., /cart/count failed)
-      const after = Number(localStorage.getItem("cart_count") || "0");
-      if (after === before) bumpCartCount(1);
+      // addToCart() refreshes /cart/count/. Do not manually bump the badge here,
+      // because adding quantity for the same event should still count as one cart item.
 
       // ✅ DO NOT redirect anywhere
     }
@@ -1690,12 +1686,10 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
       return;
     }
 
-    const before = Number(localStorage.getItem("cart_count") || "0");
-
     const item = await addToCart(ev.id);
     if (item) {
-      const after = Number(localStorage.getItem("cart_count") || "0");
-      if (after === before) bumpCartCount(1);
+      // addToCart() refreshes /cart/count/. Do not manually bump the badge here,
+      // because adding quantity for the same event should still count as one cart item.
 
       // ✅ DO NOT redirect anywhere
     }

@@ -305,10 +305,9 @@ export default function MyCartPage() {
         setCart(Array.isArray(data?.items) ? data.items : []);
         setSubtotal(Number(data?.subtotal ?? 0));
         setTotal(Number(data?.total ?? 0));
-        const count = (data?.items || []).reduce(
-          (s, it) => s + (it.quantity || 0),
-          0
-        );
+        // Cart badge shows number of distinct items/events, not total ticket quantity.
+        // Example: one event with quantity 10 should still show badge 1.
+        const count = Array.isArray(data?.items) ? data.items.length : 0;
         localStorage.setItem("cart_count", String(count));
         window.dispatchEvent(new Event("cart:update"));
       } catch (e) {
@@ -479,10 +478,8 @@ export default function MyCartPage() {
     setCart(Array.isArray(data?.items) ? data.items : []);
     setSubtotal(Number(data?.subtotal ?? 0));
     setTotal(Number(data?.total ?? 0));
-    const count = (data?.items || []).reduce(
-      (s, it) => s + (it.quantity || 0),
-      0
-    );
+    // Cart badge shows number of distinct items/events, not total ticket quantity.
+    const count = Array.isArray(data?.items) ? data.items.length : 0;
     localStorage.setItem("cart_count", String(count));
     window.dispatchEvent(new Event("cart:update"));
   }
