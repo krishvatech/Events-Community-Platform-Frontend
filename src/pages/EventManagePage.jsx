@@ -610,6 +610,9 @@ export default function EventManagePage() {
   const [eventOrdersLoading, setEventOrdersLoading] = useState(false);
   const [eventOrdersError, setEventOrdersError] = useState("");
   const [markPaidLoadingId, setMarkPaidLoadingId] = useState(null);
+  const [paymentRefDialogOpen, setPaymentRefDialogOpen] = useState(false);
+  const [paymentRefValue, setPaymentRefValue] = useState("");
+  const [paymentRefOrder, setPaymentRefOrder] = useState(null);
 
   const extractTextFromSaleorDescription = useCallback((desc) => {
     if (!desc) return "";
@@ -771,22 +774,40 @@ export default function EventManagePage() {
     }
   }, [eventId, isOwner, event?.is_free]);
 
-  const handleMarkEventOrderPaid = useCallback(async (order) => {
-    if (!order?.id || markPaidLoadingId) return;
-    const reference = window.prompt("Enter payment reference / bank transaction ID", order.payment_reference || "");
-    if (reference === null) return;
+  const handleOpenPaymentRefDialog = useCallback((order) => {
+    if (!order?.id) return;
+    setPaymentRefOrder(order);
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    setPaymentRefValue(order.payment_reference || `TXN-${today}-${String(order.id).padStart(3, '0')}`);
+    setPaymentRefDialogOpen(true);
+  }, []);
 
-    setMarkPaidLoadingId(order.id);
+  const handleClosePaymentRefDialog = useCallback(() => {
+    setPaymentRefDialogOpen(false);
+    setPaymentRefValue("");
+    setPaymentRefOrder(null);
+  }, []);
+
+  const handleConfirmPaymentRef = useCallback(async () => {
+    if (!paymentRefOrder?.id || markPaidLoadingId) return;
+    const reference = paymentRefValue.trim();
+    if (!reference) {
+      toast.error("Payment reference cannot be empty");
+      return;
+    }
+
+    handleClosePaymentRefDialog();
+    setMarkPaidLoadingId(paymentRefOrder.id);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/orders/${order.id}/mark-paid/`, {
+      const res = await fetch(`${API_ROOT}/orders/${paymentRefOrder.id}/mark-paid/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          payment_reference: reference.trim(),
+          payment_reference: reference,
           payment_source: "manual",
         }),
       });
@@ -794,15 +815,19 @@ export default function EventManagePage() {
       if (!res.ok) {
         throw new Error(body.detail || body.error || `HTTP ${res.status}`);
       }
-      toast.success(`Order #${order.id} marked as paid.`);
-      setEventOrders((prev) => prev.map((row) => (row.id === order.id ? body : row)));
+      toast.success(`Order #${paymentRefOrder.id} marked as paid.`);
+      setEventOrders((prev) => prev.map((row) => (row.id === paymentRefOrder.id ? body : row)));
       setRegsRefresh((value) => value + 1);
     } catch (err) {
       toast.error(err.message || "Failed to mark order paid");
     } finally {
       setMarkPaidLoadingId(null);
     }
-  }, [markPaidLoadingId]);
+  }, [paymentRefOrder, paymentRefValue, markPaidLoadingId, handleClosePaymentRefDialog]);
+
+  const handleMarkEventOrderPaid = useCallback((order) => {
+    handleOpenPaymentRefDialog(order);
+  }, [handleOpenPaymentRefDialog]);
 
 
 
@@ -9809,6 +9834,96 @@ export default function EventManagePage() {
               sx={{ bgcolor: "#22c55e", color: "white" }}
             >
               {answerSubmitting ? (isEditingAnswer ? "Updating..." : "Publishing...") : (isEditingAnswer ? "Update Answer" : "Publish Answer")}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={paymentRefDialogOpen}
+          onClose={handleClosePaymentRefDialog}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: "12px",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              fontSize: "1.1rem",
+              fontWeight: 600,
+              color: "text.primary",
+              paddingY: 2.5,
+              borderBottom: "1px solid #e5e7eb",
+            }}
+          >
+            Enter Payment Reference
+          </DialogTitle>
+          <DialogContent sx={{ paddingY: 3 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ marginBottom: 2.5 }}
+            >
+              Enter the payment reference or bank transaction ID for order #{paymentRefOrder?.id}
+            </Typography>
+            <TextField
+              fullWidth
+              label="Payment Reference / Transaction ID"
+              value={paymentRefValue}
+              onChange={(e) => setPaymentRefValue(e.target.value)}
+              placeholder="e.g., TXN-20250617-001"
+              variant="outlined"
+              size="medium"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "primary.main",
+                  },
+                  "&.Mui-focused": {
+                    boxShadow: "0 0 0 3px rgba(27, 187, 179, 0.1)",
+                  },
+                },
+              }}
+              autoFocus
+              onKeyPress={(e) => {
+                if (e.key === "Enter" && paymentRefValue.trim()) {
+                  handleConfirmPaymentRef();
+                }
+              }}
+            />
+          </DialogContent>
+          <DialogActions sx={{ paddingX: 3, paddingBottom: 2, gap: 1 }}>
+            <Button
+              onClick={handleClosePaymentRefDialog}
+              variant="outlined"
+              sx={{
+                borderRadius: "8px",
+                textTransform: "none",
+                fontSize: "0.95rem",
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmPaymentRef}
+              variant="contained"
+              disabled={!paymentRefValue.trim() || markPaidLoadingId === paymentRefOrder?.id}
+              sx={{
+                borderRadius: "8px",
+                textTransform: "none",
+                fontSize: "0.95rem",
+              }}
+            >
+              {markPaidLoadingId === paymentRefOrder?.id ? (
+                <CircularProgress size={20} sx={{ color: "white" }} />
+              ) : (
+                "Mark as Paid"
+              )}
             </Button>
           </DialogActions>
         </Dialog>

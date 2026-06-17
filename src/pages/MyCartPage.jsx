@@ -1056,125 +1056,215 @@ export default function MyCartPage() {
         onClose={handleCloseOrderDialog}
         fullWidth
         maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: "12px",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+          },
+        }}
       >
-        <DialogTitle>
-          Order #{selectedOrder?.number ?? selectedOrder?.id}
+        <DialogTitle
+          sx={{
+            fontSize: "1.1rem",
+            fontWeight: 700,
+            color: "text.primary",
+            paddingY: 2.5,
+            borderBottom: "1px solid #e5e7eb",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Box>Order #{selectedOrder?.number ?? selectedOrder?.id}</Box>
+          <Chip
+            label={String(selectedOrder?.status || "paid").toUpperCase()}
+            size="small"
+            color={
+              selectedOrder?.status === "cancelled"
+                ? "default"
+                : selectedOrder?.status === "pending"
+                  ? "warning"
+                  : "success"
+            }
+            variant="outlined"
+            sx={{ ml: 2 }}
+          />
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent sx={{ paddingY: 3, paddingX: 3 }}>
           {selectedOrder && (
-            <Box className="space-y-3">
-              <Box className="flex flex-wrap justify-between gap-2 mb-2">
+            <Box className="space-y-4">
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  pb: 2,
+                  borderBottom: "1px solid #e5e7eb",
+                }}
+              >
                 <Typography variant="body2" color="text.secondary">
                   Placed on{" "}
-                  {selectedOrder.created
-                    ? new Date(
-                      selectedOrder.created
-                    ).toLocaleString()
-                    : "-"}
+                  <strong>
+                    {selectedOrder.created
+                      ? new Date(selectedOrder.created).toLocaleDateString()
+                      : "-"}
+                  </strong>
                 </Typography>
-                <Chip
-                  label={String(
-                    selectedOrder.status || "paid"
-                  ).toUpperCase()}
-                  size="small"
-                  color={
-                    selectedOrder.status === "cancelled"
-                      ? "default"
-                      : selectedOrder.status === "pending"
-                        ? "warning"
-                        : "success"
-                  }
-                  variant="outlined"
-                />
               </Box>
 
               <Box>
                 <Typography
                   variant="subtitle2"
-                  className="mb-1"
-                  sx={{ fontWeight: 600 }}
+                  sx={{ fontWeight: 700, mb: 1.5, color: "text.primary" }}
                 >
-                  Items
+                  Order Items
                 </Typography>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Item</TableCell>
-                      <TableCell align="right">Qty</TableCell>
-                      <TableCell align="right">Price</TableCell>
-                      <TableCell align="right">Total</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {(selectedOrder.items || []).map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <Box className="flex items-center gap-2">
-                            {item.image ? (
-                              <img
-                                src={toAbs(item.image)}
-                                alt={item.title}
-                                className="w-10 h-10 rounded-md object-cover border border-slate-200"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-md bg-slate-200" />
-                            )}
-                            <Typography className="text-sm font-medium">
-                              {item.title}
-                            </Typography>
-                          </Box>
+                <Box sx={{ width: "100%", overflowX: "auto" }}>
+                  <Table size="small" sx={{ minWidth: 300 }}>
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: "#f9fafb" }}>
+                        <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
+                          Item
                         </TableCell>
-                        <TableCell align="right">{item.qty}</TableCell>
-                        <TableCell align="right">
-                          {fmt(item.price)}
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                          Qty
                         </TableCell>
-                        <TableCell align="right">
-                          {fmt(item.price * item.qty)}
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                          Price
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                          Total
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {(selectedOrder.items || []).map((item) => (
+                        <TableRow key={item.id} sx={{ "&:hover": { backgroundColor: "#fafafa" } }}>
+                          <TableCell>
+                            <Box className="flex items-center gap-2">
+                              {item.image ? (
+                                <img
+                                  src={toAbs(item.image)}
+                                  alt={item.title}
+                                  className="w-10 h-10 rounded-md object-cover border border-slate-200"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-md bg-slate-200" />
+                              )}
+                              <Typography sx={{ fontSize: "0.875rem", fontWeight: 500 }}>
+                                {item.title}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontSize: "0.875rem" }}>
+                            {item.qty}
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontSize: "0.875rem" }}>
+                            {fmt(item.price)}
+                          </TableCell>
+                          <TableCell
+                            align="right"
+                            sx={{ fontSize: "0.875rem", fontWeight: 600 }}
+                          >
+                            {fmt(item.price * item.qty)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Box>
               </Box>
 
-              <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-                <Box className="flex flex-wrap justify-between gap-2 items-center">
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 2,
+                  backgroundColor: "#f9fafb",
+                }}
+              >
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                   <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Invoice</Typography>
+                    <Typography sx={{ fontSize: "0.75rem", fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Invoice
+                    </Typography>
                     {selectedOrder.invoice ? (
-                      <Typography variant="body2" color="text.secondary">
-                        {selectedOrder.invoice.number} · {String(selectedOrder.invoice.state || "issued").toUpperCase()}
+                      <Typography sx={{ fontSize: "0.95rem", fontWeight: 600, color: "text.primary", mt: 0.5 }}>
+                        {selectedOrder.invoice.number}
                       </Typography>
                     ) : selectedOrder.status === "paid" ? (
-                      <Typography variant="body2" color="text.secondary">Invoice is being generated.</Typography>
+                      <Typography sx={{ fontSize: "0.875rem", color: "text.secondary", mt: 0.5 }}>
+                        Invoice is being generated...
+                      </Typography>
                     ) : (
-                      <Typography variant="body2" color="text.secondary">Available after payment is confirmed.</Typography>
+                      <Typography sx={{ fontSize: "0.875rem", color: "text.secondary", mt: 0.5 }}>
+                        Available after payment is confirmed.
+                      </Typography>
                     )}
                   </Box>
                   {selectedOrder.invoice?.pdf_ready ? (
-                    <Button variant="contained" onClick={(e) => handleDownloadInvoice(selectedOrder.invoice, e)} sx={{ textTransform: "none" }}>
-                      Download invoice
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={(e) => handleDownloadInvoice(selectedOrder.invoice, e)}
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#1bbbb3",
+                        "&:hover": { backgroundColor: "#0ea5a4" },
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      Download Invoice
                     </Button>
                   ) : selectedOrder.invoice ? (
-                    <Button variant="outlined" onClick={(e) => handleGenerateInvoicePdf(selectedOrder.invoice, e)} sx={{ textTransform: "none" }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={(e) => handleGenerateInvoicePdf(selectedOrder.invoice, e)}
+                      sx={{
+                        textTransform: "none",
+                        borderColor: "#1bbbb3",
+                        color: "#1bbbb3",
+                        alignSelf: "flex-start",
+                      }}
+                    >
                       Generate PDF
                     </Button>
                   ) : null}
                 </Box>
               </Paper>
 
-              <Box className="flex justify-end mt-2">
-                <Typography variant="subtitle1" fontWeight={700}>
-                  Order total: {fmt(selectedOrder.total)}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  pt: 2,
+                  borderTop: "1px solid #e5e7eb",
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "text.secondary" }}>
+                  Order Total:
+                </Typography>
+                <Typography
+                  variant="h6"
+                  sx={{ fontWeight: 800, color: "#1bbbb3" }}
+                >
+                  {fmt(selectedOrder.total)}
                 </Typography>
               </Box>
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ paddingX: 3, paddingBottom: 2, gap: 1 }}>
           <Button
             onClick={handleCloseOrderDialog}
-            sx={{ textTransform: "none" }}
+            variant="outlined"
+            sx={{
+              textTransform: "none",
+              borderRadius: "8px",
+            }}
           >
             Close
           </Button>
