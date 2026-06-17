@@ -140,30 +140,35 @@ export const sanitizeSlugInput = (s) =>
 // Allows: @, #, $, &, ?, !, (, ), *, +, ;, :, ~, ' and other special chars
 
 export const getDisplayPrice = (event) => {
-  const label = String(event?.price_label || "").trim();
-  if (label) return label;
+  const label = String(event?.price_label || event?.price_display_label || "").trim();
 
-  if (event?.is_free) return "Free";
+  // Manual labels are useful while the Saleor product is not priced yet.
+  // Once a paid event has a valid Saleor/ECP price, show the real checkout price
+  // so public event cards never display a stale label such as "80" while checkout
+  // charges a different amount such as "$150".
+  // allow_manual_price_display remains the explicit escape hatch for special cases
+  // like "By invitation only" or "Price on application".
+  if (event?.allow_manual_price_display && label) return label;
+
+  if (event?.is_free) return label || "Free";
 
   const rawPrice = event?.price;
 
-  if (rawPrice === null || rawPrice === undefined || rawPrice === "") {
-    return "Price to be announced";
+  if (rawPrice !== null && rawPrice !== undefined && rawPrice !== "") {
+    const amount = Number(rawPrice);
+
+    if (Number.isFinite(amount) && amount > 0) {
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: event?.currency || "USD",
+          maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+        }).format(amount);
+      } catch {
+        return `$${amount}`;
+      }
+    }
   }
 
-  const amount = Number(rawPrice);
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return "Price to be announced";
-  }
-
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: event?.currency || "USD",
-      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    }).format(amount);
-  } catch {
-    return `$${amount}`;
-  }
+  return label || "Price to be announced";
 };

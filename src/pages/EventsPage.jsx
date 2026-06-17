@@ -474,6 +474,8 @@ function toCard(ev, isPinnedTopCopy = false) {
     origins: Array.isArray(ev.origins) ? ev.origins : [],
     price: ev.price,
     price_label: ev.price_label,
+    price_display_label: ev.price_display_label,
+    allow_manual_price_display: !!ev.allow_manual_price_display,
     is_free: ev.is_free || false,
     status: ev.status,
     is_live: ev.is_live,

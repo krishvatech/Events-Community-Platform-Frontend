@@ -2012,7 +2012,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                 fullWidth
                                 value={priceLabel}
                                 onChange={(e) => setPriceLabel(e.target.value)}
-                                helperText='Optional. Shown instead of Saleor price. E.g. "By Invitation Only", "From $990"'
+                                helperText='Optional fallback before Saleor price is configured. Once Saleor price exists, public pages show the real checkout price.'
                                 sx={{ mt: 2 }}
                                 inputProps={{ maxLength: 100 }}
                             />

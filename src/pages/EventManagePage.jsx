@@ -6587,7 +6587,7 @@ export default function EventManagePage() {
               fullWidth
               value={saleorPriceLabel}
               onChange={(e) => setSaleorPriceLabel(e.target.value)}
-              helperText='Optional. This text is shown on public event pages instead of the Saleor price. It does not change the checkout price. Examples: "From $990", "By Invitation Only", "Price on application".'
+              helperText='Optional fallback shown before Saleor price is configured. Once a valid Saleor price exists, public pages show the Saleor checkout price to avoid mismatched pricing.'
               inputProps={{ maxLength: 100 }}
             />
             <Button sx={{ mt: 2 }} variant="outlined" onClick={handleSavePriceLabel}>
@@ -6674,7 +6674,7 @@ export default function EventManagePage() {
                   label="Public price display text"
                   value={saleorPriceLabel}
                   onChange={(e) => { setSaleorPriceLabel(e.target.value); setProductDirty(true); }}
-                  helperText='Optional. If filled, this text overrides the Saleor price on public event pages. It does not affect checkout pricing. Examples: "From $990", "By Invitation Only", "Price on application".'
+                  helperText='Optional fallback shown before Saleor price is configured. Once a valid Saleor price exists, public pages show the Saleor checkout price to avoid mismatched pricing.'
                   sx={{ mb: 4, width: 400, display: 'block' }}
                   inputProps={{ maxLength: 100 }}
                 />
