@@ -6326,6 +6326,29 @@ export default function EventManagePage() {
       return `${String(currency || "USD").toUpperCase()} ${amount.toFixed(2)}`;
     };
 
+    const formatDate = (value) => {
+      if (!value) return "—";
+      const parsed = dayjs(value);
+      return parsed.isValid() ? parsed.format("MMM D, YYYY") : "—";
+    };
+
+    const invoiceStatus = (invoice) => {
+      const state = String(invoice?.state || "").toLowerCase();
+      if (!invoice) return { label: "Not created", color: "default", variant: "outlined" };
+      if (state === "paid") return { label: "Paid", color: "success", variant: "filled" };
+      if (state === "overdue") return { label: "Overdue", color: "error", variant: "filled" };
+      if (state === "partially_paid") return { label: "Partially paid", color: "warning", variant: "filled" };
+      return { label: state ? state.replace(/_/g, " ").toUpperCase() : "Issued", color: "info", variant: "outlined" };
+    };
+
+    const totals = eventOrders.reduce((acc, order) => {
+      const amount = Number(order.total || 0);
+      if (order.status === "paid") acc.paid += amount;
+      else acc.pending += amount;
+      acc.count += 1;
+      return acc;
+    }, { count: 0, paid: 0, pending: 0 });
+
     if (event?.is_free !== false) {
       return (
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
@@ -6338,47 +6361,70 @@ export default function EventManagePage() {
     }
 
     return (
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} sx={{ mb: 2 }}>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800 }}>Event Orders</Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-              Review manual-payment orders for this paid event and mark verified bank/manual payments as paid.
-            </Typography>
-          </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshRoundedIcon />}
-            onClick={fetchEventOrders}
-            disabled={eventOrdersLoading}
-            sx={{ textTransform: "none", borderRadius: 999 }}
-          >
-            Refresh
-          </Button>
-        </Stack>
+      <Stack spacing={2.5}>
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+          <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={2}>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: "#071d49" }}>Orders & Invoices</Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5, maxWidth: 720 }}>
+                Track manual-payment orders, verify bank/manual payments, and download the final invoice PDF for each customer.
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshRoundedIcon />}
+              onClick={fetchEventOrders}
+              disabled={eventOrdersLoading}
+              sx={{ textTransform: "none", borderRadius: 999 }}
+            >
+              Refresh
+            </Button>
+          </Stack>
+
+          <Grid container spacing={2} sx={{ mt: 2 }}>
+            <Grid item xs={12} md={4}>
+              <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "rgba(15, 118, 110, 0.08)", border: "1px solid rgba(15, 118, 110, 0.16)" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase" }}>Total orders</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{totals.count}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.16)" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase" }}>Paid amount</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{money(totals.paid, event?.currency || "USD")}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "rgba(245, 158, 11, 0.10)", border: "1px solid rgba(245, 158, 11, 0.20)" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase" }}>Pending amount</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>{money(totals.pending, event?.currency || "USD")}</Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Paper>
 
         {eventOrdersError && (
-          <Alert severity="error" sx={{ mb: 2 }}>{eventOrdersError}</Alert>
+          <Alert severity="error">{eventOrdersError}</Alert>
         )}
 
         {eventOrdersLoading ? (
-          <Box sx={{ py: 4 }}><LinearProgress /></Box>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+            <LinearProgress />
+          </Paper>
         ) : eventOrders.length === 0 ? (
           <Alert severity="info">No paid orders found for this event yet.</Alert>
         ) : (
-          <TableContainer>
+          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
             <Table size="small">
               <TableHead>
-                <TableRow>
-                  <TableCell>Order</TableCell>
-                  <TableCell>Customer</TableCell>
-                  <TableCell>Items</TableCell>
-                  <TableCell>Total</TableCell>
-                  <TableCell>Saleor Order</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Payment Ref</TableCell>
-                  <TableCell>Invoice</TableCell>
-                  <TableCell align="right">Action</TableCell>
+                <TableRow sx={{ bgcolor: "rgba(7, 29, 73, 0.04)" }}>
+                  <TableCell sx={{ fontWeight: 800 }}>Order</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Customer</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Saleor</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Amount</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Payment</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Invoice</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -6386,69 +6432,113 @@ export default function EventManagePage() {
                   const items = Array.isArray(order.items) ? order.items : [];
                   const qty = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
                   const isPaid = order.status === "paid";
+                  const inv = order.invoice || null;
+                  const invStatus = invoiceStatus(inv);
                   return (
-                    <TableRow key={order.id} hover>
-                      <TableCell>#{order.id}</TableCell>
+                    <TableRow key={order.id} hover sx={{ '& td': { py: 1.5 } }}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 900 }}>#{order.id}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>{qty || 0} item{Number(qty || 0) === 1 ? "" : "s"}</Typography>
+                      </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
                           {order.user_display_name || order.user_email || "Customer"}
                         </Typography>
                         {order.user_email && (
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>{order.user_email}</Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>{order.user_email}</Typography>
                         )}
                       </TableCell>
-                      <TableCell>{qty || "—"}</TableCell>
-                      <TableCell>{money(order.total, order.currency)}</TableCell>
-                      <TableCell>{order.saleor_order_number ? `#${order.saleor_order_number}` : (order.saleor_order_id || "—")}</TableCell>
                       <TableCell>
-                        <Chip
-                          size="small"
-                          label={(order.status || "pending").toUpperCase()}
-                          color={isPaid ? "success" : order.status === "canceled" ? "default" : "warning"}
-                          variant={isPaid ? "filled" : "outlined"}
-                        />
-                      </TableCell>
-                      <TableCell>{order.payment_reference || "—"}</TableCell>
-                      <TableCell>
-                        {order.invoice?.pdf_ready ? (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<FileDownloadRoundedIcon />}
-                            onClick={() => downloadEventOrderInvoice(order.invoice)}
-                            sx={{ textTransform: "none", borderRadius: 999 }}
-                          >
-                            Download
-                          </Button>
-                        ) : order.invoice ? (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => generateEventOrderInvoicePdf(order)}
-                            sx={{ textTransform: "none", borderRadius: 999 }}
-                          >
-                            Generate PDF
-                          </Button>
-                        ) : isPaid ? (
-                          <Chip size="small" label="Generating" variant="outlined" />
-                        ) : (
-                          <Chip size="small" label="After payment" variant="outlined" />
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {order.saleor_order_number ? `#${order.saleor_order_number}` : "—"}
+                        </Typography>
+                        {order.saleor_order_id && (
+                          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", maxWidth: 150 }} noWrap>
+                            {order.saleor_order_id}
+                          </Typography>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>{money(order.total, order.currency)}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>{String(order.currency || "USD").toUpperCase()}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack spacing={0.6} alignItems="flex-start">
+                          <Chip
+                            size="small"
+                            label={(order.status || "pending").toUpperCase()}
+                            color={isPaid ? "success" : order.status === "canceled" ? "default" : "warning"}
+                            variant={isPaid ? "filled" : "outlined"}
+                          />
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                            Ref: {order.payment_reference || "not added"}
+                          </Typography>
+                          {order.paid_at && (
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>Paid: {formatDate(order.paid_at)}</Typography>
+                          )}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Stack spacing={0.75} alignItems="flex-start">
+                          {inv ? (
+                            <>
+                              <Typography variant="body2" sx={{ fontWeight: 800 }}>{inv.number}</Typography>
+                              <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                                <Chip size="small" label={invStatus.label} color={invStatus.color} variant={invStatus.variant} />
+                                {inv.pdf_ready ? (
+                                  <Chip size="small" label="PDF ready" color="success" variant="outlined" />
+                                ) : (
+                                  <Chip size="small" label="PDF pending" variant="outlined" />
+                                )}
+                              </Stack>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                Issued {formatDate(inv.issue_date)} • Due {formatDate(inv.due_date)}
+                              </Typography>
+                            </>
+                          ) : (
+                            <Chip size="small" label={isPaid ? "Generating invoice" : "Invoice after checkout"} variant="outlined" />
+                          )}
+                        </Stack>
                       </TableCell>
                       <TableCell align="right">
-                        {isPaid ? (
-                          <Chip size="small" color="success" label="Paid" />
-                        ) : (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={() => handleMarkEventOrderPaid(order)}
-                            disabled={markPaidLoadingId === order.id}
-                            sx={{ textTransform: "none", borderRadius: 999 }}
-                          >
-                            {markPaidLoadingId === order.id ? "Saving..." : "Mark paid"}
-                          </Button>
-                        )}
+                        <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center" flexWrap="wrap" useFlexGap>
+                          {inv?.pdf_ready ? (
+                            <Tooltip title="Download invoice PDF">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<FileDownloadRoundedIcon />}
+                                onClick={() => downloadEventOrderInvoice(inv)}
+                                sx={{ textTransform: "none", borderRadius: 999 }}
+                              >
+                                Invoice
+                              </Button>
+                            </Tooltip>
+                          ) : inv ? (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => generateEventOrderInvoicePdf(order)}
+                              sx={{ textTransform: "none", borderRadius: 999 }}
+                            >
+                              Generate PDF
+                            </Button>
+                          ) : null}
+
+                          {!isPaid ? (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => handleMarkEventOrderPaid(order)}
+                              disabled={markPaidLoadingId === order.id}
+                              sx={{ textTransform: "none", borderRadius: 999 }}
+                            >
+                              {markPaidLoadingId === order.id ? "Saving..." : "Mark paid"}
+                            </Button>
+                          ) : (
+                            <Chip size="small" color="success" label="Paid" />
+                          )}
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   );
@@ -6457,7 +6547,7 @@ export default function EventManagePage() {
             </Table>
           </TableContainer>
         )}
-      </Paper>
+      </Stack>
     );
   };
 
