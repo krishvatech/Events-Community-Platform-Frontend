@@ -535,8 +535,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     // Calculate total filtered items
     const allItems = [
         ...discoverItems,
-        ...(isNormalUser ? trainingsItems : []),
-        ...(isNormalUser ? resourcesItems : []),
+        ...trainingsItems,  // Show for ALL users
+        ...resourcesItems,  // Show for ALL users
         ...manageItems,
         ...(adminItems.length > 0 ? adminItems : [])
     ];
@@ -733,8 +733,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 </Box>
 
                 {renderList(discoverItems, "EVENTS & COMMUNITY")}
-                {isNormalUser && renderList(trainingsItems, "TRAININGS & COURSES")}
-                {isNormalUser && renderList(resourcesItems, "RESOURCES")}
+                {renderList(trainingsItems, "TRAININGS & COURSES")}
+                {renderList(resourcesItems, "RESOURCES")}
                 {renderList(manageItems, isNormalUser ? "PERSONAL" : "MY CONTENT")}
                 {adminItems.length > 0 && renderList(adminItems.filter(item => item.label !== "Saleor Manager" || saleorEnabled), "PLATFORM")}
 

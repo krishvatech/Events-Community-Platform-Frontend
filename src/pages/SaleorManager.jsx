@@ -1678,6 +1678,7 @@ export default function SaleorManager() {
               <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
                 {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : tab === 2 ? "Shipping Policy Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
               </Typography>
+              {/* TODO: Hide create button for now - uncomment to enable in future
               {(tab === 0 || tab === 1 || tab === 2 || tab === 3 || tab === 5) && (
                 <Button
                   variant="contained"
@@ -1699,6 +1700,7 @@ export default function SaleorManager() {
                   Create New
                 </Button>
               )}
+              */}
             </Box>
 
             {loading ? (
@@ -1731,9 +1733,11 @@ export default function SaleorManager() {
                       </TableCell>
                     )}
                     {tab === 3 && <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Tax Class</TableCell>}
+                    {/* TODO: Hide Actions column header - uncomment when action buttons are re-enabled
                     <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>
                       Actions
                     </TableCell>
+                    */}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1828,6 +1832,7 @@ export default function SaleorManager() {
                           />
                         ) : tab === 4 ? (
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            {/* TODO: Toggle switch hidden - uncomment to enable staff active status changes
                             <Switch
                               size="small"
                               checked={Boolean(item.is_active)}
@@ -1835,6 +1840,7 @@ export default function SaleorManager() {
                               onChange={(event) => handleStaffActiveChange(item, event.target.checked)}
                               inputProps={{ "aria-label": `Set ${item.email} active status` }}
                             />
+                            */}
                             <Chip
                               label={item.is_active ? "Active" : "Inactive"}
                               size="small"
@@ -1887,6 +1893,7 @@ export default function SaleorManager() {
                           </Typography>
                         </TableCell>
                       )}
+                      {/* TODO: Hide action buttons (edit, delete, permissions) for now - uncomment to enable in future
                       <TableCell align="right">
                           {(tab === 0 || tab === 1 || tab === 2 || tab === 3) && (
                             <>
@@ -1949,11 +1956,12 @@ export default function SaleorManager() {
                             </>
                           )}
                       </TableCell>
+                      */}
                     </TableRow>
                   ))}
                   {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : tab === 3 ? productTypes : tab === 4 ? staffUsers : permissionGroups).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={tab === 3 ? 5 : tab === 4 ? 5 : tab === 5 ? 4 : 5} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={tab === 3 ? 4 : tab === 4 ? 4 : tab === 5 ? 3 : 4} align="center" sx={{ py: 6 }}>
                         <Typography variant="body1" sx={{ color: "#9ca3af" }}>
                           No records found. Try syncing from Saleor.
                         </Typography>
