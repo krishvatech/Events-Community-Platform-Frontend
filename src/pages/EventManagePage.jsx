@@ -210,7 +210,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Product Management", "Edit", "Applications", "Application Tracks", "Registered Members", "Participants", "Participant Information", "Promotional Profiles", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Orders", "Edit", "Applications", "Application Tracks", "Registered Members", "Participants", "Participant Information", "Promotional Profiles", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications"];
 
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
@@ -222,9 +222,9 @@ const getTabLabels = (event, isOwner) => {
   if (event?.registration_type !== 'apply') {
     labels = labels.filter(label => label !== "Applications" && label !== "Application Tracks");
   }
-  // Only show Product Management tab for paid events (is_free === false strictly)
+  // Only show payment/product tabs for paid events (is_free === false strictly)
   if (event?.is_free !== false) {
-    labels = labels.filter(label => label !== "Product Management");
+    labels = labels.filter(label => label !== "Product Management" && label !== "Orders");
   }
   // Hide Companion tab for virtual-only events
   const eventFormat = event?.event_format || event?.format;
@@ -605,6 +605,12 @@ export default function EventManagePage() {
     badge_label: "early_bird"
   });
 
+  // Paid event order review state
+  const [eventOrders, setEventOrders] = useState([]);
+  const [eventOrdersLoading, setEventOrdersLoading] = useState(false);
+  const [eventOrdersError, setEventOrdersError] = useState("");
+  const [markPaidLoadingId, setMarkPaidLoadingId] = useState(null);
+
   const extractTextFromSaleorDescription = useCallback((desc) => {
     if (!desc) return "";
     try {
@@ -646,6 +652,16 @@ export default function EventManagePage() {
   const guestAuditTabIndex = tabLabels.indexOf("Guest Audit");
   const speedNetworkingTabIndex = tabLabels.indexOf("Speed Networking");
   const productManagementTabIndex = tabLabels.indexOf("Product Management");
+  const ordersTabIndex = tabLabels.indexOf("Orders");
+
+  useEffect(() => {
+    const requestedTab = location.state?.initialTab;
+    if (!requestedTab) return;
+    const idx = tabLabels.indexOf(requestedTab);
+    if (idx !== -1 && tab !== idx) {
+      setTab(idx);
+    }
+  }, [location.state?.initialTab, tabLabels, tab]);
 
   const fetchSaleorProduct = useCallback(async () => {
     if (!eventId || !isOwner) return;
@@ -729,6 +745,123 @@ export default function EventManagePage() {
       fetchSaleorDiscounts();
     }
   }, [tab, productManagementTabIndex, fetchSaleorProduct, fetchSaleorDiscounts]);
+
+  const fetchEventOrders = useCallback(async () => {
+    if (!eventId || !isOwner || event?.is_free !== false) return;
+    setEventOrdersLoading(true);
+    setEventOrdersError("");
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/orders/`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.detail || body.error || `HTTP ${res.status}`);
+      }
+      setEventOrders(Array.isArray(body.orders) ? body.orders : []);
+    } catch (err) {
+      console.error("Failed to fetch event orders:", err);
+      setEventOrdersError(err.message || "Failed to load event orders");
+    } finally {
+      setEventOrdersLoading(false);
+    }
+  }, [eventId, isOwner, event?.is_free]);
+
+  const handleMarkEventOrderPaid = useCallback(async (order) => {
+    if (!order?.id || markPaidLoadingId) return;
+    const reference = window.prompt("Enter payment reference / bank transaction ID", order.payment_reference || "");
+    if (reference === null) return;
+
+    setMarkPaidLoadingId(order.id);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/orders/${order.id}/mark-paid/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          payment_reference: reference.trim(),
+          payment_source: "manual",
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.detail || body.error || `HTTP ${res.status}`);
+      }
+      toast.success(`Order #${order.id} marked as paid.`);
+      setEventOrders((prev) => prev.map((row) => (row.id === order.id ? body : row)));
+      setRegsRefresh((value) => value + 1);
+    } catch (err) {
+      toast.error(err.message || "Failed to mark order paid");
+    } finally {
+      setMarkPaidLoadingId(null);
+    }
+  }, [markPaidLoadingId]);
+
+
+
+  const downloadEventOrderInvoice = useCallback(async (invoice) => {
+    if (!invoice?.id) return;
+    try {
+      const token = getToken();
+      const downloadUrl = invoice.download_url
+        ? (invoice.download_url.startsWith("http") ? invoice.download_url : `${API_ORIGIN}${invoice.download_url}`)
+        : `${API_ROOT}/invoices/${invoice.id}/download_pdf/`;
+      const res = await fetch(downloadUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Invoice PDF is not ready yet.");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${invoice.number || `invoice-${invoice.id}`}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.message || "Could not download invoice.");
+    }
+  }, []);
+
+  const generateEventOrderInvoicePdf = useCallback(async (order) => {
+    const invoice = order?.invoice;
+    if (!invoice?.id) return;
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/invoices/${invoice.id}/generate_pdf/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail || body.error || "Could not generate invoice PDF.");
+      setEventOrders((prev) => prev.map((row) => (
+        row.id === order.id ? { ...row, invoice: { ...row.invoice, ...body } } : row
+      )));
+      toast.success("Invoice PDF generated.");
+      if (body?.pdf_ready) {
+        await downloadEventOrderInvoice({ ...invoice, ...body });
+      }
+    } catch (err) {
+      toast.error(err.message || "Could not generate invoice PDF.");
+    }
+  }, [downloadEventOrderInvoice]);
+
+  useEffect(() => {
+    if (ordersTabIndex !== -1 && tab === ordersTabIndex) {
+      fetchEventOrders();
+    }
+  }, [tab, ordersTabIndex, fetchEventOrders]);
 
   const openCreateDiscount = () => {
     setEditingDiscount(null);
@@ -6162,6 +6295,147 @@ export default function EventManagePage() {
     }
   };
 
+  const renderEventOrders = () => {
+    const money = (value, currency = event?.currency || "USD") => {
+      const amount = Number(value || 0);
+      return `${String(currency || "USD").toUpperCase()} ${amount.toFixed(2)}`;
+    };
+
+    if (event?.is_free !== false) {
+      return (
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>Orders</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
+            Orders are only available for paid events.
+          </Typography>
+        </Paper>
+      );
+    }
+
+    return (
+      <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} sx={{ mb: 2 }}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800 }}>Event Orders</Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
+              Review manual-payment orders for this paid event and mark verified bank/manual payments as paid.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshRoundedIcon />}
+            onClick={fetchEventOrders}
+            disabled={eventOrdersLoading}
+            sx={{ textTransform: "none", borderRadius: 999 }}
+          >
+            Refresh
+          </Button>
+        </Stack>
+
+        {eventOrdersError && (
+          <Alert severity="error" sx={{ mb: 2 }}>{eventOrdersError}</Alert>
+        )}
+
+        {eventOrdersLoading ? (
+          <Box sx={{ py: 4 }}><LinearProgress /></Box>
+        ) : eventOrders.length === 0 ? (
+          <Alert severity="info">No paid orders found for this event yet.</Alert>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Order</TableCell>
+                  <TableCell>Customer</TableCell>
+                  <TableCell>Items</TableCell>
+                  <TableCell>Total</TableCell>
+                  <TableCell>Saleor Order</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Payment Ref</TableCell>
+                  <TableCell>Invoice</TableCell>
+                  <TableCell align="right">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {eventOrders.map((order) => {
+                  const items = Array.isArray(order.items) ? order.items : [];
+                  const qty = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+                  const isPaid = order.status === "paid";
+                  return (
+                    <TableRow key={order.id} hover>
+                      <TableCell>#{order.id}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {order.user_display_name || order.user_email || "Customer"}
+                        </Typography>
+                        {order.user_email && (
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>{order.user_email}</Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>{qty || "—"}</TableCell>
+                      <TableCell>{money(order.total, order.currency)}</TableCell>
+                      <TableCell>{order.saleor_order_number ? `#${order.saleor_order_number}` : (order.saleor_order_id || "—")}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={(order.status || "pending").toUpperCase()}
+                          color={isPaid ? "success" : order.status === "canceled" ? "default" : "warning"}
+                          variant={isPaid ? "filled" : "outlined"}
+                        />
+                      </TableCell>
+                      <TableCell>{order.payment_reference || "—"}</TableCell>
+                      <TableCell>
+                        {order.invoice?.pdf_ready ? (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<FileDownloadRoundedIcon />}
+                            onClick={() => downloadEventOrderInvoice(order.invoice)}
+                            sx={{ textTransform: "none", borderRadius: 999 }}
+                          >
+                            Download
+                          </Button>
+                        ) : order.invoice ? (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => generateEventOrderInvoicePdf(order)}
+                            sx={{ textTransform: "none", borderRadius: 999 }}
+                          >
+                            Generate PDF
+                          </Button>
+                        ) : isPaid ? (
+                          <Chip size="small" label="Generating" variant="outlined" />
+                        ) : (
+                          <Chip size="small" label="After payment" variant="outlined" />
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {isPaid ? (
+                          <Chip size="small" color="success" label="Paid" />
+                        ) : (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => handleMarkEventOrderPaid(order)}
+                            disabled={markPaidLoadingId === order.id}
+                            sx={{ textTransform: "none", borderRadius: 999 }}
+                          >
+                            {markPaidLoadingId === order.id ? "Saving..." : "Mark paid"}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+    );
+  };
+
   const renderProductManagement = () => {
     if (saleorLoading && !saleorProduct) {
       return (
@@ -8405,6 +8679,7 @@ export default function EventManagePage() {
                       {tab === tabLabels.indexOf("Email Notifications") && <EventEmailTemplatesManager event={event} />}
                       {tab === tabLabels.indexOf("Companion") && renderCompanion()}
                       {tabLabels.indexOf("Product Management") !== -1 && tab === tabLabels.indexOf("Product Management") && renderProductManagement()}
+                      {ordersTabIndex !== -1 && tab === ordersTabIndex && renderEventOrders()}
                       {tab === tabLabels.indexOf("Edit") && renderEdit()}
                     </>
                   ) : (
@@ -8424,6 +8699,7 @@ export default function EventManagePage() {
                       {tab === tabLabels.indexOf("Email Notifications") && <EventEmailTemplatesManager event={event} />}
                       {tab === tabLabels.indexOf("Companion") && renderCompanion()}
                       {tabLabels.indexOf("Product Management") !== -1 && tab === tabLabels.indexOf("Product Management") && renderProductManagement()}
+                      {ordersTabIndex !== -1 && tab === ordersTabIndex && renderEventOrders()}
                       {tab === tabLabels.indexOf("Edit") && renderEdit()}
                     </>
                   )}

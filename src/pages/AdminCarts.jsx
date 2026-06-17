@@ -54,8 +54,8 @@ const fmt = (n) =>
 function SuccessToast({
   open,
   onClose,
-  title = "Payment successful",
-  subtitle = "Your order has been placed.",
+  title = "Invoice generated",
+  subtitle = "Your registration is pending until manual payment is received.",
 }) {
   return (
     <Backdrop
@@ -216,7 +216,7 @@ export default function AdminCarts() {
   const viewItems = useMemo(() => {
     return (cart || []).map((it) => ({
       id: it.id,
-      eventId: it.event?.id || null,   // ✅ needed for register-bulk
+      eventId: it.event?.id || null,
       title: it.event?.title || "Event",
       price: Number(it.unit_price ?? it.event?.price ?? 0),
       qty: Number(it.quantity ?? 1),
@@ -311,38 +311,30 @@ export default function AdminCarts() {
   const proceedCheckout = async () => {
     if (!viewItems.length) return;
 
-    // unique event ids from cart
-    const eventIds = [...new Set(viewItems.map((i) => i.eventId).filter(Boolean))];
-    if (!eventIds.length) return;
-
     try {
-      // 1) create EventRegistration rows
-      const res = await fetch(`${API_BASE}/events/register-bulk/`, {
+      const checkoutRes = await fetch(`${API_BASE}/orders/offline-checkout/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ event_ids: eventIds }),
+        body: JSON.stringify({ payment_method: "bank_transfer" }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      await res.json();
 
-      // 2) finalize current cart as a "paid" order (keeps items attached)
-      const checkoutRes = await fetch(`${API_BASE}/orders/checkout/`, {
-        method: "POST",
-        headers: authHeaders(),
-      });
-      if (!checkoutRes.ok) throw new Error(`Checkout HTTP ${checkoutRes.status}`);
+      if (!checkoutRes.ok) {
+        const errBody = await checkoutRes.json().catch(() => ({}));
+        throw new Error(errBody.detail || `Checkout HTTP ${checkoutRes.status}`);
+      }
       await checkoutRes.json();
 
-      // 3) toast + refresh cart + reload previous orders
       setShowPaid(true);
       setTimeout(() => {
         setShowPaid(false);
-      }, 2000);
+      }, 2500);
 
       await refreshCart();
       await loadOrders();
+      setTab(1);
     } catch (err) {
-      console.error("Bulk register failed:", err);
+      console.error("Offline checkout failed:", err);
+      alert(err.message || "Checkout failed. Please try again.");
     }
   };
 
@@ -632,7 +624,7 @@ export default function AdminCarts() {
               <Typography variant="h6" sx={{ fontWeight: 800 }}>
                 Previous orders
               </Typography>
-              <Chip label="Paid only" size="small" variant="outlined" />
+              <Chip label="Pending + paid" size="small" variant="outlined" />
             </Box>
 
             {ordersLoading && (
