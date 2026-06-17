@@ -524,6 +524,8 @@ export default function EventDetailsPage() {
   const [loading, setLoading] = useState(!preload);
   const [error, setError] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const [addingPaidEventToCart, setAddingPaidEventToCart] = useState(false);
+  const [paidCartNotice, setPaidCartNotice] = useState(null);
 
   // Participant List Dialog
   const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
@@ -584,6 +586,11 @@ export default function EventDetailsPage() {
 
   // Q&A Groups state
   const [qaGroups, setQaGroups] = useState([]);
+
+  useEffect(() => {
+    setPaidCartNotice(null);
+    setAddingPaidEventToCart(false);
+  }, [event?.id]);
 
   // Component for clickable user names
   const ClickableAsker = ({ userId, name, isAnonymous }) => {
@@ -668,6 +675,11 @@ export default function EventDetailsPage() {
               const item = await addToCart(eventIdOrSlug, 1, token);
               if (item) {
                 bumpCartCount(0);
+                setPaidCartNotice({
+                  title: event?.title || "this event",
+                  message: "This paid event has been added to your cart. Please complete checkout from My Orders.",
+                });
+                toast.success("Added to cart. Complete checkout from My Orders.");
               }
             } else {
               refreshEventFromServer();
@@ -1134,9 +1146,22 @@ export default function EventDetailsPage() {
       const profileOk = await ensureRegistrationProfileComplete();
       if (!profileOk) return;
 
+      setAddingPaidEventToCart(true);
+      setPaidCartNotice(null);
       toast.info("This is a paid event. Adding to cart...");
-      const item = await addToCart(event.id, 1, token);
-      if (item) bumpCartCount(0);
+      try {
+        const item = await addToCart(event.id, 1, token);
+        if (item) {
+          bumpCartCount(0);
+          setPaidCartNotice({
+            title: event?.title || "this event",
+            message: "This paid event has been added to your cart. Please complete checkout from My Orders.",
+          });
+          toast.success("Added to cart. Complete checkout from My Orders.");
+        }
+      } finally {
+        setAddingPaidEventToCart(false);
+      }
       return;
     }
 
@@ -2339,15 +2364,59 @@ export default function EventDetailsPage() {
                             <Button
                               onClick={handleRegister}
                               variant="contained"
+                              disabled={addingPaidEventToCart}
                               sx={{
                                 textTransform: "none",
                                 backgroundColor: "#10b8a6",
                                 "&:hover": { backgroundColor: "#0ea5a4" },
+                                "&.Mui-disabled": { backgroundColor: "#9adbd3", color: "#ffffff" },
                               }}
                               className="rounded-xl"
                             >
-                              Register Now
+                              {!event?.is_free && addingPaidEventToCart
+                                ? "Adding to cart..."
+                                : !event?.is_free && paidCartNotice
+                                  ? "Added to cart"
+                                  : "Register Now"}
                             </Button>
+                            {!event?.is_free && paidCartNotice && (
+                              <Alert
+                                severity="success"
+                                variant="outlined"
+                                sx={{
+                                  mt: 2,
+                                  width: "100%",
+                                  alignItems: "center",
+                                  borderColor: "#10b8a6",
+                                  backgroundColor: "rgba(16,184,166,0.06)",
+                                  "& .MuiAlert-icon": { color: "#10b8a6" },
+                                }}
+                                action={
+                                  <Stack direction="row" spacing={1}>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      onClick={() => navigate("/account/cart")}
+                                      sx={{
+                                        textTransform: "none",
+                                        backgroundColor: "#10b8a6",
+                                        whiteSpace: "nowrap",
+                                        "&:hover": { backgroundColor: "#0ea5a4" },
+                                      }}
+                                    >
+                                      Go to cart
+                                    </Button>
+                                  </Stack>
+                                }
+                              >
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: "#064e3b" }}>
+                                  Added to cart
+                                </Typography>
+                                <Typography variant="caption" sx={{ display: "block", color: "#0f766e" }}>
+                                  {paidCartNotice.message}
+                                </Typography>
+                              </Alert>
+                            )}
                             {(!token || isGuest) && isWithinGuestJoinWindow(event.start_time) && (
                               <Button
                                 onClick={() => setGuestModalOpen(true)}
