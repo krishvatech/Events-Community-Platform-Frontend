@@ -33,6 +33,9 @@ import {
   DialogActions,
   CircularProgress,
   Skeleton,
+  Alert,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 // Icons
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -80,8 +83,8 @@ const toAbs = (u) => {
 function SuccessToast({
   open,
   onClose,
-  title = "Payment successful",
-  subtitle = "Your order has been placed.",
+  title = "Order placed",
+  subtitle = "Your order has been placed. Payment may still be pending.",
 }) {
   return (
     <Backdrop
@@ -171,6 +174,31 @@ const fmt = (n) =>
     maximumFractionDigits: 2,
   }).format(n || 0);
 
+const buildEmptyAddressForm = (fullName = "") => {
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  return {
+    address_type: "billing",
+    first_name: parts[0] || "",
+    last_name: parts.length > 1 ? parts.slice(1).join(" ") : "",
+    company_name: "",
+    street_address1: "",
+    street_address2: "",
+    city: "",
+    country_area: "",
+    postal_code: "",
+    country: "US",
+    phone: "",
+    is_default: true,
+  };
+};
+
+const normalizeAddressForm = (addr = {}, fallbackName = "") => ({
+  ...buildEmptyAddressForm(fallbackName),
+  ...addr,
+  country: String(addr.country || "US").toUpperCase().slice(0, 2),
+  is_default: addr.is_default !== false,
+});
+
 export default function MyCartPage() {
   const navigate = useNavigate();
   const storedUser = useMemo(() => {
@@ -199,6 +227,15 @@ export default function MyCartPage() {
   const [ordersError, setOrdersError] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+
+  // Address management for Saleor billing checkout
+  const [addresses, setAddresses] = useState([]);
+  const [addressesLoading, setAddressesLoading] = useState(false);
+  const [addressesError, setAddressesError] = useState("");
+  const [addressSaving, setAddressSaving] = useState(false);
+  const [addressMessage, setAddressMessage] = useState("");
+  const [editingAddressId, setEditingAddressId] = useState(null);
+  const [addressForm, setAddressForm] = useState(() => buildEmptyAddressForm(fullName));
 
   // CART: load current cart items
   useEffect(() => {
@@ -274,6 +311,145 @@ export default function MyCartPage() {
     }
   }, [tab]);
 
+  const loadAddresses = async ({ silent = false } = {}) => {
+    try {
+      if (!silent) {
+        setAddressesLoading(true);
+        setAddressesError("");
+      }
+      const res = await fetch(`${API_BASE}/orders/addresses/`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+      setAddresses(list);
+
+      const defaultBilling = list.find((addr) => addr.address_type === "billing" && addr.is_default)
+        || list.find((addr) => addr.address_type === "billing");
+      if (defaultBilling && !editingAddressId) {
+        setAddressForm(normalizeAddressForm(defaultBilling, fullName));
+        setEditingAddressId(defaultBilling.id);
+      }
+      return list;
+    } catch (err) {
+      console.error("Failed to load addresses", err);
+      if (!silent) setAddressesError("Could not load your addresses. Please try again.");
+      return [];
+    } finally {
+      if (!silent) setAddressesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 2) {
+      loadAddresses();
+    }
+  }, [tab]);
+
+  const updateAddressForm = (field, value) => {
+    setAddressMessage("");
+    setAddressForm((current) => ({
+      ...current,
+      [field]: field === "country" ? String(value || "").toUpperCase().slice(0, 2) : value,
+    }));
+  };
+
+  const resetAddressForm = () => {
+    setEditingAddressId(null);
+    setAddressMessage("");
+    setAddressForm(buildEmptyAddressForm(fullName));
+  };
+
+  const startEditAddress = (addr) => {
+    setEditingAddressId(addr.id);
+    setAddressMessage("");
+    setAddressForm(normalizeAddressForm(addr, fullName));
+  };
+
+  const saveAddress = async (e) => {
+    e?.preventDefault?.();
+    try {
+      setAddressSaving(true);
+      setAddressesError("");
+      setAddressMessage("");
+
+      const payload = normalizeAddressForm(addressForm, fullName);
+      const url = editingAddressId
+        ? `${API_BASE}/orders/addresses/${editingAddressId}/`
+        : `${API_BASE}/orders/addresses/`;
+      const res = await fetch(url, {
+        method: editingAddressId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        let message = `Address save HTTP ${res.status}`;
+        try {
+          const data = await res.json();
+          message = data?.detail || JSON.stringify(data) || message;
+        } catch { }
+        throw new Error(message);
+      }
+
+      const saved = await res.json();
+      setEditingAddressId(saved.id);
+      setAddressForm(normalizeAddressForm(saved, fullName));
+      setAddressMessage("Address saved successfully.");
+      await loadAddresses({ silent: true });
+    } catch (err) {
+      console.error("Failed to save address", err);
+      setAddressesError(err?.message || "Could not save address. Please check the fields and try again.");
+    } finally {
+      setAddressSaving(false);
+    }
+  };
+
+  const deleteAddress = async (addr) => {
+    if (!addr?.id) return;
+    if (!window.confirm("Delete this address?")) return;
+    try {
+      setAddressSaving(true);
+      const res = await fetch(`${API_BASE}/orders/addresses/${addr.id}/`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+      if (editingAddressId === addr.id) resetAddressForm();
+      await loadAddresses({ silent: true });
+    } catch (err) {
+      console.error("Failed to delete address", err);
+      setAddressesError("Could not delete address. Please try again.");
+    } finally {
+      setAddressSaving(false);
+    }
+  };
+
+  const setDefaultAddress = async (addr) => {
+    if (!addr?.id) return;
+    try {
+      setAddressSaving(true);
+      setAddressesError("");
+      const payload = normalizeAddressForm({ ...addr, is_default: true }, fullName);
+      const res = await fetch(`${API_BASE}/orders/addresses/${addr.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const saved = await res.json();
+      setEditingAddressId(saved.id);
+      setAddressForm(normalizeAddressForm(saved, fullName));
+      await loadAddresses({ silent: true });
+    } catch (err) {
+      console.error("Failed to set default address", err);
+      setAddressesError("Could not set default address. Please try again.");
+    } finally {
+      setAddressSaving(false);
+    }
+  };
+
   // NEW: normalized view for orders
   const viewOrders = useMemo(() => {
     return (orders || []).map((o) => {
@@ -345,42 +521,44 @@ export default function MyCartPage() {
   const proceedCheckout = async () => {
     if (!viewItems.length) return;
 
-    const eventIds = [...new Set(viewItems.map((i) => i.eventId).filter(Boolean))];
-    if (!eventIds.length) return;
-
     try {
-      // 1) Register events (existing behaviour)
-      const res = await fetch(`${API_BASE}/events/register-bulk/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ event_ids: eventIds }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      await res.json();
+      if (Number(total) > 0) {
+        const addressList = addresses.length ? addresses : await loadAddresses({ silent: true });
+        const hasBillingAddress = addressList.some((addr) => addr.address_type === "billing");
+        if (!hasBillingAddress) {
+          setTab(2);
+          alert("Please add your billing address before checkout.");
+          return;
+        }
+      }
 
-      // 2) Finalize current cart as "paid" order
+      // Backend now creates Saleor unpaid order for paid events and pending registrations.
+      // It keeps legacy local checkout only when Saleor is disabled or cart is free-only.
       const checkoutRes = await fetch(`${API_BASE}/orders/checkout/`, {
         method: "POST",
         headers: authHeaders(),
       });
       if (!checkoutRes.ok) {
-        throw new Error(`Checkout HTTP ${checkoutRes.status}`);
+        let message = `Checkout HTTP ${checkoutRes.status}`;
+        try {
+          const errorData = await checkoutRes.json();
+          message = errorData?.detail || message;
+        } catch { }
+        throw new Error(message);
       }
-      const newOrder = await checkoutRes.json();
+      await checkoutRes.json();
       await loadOrders();
-      // 3) Show success toast
+
       setShowPaid(true);
       setTimeout(() => {
         setShowPaid(false);
-      }, 2000);
+      }, 2200);
 
-      // 4) Refresh cart (this will create a fresh empty cart on the backend)
       await refreshCart();
-
-      // (Optional) auto-switch to Orders tab after payment:
-      // setTab(1);
+      setTab(1);
     } catch (err) {
       console.error(err);
+      alert(err?.message || "Checkout failed");
     }
   };
 
@@ -757,13 +935,229 @@ export default function MyCartPage() {
               </Box>
             )}
 
-            {/* TAB 2 & 3: simple placeholders for now */}
+            {/* TAB 2: ADDRESSES */}
             {tab === 2 && (
-              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-600">
-                Addresses section coming soon.
+              <Box className="mt-4 rounded-2xl border border-slate-200 bg-white text-slate-700">
+                <Box className="p-6 border-b border-slate-200">
+                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                    Billing address
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    This address is sent to Saleor during checkout and used for the invoice.
+                  </Typography>
+                </Box>
+
+                <Box className="p-6">
+                  {addressesError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {addressesError}
+                    </Alert>
+                  )}
+                  {addressMessage && (
+                    <Alert severity="success" sx={{ mb: 2 }}>
+                      {addressMessage}
+                    </Alert>
+                  )}
+
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={7}>
+                      <Box component="form" onSubmit={saveAddress}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="First name"
+                              value={addressForm.first_name}
+                              onChange={(e) => updateAddressForm("first_name", e.target.value)}
+                              required
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Last name"
+                              value={addressForm.last_name}
+                              onChange={(e) => updateAddressForm("last_name", e.target.value)}
+                              required
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <TextField
+                              label="Company name (optional)"
+                              value={addressForm.company_name}
+                              onChange={(e) => updateAddressForm("company_name", e.target.value)}
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <TextField
+                              label="Street address"
+                              value={addressForm.street_address1}
+                              onChange={(e) => updateAddressForm("street_address1", e.target.value)}
+                              required
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <TextField
+                              label="Apartment, suite, etc. (optional)"
+                              value={addressForm.street_address2}
+                              onChange={(e) => updateAddressForm("street_address2", e.target.value)}
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="City"
+                              value={addressForm.city}
+                              onChange={(e) => updateAddressForm("city", e.target.value)}
+                              required
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="State / region"
+                              value={addressForm.country_area}
+                              onChange={(e) => updateAddressForm("country_area", e.target.value)}
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Postal code"
+                              value={addressForm.postal_code}
+                              onChange={(e) => updateAddressForm("postal_code", e.target.value)}
+                              required
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Country code"
+                              helperText="Use 2 letters, e.g. US, IN, CH"
+                              value={addressForm.country}
+                              onChange={(e) => updateAddressForm("country", e.target.value)}
+                              inputProps={{ maxLength: 2 }}
+                              required
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <TextField
+                              label="Phone (optional)"
+                              value={addressForm.phone}
+                              onChange={(e) => updateAddressForm("phone", e.target.value)}
+                              fullWidth
+                              size="small"
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={!!addressForm.is_default}
+                                  onChange={(e) => updateAddressForm("is_default", e.target.checked)}
+                                />
+                              }
+                              label="Use this as my default billing address"
+                            />
+                          </Grid>
+                          <Grid item xs={12}>
+                            <Box className="flex flex-wrap gap-2">
+                              <Button
+                                type="submit"
+                                variant="contained"
+                                disabled={addressSaving}
+                                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                              >
+                                {addressSaving ? "Saving..." : editingAddressId ? "Update address" : "Save address"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outlined"
+                                onClick={resetAddressForm}
+                                disabled={addressSaving}
+                                sx={{ textTransform: "none" }}
+                              >
+                                Add new
+                              </Button>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    </Grid>
+
+                    <Grid item xs={12} md={5}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                        Saved addresses
+                      </Typography>
+                      {addressesLoading && (
+                        <Box className="space-y-2">
+                          <Skeleton height={70} />
+                          <Skeleton height={70} />
+                        </Box>
+                      )}
+                      {!addressesLoading && addresses.length === 0 && (
+                        <Box className="p-4 rounded-xl border border-dashed border-slate-300 text-slate-500">
+                          No address saved yet. Fill the form and click Save address.
+                        </Box>
+                      )}
+                      {!addressesLoading && addresses.map((addr) => (
+                        <Box
+                          key={addr.id}
+                          className="p-4 mb-3 rounded-xl border border-slate-200 bg-slate-50"
+                        >
+                          <Box className="flex items-center justify-between gap-2">
+                            <Typography sx={{ fontWeight: 700 }}>
+                              {addr.first_name} {addr.last_name}
+                            </Typography>
+                            {addr.is_default && <Chip label="Default" size="small" color="success" variant="outlined" />}
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                            {addr.street_address1}
+                            {addr.street_address2 ? `, ${addr.street_address2}` : ""}
+                            <br />
+                            {addr.city}{addr.country_area ? `, ${addr.country_area}` : ""} {addr.postal_code}
+                            <br />
+                            {addr.country}{addr.phone ? ` · ${addr.phone}` : ""}
+                          </Typography>
+                          <Box className="flex gap-2 mt-2">
+                            <Button size="small" variant="outlined" onClick={() => startEditAddress(addr)} sx={{ textTransform: "none" }}>
+                              Edit
+                            </Button>
+                            {!addr.is_default && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => setDefaultAddress(addr)}
+                                sx={{ textTransform: "none" }}
+                              >
+                                Set default
+                              </Button>
+                            )}
+                            <Button size="small" color="error" onClick={() => deleteAddress(addr)} sx={{ textTransform: "none" }}>
+                              Delete
+                            </Button>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Grid>
+                  </Grid>
+                </Box>
               </Box>
             )}
 
+            {/* TAB 3: ACCOUNT DETAILS */}
             {tab === 3 && (
               <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-600">
                 Account details section coming soon.
