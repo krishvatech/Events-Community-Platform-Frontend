@@ -52,6 +52,7 @@ import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNone
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { API_BASE, getToken } from "../utils/api.js";
+import { LeadGenModal } from "../components/LeadGenModal.jsx";
 
 const navItems = [
   { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon /> },
@@ -244,6 +245,18 @@ const billingAddressIsComplete = (addr) => {
   return required.every((key) => String(addr?.[key] || "").trim());
 };
 
+const normalizeMissingLeadGenFields = (raw) => {
+  if (!raw) return {};
+  if (Array.isArray(raw)) {
+    return raw.reduce((acc, field) => {
+      const key = String(field || "").trim();
+      if (key) acc[key] = key;
+      return acc;
+    }, {});
+  }
+  return typeof raw === "object" ? raw : {};
+};
+
 export default function MyCartPage() {
   const navigate = useNavigate();
   const storedUser = useMemo(() => {
@@ -279,6 +292,8 @@ export default function MyCartPage() {
   const [billingSaving, setBillingSaving] = useState(false);
   const [billingMessage, setBillingMessage] = useState("");
   const [billingError, setBillingError] = useState("");
+  const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
+  const [leadGenMissingFields, setLeadGenMissingFields] = useState({});
 
   // CART: load current cart items
   useEffect(() => {
@@ -510,6 +525,11 @@ export default function MyCartPage() {
 
       if (!checkoutRes.ok) {
         const errBody = await checkoutRes.json().catch(() => ({}));
+        if (errBody?.status === "missing_lead_gen_fields") {
+          setLeadGenMissingFields(normalizeMissingLeadGenFields(errBody.missing_fields));
+          setLeadGenModalOpen(true);
+          return;
+        }
         throw new Error(errBody.detail || `Checkout HTTP ${checkoutRes.status}`);
       }
 
@@ -1049,6 +1069,17 @@ export default function MyCartPage() {
 
       {/* Centered animated toast */}
       <SuccessToast open={showPaid} onClose={() => setShowPaid(false)} />
+
+      {/* LEAD GEN MODAL */}
+      <LeadGenModal
+        open={leadGenModalOpen}
+        onClose={() => {
+          setLeadGenModalOpen(false);
+          setLeadGenMissingFields({});
+        }}
+        user={storedUser}
+        missingFields={leadGenMissingFields}
+      />
 
       {/* ORDER ITEMS POPUP */}
       <Dialog

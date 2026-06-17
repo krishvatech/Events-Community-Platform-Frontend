@@ -168,6 +168,10 @@ async function fetchMissingProfileFieldsForApplication(token) {
   return getMissingProfileFieldsForApplication(profile);
 }
 
+async function ensureRegistrationProfileComplete(token) {
+  return fetchMissingProfileFieldsForApplication(token);
+}
+
 function priceStr(p) {
   if (p === 0) return "Free";
   try {
@@ -844,6 +848,18 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       );
       // Remove from Available Replays since user is now registered
       setReplayEvents(prev => (prev || []).filter(e => e.id !== ev.id));
+      return;
+    }
+
+    try {
+      const missingFields = await ensureRegistrationProfileComplete(token);
+      if (Object.keys(missingFields).length > 0) {
+        leadGenCallbackRef.current = () => handleRegisterCard(true);
+        if (onLeadGenNeeded) onLeadGenNeeded(missingFields);
+        return;
+      }
+    } catch (err) {
+      toast.error(err.message || "Unable to check your profile. Please try again.");
       return;
     }
 
@@ -1657,6 +1673,18 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
       );
       // Remove from Available Replays since user is now registered
       setReplayEvents(prev => (prev || []).filter(e => e.id !== ev.id));
+      return;
+    }
+
+    try {
+      const missingFields = await ensureRegistrationProfileComplete(token);
+      if (Object.keys(missingFields).length > 0) {
+        leadGenCallbackRef.current = () => handleRegisterRow(true);
+        if (onLeadGenNeeded) onLeadGenNeeded(missingFields);
+        return;
+      }
+    } catch (err) {
+      toast.error(err.message || "Unable to check your profile. Please try again.");
       return;
     }
 

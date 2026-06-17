@@ -661,6 +661,9 @@ export default function EventDetailsPage() {
 
           if (res.ok) {
             if (data?.status === "requires_payment") {
+              const profileOk = await ensureRegistrationProfileComplete();
+              if (!profileOk) return;
+
               toast.info("This is a paid event. Adding to cart...");
               const item = await addToCart(eventIdOrSlug, 1, token);
               if (item) {
@@ -1098,6 +1101,28 @@ export default function EventDetailsPage() {
     }
   };
 
+  const ensureRegistrationProfileComplete = async () => {
+    const profileRes = await fetch(`${API_BASE}/auth/me/profile/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!profileRes.ok) {
+      toast.error("Unable to fetch your profile. Please try again.");
+      return false;
+    }
+
+    const profile = await profileRes.json();
+    const missingFields = getMissingProfileFieldsForApplication(profile);
+    if (Object.keys(missingFields).length > 0) {
+      leadGenCallbackRef.current = () => handleRegister();
+      setMissingLeadGenFields(missingFields);
+      setLeadGenModalOpen(true);
+      return false;
+    }
+
+    return true;
+  };
+
   const handleRegister = async () => {
     if (!event?.id) return;
     if (!token) {
@@ -1106,6 +1131,9 @@ export default function EventDetailsPage() {
     }
 
     if (!event.is_free) {
+      const profileOk = await ensureRegistrationProfileComplete();
+      if (!profileOk) return;
+
       toast.info("This is a paid event. Adding to cart...");
       const item = await addToCart(event.id, 1, token);
       if (item) bumpCartCount(0);
