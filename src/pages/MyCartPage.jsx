@@ -337,6 +337,19 @@ export default function MyCartPage() {
     }));
   }, [cart]);
 
+  // Prefer item-level totals for display. This avoids stale cart totals if an
+  // item quantity changed but the backend cart aggregate has not refreshed yet.
+  const computedSubtotal = useMemo(
+    () =>
+      (viewItems || []).reduce(
+        (sum, it) => sum + (Number(it.price) || 0) * (Number(it.qty) || 1),
+        0
+      ),
+    [viewItems]
+  );
+  const displaySubtotal = computedSubtotal || subtotal;
+  const displayTotal = Math.max(0, displaySubtotal - (Number(discount) || 0));
+
   // NEW: load previous orders when Orders tab is opened
   const loadOrders = async () => {
     try {
@@ -796,7 +809,7 @@ export default function MyCartPage() {
                         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
                           <span className="text-slate-600">Subtotal</span>
                           <span className="font-semibold">
-                            {fmt(subtotal)}
+                            {fmt(displaySubtotal)}
                           </span>
                         </div>
                         {discount > 0 && (
@@ -818,7 +831,7 @@ export default function MyCartPage() {
                             Total
                           </span>
                           <span className="text-slate-900 font-extrabold">
-                            {fmt(total)}
+                            {fmt(displayTotal)}
                           </span>
                         </div>
                       </div>
