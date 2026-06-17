@@ -3487,6 +3487,27 @@ function AdminEventCard({
                     </Button>
                   )}
 
+                  {ev?.is_free === false && (
+                    <Button
+                      component={Link}
+                      to={`/admin/events/${ev.id}`}
+                      state={{ event: ev, initialTab: "Orders" }}
+                      variant="outlined"
+                      className="rounded-xl flex-1"
+                      onClick={(e) => e.stopPropagation()}
+                      sx={{
+                        textTransform: "none",
+                        minWidth: 0,
+                        px: 1,
+                        borderColor: "#f59e0b",
+                        color: "#b45309",
+                        "&:hover": { borderColor: "#d97706", backgroundColor: "#fffbeb" },
+                      }}
+                    >
+                      Orders
+                    </Button>
+                  )}
+
                   {/* Upcoming/Live → View Details (Event Manage) */}
                   <Button
                     component={Link}

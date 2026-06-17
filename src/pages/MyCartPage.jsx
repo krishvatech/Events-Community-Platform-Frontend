@@ -172,6 +172,48 @@ const fmt = (n) =>
     maximumFractionDigits: 2,
   }).format(n || 0);
 
+const getInvoiceDownloadUrl = (invoice) => {
+  if (!invoice?.id) return "";
+  if (invoice.download_url) {
+    return invoice.download_url.startsWith("http")
+      ? invoice.download_url
+      : `${API_ORIGIN}${invoice.download_url}`;
+  }
+  return `${API_BASE}/invoices/${invoice.id}/download_pdf/`;
+};
+
+const downloadInvoicePdf = async (invoice) => {
+  if (!invoice?.id) return;
+  const res = await fetch(getInvoiceDownloadUrl(invoice), {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error("Invoice PDF is not ready yet. Please try again in a moment.");
+  }
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${invoice.number || `invoice-${invoice.id}`}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+const generateInvoicePdf = async (invoice) => {
+  if (!invoice?.id) return null;
+  const res = await fetch(`${API_BASE}/invoices/${invoice.id}/generate_pdf/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.error || body.detail || "Could not generate invoice PDF.");
+  }
+  return body;
+};
+
 
 const BILLING_COUNTRIES = [
   { code: "CH", label: "Switzerland" },
@@ -376,6 +418,7 @@ export default function MyCartPage() {
         created: o.created || o.created_at || o.ordered_at,
         status: o.status || o.payment_status || "paid",
         total: Number(o.total || o.total_amount || o.amount || 0),
+        invoice: o.invoice || null,
         items: rawItems.map((oi) => ({
           id: oi.id,
           title: oi.event?.title || oi.product_name || oi.name || "Item",
@@ -495,6 +538,38 @@ export default function MyCartPage() {
   const handleCloseOrderDialog = () => {
     setOrderDialogOpen(false);
     setSelectedOrder(null);
+  };
+
+
+  const handleDownloadInvoice = async (invoice, event) => {
+    event?.stopPropagation?.();
+    try {
+      await downloadInvoicePdf(invoice);
+    } catch (err) {
+      alert(err.message || "Could not download invoice.");
+    }
+  };
+
+  const handleGenerateInvoicePdf = async (invoice, event) => {
+    event?.stopPropagation?.();
+    try {
+      const updatedInvoice = await generateInvoicePdf(invoice);
+      setOrders((prev) => prev.map((order) => (
+        order.invoice?.id === invoice.id
+          ? { ...order, invoice: { ...order.invoice, ...updatedInvoice } }
+          : order
+      )));
+      setSelectedOrder((prev) => (
+        prev?.invoice?.id === invoice.id
+          ? { ...prev, invoice: { ...prev.invoice, ...updatedInvoice } }
+          : prev
+      ));
+      if (updatedInvoice?.pdf_ready) {
+        await downloadInvoicePdf({ ...invoice, ...updatedInvoice });
+      }
+    } catch (err) {
+      alert(err.message || "Could not generate invoice PDF.");
+    }
   };
 
   return (
@@ -765,6 +840,7 @@ export default function MyCartPage() {
                           <TableCell align="right">Items</TableCell>
                           <TableCell align="right">Total</TableCell>
                           <TableCell align="right">Status</TableCell>
+                          <TableCell align="right">Invoice</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -784,6 +860,9 @@ export default function MyCartPage() {
                             </TableCell>
                             <TableCell align="right">
                               <Skeleton width={90} />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Skeleton width={110} />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -814,6 +893,7 @@ export default function MyCartPage() {
                           <TableCell align="right">Items</TableCell>
                           <TableCell align="right">Total</TableCell>
                           <TableCell align="right">Status</TableCell>
+                          <TableCell align="right">Invoice</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -849,6 +929,31 @@ export default function MyCartPage() {
                                       : "success"
                                 }
                               />
+                            </TableCell>
+                            <TableCell align="right">
+                              {o.invoice?.pdf_ready ? (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={(e) => handleDownloadInvoice(o.invoice, e)}
+                                  sx={{ textTransform: "none" }}
+                                >
+                                  Download
+                                </Button>
+                              ) : o.invoice ? (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={(e) => handleGenerateInvoicePdf(o.invoice, e)}
+                                  sx={{ textTransform: "none" }}
+                                >
+                                  Generate PDF
+                                </Button>
+                              ) : o.status === "paid" ? (
+                                <Chip size="small" label="Generating" variant="outlined" />
+                              ) : (
+                                <Chip size="small" label="After payment" variant="outlined" />
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1031,6 +1136,32 @@ export default function MyCartPage() {
                   </TableBody>
                 </Table>
               </Box>
+
+              <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+                <Box className="flex flex-wrap justify-between gap-2 items-center">
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Invoice</Typography>
+                    {selectedOrder.invoice ? (
+                      <Typography variant="body2" color="text.secondary">
+                        {selectedOrder.invoice.number} · {String(selectedOrder.invoice.state || "issued").toUpperCase()}
+                      </Typography>
+                    ) : selectedOrder.status === "paid" ? (
+                      <Typography variant="body2" color="text.secondary">Invoice is being generated.</Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">Available after payment is confirmed.</Typography>
+                    )}
+                  </Box>
+                  {selectedOrder.invoice?.pdf_ready ? (
+                    <Button variant="contained" onClick={(e) => handleDownloadInvoice(selectedOrder.invoice, e)} sx={{ textTransform: "none" }}>
+                      Download invoice
+                    </Button>
+                  ) : selectedOrder.invoice ? (
+                    <Button variant="outlined" onClick={(e) => handleGenerateInvoicePdf(selectedOrder.invoice, e)} sx={{ textTransform: "none" }}>
+                      Generate PDF
+                    </Button>
+                  ) : null}
+                </Box>
+              </Paper>
 
               <Box className="flex justify-end mt-2">
                 <Typography variant="subtitle1" fontWeight={700}>
