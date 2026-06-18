@@ -610,9 +610,8 @@ export default function EventManagePage() {
   const [eventOrdersLoading, setEventOrdersLoading] = useState(false);
   const [eventOrdersError, setEventOrdersError] = useState("");
   const [markPaidLoadingId, setMarkPaidLoadingId] = useState(null);
-  const [paymentRefDialogOpen, setPaymentRefDialogOpen] = useState(false);
-  const [paymentRefValue, setPaymentRefValue] = useState("");
-  const [paymentRefOrder, setPaymentRefOrder] = useState(null);
+  const [markPaidDialogOrder, setMarkPaidDialogOrder] = useState(null);
+  const [markPaidReference, setMarkPaidReference] = useState("");
 
   const extractTextFromSaleorDescription = useCallback((desc) => {
     if (!desc) return "";
@@ -774,40 +773,44 @@ export default function EventManagePage() {
     }
   }, [eventId, isOwner, event?.is_free]);
 
-  const handleOpenPaymentRefDialog = useCallback((order) => {
-    if (!order?.id) return;
-    setPaymentRefOrder(order);
-    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    setPaymentRefValue(order.payment_reference || `TXN-${today}-${String(order.id).padStart(3, '0')}`);
-    setPaymentRefDialogOpen(true);
+  const getSuggestedPaymentReference = useCallback((order) => {
+    const existing = String(order?.payment_reference || "").trim();
+    if (existing) return existing;
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const orderPart = String(order?.id || "0").padStart(3, "0");
+    return `TXN-${yyyy}${mm}${dd}-${orderPart}`;
   }, []);
 
-  const handleClosePaymentRefDialog = useCallback(() => {
-    setPaymentRefDialogOpen(false);
-    setPaymentRefValue("");
-    setPaymentRefOrder(null);
-  }, []);
+  const openMarkPaidDialog = useCallback((order) => {
+    if (!order?.id || markPaidLoadingId) return;
+    setMarkPaidReference(getSuggestedPaymentReference(order));
+    setMarkPaidDialogOrder(order);
+  }, [getSuggestedPaymentReference, markPaidLoadingId]);
 
-  const handleConfirmPaymentRef = useCallback(async () => {
-    if (!paymentRefOrder?.id || markPaidLoadingId) return;
-    const reference = paymentRefValue.trim();
-    if (!reference) {
-      toast.error("Payment reference cannot be empty");
-      return;
-    }
+  const closeMarkPaidDialog = useCallback(() => {
+    if (markPaidLoadingId) return;
+    setMarkPaidDialogOrder(null);
+    setMarkPaidReference("");
+  }, [markPaidLoadingId]);
 
-    handleClosePaymentRefDialog();
-    setMarkPaidLoadingId(paymentRefOrder.id);
+  const handleMarkEventOrderPaid = useCallback(async () => {
+    const order = markPaidDialogOrder;
+    if (!order?.id || markPaidLoadingId) return;
+
+    setMarkPaidLoadingId(order.id);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/orders/${paymentRefOrder.id}/mark-paid/`, {
+      const res = await fetch(`${API_ROOT}/orders/${order.id}/mark-paid/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          payment_reference: reference,
+          payment_reference: markPaidReference.trim(),
           payment_source: "manual",
         }),
       });
@@ -815,19 +818,18 @@ export default function EventManagePage() {
       if (!res.ok) {
         throw new Error(body.detail || body.error || `HTTP ${res.status}`);
       }
-      toast.success(`Order #${paymentRefOrder.id} marked as paid.`);
-      setEventOrders((prev) => prev.map((row) => (row.id === paymentRefOrder.id ? body : row)));
+      const itemCount = Array.isArray(body.items) ? body.items.length : 0;
+      toast.success(`Order #${order.id} marked as paid${itemCount > 1 ? ` (${itemCount} event items confirmed)` : ""}.`);
+      setEventOrders((prev) => prev.map((row) => (row.id === order.id ? body : row)));
       setRegsRefresh((value) => value + 1);
+      setMarkPaidDialogOrder(null);
+      setMarkPaidReference("");
     } catch (err) {
       toast.error(err.message || "Failed to mark order paid");
     } finally {
       setMarkPaidLoadingId(null);
     }
-  }, [paymentRefOrder, paymentRefValue, markPaidLoadingId, handleClosePaymentRefDialog]);
-
-  const handleMarkEventOrderPaid = useCallback((order) => {
-    handleOpenPaymentRefDialog(order);
-  }, [handleOpenPaymentRefDialog]);
+  }, [markPaidDialogOrder, markPaidReference, markPaidLoadingId]);
 
 
 
@@ -6349,6 +6351,19 @@ export default function EventManagePage() {
       return acc;
     }, { count: 0, paid: 0, pending: 0 });
 
+    const getDistinctEventIds = (items = []) => {
+      const ids = new Set();
+      items.forEach((item) => {
+        const id = item?.event?.id;
+        if (id !== undefined && id !== null) ids.add(String(id));
+      });
+      return ids;
+    };
+
+    const getCurrentEventQuantity = (items = []) => items
+      .filter((item) => String(item?.event?.id || "") === String(eventId || ""))
+      .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+
     if (event?.is_free !== false) {
       return (
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
@@ -6431,6 +6446,9 @@ export default function EventManagePage() {
                 {eventOrders.map((order) => {
                   const items = Array.isArray(order.items) ? order.items : [];
                   const qty = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+                  const currentEventQty = getCurrentEventQuantity(items);
+                  const distinctEventCount = getDistinctEventIds(items).size;
+                  const isMultiEventOrder = distinctEventCount > 1;
                   const isPaid = order.status === "paid";
                   const inv = order.invoice || null;
                   const invStatus = invoiceStatus(inv);
@@ -6438,7 +6456,18 @@ export default function EventManagePage() {
                     <TableRow key={order.id} hover sx={{ '& td': { py: 1.5 } }}>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 900 }}>#{order.id}</Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>{qty || 0} item{Number(qty || 0) === 1 ? "" : "s"}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                          {currentEventQty || 0} item{Number(currentEventQty || 0) === 1 ? "" : "s"} for this event
+                        </Typography>
+                        {isMultiEventOrder && (
+                          <Chip
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                            label={`Full order: ${distinctEventCount} events`}
+                            sx={{ mt: 0.6, height: 22 }}
+                          />
+                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -6528,12 +6557,31 @@ export default function EventManagePage() {
                           {!isPaid ? (
                             <Button
                               size="small"
-                              variant="contained"
-                              onClick={() => handleMarkEventOrderPaid(order)}
+                              variant="outlined"
+                              startIcon={<CheckCircleRoundedIcon fontSize="small" />}
+                              onClick={() => openMarkPaidDialog(order)}
                               disabled={markPaidLoadingId === order.id}
-                              sx={{ textTransform: "none", borderRadius: 999 }}
+                              sx={{
+                                textTransform: "none",
+                                borderRadius: 999,
+                                px: 1.5,
+                                py: 0.65,
+                                minWidth: 138,
+                                fontWeight: 800,
+                                lineHeight: 1.2,
+                                whiteSpace: "nowrap",
+                                borderColor: "#18b8b0",
+                                color: "#0f766e",
+                                bgcolor: "rgba(24, 184, 176, 0.06)",
+                                boxShadow: "none",
+                                "&:hover": {
+                                  borderColor: "#0f766e",
+                                  bgcolor: "rgba(24, 184, 176, 0.12)",
+                                  boxShadow: "none",
+                                },
+                              }}
                             >
-                              {markPaidLoadingId === order.id ? "Saving..." : "Mark paid"}
+                              {markPaidLoadingId === order.id ? "Saving..." : "Confirm payment"}
                             </Button>
                           ) : (
                             <Chip size="small" color="success" label="Paid" />
@@ -6547,6 +6595,129 @@ export default function EventManagePage() {
             </Table>
           </TableContainer>
         )}
+
+        <Dialog
+          open={Boolean(markPaidDialogOrder)}
+          onClose={closeMarkPaidDialog}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 900 }}>Confirm full order payment</DialogTitle>
+          <DialogContent dividers>
+            {markPaidDialogOrder && (() => {
+              const items = Array.isArray(markPaidDialogOrder.items) ? markPaidDialogOrder.items : [];
+              const distinctEventCount = getDistinctEventIds(items).size;
+              const isMultiEventOrder = distinctEventCount > 1;
+              const suggestedReference = getSuggestedPaymentReference(markPaidDialogOrder);
+              return (
+                <Stack spacing={2}>
+                  {isMultiEventOrder ? (
+                    <Alert severity="warning" icon={<WarningRoundedIcon />}>
+                      This customer order contains <b>{distinctEventCount} different events</b>. Marking it paid will confirm all registrations in this order and create one paid invoice for the full amount.
+                    </Alert>
+                  ) : (
+                    <Alert severity="info" icon={<InfoRoundedIcon />}>
+                      Payment confirmation is order-level. This will mark the whole order as paid.
+                    </Alert>
+                  )}
+
+                  <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "rgba(7, 29, 73, 0.04)", border: "1px solid", borderColor: "divider" }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>
+                      Order reference details
+                    </Typography>
+                    <Grid container spacing={1.25}>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Local order</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>#{markPaidDialogOrder.id}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Saleor order</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                          {markPaidDialogOrder.saleor_order_number ? `#${markPaidDialogOrder.saleor_order_number}` : "—"}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                          {markPaidDialogOrder.payment_reference ? "Saved payment reference" : "Suggested payment reference"}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 900, color: "primary.main" }}>
+                          {suggestedReference}
+                        </Typography>
+                      </Grid>
+                      {markPaidDialogOrder.saleor_order_id && (
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Saleor order ID</Typography>
+                          <Tooltip title={markPaidDialogOrder.saleor_order_id}>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+                              {markPaidDialogOrder.saleor_order_id}
+                            </Typography>
+                          </Tooltip>
+                        </Grid>
+                      )}
+                    </Grid>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Order #{markPaidDialogOrder.id} items</Typography>
+                    <Table size="small" sx={{ border: "1px solid", borderColor: "divider" }}>
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: "rgba(7, 29, 73, 0.04)" }}>
+                          <TableCell sx={{ fontWeight: 800 }}>Event</TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 800 }}>Qty</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800 }}>Total</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {items.map((item) => {
+                          const isCurrentEvent = String(item?.event?.id || "") === String(eventId || "");
+                          return (
+                            <TableRow key={item.id || item?.event?.id}>
+                              <TableCell>
+                                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{item?.event?.title || "Event"}</Typography>
+                                  {isCurrentEvent && <Chip size="small" color="info" variant="outlined" label="Current event" />}
+                                </Stack>
+                              </TableCell>
+                              <TableCell align="center">{item.quantity || 0}</TableCell>
+                              <TableCell align="right">{money(item.line_total, markPaidDialogOrder.currency)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </Box>
+
+                  <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(15, 118, 110, 0.08)", border: "1px solid rgba(15, 118, 110, 0.16)" }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2" sx={{ fontWeight: 800 }}>Full order total</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 900 }}>{money(markPaidDialogOrder.total, markPaidDialogOrder.currency)}</Typography>
+                    </Stack>
+                  </Box>
+
+                  <TextField
+                    label="Payment reference / bank transaction ID"
+                    value={markPaidReference}
+                    onChange={(e) => setMarkPaidReference(e.target.value)}
+                    fullWidth
+                    autoFocus
+                    helperText="This reference will be saved on the order and invoice payment event. You can keep the suggested reference or replace it with the real bank transaction ID."
+                  />
+                </Stack>
+              );
+            })()}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={closeMarkPaidDialog} disabled={Boolean(markPaidLoadingId)} sx={{ textTransform: "none" }}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={handleMarkEventOrderPaid}
+              disabled={!markPaidDialogOrder || Boolean(markPaidLoadingId)}
+              sx={{ textTransform: "none", borderRadius: 999 }}
+            >
+              {markPaidLoadingId ? "Marking paid..." : "Confirm full order paid"}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Stack>
     );
   };
@@ -9924,96 +10095,6 @@ export default function EventManagePage() {
               sx={{ bgcolor: "#22c55e", color: "white" }}
             >
               {answerSubmitting ? (isEditingAnswer ? "Updating..." : "Publishing...") : (isEditingAnswer ? "Update Answer" : "Publish Answer")}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        <Dialog
-          open={paymentRefDialogOpen}
-          onClose={handleClosePaymentRefDialog}
-          maxWidth="sm"
-          fullWidth
-          PaperProps={{
-            sx: {
-              borderRadius: "12px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
-            },
-          }}
-        >
-          <DialogTitle
-            sx={{
-              fontSize: "1.1rem",
-              fontWeight: 600,
-              color: "text.primary",
-              paddingY: 2.5,
-              borderBottom: "1px solid #e5e7eb",
-            }}
-          >
-            Enter Payment Reference
-          </DialogTitle>
-          <DialogContent sx={{ paddingY: 3 }}>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ marginBottom: 2.5 }}
-            >
-              Enter the payment reference or bank transaction ID for order #{paymentRefOrder?.id}
-            </Typography>
-            <TextField
-              fullWidth
-              label="Payment Reference / Transaction ID"
-              value={paymentRefValue}
-              onChange={(e) => setPaymentRefValue(e.target.value)}
-              placeholder="e.g., TXN-20250617-001"
-              variant="outlined"
-              size="medium"
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "8px",
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    borderColor: "primary.main",
-                  },
-                  "&.Mui-focused": {
-                    boxShadow: "0 0 0 3px rgba(27, 187, 179, 0.1)",
-                  },
-                },
-              }}
-              autoFocus
-              onKeyPress={(e) => {
-                if (e.key === "Enter" && paymentRefValue.trim()) {
-                  handleConfirmPaymentRef();
-                }
-              }}
-            />
-          </DialogContent>
-          <DialogActions sx={{ paddingX: 3, paddingBottom: 2, gap: 1 }}>
-            <Button
-              onClick={handleClosePaymentRefDialog}
-              variant="outlined"
-              sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontSize: "0.95rem",
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmPaymentRef}
-              variant="contained"
-              disabled={!paymentRefValue.trim() || markPaidLoadingId === paymentRefOrder?.id}
-              sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontSize: "0.95rem",
-              }}
-            >
-              {markPaidLoadingId === paymentRefOrder?.id ? (
-                <CircularProgress size={20} sx={{ color: "white" }} />
-              ) : (
-                "Mark as Paid"
-              )}
             </Button>
           </DialogActions>
         </Dialog>
