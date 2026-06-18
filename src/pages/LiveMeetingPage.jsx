@@ -2968,6 +2968,10 @@ export default function NewLiveMeeting() {
 
   // ✅ NEW: Social Lounge Participants & Transition State
   const [preEventLoungeParticipants, setPreEventLoungeParticipants] = useState([]);
+  // Host Participants panel needs a lightweight backend source for users who
+  // moved into separate Breakout/Lounge RTK rooms and are no longer visible in
+  // the host main-room RTK participant list.
+  const [roomFilteredParticipants, setRoomFilteredParticipants] = useState([]);
   const [loungeCountingDown, setLoungeCountingDown] = useState(false);
   const [loungeCountdownValue, setLoungeCountdownValue] = useState(0);
   const [loungeCountdownTransition, setLoungeCountdownTransition] = useState("to_waiting_room");
@@ -10256,6 +10260,67 @@ export default function NewLiveMeeting() {
       clearInterval(t);
     };
   }, [eventId, isHost, eventData?.lounge_enabled_waiting_room]);
+
+  // Host-only lightweight room occupants for the Participants panel.
+  // Breakout users join separate RTK meetings, so they can disappear from the
+  // host's main-room participant list. This endpoint uses DB location/table
+  // tracking and is much lighter than full lounge-state.
+  useEffect(() => {
+    if (
+      !eventId ||
+      !isHost ||
+      !participantsPanelActive ||
+      !["all", "breakout", "lounge"].includes(participantRoomFilter)
+    ) {
+      setRoomFilteredParticipants([]);
+      return;
+    }
+
+    let alive = true;
+    let isPolling = false;
+
+    const poll = async () => {
+      if (!alive || document.hidden || isPolling) return;
+
+      isPolling = true;
+      try {
+        const roomType =
+          participantRoomFilter === "breakout"
+            ? "breakout"
+            : participantRoomFilter === "lounge"
+              ? "lounge"
+              : "all";
+
+        const res = await fetch(
+          toApiUrl(`events/${eventId}/lounge-participants/?room_type=${roomType}&limit=100`),
+          { headers: { ...authHeader() } }
+        );
+        if (!res.ok) return;
+
+        const data = await res.json().catch(() => null);
+        const results = Array.isArray(data?.results) ? data.results : [];
+        if (!alive) return;
+
+        setRoomFilteredParticipants(
+          results.map((lp) => ({
+            ...lp,
+            full_name: lp.user_name || lp.full_name || "User",
+          }))
+        );
+      } catch (e) {
+        console.warn("[LiveMeeting] Failed to fetch room-filtered participants:", e?.message || e);
+      } finally {
+        isPolling = false;
+      }
+    };
+
+    poll();
+    const t = setInterval(poll, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [eventId, isHost, participantsPanelActive, participantRoomFilter]);
 
   useEffect(() => {
     if (!pendingWaitFocus) return;
@@ -19223,6 +19288,59 @@ export default function NewLiveMeeting() {
         .filter(Boolean)
     );
     const virtualRoomParticipants = [];
+
+    if (isHost && !isBreakout && Array.isArray(roomFilteredParticipants) && roomFilteredParticipants.length > 0) {
+      for (const roomParticipant of roomFilteredParticipants) {
+        const rawUserId = roomParticipant?.user_id ?? roomParticipant?.userId;
+        if (rawUserId === undefined || rawUserId === null || String(rawUserId) === "") continue;
+
+        const userId = String(rawUserId);
+        if (scopedParticipantUserIds.has(userId)) continue;
+        scopedParticipantUserIds.add(userId);
+
+        const currentLocation = String(roomParticipant?.current_location || "").toLowerCase();
+        const tableCategory = String(roomParticipant?.table_category || "").toUpperCase();
+        const roomType =
+          currentLocation === "breakout_room" || tableCategory === "BREAKOUT"
+            ? "breakout"
+            : "lounge";
+
+        virtualRoomParticipants.push({
+          id: `virtual-room-filtered:${userId}`,
+          name:
+            roomParticipant?.full_name ||
+            roomParticipant?.user_name ||
+            roomParticipant?.username ||
+            `User ${userId}`,
+          role: "Audience",
+          presetName: "",
+          mic: false,
+          cam: false,
+          active: false,
+          joinedAtTs: Date.now(),
+          picture: roomParticipant?.avatar_url || roomParticipant?.avatar || "",
+          inMeeting: false,
+          isVirtual: true,
+          isOccupyingLounge: true,
+          mood: null,
+          _roomLocation: {
+            type: roomType,
+            roomId: roomParticipant?.table_id ? String(roomParticipant.table_id) : null,
+            roomName:
+              roomParticipant?.table_name ||
+              (roomType === "breakout" ? "Breakout Room" : "Social Lounge"),
+            roomCategory: roomType === "breakout" ? "BREAKOUT" : "LOUNGE",
+          },
+          _raw: {
+            customParticipantId: userId,
+            userId,
+            user_id: userId,
+            is_guest: Boolean(roomParticipant?.is_guest),
+          },
+        });
+      }
+    }
+
     if (isHost && !isBreakout && Array.isArray(loungeTables) && loungeTables.length > 0) {
       for (const table of loungeTables) {
         const roomType = table?.category === "BREAKOUT" ? "breakout" : "lounge";
@@ -19373,6 +19491,7 @@ export default function NewLiveMeeting() {
     participantRoomMap,  //  Added dependency
     getParticipantRoomInfo,
     assignedRoleByIdentity,  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
+    roomFilteredParticipants,
     loungeTables,
   ]);
 
