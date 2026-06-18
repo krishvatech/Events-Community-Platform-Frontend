@@ -1,69 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Avatar, Tooltip, Box, Typography } from '@mui/material';
 import VerifiedRoundedIcon from '@mui/icons-material/VerifiedRounded';
-import { getToken, API_BASE } from '../../utils/api';
 
-// Helper function to create auth headers
-const authHeader = () => {
-    const tok = getToken();
-    return tok ? { Authorization: `Bearer ${tok}` } : {};
-};
-
-// Helper function to build API URLs
-const toApiUrl = (pathOrUrl) => {
-    try {
-        return new URL(pathOrUrl).toString();
-    } catch {
-        const rel = String(pathOrUrl).replace(/^\/+/, "");
-        return `${API_BASE}/${rel}`;
-    }
-};
-
-const LoungeSeat = ({ participant, index, maxSeats, radius = 60, seatSize = { empty: 32, occupied: 36 }, onParticipantClick, deferKycLookup = false }) => {
-    const [isVerified, setIsVerified] = useState(false);
-
-    // Fetch kyc_status if not available in participant data
-    useEffect(() => {
-        if (!participant) return;
-        if (deferKycLookup) return;
-
-        // Check if kyc_status is already available in participant data
-        if (participant?.kyc_status === "approved") {
-            setIsVerified(true);
-            return;
-        }
-
-        // Fetch from API if not available
-        const userId = participant?.user_id || participant?.id;
-        if (!userId) return;
-
-        let isMounted = true;
-        const fetchKycStatus = async () => {
-            try {
-                const headers = { accept: "application/json", ...authHeader() };
-                const res = await fetch(toApiUrl(`users/${userId}/`), { headers });
-                if (!res.ok) return;
-                const data = await res.json().catch(() => null);
-                if (!isMounted || !data) return;
-
-                // Check kyc_status in multiple possible locations
-                const kycStatus =
-                    data?.kyc_status ||
-                    data?.profile?.kyc_status ||
-                    data?.user?.kyc_status ||
-                    data?.user?.profile?.kyc_status;
-
-                if (kycStatus === "approved") {
-                    setIsVerified(true);
-                }
-            } catch (e) {
-                // Silently fail
-            }
-        };
-
-        fetchKycStatus();
-        return () => { isMounted = false; };
-    }, [deferKycLookup, participant]);
+const LoungeSeat = ({ participant, index, maxSeats, radius = 60, seatSize = { empty: 32, occupied: 36 }, onParticipantClick }) => {
+    // IMPORTANT FOR 400+ LIVE USERS:
+    // Do not fetch /api/users/<id>/ from every seat render. The lounge-state
+    // payload already contains participant metadata such as kyc_status. During
+    // breakout movement, per-seat profile lookups create a request storm and
+    // make Daphne kill slow /api/users/<id>/ requests.
+    const kycStatus =
+        participant?.kyc_status ||
+        participant?.profile?.kyc_status ||
+        participant?.user?.kyc_status ||
+        participant?.user?.profile?.kyc_status;
+    const isVerified = kycStatus === "approved";
 
     // ✅ PRODUCTION-READY DYNAMIC SEAT POSITIONING
     // Calculates seat positions for any table size (4, 6, 8, 10, 12, 15, 20, 40+)

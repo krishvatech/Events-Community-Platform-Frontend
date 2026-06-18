@@ -2512,9 +2512,11 @@ export default function NewLiveMeeting() {
   // polling/broadcasting participant state creates an RTK/browser fan-out storm.
   const LIVE_LARGE_MAIN_ROOM_LIMIT = Number(import.meta.env.VITE_LIVE_LARGE_MAIN_ROOM_LIMIT || 100);
   const RTK_MAIN_PARTICIPANTS_POLL_MS = Number(import.meta.env.VITE_RTK_MAIN_PARTICIPANTS_POLL_MS || 30000);
-  const RTK_BREAKOUT_PARTICIPANTS_POLL_MS = Number(import.meta.env.VITE_RTK_BREAKOUT_PARTICIPANTS_POLL_MS || 8000);
+  const RTK_BREAKOUT_PARTICIPANTS_POLL_MS = Number(import.meta.env.VITE_RTK_BREAKOUT_PARTICIPANTS_POLL_MS || 15000);
   const RTK_MAIN_PRESENCE_BROADCAST_MS = Number(import.meta.env.VITE_RTK_MAIN_PRESENCE_BROADCAST_MS || 30000);
-  const RTK_BREAKOUT_PRESENCE_BROADCAST_MS = Number(import.meta.env.VITE_RTK_BREAKOUT_PRESENCE_BROADCAST_MS || 10000);
+  const RTK_BREAKOUT_PRESENCE_BROADCAST_MS = Number(import.meta.env.VITE_RTK_BREAKOUT_PRESENCE_BROADCAST_MS || 20000);
+  const BREAKOUT_JOIN_POLLING_PAUSE_MS = Number(import.meta.env.VITE_BREAKOUT_JOIN_POLLING_PAUSE_MS || 90000);
+  const BREAKOUT_STATUS_POLL_MS = Number(import.meta.env.VITE_BREAKOUT_STATUS_POLL_MS || 60000);
 
   const LIVE_CHAT_PAGE_SIZE = 10;
   const LIVE_QNA_PAGE_SIZE = 10;
@@ -5756,8 +5758,15 @@ export default function NewLiveMeeting() {
 
         setIsBreakout(true);
         isBreakoutRef.current = true;
-        loungeOpenAutoCloseRef.current = true;
-        setLoungeOpen(true); // ✅ CRITICAL: Mark lounge as open so render condition works
+
+        // 400+ SCALE FIX:
+        // Do not open the full LoungeOverlay during host-forced breakout joins.
+        // Opening it mounts LoungeGrid/LoungeSeat and triggers /lounge-state/,
+        // room-chat and user/profile side effects for every participant at once.
+        // The RTK meeting renders from authToken + isBreakout; lounge UI should
+        // only open when the user manually clicks the lounge button.
+        loungeOpenAutoCloseRef.current = false;
+        setLoungeOpen(false);
         setAuthToken(newToken);
 
         // Auto-switch to Room Chat (Tab 0) when entering breakout
@@ -6004,10 +6013,11 @@ export default function NewLiveMeeting() {
 
     // Pause non-critical polling while switching RTK rooms. This protects the
     // backend during the heavy /lounge-join-table/ + websocket transition.
+    // Keep this long enough for 400+ users to finish staggered breakout joins.
     shouldPausePollingRef.current = true;
     window.setTimeout(() => {
       shouldPausePollingRef.current = false;
-    }, 20000);
+    }, BREAKOUT_JOIN_POLLING_PAUSE_MS);
 
     // ✅ DEFENSIVE: Ensure we're NOT updating meeting status
     // Joining a lounge should NEVER trigger updateLiveStatus or change meeting state
@@ -8422,9 +8432,17 @@ export default function NewLiveMeeting() {
         if (msg.type === "force_join_breakout") {
           // Host-initiated force join. Backend batches these messages; the
           // client still adds a small jitter inside each batch.
-          const jitterMs = Number(msg.join_jitter_ms || 2500);
-          console.log("[MainSocket] Force join to breakout:", msg.table_id, "jitterMs=", jitterMs);
-          handleEnterBreakout(msg.table_id, msg.table_name || null, { jitterMs });
+          const jitterMs = Number(msg.join_jitter_ms || 10000);
+          const delayMs = Number(msg.join_delay_ms || 0);
+          console.log(
+            "[MainSocket] Force join to breakout:",
+            msg.table_id,
+            "delayMs=",
+            delayMs,
+            "jitterMs=",
+            jitterMs
+          );
+          handleEnterBreakout(msg.table_id, msg.table_name || null, { delayMs, jitterMs });
         } else if (msg.type === "breakout_restored") {
           // ✅ NEW: Page reload/reconnect - user is being restored to their previous breakout room
           console.log("[MainSocket] Breakout restored to table", msg.table_id);
@@ -9563,6 +9581,7 @@ export default function NewLiveMeeting() {
 
     const pollLoungeStatus = async () => {
       if (document.hidden) return;
+      if (shouldPausePollingRef.current) return;
       if (isPolling) return;
       if (!alive) return;
 
@@ -9594,13 +9613,13 @@ export default function NewLiveMeeting() {
     // Poll once, then slow fallback only.
     // WebSocket should be the primary source of breakout/lounge changes.
     pollLoungeStatus();
-    const interval = setInterval(pollLoungeStatus, 20000);
+    const interval = setInterval(pollLoungeStatus, BREAKOUT_STATUS_POLL_MS);
 
     return () => {
       alive = false;
       clearInterval(interval);
     };
-  }, [eventId, isBreakout, role]);
+  }, [eventId, isBreakout, role, BREAKOUT_STATUS_POLL_MS]);
 
   const sendMainSocketAction = useCallback((payload) => {
     const ws = mainSocketRef.current;
