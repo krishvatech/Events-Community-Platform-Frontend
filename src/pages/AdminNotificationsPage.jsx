@@ -476,6 +476,11 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
               <>
                 <Box component="span" fontWeight={700}>{n.actor_name}</Box> reacted to your post.
               </>
+            ) : n.type === "event" && n.data?.type === "order_payment_confirmed" ? (
+              <>
+                <Box component="span" fontWeight={700}>Payment confirmed:</Box>{" "}
+                {String(n.title || "Your order has been marked paid").replace(/friend/gi, "contact")}
+              </>
             ) : n.type === "event" ? (
               <>
                 <Box component="span" fontWeight={700}>{String(n.title || "Event notification").replace(/friend/gi, "contact")}</Box>
@@ -518,6 +523,44 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
             <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#64748b', fontStyle: 'italic' }}>
               "{n.data.reason}"
             </Typography>
+          )}
+
+          {n._source === "standard_notif" && n.data?.type === "order_payment_confirmed" && (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ mt: 1 }}>
+              {n.data?.invoice_number && (
+                <Chip
+                  size="small"
+                  label={`Invoice ${n.data.invoice_number}`}
+                  sx={{ height: 22, fontSize: 11, borderRadius: 99, bgcolor: '#ecfdf5', color: '#15803d', fontWeight: 700 }}
+                />
+              )}
+              {n.data?.amount && (
+                <Chip
+                  size="small"
+                  label={`${n.data.currency || 'USD'} ${n.data.amount}`}
+                  sx={{ height: 22, fontSize: 11, borderRadius: 99, bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 700 }}
+                />
+              )}
+              <Button
+                component={Link}
+                to={n.data?.action_url || "/account/cart?tab=orders"}
+                size="small"
+                variant="outlined"
+                sx={{
+                  textTransform: "none",
+                  borderRadius: 99,
+                  px: 1.5,
+                  py: 0.25,
+                  minHeight: 26,
+                  borderColor: TEAL,
+                  color: TEAL,
+                  fontWeight: 700,
+                  '&:hover': { borderColor: TEAL, bgcolor: '#f0fdfa' },
+                }}
+              >
+                {n.data?.action_label || "View order"}
+              </Button>
+            </Stack>
           )}
 
           {/* ACTION BUTTONS (Only if pending) */}

@@ -23,6 +23,7 @@ import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRound
 import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
 import VerifiedIcon from "@mui/icons-material/Verified";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 
 const BORDER = "#e2e8f0";
 
@@ -100,6 +101,25 @@ function isContentReport(item) {
     if (title.includes("report")) return true;
   }
   return false;
+}
+
+function isPaymentNotification(item) {
+  return String(item?.data?.type || "").toLowerCase() === "order_payment_confirmed";
+}
+
+function appendOrderParam(href, orderId) {
+  const id = String(orderId || "").trim();
+  if (!id) return href || "/account/cart?tab=orders";
+  const base = href || "/account/cart?tab=orders";
+  if (/[?&](order|order_id|openOrder)=/.test(base)) return base;
+  const [withoutHash, hash = ""] = base.split("#");
+  const separator = withoutHash.includes("?") ? "&" : "?";
+  return `${withoutHash}${separator}order=${encodeURIComponent(id)}${hash ? `#${hash}` : ""}`;
+}
+
+function paymentOrderHref(item) {
+  const href = item?.data?.action_url || item?.data?.link || item?.data?.url || "/account/cart?tab=orders";
+  return appendOrderParam(href, item?.data?.order_id || item?.data?.order_number);
 }
 
 // Keep Community Notifications page scoped to verification items only
@@ -382,6 +402,7 @@ function NotificationRow({
   const currentUserId = React.useMemo(() => String(getCurrentUserId() ?? ""), []);
   const showDescription =
     item.description &&
+    !isPaymentNotification(item) &&
     !/^Post #\d+$/i.test(String(item.description).trim());
 
   // --- Dynamic Content for Identity Requests ---
@@ -721,6 +742,29 @@ function NotificationRow({
       );
     }
     if (item.kind === "event") {
+      if (isPaymentNotification(item)) {
+        const orderLabel = item.data?.order_number || item.data?.order_id || "";
+        const invoiceNumber = item.data?.invoice_number || "";
+        const amount = item.data?.amount || item.data?.total_amount || "";
+        return (
+          <Stack direction="column" spacing={0.5}>
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
+              <ReceiptLongRoundedIcon sx={{ fontSize: 17, color: "#0f766e" }} />
+              <Typography variant="body2" sx={{ fontWeight: 800, color: "#0f172a" }}>
+                {item.title || `Payment confirmed${orderLabel ? ` for order #${orderLabel}` : ""}`}
+              </Typography>
+            </Stack>
+            <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
+              {item.description || `Your manual payment has been confirmed${invoiceNumber ? `. Invoice ${invoiceNumber} is ready to download.` : "."}`}
+            </Typography>
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
+              {invoiceNumber && <Chip size="small" label={invoiceNumber} sx={{ height: 22, bgcolor: "#ecfeff", color: "#0f766e", fontWeight: 700 }} />}
+              {amount && <Chip size="small" label={amount} sx={{ height: 22, bgcolor: "#f0fdf4", color: "#166534", fontWeight: 700 }} />}
+            </Stack>
+          </Stack>
+        );
+      }
+
       // Handle registration confirmation notifications
       if (item.data?.action === "registered") {
         const eventTitle = item.context?.eventTitle || item.title;
@@ -790,6 +834,23 @@ function NotificationRow({
 
 
   const ActionsByKind = () => {
+    if (isPaymentNotification(item)) {
+      return (
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen?.(item);
+          }}
+          startIcon={<ReceiptLongRoundedIcon />}
+          sx={{ textTransform: "none", borderRadius: 2, mt: 1, borderColor: "#99f6e4", color: "#0f766e", fontWeight: 700 }}
+        >
+          View order
+        </Button>
+      );
+    }
+
     if (item.kind === "friend_request" || item.kind === "connection_request") {
       if (item.source === "sent_request") {
         if (item.state === "canceled") return null;
@@ -915,6 +976,7 @@ function NotificationRow({
       onClick={() => {
         // Make entire card clickable for certain notification types
         if (
+          isPaymentNotification(item) ||
           item.kind === "forum_enabled" ||
           item.kind === "forum_disabled" ||
           item.data?.type === "kyc" ||
@@ -939,6 +1001,7 @@ function NotificationRow({
         borderRadius: 2,
         bgcolor: unread ? "#f6fffe" : "background.paper",
         cursor: (
+          isPaymentNotification(item) ||
           item.kind === "forum_enabled" ||
           item.kind === "forum_disabled" ||
           item.data?.type === "kyc" ||
@@ -951,6 +1014,7 @@ function NotificationRow({
           item.data?.group_slug
         ) ? "pointer" : "default",
         "&:hover": (
+          isPaymentNotification(item) ||
           item.kind === "forum_enabled" ||
           item.kind === "forum_disabled" ||
           item.data?.type === "kyc" ||
@@ -968,7 +1032,11 @@ function NotificationRow({
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
-          {isKycNotification(item) ? (
+          {isPaymentNotification(item) ? (
+            <Avatar sx={{ bgcolor: "#ecfeff", color: "#0f766e" }}>
+              <ReceiptLongRoundedIcon />
+            </Avatar>
+          ) : isKycNotification(item) ? (
             <Avatar sx={{ bgcolor: "transparent" }}>
               <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 32 }} />
             </Avatar>
@@ -1015,9 +1083,10 @@ function NotificationRow({
           >
             {(() => {
               const isKyc = isKycNotification(item);
+              const isPayment = isPaymentNotification(item);
               const isNameChange = item.kind === "name_change" || String(item?.data?.type || "").toLowerCase() === "name_change" || item.source === "identity";
-              const label = isKyc ? "KYC" : isNameChange ? "Name Change" : kindChip(item.kind);
-              return <Chip size="small" label={label} />;
+              const label = isPayment ? "Payments" : isKyc ? "KYC" : isNameChange ? "Name Change" : kindChip(item.kind);
+              return <Chip size="small" label={label} sx={isPayment ? { bgcolor: "#ecfeff", color: "#0f766e", fontWeight: 700 } : undefined} />;
             })()}
             <Typography variant="caption" color="text.secondary">
               {formatWhen(item.created_at)}
@@ -1045,6 +1114,7 @@ function NotificationRow({
             </IconButton>
 
             {(
+              isPaymentNotification(item) ||
               item.data?.type === "kyc" ||
               item.kind === "name_change" ||
               item.kind === "forum_enabled" ||
@@ -1392,6 +1462,11 @@ export default function NotificationsPage({
     const ctx = n.context || {};
 
     let dest = null;
+    if (isPaymentNotification(n)) {
+      markAndNavigate(n, paymentOrderHref(n));
+      return;
+    }
+
     if (isKycNotification(n) || n.kind === "name_change" || n.source === "identity") {
       markAndNavigate(n, "/account/profile");
       return;

@@ -1,6 +1,6 @@
 // src/pages/MyCartPage.jsx
 import React, { useMemo, useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar,
   Box,
@@ -259,6 +259,7 @@ const normalizeMissingLeadGenFields = (raw) => {
 
 export default function MyCartPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const storedUser = useMemo(() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "{}");
@@ -294,6 +295,20 @@ export default function MyCartPage() {
   const [billingError, setBillingError] = useState("");
   const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
   const [leadGenMissingFields, setLeadGenMissingFields] = useState({});
+
+  const requestedOrderId = useMemo(() => {
+    const params = new URLSearchParams(location.search || "");
+    return params.get("order") || params.get("order_id") || params.get("openOrder") || "";
+  }, [location.search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || "");
+    const requestedTab = String(params.get("tab") || "").toLowerCase();
+    const tabMap = { cart: 0, orders: 1, addresses: 2, account: 3, account_details: 3 };
+    if (requestedTab && Object.prototype.hasOwnProperty.call(tabMap, requestedTab)) {
+      setTab((current) => (current === tabMap[requestedTab] ? current : tabMap[requestedTab]));
+    }
+  }, [location.search]);
 
   // CART: load current cart items
   useEffect(() => {
@@ -463,6 +478,22 @@ export default function MyCartPage() {
     });
   }, [orders]);
 
+  useEffect(() => {
+    if (!requestedOrderId || tab !== 1 || ordersLoading) return;
+    const normalize = (value) => String(value ?? "").trim();
+    const requested = normalize(requestedOrderId);
+    const match = viewOrders.find((order) => (
+      normalize(order.id) === requested || normalize(order.number) === requested
+    ));
+    if (!match) return;
+
+    const alreadyOpen = orderDialogOpen && normalize(selectedOrder?.id) === normalize(match.id);
+    if (!alreadyOpen) {
+      setSelectedOrder(match);
+      setOrderDialogOpen(true);
+    }
+  }, [requestedOrderId, tab, ordersLoading, viewOrders, orderDialogOpen, selectedOrder?.id]);
+
   const applyCoupon = () => {
     let d = 0;
     if (couponCode.trim().toUpperCase() === "IMAA10") d = subtotal * 0.1;
@@ -568,6 +599,30 @@ export default function MyCartPage() {
   const handleCloseOrderDialog = () => {
     setOrderDialogOpen(false);
     setSelectedOrder(null);
+
+    // If the modal was opened from a notification deep link, remove the
+    // order query parameter. Otherwise the deep-link effect immediately
+    // reopens the modal after Close, Esc, or backdrop click.
+    const params = new URLSearchParams(location.search || "");
+    let changed = false;
+    ["order", "order_id", "openOrder"].forEach((key) => {
+      if (params.has(key)) {
+        params.delete(key);
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      const search = params.toString();
+      navigate(
+        {
+          pathname: location.pathname,
+          search: search ? `?${search}` : "",
+          hash: location.hash || "",
+        },
+        { replace: true }
+      );
+    }
   };
 
 
