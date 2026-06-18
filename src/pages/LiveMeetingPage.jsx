@@ -7853,13 +7853,21 @@ export default function NewLiveMeeting() {
       return;
     }
     if (!eventId) return;
-    // Only fetch full lounge-state when the lounge UI is visible.
-    // Normal breakout participants must not call /lounge-state/ because that endpoint
-    // returns full table/participant state and becomes expensive during 500+ user breakouts.
-    if (!loungeOpen && !(isBreakout && role === "publisher")) {
+
+    const hostNeedsRoomStateForParticipants = Boolean(
+      isHost &&
+      participantsPanelActive &&
+      (participantRoomFilter === "breakout" || participantRoomFilter === "lounge")
+    );
+
+    // Only fetch full lounge-state when the lounge UI is visible, a publisher is
+    // inside a breakout room, or the host is actively viewing room-filtered
+    // participants.  This keeps the 300–500 user optimization intact while still
+    // letting the host participant panel know who is in Breakout Rooms / Lounges.
+    if (!loungeOpen && !(isBreakout && role === "publisher") && !hostNeedsRoomStateForParticipants) {
       return;
     }
-    if (liveMinimalMode && !loungeOpen && !isBreakout) {
+    if (liveMinimalMode && !loungeOpen && !isBreakout && !hostNeedsRoomStateForParticipants) {
       return;
     }
 
@@ -7889,7 +7897,16 @@ export default function NewLiveMeeting() {
     } catch (e) {
       // ignore transient errors
     }
-  }, [liveMinimalMode, loungeOpen, isBreakout, deferNonCriticalLiveApi, eventId, role]);
+  }, [
+    liveMinimalMode,
+    loungeOpen,
+    isBreakout,
+    eventId,
+    role,
+    isHost,
+    participantsPanelActive,
+    participantRoomFilter,
+  ]);
 
   // Only fetch full lounge state when the lounge panel is open.
   // Exception: publisher/host controls may need breakout room state. Normal breakout
@@ -7898,7 +7915,15 @@ export default function NewLiveMeeting() {
     if (!eventId) return;
     if (deferNonCriticalLiveApi) return;
 
-    const shouldFetchLoungeState = loungeOpen || (isBreakout && role === "publisher");
+    const hostNeedsRoomStateForParticipants = Boolean(
+      isHost &&
+      participantsPanelActive &&
+      (participantRoomFilter === "breakout" || participantRoomFilter === "lounge")
+    );
+    const shouldFetchLoungeState =
+      loungeOpen ||
+      (isBreakout && role === "publisher") ||
+      hostNeedsRoomStateForParticipants;
     if (!shouldFetchLoungeState) {
       if (import.meta.env?.DEV) {
         console.debug("[LiveMeeting] Lounge state deferred for normal participant");
@@ -7914,7 +7939,17 @@ export default function NewLiveMeeting() {
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [deferNonCriticalLiveApi, eventId, loungeOpen, isBreakout, role, fetchLoungeState]);
+  }, [
+    deferNonCriticalLiveApi,
+    eventId,
+    loungeOpen,
+    isBreakout,
+    role,
+    isHost,
+    participantsPanelActive,
+    participantRoomFilter,
+    fetchLoungeState,
+  ]);
 
   useEffect(() => {
     if (
@@ -9043,6 +9078,18 @@ export default function NewLiveMeeting() {
           }
           if (msg.main_room_support_status) {
             setMainRoomSupportStatus(msg.main_room_support_status);
+          }
+          if (
+            (msg.lounge_state_deferred || msg.online_users_deferred) &&
+            isHostRef.current &&
+            participantsPanelActive &&
+            (participantRoomFilter === "breakout" || participantRoomFilter === "lounge")
+          ) {
+            // The backend intentionally sends lightweight lounge broadcasts during
+            // large meetings. When the host is actively looking at room-filtered
+            // participants, fetch the full state on demand so Breakout/Lounge
+            // counts stay correct without broadcasting the heavy payload to all users.
+            fetchLoungeStateRef.current?.();
           }
           if (Array.isArray(msg.support_requests) && canReceiveSupportRequestsRef.current) {
             setSupportRequests((prev) => mergeSupportRequests(prev, msg.support_requests, "sent"));
@@ -10402,22 +10449,35 @@ export default function NewLiveMeeting() {
   }, [activeTimerType, isInBreakoutRoom, roomJoined, isBreakoutEnding]);
 
   //  RECONNECT SYNC EFFECT
-  // Re-syncs timers with server after connection loss
+  // Re-syncs timers with server after connection loss.
+  // mainSocketRef is a native WebSocket, not Socket.IO, so use ws.send() and the existing queue.
   useEffect(() => {
-    if (!mainSocketRef.current) return;
+    const ws = mainSocketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    let cancelled = false;
+    const sendReconnectAction = (payload) => {
+      const socket = mainSocketRef.current;
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(payload));
+        return true;
+      }
+      pendingMainSocketActionsRef.current.push(payload);
+      return false;
+    };
 
     const handleReconnect = async () => {
-      console.log('[LiveMeeting] ✅ Socket reconnected, syncing timers/chat/Q&A with server');
+      console.log('[LiveMeeting] ✅ Socket connected/reconnected, syncing timers/chat/Q&A with server');
 
       // Request timer sync from server
       if (activeTimerType === 'breakout' && isInBreakoutRoomRef.current) {
-        mainSocketRef.current?.emit('action', {
+        sendReconnectAction({
           action: 'request_timer_sync',
           room_type: 'breakout',
           elapsed_seconds: breakoutRoomElapsedRef.current,
         });
       } else if (activeTimerType === 'main' && roomJoinedRef.current) {
-        mainSocketRef.current?.emit('action', {
+        sendReconnectAction({
           action: 'request_timer_sync',
           room_type: 'main',
           elapsed_seconds: mainRoomElapsedRef.current,
@@ -10425,7 +10485,7 @@ export default function NewLiveMeeting() {
       }
 
       // ✅ Reconnect sync: Recover missed chat messages
-      if (lastChatMessageIdRef.current && eventId) {
+      if (!cancelled && lastChatMessageIdRef.current && eventId) {
         try {
           // Get conversation ID (main room chat)
           const conversationId = `event_${eventId}`;
@@ -10435,11 +10495,9 @@ export default function NewLiveMeeting() {
           const res = await fetch(url, { headers: authHeader() });
           if (res.ok) {
             const data = await res.json();
-            if (data?.results?.length > 0) {
+            if (!cancelled && data?.results?.length > 0) {
               console.log(`[LiveMeeting] ✅ Recovered ${data.results.length} missed chat messages`);
-              // Messages will be processed by existing message handler
-              // Emit event to trigger chat panel refresh
-              mainSocketRef.current?.emit('action', {
+              sendReconnectAction({
                 action: 'refresh_messages',
                 conversation_id: conversationId,
               });
@@ -10451,7 +10509,7 @@ export default function NewLiveMeeting() {
       }
 
       // ✅ Reconnect sync: Recover missed Q&A questions
-      if (lastQnASyncTimeRef.current && eventId) {
+      if (!cancelled && lastQnASyncTimeRef.current && eventId) {
         try {
           const url = toApiUrl(
             `interactions/questions/?event_id=${eventId}&updated_after=${encodeURIComponent(lastQnASyncTimeRef.current)}&cursor=1&limit=50&sort=newest`
@@ -10460,10 +10518,9 @@ export default function NewLiveMeeting() {
           if (res.ok) {
             const data = await res.json();
             const questions = data?.results || data || [];
-            if (questions.length > 0) {
+            if (!cancelled && questions.length > 0) {
               console.log(`[LiveMeeting] ✅ Recovered ${questions.length} missed Q&A questions`);
-              // Emit event to trigger Q&A panel refresh
-              mainSocketRef.current?.emit('action', {
+              sendReconnectAction({
                 action: 'refresh_questions',
                 event_id: eventId,
               });
@@ -10475,15 +10532,11 @@ export default function NewLiveMeeting() {
       }
     };
 
-    // Listen for reconnect event
-    mainSocketRef.current?.on?.('reconnect', handleReconnect);
-    mainSocketRef.current?.on?.('connect', handleReconnect);
-
+    handleReconnect();
     return () => {
-      mainSocketRef.current?.off?.('reconnect', handleReconnect);
-      mainSocketRef.current?.off?.('connect', handleReconnect);
+      cancelled = true;
     };
-  }, [activeTimerType, isInBreakoutRoom, roomJoined]);
+  }, [activeTimerType, isInBreakoutRoom, roomJoined, eventId, mainSocketReconnectKey]);
 
   // ✅ TIMER STOP: Handle Edge Cases (Host Disconnect, Late Joins)
   // If host disconnects during breakout, timer should stop to avoid confusion
@@ -15442,6 +15495,8 @@ export default function NewLiveMeeting() {
   }, [chatMessages]);
   const chatBottomRef = useRef(null);
   const chatListRef = useRef(null);  // ✅ Scrollable chat container
+  const chatOlderLoadEnabledRef = useRef(false);
+  const chatInitialScrollTimerRef = useRef(null);
   const [newMessageCount, setNewMessageCount] = useState(0);  // ✅ "New message" indicator
   const [chatEditId, setChatEditId] = useState(null);
   const [chatEditBody, setChatEditBody] = useState("");
@@ -15501,15 +15556,40 @@ export default function NewLiveMeeting() {
     return distanceFromBottom < 80;  // within 80px of bottom
   }, []);
 
-  // ✅ Helper: Scroll to bottom smoothly
-  const scrollToBottom = useCallback(() => {
-    if (!chatListRef.current) return;
+  // ✅ Helper: Scroll to latest message. Uses direct scrollTop so it also
+  // works when the user re-opens the chat tab and the bottom sentinel is not
+  // yet mounted. Older messages are never loaded here; they load only when the
+  // user explicitly scrolls to the top.
+  const scrollToBottom = useCallback(({ enableOlderAfterScroll = false } = {}) => {
+    if (chatInitialScrollTimerRef.current) {
+      clearTimeout(chatInitialScrollTimerRef.current);
+      chatInitialScrollTimerRef.current = null;
+    }
+
     requestAnimationFrame(() => {
-      if (chatListRef.current) {
-        chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
-        console.debug("[ChatScroll] Scrolled to bottom");
-      }
+      requestAnimationFrame(() => {
+        const el = chatListRef.current;
+        if (!el) return;
+        el.scrollTop = el.scrollHeight;
+        setNewMessageCount(0);
+
+        if (enableOlderAfterScroll) {
+          chatInitialScrollTimerRef.current = setTimeout(() => {
+            chatOlderLoadEnabledRef.current = true;
+            chatInitialScrollTimerRef.current = null;
+          }, 0);
+        }
+      });
     });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (chatInitialScrollTimerRef.current) {
+        clearTimeout(chatInitialScrollTimerRef.current);
+        chatInitialScrollTimerRef.current = null;
+      }
+    };
   }, []);
 
   const normalizeCursorResponse = useCallback((payload) => {
@@ -15566,7 +15646,7 @@ export default function NewLiveMeeting() {
   }, []);
 
   const fetchChatMessages = useCallback(
-    async (conversationId, { force = false, beforeId = null, afterId = null } = {}) => {
+    async (conversationId, { force = false, beforeId = null, afterId = null, scrollToLatest = false } = {}) => {
       if (liveMinimalMode || deferNonCriticalLiveApi) return [];
       if (!force && !isChatActive) return [];
 
@@ -15621,8 +15701,17 @@ export default function NewLiveMeeting() {
         return rows;
       }
 
+      if (scrollToLatest) {
+        chatOlderLoadEnabledRef.current = false;
+      }
+
       setChatMessages(rows);
       setChatHasOlder(hasMore);
+
+      if (scrollToLatest) {
+        scrollToBottom({ enableOlderAfterScroll: true });
+      }
+
       return rows;
     },
     [
@@ -15632,6 +15721,7 @@ export default function NewLiveMeeting() {
       isChatActive,
       normalizeCursorResponse,
       mergeById,
+      scrollToBottom,
     ]
   );
 
@@ -15660,7 +15750,16 @@ export default function NewLiveMeeting() {
     const el = chatListRef.current;
     if (!el) return;
 
-    if (el.scrollTop <= 80) {
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom <= 80) {
+      setNewMessageCount(0);
+    }
+
+    // IMPORTANT: older history should load only after the latest page has
+    // rendered and the chat has been scrolled to the bottom. Without this guard,
+    // a newly opened panel can start at scrollTop=0 and immediately fetch older
+    // history, creating unnecessary live-meeting API load.
+    if (chatOlderLoadEnabledRef.current && el.scrollTop <= 80) {
       loadOlderChatMessages();
     }
   }, [loadOlderChatMessages]);
@@ -15802,7 +15901,18 @@ export default function NewLiveMeeting() {
       //  Defer messaging API during join burst
       if (liveMinimalMode || deferNonCriticalLiveApi) return 0;
       if (!hasLiveInteractiveAccess) return 0;
-      const cid = activeChatConversationId;
+      let cid = activeChatConversationId;
+
+      // Users who have not opened the chat panel yet may not have a
+      // conversation id in state. Resolve the main event conversation lazily
+      // during the existing 90s idle unread check so the user-side red dot can
+      // appear for new public chat messages without adding another poller.
+      // Do not auto-create/ensure room chat here; room chat still resolves when
+      // the room chat panel is opened.
+      if (!cid && !isRoomChatActive) {
+        cid = await ensureEventConversation();
+      }
+
       if (!cid) return 0;
 
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/`), {
@@ -15816,7 +15926,7 @@ export default function NewLiveMeeting() {
     } catch {
       return 0;
     }
-  }, [activeChatConversationId, liveMinimalMode, deferNonCriticalLiveApi, hasLiveInteractiveAccess]);
+  }, [activeChatConversationId, liveMinimalMode, deferNonCriticalLiveApi, hasLiveInteractiveAccess, isRoomChatActive, ensureEventConversation]);
 
   const markAllReadPendingRef = useRef(new Set());
   const markAllReadLastSentRef = useRef(new Map());
@@ -15888,10 +15998,13 @@ export default function NewLiveMeeting() {
     }
   }, [liveMinimalMode, deferNonCriticalLiveApi, isDocumentVisible]);
 
-  const markChatAllRead = useCallback(async (conversationId) => {
+  const markChatAllRead = useCallback(async (conversationId, options = {}) => {
     const cid = conversationId || activeChatConversationId;
-    if (!cid) return;
-    await markConversationAllRead(cid, { clearEventUnread: true });
+    if (!cid) return false;
+    return markConversationAllRead(cid, {
+      ...options,
+      clearEventUnread: true,
+    });
   }, [activeChatConversationId, markConversationAllRead]);
 
   // ============ PRIVATE CHAT STATE ============
@@ -16478,7 +16591,7 @@ export default function NewLiveMeeting() {
             // Auto-scroll after React re-renders if user was near bottom
             requestAnimationFrame(() => {
               if (wasNearBottomRef.current && alive) {
-                scrollToBottom();
+                scrollToBottom({ enableOlderAfterScroll: true });
                 setNewMessageCount(0);
               } else if (alive) {
                 // Show "New message" indicator if user scrolled up
@@ -16689,9 +16802,12 @@ export default function NewLiveMeeting() {
     try {
       const cid = await ensureActiveConversation();
       if (cid) {
-        await fetchChatMessages(cid, { force: true });
+        await fetchChatMessages(cid, { force: true, scrollToLatest: true });
         if (isChatActive && isDocumentVisible()) {
-          await markChatAllRead(cid);
+          // User explicitly opened/read the chat thread. Bypass the short
+          // cooldown here so stale unread dots clear immediately; background
+          // mark-read calls remain protected from storms.
+          await markChatAllRead(cid, { force: true });
         }
       }
     } catch (e) {
@@ -16727,7 +16843,7 @@ export default function NewLiveMeeting() {
       setChatInput("");
       setNewMessageCount(0);  // ✅ Clear "new message" indicator when user sends
       // ✅ Always scroll to bottom when sender sends a message
-      scrollToBottom();
+      scrollToBottom({ enableOlderAfterScroll: true });
     } catch (e) {
       console.error("[SendChat] ❌ Failed to send message:", e);
       setChatError(e?.message || "Failed to send message.");
@@ -16832,6 +16948,8 @@ export default function NewLiveMeeting() {
       setChatConversationId(null);
       setRoomChatConversationId(null);
       setChatMessages([]);
+      chatOlderLoadEnabledRef.current = false;
+      setNewMessageCount(0);
       setActiveTableId(null);
       setActiveTableName("");
       setLoungeTables([]);
@@ -16841,6 +16959,8 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     setRoomChatConversationId(null);
     setChatMessages([]);
+    chatOlderLoadEnabledRef.current = false;
+    setNewMessageCount(0);
     setChatInput("");
     setChatError("");
   }, [activeTableId]);
@@ -16889,11 +17009,10 @@ export default function NewLiveMeeting() {
     loadChatThread();
   }, [deferNonCriticalLiveApi, hostPerms.chat, tab, isPanelOpen, eventId, activeTableId, loadChatThread]);
 
-  useEffect(() => {
-    if (!isChatActive) return;
-    const el = chatBottomRef.current;
-    if (el) el.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages.length, isChatActive]);
+  // Do not auto-scroll on every chatMessages.length change. Older history is
+  // prepended when the user scrolls up; an unconditional effect here would jump
+  // back to the latest message and make old-history scrolling unusable. The
+  // latest-page scroll is handled explicitly in loadChatThread/fetchChatMessages.
 
   // ✅ Format chat message timestamp with seconds and AM/PM
   // Example output: "11:29:10 AM"
@@ -19091,12 +19210,76 @@ export default function NewLiveMeeting() {
       return true;
     });
 
+    // Host stays in the main RTK meeting while attendees move to separate
+    // breakout/lounge RTK meetings. Those attendees may no longer exist in the
+    // host's main-room RTK participant list, so the Participants panel must also
+    // render lightweight virtual rows from the backend LoungeTable assignments.
+    // This is display-only and only runs for host main-room view. It avoids any
+    // extra media/control logic and prevents duplicate rows when the RTK participant
+    // is still visible in the main meeting list.
+    const scopedParticipantUserIds = new Set(
+      scopedParticipants
+        .map((p) => String(getBackendUserId(p?._raw || p) || getBackendUserId(p) || ""))
+        .filter(Boolean)
+    );
+    const virtualRoomParticipants = [];
+    if (isHost && !isBreakout && Array.isArray(loungeTables) && loungeTables.length > 0) {
+      for (const table of loungeTables) {
+        const roomType = table?.category === "BREAKOUT" ? "breakout" : "lounge";
+        const participantsList = Array.isArray(table?.participants)
+          ? table.participants
+          : Object.values(table?.participants || {});
+
+        for (const tableParticipant of participantsList) {
+          const rawUserId = tableParticipant?.user_id ?? tableParticipant?.userId;
+          if (rawUserId === undefined || rawUserId === null || String(rawUserId) === "") continue;
+          const userId = String(rawUserId);
+          if (scopedParticipantUserIds.has(userId)) continue;
+          scopedParticipantUserIds.add(userId);
+
+          virtualRoomParticipants.push({
+            id: `virtual-room:${userId}`,
+            name:
+              tableParticipant?.full_name ||
+              tableParticipant?.name ||
+              tableParticipant?.username ||
+              `User ${userId}`,
+            role: "Audience",
+            presetName: "",
+            mic: false,
+            cam: false,
+            active: false,
+            joinedAtTs: tableParticipant?.joined_at ? Date.parse(tableParticipant.joined_at) : Date.now(),
+            picture: tableParticipant?.avatar_url || tableParticipant?.avatar || "",
+            inMeeting: false,
+            isVirtual: true,
+            isOccupyingLounge: true,
+            mood: null,
+            _roomLocation: {
+              type: roomType,
+              roomId: String(table.id),
+              roomName: table?.name || (roomType === "breakout" ? "Breakout Room" : "Social Lounge"),
+              roomCategory: table?.category || (roomType === "breakout" ? "BREAKOUT" : "LOUNGE"),
+            },
+            _raw: {
+              customParticipantId: userId,
+              userId,
+              user_id: userId,
+              is_guest: Boolean(tableParticipant?.is_guest),
+            },
+          });
+        }
+      }
+    }
+
+    const participantsForGrouping = scopedParticipants.concat(virtualRoomParticipants);
+
     const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || (isHost ? rtkMeeting?.self?.id : null);
     const hostUserKey = hostUserKeyRef.current;
     const hostFromKey = hostUserKey
-      ? scopedParticipants.find((p) => getParticipantUserKey(p?._raw || p) === hostUserKey)
+      ? participantsForGrouping.find((p) => getParticipantUserKey(p?._raw || p) === hostUserKey)
       : null;
-    const hostIdExists = hostId ? scopedParticipants.some((p) => p.id === hostId) : false;
+    const hostIdExists = hostId ? participantsForGrouping.some((p) => p.id === hostId) : false;
     const effectiveHostId = hostIdExists ? hostId : (hostFromKey?.id || null);
 
     // ✅ CRITICAL FIX: Apply lounge filter to hosts when not in breakout (main room context)
@@ -19104,7 +19287,7 @@ export default function NewLiveMeeting() {
     // When user is in main room, hosts occupying lounge should be filtered out
     // When user is in breakout, show all participants in that room (lounge filter doesn't apply)
     const suppressHostPresenceInMainRoom = !isHost && !isBreakout && isMainRoomSupportMissing;
-    let host = scopedParticipants.filter((p) => {
+    let host = participantsForGrouping.filter((p) => {
       // Classify by assigned role / resolved host identity only.
       // Do not exclude self when the viewer joined as audience, otherwise a host user appears under Audience.
       const assignedRole = getAssignedRoleForParticipant(p);
@@ -19115,13 +19298,13 @@ export default function NewLiveMeeting() {
       return Boolean(isActualHost && !suppressHostPresenceInMainRoom && (isBreakout || !p.isOccupyingLounge));
     });
     if (host.length === 0 && effectiveHostId && !suppressHostPresenceInMainRoom) {
-      host = scopedParticipants.filter((p) => p.id === effectiveHostId && (isBreakout || !p.isOccupyingLounge));
+      host = participantsForGrouping.filter((p) => p.id === effectiveHostId && (isBreakout || !p.isOccupyingLounge));
     }
 
     const hostIdSet = new Set(host.map((p) => p.id));
     //  Host in main room should see ALL participants (including those in breakout/lounge)
     // ✅ CRITICAL FIX: Use assignedRoleByIdentity to determine speakers (not RTK role, which is "Host" for lounge participants)
-    const speakers = scopedParticipants.filter((p) => {
+    const speakers = participantsForGrouping.filter((p) => {
       if (hostIdSet.has(p.id)) return false; // Skip hosts
       if (isBreakout || isHost || !p.isOccupyingLounge) {
         const assignedRole = getAssignedRoleForParticipant(p);
@@ -19129,7 +19312,7 @@ export default function NewLiveMeeting() {
       }
       return false;
     });
-    const audience = scopedParticipants.filter((p) => {
+    const audience = participantsForGrouping.filter((p) => {
       if (hostIdSet.has(p.id)) return false; // Skip hosts
       if (isBreakout || isHost || !p.isOccupyingLounge) {
         const assignedRole = getAssignedRoleForParticipant(p);
@@ -19190,6 +19373,7 @@ export default function NewLiveMeeting() {
     participantRoomMap,  //  Added dependency
     getParticipantRoomInfo,
     assignedRoleByIdentity,  // ✅ CRITICAL FIX: Use assigned roles to distinguish actual hosts from lounge participants
+    loungeTables,
   ]);
 
 
@@ -19554,7 +19738,10 @@ export default function NewLiveMeeting() {
   const showPrivateDot = Object.keys(privateUnreadByUserId || {}).length > 0;
   const showQnaDot = qnaUnreadCount > 0 && !isQnaActive;
 
-  const showAnyChatDot = showChatDot || showPrivateDot || showQnaDot;
+  // The chat icon should show only chat/private-chat unread state. Q&A has its
+  // own icon and dot below, so mixing qnaUnreadCount into the chat icon makes
+  // users think chat has unread messages when only Q&A changed.
+  const showAnyChatDot = showChatDot || showPrivateDot;
   const showAnyPanelDot = showAnyChatDot;
 
   const showMembersDot = showPrivateDot;
@@ -19936,17 +20123,11 @@ export default function NewLiveMeeting() {
                       onScroll={handleChatScroll}
                       sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}
                     >
-                      {(chatHasOlder || chatLoadingOlder) && (
+                      {chatLoadingOlder && (
                         <Box sx={{ mb: 1.5, textAlign: "center" }}>
-                          <Button
-                            size="small"
-                            variant="text"
-                            disabled={chatLoadingOlder}
-                            onClick={loadOlderChatMessages}
-                            sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
-                          >
-                            {chatLoadingOlder ? "Loading older messages…" : "Load older messages"}
-                          </Button>
+                          <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.62)" }}>
+                            Loading older messages…
+                          </Typography>
                         </Box>
                       )}
                       {/* ✅ New message indicator */}
@@ -19955,8 +20136,11 @@ export default function NewLiveMeeting() {
                           <Button
                             size="small"
                             onClick={() => {
-                              scrollToBottom();
+                              scrollToBottom({ enableOlderAfterScroll: true });
                               setNewMessageCount(0);
+                              if (activeChatConversationId) {
+                                markChatAllRead(activeChatConversationId, { force: true });
+                              }
                             }}
                             sx={{
                               bgcolor: "rgba(59, 130, 246, 0.9)",
