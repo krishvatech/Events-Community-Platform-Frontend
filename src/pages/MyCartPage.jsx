@@ -295,6 +295,7 @@ export default function MyCartPage() {
   const [billingError, setBillingError] = useState("");
   const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
   const [leadGenMissingFields, setLeadGenMissingFields] = useState({});
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const requestedOrderId = useMemo(() => {
     const params = new URLSearchParams(location.search || "");
@@ -540,12 +541,14 @@ export default function MyCartPage() {
   };
 
   const proceedCheckout = async () => {
-    if (!viewItems.length) return;
+    if (!viewItems.length || checkoutLoading) return;
 
+    setCheckoutLoading(true);
     try {
       if (!billingAddressIsComplete(billingAddress)) {
         setTab(2);
         alert("Please add your billing address before checkout.");
+        setCheckoutLoading(false);
         return;
       }
 
@@ -569,6 +572,7 @@ export default function MyCartPage() {
         if (errBody?.status === "missing_lead_gen_fields") {
           setLeadGenMissingFields(normalizeMissingLeadGenFields(errBody.missing_fields));
           setLeadGenModalOpen(true);
+          setCheckoutLoading(false);
           return;
         }
         throw new Error(errBody.detail || `Checkout HTTP ${checkoutRes.status}`);
@@ -587,6 +591,8 @@ export default function MyCartPage() {
     } catch (err) {
       console.error(err);
       alert(err.message || "Checkout failed. Please try again.");
+    } finally {
+      setCheckoutLoading(false);
     }
   };
 
@@ -889,7 +895,7 @@ export default function MyCartPage() {
                       </div>
                       <Button
                         onClick={proceedCheckout}
-                        disabled={cart.length === 0}
+                        disabled={cart.length === 0 || checkoutLoading}
                         fullWidth
                         className="mt-4 rounded-xl"
                         sx={{
@@ -900,7 +906,7 @@ export default function MyCartPage() {
                         }}
                         variant="contained"
                       >
-                        Proceed to checkout
+                        {checkoutLoading ? "Processing..." : "Proceed to checkout"}
                       </Button>
                     </Box>
                   </Paper>
