@@ -296,6 +296,8 @@ export default function MyCartPage() {
   const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
   const [leadGenMissingFields, setLeadGenMissingFields] = useState({});
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [checkoutWarningOpen, setCheckoutWarningOpen] = useState(false);
 
   const requestedOrderId = useMemo(() => {
     const params = new URLSearchParams(location.search || "");
@@ -427,10 +429,44 @@ export default function MyCartPage() {
         throw new Error(body.detail || JSON.stringify(body) || `HTTP ${res.status}`);
       }
       setBillingAddress({ ...EMPTY_BILLING_ADDRESS, ...(body || {}) });
-      setBillingMessage("Billing address saved.");
+
+      // Set message based on Saleor sync status
+      if (body?.saleor_synced) {
+        setBillingMessage("Billing address saved and synced to Saleor.");
+      } else if (body?.saleor_sync_error) {
+        setBillingMessage(`Billing address saved locally. Saleor sync failed: ${body.saleor_sync_error}`);
+      } else {
+        setBillingMessage("Billing address saved.");
+      }
       return body;
     } catch (err) {
       const msg = err.message || "Could not save billing address.";
+      setBillingError(msg);
+      throw err;
+    } finally {
+      setBillingSaving(false);
+    }
+  };
+
+  const deleteBillingAddress = async () => {
+    setDeleteConfirmOpen(false);
+    setBillingSaving(true);
+    setBillingMessage("");
+    setBillingError("");
+    try {
+      const res = await fetch(`${API_BASE}/orders/billing-address/`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.detail || JSON.stringify(body) || `HTTP ${res.status}`);
+      }
+      setBillingAddress(EMPTY_BILLING_ADDRESS);
+      setBillingMessage("Billing address deleted successfully.");
+      return body;
+    } catch (err) {
+      const msg = err.message || "Could not delete billing address.";
       setBillingError(msg);
       throw err;
     } finally {
@@ -546,8 +582,7 @@ export default function MyCartPage() {
     setCheckoutLoading(true);
     try {
       if (!billingAddressIsComplete(billingAddress)) {
-        setTab(2);
-        alert("Please add your billing address before checkout.");
+        setCheckoutWarningOpen(true);
         setCheckoutLoading(false);
         return;
       }
@@ -1119,10 +1154,15 @@ export default function MyCartPage() {
                       </Grid>
                     )}
 
-                    <Grid item xs={12}>
+                    <Grid item xs={12} sx={{ display: "flex", gap: 2 }}>
                       <Button variant="contained" disabled={billingSaving} onClick={saveBillingAddress} sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}>
                         {billingSaving ? "Saving..." : "Save billing address"}
                       </Button>
+                      {billingAddress.first_name && (
+                        <Button variant="outlined" disabled={billingSaving} onClick={() => setDeleteConfirmOpen(true)} color="error" sx={{ textTransform: "none" }}>
+                          {billingSaving ? "Deleting..." : "Delete address"}
+                        </Button>
+                      )}
                     </Grid>
                   </Grid>
                 )}
@@ -1151,6 +1191,85 @@ export default function MyCartPage() {
         user={storedUser}
         missingFields={leadGenMissingFields}
       />
+
+      {/* DELETE ADDRESS CONFIRMATION DIALOG */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: "12px",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontSize: "1.1rem", fontWeight: 700, pb: 1 }}>
+          Delete billing address?
+        </DialogTitle>
+        <DialogContent sx={{ py: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Are you sure you want to delete your billing address?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button
+            onClick={() => setDeleteConfirmOpen(false)}
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={deleteBillingAddress}
+            variant="contained"
+            color="error"
+            disabled={billingSaving}
+            sx={{ textTransform: "none" }}
+          >
+            {billingSaving ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* CHECKOUT WARNING - MISSING BILLING ADDRESS */}
+      <Dialog
+        open={checkoutWarningOpen}
+        onClose={() => setCheckoutWarningOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: "12px",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontSize: "1.1rem", fontWeight: 700, pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+          ⚠️ Billing address required
+        </DialogTitle>
+        <DialogContent sx={{ py: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Please add your billing address before checkout.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button
+            onClick={() => setCheckoutWarningOpen(false)}
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: "8px" }}
+          >
+            Close
+          </Button>
+          <Button
+            onClick={() => {
+              setCheckoutWarningOpen(false);
+              setTab(2);
+            }}
+            variant="contained"
+            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          >
+            Go to Addresses
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ORDER ITEMS POPUP */}
       <Dialog
