@@ -962,8 +962,8 @@ export default function MyCartPage() {
                       <TableHead>
                         <TableRow>
                           <TableCell>Order</TableCell>
+                          <TableCell>Events</TableCell>
                           <TableCell>Date</TableCell>
-                          <TableCell align="right">Items</TableCell>
                           <TableCell align="right">Total</TableCell>
                           <TableCell align="right">Status</TableCell>
                           <TableCell align="right">Invoice</TableCell>
@@ -978,8 +978,8 @@ export default function MyCartPage() {
                             <TableCell>
                               <Skeleton width={140} />
                             </TableCell>
-                            <TableCell align="right">
-                              <Skeleton width={40} />
+                            <TableCell>
+                              <Skeleton width={120} />
                             </TableCell>
                             <TableCell align="right">
                               <Skeleton width={70} />
@@ -1015,8 +1015,8 @@ export default function MyCartPage() {
                       <TableHead>
                         <TableRow>
                           <TableCell>Order</TableCell>
+                          <TableCell>Events</TableCell>
                           <TableCell>Date</TableCell>
-                          <TableCell align="right">Items</TableCell>
                           <TableCell align="right">Total</TableCell>
                           <TableCell align="right">Status</TableCell>
                           <TableCell align="right">Invoice</TableCell>
@@ -1032,12 +1032,18 @@ export default function MyCartPage() {
                           >
                             <TableCell>#{o.number}</TableCell>
                             <TableCell>
+                              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                                {(o.items || []).map((item, idx) => (
+                                  <Typography key={idx} sx={{ fontSize: "0.875rem", color: "text.primary" }}>
+                                    {item.title} {item.qty > 1 ? `(×${item.qty})` : ""}
+                                  </Typography>
+                                ))}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
                               {o.created
                                 ? new Date(o.created).toLocaleString()
                                 : "-"}
-                            </TableCell>
-                            <TableCell align="right">
-                              {o.items?.length || 0}
                             </TableCell>
                             <TableCell align="right">
                               {fmt(o.total)}
