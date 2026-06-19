@@ -63,58 +63,90 @@ const CARD_BG = "#ffffff";
 const CARD_BORDER = "#F0EEEB";
 
 // --- Helpers for badges ---
-async function countFromPaginated(url) {
+const BADGE_CACHE_TTL_MS = 60_000;
+const ADMIN_BADGE_BASE_DELAY_MS = 750;
+const ADMIN_BADGE_JITTER_MS = 4_000;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function canLoadAdminBadges() {
+    return isOwnerUser() || isStaffUser();
+}
+
+function readBadgeCache(key, ttlMs = BADGE_CACHE_TTL_MS) {
     try {
-        const res = await apiClient.get(url);
-        const j = res.data;
-        if (typeof j.count === "number") return j.count;
-        const arr = Array.isArray(j) ? j : j?.results || [];
-        return arr.length;
+        const raw = sessionStorage.getItem(`sidebarBadge:${key}`);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || (Date.now() - parsed.ts) > ttlMs) return null;
+        return Number(parsed.value || 0);
     } catch {
-        return 0;
+        return null;
     }
 }
 
+function writeBadgeCache(key, value) {
+    try {
+        sessionStorage.setItem(
+            `sidebarBadge:${key}`,
+            JSON.stringify({ ts: Date.now(), value: Number(value || 0) })
+        );
+    } catch { }
+}
+
+async function cachedBadgeCount(key, loader, ttlMs = BADGE_CACHE_TTL_MS) {
+    const cached = readBadgeCache(key, ttlMs);
+    if (cached !== null) return cached;
+    const value = await loader();
+    writeBadgeCache(key, value);
+    return Number(value || 0);
+}
+
+async function countFromPaginated(url, cacheKey = url) {
+    return cachedBadgeCount(cacheKey, async () => {
+        try {
+            const res = await apiClient.get(url);
+            const j = res.data;
+            if (typeof j.count === "number") return j.count;
+            const arr = Array.isArray(j) ? j : j?.results || [];
+            return arr.length;
+        } catch {
+            return 0;
+        }
+    });
+}
+
 async function getUnreadGroupNotifCount(kind) {
+    if (!canLoadAdminBadges()) return 0;
     return countFromPaginated(
-        `/group-notifications/?unread=1&kind=${encodeURIComponent(kind)}&page_size=1`
+        `/group-notifications/?unread=1&kind=${encodeURIComponent(kind)}&page_size=1`,
+        `group-notif-${kind}`
     );
 }
 
 async function getPendingNameRequestsCount() {
     if (!isOwnerUser()) return 0;
     return countFromPaginated(
-        `/auth/admin/name-requests/?status=pending&page_size=1`
+        `/auth/admin/name-requests/?status=pending&page_size=1`,
+        "admin-name-requests"
     );
 }
 
 async function getPendingJoinRequestsCount() {
-    try {
-        const r = await apiClient.get(`/groups/?page_size=200`);
-        const j = r.data;
-        const groups = Array.isArray(j) ? j : j?.results || [];
-        const manageable = groups.filter((g) =>
-            ["owner", "admin", "moderator"].includes(g?.current_user_role)
-        );
-        const counts = await Promise.all(
-            manageable.map(async (g) => {
-                try {
-                    const rr = await apiClient.get(`/groups/${g.id}/member-requests/`);
-                    const jj = rr.data;
-                    if (typeof jj.count === "number") return jj.count;
-                    return Array.isArray(jj.requests) ? jj.requests.length : 0;
-                } catch {
-                    return 0;
-                }
-            })
-        );
-        return counts.reduce((a, b) => a + (b || 0), 0);
-    } catch {
-        return 0;
-    }
+    if (!canLoadAdminBadges()) return 0;
+    return cachedBadgeCount("admin-pending-join-requests", async () => {
+        try {
+            const r = await apiClient.get(`/groups/admin/pending-join-requests-count/`);
+            const j = r.data || {};
+            return Number(j.pending_join_requests_count ?? j.count ?? 0);
+        } catch {
+            return 0;
+        }
+    });
 }
 
 async function getAdminNotificationsBadgeCount() {
+    if (!canLoadAdminBadges()) return 0;
     const [joinPending, memberJoinedUnread, groupCreatedUnread, namePending] =
         await Promise.all([
             getPendingJoinRequestsCount(),
@@ -126,26 +158,19 @@ async function getAdminNotificationsBadgeCount() {
 }
 
 async function getUserUnreadCount() {
-    try {
-        const res = await apiClient.get(`/notifications/?unread=1&page_size=1`);
-        const j = res.data;
-        if (typeof j.count === "number") return j.count;
-        const arr = Array.isArray(j) ? j : j?.results || [];
-        return arr.reduce((acc, n) => acc + (n?.is_read ? 0 : 1), 0);
-    } catch {
-        return 0;
-    }
+    return countFromPaginated(`/notifications/?unread=1&page_size=1`, "user-notifications");
 }
 
 async function getMessagesUnreadCount() {
-    try {
-        const res = await apiClient.get(`/messaging/conversations/`);
-        const raw = res.data;
-        const data = Array.isArray(raw) ? raw : (raw?.results || []);
-        return data.reduce((acc, curr) => acc + (curr.unread_count || 0), 0);
-    } catch {
-        return 0;
-    }
+    return cachedBadgeCount("messages-unread", async () => {
+        try {
+            const res = await apiClient.get(`/messaging/conversations/unread-count/`);
+            const raw = res.data || {};
+            return Number(raw.unread_count ?? raw.count ?? 0);
+        } catch {
+            return 0;
+        }
+    }, 15_000);
 }
 
 export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
@@ -287,10 +312,12 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             // Do not fetch very frequently for 200–500 users.
             m = await getMessagesUnreadCount();
 
-            if (isSuperUser) {
+            if (isSuperUser || isStaffOnly) {
+                // Delay admin badge APIs so 500 users landing on dashboard do not
+                // create an immediate grouped/admin badge spike.
+                await sleep(ADMIN_BADGE_BASE_DELAY_MS + Math.floor(Math.random() * ADMIN_BADGE_JITTER_MS));
+                if (off) return;
                 n = await getAdminNotificationsBadgeCount();
-            } else if (isStaffOnly) {
-                n = await getUserUnreadCount();
             } else {
                 n = await getUserUnreadCount();
             }

@@ -11714,6 +11714,14 @@ export default function NewLiveMeeting() {
     navigate(defaultMeetingExitPath, { replace: true });
   }, [defaultMeetingExitPath, navigate]);
 
+  const getMeetingEndRedirectDelayMs = useCallback(() => {
+    const baseMs = Number(import.meta.env.VITE_MEETING_END_REDIRECT_BASE_MS || 4000);
+    const jitterMs = Math.floor(
+      Math.random() * Number(import.meta.env.VITE_MEETING_END_REDIRECT_JITTER_MS || 15000)
+    );
+    return baseMs + Math.max(0, jitterMs);
+  }, []);
+
   const handleSpeedNetworkingNavigateMainRoom = useCallback(() => {
     setShowSpeedNetworking(false);
     setMainMeetingIsolationForSpeedNetworking(false);
@@ -11871,8 +11879,8 @@ export default function NewLiveMeeting() {
     }
     navigationTimeoutRef.current = setTimeout(() => {
       navigateAfterMeetingExit();
-    }, 4000);
-  }, [navigateAfterMeetingExit, setMainMeetingIsolationForSpeedNetworking]);
+    }, getMeetingEndRedirectDelayMs());
+  }, [getMeetingEndRedirectDelayMs, navigateAfterMeetingExit, setMainMeetingIsolationForSpeedNetworking]);
 
   const handleMeetingEnd = useCallback(
     async (state, options = {}) => {
@@ -11900,6 +11908,33 @@ export default function NewLiveMeeting() {
         return;
       }
       endHandledRef.current = true;
+      shouldPausePollingRef.current = true;
+      setDbStatus("ended");
+      setRoomJoined(false);
+      roomJoinedRef.current = false;
+      setParticipantsPanelActive(false);
+      setRightPanelOpen(false);
+      setRightOpen(false);
+      setLoungeOpen(false);
+      setShowSpeedNetworking(false);
+      setMainMeetingIsolationForSpeedNetworking(false);
+
+      try {
+        intentionalMainSocketCloseRef.current = true;
+        if (mainSocketRef.current?.readyState === WebSocket.OPEN || mainSocketRef.current?.readyState === WebSocket.CONNECTING) {
+          mainSocketRef.current.close();
+        }
+        if (eventChatWsRef.current?.readyState === WebSocket.OPEN || eventChatWsRef.current?.readyState === WebSocket.CONNECTING) {
+          eventChatWsRef.current.close();
+        }
+        if (privateChatWsRef.current?.readyState === WebSocket.OPEN || privateChatWsRef.current?.readyState === WebSocket.CONNECTING) {
+          privateChatWsRef.current.close();
+        }
+        if (qnaWsRef.current?.readyState === WebSocket.OPEN || qnaWsRef.current?.readyState === WebSocket.CONNECTING) {
+          qnaWsRef.current.close();
+        }
+      } catch { }
+
       console.log("[LiveMeeting] handleMeetingEnd called with state:", state, "explicitEnd:", explicitEnd);
 
       if (document.fullscreenElement) {
@@ -12004,10 +12039,11 @@ export default function NewLiveMeeting() {
         // Not in post-event window: show thank-you page
         setShowEndStateMessage(true);
 
-        // Schedule a single auto-redirect after four seconds
+        // Schedule a single auto-redirect with jitter so 500 users do not
+        // all hit dashboard APIs at the same exact second.
         navigationTimeoutRef.current = setTimeout(() => {
           navigateAfterMeetingExit();
-        }, 4000);
+        }, getMeetingEndRedirectDelayMs());
 
         // Clean up the timeout if the component unmounts
         return () => {
@@ -12016,7 +12052,7 @@ export default function NewLiveMeeting() {
         };
       }
     },
-    [navigateAfterMeetingExit, updateLiveStatus, rtkMeeting, isBanned, eventId, role, loungeOpenStatus]
+    [getMeetingEndRedirectDelayMs, navigateAfterMeetingExit, updateLiveStatus, rtkMeeting, isBanned, eventId, role, loungeOpenStatus, setMainMeetingIsolationForSpeedNetworking]
   );
 
   // ✅ Handler for exiting post-event lounge

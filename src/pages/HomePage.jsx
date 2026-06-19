@@ -128,43 +128,12 @@ export default function HomePage() {
     apiClient.get("/cms/pages/home/").then(r => setPage(r.data)).catch(() => null);
   }, []);
 
-  // Fetch and choose hero event by priority: featured > pinned > upcoming
+  // Fetch hero event from optimized landing endpoint
   useEffect(() => {
-    apiClient.get("/events/?status=published&exclude_ended=1&limit=20")
+    apiClient.get("/events/landing/")
       .then(r => {
-        const events = r.data?.results || [];
-        const now = new Date();
-
-        // Filter to upcoming events only
-        const upcomingEvents = events.filter(e => new Date(e.start_time) > now);
-
-        if (upcomingEvents.length === 0) {
-          setFeaturedEvent(null);
-          return;
-        }
-
-        // Priority 1: Featured event
-        const featuredEvent = upcomingEvents.find(e => e.is_featured);
-        if (featuredEvent) {
-          setFeaturedEvent(featuredEvent);
-          return;
-        }
-
-        // Priority 2: Pinned event with lowest pin_priority
-        const pinnedEvents = upcomingEvents.filter(e => e.is_pinned);
-        if (pinnedEvents.length > 0) {
-          const pinned = pinnedEvents.reduce((prev, curr) =>
-            (curr.pin_priority < prev.pin_priority) ? curr : prev
-          );
-          setFeaturedEvent(pinned);
-          return;
-        }
-
-        // Priority 3: Nearest upcoming event (by start_time)
-        const nearest = upcomingEvents.reduce((prev, curr) =>
-          new Date(curr.start_time) < new Date(prev.start_time) ? curr : prev
-        );
-        setFeaturedEvent(nearest);
+        const heroEvent = r.data?.hero_event || null;
+        setFeaturedEvent(heroEvent);
       })
       .catch(() => setFeaturedEvent(null));
   }, []);

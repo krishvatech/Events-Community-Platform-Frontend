@@ -71,9 +71,21 @@ function getEventLocation(event) {
   if (event?.format === "virtual" || event?.format === "hybrid") {
     return "Virtual live";
   }
-  return event?.location || "";
+  return event?.location || event?.location_city || event?.location_country || "";
 }
 
+function getEventStartValue(event) {
+  return event?.start_time || event?.start_date || event?.date || null;
+}
+
+function getEventType(event) {
+  return event?.event_type || event?.category || event?.format || "Event";
+}
+
+function getEventHref(event) {
+  const key = event?.slug || event?.id || "";
+  return key ? `/events/${key}` : "/events";
+}
 
 // ── FadeIn Animation ─────────────────────────────────────────────────────────
 function FadeIn({ children, delay = 0 }) {
@@ -336,13 +348,15 @@ function PendingFormsBanner({ forms }) {
 
 // ── Featured Event Hero ───────────────────────────────────────────────────────
 function FeaturedHero({ event }) {
-  const accent = getAccent(event?.event_type);
-  const imgSrc = event?.cover_image || event?.image_url || event?.image || FALLBACK_IMGS[0];
-  const dateStr = event?.start_date
-    ? new Date(event.start_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+  const accent = getAccent(getEventType(event));
+  const heroLabel = event?.is_featured === true ? "Featured" : (event?.is_pinned === true ? "Pinned" : "Featured");
+  const imgSrc = event?.cover_image || event?.preview_image || event?.image_url || event?.image || FALLBACK_IMGS[0];
+  const startValue = getEventStartValue(event);
+  const dateStr = startValue
+    ? new Date(startValue).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     : "";
   const eventLocation = getEventLocation(event);
-  const href = `/events/${event?.id || event?.slug || ""}`;
+  const href = getEventHref(event);
   return (
     <a href={href} style={{ textDecoration: "none", display: "block", marginBottom: 24 }}>
       <div style={{
@@ -357,7 +371,7 @@ function FeaturedHero({ event }) {
             padding: "3px 10px", borderRadius: 100, display: "inline-block", marginBottom: 14,
             textTransform: "uppercase", letterSpacing: 1, width: "fit-content", fontFamily: FONT,
           }}>
-            ✦ Featured — {event?.event_type || "Event"}
+            ✦ {heroLabel} — {getEventType(event)}
           </span>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: N, margin: "0 0 10px", lineHeight: 1.3, fontFamily: FONT }}>
             {event?.title}
@@ -396,13 +410,14 @@ function FeaturedHero({ event }) {
 
 // ── Event Card (grid) ─────────────────────────────────────────────────────────
 function DashEventCard({ event, index }) {
-  const accent = getAccent(event?.event_type);
-  const imgSrc = event?.cover_image || event?.image_url || event?.image || FALLBACK_IMGS[index % FALLBACK_IMGS.length];
-  const dateStr = event?.start_date
-    ? new Date(event.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  const accent = getAccent(getEventType(event));
+  const imgSrc = event?.cover_image || event?.preview_image || event?.image_url || event?.image || FALLBACK_IMGS[index % FALLBACK_IMGS.length];
+  const startValue = getEventStartValue(event);
+  const dateStr = startValue
+    ? new Date(startValue).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
   const eventLocation = getEventLocation(event);
-  const href = `/events/${event?.id || event?.slug || ""}`;
+  const href = getEventHref(event);
   return (
     <a href={href} style={{ textDecoration: "none" }}>
       <div
@@ -426,10 +441,10 @@ function DashEventCard({ event, index }) {
           />
         </div>
         <div style={{ padding: "14px 16px 18px", fontFamily: FONT, flex: 1, display: "flex", flexDirection: "column" }}>
-          {(dateStr || event?.event_type) && (
+          {(dateStr || getEventType(event)) && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
               {dateStr && <span style={{ fontSize: 11, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: 0.5 }}>{dateStr}</span>}
-              {event?.event_type && <span style={{ fontSize: 10, color: "#AAA", background: "#F5F4F2", padding: "2px 6px", borderRadius: 4 }}>{event.event_type}</span>}
+              {getEventType(event) && <span style={{ fontSize: 10, color: "#AAA", background: "#F5F4F2", padding: "2px 6px", borderRadius: 4 }}>{getEventType(event)}</span>}
             </div>
           )}
           <h3 style={{ fontSize: 13, fontWeight: 700, color: N, margin: "0 0 4px", lineHeight: 1.4, fontFamily: FONT, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
@@ -553,12 +568,11 @@ function FooterCTA({ isMember }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
+  const [landingHero, setLandingHero] = useState(null);
   const [events, setEvents] = useState([]);
   // const [discussions, setDiscussions] = useState([]); // COMMENTED OUT - will restore when community section is re-enabled
   // const [groups, setGroups] = useState([]); // COMMENTED OUT - will restore when community section is re-enabled
   const [loading, setLoading] = useState(true);
-  const [notifCount, setNotifCount] = useState(0);
-  const [messageCount, setMessageCount] = useState(0);
   const [showProfileBanner, setShowProfileBanner] = useState(true);
   const [showVerifyBanner, setShowVerifyBanner] = useState(true);
   const [pendingForms, setPendingForms] = useState([]);
@@ -575,32 +589,17 @@ export default function DashboardPage() {
     ]).then(([userData, eventsData, formsData]) => {
       if (!active) return;
       setUser(userData);
-      // Build events array: hero first, then upcoming events
-      const allEvents = [];
-      if (eventsData.hero_event) {
-        allEvents.push(eventsData.hero_event);
-      }
-      if (eventsData.upcoming_events && Array.isArray(eventsData.upcoming_events)) {
-        allEvents.push(...eventsData.upcoming_events);
-      }
-      setEvents(allEvents.slice(0, 10)); // Store up to 10 for flexibility
+
+      const apiHero = eventsData?.hero_event || null;
+      // Accept backend hero only when it is an admin featured event or pinned fallback.
+      // This protects the UI from old cached responses that promoted a normal event to hero.
+      setLandingHero(apiHero?.is_featured === true || apiHero?.is_pinned === true ? apiHero : null);
+      setEvents(Array.isArray(eventsData?.upcoming_events) ? eventsData.upcoming_events.slice(0, 10) : []);
+
       setPendingForms(formsData); // Show all pending forms
       setLoading(false);
     });
 
-    const syncBadges = async () => {
-      try {
-        const nr = await apiClient.get("/notifications/?unread=1&page_size=1");
-        const nj = nr.data;
-        setNotifCount(typeof nj.count === "number" ? nj.count : (nj?.results?.length || 0));
-      } catch { }
-      try {
-        const mr = await apiClient.get("/messaging/conversations/");
-        const md = Array.isArray(mr.data) ? mr.data : (mr.data?.results || []);
-        setMessageCount(md.reduce((a, c) => a + (c.unread_count || 0), 0));
-      } catch { }
-    };
-    syncBadges();
     return () => { active = false; };
   }, []);
 
@@ -609,46 +608,28 @@ export default function DashboardPage() {
   const profileCompletion = profile.profile_completion_percentage ?? 0;
   const firstName = user?.first_name || user?.username || "there";
   const isMember = profile.is_member || user?.is_member || false;
-  const displayEvents = events.length >= 2 ? events : STATIC_EVENTS;
+  // Keep real API events first. Use STATIC_EVENTS only as filler/fallback,
+  // never as a replacement for real featured/pinned events.
+  const displayEvents = events;
 
-  // Select featured event by priority: featured > pinned > nearest upcoming
-  const selectFeaturedEvent = (eventList) => {
-    if (eventList.length === 0) return null;
-
-    // Priority 1: Featured event
-    const featured = eventList.find(e => e.is_featured === true);
-    if (featured) return featured;
-
-    // Priority 2: Pinned event with lowest pin_priority
-    const pinned = eventList.filter(e => e.is_pinned === true);
-    if (pinned.length > 0) {
-      return pinned.reduce((prev, curr) =>
-        (curr.pin_priority < prev.pin_priority) ? curr : prev
-      );
-    }
-
-    // Priority 3: Nearest upcoming event by start_time
-    if (eventList.length > 0) {
-      const upcoming = eventList.filter(e => e.start_time && new Date(e.start_time) > new Date());
-      if (upcoming.length > 0) {
-        return upcoming.reduce((prev, curr) =>
-          new Date(curr.start_time) < new Date(prev.start_time) ? curr : prev
-        );
-      }
-    }
-
-    // Fallback: first event
-    return eventList[0];
+  // Select static fallback only. Real hero comes from backend as: featured > pinned fallback.
+  const selectStaticHero = (eventList) => {
+    if (!Array.isArray(eventList) || eventList.length === 0) return null;
+    return eventList.find(e => e.is_featured === true) || eventList[0];
   };
 
-  const featuredEvent = selectFeaturedEvent(displayEvents);
+  const featuredEvent = landingHero || selectStaticHero(STATIC_EVENTS);
 
-  // Sort upcoming events: pinned first (by pin_priority), then normal by start_time
+  // Sort grid events: real pinned/upcoming first, then static filler when real events are less than 3.
   const sortGridEvents = (eventList, excludeEvent) => {
-    // Exclude featured event
-    const filtered = eventList.filter(e => !excludeEvent || e.id !== excludeEvent.id);
+    // Exclude featured/hero event only. Keep other real pinned events in the grid.
+    const excludeKey = excludeEvent?.id || excludeEvent?.slug;
+    const filtered = [...eventList].filter(e => {
+      const eventKey = e?.id || e?.slug;
+      return !excludeKey || eventKey !== excludeKey;
+    });
 
-    // Sort by: pinned DESC > pin_priority ASC > pinned_at DESC > start_time ASC
+    // Sort by: pinned DESC > pin_priority ASC > pinned_at DESC > start date ASC
     return filtered.sort((a, b) => {
       // Pinned events first
       const aPinned = a.is_pinned === true ? 1 : 0;
@@ -657,8 +638,8 @@ export default function DashboardPage() {
 
       // Within pinned: lower pin_priority first
       if (aPinned && bPinned) {
-        const aPriority = a.pin_priority || 999999;
-        const bPriority = b.pin_priority || 999999;
+        const aPriority = Number.isFinite(Number(a.pin_priority)) ? Number(a.pin_priority) : 999999;
+        const bPriority = Number.isFinite(Number(b.pin_priority)) ? Number(b.pin_priority) : 999999;
         if (aPriority !== bPriority) return aPriority - bPriority;
 
         // Same priority: most recent pinned_at first
@@ -668,17 +649,21 @@ export default function DashboardPage() {
       }
 
       // Non-pinned events: nearest by start_time first
-      const aStart = a.start_time ? new Date(a.start_time).getTime() : Infinity;
-      const bStart = b.start_time ? new Date(b.start_time).getTime() : Infinity;
+      const aStartValue = getEventStartValue(a);
+      const bStartValue = getEventStartValue(b);
+      const aStart = aStartValue ? new Date(aStartValue).getTime() : Infinity;
+      const bStart = bStartValue ? new Date(bStartValue).getTime() : Infinity;
       return aStart - bStart;
     });
   };
 
-  const gridEvents = sortGridEvents(displayEvents, featuredEvent).slice(0, 3);
+  const realGridEvents = sortGridEvents(events, featuredEvent).slice(0, 3);
+  const staticGridEvents = sortGridEvents(STATIC_EVENTS, featuredEvent).slice(0, Math.max(0, 3 - realGridEvents.length));
+  const gridEvents = [...realGridEvents, ...staticGridEvents];
 
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT }}>
-      <DashTopbar notifCount={notifCount} messageCount={messageCount} isAdmin={isAdminUser} />
+      <DashTopbar notifCount={0} messageCount={0} isAdmin={isAdminUser} />
 
       {/* Welcome Section */}
       <FadeIn>
