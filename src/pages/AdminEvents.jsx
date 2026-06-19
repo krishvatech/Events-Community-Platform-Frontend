@@ -3930,17 +3930,16 @@ function EventsPage() {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
-      const res = await fetch(`${API_ROOT}/events/${ev.id}/`, {
-        method: "PATCH",
+      const res = await fetch(`${API_ROOT}/events/${ev.id}/feature/`, {
+        method: "POST",
         headers,
-        body: JSON.stringify({ is_featured: true }),
       });
       if (!res.ok) throw new Error("Failed to set featured event");
       const updated = await res.json();
-      // Update all events: selected one gets is_featured=true, others get is_featured=false
+      // Keep the star visible immediately. Backend enforces one featured event globally.
       setEvents(prev => prev.map(e => ({
-        ...e,
-        is_featured: e.id === ev.id ? true : false
+        ...(e.id === ev.id ? { ...e, ...updated } : e),
+        is_featured: e.id === ev.id,
       })));
     } catch (e) {
       setErrMsg(e?.message || "Failed to set featured event");
@@ -3955,15 +3954,14 @@ function EventsPage() {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
-      const res = await fetch(`${API_ROOT}/events/${ev.id}/`, {
-        method: "PATCH",
+      const res = await fetch(`${API_ROOT}/events/${ev.id}/unfeature/`, {
+        method: "POST",
         headers,
-        body: JSON.stringify({ is_featured: false }),
       });
       if (!res.ok) throw new Error("Failed to remove featured event");
       const updated = await res.json();
       // Update selected event to remove featured status
-      setEvents(prev => prev.map(e => e.id === ev.id ? { ...e, is_featured: false } : e));
+      setEvents(prev => prev.map(e => e.id === ev.id ? { ...e, ...updated, is_featured: false } : e));
     } catch (e) {
       setErrMsg(e?.message || "Failed to remove featured event");
       setErrOpen(true);

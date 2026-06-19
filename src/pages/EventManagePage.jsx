@@ -609,6 +609,9 @@ export default function EventManagePage() {
   const [eventOrders, setEventOrders] = useState([]);
   const [eventOrdersLoading, setEventOrdersLoading] = useState(false);
   const [eventOrdersError, setEventOrdersError] = useState("");
+  const [eventOrdersTotal, setEventOrdersTotal] = useState(0);
+  const [eventOrdersPage, setEventOrdersPage] = useState(1);
+  const [eventOrdersLimit] = useState(20);
   const [markPaidLoadingId, setMarkPaidLoadingId] = useState(null);
   const [markPaidDialogOrder, setMarkPaidDialogOrder] = useState(null);
   const [markPaidReference, setMarkPaidReference] = useState("");
@@ -748,13 +751,18 @@ export default function EventManagePage() {
     }
   }, [tab, productManagementTabIndex, fetchSaleorProduct, fetchSaleorDiscounts]);
 
-  const fetchEventOrders = useCallback(async () => {
+  const fetchEventOrders = useCallback(async (page = 1) => {
     if (!eventId || !isOwner || event?.is_free !== false) return;
     setEventOrdersLoading(true);
     setEventOrdersError("");
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/orders/`, {
+      const offset = (page - 1) * eventOrdersLimit;
+      const url = new URL(`${API_ROOT}/events/${eventId}/orders/`, window.location.origin);
+      url.searchParams.set("limit", String(eventOrdersLimit));
+      url.searchParams.set("offset", String(offset));
+
+      const res = await fetch(url.toString(), {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -765,13 +773,15 @@ export default function EventManagePage() {
         throw new Error(body.detail || body.error || `HTTP ${res.status}`);
       }
       setEventOrders(Array.isArray(body.orders) ? body.orders : []);
+      setEventOrdersTotal(Number(body.count || 0));
+      setEventOrdersPage(page);
     } catch (err) {
       console.error("Failed to fetch event orders:", err);
       setEventOrdersError(err.message || "Failed to load event orders");
     } finally {
       setEventOrdersLoading(false);
     }
-  }, [eventId, isOwner, event?.is_free]);
+  }, [eventId, isOwner, event?.is_free, eventOrdersLimit]);
 
   const getSuggestedPaymentReference = useCallback((order) => {
     const existing = String(order?.payment_reference || "").trim();
@@ -6429,7 +6439,8 @@ export default function EventManagePage() {
         ) : eventOrders.length === 0 ? (
           <Alert severity="info">No paid orders found for this event yet.</Alert>
         ) : (
-          <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
+          <>
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ bgcolor: "rgba(7, 29, 73, 0.04)" }}>
@@ -6594,6 +6605,17 @@ export default function EventManagePage() {
               </TableBody>
             </Table>
           </TableContainer>
+          {eventOrdersTotal > eventOrdersLimit && (
+            <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+              <Pagination
+                count={Math.ceil(eventOrdersTotal / eventOrdersLimit)}
+                page={eventOrdersPage}
+                onChange={(_, page) => fetchEventOrders(page)}
+                color="primary"
+              />
+            </Box>
+          )}
+          </>
         )}
 
         <Dialog
