@@ -19,6 +19,19 @@ function computeEventStatus(ev) {
     return "upcoming";
 }
 
+const registrationRows = (data) => (Array.isArray(data) ? data : (data?.results || []));
+
+function getRegistrationEventId(registration) {
+    if (!registration) return null;
+    if (registration.event_id != null) return registration.event_id;
+    if (registration.event && typeof registration.event === "object") return registration.event.id;
+    return registration.event ?? registration.eventId ?? null;
+}
+
+function findRegistrationForEvent(rows, eventId) {
+    return rows.find((row) => Number(getRegistrationEventId(row)) === Number(eventId)) || null;
+}
+
 export default function RegisteredActions({ ev, reg, onUnregistered, onCancelRequested, hideChip = false }) {
 
     const [open, setOpen] = useState(false);
@@ -58,31 +71,23 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
         setLoading(true);
 
         try {
-            const resolveRegistrationId = async () => {
-                if (reg?.id) return reg.id;
-                // Ensure a registration exists for this event for current user
-                const registerRes = await fetch(`${API_BASE}/events/${ev.id}/register/`, {
-                    method: "POST",
-                    headers: authHeaders(),
-                });
-                if (!registerRes.ok) {
-                    throw new Error("Unable to create/find registration for this event.");
-                }
-                const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
+            const resolveRegistration = async () => {
+                if (reg?.id) return reg;
+
+                const mineRes = await fetch(`${API_BASE}/event-registrations/mine/?event=${encodeURIComponent(ev.id)}`, {
                     headers: token ? { Authorization: `Bearer ${token}` } : authHeaders(),
                 });
                 if (!mineRes.ok) throw new Error("Unable to refresh your registration details.");
                 const mineData = await mineRes.json();
-                const rows = Array.isArray(mineData) ? mineData : (mineData.results || []);
-                const mineForEvent = rows.find((r) => Number(r?.event?.id) === Number(ev.id));
+                const mineForEvent = findRegistrationForEvent(registrationRows(mineData), ev.id);
                 if (!mineForEvent?.id) throw new Error("Registration not found for this event.");
-                return mineForEvent.id;
+                return mineForEvent;
             };
 
             if (actionType === 'unregister') {
-                const regId = await resolveRegistrationId();
+                const resolvedReg = await resolveRegistration();
 
-                const res = await fetch(`${API_BASE}/event-registrations/${regId}/`, {
+                const res = await fetch(`${API_BASE}/event-registrations/${resolvedReg.id}/`, {
                     method: "DELETE",
                     headers: authHeaders(),
                 });
@@ -92,9 +97,9 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                 if (onUnregistered) onUnregistered(ev.id);
 
             } else if (actionType === 'cancel_request') {
-                const regId = await resolveRegistrationId();
+                const resolvedReg = await resolveRegistration();
 
-                const res = await fetch(`${API_BASE}/event-registrations/${regId}/cancel_request/`, {
+                const res = await fetch(`${API_BASE}/event-registrations/${resolvedReg.id}/cancel_request/`, {
                     method: "POST",
                     headers: authHeaders(),
                 });
@@ -102,7 +107,11 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
 
                 toast.success("Cancellation request submitted.");
                 if (onCancelRequested) {
-                    onCancelRequested(ev.id, { ...reg, status: 'cancellation_requested', cancellation_requested: true });
+                    onCancelRequested(ev.id, {
+                        ...resolvedReg,
+                        status: 'cancellation_requested',
+                        cancellation_requested: true,
+                    });
                 }
             }
             handleClose();

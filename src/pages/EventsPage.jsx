@@ -39,6 +39,7 @@ import PlaceIcon from "@mui/icons-material/Place";
 import GroupsIcon from "@mui/icons-material/Groups";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import PushPinIcon from "@mui/icons-material/PushPin";
+import ShoppingCartCheckoutRoundedIcon from "@mui/icons-material/ShoppingCartCheckoutRounded";
 import { FormControl, Select, MenuItem, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -88,6 +89,62 @@ function EventFullToast() {
         </Typography>
       </Box>
     </Box>
+  );
+}
+
+function PaidCartToast({ eventTitle, onGoToCart }) {
+  return (
+    <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, gap: 1.5 }}>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography variant="subtitle2" fontWeight={700} color="inherit" sx={{ lineHeight: 1.25 }}>
+          Added to cart
+        </Typography>
+        <Typography variant="body2" color="inherit" sx={{ opacity: 0.95, lineHeight: 1.35, overflowWrap: "anywhere" }}>
+          {eventTitle ? `"${eventTitle}" has been added to your cart.` : "This paid event has been added to your cart."}
+        </Typography>
+        <Typography variant="caption" color="inherit" sx={{ display: "block", opacity: 0.85, mt: 0.25 }}>
+          Please complete checkout from My Orders.
+        </Typography>
+      </Box>
+      <Button
+        size="small"
+        variant="contained"
+        startIcon={<ShoppingCartCheckoutRoundedIcon fontSize="small" />}
+        onClick={(e) => {
+          e.stopPropagation();
+          onGoToCart();
+        }}
+        sx={{
+          flexShrink: 0,
+          alignSelf: { xs: "flex-start", sm: "center" },
+          textTransform: "none",
+          borderRadius: 999,
+          backgroundColor: "#fff",
+          color: "#047857",
+          boxShadow: "none",
+          "&:hover": { backgroundColor: "#ecfdf5", boxShadow: "none" },
+        }}
+      >
+        Go to cart
+      </Button>
+    </Box>
+  );
+}
+
+function showPaidCartToast(eventTitle, navigate) {
+  toast.success(
+    <PaidCartToast eventTitle={eventTitle} onGoToCart={() => navigate("/account/cart")} />,
+    {
+      position: "top-center",
+      autoClose: 7000,
+      hideProgressBar: false,
+      closeOnClick: false,
+      pauseOnHover: true,
+      draggable: true,
+      theme: "colored",
+      icon: false,
+      style: { borderRadius: "12px", padding: "14px 16px" },
+    }
   );
 }
 
@@ -869,8 +926,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     if (item) {
       // addToCart() refreshes /cart/count/. Do not manually bump the badge here,
       // because adding quantity for the same event should still count as one cart item.
-
-      // ✅ DO NOT redirect anywhere
+      showPaidCartToast(ev.title, navigate);
     }
   };
 
@@ -1690,8 +1746,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
     if (item) {
       // addToCart() refreshes /cart/count/. Do not manually bump the badge here,
       // because adding quantity for the same event should still count as one cart item.
-
-      // ✅ DO NOT redirect anywhere
+      showPaidCartToast(ev.title, navigate);
     }
   };
 

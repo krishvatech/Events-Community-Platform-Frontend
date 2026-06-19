@@ -289,6 +289,60 @@ function isConfirmedRegistration(registration, event) {
   return Boolean(registration && (!registration.attendee_status || registration.attendee_status === "confirmed"));
 }
 
+const registrationRows = (data) => (Array.isArray(data) ? data : (data?.results || []));
+
+function getRegistrationEventId(registration) {
+  if (!registration) return null;
+  if (registration.event_id != null) return registration.event_id;
+  if (registration.event && typeof registration.event === "object") return registration.event.id;
+  return registration.event ?? registration.eventId ?? null;
+}
+
+function findRegistrationForEvent(rows, eventId) {
+  return rows.find((row) => Number(getRegistrationEventId(row)) === Number(eventId)) || null;
+}
+
+async function fetchMyRegistrationForEvent(eventId, token) {
+  if (!eventId || !token) return null;
+
+  const res = await fetch(`${API_BASE}/event-registrations/mine/?event=${encodeURIComponent(eventId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  return findRegistrationForEvent(registrationRows(data), eventId);
+}
+
+function clearCurrentUserRegistrationFlags(currentEvent) {
+  if (!currentEvent) return currentEvent;
+
+  return {
+    ...currentEvent,
+    registration_status: null,
+    attendee_status: null,
+    origin_status: null,
+    payment_pending: false,
+    is_confirmed_registered: false,
+    assigned_tier: null,
+    origins: [],
+    user_status: currentEvent.user_status
+      ? {
+          ...currentEvent.user_status,
+          registration_status: null,
+          attendee_status: null,
+          origin_status: null,
+          payment_pending: false,
+          is_confirmed_registered: false,
+          assigned_tier: null,
+          origins: [],
+          confirmed_origins_count: 0,
+          pending_origins_count: 0,
+        }
+      : currentEvent.user_status,
+  };
+}
+
 function formatTierAmount(price, currency = "USD") {
   const amount = Number(price || 0);
   try {
@@ -684,15 +738,8 @@ export default function EventDetailsPage() {
             } else {
               refreshEventFromServer();
               // Also refresh registration immediately
-              const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (mineRes.ok) {
-                const mineData = await mineRes.json();
-                const results = Array.isArray(mineData) ? mineData : (mineData.results || []);
-                const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event?.id));
-                setRegistration(mineForEvent || null);
-              }
+              const mineForEvent = await fetchMyRegistrationForEvent(event?.id, token);
+              setRegistration(mineForEvent || null);
             }
           } else if (res.status !== 400 || data?.detail !== "Invalid or expired token.") {
             console.error(data?.detail || "Could not accept invite.");
@@ -854,21 +901,20 @@ export default function EventDetailsPage() {
   const joinState = useJoinLiveState(event);
 
   // Fetch registration status
-  const [registration, setRegistration] = useState(null);
+  const [registration, setRegistration] = useState(preload?.my_registration || null);
   useEffect(() => {
     if (!event?.id || !token) return;
     let cancelled = false;
     (async () => {
       try {
         // Fetch only the current user's registrations, then pick this event.
-        const res = await fetch(`${API_BASE}/event-registrations/mine/`, {
+        const res = await fetch(`${API_BASE}/event-registrations/mine/?event=${encodeURIComponent(event.id)}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
-          const results = Array.isArray(data) ? data : (data.results || []);
-          const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
+          const mineForEvent = findRegistrationForEvent(registrationRows(data), event.id);
           setRegistration(mineForEvent || null);
         }
       } catch { }
@@ -990,16 +1036,9 @@ export default function EventDetailsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const mineForEvent = await fetchMyRegistrationForEvent(event.id, token);
         if (cancelled) return;
-        if (mineRes.ok) {
-          const data = await mineRes.json();
-          const results = Array.isArray(data) ? data : (data.results || []);
-          const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
-          setRegistration(mineForEvent || null);
-        }
+        setRegistration(mineForEvent || null);
       } catch { }
     })();
     return () => { cancelled = true; };
@@ -1191,38 +1230,31 @@ export default function EventDetailsPage() {
         return;
       }
 
-      const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (mineRes.ok) {
-        const data = await mineRes.json();
-        const results = Array.isArray(data) ? data : (data.results || []);
-        const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
-        setRegistration(mineForEvent || null);
+      const mineForEvent = await fetchMyRegistrationForEvent(event.id, token);
+      setRegistration(mineForEvent || null);
 
-        // Refetch event to update can_signup_for_replay and has_replay_access fields
-        try {
-          const eventRes = await fetch(urlJoin(API_BASE, `/events/${encodeURIComponent(slug)}/?include=questions&include_ended=true`), {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (eventRes.ok) {
-            const eventData = await eventRes.json();
-            setEvent(eventData);
-          }
-        } catch (_) {}
+      // Refetch event to update can_signup_for_replay and has_replay_access fields
+      try {
+        const eventRes = await fetch(urlJoin(API_BASE, `/events/${encodeURIComponent(slug)}/?include=questions&include_ended=true`), {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (eventRes.ok) {
+          const eventData = await eventRes.json();
+          setEvent(eventData);
+        }
+      } catch (_) {}
 
-        // Show success toast and dispatch unread notification event
-        toast.success(`You have successfully registered for "${event?.title || "this event"}"!`);
-        try {
-          const prev = Number(localStorage.getItem("unread_notifications") || "0");
-          const next = prev + 1;
-          localStorage.setItem("unread_notifications", String(next));
-          window.dispatchEvent(new CustomEvent("notify:unread", { detail: { count: next } }));
-        } catch (_) {}
-      }
+      // Show success toast and dispatch unread notification event
+      toast.success(`You have successfully registered for "${event?.title || "this event"}"!`);
+      try {
+        const prev = Number(localStorage.getItem("unread_notifications") || "0");
+        const next = prev + 1;
+        localStorage.setItem("unread_notifications", String(next));
+        window.dispatchEvent(new CustomEvent("notify:unread", { detail: { count: next } }));
+      } catch (_) {}
     } catch (_) { }
   };
 
@@ -2518,6 +2550,8 @@ export default function EventDetailsPage() {
                               onUnregistered={() => {
                                 // Refresh both registration and application status after cancellation
                                 setRegistration(null);
+                                setEvent((prev) => clearCurrentUserRegistrationFlags(prev));
+                                refreshEventFromServer();
                                 // Trigger refresh of application status
                                 (async () => {
                                   try {
