@@ -602,9 +602,10 @@ const LoungeOverlay = ({
                 const reason = data.reason || "The lounge is currently closed";
                 console.warn("[Lounge] ❌ 403 Forbidden - Lounge not available:", reason);
                 console.warn("[Lounge] This usually means the lounge status changed or the waiting room is still active");
-                alert(`Unable to join table:\n${reason}\n\nPlease refresh the page if the lounge should be open.`);
-                // Refresh the lounge state to get latest status
-                window.location.reload();
+                alert(`Unable to join table:\n${reason}\n\nPlease check Lounge Settings if this should be open.`);
+                // Do not reload during a live meeting. A reload can disrupt RTK/live-room state.
+                // Just refresh the lightweight lounge state so the banner/buttons stay accurate.
+                fetchLoungeState();
             } else {
                 console.error("[Lounge] Breakout fetch failed (Even with fallback):", res.status);
                 alert("Failed to join table. Please try again.");
@@ -677,10 +678,30 @@ const LoungeOverlay = ({
                 });
             }
             if (res.ok) {
-                // Broadcast will update the UI via WebSocket
+                const data = await res.json().catch(() => ({}));
+                const createdTable = {
+                    ...data,
+                    category: data.category || "LOUNGE",
+                    max_seats: data.max_seats || clampSeats(createSeats),
+                    participants: {},
+                    icon_url: resolveMediaUrl(data.icon_url),
+                };
+
+                // Do not wait only for WebSocket here. The REST endpoint creates the table,
+                // so update this admin's UI immediately and then refresh state in the background.
+                if (createdTable.id) {
+                    setTables((prev) => {
+                        if (prev.some((t) => String(t.id) === String(createdTable.id))) return prev;
+                        return [...prev, createdTable];
+                    });
+                }
                 setCreateOpen(false);
                 setCreateIconFile(null);
                 setCreateSeats(4);
+                fetchLoungeState();
+            } else {
+                const data = await res.json().catch(() => ({}));
+                alert(data?.detail || data?.error || "Failed to create lounge table.");
             }
         } catch (err) {
             console.error("Failed to create table", err);
@@ -993,8 +1014,10 @@ const LoungeOverlay = ({
                                 title="Social Lounge"
                                 description="Meet and greet. Take a seat to join a conversation."
                                 onJoin={(tableId, seatIndex) => {
-                                    if (loungeOpenStatus?.status === 'CLOSED' && !isAdmin) {
-                                        alert("The lounge is currently closed.");
+                                    // LOUNGE tables must respect lounge availability for everyone, including host/admin.
+                                    // Admin can create/edit tables while closed, but cannot join a closed lounge table.
+                                    if (loungeOpenStatus?.status === 'CLOSED') {
+                                        alert(`The lounge is currently closed: ${loungeOpenStatus?.reason || "not available"}`);
                                         return;
                                     }
                                     handleJoinTable(tableId, seatIndex);

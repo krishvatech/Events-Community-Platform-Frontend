@@ -241,22 +241,21 @@ const LoungeTable = ({
                             });
                         }
 
-                        return slots.map((slot, i) => (
+                        return slots.map((slot, i) => {
+                            const canJoinSeat = !slot.participant &&
+                                !isUserAtThisTable &&
+                                slot.seatIndex !== undefined &&
+                                !shouldDisableJoin &&
+                                !isFull;
+
+                            return (
                             <Box
                                 key={`seat-${i}`}
-                                onClick={() =>
-                                    !slot.participant &&
-                                    !isUserAtThisTable &&
-                                    slot.seatIndex !== undefined &&
-                                    handleJoin(slot.seatIndex)
-                                }
+                                onClick={() => canJoinSeat && handleJoin(slot.seatIndex)}
+                                title={shouldDisableJoin ? 'Lounge is closed' : undefined}
                                 sx={{
-                                    cursor:
-                                        !slot.participant &&
-                                            !isUserAtThisTable &&
-                                            slot.seatIndex !== undefined
-                                            ? 'pointer'
-                                            : 'default',
+                                    cursor: canJoinSeat ? 'pointer' : 'default',
+                                    opacity: shouldDisableJoin && !slot.participant ? 0.45 : 1,
                                 }}
                             >
                                 <LoungeSeat
@@ -269,7 +268,8 @@ const LoungeTable = ({
                                     deferKycLookup={deferKycLookup}
                                 />
                             </Box>
-                        ));
+                            );
+                        });
                     })()}
                 </Box>
 
