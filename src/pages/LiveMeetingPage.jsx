@@ -260,6 +260,29 @@ const SUPPORT_TAB_INDEX = 4;
 const QNA_HOT_GRAVITY = 1.5;        // time decay exponent for hot score
 const QNA_FLAME_THRESHOLD = 0.5;    // hot score above this → show 🔥 trending
 const QNA_DISPLAY_BROADCAST_TYPE = "qna-display-state";
+
+const WAITING_ROOM_STATUS_POLL_MS = Number(
+  import.meta.env.VITE_WAITING_ROOM_STATUS_POLL_MS || 25000
+);
+
+const WAITING_ROOM_STATUS_JITTER_MS = Number(
+  import.meta.env.VITE_WAITING_ROOM_STATUS_JITTER_MS || 10000
+);
+
+const WAITING_ROOM_HOST_QUEUE_POLL_MS = Number(
+  import.meta.env.VITE_WAITING_ROOM_HOST_QUEUE_POLL_MS || 10000
+);
+
+const LOUNGE_PARTICIPANTS_POLL_MS = Number(
+  import.meta.env.VITE_LOUNGE_PARTICIPANTS_POLL_MS || 10000
+);
+
+function clientJitterMs(baseMs, jitterMs = 0) {
+  const base = Math.max(1000, Number(baseMs) || 1000);
+  const jitter = Math.max(0, Number(jitterMs) || 0);
+  return base + Math.floor(Math.random() * jitter);
+}
+
 const flagEmojiFromISO2 = (code) => {
   if (!code || code.length !== 2) return "";
   return Array.from(code.toUpperCase()).map(c => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
@@ -7851,7 +7874,10 @@ export default function NewLiveMeeting() {
 
     poll();
     //  Reduce polling from 3s to 10s + random 5s (10-15s range)
-    const pollDelayMs = 10000 + Math.floor(Math.random() * 5000);
+    const pollDelayMs = clientJitterMs(
+      WAITING_ROOM_STATUS_POLL_MS,
+      WAITING_ROOM_STATUS_JITTER_MS
+    );
     const t = setInterval(poll, pollDelayMs);
     console.log(`[LiveMeeting] Waiting room polling scheduled every ${pollDelayMs}ms`);
     return () => {
@@ -8717,9 +8743,16 @@ export default function NewLiveMeeting() {
             // Asynchronously return to main room with proper stream re-subscription
             // ✅ Use function Ref to ensure we call the latest version with fresh closures
             if (applyBreakoutTokenRef.current) {
-              applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
-                console.error("[MainSocket] Error returning to main room:", e);
-              });
+              const returnJitterMs = Math.max(0, Number(msg.return_jitter_ms || 15000));
+              const returnDelayMs = Math.floor(Math.random() * returnJitterMs);
+
+              console.log(`[MainSocket] Breakout ended; returning to main room after ${returnDelayMs}ms`);
+
+              window.setTimeout(() => {
+                applyBreakoutTokenRef.current?.(null, null, null, null).catch((e) => {
+                  console.error("[MainSocket] Error returning to main room:", e);
+                });
+              }, returnDelayMs);
             }
           } else {
             console.log("[MainSocket] Not in breakout, still clearing timers for consistency");
@@ -9333,6 +9366,25 @@ export default function NewLiveMeeting() {
           setJoinError("");
           setMainMeetingIsolationForSpeedNetworking(false);
 
+          // Safety timeout for server-initiated stops. Without this, users can stay forever
+          // on "Returning to main meeting..." if RTK init/join fails or the roomJoined event is missed.
+          if (stopFlowTimeoutRef.current) clearTimeout(stopFlowTimeoutRef.current);
+          stopFlowTimeoutRef.current = window.setTimeout(() => {
+            const state = speedNetworkingStateRef.current;
+            const phase = speedNetworkingStopPhaseRef.current;
+            const stillReturning = ['stopping', 'rejoining_main'].includes(state) ||
+              ['stopping', 'leaving_lounge_room', 'requesting_main_join', 'rejoining_main'].includes(phase);
+
+            if (!stillReturning) return;
+
+            console.error(`[StopFlow:${transitionId}] ❌ TIMEOUT: main-room rejoin did not complete`);
+            speedNetworkingStopPhaseRef.current = 'error';
+            speedNetworkingStateRef.current = 'error';
+            setSpeedNetworkingState('error');
+            setLoadingJoin(false);
+            setJoinError('Reconnection timeout. Please click Retry or refresh the page.');
+          }, 20000);
+
           // If host-click flow already moved us to rejoining/joined, skip duplicate token work.
           if (existingTransitionId && ['rejoining_main', 'joined_main'].includes(speedNetworkingStateRef.current)) {
             console.log(`[StopFlow:${transitionId}] ✅ Already ${speedNetworkingStateRef.current}; skipping duplicate server stop transition`);
@@ -9350,21 +9402,35 @@ export default function NewLiveMeeting() {
                 await applyBreakoutTokenRef.current(null, null, null, null);
                 const loungeExitDuration = Date.now() - loungeExitPhaseStartTime;
                 console.log(`[StopFlow:${transitionId}] ✅ Left lounge room [phase: ${loungeExitDuration}ms | total: ${Date.now() - timestamp}ms]`);
-
+              } catch (e) {
+                // Do not stop here. Even if explicit lounge leave fails, request a fresh main token
+                // so the user has a recovery path back to the main meeting.
+                console.warn(`[StopFlow:${transitionId}] ⚠️ Error leaving lounge [total: ${Date.now() - timestamp}ms]:`, e?.message);
+              } finally {
                 setSpeedNetworkingState('rejoining_main');
+                speedNetworkingStateRef.current = 'rejoining_main';
+                speedNetworkingStopPhaseRef.current = 'requesting_main_join';
                 forceFreshMainTokenForStopFlow(transitionId).catch((err) => {
                   console.error(`[StopFlow:${transitionId}] ❌ Fresh token fetch failed after lounge exit:`, err?.message || err);
+                  speedNetworkingStopPhaseRef.current = 'error';
+                  speedNetworkingStateRef.current = 'error';
+                  setSpeedNetworkingState('error');
+                  setLoadingJoin(false);
                   setJoinError(err?.message || "Failed to refresh meeting token");
                 });
-              } catch (e) {
-                console.warn(`[StopFlow:${transitionId}] ⚠️ Error leaving lounge [total: ${Date.now() - timestamp}ms]:`, e?.message);
               }
             })();
           } else {
             // No lounge, directly request main (FAST PATH)
             setSpeedNetworkingState('rejoining_main');
+            speedNetworkingStateRef.current = 'rejoining_main';
+            speedNetworkingStopPhaseRef.current = 'requesting_main_join';
             forceFreshMainTokenForStopFlow(transitionId).catch((err) => {
               console.error(`[StopFlow:${transitionId}] ❌ Fresh token fetch failed (no lounge):`, err?.message || err);
+              speedNetworkingStopPhaseRef.current = 'error';
+              speedNetworkingStateRef.current = 'error';
+              setSpeedNetworkingState('error');
+              setLoadingJoin(false);
               setJoinError(err?.message || "Failed to refresh meeting token");
             });
           }
@@ -9454,18 +9520,26 @@ export default function NewLiveMeeting() {
           setLoungeCountdownValue(0);
 
           if (msg.transition === "to_main_room") {
-            // All users (including host) should return to main room.
-            setWaitingRoomActive(false);
-            setLoungeOpen(false);
-            setJoinMainRequested(true);
-            setHostChoseLoungeOnly(false);
-            setJoinRequestTick((v) => v + 1);
-            if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
-              applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
-                console.warn("[MainSocket] Failed to force return to main room after lounge_stopped:", e);
-              });
-            }
-            showSnackbar("You've been moved to the Main Room!", "success");
+            const returnJitterMs = Math.max(0, Number(msg.return_jitter_ms || 15000));
+            const returnDelayMs = Math.floor(Math.random() * returnJitterMs);
+
+            console.log(`[MainSocket] lounge_stopped -> to_main_room; applying return delay ${returnDelayMs}ms`);
+
+            window.setTimeout(() => {
+              setWaitingRoomActive(false);
+              setLoungeOpen(false);
+              setJoinMainRequested(true);
+              setHostChoseLoungeOnly(false);
+              setJoinRequestTick((v) => v + 1);
+
+              if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+                applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                  console.warn("[MainSocket] Failed to force return to main room after lounge_stopped:", e);
+                });
+              }
+
+              showSnackbar("You've been moved to the Main Room!", "success");
+            }, returnDelayMs);
           } else {
             // Moved to waiting room
             if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
@@ -10178,7 +10252,7 @@ export default function NewLiveMeeting() {
       }
     };
     poll();
-    const t = setInterval(poll, 5000);
+    const t = setInterval(poll, WAITING_ROOM_HOST_QUEUE_POLL_MS);
     return () => {
       alive = false;
       clearInterval(t);
@@ -10273,7 +10347,7 @@ export default function NewLiveMeeting() {
       }
     };
     poll();
-    const t = setInterval(poll, 5000);
+    const t = setInterval(poll, LOUNGE_PARTICIPANTS_POLL_MS);
     return () => {
       alive = false;
       clearInterval(t);
@@ -10862,6 +10936,34 @@ export default function NewLiveMeeting() {
     };
   }, [isInBreakoutRoom, mainRtkMeeting]);
 
+  const finishSpeedNetworkingStopFlowAfterMainJoin = useCallback((reason = 'main_joined') => {
+    const activeStopFlow = Boolean(stopFlowTransitionIdRef.current || stopFlowTransitionId) ||
+      ['stopping', 'rejoining_main'].includes(speedNetworkingStateRef.current) ||
+      ['stopping', 'leaving_lounge_room', 'requesting_main_join', 'rejoining_main'].includes(speedNetworkingStopPhaseRef.current);
+
+    if (!activeStopFlow) return;
+
+    const activeTransitionId = stopFlowTransitionIdRef.current || stopFlowTransitionId;
+    console.log(`[StopFlow:${activeTransitionId || 'unknown'}] ✅ Main room joined (${reason}); finishing stop-flow`);
+
+    speedNetworkingStopPhaseRef.current = 'joined_main';
+    setSpeedNetworkingState('idle');
+    speedNetworkingStateRef.current = 'idle';
+    setLoadingJoin(false);
+    setJoinError('');
+
+    if (stopFlowTimeoutRef.current) {
+      clearTimeout(stopFlowTimeoutRef.current);
+      stopFlowTimeoutRef.current = null;
+    }
+
+    if (activeTransitionId) {
+      setStopFlowTransitionId(null);
+      setStopFlowStartTimestamp(null);
+      stopFlowTransitionIdRef.current = null;
+    }
+  }, [stopFlowTransitionId]);
+
   // ---------- MUST join RTK room (custom UI doesn't auto-join) ----------
   useEffect(() => {
     if (!rtkMeeting?.self || !initDone) {
@@ -10879,31 +10981,7 @@ export default function NewLiveMeeting() {
     console.log("[LiveMeeting] ✅ Join effect triggered! rtkMeeting.self exists and initDone is true");
 
     const onRoomJoined = async () => {
-      // ✅ NEW: Mark stop flow as successfully joined
-      if (speedNetworkingStopPhaseRef.current !== 'joined_main') {
-        console.log(`[StopFlow] Room joined, marking as completed`);
-        speedNetworkingStopPhaseRef.current = 'joined_main';
-        setSpeedNetworkingState('joined_main');
-        speedNetworkingStateRef.current = 'joined_main';
-
-        // Clear timeout since we succeeded
-        if (stopFlowTimeoutRef.current) {
-          clearTimeout(stopFlowTimeoutRef.current);
-          stopFlowTimeoutRef.current = null;
-        }
-
-        // Clear stop flow ID so new stops can happen
-        if (stopFlowTransitionId) {
-          console.log(`[StopFlow:${stopFlowTransitionId}] ✅ COMPLETED`);
-          setStopFlowTransitionId(null);
-          setStopFlowStartTimestamp(null);
-          stopFlowTransitionIdRef.current = null;
-        }
-
-        // Reset to idle now that main room is active
-        setSpeedNetworkingState('idle');
-        speedNetworkingStateRef.current = 'idle';
-      }
+      finishSpeedNetworkingStopFlowAfterMainJoin('roomJoined event');
 
       console.log("[LiveMeeting] ✅ roomJoined event received!");
       setRoomJoined(true);
@@ -11007,10 +11085,12 @@ export default function NewLiveMeeting() {
     };
     rtkMeeting.self.on?.("roomJoined", onRoomJoined);
 
-    // refresh case
+    // refresh case: the SDK can already be joined before our listener is attached.
+    // Treat this as a successful main-room join too, otherwise the stop screen can stay forever.
     if (rtkMeeting.self.roomJoined) {
       setRoomJoined(true);
       setLiveCriticalReady(true);
+      finishSpeedNetworkingStopFlowAfterMainJoin('already roomJoined before listener');
     }
 
     (async () => {
@@ -11064,6 +11144,12 @@ export default function NewLiveMeeting() {
         console.log("[LiveMeeting] Calling rtkMeeting.joinRoom()...");
         await rtkMeeting.joinRoom?.();
         console.log("[LiveMeeting] ✅ joinRoom() completed successfully!");
+
+        // Some RTK clients resolve joinRoom() without firing roomJoined again.
+        // Do not keep the Speed Networking stop overlay waiting for an event that may be missed.
+        setRoomJoined(true);
+        setLiveCriticalReady(true);
+        finishSpeedNetworkingStopFlowAfterMainJoin('joinRoom resolved');
       } catch (e) {
         console.error("[LiveMeeting] ❌ joinRoom failed:", e?.message || e);
 
@@ -11112,7 +11198,7 @@ export default function NewLiveMeeting() {
     return () => {
       rtkMeeting.self.off?.("roomJoined", onRoomJoined);
     };
-  }, [rtkMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick, eventData?.lounge_enabled_speed_networking, networkingSessionId, loungeOpen, speedNetworkingState, stopFlowTransitionId]);
+  }, [rtkMeeting, ensureVideoInputReady, forceSelfAudioOffAtMediaLevel, initDone, dbStatus, role, isBreakout, isOnBreak, speedNetworkingRejoinTick, eventData?.lounge_enabled_speed_networking, networkingSessionId, loungeOpen, speedNetworkingState, stopFlowTransitionId, finishSpeedNetworkingStopFlowAfterMainJoin]);
 
   // On lounge/breakout -> main transition, some SDKs recreate audio senders asynchronously.
   // Keep forcing hard mute briefly while mic UI is OFF to prevent ghost audio transmission.
@@ -25144,8 +25230,9 @@ export default function NewLiveMeeting() {
         <Tooltip title="Networking" placement="left" arrow>
           <IconButton
             onClick={() => {
+              // Open the panel only. User can join from inside SpeedNetworkingZone.
+              // This avoids parent + child duplicate /join/ calls.
               setShowSpeedNetworking(true);
-              checkAndAutoJoinSpeedNetworking({ force: true });
             }}
             sx={{
               width: 44,
@@ -29336,11 +29423,13 @@ export default function NewLiveMeeting() {
           open={showNetworkingPrompt && !isGuest}
           sessionData={sessionStartNotification}
           onJoinNetworking={() => {
-            console.log("[Modal] Redirecting to Speed Networking screen and auto-joining queue");
+            console.log("[Modal] Opening Speed Networking screen; SpeedNetworkingZone will auto-join once");
             setShowNetworkingPrompt(false);
+
+            // This trigger is passed to SpeedNetworkingZone as autoJoinOnOpen.
+            // Only SpeedNetworkingZone should call /join/.
             setSpeedNetworkingAutoJoinTrigger(Date.now());
             setShowSpeedNetworking(true);
-            checkAndAutoJoinSpeedNetworking({ force: true });
           }}
           onJoinLounge={() => {
             setShowNetworkingPrompt(false);

@@ -171,7 +171,7 @@ export default function SpeedNetworkingControls({
     };
 
     const handleStartSession = async () => {
-        if (!session) return;
+        if (!session || loading) return;
 
         try {
             setLoading(true);
@@ -181,13 +181,25 @@ export default function SpeedNetworkingControls({
                 headers: authHeader()
             });
 
-            if (!res.ok) throw new Error('Failed to start session');
+            const data = await res.json().catch(() => ({}));
 
-            if (onSessionUpdated) onSessionUpdated();
-            setLoading(false);
+            if (!res.ok) {
+                const message = data.detail || data.error || 'Failed to start session';
+
+                // If the first request already started it and a duplicate/retry came back, refresh UI instead of showing a false failure.
+                if (res.status === 400 && /already active|not in pending/i.test(String(message))) {
+                    if (onSessionUpdated) await onSessionUpdated();
+                    return;
+                }
+
+                throw new Error(message);
+            }
+
+            if (onSessionUpdated) await onSessionUpdated();
         } catch (err) {
             console.error('[SpeedNetworking] Error starting session:', err);
-            alert('Failed to start session');
+            alert(err?.message || 'Failed to start session');
+        } finally {
             setLoading(false);
         }
     };

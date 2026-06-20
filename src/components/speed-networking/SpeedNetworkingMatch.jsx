@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Typography, Button, LinearProgress, Collapse, Chip, Avatar, Divider, IconButton, TextField, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, Stack } from '@mui/material';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
@@ -56,7 +56,10 @@ const rtkStyles = `
     }
 `;
 
-const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
+const SPEED_NETWORKING_DM_PAGE_SIZE = Number(import.meta.env.VITE_SPEED_NETWORKING_DM_PAGE_SIZE || 30);
+const SPEED_NETWORKING_DM_ACTIVE_POLL_MS = Number(import.meta.env.VITE_SPEED_NETWORKING_DM_ACTIVE_POLL_MS || 30000);
+const SPEED_NETWORKING_DM_WS_FALLBACK_MS = Number(import.meta.env.VITE_SPEED_NETWORKING_DM_WS_FALLBACK_MS || 120000);
 const HIDDEN_SPEED_NETWORKING_CONTROLS = new Set([
     'rtk-chat-toggle',
     'rtk-polls-toggle',
@@ -71,9 +74,61 @@ function stripHiddenControls(items = []) {
     });
 }
 
+function getToken() {
+    return localStorage.getItem("guest_token")
+        || localStorage.getItem("access")
+        || localStorage.getItem("access_token")
+        || "";
+}
+
 function authHeader() {
-    const token = localStorage.getItem("access") || localStorage.getItem("access_token");
+    const token = getToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function toWsUrl(pathOrUrl) {
+    const token = getToken();
+    const root = API_ROOT.replace(/^http/i, "ws").replace(/\/api\/?$/, "");
+
+    let url;
+    try {
+        const parsed = new URL(pathOrUrl);
+        parsed.protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
+        url = parsed.toString();
+    } catch {
+        const rel = String(pathOrUrl).replace(/^\/+/, "");
+        url = `${root}/${rel}`.replace(/([^:]\/)\/+/g, "$1");
+    }
+
+    if (!token) return url;
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}token=${encodeURIComponent(token)}`;
+}
+
+function mergeMessagesById(existing = [], incoming = []) {
+    const map = new Map();
+    for (const msg of existing) {
+        if (msg?.id != null) map.set(String(msg.id), msg);
+    }
+    for (const msg of incoming) {
+        if (msg?.id != null) map.set(String(msg.id), msg);
+    }
+    return Array.from(map.values()).sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0));
+}
+
+function normalizeMessageCursorResponse(payload) {
+    const rows = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.results)
+            ? payload.results
+            : [];
+
+    return {
+        rows,
+        hasMore: Boolean(payload?.has_more),
+        oldestId: payload?.oldest_id ?? rows[0]?.id ?? null,
+        newestId: payload?.newest_id ?? rows[rows.length - 1]?.id ?? null,
+    };
 }
 
 export default function SpeedNetworkingMatch({
@@ -99,17 +154,31 @@ export default function SpeedNetworkingMatch({
     const [chatMessages, setChatMessages] = useState([]);
     const [chatInput, setChatInput] = useState('');
     const [chatSending, setChatSending] = useState(false);
+    const [chatHasOlder, setChatHasOlder] = useState(false);
+    const [chatLoadingOlder, setChatLoadingOlder] = useState(false);
+    const [chatError, setChatError] = useState('');
     const [showVirtualBgDialog, setShowVirtualBgDialog] = useState(false);
     const [virtualBgSelection, setVirtualBgSelection] = useState(() => loadStoredBackgroundSelection());
     const [virtualBgError, setVirtualBgError] = useState('');
     const [virtualBgSupported, setVirtualBgSupported] = useState(true);
+    const chatListRef = useRef(null);
     const chatBottomRef = useRef(null);
+    const chatWsRef = useRef(null);
+    const chatWsConnectedRef = useRef(false);
+    const chatFetchInFlightRef = useRef(false);
+    const chatOlderInFlightRef = useRef(false);
+    const chatMessagesRef = useRef([]);
+    const chatFallbackLastFetchRef = useRef(0);
     const autoAdvanceTriggeredRef = useRef(false);
     const matchStartMsRef = useRef(Date.now());
     const speedNetworkingUiConfigRef = useRef(null);
     const virtualBgReadyRef = useRef(false);
     const virtualBgMeetingRef = useRef(null);
     const virtualBgUploadInputRef = useRef(null);
+
+    useEffect(() => {
+        chatMessagesRef.current = chatMessages;
+    }, [chatMessages]);
 
     if (!speedNetworkingUiConfigRef.current) {
         // Start from RTK defaults and only remove the 4 requested controls.
@@ -405,30 +474,129 @@ export default function SpeedNetworkingMatch({
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const fetchChatMessages = async (conversationId) => {
-        if (!conversationId) return;
-        const url = `${API_ROOT}/messaging/conversations/${conversationId}/messages/`;
-        const res = await fetch(url, { headers: { ...authHeader(), Accept: 'application/json' } });
-        const data = await res.json().catch(() => []);
-        if (res.ok) {
-            setChatMessages(Array.isArray(data) ? data : []);
+    const isChatNearBottom = useCallback(() => {
+        const el = chatListRef.current;
+        if (!el) return true;
+        return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    }, []);
+
+    const scrollChatToBottom = useCallback((behavior = 'smooth') => {
+        requestAnimationFrame(() => {
+            chatBottomRef.current?.scrollIntoView({ behavior, block: 'end' });
+        });
+    }, []);
+
+    const fetchChatMessages = useCallback(async (
+        conversationId,
+        { beforeId = null, afterId = null, replace = false, scrollToLatest = false, limit = null } = {}
+    ) => {
+        if (!conversationId || chatFetchInFlightRef.current) return [];
+
+        chatFetchInFlightRef.current = true;
+        const listEl = chatListRef.current;
+        const previousScrollHeight = beforeId && listEl ? listEl.scrollHeight : 0;
+        const previousScrollTop = beforeId && listEl ? listEl.scrollTop : 0;
+
+        try {
+            const params = new URLSearchParams({
+                cursor: '1',
+                limit: String(limit ?? SPEED_NETWORKING_DM_PAGE_SIZE),
+            });
+            if (beforeId) params.set('before_id', String(beforeId));
+            if (afterId) params.set('after_id', String(afterId));
+
+            const url = `${API_ROOT}/messaging/conversations/${conversationId}/messages/?${params.toString()}`;
+            const res = await fetch(url, { headers: { ...authHeader(), Accept: 'application/json' } });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data?.detail || 'Failed to load chat messages.');
+            }
+
+            const { rows, hasMore } = normalizeMessageCursorResponse(data);
+
+            if (beforeId) {
+                if (rows.length) {
+                    setChatMessages((prev) => mergeMessagesById(rows, prev));
+                    requestAnimationFrame(() => {
+                        const currentEl = chatListRef.current;
+                        if (currentEl) {
+                            currentEl.scrollTop = currentEl.scrollHeight - previousScrollHeight + previousScrollTop;
+                        }
+                    });
+                }
+                setChatHasOlder(hasMore);
+                return rows;
+            }
+
+            if (afterId) {
+                if (rows.length) {
+                    const nearBottom = isChatNearBottom();
+                    setChatMessages((prev) => mergeMessagesById(prev, rows));
+                    if (nearBottom) scrollChatToBottom();
+                }
+                return rows;
+            }
+
+            setChatMessages((prev) => replace ? rows : mergeMessagesById(prev, rows));
+            setChatHasOlder(hasMore);
+            if (scrollToLatest) scrollChatToBottom('auto');
+            return rows;
+        } catch (error) {
+            setChatError(error?.message || 'Failed to load chat messages.');
+            return [];
+        } finally {
+            chatFetchInFlightRef.current = false;
         }
-    };
+    }, [isChatNearBottom, scrollChatToBottom]);
+
+    const loadOlderSpeedNetworkingMessages = useCallback(async () => {
+        if (!chatConversationId || !chatHasOlder || chatLoadingOlder || chatOlderInFlightRef.current) return;
+        const oldestId = chatMessages[0]?.id;
+        if (!oldestId) return;
+
+        chatOlderInFlightRef.current = true;
+        setChatLoadingOlder(true);
+        try {
+            await fetchChatMessages(chatConversationId, { beforeId: oldestId });
+        } finally {
+            chatOlderInFlightRef.current = false;
+            setChatLoadingOlder(false);
+        }
+    }, [chatConversationId, chatHasOlder, chatLoadingOlder, chatMessages, fetchChatMessages]);
+
+    const handleSpeedNetworkingChatScroll = useCallback(() => {
+        const el = chatListRef.current;
+        if (!el) return;
+        if (el.scrollTop <= 80) {
+            loadOlderSpeedNetworkingMessages();
+        }
+    }, [loadOlderSpeedNetworkingMessages]);
 
     const openSpeedNetworkingChat = async () => {
         if (!partner?.id) return;
         setChatOpen(true);
         setChatLoading(true);
+        setChatError('');
+        setChatConversationId(null);
+        setChatMessages([]);
+        setChatHasOlder(false);
         try {
             const res = await fetch(`${API_ROOT}/messaging/conversations/ensure-direct/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeader() },
-                body: JSON.stringify({ recipient_id: partner.id }),
+                body: JSON.stringify({
+                    recipient_id: partner.id,
+                    // Required for live-event non-friend DM permission.
+                    event_id: eventId || null,
+                }),
             });
             const data = await res.json().catch(() => null);
-            if (!res.ok || !data?.id) return;
+            if (!res.ok || !data?.id) {
+                setChatError(data?.detail || 'Unable to open private chat.');
+                return;
+            }
             setChatConversationId(data.id);
-            await fetchChatMessages(data.id);
+            await fetchChatMessages(data.id, { replace: true, scrollToLatest: true, limit: 10 });
         } finally {
             setChatLoading(false);
         }
@@ -438,28 +606,97 @@ export default function SpeedNetworkingMatch({
         const text = chatInput.trim();
         if (!text || !chatConversationId || chatSending) return;
         setChatSending(true);
+        setChatError('');
         try {
             const res = await fetch(`${API_ROOT}/messaging/conversations/${chatConversationId}/messages/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeader() },
                 body: JSON.stringify({ body: text, event_id: eventId || undefined }),
             });
-            if (!res.ok) return;
-            const msg = await res.json();
-            setChatMessages((prev) => [...prev, msg]);
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.detail || 'Failed to send message.');
+            }
+            setChatMessages((prev) => mergeMessagesById(prev, [data]));
             setChatInput('');
+            scrollChatToBottom();
+        } catch (error) {
+            setChatError(error?.message || 'Failed to send message.');
         } finally {
             setChatSending(false);
         }
     };
 
+    // Same low-load model as public chat: WebSocket first, HTTP only as fallback.
     useEffect(() => {
         if (!chatOpen || !chatConversationId) return;
+
+        let alive = true;
+        chatWsConnectedRef.current = false;
+
+        try {
+            const wsUrl = toWsUrl(`/ws/messaging/conversations/${chatConversationId}/`);
+            const ws = new WebSocket(wsUrl);
+            chatWsRef.current = ws;
+
+            ws.onopen = () => {
+                if (!alive) return;
+                chatWsConnectedRef.current = true;
+            };
+
+            ws.onmessage = (event) => {
+                if (!alive) return;
+                try {
+                    const data = JSON.parse(event.data);
+                    if (!data?.message) return;
+                    if (['message.created', 'message.edited', 'message.deleted'].includes(data.type)) {
+                        const nearBottom = isChatNearBottom();
+                        setChatMessages((prev) => mergeMessagesById(prev, [data.message]));
+                        if (nearBottom || String(data.message?.sender_id || '') === String(currentUserId || '')) {
+                            scrollChatToBottom();
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[SpeedNetworkingChat WS] parse error', error);
+                }
+            };
+
+            ws.onerror = () => {
+                chatWsConnectedRef.current = false;
+            };
+
+            ws.onclose = () => {
+                if (chatWsRef.current === ws) chatWsRef.current = null;
+                chatWsConnectedRef.current = false;
+            };
+        } catch {
+            chatWsRef.current = null;
+            chatWsConnectedRef.current = false;
+        }
+
         const poll = setInterval(() => {
-            fetchChatMessages(chatConversationId);
-        }, 3000);
-        return () => clearInterval(poll);
-    }, [chatOpen, chatConversationId]);
+            const now = Date.now();
+            const minDelay = chatWsConnectedRef.current
+                ? SPEED_NETWORKING_DM_WS_FALLBACK_MS
+                : SPEED_NETWORKING_DM_ACTIVE_POLL_MS;
+            if (now - chatFallbackLastFetchRef.current < minDelay) return;
+            chatFallbackLastFetchRef.current = now;
+
+            const currentMessages = chatMessagesRef.current || [];
+            const latestId = currentMessages[currentMessages.length - 1]?.id;
+            fetchChatMessages(chatConversationId, latestId ? { afterId: latestId } : {});
+        }, SPEED_NETWORKING_DM_ACTIVE_POLL_MS);
+
+        return () => {
+            alive = false;
+            clearInterval(poll);
+            chatWsConnectedRef.current = false;
+            if (chatWsRef.current) {
+                chatWsRef.current.close();
+                chatWsRef.current = null;
+            }
+        };
+    }, [chatOpen, chatConversationId, currentUserId, fetchChatMessages, isChatNearBottom, scrollChatToBottom]);
 
     useEffect(() => {
         if (!chatOpen) return;
@@ -761,7 +998,23 @@ export default function SpeedNetworkingMatch({
                             </IconButton>
                         </Box>
 
-                        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 2, py: 1.5 }}>
+                        <Box
+                            ref={chatListRef}
+                            onScroll={handleSpeedNetworkingChatScroll}
+                            sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 2, py: 1.5 }}
+                        >
+                            {chatLoadingOlder && (
+                                <Box sx={{ mb: 1.5, textAlign: 'center' }}>
+                                    <Typography sx={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                                        Loading older messages…
+                                    </Typography>
+                                </Box>
+                            )}
+                            {chatError && (
+                                <Typography color="error" sx={{ mb: 1, fontSize: 12 }}>
+                                    {chatError}
+                                </Typography>
+                            )}
                             {chatLoading ? (
                                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                                     <CircularProgress size={22} />
