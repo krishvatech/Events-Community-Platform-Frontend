@@ -9,6 +9,32 @@ import InterestSelector from './InterestSelector';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
+const SPEED_NETWORKING_SESSION_POLL_MS = Number(
+  import.meta.env.VITE_SPEED_NETWORKING_SESSION_POLL_MS || 15000
+);
+
+const SPEED_NETWORKING_MY_MATCH_POLL_MS = Number(
+  import.meta.env.VITE_SPEED_NETWORKING_MY_MATCH_POLL_MS || 8000
+);
+
+const SPEED_NETWORKING_MATCH_STATUS_POLL_MS = Number(
+  import.meta.env.VITE_SPEED_NETWORKING_MATCH_STATUS_POLL_MS || 15000
+);
+
+const SPEED_NETWORKING_POLL_JITTER_MS = Number(
+  import.meta.env.VITE_SPEED_NETWORKING_POLL_JITTER_MS || 5000
+);
+
+const SPEED_NETWORKING_RETURN_JITTER_MS = Number(
+  import.meta.env.VITE_SPEED_NETWORKING_RETURN_JITTER_MS || 15000
+);
+
+function withClientJitter(baseMs, jitterMs = SPEED_NETWORKING_POLL_JITTER_MS) {
+  const base = Math.max(1000, Number(baseMs) || 1000);
+  const jitter = Math.max(0, Number(jitterMs) || 0);
+  return base + Math.floor(Math.random() * jitter);
+}
+
 function authHeader() {
     const token = localStorage.getItem("access") || localStorage.getItem("access_token");
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -64,6 +90,14 @@ function matchIncludesUser(match, userId) {
     return p1 === me || p2 === me;
 }
 
+function isAbortLikeError(err) {
+    const text = String(err?.message || err || '').toLowerCase();
+    return err?.name === 'AbortError'
+        || text.includes('aborted')
+        || text.includes('signal is aborted')
+        || text.includes('request timeout');
+}
+
 function isGuestNotSupportedError(errorText) {
     const text = String(errorText || '').toLowerCase();
     return text.includes('guest_not_supported') || text.includes('registered users only');
@@ -109,6 +143,7 @@ export default function SpeedNetworkingZone({
     const sessionPollInFlightRef = useRef(false);
     const matchStatusPollInFlightRef = useRef(false);
     const autoJoinAttemptedRef = useRef(false);
+    const endNavigationTimeoutRef = useRef(null);
 
     // Helper to normalize speed networking user shape to member info shape
     const buildMemberObj = (user) => {
@@ -190,6 +225,13 @@ export default function SpeedNetworkingZone({
             setSession(activeSession);
             setLoading(false);
         } catch (err) {
+            if (isAbortLikeError(err)) {
+                // Abort/timeout can happen during live room token switches or backend join bursts.
+                // It is transient and should not replace the whole Speed Networking UI with an error screen.
+                console.warn('[SpeedNetworking] Session fetch aborted/timed out; keeping current UI and retrying on next poll.', err?.message || err);
+                setLoading(false);
+                return;
+            }
             console.error('[SpeedNetworking] Error fetching session:', err);
             setError(err.message);
             setLoading(false);
@@ -300,7 +342,28 @@ export default function SpeedNetworkingZone({
         // Session started
         else if (normalizedType === 'speed_networking_session_started') {
             console.log("[SpeedNetworking] Session started");
-            // Will be picked up by polling mechanism
+            const startedSession = {
+                id: messageData.session_id || session?.id,
+                name: messageData.session_name || session?.name || 'Speed Networking',
+                status: 'ACTIVE',
+                duration_minutes: messageData.duration_minutes ?? session?.duration_minutes ?? 3,
+                buffer_seconds: messageData.buffer_seconds ?? session?.buffer_seconds ?? 0,
+                queue_count: messageData.queue_count ?? session?.queue_count ?? 0,
+                active_matches_count: messageData.active_matches_count ?? session?.active_matches_count ?? 0,
+            };
+
+            // Update immediately. Do not wait for the next poll, because the list endpoint is cached.
+            setSession(prev => ({ ...(prev || {}), ...startedSession }));
+            setCurrentMatch(null);
+            setTransitionMatch(null);
+            setInQueue(false);
+            setError(null);
+            setLoading(false);
+
+            // Then fetch the authoritative session after a small client-side jitter.
+            window.setTimeout(() => {
+                fetchActiveSession();
+            }, Math.floor(Math.random() * 1500));
         }
         // Queue update
         else if (normalizedType === 'speed_networking_queue_update') {
@@ -465,25 +528,43 @@ export default function SpeedNetworkingZone({
 
         // OPTIMIZATION: Increased from 2s to 10s to handle 100+ concurrent users
         // WebSocket notifications handle real-time updates; polling is just fallback
-        const interval = setInterval(checkMatchStatus, 10000);  // 10 seconds instead of 2
+        const interval = setInterval(
+          checkMatchStatus,
+          withClientJitter(SPEED_NETWORKING_MATCH_STATUS_POLL_MS)
+        );
         return () => clearInterval(interval);
     }, [currentMatch, session, eventId]);
 
-    // When session ends, immediately clear queue and match states
+    // When session ends, stagger return/navigation to avoid burst load
     useEffect(() => {
-        if (session && session.status === 'ENDED') {
-            setCurrentMatch(null);
-            setTransitionMatch(null);
-            setInQueue(false);
-            if (exitNavigation?.target !== 'speed_networking_exit_options') {
-                (async () => {
-                    const navigation = await fetchNavigationState();
-                    if (navigation) {
-                        applyNavigationDecision(navigation);
-                    }
-                })();
-            }
+        if (!session || session.status !== 'ENDED') return;
+
+        setCurrentMatch(null);
+        setTransitionMatch(null);
+        setInQueue(false);
+
+        if (exitNavigation?.target === 'speed_networking_exit_options') return;
+
+        if (endNavigationTimeoutRef.current) {
+            window.clearTimeout(endNavigationTimeoutRef.current);
         }
+
+        const delayMs = Math.floor(Math.random() * SPEED_NETWORKING_RETURN_JITTER_MS);
+        console.log(`[SpeedNetworking] Session ended; delaying return/navigation by ${delayMs}ms`);
+
+        endNavigationTimeoutRef.current = window.setTimeout(async () => {
+            const navigation = await fetchNavigationState();
+            if (navigation) {
+                applyNavigationDecision(navigation);
+            }
+        }, delayMs);
+
+        return () => {
+            if (endNavigationTimeoutRef.current) {
+                window.clearTimeout(endNavigationTimeoutRef.current);
+                endNavigationTimeoutRef.current = null;
+            }
+        };
     }, [session?.status, fetchNavigationState, applyNavigationDecision, exitNavigation?.target]);
 
     const fetchMyMatch = useCallback(async () => {
@@ -575,6 +656,11 @@ export default function SpeedNetworkingZone({
             }
             setLoading(false);
         } catch (err) {
+            if (isAbortLikeError(err)) {
+                console.warn('[SpeedNetworking] Join queue request aborted/timed out; keeping user in lobby.', err?.message || err);
+                setLoading(false);
+                return;
+            }
             console.error('[SpeedNetworking] Error joining queue:', err);
             setError(err.message);
             setLoading(false);
@@ -652,6 +738,10 @@ export default function SpeedNetworkingZone({
                 applyNavigationDecision(data.navigation);
             }
         } catch (err) {
+            if (isAbortLikeError(err)) {
+                console.warn('[SpeedNetworking] Leave queue request aborted/timed out; ignoring transient error.', err?.message || err);
+                return;
+            }
             console.error('[SpeedNetworking] Error leaving queue:', err);
             setError(err.message);
         }
@@ -696,6 +786,11 @@ export default function SpeedNetworkingZone({
 
             setLoading(false);
         } catch (err) {
+            if (isAbortLikeError(err)) {
+                console.warn('[SpeedNetworking] Next-match request aborted/timed out; continuing queue poll.', err?.message || err);
+                setLoading(false);
+                return;
+            }
             console.error('[SpeedNetworking] Error getting next match:', err);
             setError(err.message);
             setLoading(false);
@@ -719,8 +814,8 @@ export default function SpeedNetworkingZone({
         let timeoutId;
         let cancelled = false;
         let backoffMs = 0;
-        const minPollMs = 3500;
-        const maxPollMs = 20000;
+        const minPollMs = SPEED_NETWORKING_MY_MATCH_POLL_MS;
+        const maxPollMs = Math.max(20000, SPEED_NETWORKING_MY_MATCH_POLL_MS * 3);
 
         const scheduleNext = (delayMs) => {
             if (cancelled) return;
@@ -748,8 +843,8 @@ export default function SpeedNetworkingZone({
             scheduleNext(minPollMs);
         };
 
-        // Fast first check, then adaptive polling.
-        scheduleNext(250);
+        // Do not let every browser hit my-match at the same millisecond.
+        scheduleNext(withClientJitter(1000, 4000));
 
         return () => {
             cancelled = true;
@@ -839,11 +934,15 @@ export default function SpeedNetworkingZone({
                     }
                 }
             } catch (err) {
-                console.error('[SpeedNetworking] Error polling session status:', err);
+                if (!isAbortLikeError(err)) {
+                    console.error('[SpeedNetworking] Error polling session status:', err);
+                } else {
+                    console.debug('[SpeedNetworking] Session poll aborted/timed out; will retry on next poll.');
+                }
             } finally {
                 sessionPollInFlightRef.current = false;
             }
-        }, 2000); // Fast fallback so participants exit speed networking quickly even if WS event is missed.
+        }, withClientJitter(SPEED_NETWORKING_SESSION_POLL_MS));
 
         return () => clearInterval(pollInterval);
     }, [session?.id, eventId]);
