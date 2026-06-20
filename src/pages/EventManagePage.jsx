@@ -902,14 +902,17 @@ export default function EventManagePage() {
 
   const openCreateDiscount = () => {
     setEditingDiscount(null);
+    const defaultChannel = saleorChannels.find(c => c.slug === "default-channel");
+    const eventStartDate = event?.start_time ? dayjs(event.start_time).subtract(15, "days").format("YYYY-MM-DD") : "";
+    const eventEndDate = event?.end_time ? dayjs(event.end_time).format("YYYY-MM-DD") : "";
     setDiscountForm({
       name: "",
       description: "",
-      channel_id: "",
+      channel_id: defaultChannel?.id || "",
       reward_value_type: "PERCENTAGE",
       reward_value: "",
-      start_date: "",
-      end_date: "",
+      start_date: eventStartDate,
+      end_date: eventEndDate,
       badge_label: "early_bird"
     });
     setDiscountDialogOpen(true);
