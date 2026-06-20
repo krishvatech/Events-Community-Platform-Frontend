@@ -6713,6 +6713,18 @@ export default function EventManagePage() {
                   </Box>
 
                   <Box sx={{ p: 2, borderRadius: 2, bgcolor: "rgba(15, 118, 110, 0.08)", border: "1px solid rgba(15, 118, 110, 0.16)" }}>
+                    {parseFloat(markPaidDialogOrder.discount_amount || 0) > 0 && (
+                      <>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: "text.secondary" }}>Subtotal</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{money(markPaidDialogOrder.subtotal, markPaidDialogOrder.currency)}</Typography>
+                        </Stack>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, pb: 1.5, borderBottom: "1px solid rgba(15, 118, 110, 0.16)" }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: "text.secondary" }}>Discount applied</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: "error.main" }}>-{money(markPaidDialogOrder.discount_amount, markPaidDialogOrder.currency)}</Typography>
+                        </Stack>
+                      </>
+                    )}
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" sx={{ fontWeight: 800 }}>Full order total</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 900 }}>{money(markPaidDialogOrder.total, markPaidDialogOrder.currency)}</Typography>

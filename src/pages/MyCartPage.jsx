@@ -497,6 +497,8 @@ export default function MyCartPage() {
         created: o.created || o.created_at || o.ordered_at,
         status: o.status || o.payment_status || "paid",
         total: Number(o.total || o.total_amount || o.amount || 0),
+        subtotal: Number(o.subtotal || o.total || 0),
+        discount_amount: Number(o.discount_amount || 0),
         invoice: o.invoice || null,
         items: rawItems.map((oi) => ({
           id: oi.id,
@@ -1464,13 +1466,23 @@ export default function MyCartPage() {
 
               <Box
                 sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
                   pt: 2,
                   borderTop: "1px solid #e5e7eb",
                 }}
               >
+                {parseFloat(selectedOrder.discount_amount || 0) > 0 && (
+                  <Box sx={{ mb: 1.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Typography variant="body2" sx={{ color: "text.secondary" }}>Subtotal:</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>{fmt(selectedOrder.subtotal)}</Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Typography variant="body2" sx={{ color: "text.secondary" }}>Discount:</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: "#ef4444" }}>-{fmt(selectedOrder.discount_amount)}</Typography>
+                    </Box>
+                  </Box>
+                )}
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "text.secondary" }}>
                   Order Total:
                 </Typography>
@@ -1480,6 +1492,7 @@ export default function MyCartPage() {
                 >
                   {fmt(selectedOrder.total)}
                 </Typography>
+                </Box>
               </Box>
             </Box>
           )}
