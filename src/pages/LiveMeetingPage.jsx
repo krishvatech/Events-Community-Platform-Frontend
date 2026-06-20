@@ -27691,7 +27691,6 @@ export default function NewLiveMeeting() {
                     py: 1,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
                     gap: { xs: 0.75, sm: 1.5 },
                     mx: "auto",
                     maxWidth: { xs: "calc(100vw - 24px)", sm: "auto" },
