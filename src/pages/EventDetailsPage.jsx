@@ -1418,8 +1418,10 @@ export default function EventDetailsPage() {
     window.addEventListener("focus", handleFocus);
     window.addEventListener("storage", handleStorage);
     const intervalId = window.setInterval(() => {
+      // Avoid unnecessary background API load when the event tab is not visible.
+      if (document.hidden) return;
       refreshEventFromServer();
-    }, 10000);
+    }, 30000);
 
     return () => {
       window.removeEventListener("focus", handleFocus);

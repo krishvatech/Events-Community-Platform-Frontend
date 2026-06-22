@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -34,10 +34,17 @@ function getToken() {
     return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
 }
 
-// Add cache-busting query parameter for URLs that need fresh data
-function addCacheBust(url) {
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}_cb=${Date.now()}`;
+function mergeMatches(incoming, previous = []) {
+    const map = new Map();
+    [...previous, ...incoming].forEach((match) => {
+        if (!match || match.match_id === null || match.match_id === undefined) return;
+        map.set(String(match.match_id), match);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+        const aTime = a?.ended_at ? new Date(a.ended_at).getTime() : 0;
+        const bTime = b?.ended_at ? new Date(b.ended_at).getTime() : 0;
+        return bTime - aTime;
+    });
 }
 
 export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
@@ -49,37 +56,83 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
     const [selectedTab, setSelectedTab] = useState('all');
     const [historyHidden, setHistoryHidden] = useState(false);
 
+    const hasLoadedOnceRef = useRef(false);
+    const fetchInFlightRef = useRef(false);
+    const refreshTimerRef = useRef(null);
+
     // State to track friend request status for each match partner
     const [friendStatusMap, setFriendStatusMap] = useState({}); // { [userId]: 'none' | 'pending_outgoing' | 'friends' }
 
-    const mergeMatches = (incoming, previous = []) => {
-        const map = new Map();
-        [...previous, ...incoming].forEach((match) => {
-            if (!match || match.match_id === null || match.match_id === undefined) return;
-            map.set(String(match.match_id), match);
-        });
-        return Array.from(map.values()).sort((a, b) => {
-            const aTime = a?.ended_at ? new Date(a.ended_at).getTime() : 0;
-            const bTime = b?.ended_at ? new Date(b.ended_at).getTime() : 0;
-            return bTime - aTime;
-        });
-    };
+    const fetchUserMatches = useCallback(async ({ showInitialLoader = false } = {}) => {
+        if (!sessionId) {
+            setLoading(false);
+            return;
+        }
 
-    // Poll for past matches every 5 seconds to detect completed matches
+        // Avoid overlapping requests when websocket and fallback timer fire close together.
+        if (fetchInFlightRef.current) return;
+        fetchInFlightRef.current = true;
+
+        const shouldShowFullLoader = showInitialLoader && !hasLoadedOnceRef.current;
+        if (shouldShowFullLoader) {
+            setLoading(true);
+        }
+
+        try {
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/${sessionId}/user-matches/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, {
+                headers: authHeader(),
+                cache: 'no-store',
+            });
+
+            if (res.status === 403) {
+                setHistoryHidden(true);
+                return;
+            }
+
+            if (!res.ok) {
+                throw new Error('Failed to fetch matches');
+            }
+
+            const data = await res.json();
+            setMatches(prev => mergeMatches(data.matches || [], prev));
+            setSessionName(data.session_name || '');
+            setError(null);
+        } catch (err) {
+            console.error('[MatchHistory] Error fetching matches:', err);
+            // Keep the already-rendered history visible during background refresh failures.
+            if (!hasLoadedOnceRef.current) {
+                setError(err.message);
+            }
+        } finally {
+            hasLoadedOnceRef.current = true;
+            fetchInFlightRef.current = false;
+            setLoading(false);
+        }
+    }, [eventId, sessionId]);
+
+    const scheduleBackgroundRefresh = useCallback(() => {
+        if (refreshTimerRef.current) return;
+        refreshTimerRef.current = setTimeout(() => {
+            refreshTimerRef.current = null;
+            fetchUserMatches({ showInitialLoader: false });
+        }, 500);
+    }, [fetchUserMatches]);
+
+    // Initial fetch + low-frequency fallback polling. WebSocket handles instant updates;
+    // the timer is only a safety net and does not show the full-page loader.
     useEffect(() => {
         if (!sessionId || !eventId || historyHidden) return;
 
-        // Initial fetch
-        fetchUserMatches();
+        fetchUserMatches({ showInitialLoader: true });
 
-        // Poll every 5 seconds when session is active
         const interval = setInterval(() => {
-            console.log("[MatchHistory] Polling for updated past matches...");
-            fetchUserMatches();
-        }, 5000);
+            if (document.hidden) return;
+            fetchUserMatches({ showInitialLoader: false });
+        }, 30000);
 
         return () => clearInterval(interval);
-    }, [eventId, sessionId, historyHidden]);
+    }, [eventId, sessionId, historyHidden, fetchUserMatches]);
 
     useEffect(() => {
         if (!sessionId || !eventId || historyHidden) return;
@@ -94,10 +147,6 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
             const wsUrl = `${WS_ROOT}/ws/events/${eventId}/${qs}`.replace(/([^:]\/)\/+/g, "$1");
             ws = new WebSocket(wsUrl);
 
-            ws.onopen = () => {
-                fetchUserMatches();
-            };
-
             ws.onmessage = (event) => {
                 try {
                     const msg = JSON.parse(event.data);
@@ -109,8 +158,9 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                         if (!data.match) return;
                         setMatches(prev => mergeMatches([data.match], prev));
                     } else if (normalizedType === 'speed_networking_match_ended') {
-                        // Fallback consistency: pull latest persisted match list.
-                        fetchUserMatches();
+                        if (Number(data.session_id) !== Number(sessionId)) return;
+                        // Coalesce repeated events into one silent refresh.
+                        scheduleBackgroundRefresh();
                     }
                 } catch (err) {
                     console.error('[MatchHistory] Failed to process WS message:', err);
@@ -119,7 +169,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
             ws.onclose = () => {
                 if (closedByCleanup) return;
-                reconnectTimer = setTimeout(connect, 1500);
+                reconnectTimer = setTimeout(connect, 5000);
             };
         };
 
@@ -128,49 +178,15 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
         return () => {
             closedByCleanup = true;
             if (reconnectTimer) clearTimeout(reconnectTimer);
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current);
+                refreshTimerRef.current = null;
+            }
             if (ws && ws.readyState <= WebSocket.OPEN) {
                 ws.close();
             }
         };
-    }, [eventId, sessionId]);
-
-    const fetchUserMatches = async () => {
-        if (!sessionId) {
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setLoading(true);
-            let url = `${API_ROOT}/events/${eventId}/speed-networking/${sessionId}/user-matches/`.replace(/([^:]\/)\/+/g, "$1");
-            url = addCacheBust(url); // Add cache-bust for fresh match data
-            const res = await fetch(url, { headers: authHeader() });
-
-            if (res.status === 403) {
-                setHistoryHidden(true);
-                setLoading(false);
-                return;
-            }
-
-            if (!res.ok) {
-                throw new Error('Failed to fetch matches');
-            }
-
-            const data = await res.json();
-            setMatches(prev => mergeMatches(data.matches || [], prev));
-            setSessionName(data.session_name || '');
-
-            // Optimistically checking friend status if available in data, otherwise defaults to 'none'
-            // Using a simple effect to load status could be better but let's init map first
-            // Note: The backend response might need to include friend status for this to be perfect on load.
-            // For now, we assume 'none' and let the user click connect.
-        } catch (err) {
-            console.error('[MatchHistory] Error fetching matches:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [eventId, sessionId, historyHidden, scheduleBackgroundRefresh]);
 
     // Logic to send friend request
     const handleConnect = async (partnerId) => {
@@ -231,6 +247,10 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
         if (!Number.isFinite(score)) return null;
         return Math.max(0, Math.min(100, score));
     };
+
+    if (historyHidden) {
+        return null;
+    }
 
     if (loading) {
         return (

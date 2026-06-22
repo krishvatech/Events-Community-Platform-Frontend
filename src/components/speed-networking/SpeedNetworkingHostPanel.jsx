@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     Box,
     Typography,
@@ -104,6 +104,20 @@ function addCacheBust(url) {
     return `${url}${separator}_cb=${Date.now()}`;
 }
 
+function getDisplayName(user, fallback = 'Participant') {
+    if (!user) return fallback;
+
+    const fullName =
+        user.full_name ||
+        [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+
+    return fullName || user.username || user.email || fallback;
+}
+
+function getUserInitial(user, fallback = 'P') {
+    return getDisplayName(user, fallback).charAt(0).toUpperCase();
+}
+
 // OPTIMIZATION: Fetch with timeout for host panel
 async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
     const controller = new AbortController();
@@ -131,11 +145,13 @@ export default function SpeedNetworkingHostPanel({
     const [queueEntries, setQueueEntries] = useState([]);
     const [pastMatches, setPastMatches] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [backgroundRefreshing, setBackgroundRefreshing] = useState(false);
     const [expanded, setExpanded] = useState(true);
     const [removing, setRemoving] = useState(null);
     const [selectedTab, setSelectedTab] = useState('waiting');
     const [criteriaConfig, setCriteriaConfig] = useState(null);
     const [savingCriteria, setSavingCriteria] = useState(false);
+    const [criteriaDirty, setCriteriaDirty] = useState(false);
     const [matchPreview, setMatchPreview] = useState(null);
     const [loadingPreview, setLoadingPreview] = useState(false);
     const [testUserAId, setTestUserAId] = useState(null);
@@ -150,6 +166,12 @@ export default function SpeedNetworkingHostPanel({
     const fetchInFlightRef = useRef(false);
     const fetchQueuedRef = useRef(false);
     const refreshTimerRef = useRef(null);
+    const hasLoadedOnceRef = useRef(false);
+    const selectedTabRef = useRef(selectedTab);
+
+    useEffect(() => {
+        selectedTabRef.current = selectedTab;
+    }, [selectedTab]);
 
     const mergePastMatches = (incoming, previous = []) => {
         const map = new Map();
@@ -168,55 +190,61 @@ export default function SpeedNetworkingHostPanel({
 
     const fetchQueue = useCallback(async () => {
         if (!session?.id) {
-            console.log('[HostPanel] fetchQueue: session.id not available');
             return;
         }
         if (fetchInFlightRef.current) {
             fetchQueuedRef.current = true;
             return;
         }
+
+        const isInitialLoad = !hasLoadedOnceRef.current;
+        const shouldFetchPastMatches = isInitialLoad || selectedTabRef.current === 'past';
+
         fetchInFlightRef.current = true;
         try {
-            setLoading(true);
+            if (isInitialLoad) {
+                setLoading(true);
+            } else {
+                setBackgroundRefreshing(true);
+            }
+
             let queueUrl = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/queue/`.replace(/([^:]\/)\/+/g, "$1");
             let sessionUrl = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/`.replace(/([^:]\/)\/+/g, "$1");
             queueUrl = addCacheBust(queueUrl);
             sessionUrl = addCacheBust(sessionUrl);
 
-            console.log('[HostPanel] Fetching queue and session data at', new Date().toISOString());
+            const queuePromise = fetch(queueUrl, { headers: authHeader(), cache: 'no-store' });
+            const sessionPromise = shouldFetchPastMatches
+                ? fetch(sessionUrl, { headers: authHeader(), cache: 'no-store' })
+                : Promise.resolve(null);
 
-            // Fetch both queue entries and full session data (which includes all matches)
-            const [queueRes, sessionRes] = await Promise.all([
-                fetch(queueUrl, { headers: authHeader(), cache: 'no-store' }),
-                fetch(sessionUrl, { headers: authHeader(), cache: 'no-store' })
-            ]);
+            const [queueRes, sessionRes] = await Promise.all([queuePromise, sessionPromise]);
 
             if (queueRes.ok) {
                 const queueData = await queueRes.json();
-                console.log('[HostPanel] Queue fetch successful! Got', queueData.length, 'entries at', new Date().toISOString());
                 setQueueEntries(queueData);
             } else {
                 console.error('[HostPanel] Queue fetch failed with status:', queueRes.status);
             }
 
-            // Extract past matches from the full session data
-            if (sessionRes.ok) {
+            if (shouldFetchPastMatches && sessionRes?.ok) {
                 const sessionData = await sessionRes.json();
-                console.log('[HostPanel] Session fetch successful! Got matches:', sessionData.matches);
-
                 if (sessionData.matches && Array.isArray(sessionData.matches)) {
-                    const past = sessionData.matches.filter(m => m.status === 'COMPLETED' || m.status === 'SKIPPED');
-                    console.log('[HostPanel] Extracted', past.length, 'past matches');
+                    const past = sessionData.matches.filter(
+                        m => m.status === 'COMPLETED' || m.status === 'SKIPPED'
+                    );
                     setPastMatches(prev => mergePastMatches(past, prev));
                 }
-            } else {
+            } else if (shouldFetchPastMatches && sessionRes && !sessionRes.ok) {
                 console.error('[HostPanel] Session fetch failed with status:', sessionRes.status);
             }
         } catch (err) {
             console.error('[HostPanel] Error fetching data:', err);
         } finally {
             fetchInFlightRef.current = false;
+            hasLoadedOnceRef.current = true;
             setLoading(false);
+            setBackgroundRefreshing(false);
             if (fetchQueuedRef.current) {
                 fetchQueuedRef.current = false;
                 fetchQueue();
@@ -229,19 +257,12 @@ export default function SpeedNetworkingHostPanel({
         fetchQueue();
     }, [fetchQueue]);
 
-    // Refetch when queue updates via WebSocket
+    // Refetch when queue updates via WebSocket. Debounce bursts so one
+    // match operation creates at most one silent background fetch on host UI.
     useEffect(() => {
-        if (!lastMessage) {
-            console.log('[HostPanel] lastMessage is null, skipping');
-            return;
-        }
-        const messageType = lastMessage.type;
-        console.log('[HostPanel] Received WebSocket message:', {
-            type: messageType,
-            data: lastMessage.data,
-            timestamp: new Date().toISOString()
-        });
+        if (!lastMessage) return;
 
+        const messageType = lastMessage.type;
         const shouldRefresh =
             messageType === 'speed_networking_queue_update' ||
             messageType === 'speed_networking.queue_update' ||
@@ -258,18 +279,12 @@ export default function SpeedNetworkingHostPanel({
         }
 
         if (shouldRefresh) {
-            console.log('[HostPanel] Queue update message matched! Fetching queue...');
-            // OPTIMIZATION: Single fetch with delay instead of double fetch
-            // Remove the double 100ms and 800ms delay pattern that was causing excessive API calls
             if (refreshTimerRef.current) {
                 clearTimeout(refreshTimerRef.current);
             }
             refreshTimerRef.current = setTimeout(() => {
-                console.log('[HostPanel] Calling fetchQueue() after 300ms delay');
                 fetchQueue();
             }, 300);
-        } else {
-            console.log('[HostPanel] Message type does not match. Expected "speed_networking_queue_update", got:', messageType);
         }
     }, [lastMessage, fetchQueue]);
 
@@ -311,7 +326,7 @@ export default function SpeedNetworkingHostPanel({
             if (res.ok) {
                 const sessionData = await res.json();
                 setCriteriaConfig(sessionData.criteria_config);
-                console.log('[HostPanel] Fetched criteria config:', sessionData.criteria_config);
+                setCriteriaDirty(false);
             }
         } catch (err) {
             console.error('[HostPanel] Error fetching criteria config:', err);
@@ -323,12 +338,10 @@ export default function SpeedNetworkingHostPanel({
         try {
             setLoadingPreview(true);
             const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/match_preview/`.replace(/([^:]\/)\/+/g, "$1");
-            console.log('[HostPanel] Fetching match preview from:', url);
             const res = await fetch(url, { headers: authHeader() });
             if (res.ok) {
                 const data = await res.json();
                 setMatchPreview(data);
-                console.log('[HostPanel] Match preview received:', data);
             } else {
                 const errorData = await res.json().catch(() => ({}));
                 console.error('[HostPanel] API error:', res.status, errorData);
@@ -367,8 +380,8 @@ export default function SpeedNetworkingHostPanel({
                 body: JSON.stringify({ criteria_config: normalizedConfig })
             });
             if (res.ok) {
-                console.log('[HostPanel] Criteria saved successfully');
                 setCriteriaConfig(normalizedConfig);
+                setCriteriaDirty(false);
                 await fetchMatchPreview();
                 return true;
             } else {
@@ -405,6 +418,7 @@ export default function SpeedNetworkingHostPanel({
             };
         });
         setCriteriaConfig(normalized);
+        setCriteriaDirty(true);
     };
 
     const handleTestMatchScore = async () => {
@@ -423,7 +437,6 @@ export default function SpeedNetworkingHostPanel({
             if (res.ok) {
                 const data = await res.json();
                 setTestMatchResult(data);
-                console.log('[HostPanel] Test match score result:', data);
             } else {
                 const errorData = await res.json().catch(() => ({}));
                 console.error('[HostPanel] Failed to test match score:', errorData);
@@ -476,7 +489,7 @@ export default function SpeedNetworkingHostPanel({
                     body: JSON.stringify({ criteria_config: normalizeCriteriaConfig(tempCriteriaConfig) })
                 });
                 if (res.ok) {
-                    console.log('[HostPanel] Wizard criteria saved successfully');
+                    setCriteriaDirty(false);
                     await fetchMatchPreview();
                 } else {
                     const errorData = await res.json();
@@ -503,35 +516,36 @@ export default function SpeedNetworkingHostPanel({
         }
     }, [selectedTab]);  // FIXED: Removed queueEntries from dependency array
 
+    // Past matches are loaded lazily. Only fetch the full session payload when
+    // the host opens the Past Matches tab, not on every queue refresh.
+    useEffect(() => {
+        if (selectedTab === 'past' && hasLoadedOnceRef.current) {
+            fetchQueue();
+        }
+    }, [selectedTab, fetchQueue]);
+
     // Calculate stats
-    const waitingCount = queueEntries.filter(e => !e.current_match).length;
-    const matchedCount = queueEntries.filter(e => e.current_match).length;
+    const waitingEntries = useMemo(
+        () => queueEntries.filter(e => !e.current_match),
+        [queueEntries]
+    );
+    const waitingCount = waitingEntries.length;
 
     // Get matched pairs (only ACTIVE matches, not SKIPPED or COMPLETED)
-    const matchedPairs = [];
-    const seenMatches = new Set();
-    queueEntries.forEach(entry => {
-        console.log('[HostPanel] Queue entry:', {
-            userId: entry.user?.id,
-            userName: entry.user?.first_name || entry.user?.username,
-            hasMatch: !!entry.current_match,
-            matchStatus: entry.current_match?.status,
-            matchId: entry.current_match?.id
+    const matchedPairs = useMemo(() => {
+        const pairs = [];
+        const seenMatches = new Set();
+
+        queueEntries.forEach(entry => {
+            const match = entry.current_match;
+            if (match && match.status === 'ACTIVE' && !seenMatches.has(match.id)) {
+                seenMatches.add(match.id);
+                pairs.push(match);
+            }
         });
 
-        if (entry.current_match && entry.current_match.status === 'ACTIVE' && !seenMatches.has(entry.current_match.id)) {
-            seenMatches.add(entry.current_match.id);
-            matchedPairs.push(entry.current_match);
-        }
-    });
-
-    console.log('[HostPanel] Calculated stats:', {
-        totalEntries: queueEntries.length,
-        waitingCount,
-        matchedCount,
-        matchedPairsCount: matchedPairs.length,
-        pastMatchesCount: pastMatches.length
-    });
+        return pairs;
+    }, [queueEntries]);
 
     return (
         <Box sx={{
@@ -554,6 +568,9 @@ export default function SpeedNetworkingHostPanel({
                     <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>
                         Queue Management
                     </Typography>
+                    {backgroundRefreshing && !loading && (
+                        <CircularProgress size={14} sx={{ color: 'rgba(255,255,255,0.55)' }} />
+                    )}
                 </Box>
                 <IconButton
                     size="small"
@@ -607,7 +624,7 @@ export default function SpeedNetworkingHostPanel({
                                 <>
                                     {waitingCount > 0 ? (
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                            {queueEntries.filter(e => !e.current_match).map((entry) => (
+                                            {waitingEntries.map((entry) => (
                                                 <Box
                                                     key={entry.id}
                                                     sx={{
@@ -637,10 +654,10 @@ export default function SpeedNetworkingHostPanel({
                                                     >
                                                         <Avatar
                                                             src={entry.user?.avatar_url}
-                                                            alt={entry.user?.first_name}
+                                                            alt={getDisplayName(entry.user, 'User')}
                                                             sx={{ width: 32, height: 32 }}
                                                         >
-                                                            {entry.user?.first_name?.charAt(0) || 'U'}
+                                                            {getUserInitial(entry.user, 'U')}
                                                         </Avatar>
                                                         <Box sx={{ flex: 1, minWidth: 0 }}>
                                                             <Typography sx={{
@@ -651,7 +668,7 @@ export default function SpeedNetworkingHostPanel({
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis'
                                                             }}>
-                                                                {entry.user?.first_name || entry.user?.username}
+                                                                {getDisplayName(entry.user, 'User')}
                                                             </Typography>
                                                             <Typography sx={{
                                                                 color: 'rgba(255,255,255,0.5)',
@@ -713,24 +730,6 @@ export default function SpeedNetworkingHostPanel({
                                                         border: '1px solid rgba(34,197,94,0.3)'
                                                     }}
                                                 >
-                                                    {/* Config Version Indicator */}
-                                                    {match.config_version !== undefined && session?.config_version !== undefined && (
-                                                        <Box sx={{ mb: 1 }}>
-                                                            <Chip
-                                                                label={
-                                                                    match.config_version === session.config_version
-                                                                        ? 'Current Config'
-                                                                        : `Old Config (v${match.config_version})`
-                                                                }
-                                                                color={match.config_version === session.config_version ? 'success' : 'warning'}
-                                                                size="small"
-                                                                sx={{
-                                                                    height: 24,
-                                                                    fontSize: 11
-                                                                }}
-                                                            />
-                                                        </Box>
-                                                    )}
                                                     <Box sx={{
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -755,10 +754,10 @@ export default function SpeedNetworkingHostPanel({
                                                             }}
                                                         >
                                                             <Avatar
-                                                                alt={match.participant_1?.first_name}
+                                                                alt={getDisplayName(match.participant_1)}
                                                                 sx={{ width: 28, height: 28 }}
                                                             >
-                                                                {match.participant_1?.first_name?.charAt(0) || 'P'}
+                                                                {getUserInitial(match.participant_1)}
                                                             </Avatar>
                                                             <Typography sx={{
                                                                 color: '#fff',
@@ -767,7 +766,7 @@ export default function SpeedNetworkingHostPanel({
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis'
                                                             }}>
-                                                                {match.participant_1?.first_name || match.participant_1?.username}
+                                                                {getDisplayName(match.participant_1)}
                                                             </Typography>
                                                         </Box>
 
@@ -806,13 +805,13 @@ export default function SpeedNetworkingHostPanel({
                                                                 textOverflow: 'ellipsis',
                                                                 textAlign: 'right'
                                                             }}>
-                                                                {match.participant_2?.first_name || match.participant_2?.username}
+                                                                {getDisplayName(match.participant_2)}
                                                             </Typography>
                                                             <Avatar
-                                                                alt={match.participant_2?.first_name}
+                                                                alt={getDisplayName(match.participant_2)}
                                                                 sx={{ width: 28, height: 28 }}
                                                             >
-                                                                {match.participant_2?.first_name?.charAt(0) || 'P'}
+                                                                {getUserInitial(match.participant_2)}
                                                             </Avatar>
                                                         </Box>
                                                     </Box>
@@ -907,10 +906,10 @@ export default function SpeedNetworkingHostPanel({
                                                             }}
                                                         >
                                                             <Avatar
-                                                                alt={match.participant_1?.first_name}
+                                                                alt={getDisplayName(match.participant_1)}
                                                                 sx={{ width: 28, height: 28 }}
                                                             >
-                                                                {match.participant_1?.first_name?.charAt(0) || 'P'}
+                                                                {getUserInitial(match.participant_1)}
                                                             </Avatar>
                                                             <Typography sx={{
                                                                 color: '#fff',
@@ -919,7 +918,7 @@ export default function SpeedNetworkingHostPanel({
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis'
                                                             }}>
-                                                                {match.participant_1?.first_name || match.participant_1?.username}
+                                                                {getDisplayName(match.participant_1)}
                                                             </Typography>
                                                         </Box>
 
@@ -958,13 +957,13 @@ export default function SpeedNetworkingHostPanel({
                                                                 textOverflow: 'ellipsis',
                                                                 textAlign: 'right'
                                                             }}>
-                                                                {match.participant_2?.first_name || match.participant_2?.username}
+                                                                {getDisplayName(match.participant_2)}
                                                             </Typography>
                                                             <Avatar
-                                                                alt={match.participant_2?.first_name}
+                                                                alt={getDisplayName(match.participant_2)}
                                                                 sx={{ width: 28, height: 28 }}
                                                             >
-                                                                {match.participant_2?.first_name?.charAt(0) || 'P'}
+                                                                {getUserInitial(match.participant_2)}
                                                             </Avatar>
                                                         </Box>
                                                     </Box>
@@ -1015,11 +1014,11 @@ export default function SpeedNetworkingHostPanel({
                                         <Autocomplete
                                             options={queueEntries.filter(e => !e.current_match).map(e => ({
                                                 id: e.user.id,
-                                                label: `${e.user.first_name || e.user.username}`,
+                                                label: getDisplayName(e.user, 'User'),
                                                 user: e.user
                                             }))}
                                             getOptionLabel={(option) => option.label}
-                                            value={testUserAId ? { id: testUserAId, label: queueEntries.find(e => e.user.id === testUserAId)?.user?.first_name || 'User A' } : null}
+                                            value={testUserAId ? { id: testUserAId, label: getDisplayName(queueEntries.find(e => e.user.id === testUserAId)?.user, 'User A') } : null}
                                             onChange={(e, value) => setTestUserAId(value?.id || null)}
                                             renderInput={(params) => (
                                                 <TextField
@@ -1045,7 +1044,7 @@ export default function SpeedNetworkingHostPanel({
                                                 user: e.user
                                             }))}
                                             getOptionLabel={(option) => option.label}
-                                            value={testUserBId ? { id: testUserBId, label: queueEntries.find(e => e.user.id === testUserBId)?.user?.first_name || 'User B' } : null}
+                                            value={testUserBId ? { id: testUserBId, label: getDisplayName(queueEntries.find(e => e.user.id === testUserBId)?.user, 'User B') } : null}
                                             onChange={(e, value) => setTestUserBId(value?.id || null)}
                                             renderInput={(params) => (
                                                 <TextField
@@ -1247,6 +1246,17 @@ export default function SpeedNetworkingHostPanel({
                             {/* Settings Tab */}
                             {selectedTab === 'settings' && (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <Alert severity={criteriaDirty ? 'warning' : 'info'} sx={{
+                                        bgcolor: criteriaDirty ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)',
+                                        borderColor: criteriaDirty ? 'rgba(245,158,11,0.3)' : 'rgba(59,130,246,0.3)'
+                                    }}>
+                                        <Typography sx={{ fontSize: 12, color: '#fff' }}>
+                                            {criteriaDirty
+                                                ? 'Unsaved changes. Click Save when ready. Active matches stay connected; saved settings apply to future matches.'
+                                                : 'Settings are live-safe. Current active matches stay connected; future matches use the latest saved settings.'}
+                                        </Typography>
+                                    </Alert>
+
                                     {/* Interest Tags Manager */}
                                     <InterestTagManager
                                         eventId={eventId}
@@ -1262,12 +1272,11 @@ export default function SpeedNetworkingHostPanel({
                                             config={criteriaConfig}
                                             onUpdate={(newConfig) => {
                                                 setCriteriaConfig(newConfig);
-                                                handleSaveCriteria(newConfig);
+                                                setCriteriaDirty(true);
                                             }}
                                             onOpenInterestManager={() => {
                                                 // You can add a ref to InterestTagManager or trigger it via a state
                                                 // For now, this will be a callback placeholder
-                                                console.log('Open Interest Manager');
                                             }}
                                         />
                                     )}
@@ -1356,6 +1365,7 @@ export default function SpeedNetworkingHostPanel({
                                                                 const newConfig = { ...criteriaConfig };
                                                                 newConfig.random_factor = newValue / 100;
                                                                 setCriteriaConfig(newConfig);
+                                                                setCriteriaDirty(true);
                                                             }}
                                                             min={0}
                                                             max={30}
@@ -1391,6 +1401,7 @@ export default function SpeedNetworkingHostPanel({
                                                                     const newConfig = { ...criteriaConfig };
                                                                     newConfig.prefer_new_users = e.target.checked;
                                                                     setCriteriaConfig(newConfig);
+                                                                    setCriteriaDirty(true);
                                                                 }}
                                                                 size="small"
                                                             />
@@ -1435,7 +1446,7 @@ export default function SpeedNetworkingHostPanel({
                                                         '&:hover': { bgcolor: '#16a34a' }
                                                     }}
                                                 >
-                                                    {savingCriteria ? <CircularProgress size={20} /> : 'Save'}
+                                                    {savingCriteria ? <CircularProgress size={20} /> : (criteriaDirty ? 'Save Changes' : 'Save')}
                                                 </Button>
                                             </Box>
 
