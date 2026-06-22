@@ -2257,6 +2257,7 @@ export default function EventsPage() {
   const [error, setError] = useState("");
   const [locationOptionsCache, setLocationOptionsCache] = useState([]);
   const [total, setTotal] = useState(0);
+  const [eventCountFromAPI, setEventCountFromAPI] = useState(0);
   const [searchDebouncedValue, setSearchDebouncedValue] = useState(""); // Debounced search
   const CATEGORIES_URL = `${EVENTS_URL}categories/`; // /api/events/categories/
   const [categories, setCategories] = useState([]);
@@ -2987,8 +2988,7 @@ export default function EventsPage() {
         });
 
         setRawEvents(filtered);
-        // Total is the sum of regular events (from backend) and total pinned events (pre-fetched)
-        setTotal(Number(data.count ?? filtered.length) + pinnedEvents.length);
+        setEventCountFromAPI(Number(data.count ?? filtered.length));
       } catch (e) {
         if (e.name !== "AbortError") setError(String(e?.message || e));
       } finally {
@@ -3071,6 +3071,11 @@ export default function EventsPage() {
     })();
     return () => controller.abort();
   }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId]);
+
+  // Recalculate total whenever event count from API or pinned events change
+  useEffect(() => {
+    setTotal(eventCountFromAPI + pinnedEvents.length);
+  }, [eventCountFromAPI, pinnedEvents]);
 
   // Fetch replay events only when on replays tab
   useEffect(() => {
@@ -3399,7 +3404,7 @@ export default function EventsPage() {
   // Regular events needed to fill remaining slots
   const remainingSlots = PAGE_SIZE - displayedPinnedEvents.length;
 
-  events.forEach((ev) => {
+  (events || []).forEach((ev) => {
     // Skip if already have enough events for this page
     if (eventsToDisplay.length >= remainingSlots) {
       return;
