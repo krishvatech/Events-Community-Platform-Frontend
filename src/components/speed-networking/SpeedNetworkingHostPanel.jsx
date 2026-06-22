@@ -47,6 +47,53 @@ import CollapsibleMatchingCriteria from './CollapsibleMatchingCriteria';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
+const DEFAULT_CRITERIA_NUMBERS = {
+    skill: { weight: 0.35, threshold: 40 },
+    experience: { weight: 0.30, threshold: 50 },
+    location: { weight: 0.20, threshold: 30 },
+    education: { weight: 0.15, threshold: 40 },
+    interests: { weight: 0, threshold: 50 },
+};
+
+function isReactEvent(value) {
+    return Boolean(
+        value &&
+        typeof value === 'object' &&
+        (typeof value.preventDefault === 'function' ||
+            Object.prototype.hasOwnProperty.call(value, 'nativeEvent')) &&
+        Object.prototype.hasOwnProperty.call(value, 'target')
+    );
+}
+
+function normalizeCriteriaConfig(config = {}) {
+    const next = { ...config };
+
+    Object.entries(DEFAULT_CRITERIA_NUMBERS).forEach(([key, defaults]) => {
+        if (!next[key]) return;
+
+        const rawWeight = Number(next[key].weight);
+        const rawThreshold = Number(next[key].threshold);
+
+        next[key] = {
+            ...next[key],
+            enabled: Boolean(next[key].enabled),
+            weight: Number.isFinite(rawWeight) ? rawWeight : defaults.weight,
+            threshold: Number.isFinite(rawThreshold) ? rawThreshold : defaults.threshold,
+        };
+    });
+
+    if (next.random_factor !== undefined) {
+        const rawRandomFactor = Number(next.random_factor);
+        next.random_factor = Number.isFinite(rawRandomFactor) ? rawRandomFactor : 0.1;
+    }
+
+    if (next.prefer_new_users !== undefined) {
+        next.prefer_new_users = Boolean(next.prefer_new_users);
+    }
+
+    return next;
+}
+
 function authHeader() {
     const token = localStorage.getItem("access") || localStorage.getItem("access_token");
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -295,28 +342,45 @@ export default function SpeedNetworkingHostPanel({
         }
     };
 
-    const handleSaveCriteria = async () => {
-        if (!session?.id || !criteriaConfig) return;
+    const handleSaveCriteria = async (overrideConfig = null) => {
+        // MUI Button passes the click event as the first argument when this handler
+        // is used as onClick={handleSaveCriteria}. Do not treat that event as
+        // criteria config, because it contains DOM/React Fiber circular references
+        // and JSON.stringify will fail with "Converting circular structure to JSON".
+        if (isReactEvent(overrideConfig)) {
+            overrideConfig.preventDefault?.();
+            overrideConfig.stopPropagation?.();
+            overrideConfig = null;
+        }
+
+        const sourceConfig = overrideConfig || criteriaConfig;
+        if (!session?.id || !sourceConfig) return false;
+
+        const normalizedConfig = normalizeCriteriaConfig(sourceConfig);
+
         try {
             setSavingCriteria(true);
             const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/update_criteria/`.replace(/([^:]\/)\/+/g, "$1");
             const res = await fetch(url, {
                 method: 'PATCH',
                 headers: { ...authHeader(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ criteria_config: criteriaConfig })
+                body: JSON.stringify({ criteria_config: normalizedConfig })
             });
             if (res.ok) {
                 console.log('[HostPanel] Criteria saved successfully');
-                // Refresh preview after saving
+                setCriteriaConfig(normalizedConfig);
                 await fetchMatchPreview();
+                return true;
             } else {
-                const errorData = await res.json();
+                const errorData = await res.json().catch(() => ({}));
                 console.error('[HostPanel] Failed to save criteria:', errorData);
                 alert('Failed to save criteria: ' + (errorData.error || 'Unknown error'));
+                return false;
             }
         } catch (err) {
             console.error('[HostPanel] Error saving criteria:', err);
             alert('Error saving criteria: ' + err.message);
+            return false;
         } finally {
             setSavingCriteria(false);
         }
@@ -409,7 +473,7 @@ export default function SpeedNetworkingHostPanel({
                 const res = await fetch(url, {
                     method: 'PATCH',
                     headers: { ...authHeader(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ criteria_config: tempCriteriaConfig })
+                    body: JSON.stringify({ criteria_config: normalizeCriteriaConfig(tempCriteriaConfig) })
                 });
                 if (res.ok) {
                     console.log('[HostPanel] Wizard criteria saved successfully');
@@ -1362,7 +1426,7 @@ export default function SpeedNetworkingHostPanel({
                                                 </Button>
                                                 <Button
                                                     variant="contained"
-                                                    onClick={handleSaveCriteria}
+                                                    onClick={() => handleSaveCriteria()}
                                                     disabled={savingCriteria}
                                                     sx={{
                                                         bgcolor: '#22c55e',

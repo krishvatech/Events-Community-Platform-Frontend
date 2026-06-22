@@ -110,6 +110,26 @@ function getFriendlyErrorMessage(errorText) {
     return String(errorText || 'Something went wrong.');
 }
 
+
+function speedNetworkingRestoreKey(eventId) {
+    return `speed-networking-active:${eventId}`;
+}
+
+function rememberSpeedNetworkingFlow(eventId, sessionId) {
+    if (!eventId || !sessionId) return;
+    try {
+        localStorage.setItem(speedNetworkingRestoreKey(eventId), JSON.stringify({
+            session_id: sessionId,
+            ts: Date.now(),
+        }));
+    } catch (_) {}
+}
+
+function clearRememberedSpeedNetworkingFlow(eventId) {
+    if (!eventId) return;
+    try { localStorage.removeItem(speedNetworkingRestoreKey(eventId)); } catch (_) {}
+}
+
 export default function SpeedNetworkingZone({
     eventId,
     isAdmin,
@@ -432,6 +452,8 @@ export default function SpeedNetworkingZone({
             setInQueue(false);
             setCurrentMatch(null);
             setTransitionMatch(null);
+
+            clearRememberedSpeedNetworkingFlow(eventId);
             return;
         }
 
@@ -494,18 +516,17 @@ export default function SpeedNetworkingZone({
                     headers: authHeader()
                 });
 
-                if (res.status === 404 || res.status === 400) {
-                    // Match ended or user no longer in queue
-                    console.log("[SpeedNetworking] Match ended (detected via polling)");
-                    setCurrentMatch(null);
-                    setTransitionMatch(null);
-                    setInQueue(true);
-                    return;
-                }
-
                 if (!res.ok) return;
 
                 const data = await res.json();
+
+                if (data?.status === 'not_in_queue') {
+                    console.log("[SpeedNetworking] User is not in speed queue");
+                    setCurrentMatch(null);
+                    setTransitionMatch(null);
+                    setInQueue(false);
+                    return;
+                }
 
                 // If we got a different match, our current match must have ended
                 if (data.id && data.id !== currentMatch.id) {
@@ -542,6 +563,8 @@ export default function SpeedNetworkingZone({
         setCurrentMatch(null);
         setTransitionMatch(null);
         setInQueue(false);
+
+        clearRememberedSpeedNetworkingFlow(eventId);
 
         if (exitNavigation?.target === 'speed_networking_exit_options') return;
 
@@ -582,10 +605,15 @@ export default function SpeedNetworkingZone({
                 signal: controller.signal
             });
 
-            if (res.status === 404 || res.status === 400) return { matched: false, error: false };
             if (!res.ok) return { matched: false, error: true };
 
             const data = await res.json();
+            if (data?.status === 'not_in_queue') {
+                setInQueue(false);
+                setCurrentMatch(null);
+                setTransitionMatch(null);
+                return { matched: false, error: false, notInQueue: true };
+            }
             if (!data?.id) return { matched: false, error: false };
 
             if (isInBufferWindow(data, session) && (session.buffer_seconds || 0) > 0) {
@@ -690,8 +718,13 @@ export default function SpeedNetworkingZone({
         if (!session) return;
         setExitNavigation(null);
 
-        // Only show interest selector if interest matching is enabled in criteria_config
-        const interestMatchingEnabled = session.criteria_config?.interest_based?.enabled;
+        // Only show interest selector if interest matching is enabled in criteria_config.
+        // Backend stores the current config under `interests`; keep legacy
+        // `interest_based` support for old sessions.
+        const interestMatchingEnabled = Boolean(
+            session.criteria_config?.interests?.enabled ||
+            session.criteria_config?.interest_based?.enabled
+        );
         if (!interestMatchingEnabled) {
             handleJoinQueueWithInterests([]);
             return;
@@ -867,6 +900,15 @@ export default function SpeedNetworkingZone({
         const inNetworkingFlow = mode !== 'idle';
         onNetworkingStateChange({ mode, inNetworkingFlow });
     }, [currentMatch, inQueue, onNetworkingStateChange, transitionMatch]);
+
+    // Persist only users who are already inside Speed Networking/queue so refresh can restore
+    // the full-screen networking modal without auto-opening it for every event attendee.
+    useEffect(() => {
+        if (!eventId || !session?.id) return;
+        if (currentMatch || transitionMatch || inQueue) {
+            rememberSpeedNetworkingFlow(eventId, session.id);
+        }
+    }, [eventId, session?.id, currentMatch, transitionMatch, inQueue]);
 
     useEffect(() => {
         if (!autoJoinOnOpen || !session || session.status !== 'ACTIVE') return;

@@ -116,6 +116,38 @@ function mergeMessagesById(existing = [], incoming = []) {
     return Array.from(map.values()).sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0));
 }
 
+
+function collectionToArray(collection) {
+    if (!collection) return [];
+    if (Array.isArray(collection)) return collection;
+    if (typeof collection.toArray === 'function') return collection.toArray();
+    if (Array.isArray(collection.participants)) return collection.participants;
+    if (typeof collection.values === 'function') return Array.from(collection.values());
+    return [];
+}
+
+function getRemoteParticipants(meeting) {
+    if (!meeting?.participants) return [];
+    const selfId = meeting?.self?.id != null ? String(meeting.self.id) : null;
+    const sources = [
+        meeting.participants.remoteParticipants,
+        meeting.participants.joined,
+        meeting.participants.joinedParticipants,
+        meeting.participants.active,
+    ];
+
+    const seen = new Map();
+    for (const source of sources) {
+        for (const participant of collectionToArray(source)) {
+            const id = participant?.id != null ? String(participant.id) : null;
+            if (!id || (selfId && id === selfId)) continue;
+            seen.set(id, participant);
+        }
+    }
+
+    return Array.from(seen.values());
+}
+
 function normalizeMessageCursorResponse(payload) {
     const rows = Array.isArray(payload)
         ? payload
@@ -238,21 +270,28 @@ export default function SpeedNetworkingMatch({
                 self: meeting.self?.id
             });
 
+            const syncRemotePresence = () => {
+                const remoteParticipants = getRemoteParticipants(meeting);
+                setHasRemoteParticipant(remoteParticipants.length > 0);
+                console.log("[SpeedNetworkingMatch] Remote participant sync:", {
+                    remoteCount: remoteParticipants.length,
+                    remoteIds: remoteParticipants.map((p) => p?.id),
+                    self: meeting.self?.id,
+                });
+            };
+
             // Listen for participant events
             const handleParticipantJoined = (event) => {
                 console.log("[SpeedNetworkingMatch] Participant joined:", event);
-                // Immediately update state when partner joins (don't wait for polling)
-                setHasRemoteParticipant(true);
+                syncRemotePresence();
             };
 
             const handleParticipantLeft = (event) => {
                 console.log("[SpeedNetworkingMatch] Participant left:", event);
-                // Check if any remote participants remain
-                const selfId = meeting?.self?.id != null ? String(meeting.self.id) : null;
-                const joined = (meeting.participants?.joined?.toArray?.() || meeting.participants?.joined?.participants || []);
-                const remoteExists = joined.some((p) => String(p?.id) !== selfId);
-                setHasRemoteParticipant(remoteExists);
+                syncRemotePresence();
             };
+
+            syncRemotePresence();
 
             if (meeting.participants) {
                 meeting.participants.on?.('participantJoined', handleParticipantJoined);
@@ -367,28 +406,18 @@ export default function SpeedNetworkingMatch({
         }
     };
 
-    // Track whether partner has actually joined the RTK room
+    // Track whether partner has actually joined the RTK room.
+    // RTK SDK versions expose participants in slightly different collections;
+    // read all known shapes so the "waiting for partner" banner does not get stuck
+    // when the remote participant is actually present.
     useEffect(() => {
         if (!meeting) {
             setHasRemoteParticipant(false);
             return;
         }
 
-        const getJoined = () => {
-            const joinedCollection = meeting.participants?.joined;
-            const arr =
-                typeof joinedCollection?.toArray === 'function'
-                    ? joinedCollection.toArray()
-                    : Array.isArray(joinedCollection?.participants)
-                        ? joinedCollection.participants
-                        : [];
-            return arr || [];
-        };
-
         const syncRemotePresence = () => {
-            const selfId = meeting?.self?.id != null ? String(meeting.self.id) : null;
-            const joined = getJoined();
-            const remoteExists = joined.some((p) => String(p?.id) !== selfId);
+            const remoteExists = getRemoteParticipants(meeting).length > 0;
             setHasRemoteParticipant(remoteExists);
         };
 

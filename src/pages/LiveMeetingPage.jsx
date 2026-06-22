@@ -11342,7 +11342,7 @@ export default function NewLiveMeeting() {
   const autoJoinCheckOnMountRef = useRef(false);
 
   // Helper function to check and auto-join Speed Networking
-  const checkAndAutoJoinSpeedNetworking = useCallback(async ({ force = false } = {}) => {
+  const checkAndAutoJoinSpeedNetworking = useCallback(async ({ force = false, joinIfMissing = true } = {}) => {
     // Do not auto-poll speed networking for every participant.
     // Only check when user opens the speed networking dialog or when WS event triggers it.
     if (!force) return;
@@ -11406,10 +11406,19 @@ export default function NewLiveMeeting() {
             });
 
             console.log('[LiveMeeting] Queue check response status:', checkRes.status);
+            const checkData = checkRes.ok ? await checkRes.json().catch(() => ({})) : {};
 
             // If user already has a queue entry/match, they'll be restored automatically
             // by SpeedNetworkingZone component. Only join if they don't have one.
-            if (checkRes.status === 404) {
+            if (checkRes.status === 404 || checkData?.status === 'not_in_queue') {
+              if (!joinIfMissing) {
+                console.log('[LiveMeeting] Remembered Speed Networking state is stale; not auto-joining.');
+                try { localStorage.removeItem(`speed-networking-active:${eventId}`); } catch (_) {}
+                setShowSpeedNetworking(false);
+                setSpeedNetworkingNotification(null);
+                return;
+              }
+
               // No existing queue entry, join now
               console.log('[LiveMeeting] No existing queue entry, attempting auto-join');
 
@@ -11436,7 +11445,7 @@ export default function NewLiveMeeting() {
                 setSpeedNetworkingNotification(null);
               }
             } else if (checkRes.ok) {
-              const existingQueue = await checkRes.json();
+              const existingQueue = checkData;
               console.log('[LiveMeeting] ✅ User has existing queue entry, restoring:', existingQueue);
               if (existingQueue.current_match) {
                 setSpeedNetworkingNotification('Restoring your active match...');
@@ -11465,6 +11474,34 @@ export default function NewLiveMeeting() {
   // Speed networking should open from user action or WebSocket session-start event.
   useEffect(() => {
   }, []);
+
+  // Restore only users who were already in Speed Networking before refresh.
+  // This is localStorage-gated, so it does not add polling/API load for all live-room users.
+  useEffect(() => {
+    if (!roomJoined || isGuest || !eventId) return;
+
+    let remembered = null;
+    try {
+      remembered = JSON.parse(localStorage.getItem(`speed-networking-active:${eventId}`) || 'null');
+    } catch (_) {
+      remembered = null;
+    }
+
+    if (!remembered?.session_id) return;
+
+    const maxRestoreAgeMs = Number(import.meta.env.VITE_SPEED_NETWORKING_RESTORE_MAX_AGE_MS || 6 * 60 * 60 * 1000);
+    if (remembered.ts && Date.now() - Number(remembered.ts) > maxRestoreAgeMs) {
+      try { localStorage.removeItem(`speed-networking-active:${eventId}`); } catch (_) {}
+      return;
+    }
+
+    const delayMs = Math.floor(Math.random() * Number(import.meta.env.VITE_SPEED_NETWORKING_RESTORE_JITTER_MS || 3000));
+    const timerId = window.setTimeout(() => {
+      checkAndAutoJoinSpeedNetworking({ force: true, joinIfMissing: false });
+    }, delayMs);
+
+    return () => window.clearTimeout(timerId);
+  }, [roomJoined, eventId, isGuest, checkAndAutoJoinSpeedNetworking]);
 
   // Keep local button state in sync with RTK actual state
 
