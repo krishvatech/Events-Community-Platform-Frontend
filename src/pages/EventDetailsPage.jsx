@@ -364,11 +364,11 @@ function PaymentPendingDetails({ registration, event }) {
   const currency = origin?.currency || assignedTier?.currency;
 
   return (
-    <Alert severity="warning" sx={{ my: 1.5 }}>
-      <Typography variant="subtitle2" fontWeight={800}>
-        Application approved — payment pending
+    <Alert severity="warning" sx={{ mt: 1, width: "100%" }}>
+      <Typography variant="body2">
+        Your application is approved. Payment is handled manually by the event team, so your registration will be confirmed after the payment is verified.
       </Typography>
-      {tierLabel && <Typography variant="body2">Assigned tier: {tierLabel}</Typography>}
+      {tierLabel && <Typography variant="body2" sx={{ mt: 0.75 }}>Assigned tier: {tierLabel}</Typography>}
       {price !== undefined && price !== null && (
         <Typography variant="body2">Amount due: {formatTierAmount(price, currency)}</Typography>
       )}
@@ -2113,7 +2113,10 @@ export default function EventDetailsPage() {
                   <Paper elevation={0} className="rounded-2xl border border-slate-200">
                     <Box className="p-5">
                       <Typography variant="h6" className="font-extrabold">Attend</Typography>
-                      <Typography variant="h5" className="font-bold text-teal-600 mt-1 mb-2">
+                      <Typography
+                        variant="h5"
+                        className={`font-bold mt-1 mb-2 ${paymentPending ? "text-amber-600" : "text-teal-600"}`}
+                      >
                         {isEventOwner
                           ? "You are the event host."
                           : paymentPending
@@ -2148,6 +2151,8 @@ export default function EventDetailsPage() {
                           >
                             Event Cancelled
                           </Button>
+                        ) : paymentPending ? (
+                          <PaymentPendingDetails registration={registration} event={event} />
                         ) : canShowActiveJoin && canJoinEventNow ? (
                           <Button
                             onClick={() => {
@@ -2199,12 +2204,7 @@ export default function EventDetailsPage() {
                           hasOpenApplicationTracks(event) ? (
                           <>
                             {paymentPending
-                              ? (
-                                <Stack spacing={1} alignItems="flex-start">
-                                  <Chip label="Payment Pending" color="warning" variant="outlined" sx={{ py: 2.5 }} />
-                                  <PaymentPendingDetails registration={registration} event={event} />
-                                </Stack>
-                              )
+                              ? <PaymentPendingDetails registration={registration} event={event} />
                               : (!myApplication || applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
                               ? (
                                 <>
@@ -2357,32 +2357,28 @@ export default function EventDetailsPage() {
                                       )
                                       : null
                             }
-                            {/* Payment Pending Status */}
+                            {/* Manual payment pending status from event.user_status. */}
                             {(() => {
                               const pendingStatus = getPaymentStatus(event);
                               return pendingStatus && !paymentPending ? (
-                                <Box sx={{ mt: 2, p: 2, backgroundColor: '#fff3e0', borderRadius: 1, border: '1px solid #ffe0b2' }}>
-                                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#e65100', mb: 1 }}>
+                                <Alert severity="warning" sx={{ mt: 2, width: '100%' }}>
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                                     Application Approved — Payment Pending
                                   </Typography>
-                                  <Typography variant="body2" sx={{ mb: 1 }}>
-                                    <strong>Assigned Tier:</strong> {pendingStatus.tier_label}
+                                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    Payment is handled manually by the event team. Your registration will be confirmed after the payment is verified.
                                   </Typography>
-                                  <Typography variant="body2" sx={{ mb: 2 }}>
-                                    <strong>Amount Due:</strong> {pendingStatus.currency} {pendingStatus.price}
-                                  </Typography>
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{ color: '#e65100', borderColor: '#e65100' }}
-                                    onClick={() => {
-                                      // TODO: Implement payment flow (redirect to payment processor)
-                                      toast.info("Payment feature coming soon");
-                                    }}
-                                  >
-                                    Complete Payment
-                                  </Button>
-                                </Box>
+                                  {pendingStatus.tier_label && (
+                                    <Typography variant="body2" sx={{ mt: 0.75 }}>
+                                      <strong>Assigned Tier:</strong> {pendingStatus.tier_label}
+                                    </Typography>
+                                  )}
+                                  {pendingStatus.price !== undefined && pendingStatus.price !== null && (
+                                    <Typography variant="body2">
+                                      <strong>Amount Due:</strong> {pendingStatus.currency} {pendingStatus.price}
+                                    </Typography>
+                                  )}
+                                </Alert>
                               ) : null;
                             })()
                             }
