@@ -332,8 +332,9 @@ export default function MyResourcesPage() {
                   setFilterType(e.target.value);
                   setPage(1);
                 }}
-                  displayEmpty>
-                  <MenuItem value="">Type</MenuItem>
+                  displayEmpty
+                  renderValue={(value) => value || 'All Types'}
+                >
                   <MenuItem value="file">File</MenuItem>
                   <MenuItem value="video">Video</MenuItem>
                   <MenuItem value="link">Link</MenuItem>
@@ -444,32 +445,30 @@ export default function MyResourcesPage() {
                           >
                             <ListItemIcon>{getResourceIcon(resource.type)}</ListItemIcon>
                             <ListItemText
-                              sx={{ pr: isMobile ? 0 : 2 }}
+                              sx={{ pr: isMobile ? 0 : 10 }}
                               primary={
                                 <Typography variant="body1" sx={{ fontWeight: 500, color: '#0ea5a4', '&:hover': { textDecoration: 'underline' } }}>
                                   {resource.title}
                                 </Typography>
                               }
                               secondary={
-                                <>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, minWidth: 0, width: '100%' }}>
                                   <Typography
                                     component="span"
                                     variant="body2"
                                     color="text.secondary"
                                     sx={{
-                                      display: "-webkit-box",
-                                      WebkitBoxOrient: "vertical",
-                                      WebkitLineClamp: 1,
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      wordBreak: "break-word",
+                                      flex: 1,
+                                      minWidth: 0,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
                                     }}
                                   >
                                     {resource.description || "No description"}
                                   </Typography>
-                                  <br />
-                                  <Typography component="span" variant="caption" color="text.secondary">Added {new Date(resource.created_at).toLocaleDateString()}</Typography>
-                                </>
+                                  <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>Added {new Date(resource.created_at).toLocaleDateString()}</Typography>
+                                </Box>
                               }
                             />
                           </ListItem>
