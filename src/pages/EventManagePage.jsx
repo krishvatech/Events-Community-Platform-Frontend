@@ -511,7 +511,7 @@ export default function EventManagePage() {
     location: { enabled: false, threshold: 50 },
     experience: { enabled: false, threshold: 50 },
     education: { enabled: false, threshold: 50 },
-    interest_based: {
+    interests: {
       enabled: false,
       match_mode: "complementary",
       tags: []
@@ -1650,7 +1650,7 @@ export default function EventManagePage() {
           location: { enabled: false, threshold: 50 },
           experience: { enabled: false, threshold: 50 },
           education: { enabled: false, threshold: 50 },
-          interest_based: { enabled: false, match_mode: "complementary", tags: [] }
+          interests: { enabled: false, match_mode: "complementary", tags: [] }
         });
       }
     }
@@ -5849,18 +5849,18 @@ export default function EventManagePage() {
               <FormControlLabel
                 control={
                   <Checkbox
-                    checked={criteriaConfig.interest_based.enabled}
+                    checked={criteriaConfig.interests.enabled}
                     onChange={(e) =>
                       setCriteriaConfig((prev) => ({
                         ...prev,
-                        interest_based: { ...prev.interest_based, enabled: e.target.checked }
+                        interests: { ...prev.interests, enabled: e.target.checked }
                       }))
                     }
                   />
                 }
                 label="Interest-Based Matching"
               />
-              {criteriaConfig.interest_based.enabled && (
+              {criteriaConfig.interests.enabled && (
                 <Box sx={{ ml: 4, mt: 1 }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", mb: 1, display: "block", fontWeight: 500 }}>
                     Match Mode
@@ -5870,20 +5870,20 @@ export default function EventManagePage() {
                       onClick={() =>
                         setCriteriaConfig((prev) => ({
                           ...prev,
-                          interest_based: { ...prev.interest_based, match_mode: "complementary" }
+                          interests: { ...prev.interests, match_mode: "complementary" }
                         }))
                       }
                       sx={{
                         p: 1.2,
                         border: "2px solid",
                         borderColor:
-                          criteriaConfig.interest_based.match_mode === "complementary"
+                          criteriaConfig.interests.match_mode === "complementary"
                             ? "#10b8a6"
                             : "divider",
                         borderRadius: 1,
                         cursor: "pointer",
                         backgroundColor:
-                          criteriaConfig.interest_based.match_mode === "complementary"
+                          criteriaConfig.interests.match_mode === "complementary"
                             ? "rgba(16, 184, 166, 0.05)"
                             : "transparent",
                         transition: "all 0.2s",
@@ -5894,7 +5894,7 @@ export default function EventManagePage() {
                       }}
                     >
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        {criteriaConfig.interest_based.match_mode === "complementary" ? (
+                        {criteriaConfig.interests.match_mode === "complementary" ? (
                           <Box sx={{ fontSize: 16 }}>👥</Box>
                         ) : (
                           <Box sx={{ fontSize: 16, opacity: 0.5 }}>👥</Box>
@@ -5914,20 +5914,20 @@ export default function EventManagePage() {
                       onClick={() =>
                         setCriteriaConfig((prev) => ({
                           ...prev,
-                          interest_based: { ...prev.interest_based, match_mode: "similar" }
+                          interests: { ...prev.interests, match_mode: "similar" }
                         }))
                       }
                       sx={{
                         p: 1.2,
                         border: "2px solid",
                         borderColor:
-                          criteriaConfig.interest_based.match_mode === "similar"
+                          criteriaConfig.interests.match_mode === "similar"
                             ? "#10b8a6"
                             : "divider",
                         borderRadius: 1,
                         cursor: "pointer",
                         backgroundColor:
-                          criteriaConfig.interest_based.match_mode === "similar"
+                          criteriaConfig.interests.match_mode === "similar"
                             ? "rgba(16, 184, 166, 0.05)"
                             : "transparent",
                         transition: "all 0.2s",
@@ -5938,7 +5938,7 @@ export default function EventManagePage() {
                       }}
                     >
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        {criteriaConfig.interest_based.match_mode === "similar" ? (
+                        {criteriaConfig.interests.match_mode === "similar" ? (
                           <Box sx={{ fontSize: 16 }}>😊</Box>
                         ) : (
                           <Box sx={{ fontSize: 16, opacity: 0.5 }}>😊</Box>
@@ -5958,20 +5958,20 @@ export default function EventManagePage() {
                       onClick={() =>
                         setCriteriaConfig((prev) => ({
                           ...prev,
-                          interest_based: { ...prev.interest_based, match_mode: "both" }
+                          interests: { ...prev.interests, match_mode: "both" }
                         }))
                       }
                       sx={{
                         p: 1.2,
                         border: "2px solid",
                         borderColor:
-                          criteriaConfig.interest_based.match_mode === "both"
+                          criteriaConfig.interests.match_mode === "both"
                             ? "#10b8a6"
                             : "divider",
                         borderRadius: 1,
                         cursor: "pointer",
                         backgroundColor:
-                          criteriaConfig.interest_based.match_mode === "both"
+                          criteriaConfig.interests.match_mode === "both"
                             ? "rgba(16, 184, 166, 0.05)"
                             : "transparent",
                         transition: "all 0.2s",
@@ -5982,7 +5982,7 @@ export default function EventManagePage() {
                       }}
                     >
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        {criteriaConfig.interest_based.match_mode === "both" ? (
+                        {criteriaConfig.interests.match_mode === "both" ? (
                           <Box sx={{ fontSize: 16 }}>⭐</Box>
                         ) : (
                           <Box sx={{ fontSize: 16, opacity: 0.5 }}>⭐</Box>
@@ -6006,10 +6006,10 @@ export default function EventManagePage() {
                   >
                     Add Tags
                   </Button>
-                  {criteriaConfig.interest_based.tags.length > 0 && (
+                  {criteriaConfig.interests.tags.length > 0 && (
                     <Box sx={{ mt: 1 }}>
                       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                        {criteriaConfig.interest_based.tags.map((tag, idx) => (
+                        {criteriaConfig.interests.tags.map((tag, idx) => (
                           <Chip
                             key={idx}
                             label={tag.label}
@@ -6017,9 +6017,9 @@ export default function EventManagePage() {
                             onDelete={() =>
                               setCriteriaConfig((prev) => ({
                                 ...prev,
-                                interest_based: {
-                                  ...prev.interest_based,
-                                  tags: prev.interest_based.tags.filter((_, i) => i !== idx)
+                                interests: {
+                                  ...prev.interests,
+                                  tags: prev.interests.tags.filter((_, i) => i !== idx)
                                 }
                               }))
                             }
@@ -6048,7 +6048,7 @@ export default function EventManagePage() {
                 location: { enabled: false, threshold: 50 },
                 experience: { enabled: false, threshold: 50 },
                 education: { enabled: false, threshold: 50 },
-                interest_based: { enabled: false, match_mode: "complementary", tags: [] }
+                interests: { enabled: false, match_mode: "complementary", tags: [] }
               });
             }}
           >
@@ -6075,7 +6075,7 @@ export default function EventManagePage() {
                 location: { enabled: false, threshold: 50 },
                 experience: { enabled: false, threshold: 50 },
                 education: { enabled: false, threshold: 50 },
-                interest_based: { enabled: false, match_mode: "complementary", tags: [] }
+                interests: { enabled: false, match_mode: "complementary", tags: [] }
               });
             }}
             sx={{
@@ -6195,10 +6195,10 @@ export default function EventManagePage() {
               if (tagLabel.trim()) {
                 setCriteriaConfig((prev) => ({
                   ...prev,
-                  interest_based: {
-                    ...prev.interest_based,
+                  interests: {
+                    ...prev.interests,
                     tags: [
-                      ...prev.interest_based.tags,
+                      ...prev.interests.tags,
                       { label: tagLabel.trim(), category: tagCategory, type: tagType }
                     ]
                   }

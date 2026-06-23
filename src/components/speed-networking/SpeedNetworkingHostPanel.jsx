@@ -69,6 +69,13 @@ function isReactEvent(value) {
 function normalizeCriteriaConfig(config = {}) {
     const next = { ...config };
 
+    // Backward compatibility for sessions created by the older page. The API
+    // accepts only `interests`, so never send `interest_based` back on save.
+    if (next.interest_based && !next.interests) {
+        next.interests = next.interest_based;
+    }
+    delete next.interest_based;
+
     Object.entries(DEFAULT_CRITERIA_NUMBERS).forEach(([key, defaults]) => {
         if (!next[key]) return;
 
