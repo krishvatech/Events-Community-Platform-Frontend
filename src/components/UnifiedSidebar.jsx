@@ -217,10 +217,15 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         { label: "My Certificates", to: "/account/certificates", icon: EmojiEventsRoundedIcon },
     ];
 
-    const resourcesItems = [
-        { label: "E-Library", to: "/account/resources", icon: LibraryBooksRoundedIcon },
-        { label: "My Recordings", to: "/account/recordings", icon: OndemandVideoRoundedIcon },
-    ];
+    const resourcesItems = isSuperUser
+        ? [
+            { label: "E-Library", to: "/admin/resources", icon: LibraryBooksRoundedIcon },
+            { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },
+          ]
+        : [
+            { label: "E-Library", to: "/account/resources", icon: LibraryBooksRoundedIcon },
+            { label: "My Recordings", to: "/account/recordings", icon: OndemandVideoRoundedIcon },
+          ];
 
     let manageItems = [];
     let adminItems = [];
@@ -232,8 +237,6 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
             { label: "My Series", to: "/admin/series", icon: ArticleRoundedIcon },
             { label: "Virtual Speakers", to: "/admin/virtual-speakers", icon: MicRoundedIcon },
-            { label: "My Resources", to: "/admin/resources", icon: LibraryBooksRoundedIcon },
-            { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/admin/notifications", icon: NotificationsRoundedIcon, badge: "notifications" },
