@@ -91,7 +91,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
       const token = localStorage.getItem("access_token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      const limit = 20;
+      const limit = 10;
       const offset = reset ? 0 : eventOffset;
 
       const params = new URLSearchParams();
@@ -255,29 +255,16 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
     try {
       const token = localStorage.getItem("access_token");
 
-      // 1) Find the selected event
-      const selectedEvent =
-        eventOptions.find((e) => String(e.id) === String(form.event_id)) ||
-        events.find((e) => String(e.id) === String(form.event_id));
-
-      // 2) Resolve community id from various possible shapes
-      const rawCommunityId =
-        selectedEvent?.community_id ??
-        selectedEvent?.communityId ??
-        selectedEvent?.community?.id ??
-        selectedEvent?.community; // if backend returns a plain id as "community"
-
-      if (!selectedEvent || !rawCommunityId) {
-        showSnackbar("No valid community_id found for the selected event. Please check your /events response.", "error");
+      // 1) Validate event is selected
+      if (!form.event_id) {
+        showSnackbar("Please select an event.", "error");
         setUploading(false);
         return;
       }
 
-      // 3) Build FormData with the CORRECT keys expected by DRF
+      // 2) Build FormData with only required fields
       const formData = new FormData();
-      formData.append("community_id", String(rawCommunityId)); // correct key
-      formData.append("event_id", String(form.event_id)); // correct key
-
+      formData.append("event_id", String(form.event_id));
       formData.append("title", form.title);
       formData.append("description", form.description);
       formData.append("type", form.type);
@@ -663,20 +650,12 @@ export default function MyResourcesAdmin() {
 
     const ownerUser = isOwnerUser(currentUser);
 
-    // ✅ Owner: show only resources uploaded/owned by this user
+    // ✅ Superuser/Owner: show all resources
     if (ownerUser) {
-      return allResources.filter((r) => {
-        const isOwner =
-          r.uploaded_by_id === currentUser.id ||
-          r.created_by === currentUser.id ||
-          r.user_id === currentUser.id ||
-          r.uploaded_by === currentUser.id ||
-          r.author === currentUser.id;
-        return isOwner;
-      });
+      return allResources;
     }
 
-    // ✅ Staff: ONLY events they purchased / registered for
+    // ✅ Normal user: ONLY events they purchased / registered for
     if (!registeredEventIds || registeredEventIds.length === 0) {
       return [];
     }
