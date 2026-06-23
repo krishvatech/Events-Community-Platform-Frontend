@@ -1277,7 +1277,7 @@ export default function EventManagePage() {
     }
   }, [event]);
 
-  // ---- load registrations with lazy loading (owner only) ----
+  // ---- load registrations once per event/refresh (owner only) ----
   useEffect(() => {
     if (!eventId || !isOwner) return;
 
@@ -1285,20 +1285,18 @@ export default function EventManagePage() {
     if (!token) return;
 
     const controller = new AbortController();
-    const MEMBERS_PER_PAGE = 10;
 
-    const loadRegsPage = async (pageNum) => {
+    const loadRegistrations = async () => {
       setRegistrationsLoading(true);
       setRegistrationsError("");
       try {
-        const MEMBERS_PER_PAGE = 10;
         const headers = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         };
 
-        // Fetch all members (or a large batch) to enable proper sorting across all data
-        // Frontend will sort all records, then display paginated results
+        // Fetch the owner member list only when the event changes or after an explicit refresh.
+        // Do not refetch this endpoint on local table pagination clicks.
         const res = await fetch(
           `${API_ROOT}/events/${eventId}/registrations/?limit=200`,
           { headers, signal: controller.signal }
@@ -1316,13 +1314,11 @@ export default function EventManagePage() {
           count = json.length;
         } else if (json?.results && Array.isArray(json.results)) {
           data = json.results;
-          count = json.count || 0;
+          count = json.count || data.length;
         }
 
         setRegistrations(data);
-        if (pageNum === 1) {
-          setTotalMembersCount(count);
-        }
+        setTotalMembersCount(count);
       } catch (e) {
         if (e.name === "AbortError") return;
         setRegistrationsError(e?.message || "Unable to load members");
@@ -1331,10 +1327,9 @@ export default function EventManagePage() {
       }
     };
 
-    // Load requested page
-    loadRegsPage(memberPage);
+    loadRegistrations();
     return () => controller.abort();
-  }, [eventId, isOwner, memberPage, regsRefresh]);
+  }, [eventId, isOwner, regsRefresh]);
 
   // ---- Companion Tab: load badge labels ----
   const companionTabIndex = tabLabels.indexOf("Companion");
@@ -2106,25 +2101,40 @@ export default function EventManagePage() {
     }
   };
 
-  // Fetch friend status for a user
-  const fetchFriendStatus = async (userId) => {
+  const normalizeFriendStatus = (status) => {
+    const value = String(status || "").toLowerCase();
+    if (value === "incoming_pending") return "pending_incoming";
+    if (value === "outgoing_pending") return "pending_outgoing";
+    if (["friends", "friend", "accepted"].includes(value)) return "friends";
+    if (value === "self") return "self";
+    return "none";
+  };
+
+  // Fetch friend status for visible users in one request instead of one API per member.
+  const fetchFriendStatusesBulk = async (userIds) => {
+    const ids = Array.from(new Set((userIds || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0)));
+
+    if (!ids.length) return {};
+
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/friends/status/?user_id=${userId}`, {
+      const res = await fetch(`${API_ROOT}/friends/status-bulk/?user_ids=${ids.join(",")}`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         credentials: "include",
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return "none";
+      if (!res.ok) return {};
 
-      const status = (data?.status || "").toLowerCase();
-      if (status === "incoming_pending") return "pending_incoming";
-      if (status === "outgoing_pending") return "pending_outgoing";
-      if (["friends", "friend", "accepted"].includes(status)) return "friends";
-      return "none";
+      const rawResults = data?.results || {};
+      return ids.reduce((acc, id) => {
+        acc[id] = normalizeFriendStatus(rawResults[String(id)]?.status || rawResults[id]?.status);
+        return acc;
+      }, {});
     } catch (err) {
-      console.error("Failed to fetch friend status:", err);
-      return "none";
+      console.error("Failed to fetch bulk friend status:", err);
+      return {};
     }
   };
 
@@ -2342,23 +2352,25 @@ export default function EventManagePage() {
   // Slice filtered members to show only current page (10 per page)
   const pagedMembers = filteredMembers.slice((memberPage - 1) * MEMBERS_PER_PAGE, memberPage * MEMBERS_PER_PAGE);
 
-  // Load friend statuses for visible members
+  // Load friend statuses for visible members using the bulk endpoint.
   useEffect(() => {
     if (!isOwner || !pagedMembers.length) return;
 
+    const missingUserIds = pagedMembers
+      .map((member) => member.user_id)
+      .filter((userId) => userId && !friendStatusByUser[userId]);
+
+    if (!missingUserIds.length) return;
+
+    let cancelled = false;
     const loadStatuses = async () => {
-      const statuses = {};
-      for (const member of pagedMembers) {
-        if (member.user_id && !friendStatusByUser[member.user_id]) {
-          statuses[member.user_id] = await fetchFriendStatus(member.user_id);
-        }
-      }
-      if (Object.keys(statuses).length > 0) {
-        setFriendStatusByUser(prev => ({ ...prev, ...statuses }));
-      }
+      const statuses = await fetchFriendStatusesBulk(missingUserIds);
+      if (cancelled || Object.keys(statuses).length === 0) return;
+      setFriendStatusByUser(prev => ({ ...prev, ...statuses }));
     };
 
     loadStatuses();
+    return () => { cancelled = true; };
   }, [pagedMembers, isOwner, friendStatusByUser]);
 
   const filteredGuestAuditRows = useMemo(() => {

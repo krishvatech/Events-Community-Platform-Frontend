@@ -917,6 +917,35 @@ export default function MyContacts() {
         return normalizeFriendStatus(d?.status || d?.friendship || "none");
     }
 
+    async function fetchFriendStatusesBulk(ids = []) {
+        const cleanIds = Array.from(new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
+        if (!cleanIds.length) return {};
+
+        try {
+            const r = await fetch(`${API_BASE}/friends/status-bulk/?user_ids=${cleanIds.join(",")}`, {
+                headers: tokenHeader(),
+                credentials: "include",
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d?.detail || "Failed to load friend statuses");
+
+            const results = d?.results || {};
+            return Object.fromEntries(
+                cleanIds.map((id) => {
+                    const row = results[String(id)] || results[id] || {};
+                    return [id, normalizeFriendStatus(row?.status || row?.friendship || "none")];
+                })
+            );
+        } catch {
+            const entries = await Promise.all(
+                cleanIds.map(async (id) => {
+                    try { return [id, await fetchFriendStatus(id)]; } catch { return [id, "none"]; }
+                })
+            );
+            return Object.fromEntries(entries);
+        }
+    }
+
     async function sendFriendRequest(id) {
         try {
             const r = await fetch(`${API_BASE}/friend-requests/`, {
@@ -1179,12 +1208,8 @@ export default function MyContacts() {
         if (!ids.length) return;
         (async () => {
             try {
-                const entries = await Promise.all(
-                    ids.map(async (id) => {
-                        try { const s = await fetchFriendStatus(id); return [id, s]; } catch { return [id, "none"]; }
-                    })
-                );
-                if (alive) setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
+                const statuses = await fetchFriendStatusesBulk(ids);
+                if (alive) setFriendStatusByUser((m) => ({ ...m, ...statuses }));
             } catch { }
         })();
         return () => { alive = false; };

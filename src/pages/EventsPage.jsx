@@ -2287,6 +2287,7 @@ export default function EventsPage() {
   const [seriesData, setSeriesData] = useState(new Map()); // Map of seriesId -> series data
   const seriesFetchTimeoutRef = React.useRef(null);
   const seriesCacheRef = React.useRef(new Map());
+  const registrationFocusRefreshRef = React.useRef(0);
 
   const handleGuestJoinRequested = React.useCallback((eventData) => {
     setGuestJoinEvent(eventData);
@@ -2813,14 +2814,18 @@ export default function EventsPage() {
     if (!token) return; // Not logged in
 
     const handleFocus = () => {
+      // Refresh current user's registration state only, not the full event registration list.
+      // Also throttle focus refresh so route changes / browser focus do not create API spikes.
+      const now = Date.now();
+      if (now - registrationFocusRefreshRef.current < 30000) return;
+      registrationFocusRefreshRef.current = now;
 
-      // Refresh all current registrations
       if (myRegistrations && Object.keys(myRegistrations).length > 0) {
         const refreshRegs = {};
         Promise.all(
-          Object.entries(myRegistrations).map(async ([eventId, reg]) => {
+          Object.keys(myRegistrations).map(async (eventId) => {
             try {
-              const regUrl = new URL(`${API_BASE}/event-registrations/`);
+              const regUrl = new URL(`${API_BASE}/event-registrations/mine/`);
               regUrl.searchParams.set("event", String(eventId));
               const rRes = await fetch(regUrl.toString(), {
                 headers: {
@@ -2831,15 +2836,20 @@ export default function EventsPage() {
               if (rRes.ok) {
                 const rData = await rRes.json();
                 const rList = Array.isArray(rData?.results) ? rData.results : (Array.isArray(rData) ? rData : []);
-                if (rList.length > 0) {
-                  refreshRegs[eventId] = rList[0];
-                }
+                refreshRegs[eventId] = rList[0] || null;
               }
             } catch (e) {
             }
           })
         ).then(() => {
-          setMyRegistrations(prev => ({ ...prev, ...refreshRegs }));
+          setMyRegistrations((prev) => {
+            const next = { ...prev };
+            Object.entries(refreshRegs).forEach(([eventId, reg]) => {
+              if (reg) next[eventId] = reg;
+              else delete next[eventId];
+            });
+            return next;
+          });
         });
       }
     };

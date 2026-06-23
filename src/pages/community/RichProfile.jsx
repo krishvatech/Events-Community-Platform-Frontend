@@ -2325,6 +2325,11 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
     };
   }, []);
 
+  function normalizeFriendStatusValue(status) {
+    const map = { incoming_pending: "pending_incoming", outgoing_pending: "pending_outgoing" };
+    return (map[status] || status || "none").toLowerCase();
+  }
+
   async function fetchFriendStatus(targetId) {
     try {
       const r = await fetch(`${API_BASE}/friends/status/?user_id=${targetId}`, {
@@ -2332,16 +2337,59 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         credentials: "include",
       });
       const d = await r.json().catch(() => ({}));
-      // backend may return incoming_pending/outgoing_pending — normalize:
-      const map = { incoming_pending: "pending_incoming", outgoing_pending: "pending_outgoing" };
 
       if (d?.status === "incoming_pending" && d?.request_id) {
         setConnFriendRequests((prev) => ({ ...prev, [targetId]: d.request_id }));
       }
 
-      return (map[d?.status] || d?.status || "none").toLowerCase();
+      return normalizeFriendStatusValue(d?.status);
     } catch {
       return "none";
+    }
+  }
+
+  async function fetchFriendStatusesBulk(targetIds = []) {
+    const ids = Array.from(
+      new Set(
+        targetIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )
+    );
+
+    if (!ids.length) return {};
+
+    try {
+      const r = await fetch(`${API_BASE}/friends/status-bulk/?user_ids=${ids.join(",")}`, {
+        headers: { ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d?.detail || "Failed to load friendship statuses");
+
+      const results = d?.results || {};
+      const statuses = {};
+      const incomingRequests = {};
+
+      ids.forEach((id) => {
+        const item = results[String(id)] || results[id] || {};
+        const status = normalizeFriendStatusValue(item?.status);
+        statuses[String(id)] = status;
+        if (status === "pending_incoming" && item?.request_id) {
+          incomingRequests[String(id)] = item.request_id;
+        }
+      });
+
+      if (Object.keys(incomingRequests).length) {
+        setConnFriendRequests((prev) => ({ ...prev, ...incomingRequests }));
+      }
+
+      return statuses;
+    } catch {
+      const entries = await Promise.all(
+        ids.map(async (id) => [String(id), await fetchFriendStatus(id)])
+      );
+      return Object.fromEntries(entries);
     }
   }
 
@@ -3452,10 +3500,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
     const ids = Array.from(new Set([...list, ...mutualList].map((x) => String(x?.id)).filter(Boolean)));
     const missing = ids.filter((id) => connFriendStatus[id] === undefined && String(id) !== String(me?.id || ""));
     if (missing.length) {
-      const entries = await Promise.all(
-        missing.map(async (id) => [id, await fetchFriendStatus(id)])
-      );
-      setConnFriendStatus((m) => ({ ...m, ...Object.fromEntries(entries) }));
+      const statuses = await fetchFriendStatusesBulk(missing);
+      setConnFriendStatus((m) => ({ ...m, ...statuses }));
     }
     setConnLoading(false);
   };
