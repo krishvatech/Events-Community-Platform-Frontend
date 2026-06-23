@@ -44,6 +44,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import InterestTagManager from './InterestTagManager';
 import InterestCriteriaConfig from './InterestCriteriaConfig';
 import CollapsibleMatchingCriteria from './CollapsibleMatchingCriteria';
+import SpeedNetworkingSettingsDialog from './SpeedNetworkingSettingsDialog';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -67,6 +68,13 @@ function isReactEvent(value) {
 
 function normalizeCriteriaConfig(config = {}) {
     const next = { ...config };
+
+    // Backward compatibility for sessions created by the older page. The API
+    // accepts only `interests`, so never send `interest_based` back on save.
+    if (next.interest_based && !next.interests) {
+        next.interests = next.interest_based;
+    }
+    delete next.interest_based;
 
     Object.entries(DEFAULT_CRITERIA_NUMBERS).forEach(([key, defaults]) => {
         if (!next[key]) return;
@@ -158,6 +166,7 @@ export default function SpeedNetworkingHostPanel({
     const [testUserBId, setTestUserBId] = useState(null);
     const [testMatchResult, setTestMatchResult] = useState(null);
     const [testingMatch, setTestingMatch] = useState(false);
+    const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
 
     // Setup Wizard states
     const [wizardOpen, setWizardOpen] = useState(false);
@@ -504,17 +513,17 @@ export default function SpeedNetworkingHostPanel({
         closeWizard();
     };
 
-    // Load criteria config when tab changes to settings
+    // Load criteria config when settings dialog opens
     useEffect(() => {
-        if (selectedTab === 'settings') {
+        if (settingsDialogOpen) {
             if (!criteriaConfig) {
                 fetchCriteriaConfig();
             }
-            // OPTIMIZATION: Only fetch preview when tab changes, not on every queueEntries change
+            // OPTIMIZATION: Only fetch preview when dialog opens, not on every queueEntries change
             // This prevents waterfall of API calls
             fetchMatchPreview();
         }
-    }, [selectedTab]);  // FIXED: Removed queueEntries from dependency array
+    }, [settingsDialogOpen]);
 
     // Past matches are loaded lazily. Only fetch the full session payload when
     // the host opens the Past Matches tab, not on every queue refresh.
@@ -549,12 +558,16 @@ export default function SpeedNetworkingHostPanel({
 
     return (
         <Box sx={{
-            p: 2,
+            p: { xs: 1.25, md: 1.5 },
             borderTop: '1px solid rgba(255,255,255,0.1)',
-            bgcolor: 'rgba(34,197,94,0.05)',
-            maxHeight: expanded ? '600px' : 'auto',
+            bgcolor: 'rgba(9,20,33,0.96)',
+            maxHeight: expanded ? { xs: '46vh', md: '38vh' } : 58,
+            minHeight: expanded ? 0 : 58,
             overflow: expanded ? 'auto' : 'hidden',
-            transition: 'max-height 0.3s ease-in-out'
+            transition: 'max-height 0.25s ease-in-out, min-height 0.25s ease-in-out',
+            '&::-webkit-scrollbar': { width: 8 },
+            '&::-webkit-scrollbar-track': { bgcolor: 'rgba(255,255,255,0.04)' },
+            '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.24)', borderRadius: 8 }
         }}>
             {/* Header */}
             <Box sx={{
@@ -568,17 +581,35 @@ export default function SpeedNetworkingHostPanel({
                     <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>
                         Queue Management
                     </Typography>
+                    <Stack direction="row" spacing={0.75} sx={{ display: { xs: 'none', sm: 'flex' }, ml: 0.5 }}>
+                        <Chip size="small" label={`${waitingCount} waiting`} sx={{ height: 22, bgcolor: 'rgba(90,120,255,0.18)', color: '#dbe4ff', fontSize: 11 }} />
+                        <Chip size="small" label={`${matchedPairs.length} active`} sx={{ height: 22, bgcolor: 'rgba(34,197,94,0.16)', color: '#bbf7d0', fontSize: 11 }} />
+                    </Stack>
                     {backgroundRefreshing && !loading && (
                         <CircularProgress size={14} sx={{ color: 'rgba(255,255,255,0.55)' }} />
                     )}
                 </Box>
-                <IconButton
-                    size="small"
-                    onClick={() => setExpanded(!expanded)}
-                    sx={{ color: 'rgba(255,255,255,0.7)' }}
-                >
-                    {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Tooltip title="Open Settings">
+                        <IconButton
+                            size="small"
+                            onClick={() => setSettingsDialogOpen(true)}
+                            sx={{
+                                color: 'rgba(255,255,255,0.7)',
+                                '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' }
+                            }}
+                        >
+                            <TuneIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                    <IconButton
+                        size="small"
+                        onClick={() => setExpanded(!expanded)}
+                        sx={{ color: 'rgba(255,255,255,0.7)' }}
+                    >
+                        {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </IconButton>
+                </Box>
             </Box>
 
             {/* Tabs and Content */}
@@ -588,9 +619,17 @@ export default function SpeedNetworkingHostPanel({
                     <Tabs
                         value={selectedTab}
                         onChange={(e, newValue) => setSelectedTab(newValue)}
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        allowScrollButtonsMobile
                         sx={{
+                            position: 'sticky',
+                            top: -12,
+                            zIndex: 2,
+                            bgcolor: 'rgba(9,20,33,0.98)',
+                            backdropFilter: 'blur(10px)',
                             borderBottom: '1px solid rgba(255,255,255,0.1)',
-                            mb: 2,
+                            mb: 1.5,
                             '& .MuiTab-root': {
                                 color: 'rgba(255,255,255,0.6)',
                                 fontSize: 13,
@@ -610,7 +649,6 @@ export default function SpeedNetworkingHostPanel({
                         <Tab label={`Active Matches (${matchedPairs.length})`} value="active" />
                         <Tab label={`Past Matches (${pastMatches.length})`} value="past" />
                         <Tab label="Test Match" value="test" />
-                        <Tab label="Settings" value="settings" />
                     </Tabs>
 
                     {loading ? (
@@ -1002,7 +1040,7 @@ export default function SpeedNetworkingHostPanel({
 
                             {/* Test Match Tab */}
                             {selectedTab === 'test' && (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                                     <Alert severity="info" sx={{ bgcolor: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' }}>
                                         <Typography sx={{ fontSize: 13, color: '#fff' }}>
                                             Select two users from the waiting queue to preview their match score with current criteria settings.
@@ -1243,414 +1281,28 @@ export default function SpeedNetworkingHostPanel({
                                 </Box>
                             )}
 
-                            {/* Settings Tab */}
-                            {selectedTab === 'settings' && (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    <Alert severity={criteriaDirty ? 'warning' : 'info'} sx={{
-                                        bgcolor: criteriaDirty ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)',
-                                        borderColor: criteriaDirty ? 'rgba(245,158,11,0.3)' : 'rgba(59,130,246,0.3)'
-                                    }}>
-                                        <Typography sx={{ fontSize: 12, color: '#fff' }}>
-                                            {criteriaDirty
-                                                ? 'Unsaved changes. Click Save when ready. Active matches stay connected; saved settings apply to future matches.'
-                                                : 'Settings are live-safe. Current active matches stay connected; future matches use the latest saved settings.'}
-                                        </Typography>
-                                    </Alert>
-
-                                    {/* Interest Tags Manager */}
-                                    <InterestTagManager
-                                        eventId={eventId}
-                                        sessionId={session?.id}
-                                        session={session}
-                                    />
-
-                                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
-
-                                    {/* Collapsible Matching Criteria Component */}
-                                    {criteriaConfig && (
-                                        <CollapsibleMatchingCriteria
-                                            config={criteriaConfig}
-                                            onUpdate={(newConfig) => {
-                                                setCriteriaConfig(newConfig);
-                                                setCriteriaDirty(true);
-                                            }}
-                                            onOpenInterestManager={() => {
-                                                // You can add a ref to InterestTagManager or trigger it via a state
-                                                // For now, this will be a callback placeholder
-                                            }}
-                                        />
-                                    )}
-
-                                    {/* Additional Factors Section */}
-                                    {criteriaConfig && (
-                                        <Box sx={{
-                                            mt: 3,
-                                            pt: 2,
-                                            borderTop: '1px solid rgba(255,255,255,0.1)'
-                                        }}>
-                                            <Typography sx={{
-                                                color: '#fff',
-                                                fontWeight: 600,
-                                                fontSize: 13,
-                                                mb: 2,
-                                                textTransform: 'uppercase',
-                                                letterSpacing: 0.5
-                                            }}>
-                                                Advanced Settings
-                                            </Typography>
-
-                                            <Alert severity="info" sx={{
-                                                bgcolor: 'rgba(59,130,246,0.1)',
-                                                borderColor: 'rgba(59,130,246,0.3)',
-                                                mb: 2
-                                            }}>
-                                                <Typography sx={{ fontSize: 12, color: '#fff' }}>
-                                                    💡 Fine-tune advanced matching parameters to optimize match quality
-                                                </Typography>
-                                            </Alert>
-
-                                            {/* Serendipity/Luck Factor */}
-                                            <Card sx={{
-                                                bgcolor: 'rgba(255,255,255,0.05)',
-                                                borderRadius: 2,
-                                                border: '1px solid rgba(255,255,255,0.1)',
-                                                mb: 1.5
-                                            }}>
-                                                <CardContent>
-                                                    <Box sx={{
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center',
-                                                        mb: 2
-                                                    }}>
-                                                        <Typography sx={{
-                                                            color: '#fff',
-                                                            fontWeight: 600,
-                                                            fontSize: 14
-                                                        }}>
-                                                            Serendipity Factor
-                                                        </Typography>
-                                                        <Tooltip title="Add randomness to encourage surprising connections">
-                                                            <Typography sx={{
-                                                                color: 'rgba(255,255,255,0.5)',
-                                                                fontSize: 11
-                                                            }}>
-                                                                ?
-                                                            </Typography>
-                                                        </Tooltip>
-                                                    </Box>
-                                                    <Box>
-                                                        <Box sx={{
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            mb: 1
-                                                        }}>
-                                                            <Typography sx={{
-                                                                color: 'rgba(255,255,255,0.7)',
-                                                                fontSize: 12
-                                                            }}>
-                                                                Random Element Weight
-                                                            </Typography>
-                                                            <Typography sx={{
-                                                                color: '#fff',
-                                                                fontSize: 12,
-                                                                fontWeight: 500
-                                                            }}>
-                                                                {Math.round((criteriaConfig?.random_factor || 0) * 100)}%
-                                                            </Typography>
-                                                        </Box>
-                                                        <Slider
-                                                            value={(criteriaConfig?.random_factor || 0) * 100}
-                                                            onChange={(e, newValue) => {
-                                                                const newConfig = { ...criteriaConfig };
-                                                                newConfig.random_factor = newValue / 100;
-                                                                setCriteriaConfig(newConfig);
-                                                                setCriteriaDirty(true);
-                                                            }}
-                                                            min={0}
-                                                            max={30}
-                                                            step={1}
-                                                            sx={{
-                                                                color: '#f59e0b',
-                                                                '& .MuiSlider-track': { bgcolor: '#f59e0b' }
-                                                            }}
-                                                        />
-                                                        <Typography sx={{
-                                                            color: 'rgba(255,255,255,0.5)',
-                                                            fontSize: 11,
-                                                            mt: 1
-                                                        }}>
-                                                            Recommended: 5-15% for organic matching
-                                                        </Typography>
-                                                    </Box>
-                                                </CardContent>
-                                            </Card>
-
-                                            {/* Matching Recency Preference */}
-                                            <Card sx={{
-                                                bgcolor: 'rgba(255,255,255,0.05)',
-                                                borderRadius: 2,
-                                                border: '1px solid rgba(255,255,255,0.1)'
-                                            }}>
-                                                <CardContent>
-                                                    <FormControlLabel
-                                                        control={
-                                                            <Switch
-                                                                checked={criteriaConfig?.prefer_new_users !== false}
-                                                                onChange={(e) => {
-                                                                    const newConfig = { ...criteriaConfig };
-                                                                    newConfig.prefer_new_users = e.target.checked;
-                                                                    setCriteriaConfig(newConfig);
-                                                                    setCriteriaDirty(true);
-                                                                }}
-                                                                size="small"
-                                                            />
-                                                        }
-                                                        label={
-                                                            <Box>
-                                                                <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>
-                                                                    Prioritize New Users
-                                                                </Typography>
-                                                                <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
-                                                                    Match users who recently joined first
-                                                                </Typography>
-                                                            </Box>
-                                                        }
-                                                        sx={{ color: 'rgba(255,255,255,0.7)', width: '100%' }}
-                                                    />
-                                                </CardContent>
-                                            </Card>
-
-                                            {/* Normalize and Save Buttons */}
-                                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                                <Button
-                                                    variant="outlined"
-                                                    onClick={handleNormalizeWeights}
-                                                    sx={{
-                                                        color: '#5a78ff',
-                                                        borderColor: '#5a78ff',
-                                                        flex: 1,
-                                                        '&:hover': { bgcolor: 'rgba(90,120,255,0.1)' }
-                                                    }}
-                                                >
-                                                    Normalize Weights
-                                                </Button>
-                                                <Button
-                                                    variant="contained"
-                                                    onClick={() => handleSaveCriteria()}
-                                                    disabled={savingCriteria}
-                                                    sx={{
-                                                        bgcolor: '#22c55e',
-                                                        color: '#000',
-                                                        flex: 1,
-                                                        '&:hover': { bgcolor: '#16a34a' }
-                                                    }}
-                                                >
-                                                    {savingCriteria ? <CircularProgress size={20} /> : (criteriaDirty ? 'Save Changes' : 'Save')}
-                                                </Button>
-                                            </Box>
-
-                                            {/* Match Preview Card */}
-                                            {(matchPreview || loadingPreview) && (
-                                                <Card sx={{
-                                                    bgcolor: 'rgba(90,120,255,0.1)',
-                                                    borderRadius: 2,
-                                                    border: '1px solid rgba(90,120,255,0.3)'
-                                                }}>
-                                                    <CardContent>
-                                                        <Box sx={{
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            mb: 2
-                                                        }}>
-                                                            <Typography sx={{
-                                                                color: '#fff',
-                                                                fontWeight: 600,
-                                                                fontSize: 14
-                                                            }}>
-                                                                Match Preview
-                                                            </Typography>
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={fetchMatchPreview}
-                                                                disabled={loadingPreview}
-                                                            >
-                                                                {loadingPreview ? (
-                                                                    <CircularProgress size={20} />
-                                                                ) : (
-                                                                    <RefreshIcon sx={{ color: '#5a78ff', fontSize: 18 }} />
-                                                                )}
-                                                            </IconButton>
-                                                        </Box>
-
-                                                        {loadingPreview ? (
-                                                            <Box sx={{ textAlign: 'center', py: 2 }}>
-                                                                <CircularProgress size={24} />
-                                                                <Typography sx={{
-                                                                    color: 'rgba(255,255,255,0.7)',
-                                                                    fontSize: 12,
-                                                                    mt: 1
-                                                                }}>
-                                                                    Calculating preview...
-                                                                </Typography>
-                                                            </Box>
-                                                        ) : matchPreview?.total_waiting < 2 ? (
-                                                            <Typography sx={{
-                                                                color: 'rgba(255,255,255,0.7)',
-                                                                fontSize: 13,
-                                                                textAlign: 'center',
-                                                                py: 2
-                                                            }}>
-                                                                Need at least 2 users in queue to preview matches
-                                                            </Typography>
-                                                        ) : (
-                                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                                            {/* Waiting Users */}
-                                                            <Box>
-                                                                <Typography sx={{
-                                                                    color: 'rgba(255,255,255,0.7)',
-                                                                    fontSize: 12,
-                                                                    mb: 0.5
-                                                                }}>
-                                                                    Waiting Users: <span style={{ color: '#fff', fontWeight: 600 }}>{matchPreview.total_waiting}</span>
-                                                                </Typography>
-                                                            </Box>
-
-                                                            {/* Potential Pairs */}
-                                                            <Box>
-                                                                <Typography sx={{
-                                                                    color: 'rgba(255,255,255,0.7)',
-                                                                    fontSize: 12,
-                                                                    mb: 0.5
-                                                                }}>
-                                                                    Potential Pairs: <span style={{ color: '#fff', fontWeight: 600 }}>{matchPreview.potential_pairs}</span>
-                                                                </Typography>
-                                                            </Box>
-
-                                                            {/* Match Rate with Progress Bar */}
-                                                            <Box>
-                                                                <Box sx={{
-                                                                    display: 'flex',
-                                                                    justifyContent: 'space-between',
-                                                                    mb: 0.5
-                                                                }}>
-                                                                    <Typography sx={{
-                                                                        color: 'rgba(255,255,255,0.7)',
-                                                                        fontSize: 12
-                                                                    }}>
-                                                                        Matchable Pairs
-                                                                    </Typography>
-                                                                    <Typography sx={{
-                                                                        color: '#22c55e',
-                                                                        fontSize: 12,
-                                                                        fontWeight: 600
-                                                                    }}>
-                                                                        {matchPreview.matchable_pairs}/{matchPreview.potential_pairs} ({matchPreview.match_rate}%)
-                                                                    </Typography>
-                                                                </Box>
-                                                                <LinearProgress
-                                                                    variant="determinate"
-                                                                    value={matchPreview.match_rate}
-                                                                    sx={{
-                                                                        bgcolor: 'rgba(255,255,255,0.1)',
-                                                                        '& .MuiLinearProgress-bar': {
-                                                                            bgcolor: matchPreview.match_rate > 75 ? '#22c55e' : matchPreview.match_rate > 50 ? '#f59e0b' : '#ef4444'
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            </Box>
-
-                                                            {/* Avg Score with Progress Bar */}
-                                                            <Box>
-                                                                <Box sx={{
-                                                                    display: 'flex',
-                                                                    justifyContent: 'space-between',
-                                                                    mb: 0.5
-                                                                }}>
-                                                                    <Typography sx={{
-                                                                        color: 'rgba(255,255,255,0.7)',
-                                                                        fontSize: 12
-                                                                    }}>
-                                                                        Avg Match Quality
-                                                                    </Typography>
-                                                                    <Typography sx={{
-                                                                        color: '#fff',
-                                                                        fontSize: 12,
-                                                                        fontWeight: 600
-                                                                    }}>
-                                                                        {matchPreview.avg_score}%
-                                                                    </Typography>
-                                                                </Box>
-                                                                <LinearProgress
-                                                                    variant="determinate"
-                                                                    value={matchPreview.avg_score}
-                                                                    sx={{
-                                                                        bgcolor: 'rgba(255,255,255,0.1)',
-                                                                        '& .MuiLinearProgress-bar': {
-                                                                            bgcolor: '#5a78ff'
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            </Box>
-
-                                                            {/* Score Distribution */}
-                                                            <Box>
-                                                                <Typography sx={{
-                                                                    color: 'rgba(255,255,255,0.7)',
-                                                                    fontSize: 12,
-                                                                    mb: 1
-                                                                }}>
-                                                                    Score Distribution
-                                                                </Typography>
-                                                                <Box sx={{
-                                                                    display: 'grid',
-                                                                    gridTemplateColumns: 'repeat(4, 1fr)',
-                                                                    gap: 0.5
-                                                                }}>
-                                                                    {[
-                                                                        { label: '0-25', value: matchPreview.score_distribution['0-25'] },
-                                                                        { label: '26-50', value: matchPreview.score_distribution['26-50'] },
-                                                                        { label: '51-75', value: matchPreview.score_distribution['51-75'] },
-                                                                        { label: '76-100', value: matchPreview.score_distribution['76-100'] }
-                                                                    ].map(({ label, value }) => (
-                                                                        <Box key={label} sx={{
-                                                                            textAlign: 'center',
-                                                                            p: 1,
-                                                                            bgcolor: 'rgba(255,255,255,0.05)',
-                                                                            borderRadius: 1,
-                                                                            border: '1px solid rgba(255,255,255,0.1)'
-                                                                        }}>
-                                                                            <Typography sx={{
-                                                                                color: 'rgba(255,255,255,0.7)',
-                                                                                fontSize: 10
-                                                                            }}>
-                                                                                {label}
-                                                                            </Typography>
-                                                                            <Typography sx={{
-                                                                                color: '#fff',
-                                                                                fontWeight: 600,
-                                                                                fontSize: 13
-                                                                            }}>
-                                                                                {value}
-                                                                            </Typography>
-                                                                        </Box>
-                                                                    ))}
-                                                                </Box>
-                                                            </Box>
-                                                        </Box>
-                                                        )}
-                                                    </CardContent>
-                                                </Card>
-                                            )}
-                                        </Box>
-                                    )}
-                                </Box>
-                            )}
                         </>
                     )}
                 </>
             )}
+
+            {/* Settings Dialog */}
+            <SpeedNetworkingSettingsDialog
+                open={settingsDialogOpen}
+                onClose={() => setSettingsDialogOpen(false)}
+                eventId={eventId}
+                session={session}
+                criteriaConfig={criteriaConfig}
+                setCriteriaConfig={setCriteriaConfig}
+                criteriaDirty={criteriaDirty}
+                setCriteriaDirty={setCriteriaDirty}
+                handleSaveCriteria={handleSaveCriteria}
+                handleNormalizeWeights={handleNormalizeWeights}
+                fetchMatchPreview={fetchMatchPreview}
+                matchPreview={matchPreview}
+                loadingPreview={loadingPreview}
+                savingCriteria={savingCriteria}
+            />
 
             {/* Setup Wizard Dialog */}
             <Dialog
