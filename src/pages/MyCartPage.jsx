@@ -289,6 +289,8 @@ export default function MyCartPage() {
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [ordersPage, setOrdersPage] = useState(1);
   const [ordersTotal, setOrdersTotal] = useState(0);
+  const [orderStatus, setOrderStatus] = useState("");
+  const [orderSort, setOrderSort] = useState("newest");
   const ORDERS_PER_PAGE = 10;
 
   // Billing address used for Saleor order/invoice checkout.
@@ -379,6 +381,9 @@ export default function MyCartPage() {
       const params = new URLSearchParams();
       params.append('page', page);
       params.append('page_size', ORDERS_PER_PAGE);
+      if (orderStatus) params.append('status', orderStatus);
+      if (orderSort) params.append('sort', orderSort);
+
       const res = await fetch(`${API_BASE}/orders/?${params.toString()}`, {
         headers: authHeaders(),
       });
@@ -390,12 +395,29 @@ export default function MyCartPage() {
       let total = 0;
 
       if (Array.isArray(data)) {
-        // Plain array response - apply client-side pagination
+        // Plain array response - apply client-side filtering and pagination
         allOrders = data;
-        total = data.length;
+
+        // Client-side filtering by status
+        let filtered = allOrders;
+        if (orderStatus) {
+          filtered = filtered.filter(o => {
+            const status = (o.status || o.payment_status || "paid").toLowerCase();
+            return status === orderStatus.toLowerCase();
+          });
+        }
+
+        // Client-side sorting
+        if (orderSort === "oldest") {
+          filtered.sort((a, b) => new Date(a.created || a.created_at) - new Date(b.created || b.created_at));
+        } else {
+          filtered.sort((a, b) => new Date(b.created || b.created_at) - new Date(a.created || a.created_at));
+        }
+
+        total = filtered.length;
         const start = (page - 1) * ORDERS_PER_PAGE;
         const end = start + ORDERS_PER_PAGE;
-        setOrders(allOrders.slice(start, end));
+        setOrders(filtered.slice(start, end));
       } else if (data?.results && Array.isArray(data.results)) {
         // Paginated response from backend
         setOrders(data.results);
@@ -407,7 +429,7 @@ export default function MyCartPage() {
       }
 
       setOrdersTotal(total);
-      console.log("Orders loaded:", { page, total, pageSize: ORDERS_PER_PAGE, returned: Array.isArray(data) ? data.length : data?.results?.length });
+      console.log("Orders loaded:", { page, total, pageSize: ORDERS_PER_PAGE, status: orderStatus, sort: orderSort });
     } catch (err) {
       console.error("Failed to load orders", err);
       setOrdersError("Could not load your orders. Please try again.");
@@ -505,11 +527,16 @@ export default function MyCartPage() {
     if (tab === 2) {
       loadBillingAddress();
     }
-  }, [tab, ordersPage]);
+  }, [tab, ordersPage, orderStatus, orderSort]);
 
   useEffect(() => {
     loadBillingAddress();
   }, []);
+
+  // Reset to page 1 when filters/sort change
+  useEffect(() => {
+    setOrdersPage(1);
+  }, [orderStatus, orderSort]);
 
   // NEW: normalized view for orders
   const viewOrders = useMemo(() => {
@@ -979,9 +1006,58 @@ export default function MyCartPage() {
             {/* TAB 1: PREVIOUS ORDERS */}
             {tab === 1 && (
               <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-700">
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                  Your orders
-                </Typography>
+                {/* Header with filters on the right */}
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, gap: 2, flexWrap: "wrap" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Your orders
+                  </Typography>
+
+                  {/* Filter and Sort Controls */}
+                  <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+                    {/* Status Filter */}
+                    <TextField
+                      select
+                      size="small"
+                      label="Payment Status"
+                      value={orderStatus}
+                      onChange={(e) => setOrderStatus(e.target.value)}
+                      sx={{ minWidth: 180 }}
+                    >
+                      <MenuItem value="">All Status</MenuItem>
+                      <MenuItem value="paid">Paid</MenuItem>
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="cancelled">Cancelled</MenuItem>
+                    </TextField>
+
+                    {/* Sort Option */}
+                    <TextField
+                      select
+                      size="small"
+                      label="Sort By"
+                      value={orderSort}
+                      onChange={(e) => setOrderSort(e.target.value)}
+                      sx={{ minWidth: 180 }}
+                    >
+                      <MenuItem value="newest">Newest First</MenuItem>
+                      <MenuItem value="oldest">Oldest First</MenuItem>
+                    </TextField>
+
+                    {/* Clear Filters Button */}
+                    {(orderStatus || orderSort !== "newest") && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          setOrderStatus("");
+                          setOrderSort("newest");
+                        }}
+                        sx={{ textTransform: "none" }}
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
 
                 {ordersLoading && (
                   <Box sx={{ width: "100%", overflowX: "auto", mt: 1 }}>
