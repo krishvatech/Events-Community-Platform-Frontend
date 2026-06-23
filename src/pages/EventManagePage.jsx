@@ -753,11 +753,17 @@ export default function EventManagePage() {
 
   const fetchEventOrders = useCallback(async (page = 1) => {
     if (!eventId || !isOwner || event?.is_free !== false) return;
+
+    const numericPage = Number(page);
+    const safePage = Number.isFinite(numericPage) && numericPage > 0
+      ? Math.floor(numericPage)
+      : 1;
+
     setEventOrdersLoading(true);
     setEventOrdersError("");
     try {
       const token = getToken();
-      const offset = (page - 1) * eventOrdersLimit;
+      const offset = (safePage - 1) * eventOrdersLimit;
       const url = new URL(`${API_ROOT}/events/${eventId}/orders/`, window.location.origin);
       url.searchParams.set("limit", String(eventOrdersLimit));
       url.searchParams.set("offset", String(offset));
@@ -774,7 +780,7 @@ export default function EventManagePage() {
       }
       setEventOrders(Array.isArray(body.orders) ? body.orders : []);
       setEventOrdersTotal(Number(body.count || 0));
-      setEventOrdersPage(page);
+      setEventOrdersPage(safePage);
     } catch (err) {
       console.error("Failed to fetch event orders:", err);
       setEventOrdersError(err.message || "Failed to load event orders");
@@ -6413,7 +6419,7 @@ export default function EventManagePage() {
             <Button
               variant="outlined"
               startIcon={<RefreshRoundedIcon />}
-              onClick={fetchEventOrders}
+              onClick={() => fetchEventOrders(eventOrdersPage)}
               disabled={eventOrdersLoading}
               sx={{ textTransform: "none", borderRadius: 999 }}
             >
