@@ -34,6 +34,7 @@ import {
   DialogActions,
   CircularProgress,
   Skeleton,
+  Pagination,
 } from "@mui/material";
 // Icons
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -286,6 +287,9 @@ export default function MyCartPage() {
   const [ordersError, setOrdersError] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const ORDERS_PER_PAGE = 10;
 
   // Billing address used for Saleor order/invoice checkout.
   const [billingAddress, setBillingAddress] = useState(EMPTY_BILLING_ADDRESS);
@@ -368,22 +372,42 @@ export default function MyCartPage() {
   const displayTotal = Math.max(0, displaySubtotal - (Number(discount) || 0));
 
   // NEW: load previous orders when Orders tab is opened
-  const loadOrders = async () => {
+  const loadOrders = async (page = 1) => {
     try {
       setOrdersLoading(true);
       setOrdersError("");
-      const res = await fetch(`${API_BASE}/orders/`, {
+      const params = new URLSearchParams();
+      params.append('page', page);
+      params.append('page_size', ORDERS_PER_PAGE);
+      const res = await fetch(`${API_BASE}/orders/?${params.toString()}`, {
         headers: authHeaders(),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // supports both plain array and {results: []}
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.results)
-          ? data.results
-          : [];
-      setOrders(list);
+
+      // Handle both paginated {results: [], count: N} and plain array responses
+      let allOrders = [];
+      let total = 0;
+
+      if (Array.isArray(data)) {
+        // Plain array response - apply client-side pagination
+        allOrders = data;
+        total = data.length;
+        const start = (page - 1) * ORDERS_PER_PAGE;
+        const end = start + ORDERS_PER_PAGE;
+        setOrders(allOrders.slice(start, end));
+      } else if (data?.results && Array.isArray(data.results)) {
+        // Paginated response from backend
+        setOrders(data.results);
+        total = data.count || data.results.length;
+      } else {
+        // Fallback
+        setOrders([]);
+        total = 0;
+      }
+
+      setOrdersTotal(total);
+      console.log("Orders loaded:", { page, total, pageSize: ORDERS_PER_PAGE, returned: Array.isArray(data) ? data.length : data?.results?.length });
     } catch (err) {
       console.error("Failed to load orders", err);
       setOrdersError("Could not load your orders. Please try again.");
@@ -476,12 +500,12 @@ export default function MyCartPage() {
 
   useEffect(() => {
     if (tab === 1) {
-      loadOrders();
+      loadOrders(ordersPage);
     }
     if (tab === 2) {
       loadBillingAddress();
     }
-  }, [tab]);
+  }, [tab, ordersPage]);
 
   useEffect(() => {
     loadBillingAddress();
@@ -616,7 +640,8 @@ export default function MyCartPage() {
       }
 
       await checkoutRes.json();
-      await loadOrders();
+      setOrdersPage(1);
+      await loadOrders(1);
 
       setShowPaid(true);
       setTimeout(() => {
@@ -1093,6 +1118,16 @@ export default function MyCartPage() {
                         ))}
                       </TableBody>
                     </Table>
+                  </Box>
+                )}
+                {!ordersLoading && !ordersError && viewOrders.length > 0 && (
+                  <Box sx={{ display: "flex", justifyContent: "center", pt: 2 }}>
+                    <Pagination
+                      count={Math.ceil(ordersTotal / ORDERS_PER_PAGE)}
+                      page={ordersPage}
+                      onChange={(_, newPage) => setOrdersPage(newPage)}
+                      color="primary"
+                    />
                   </Box>
                 )}
               </Box>
