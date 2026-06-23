@@ -1106,7 +1106,7 @@ export default function SpeedNetworkingZone({
             </Box>
 
             {/* Main Content */}
-            <Box sx={{ flex: 1, overflow: 'hidden' }}>
+            <Box sx={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
                 {exitNavigation ? (
                     <Box sx={{
                         height: '100%',
@@ -1301,10 +1301,18 @@ export default function SpeedNetworkingZone({
             {/* Admin Controls */}
             {isAdmin && (
                 <Box sx={{
-                    borderTop: '1px solid rgba(255,255,255,0.1)',
-                    bgcolor: 'rgba(90,120,255,0.05)'
+                    flex: '0 0 auto',
+                    borderTop: '1px solid rgba(255,255,255,0.12)',
+                    bgcolor: 'rgba(9,20,33,0.98)',
+                    maxHeight: { xs: '56vh', md: '48vh' },
+                    overflow: 'hidden',
+                    boxShadow: '0 -14px 34px rgba(0,0,0,0.28)'
                 }}>
-                    <Box sx={{ p: 2 }}>
+                    <Box sx={{
+                        p: { xs: 1, md: 1.25 },
+                        bgcolor: 'rgba(10,16,31,0.98)',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)'
+                    }}>
                         <SpeedNetworkingControls
                             eventId={eventId}
                             session={session}

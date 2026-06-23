@@ -888,7 +888,7 @@ export default function SpeedNetworkingMatch({
                 )}
             </Box>
             {/* Main Content: RTK + Partner Profile Sidebar */}
-            <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+            <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, position: 'relative' }}>
                 {/* Left: RTK Meeting */}
                 <Box sx={{
                     flex: 1,
@@ -1003,16 +1003,23 @@ export default function SpeedNetworkingMatch({
                     </Box>
                 )}
 
-                {/* Right-most: Chat Panel (non-overlay, takes layout space) */}
+                {/* Right-most: Chat Panel (overlay so video/profile area does not shrink) */}
                 {chatOpen && (
                     <Box
                         sx={{
+                            position: 'absolute',
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
                             width: { xs: '100%', sm: 360, md: 400 },
+                            maxWidth: '100%',
                             bgcolor: '#0b101a',
                             color: '#fff',
                             borderLeft: '1px solid rgba(255,255,255,0.12)',
+                            boxShadow: '-18px 0 40px rgba(0,0,0,0.35)',
                             display: 'flex',
-                            flexDirection: 'column'
+                            flexDirection: 'column',
+                            zIndex: 30
                         }}
                     >
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
