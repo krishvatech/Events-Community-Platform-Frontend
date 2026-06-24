@@ -31,8 +31,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions
-} from "@mui/material";
+  DialogActions,
+  IconButton,
+  Tooltip
+  } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PlaceIcon from "@mui/icons-material/Place";
@@ -40,6 +42,7 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import ShoppingCartCheckoutRoundedIcon from "@mui/icons-material/ShoppingCartCheckoutRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { FormControl, Select, MenuItem, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -2538,6 +2541,7 @@ export default function EventsPage() {
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Initialize search from URL params
   useEffect(() => {
@@ -3008,7 +3012,7 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId]);
+  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId, refreshKey]);
 
   // Debounce search input (400ms)
   useEffect(() => {
@@ -3080,7 +3084,7 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId]);
+  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId, refreshKey]);
 
   // Recalculate total whenever event count from API or pinned events change
   useEffect(() => {
@@ -3139,7 +3143,7 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId, replayPage, selectedTab]);
+  }, [topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, searchDebouncedValue, priceRange, filterEventId, replayPage, selectedTab, refreshKey]);
 
   // Fetch series data for events that belong to series (debounced to not block initial render)
   useEffect(() => {
@@ -3995,9 +3999,22 @@ export default function EventsPage() {
             </Paper>
 
             <div className="w-full">
-              <h2 className="text-3xl font-bold">
-                {selectedTab === "replays" ? "Available Replays" : "Upcoming Events"}
-              </h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-3xl font-bold">
+                  {selectedTab === "replays" ? "Available Replays" : "Upcoming Events"}
+                </h2>
+                {selectedTab === "upcoming" && (
+                  <Tooltip title="Refresh events">
+                    <IconButton
+                      size="small"
+                      onClick={() => setRefreshKey((k) => k + 1)}
+                      disabled={initialLoading}
+                    >
+                      <RefreshRoundedIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </div>
               <p className="text-neutral-600 mt-1">
                 {selectedTab === "replays" ? (
                   replayLoading ? (
