@@ -24,6 +24,7 @@ import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 import axios from "axios";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
@@ -600,7 +601,7 @@ export default function MyResourcesAdmin() {
   const [resourceFilterType, setResourceFilterType] = useState("");
   const [resourceSort, setResourceSort] = useState("newest");
   const [resourcePage, setResourcePage] = useState(1);
-  const RESOURCE_ITEMS_PER_PAGE = 7;
+  const RESOURCE_ITEMS_PER_PAGE = 10;
 
   const fetchCurrentUser = async () => {
     try {
@@ -1005,23 +1006,40 @@ export default function MyResourcesAdmin() {
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
-          sx={{ width: { xs: "100%", md: "auto" } }}
+          sx={{ width: { xs: "100%", md: "auto" }, alignItems: { xs: "stretch", sm: "center" } }}
         >
-          <Select
-            value={resourceFilterType}
-            onChange={(e) => {
-              setResourcePage(1);
-              setResourceFilterType(e.target.value);
-            }}
-            displayEmpty
-            size="small"
-            sx={{ minWidth: { xs: "100%", sm: 120 } }}
-          >
-            <MenuItem value="">Type</MenuItem>
-            <MenuItem value="file">File</MenuItem>
-            <MenuItem value="link">Link</MenuItem>
-            <MenuItem value="video">Video</MenuItem>
-          </Select>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
+            <Select
+              value={resourceFilterType}
+              onChange={(e) => {
+                setResourcePage(1);
+                setResourceFilterType(e.target.value);
+              }}
+              displayEmpty
+              renderValue={(value) => value || 'All Types'}
+              size="small"
+              sx={{ minWidth: { xs: "100%", sm: 120 } }}
+            >
+              <MenuItem value="file">File</MenuItem>
+              <MenuItem value="link">Link</MenuItem>
+              <MenuItem value="video">Video</MenuItem>
+            </Select>
+            {(resourceFilterType || resourceSort !== "newest") && (
+              <Tooltip title="Clear filters">
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setResourcePage(1);
+                    setResourceFilterType("");
+                    setResourceSort("newest");
+                  }}
+                  sx={{ ml: -0.5 }}
+                >
+                  <ClearRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
 
           <Box
             sx={{
