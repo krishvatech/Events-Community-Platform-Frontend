@@ -11,6 +11,7 @@ import {
   Tab,
   Tabs,
   TextField,
+  IconButton,
   Typography,
   Stack,
   Snackbar,
@@ -19,6 +20,8 @@ import {
   Pagination,
   Skeleton
 } from "@mui/material";
+import { Tooltip } from "@mui/material";
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
@@ -671,6 +674,7 @@ export default function MyEventsPage() {
   // pagination state (MOD: added)
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
 
   // Small helper for JSON GET
@@ -764,7 +768,7 @@ export default function MyEventsPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, tab, q, token]); // Re-run when page/tab/q changes
+  }, [page, tab, q, token, refreshKey]); // Re-run when page/tab/q/refreshKey changes
 
   // ✅ NEW: Refresh registration status when page regains focus
   // This ensures button text updates when user returns from live meeting after admission
@@ -923,6 +927,11 @@ export default function MyEventsPage() {
                 onChange={(e) => setQ(e.target.value)}
                 sx={{ width: { xs: "100%", sm: 360 } }}
               />
+              <Tooltip title="Refresh events">
+                <IconButton size="small" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+                  <RefreshRoundedIcon />
+                </IconButton>
+              </Tooltip>
               <Box sx={{ flex: 1, display: { xs: "none", sm: "block" } }} />
               <Button
                 component={Link}

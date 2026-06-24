@@ -43,6 +43,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import LiveTvRoundedIcon from "@mui/icons-material/LiveTvRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import AlternateEmailRoundedIcon from "@mui/icons-material/AlternateEmailRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
@@ -4108,7 +4109,7 @@ function EventsPage() {
       </Paper>
 
       {/* Search */}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} className="mb-5">
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} className="mb-5" sx={{ width: "100%" }}>
         <TextField
           size="small"
           placeholder="Search your events…"
@@ -4117,6 +4118,12 @@ function EventsPage() {
           InputProps={{ startAdornment: <SearchRoundedIcon className="mr-2 text-slate-400" /> }}
           sx={{ width: { xs: "100%", sm: 360 } }}
         />
+        <Box sx={{ flex: 1 }} />
+        <Tooltip title="Refresh events">
+          <IconButton size="small" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+            <RefreshRoundedIcon />
+          </IconButton>
+        </Tooltip>
       </Stack>
 
       {/* Grid */}
