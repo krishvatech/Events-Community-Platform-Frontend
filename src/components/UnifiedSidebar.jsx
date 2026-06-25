@@ -49,6 +49,7 @@ import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
 import MicRoundedIcon from "@mui/icons-material/MicRounded";
 import MarkEmailReadRoundedIcon from "@mui/icons-material/MarkEmailReadRounded";
+import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
 // import ForumRoundedIcon from "@mui/icons-material/ForumRounded"; // TODO: Re-enable when Discussion Forum is ready
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
@@ -250,6 +251,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Saleor Manager", to: "/admin/saleor", icon: ShoppingCartRoundedIcon },
             { label: "Email Templates", to: "/admin/email-templates", icon: MarkEmailReadRoundedIcon },
             { label: "CMS", action: "cms", icon: ArticleRoundedIcon },
+            { label: "Admin Guide", to: "/admin/guide", icon: MenuBookRoundedIcon },
         ];
     } else if (isStaffOnly) {
         // Staff User
@@ -266,7 +268,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         ];
         adminItems = [
             { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
-            ...(userCanEditProfiles ? [{ label: "Users", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }] : [])
+            ...(userCanEditProfiles ? [{ label: "Users", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }] : []),
+            { label: "Admin Guide", to: "/admin/guide", icon: MenuBookRoundedIcon },
         ];
     } else {
         // Normal User

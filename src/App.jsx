@@ -68,6 +68,7 @@ import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
 import VirtualSpeakersPage from "./pages/VirtualSpeakersPage.jsx";
 import SaleorManager from "./pages/SaleorManager.jsx";
 import EmailTemplatesPage from "./pages/admin/EmailTemplatesPage.jsx";
+import AdminGuidePage from "./pages/AdminGuidePage.jsx";
 import EventLandingPage_Marketing from "./pages/EventLandingPage_Marketing.jsx";
 import SingleEventMarketingPage from "./pages/SingleEventMarketingPage.jsx";
 import AttendeeFormPage from "./pages/AttendeeFormPage.jsx";
@@ -281,6 +282,7 @@ const AppShell = () => {
             <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
             <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
             <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
+            <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />
