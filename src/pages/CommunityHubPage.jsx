@@ -8,6 +8,7 @@ import HomePage from "./community/HomePage.jsx";
 import LiveFeedPage from "./community/LiveFeedPage.jsx";
 import NotificationsPage from "./community/NotificationsPage.jsx";
 import GroupsPage from "./community/GroupsPage.jsx";
+import ForumPage from "./community/ForumPage.jsx";
 import MembersPage from "./community/MembersPage.jsx";
 import MessagesPage from "./community/MessagesPage.jsx";
 import MyPostsPage from "./community/MyPostsPage";
@@ -45,6 +46,7 @@ export default function CommunityHubPage() {
       case "groups":
         return <GroupsPage />;
       case "forum":
+        return <ForumPage />;
       case "feed":
       default:
         return <GroupsPage />;

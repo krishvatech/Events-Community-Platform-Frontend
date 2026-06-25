@@ -1,4 +1,4 @@
-﻿// src/pages/community/GroupDetailsPage.jsx
+// src/pages/community/GroupDetailsPage.jsx
 import * as React from "react";
 import { useParams, Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -3731,6 +3731,10 @@ export default function GroupDetailsPage() {
   const location = useLocation();
   const [group, setGroup] = React.useState(null);
   const [tab, setTab] = React.useState(0);
+  const requestedTab = React.useMemo(() => {
+    const value = new URLSearchParams(location.search).get("tab");
+    return value ? value.toLowerCase().trim() : "";
+  }, [location.search]);
   const [me, setMe] = React.useState(null);
   const [canSeeRequests, setCanSeeRequests] = React.useState(false);
   const [canApproveRequests, setCanApproveRequests] = React.useState(false);
@@ -3970,9 +3974,9 @@ export default function GroupDetailsPage() {
 
   const tabDefs = React.useMemo(() => {
     const items = [
-      { label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> },
+      { key: "overview", label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> },
       {
-        label: "MEMBERS", icon: <PeopleOutlineIcon />, render: () => (
+        key: "members", label: "MEMBERS", icon: <PeopleOutlineIcon />, render: () => (
           <MembersTab
             groupId={groupId}
             group={group}
@@ -3983,10 +3987,11 @@ export default function GroupDetailsPage() {
           />
         )
       },
-      { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} /> },
+      { key: "posts", label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} /> },
     ];
     if (canSeeRequests) {
       items.push({
+        key: "requests",
         label: "REQUESTS",
         icon: <PeopleOutlineIcon />,
         render: () => (
@@ -4003,6 +4008,7 @@ export default function GroupDetailsPage() {
     // New Settings Tab
     if (canApproveRequests) { // Owners/Admins
       items.push({
+        key: "settings",
         label: "SETTINGS",
         icon: <SettingsRoundedIcon />,
         render: () => <SettingsTab group={group} onUpdate={setGroup} />,
@@ -4014,6 +4020,20 @@ export default function GroupDetailsPage() {
   React.useEffect(() => {
     if (tab >= tabDefs.length) setTab(0);
   }, [tab, tabDefs.length]);
+
+  React.useEffect(() => {
+    if (!requestedTab) return;
+
+    const nextIndex = tabDefs.findIndex((item) => {
+      const key = String(item.key || "").toLowerCase();
+      const label = String(item.label || "").toLowerCase();
+      return key === requestedTab || label === requestedTab;
+    });
+
+    if (nextIndex >= 0 && nextIndex !== tab) {
+      setTab(nextIndex);
+    }
+  }, [requestedTab, tab, tabDefs]);
 
   // Filter Logic for Likes Dialog
   const likesFilteredUsers = likesFilter === "all" ? listUsers : listUsers.filter(u => u.reactionId === likesFilter);

@@ -50,7 +50,7 @@ import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
 import MicRoundedIcon from "@mui/icons-material/MicRounded";
 import MarkEmailReadRoundedIcon from "@mui/icons-material/MarkEmailReadRounded";
 import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
-// import ForumRoundedIcon from "@mui/icons-material/ForumRounded"; // TODO: Re-enable when Discussion Forum is ready
+import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { isOwnerUser, isStaffUser, canEditProfilesUser } from "../utils/adminRole";
@@ -208,7 +208,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         { label: "Dashboard", to: "/community?view=home", icon: HomeRoundedIcon },
         { label: "Upcoming Events", to: "/events", icon: EventNoteRoundedIcon },
         { label: "Live Feed", to: "/community?view=live", icon: LiveTvRoundedIcon },
-        // { label: "Discussion Forum", to: "/community?view=forum", icon: ForumRoundedIcon }, // TODO: Re-enable when feature is ready
+        { label: "Discussion Forum", to: "/community?view=forum", icon: ForumRoundedIcon },
         { label: "Explore Groups", to: "/community?view=groups", icon: GroupsRoundedIcon },
         { label: "Explore Members", to: "/community?view=members", icon: Diversity3RoundedIcon },
     ];
