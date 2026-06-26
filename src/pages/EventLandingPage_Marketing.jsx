@@ -603,24 +603,6 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
             >
               {subtitle}
             </p>
-            <p
-              style={{
-                fontFamily: F.body,
-                fontSize: 15,
-                lineHeight: 1.7,
-                color: C.cool50,
-                margin: "0 0 32px",
-                maxWidth: 460,
-                ...a(0.7),
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {description}
-            </p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", ...a(0.85) }}>
               {!myApplication || myApplication.status === 'none' ? (
                 <button
@@ -1563,7 +1545,7 @@ function Programme() {
       day: "Monday",
       date: "Sep 14",
       sessions: ["1 pm - 5 pm  Sessions"],
-      evening: "Welcome Reception & Dinner",
+      evening: "Welcome Reception",
       accent: C.coral,
     },
     {
@@ -1577,7 +1559,7 @@ function Programme() {
       day: "Wednesday",
       date: "Sep 16",
       sessions: ["9 am - 12 pm  Sessions", "1 pm - 5 pm  Sessions"],
-      evening: "Punting & Dinner",
+      evening: "Punting",
       accent: C.green,
     },
     {
@@ -1826,8 +1808,8 @@ function OxfordExperience() {
   const evenings = [
     {
       day: "Monday",
-      title: "Welcome Reception & Dinner",
-      desc: "A reception and dinner to close the first day. No formalities beyond a brief welcome. Informal, unhurried, and shaped by the inspiration that the first day's sessions have set in motion.",
+      title: "Welcome Reception",
+      desc: "A reception to close the first day. No formalities beyond a brief welcome. Informal, unhurried, and shaped by the inspiration that the first day's sessions have set in motion.",
       accent: C.coral,
       img: receptionImg,
     },
@@ -1840,8 +1822,8 @@ function OxfordExperience() {
     },
     {
       day: "Wednesday",
-      title: "Punting & Dinner",
-      desc: "An optional early evening on the Cherwell by punt, followed by a riverside dinner. No prior punting ability required. Quintessentially Oxford.",
+      title: "Punting",
+      desc: "An optional early evening on the Cherwell by punt. No prior punting ability required. Quintessentially Oxford.",
       accent: C.green,
       img: puntingImg,
     },
