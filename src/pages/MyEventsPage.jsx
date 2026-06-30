@@ -580,8 +580,8 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
           <Button
             size="small"
             component={Link}
-            to={isOwner ? `/admin/events/${ev.id}` : `/events/${ev.slug || ev.id}?ref=my_events`}
-            state={isOwner ? undefined : { event: ev }}
+            to={isOwner ? `/admin/events/${encodeURIComponent(ev.slug)}` : `/events/${ev.slug || ev.id}?ref=my_events`}
+            state={isOwner ? { event: ev } : { event: ev }}
             variant="outlined"
             sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
           >

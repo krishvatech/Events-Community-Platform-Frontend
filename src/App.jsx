@@ -271,7 +271,7 @@ const AppShell = () => {
             <Route path="moderation" element={<RequireStaffOrAdmin><AdminModerationPage /></RequireStaffOrAdmin>} />
             <Route path="moderation/profiles" element={<RequireStaffOrAdmin><AdminProfileModerationPage /></RequireStaffOrAdmin>} />
             <Route path="name-requests" element={<AdminNameRequestsPage />} />
-            <Route path="/admin/events/:eventId" element={<EventManagePage />} />
+            <Route path="/admin/events/:slug" element={<EventManagePage />} />
             {/* keep your recordings behavior same as before */}
             <Route path="recordings" element={<AdminRecordingsPage />} />
             <Route path="recordings/:id" element={<AdminRecordingDetailsPage />} />

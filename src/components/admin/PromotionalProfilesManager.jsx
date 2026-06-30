@@ -8,7 +8,6 @@
  * - Missing assets report
  */
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import {
   Box, Button, Card, CardContent, Grid, Paper, Tab, Tabs,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -31,8 +30,7 @@ const ROLES = ['speaker', 'sponsor', 'sponsor_staff', 'startup', 'investor'];
 const STATUSES = ['not_started', 'in_progress', 'completed', 'lapsed'];
 const MODULES = ['speaker', 'sponsor', 'sponsor_staff', 'startup', 'investor'];
 
-export default function PromotionalProfilesManager() {
-  const { eventId } = useParams();
+export default function PromotionalProfilesManager({ eventId }) {
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState([]);
   const [summary, setSummary] = useState({});

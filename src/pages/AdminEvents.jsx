@@ -3012,8 +3012,8 @@ function AdminEventCard({
   const showYourTime = isVirtual && organizerTimezone && timesDiffer;
 
   const handleOpenDetails = () => {
-    if (!ev?.id) return;
-    navigate(`/admin/events/${ev.id}`, { state: { event: ev } });
+    if (!ev?.slug) return;
+    navigate(`/admin/events/${encodeURIComponent(ev.slug)}`, { state: { event: ev } });
   };
 
   return (
@@ -3245,7 +3245,7 @@ function AdminEventCard({
 
                   <Button
                     component={Link}
-                    to={`/admin/events/${ev.id}`}
+                    to={`/admin/events/${encodeURIComponent(ev.slug)}`}
                     state={{ event: ev }}
                     variant="outlined"
                     className="rounded-xl flex-1"
@@ -3312,7 +3312,7 @@ function AdminEventCard({
                   {/* Past -> View Details (Event Details Page) */}
                   <Button
                     component={Link}
-                    to={`/admin/events/${ev.id}`}
+                    to={`/admin/events/${encodeURIComponent(ev.slug)}`}
                     state={{ event: ev, from: "admin" }}
                     variant="outlined"
                     className="rounded-xl flex-1"
@@ -3491,7 +3491,7 @@ function AdminEventCard({
                   {/* Upcoming/Live → View Details (Event Manage) */}
                   <Button
                     component={Link}
-                    to={`/admin/events/${ev.id}`}
+                    to={`/admin/events/${encodeURIComponent(ev.slug)}`}
                     state={{ event: ev }}
                     variant="outlined"
                     className="rounded-xl flex-1"

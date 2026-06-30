@@ -252,7 +252,7 @@ const PREDEFINED_ROLES = [
 
 
 export default function EventManagePage() {
-  const { eventId } = useParams();
+  const { slug } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -644,14 +644,14 @@ export default function EventManagePage() {
           const json = await res.json();
           const list = Array.isArray(json) ? json : (json.results || []);
           // filter out current event
-          setHostedEvents(list.filter(e => e.id !== parseInt(eventId)));
+          setHostedEvents(list.filter(e => e.id !== event?.id));
         }
       } catch (err) {
         console.error("Failed to fetch hosted events", err);
       }
     };
     fetchHosted();
-  }, [cancelEventOpen, isOwner, eventId]);
+  }, [cancelEventOpen, isOwner, event?.id]);
 
   const tabLabels = getTabLabels(event, isOwner);
   const guestAuditTabIndex = tabLabels.indexOf("Guest Audit");
@@ -669,12 +669,12 @@ export default function EventManagePage() {
   }, [location.state?.initialTab, tabLabels, tab]);
 
   const fetchSaleorProduct = useCallback(async () => {
-    if (!eventId || !isOwner) return;
+    if (!event?.id || !isOwner) return;
     setSaleorLoading(true);
     setSaleorError("");
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-product/`, {
+      const res = await fetch(`${API_ROOT}/events/${event.id}/saleor-product/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -689,11 +689,11 @@ export default function EventManagePage() {
       setSaleorProduct(data.product || null);
       setSaleorChannels(data.channels || []);
       setSaleorWarehouses(data.warehouses?.edges?.map(e => e.node) || []);
-      
+
       // Initialize changes
       const prices = {};
       const stocks = {};
-      
+
       const variant = data.product?.variants?.[0];
       if (variant) {
         variant.channelListings?.forEach(cl => {
@@ -715,15 +715,15 @@ export default function EventManagePage() {
     } finally {
       setSaleorLoading(false);
     }
-  }, [eventId, isOwner]);
+  }, [event?.id, isOwner]);
 
   const fetchSaleorDiscounts = useCallback(async () => {
-    if (!eventId || !isOwner) return;
+    if (!event?.id || !isOwner) return;
     setDiscountLoading(true);
     setDiscountError("");
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-discounts/`, {
+      const res = await fetch(`${API_ROOT}/events/${event.id}/saleor-discounts/`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -742,7 +742,7 @@ export default function EventManagePage() {
     } finally {
       setDiscountLoading(false);
     }
-  }, [eventId, isOwner]);
+  }, [event?.id, isOwner]);
 
   useEffect(() => {
     if (productManagementTabIndex !== -1 && tab === productManagementTabIndex) {
@@ -752,7 +752,7 @@ export default function EventManagePage() {
   }, [tab, productManagementTabIndex, fetchSaleorProduct, fetchSaleorDiscounts]);
 
   const fetchEventOrders = useCallback(async (page = 1) => {
-    if (!eventId || !isOwner || event?.is_free !== false) return;
+    if (!event?.id || !isOwner || event?.is_free !== false) return;
 
     const numericPage = Number(page);
     const safePage = Number.isFinite(numericPage) && numericPage > 0
@@ -764,7 +764,7 @@ export default function EventManagePage() {
     try {
       const token = getToken();
       const offset = (safePage - 1) * eventOrdersLimit;
-      const url = new URL(`${API_ROOT}/events/${eventId}/orders/`, window.location.origin);
+      const url = new URL(`${API_ROOT}/events/${event?.id}/orders/`, window.location.origin);
       url.searchParams.set("limit", String(eventOrdersLimit));
       url.searchParams.set("offset", String(offset));
 
@@ -787,7 +787,7 @@ export default function EventManagePage() {
     } finally {
       setEventOrdersLoading(false);
     }
-  }, [eventId, isOwner, event?.is_free, eventOrdersLimit]);
+  }, [event?.id, isOwner, event?.is_free, eventOrdersLimit]);
 
   const getSuggestedPaymentReference = useCallback((order) => {
     const existing = String(order?.payment_reference || "").trim();
@@ -998,14 +998,14 @@ export default function EventManagePage() {
   };
 
   const saveDiscount = async () => {
-    if (!eventId || discountSaving) return;
+    if (!event?.id || discountSaving) return;
     setDiscountSaving(true);
     try {
       const token = getToken();
       const method = editingDiscount ? "PATCH" : "POST";
       const url = editingDiscount
-        ? `${API_ROOT}/events/${eventId}/saleor-discounts/${editingDiscount.id}/`
-        : `${API_ROOT}/events/${eventId}/saleor-discounts/`;
+        ? `${API_ROOT}/events/${event?.id}/saleor-discounts/${editingDiscount.id}/`
+        : `${API_ROOT}/events/${event?.id}/saleor-discounts/`;
 
       const res = await fetch(url, {
         method,
@@ -1048,11 +1048,11 @@ export default function EventManagePage() {
   };
 
   const deleteDiscount = async (discount) => {
-    if (!eventId) return;
+    if (!event?.id) return;
     setDeletingDiscountId(discount.id);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-discounts/${discount.id}/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/saleor-discounts/${discount.id}/`, {
         method: "DELETE",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -1075,11 +1075,11 @@ export default function EventManagePage() {
   };
 
   const syncDiscount = async (discount) => {
-    if (!eventId) return;
+    if (!event?.id) return;
     setSyncingDiscountId(discount.id);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-discounts/${discount.id}/sync/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/saleor-discounts/${discount.id}/sync/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1105,7 +1105,7 @@ export default function EventManagePage() {
   const isDiscountDisabled = !saleorProduct || productDirty || saleorSaving;
 
   const handleCancelEvent = async () => {
-    if (!eventId || cancelEventLoading) return;
+    if (!event?.id || cancelEventLoading) return;
     setCancelEventLoading(true);
     try {
       const token = getToken();
@@ -1117,7 +1117,7 @@ export default function EventManagePage() {
         payload.recommended_event_id = recommendedEventId;
       }
 
-      const res = await fetch(`${API_ROOT}/events/${eventId}/cancel/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/cancel/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1139,11 +1139,11 @@ export default function EventManagePage() {
   };
 
   const handleHideEvent = async () => {
-    if (!eventId || hideEventLoading) return;
+    if (!event?.id || hideEventLoading) return;
     setHideEventLoading(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -1164,11 +1164,11 @@ export default function EventManagePage() {
   };
 
   const handleDeleteEvent = async () => {
-    if (!eventId || deleteEventLoading) return;
+    if (!event?.id || deleteEventLoading) return;
     setDeleteEventLoading(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1190,9 +1190,9 @@ export default function EventManagePage() {
 
   // ---- load event ----
   useEffect(() => {
-    if (!eventId) return;
+    if (!slug) return;
 
-    if (initialEvent && String(initialEvent.id) === String(eventId)) {
+    if (initialEvent && String(initialEvent.slug) === String(slug)) {
       setEvent(initialEvent);
     }
 
@@ -1208,7 +1208,7 @@ export default function EventManagePage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
 
-        const url = `${API_ROOT}/events/${eventId}/`;
+        const url = `${API_ROOT}/events/${encodeURIComponent(slug)}/`;
         console.log("🔄 Fetching event from:", url);
         const res = await fetch(url, {
           headers,
@@ -1241,10 +1241,10 @@ export default function EventManagePage() {
       } catch (e) {
         if (e.name === "AbortError") return;
         console.error("❌ Event fetch failed:", {
-          eventId,
+          slug,
           error: e?.message,
           status: e?.status,
-          url: `${API_ROOT}/events/${eventId}/`
+          url: `${API_ROOT}/events/${encodeURIComponent(slug)}/`
         });
         setEventError(e?.message || "Unable to load event");
       } finally {
@@ -1254,7 +1254,7 @@ export default function EventManagePage() {
 
     load();
     return () => controller.abort();
-  }, [eventId, initialEvent]);
+  }, [slug, initialEvent]);
 
   // Sync lounge settings from event
   useEffect(() => {
@@ -1285,7 +1285,7 @@ export default function EventManagePage() {
 
   // ---- load registrations once per event/refresh (owner only) ----
   useEffect(() => {
-    if (!eventId || !isOwner) return;
+    if (!event?.id || !isOwner) return;
 
     const token = getToken();
     if (!token) return;
@@ -1304,7 +1304,7 @@ export default function EventManagePage() {
         // Fetch the owner member list only when the event changes or after an explicit refresh.
         // Do not refetch this endpoint on local table pagination clicks.
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/registrations/?limit=200`,
+          `${API_ROOT}/events/${event?.id}/registrations/?limit=200`,
           { headers, signal: controller.signal }
         );
         const json = await res.json().catch(() => ({}));
@@ -1335,19 +1335,19 @@ export default function EventManagePage() {
 
     loadRegistrations();
     return () => controller.abort();
-  }, [eventId, isOwner, regsRefresh]);
+  }, [event?.id, isOwner, regsRefresh]);
 
   // ---- Companion Tab: load badge labels ----
   const companionTabIndex = tabLabels.indexOf("Companion");
   useEffect(() => {
-    if (!eventId || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
+    if (!event?.id || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
     const controller = new AbortController();
     setCompanionLabelsLoading(true);
     setCompanionLabelsError("");
     (async () => {
       try {
         const res = await fetch(
-          `${API_ROOT}/event-badge-labels/?event_id=${eventId}`,
+          `${API_ROOT}/event-badge-labels/?event_id=${event?.id}`,
           { headers: { Authorization: `Bearer ${getToken()}` }, signal: controller.signal }
         );
         const json = await res.json().catch(() => ({}));
@@ -1362,18 +1362,18 @@ export default function EventManagePage() {
       }
     })();
     return () => controller.abort();
-  }, [eventId, isOwner, tab, companionTabIndex, companionRegsRefresh]);
+  }, [event?.id, isOwner, tab, companionTabIndex, companionRegsRefresh]);
 
   // ---- Companion Tab: load registrations with badge_labels ----
   useEffect(() => {
-    if (!eventId || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
+    if (!event?.id || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
     const controller = new AbortController();
     setCompanionRegsLoading(true);
     setCompanionRegsError("");
     (async () => {
       try {
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/registrations/?limit=100`,
+          `${API_ROOT}/events/${event?.id}/registrations/?limit=100`,
           { headers: { Authorization: `Bearer ${getToken()}` }, signal: controller.signal }
         );
         const json = await res.json().catch(() => ({}));
@@ -1388,18 +1388,18 @@ export default function EventManagePage() {
       }
     })();
     return () => controller.abort();
-  }, [eventId, isOwner, tab, companionTabIndex, companionRegsRefresh]);
+  }, [event?.id, isOwner, tab, companionTabIndex, companionRegsRefresh]);
 
   // ---- Load 1:1 Networking Settings and Tables ----
   useEffect(() => {
-    if (!eventId || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
+    if (!event?.id || !isOwner || companionTabIndex === -1 || tab !== companionTabIndex) return;
     const controller = new AbortController();
     const loadNetworking = async () => {
       setNetworkingSettingsLoading(true);
       setNetworkingTablesLoading(true);
       try {
         const token = getToken();
-        const settingsRes = await fetch(`${API_ROOT}/events/${eventId}/networking-settings/`, {
+        const settingsRes = await fetch(`${API_ROOT}/events/${event?.id}/networking-settings/`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
@@ -1428,7 +1428,7 @@ export default function EventManagePage() {
           setNetworkingReminderMinutes(settings.reminder_minutes_before || 15);
         }
 
-        const tablesRes = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/`, {
+        const tablesRes = await fetch(`${API_ROOT}/events/${event?.id}/networking-tables/`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
@@ -1447,10 +1447,10 @@ export default function EventManagePage() {
     };
     loadNetworking();
     return () => controller.abort();
-  }, [eventId, isOwner, tab, companionTabIndex]);
+  }, [event?.id, isOwner, tab, companionTabIndex]);
 
   useEffect(() => {
-    if (!eventId || !isOwner || guestAuditTabIndex === -1 || tab !== guestAuditTabIndex) return;
+    if (!event?.id || !isOwner || guestAuditTabIndex === -1 || tab !== guestAuditTabIndex) return;
 
     const token = getToken();
     if (!token) return;
@@ -1461,7 +1461,7 @@ export default function EventManagePage() {
       setGuestAuditLoading(true);
       setGuestAuditError("");
       try {
-        const res = await fetch(`${API_ROOT}/events/${eventId}/guest-audit/`, {
+        const res = await fetch(`${API_ROOT}/events/${event?.id}/guest-audit/`, {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -1483,11 +1483,11 @@ export default function EventManagePage() {
 
     loadGuestAudit();
     return () => controller.abort();
-  }, [eventId, isOwner, tab, guestAuditTabIndex]);
+  }, [event?.id, isOwner, tab, guestAuditTabIndex]);
 
   // ---- load sessions (owner only, for multi-day events) ----
   useEffect(() => {
-    if (!eventId || !isOwner) return;
+    if (!event?.id || !isOwner) return;
 
     // Only fetch sessions if explicitly a multi-day event
     if (event && !event.is_multi_day) return;
@@ -1504,10 +1504,10 @@ export default function EventManagePage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
 
-        console.log("🔄 Fetching sessions for event:", eventId, "is_multi_day:", event?.is_multi_day);
+        console.log("🔄 Fetching sessions for event:", event?.id, "is_multi_day:", event?.is_multi_day);
 
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/sessions/`,
+          `${API_ROOT}/events/${event?.id}/sessions/`,
           { headers, signal: controller.signal }
         );
         const json = await res.json().catch(() => []);
@@ -1538,11 +1538,11 @@ export default function EventManagePage() {
 
     loadSessions();
     return () => controller.abort();
-  }, [eventId, isOwner, event]);
+  }, [event?.id, isOwner, event]);
 
   // ---- load MY registration (for staff/attendee view) ----
   useEffect(() => {
-    if (!eventId || isOwner) return;
+    if (!event?.id || isOwner) return;
 
     const token = getToken();
     if (!token) return;
@@ -1570,7 +1570,7 @@ export default function EventManagePage() {
         // 2. Fetch registration for this event & user
         // Using filter ?event=X&user=Y
         const res = await fetch(
-          `${API_ROOT}/event-registrations/?event=${eventId}&user=${userId}`,
+          `${API_ROOT}/event-registrations/?event=${event?.id}&user=${userId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const json = await res.json();
@@ -1583,7 +1583,7 @@ export default function EventManagePage() {
       }
     };
     loadMyReg();
-  }, [eventId, isOwner]);
+  }, [event?.id, isOwner]);
 
   useEffect(() => {
     if (!loungeCreateIcon) {
@@ -1607,7 +1607,7 @@ export default function EventManagePage() {
 
   // Fetch speed networking sessions when tab 4 is selected
   useEffect(() => {
-    if (speedNetworkingTabIndex === -1 || tab !== speedNetworkingTabIndex || !eventId || !isOwner) return;
+    if (speedNetworkingTabIndex === -1 || tab !== speedNetworkingTabIndex || !event?.id || !isOwner) return;
 
     const fetchSpeedNetworkingSessions = async () => {
       setSpeedNetworkingLoading(true);
@@ -1615,7 +1615,7 @@ export default function EventManagePage() {
       try {
         const token = getToken();
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/speed-networking/`,
+          `${API_ROOT}/events/${event?.id}/speed-networking/`,
           {
             headers: {
               "Content-Type": "application/json",
@@ -1638,7 +1638,7 @@ export default function EventManagePage() {
     };
 
     fetchSpeedNetworkingSessions();
-  }, [tab, eventId, isOwner, speedNetworkingTabIndex]);
+  }, [tab, event?.id, isOwner, speedNetworkingTabIndex]);
 
   // Initialize form when editing
   useEffect(() => {
@@ -1675,12 +1675,12 @@ export default function EventManagePage() {
   );
 
   const fetchLoungeTables = useCallback(async () => {
-    if (!eventId || !canManageLounge) return;
+    if (!event?.id || !canManageLounge) return;
     setLoungeLoading(true);
     setLoungeError("");
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/lounge-state/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/lounge-state/`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const json = await res.json().catch(() => ({}));
@@ -1693,7 +1693,7 @@ export default function EventManagePage() {
     } finally {
       setLoungeLoading(false);
     }
-  }, [eventId, canManageLounge, normalizeLoungeTables]);
+  }, [event?.id, canManageLounge, normalizeLoungeTables]);
 
   useEffect(() => {
     fetchLoungeTables();
@@ -1701,11 +1701,11 @@ export default function EventManagePage() {
 
   const handleCreateLoungeTable = async () => {
     const name = (loungeCreateName || "").trim();
-    if (!name || !eventId || loungeCreateSaving) return;
+    if (!name || !event?.id || loungeCreateSaving) return;
     setLoungeCreateSaving(true);
     try {
       const token = getToken();
-      const url = `${API_ROOT}/events/${eventId}/create-lounge-table/`;
+      const url = `${API_ROOT}/events/${event?.id}/create-lounge-table/`;
       let res;
       const seatsValue = normalizeSeatsInput(loungeCreateSeats);
       if (loungeCreateIcon) {
@@ -1755,13 +1755,13 @@ export default function EventManagePage() {
   };
 
   const handleUpdateLoungeTable = async () => {
-    if (!eventId || !loungeEditTarget || loungeEditSaving) return;
+    if (!event?.id || !loungeEditTarget || loungeEditSaving) return;
     const name = (loungeEditName || "").trim();
     if (!name) return;
     setLoungeEditSaving(true);
     try {
       const token = getToken();
-      const url = `${API_ROOT}/events/${eventId}/lounge-table-update/`;
+      const url = `${API_ROOT}/events/${event?.id}/lounge-table-update/`;
       let res;
       const seatsValue = normalizeSeatsInput(loungeEditSeats);
       if (loungeEditIcon) {
@@ -1819,11 +1819,11 @@ export default function EventManagePage() {
   };
 
   const handleDeleteLoungeTable = async () => {
-    if (!eventId || !loungeDeleteTarget || loungeDeleteSaving) return;
+    if (!event?.id || !loungeDeleteTarget || loungeDeleteSaving) return;
     setLoungeDeleteSaving(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/lounge-table-delete/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/lounge-table-delete/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1849,14 +1849,14 @@ export default function EventManagePage() {
 
   // Speed Networking Handlers
   const handleCreateOrUpdateSpeedNetworking = async (formData) => {
-    if (!eventId) return;
+    if (!event?.id) return;
     setSpeedNetworkingActionLoading(true);
     try {
       const token = getToken();
       const method = speedNetworkingEditTarget ? "PATCH" : "POST";
       const url = speedNetworkingEditTarget
-        ? `${API_ROOT}/events/${eventId}/speed-networking/${speedNetworkingEditTarget.id}/`
-        : `${API_ROOT}/events/${eventId}/speed-networking/`;
+        ? `${API_ROOT}/events/${event?.id}/speed-networking/${speedNetworkingEditTarget.id}/`
+        : `${API_ROOT}/events/${event?.id}/speed-networking/`;
 
       const res = await fetch(url, {
         method,
@@ -1904,12 +1904,12 @@ export default function EventManagePage() {
   };
 
   const handleDeleteSpeedNetworking = async () => {
-    if (!eventId || !speedNetworkingDeleteTarget) return;
+    if (!event?.id || !speedNetworkingDeleteTarget) return;
     setSpeedNetworkingActionLoading(true);
     try {
       const token = getToken();
       const res = await fetch(
-        `${API_ROOT}/events/${eventId}/speed-networking/${speedNetworkingDeleteTarget.id}/`,
+        `${API_ROOT}/events/${event?.id}/speed-networking/${speedNetworkingDeleteTarget.id}/`,
         {
           method: "DELETE",
           headers: {
@@ -2040,7 +2040,7 @@ export default function EventManagePage() {
   }, [searchQuery, addParticipantOpen]);
 
   const handleAddParticipant = async () => {
-    if (!eventId) return;
+    if (!event?.id) return;
 
     // Validate: Need either a selected user OR a typed email
     const emailToUse = selectedUser ? selectedUser.email : addParticipantEmail;
@@ -2058,7 +2058,7 @@ export default function EventManagePage() {
       if (userIdToUse) payload.user_id = userIdToUse;
       if (emailToUse) payload.email = emailToUse;
 
-      const res = await fetch(`${API_ROOT}/events/${eventId}/add-participant/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/add-participant/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2089,7 +2089,7 @@ export default function EventManagePage() {
     setResendMailOpen(false);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/resend-registration-emails/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/resend-registration-emails/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2249,14 +2249,14 @@ export default function EventManagePage() {
 
   // ---- Refresh event after editing ----
   const refreshEvent = async () => {
-    if (!eventId) return;
+    if (!event?.id) return;
     try {
       const token = getToken();
       const headers = {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
-      const res = await fetch(`${API_ROOT}/events/${eventId}/`, { headers });
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/`, { headers });
       const json = await res.json().catch(() => null);
       if (res.ok && json) {
         setEvent(json);
@@ -3395,11 +3395,11 @@ export default function EventManagePage() {
   };
 
   const handleSaveLoungeSettings = async () => {
-    if (!eventId || loungeSettingsSaving) return;
+    if (!event?.id || loungeSettingsSaving) return;
     setLoungeSettingsSaving(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -3421,11 +3421,11 @@ export default function EventManagePage() {
   };
 
   const handleSaveVisibilitySettings = async (newSettings) => {
-    if (!eventId || visibilitySettingsSaving) return;
+    if (!event?.id || visibilitySettingsSaving) return;
     setVisibilitySettingsSaving(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -4719,7 +4719,7 @@ export default function EventManagePage() {
     setSessionActionLoading(true);
     try {
       const res = await fetch(
-        `${API_ROOT}/events/${eventId}/sessions/${selectedSession.id}/`,
+        `${API_ROOT}/events/${event?.id}/sessions/${selectedSession.id}/`,
         {
           method: "PUT",
           headers: {
@@ -4766,7 +4766,7 @@ export default function EventManagePage() {
     setSessionActionLoading(true);
     try {
       const res = await fetch(
-        `${API_ROOT}/events/${eventId}/sessions/${sessionToDelete.id}/`,
+        `${API_ROOT}/events/${event?.id}/sessions/${sessionToDelete.id}/`,
         {
           method: "DELETE",
           headers: {
@@ -4845,7 +4845,7 @@ export default function EventManagePage() {
 
     setAddSessionLoading(true);
     try {
-      const res = await fetch(`${API_ROOT}/events/${eventId}/sessions/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/sessions/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -5100,7 +5100,7 @@ export default function EventManagePage() {
 
   const renderParticipants = () => (
     <ParticipantsAttendanceTable
-      eventId={eventId}
+      eventId={event?.id}
       event={event}
       token={token}
       apiRoot={API_ROOT}
@@ -6228,7 +6228,7 @@ export default function EventManagePage() {
   );
 
   const handleSaveSaleorProduct = async () => {
-    if (!eventId || saleorSaving) return;
+    if (!event?.id || saleorSaving) return;
     setSaleorSaving(true);
     try {
       const token = getToken();
@@ -6246,7 +6246,7 @@ export default function EventManagePage() {
         }))
       };
 
-      const res = await fetch(`${API_ROOT}/events/${eventId}/saleor-product/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/saleor-product/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -6269,11 +6269,11 @@ export default function EventManagePage() {
   };
 
   const handleSyncSaleorProduct = async () => {
-    if (!eventId) return;
+    if (!event?.id) return;
     setSaleorLoading(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/sync-saleor-product/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/sync-saleor-product/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -6289,10 +6289,10 @@ export default function EventManagePage() {
   };
 
   const handleSavePriceLabel = async () => {
-    if (!eventId) return;
+    if (!event?.id) return;
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -6308,12 +6308,12 @@ export default function EventManagePage() {
   };
 
   const handlePublishEvent = async () => {
-    if (!eventId || publishing) return;
+    if (!event?.id || publishing) return;
     setPublishing(true);
     setPublishError("");
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/publish/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/publish/`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -6331,12 +6331,12 @@ export default function EventManagePage() {
   };
 
   const handleUnpublishEvent = async () => {
-    if (!eventId || publishing) return;
+    if (!event?.id || publishing) return;
     setPublishing(true);
     setPublishError("");
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${eventId}/unpublish/`, {
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/unpublish/`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -6392,7 +6392,7 @@ export default function EventManagePage() {
     };
 
     const getCurrentEventQuantity = (items = []) => items
-      .filter((item) => String(item?.event?.id || "") === String(eventId || ""))
+      .filter((item) => String(item?.event?.id || "") === String(event?.id || ""))
       .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
 
     if (event?.is_free !== false) {
@@ -6712,7 +6712,7 @@ export default function EventManagePage() {
                       </TableHead>
                       <TableBody>
                         {items.map((item) => {
-                          const isCurrentEvent = String(item?.event?.id || "") === String(eventId || "");
+                          const isCurrentEvent = String(item?.event?.id || "") === String(event?.id || "");
                           return (
                             <TableRow key={item.id || item?.event?.id}>
                               <TableCell>
@@ -7471,7 +7471,7 @@ export default function EventManagePage() {
         const res = await fetch(`${API_ROOT}/event-badge-labels/`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-          body: JSON.stringify({ event_id: eventId, name, color }),
+          body: JSON.stringify({ event_id: event?.id, name, color }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json?.name?.[0] || json?.detail || `HTTP ${res.status}`);
@@ -7594,7 +7594,7 @@ export default function EventManagePage() {
       setNetworkingSuccessMessage("");
       try {
         const token = getToken();
-        const res = await fetch(`${API_ROOT}/events/${eventId}/networking-settings/`, {
+        const res = await fetch(`${API_ROOT}/events/${event?.id}/networking-settings/`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -7628,7 +7628,7 @@ export default function EventManagePage() {
       setNetworkingTablesError("");
       try {
         const token = getToken();
-        const res = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/`, {
+        const res = await fetch(`${API_ROOT}/events/${event?.id}/networking-tables/`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -7647,7 +7647,7 @@ export default function EventManagePage() {
           throw new Error(errorMsg);
         }
 
-        const tablesRes = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/`, {
+        const tablesRes = await fetch(`${API_ROOT}/events/${event?.id}/networking-tables/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (tablesRes.ok) {
@@ -7673,7 +7673,7 @@ export default function EventManagePage() {
       setNetworkingTableEditSaving(true);
       try {
         const token = getToken();
-        const res = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/${networkingTableEditTarget.id}/`, {
+        const res = await fetch(`${API_ROOT}/events/${event?.id}/networking-tables/${networkingTableEditTarget.id}/`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -7699,7 +7699,7 @@ export default function EventManagePage() {
       setNetworkingTableDeleteLoading(true);
       try {
         const token = getToken();
-        const res = await fetch(`${API_ROOT}/events/${eventId}/networking-tables/${networkingTableDeleteTarget.id}/`, {
+        const res = await fetch(`${API_ROOT}/events/${event?.id}/networking-tables/${networkingTableDeleteTarget.id}/`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -8047,7 +8047,7 @@ export default function EventManagePage() {
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Event Companion Access</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>Generate QR code and share direct link for attendees to access the Event Companion.</Typography>
 
-          {eventId && (
+          {event?.id && (
             <Stack spacing={2}>
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 2 }}>Direct Access URL</Typography>
@@ -8996,10 +8996,10 @@ export default function EventManagePage() {
                   {tab === tabLabels.indexOf("Overview") && renderOverview()}
                   {event?.registration_type === 'apply' ? (
                     <>
-                      {tab === tabLabels.indexOf("Applications") && <EventManageApplications />}
+                      {tab === tabLabels.indexOf("Applications") && <EventManageApplications eventId={event?.id} />}
                       {tab === tabLabels.indexOf("Application Tracks") && (
                         <ApplicationTracksManager
-                          eventId={eventId}
+                          eventId={event?.id}
                           token={getToken()}
                           event={event}
                           onEventUpdated={setEvent}
@@ -9007,8 +9007,8 @@ export default function EventManagePage() {
                       )}
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
                       {tab === tabLabels.indexOf("Participants") && renderParticipants()}
-                      {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
-                      {tab === tabLabels.indexOf("Promotional Profiles") && <PromotionalProfilesManager eventId={eventId} />}
+                      {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={event?.id} />}
+                      {tab === tabLabels.indexOf("Promotional Profiles") && <PromotionalProfilesManager eventId={event?.id} />}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
                       {tab === tabLabels.indexOf("Session") && renderSessions()}
                       {tab === tabLabels.indexOf("Resources") && renderResources()}
@@ -9027,8 +9027,8 @@ export default function EventManagePage() {
                     <>
                       {tab === tabLabels.indexOf("Registered Members") && renderMembers()}
                       {tab === tabLabels.indexOf("Participants") && renderParticipants()}
-                      {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={eventId} />}
-                      {tab === tabLabels.indexOf("Promotional Profiles") && <PromotionalProfilesManager eventId={eventId} />}
+                      {tab === tabLabels.indexOf("Participant Information") && <ParticipantInformationManager eventId={event?.id} />}
+                      {tab === tabLabels.indexOf("Promotional Profiles") && <PromotionalProfilesManager eventId={event?.id} />}
                       {tab === tabLabels.indexOf("Guest Audit") && renderGuestAudit()}
                       {tab === tabLabels.indexOf("Session") && renderSessions()}
                       {tab === tabLabels.indexOf("Resources") && renderResources()}
@@ -9814,12 +9814,12 @@ export default function EventManagePage() {
           </DialogActions>
         </Dialog>
 
-        {eventId && (
+        {event?.id && (
           <>
             <InviteUsersDialog
               open={inviteUsersOpen}
               onClose={() => setInviteUsersOpen(false)}
-              eventId={eventId}
+              eventId={event?.id}
               eventTitle={event?.title || ""}
               eventSlug={event?.slug || ""}
             />
@@ -9827,7 +9827,7 @@ export default function EventManagePage() {
               open={inviteEmailsOpen}
               onClose={() => setInviteEmailsOpen(false)}
               mode="event"
-              targetIdOrSlug={eventId}
+              targetIdOrSlug={event?.slug}
             />
 
             {/* Resend Mail to All — Confirmation Dialog */}

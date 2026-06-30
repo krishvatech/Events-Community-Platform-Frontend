@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -31,8 +31,7 @@ const COLORS = {
   bg: '#F7F5F2',
 };
 
-function ParticipantDirectoryPage() {
-  const { eventId } = useParams();
+function ParticipantDirectoryPage({ eventId }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));

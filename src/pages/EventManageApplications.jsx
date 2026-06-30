@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -27,8 +26,7 @@ import {
 } from '../utils/reviewQueue';
 import { apiClient } from '../utils/api';
 
-const EventManageApplications = () => {
-  const { eventId } = useParams();
+const EventManageApplications = ({ eventId }) => {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
