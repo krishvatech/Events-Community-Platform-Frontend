@@ -272,9 +272,9 @@ const AppShell = () => {
             <Route path="moderation/profiles" element={<RequireStaffOrAdmin><AdminProfileModerationPage /></RequireStaffOrAdmin>} />
             <Route path="name-requests" element={<AdminNameRequestsPage />} />
             <Route path="/admin/events/:slug" element={<EventManagePage />} />
-            {/* keep your recordings behavior same as before */}
+            {/* recordings with slug-based routing */}
             <Route path="recordings" element={<AdminRecordingsPage />} />
-            <Route path="recordings/:id" element={<AdminRecordingDetailsPage />} />
+            <Route path="recordings/:slug" element={<AdminRecordingDetailsPage />} />
             <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
             <Route path="carts" element={<AdminCarts />} />
             <Route path="users" element={<AdminStaffPage />} />

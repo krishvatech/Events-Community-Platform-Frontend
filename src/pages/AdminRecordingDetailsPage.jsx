@@ -125,7 +125,7 @@ const getExpiryInfo = (event) => {
 };
 
 export default function AdminRecordingDetailsPage() {
-    const { id } = useParams();
+    const { slug } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -195,7 +195,7 @@ export default function AdminRecordingDetailsPage() {
             const loadAllRegistrations = async () => {
                 setListLoading(true);
                 try {
-                    const url = new URL(`${API}/events/${id}/registrations/`);
+                    const url = new URL(`${API}/events/${encodeURIComponent(slug)}/registrations/`);
                     url.searchParams.set("limit", 1000); // Fetch all registrations
 
                     const res = await fetch(url.toString(), {
@@ -221,7 +221,7 @@ export default function AdminRecordingDetailsPage() {
         return () => {
             alive = false;
         };
-    }, [notificationAttendanceFilter, event?.replay_available, id]);
+    }, [notificationAttendanceFilter, event?.replay_available, slug]);
 
     useEffect(() => {
         let alive = true;
@@ -235,7 +235,7 @@ export default function AdminRecordingDetailsPage() {
                 // For simplicity, we keep updating it to ensure freshness, but we won't block UI if already present
                 let evData = event;
                 if (!event) {
-                    const resEv = await fetch(`${API}/events/${id}/`, {
+                    const resEv = await fetch(`${API}/events/${encodeURIComponent(slug)}/`, {
                         headers: getTokenHeader(),
                     });
                     if (!resEv.ok) throw new Error("Failed to load event details");
@@ -244,7 +244,7 @@ export default function AdminRecordingDetailsPage() {
 
                 // 2. Get Registrations with pagination & filter
                 const offset = (page - 1) * PER_PAGE;
-                const url = new URL(`${API}/events/${id}/registrations/`);
+                const url = new URL(`${API}/events/${encodeURIComponent(slug)}/registrations/`);
                 url.searchParams.set("limit", PER_PAGE);
                 url.searchParams.set("offset", offset);
 
@@ -312,7 +312,7 @@ export default function AdminRecordingDetailsPage() {
         return () => {
             alive = false;
         };
-    }, [id, page, filterTab, notificationAttendanceFilter]);
+    }, [slug, page, filterTab, notificationAttendanceFilter]);
 
     // Load notification preview when replay becomes available
     useEffect(() => {
@@ -341,13 +341,13 @@ export default function AdminRecordingDetailsPage() {
 
     const handleExport = async () => {
         try {
-            const res = await fetch(`${API}/events/${id}/export-registrations/`, {
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/export-registrations/`, {
                 headers: getTokenHeader(),
             });
             if (!res.ok) throw new Error("Failed to export CSV");
 
             // Try to get filename from header
-            let filename = `Event_${id}_details.csv`;
+            let filename = `Event_${slug}_details.csv`;
             const disposition = res.headers.get('Content-Disposition');
             if (disposition && disposition.indexOf('attachment') !== -1) {
                 const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
@@ -415,7 +415,7 @@ export default function AdminRecordingDetailsPage() {
 
         try {
             // Step 1: Get presigned PUT URL from backend
-            const urlRes = await fetch(`${API}/events/${id}/generate-replay-upload-url/`, {
+            const urlRes = await fetch(`${API}/events/${encodeURIComponent(slug)}/generate-replay-upload-url/`, {
                 method: "POST",
                 headers: { ...getTokenHeader(), "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -447,7 +447,7 @@ export default function AdminRecordingDetailsPage() {
             });
 
             // Step 3: Confirm upload with backend (no auto-notify — let host choose)
-            const confirmRes = await fetch(`${API}/events/${id}/confirm-replay-upload/`, {
+            const confirmRes = await fetch(`${API}/events/${encodeURIComponent(slug)}/confirm-replay-upload/`, {
                 method: "POST",
                 headers: { ...getTokenHeader(), "Content-Type": "application/json" },
                 body: JSON.stringify({ s3_key, send_notifications: false }),
@@ -477,7 +477,7 @@ export default function AdminRecordingDetailsPage() {
         setPublishing(true);
         setPublishError("");
         try {
-            const res = await fetch(`${API}/events/${id}/publish-replay/`, {
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/publish-replay/`, {
                 method: "POST",
                 headers: { ...getTokenHeader(), "Content-Type": "application/json" },
             });
@@ -496,7 +496,7 @@ export default function AdminRecordingDetailsPage() {
 
     const handleRefreshEvent = async () => {
         try {
-            const res = await fetch(`${API}/events/${id}/`, {
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/`, {
                 headers: getTokenHeader(),
             });
             if (res.ok) {
@@ -517,7 +517,7 @@ export default function AdminRecordingDetailsPage() {
     const loadNotifPreview = async () => {
         setNotifLoading(true);
         try {
-            const res = await fetch(`${API}/events/${id}/send-replay-notifications/`, {
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/send-replay-notifications/`, {
                 headers: getTokenHeader(),
             });
             if (res.ok) {
@@ -534,7 +534,7 @@ export default function AdminRecordingDetailsPage() {
     const handleSendNotifications = async (force = false) => {
         setSendingNotifs(true);
         try {
-            const res = await fetch(`${API}/events/${id}/send-replay-notifications/`, {
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/send-replay-notifications/`, {
                 method: "POST",
                 headers: { ...getTokenHeader(), "Content-Type": "application/json" },
                 body: JSON.stringify({ force }),
@@ -555,7 +555,7 @@ export default function AdminRecordingDetailsPage() {
         setUpdatingMode(true);
         setModeUpdateError("");
         try {
-            const res = await fetch(`${API}/events/${id}/`, {
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/`, {
                 method: "PATCH",
                 headers: { ...getTokenHeader(), "Content-Type": "application/json" },
                 body: JSON.stringify({ replay_publishing_mode: newMode }),
@@ -583,7 +583,7 @@ export default function AdminRecordingDetailsPage() {
         setSavingExpiry(true);
         setExpiryError("");
         try {
-            const res = await fetch(`${API}/events/${id}/`, {
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/`, {
                 method: "PATCH",
                 headers: { ...getTokenHeader(), "Content-Type": "application/json" },
                 body: JSON.stringify({ replay_availability_duration: String(expiryDays) }),
@@ -686,7 +686,7 @@ export default function AdminRecordingDetailsPage() {
 
         setIsDeletingEvent(true);
         try {
-            const res = await fetch(`${API}/events/${id}/`, {
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/`, {
                 method: "DELETE",
                 headers: getTokenHeader(),
             });

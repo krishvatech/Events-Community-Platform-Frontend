@@ -408,7 +408,7 @@ export default function AdminRecordingsPage() {
                   <MUICard
                     elevation={0}
                     className="rounded-2xl border border-slate-200 overflow-hidden flex flex-col w-full cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => navigate(`/admin/recordings/${ev.id}`)}
+                    onClick={() => navigate(`/admin/recordings/${encodeURIComponent(ev.slug || ev.id)}`)}
                   >
                     <div
                       style={{
@@ -473,7 +473,7 @@ export default function AdminRecordingsPage() {
                                 size="small"
                                 variant="contained"
                                 startIcon={<PlayCircleOutlineRoundedIcon />}
-                                onClick={() => navigate(`/admin/recordings/${ev.id}`)}
+                                onClick={() => navigate(`/admin/recordings/${encodeURIComponent(ev.slug || ev.id)}`)}
                                 sx={{
                                   textTransform: "none",
                                   borderRadius: 2,
@@ -501,7 +501,7 @@ export default function AdminRecordingsPage() {
                             <Button
                               size="small"
                               variant="outlined"
-                              onClick={() => navigate(`/admin/recordings/${ev.id}`)}
+                              onClick={() => navigate(`/admin/recordings/${encodeURIComponent(ev.slug || ev.id)}`)}
                               sx={{
                                 textTransform: "none",
                                 borderRadius: 2,
