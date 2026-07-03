@@ -156,7 +156,36 @@ const getTimezoneOptions = () => {
 
 const TIMEZONE_OPTIONS = getTimezoneOptions();
 
+const CONNECT_PLATFORM_SLUG = "imaa_connect";
+
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
+
+const platformDisplayName = (slug, platforms = []) => {
+  const found = platforms.find((platform) => platform.slug === slug);
+  if (found?.name) return found.name;
+  if (slug === "imaa_connect") return "IMAA Connect";
+  if (slug === "manda") return "MANDA";
+  return String(slug || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getEnabledPlatformSlugs = (event) => {
+  const platforms = Array.isArray(event?.platforms) ? event.platforms : [];
+  const enabled = platforms
+    .filter((platform) => platform?.is_enabled !== false && platform?.slug)
+    .map((platform) => platform.slug);
+  if (enabled.length) return enabled;
+  if (Array.isArray(event?.platform_slugs) && event.platform_slugs.length) return event.platform_slugs;
+  return [CONNECT_PLATFORM_SLUG];
+};
+
+const appendPlatformSlugsToFormData = (formData, slugs) => {
+  const uniqueSlugs = Array.from(new Set((slugs || []).filter(Boolean)));
+  uniqueSlugs.forEach((slug, index) => {
+    formData.append(`platform_slugs[${index}]`, slug);
+  });
+};
 
 const toAbs = (u) => {
   if (!u) return u;
@@ -520,6 +549,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [submitting, setSubmitting] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [errors, setErrors] = React.useState({});
+  const [eventPlatforms, setEventPlatforms] = React.useState([]);
+  const [platformsLoading, setPlatformsLoading] = React.useState(false);
+  const [selectedPlatformSlugs, setSelectedPlatformSlugs] = React.useState([CONNECT_PLATFORM_SLUG]);
 
   // Participants
   const [participants, setParticipants] = React.useState([]);
@@ -575,10 +607,53 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setEndDate(sch.endDate);
     setStartTime(sch.startTime);
     setEndTime(sch.endTime);
+    setSelectedPlatformSlugs([CONNECT_PLATFORM_SLUG]);
     // Keep resources publish defaults aligned with the same hour
     setResPublishDate(sch.startDate);
     setResPublishTime(sch.startTime);
   }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    let active = true;
+    const controller = new AbortController();
+
+    const fetchPlatforms = async () => {
+      setPlatformsLoading(true);
+      try {
+        const res = await fetch(`${API_ROOT}/event-platforms/`, {
+          signal: controller.signal,
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        const data = await res.json().catch(() => []);
+        if (!active) return;
+        if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+        const platforms = asList(data);
+        setEventPlatforms(platforms);
+        setSelectedPlatformSlugs((current) => {
+          if (current.length > 0) return current;
+          const hasConnect = platforms.some((platform) => platform.slug === CONNECT_PLATFORM_SLUG);
+          return [hasConnect ? CONNECT_PLATFORM_SLUG : platforms[0]?.slug].filter(Boolean);
+        });
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          console.error("Failed to load event platforms", error);
+          if (active) setEventPlatforms([]);
+        }
+      } finally {
+        if (active) setPlatformsLoading(false);
+      }
+    };
+
+    fetchPlatforms();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [open, token]);
 
   // 🔴 DEBUG: Log when sessions array changes
   React.useEffect(() => {
@@ -799,6 +874,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setExternalStreamingOtherDetails("");
     setExternalStreamingHostLink("");
 
+    setSelectedPlatformSlugs([CONNECT_PLATFORM_SLUG]);
     setErrors({});
   };
 
@@ -815,6 +891,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       e.location = "Required";
     }
     if (!description.trim()) e.description = "Required";
+    if (!selectedPlatformSlugs.length) e.platforms = "Select at least one platform";
     const priceValue = Number(price);
     if (!isFree) {
       // Price is now optional — only validate format if a value is provided
@@ -928,6 +1005,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("title", title.trim());
     fd.append("slug", slug.trim());
     fd.append("description", description);
+    appendPlatformSlugsToFormData(fd, selectedPlatformSlugs);
 
     // Build location string and send separate fields
     if (format === "virtual") {
@@ -1371,6 +1449,66 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               }
               sx={{ mb: 2 }}
             />
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                mb: 2,
+                borderRadius: 2,
+                border: errors.platforms ? "1px solid #ef4444" : "1px solid #e2e8f0",
+                bgcolor: "#f8fafc",
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                Event availability
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Choose where this event should be visible. Registration stays inside each selected platform.
+              </Typography>
+              {platformsLoading ? (
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" color="text.secondary">Loading platforms...</Typography>
+                </Stack>
+              ) : eventPlatforms.length ? (
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  {eventPlatforms.map((platform) => {
+                    const checked = selectedPlatformSlugs.includes(platform.slug);
+                    return (
+                      <FormControlLabel
+                        key={platform.slug}
+                        control={
+                          <Checkbox
+                            checked={checked}
+                            onChange={(event) => {
+                              const isChecked = event.target.checked;
+                              setSelectedPlatformSlugs((current) => {
+                                const next = isChecked
+                                  ? Array.from(new Set([...current, platform.slug]))
+                                  : current.filter((slug) => slug !== platform.slug);
+                                return next;
+                              });
+                              setErrors((prev) => ({ ...prev, platforms: "" }));
+                            }}
+                          />
+                        }
+                        label={platform.name}
+                      />
+                    );
+                  })}
+                </Stack>
+              ) : (
+                <Typography variant="body2" color="error">
+                  No event platforms found. Run backend migrations and check /api/event-platforms/.
+                </Typography>
+              )}
+              {errors.platforms && (
+                <Typography variant="caption" color="error" sx={{ display: "block", mt: 1 }}>
+                  {errors.platforms}
+                </Typography>
+              )}
+            </Paper>
 
             <TextField
               label="Format"
@@ -3095,6 +3233,22 @@ function AdminEventCard({
         >
           {ev.title}
         </Typography>
+
+        {Array.isArray(ev.platforms) && ev.platforms.length > 0 && (
+          <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+            {ev.platforms
+              .filter((platform) => platform?.is_enabled !== false && platform?.slug)
+              .map((platform) => (
+                <Chip
+                  key={platform.slug}
+                  size="small"
+                  variant="outlined"
+                  label={platform.name || platformDisplayName(platform.slug)}
+                  sx={{ height: 22, fontSize: "0.72rem" }}
+                />
+              ))}
+          </Stack>
+        )}
 
         <div className="text-sm text-slate-500">
           {(() => {

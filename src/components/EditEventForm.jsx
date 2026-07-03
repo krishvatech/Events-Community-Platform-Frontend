@@ -80,6 +80,27 @@ const formats = [
     { value: "hybrid", label: "Hybrid" },
 ];
 
+const CONNECT_PLATFORM_SLUG = "imaa_connect";
+
+const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
+
+const getEnabledPlatformSlugs = (event) => {
+    const platforms = Array.isArray(event?.platforms) ? event.platforms : [];
+    const enabled = platforms
+        .filter((platform) => platform?.is_enabled !== false && platform?.slug)
+        .map((platform) => platform.slug);
+    if (enabled.length) return enabled;
+    if (Array.isArray(event?.platform_slugs) && event.platform_slugs.length) return event.platform_slugs;
+    return [CONNECT_PLATFORM_SLUG];
+};
+
+const appendPlatformSlugsToFormData = (formData, slugs) => {
+    const uniqueSlugs = Array.from(new Set((slugs || []).filter(Boolean)));
+    uniqueSlugs.forEach((slug, index) => {
+        formData.append(`platform_slugs[${index}]`, slug);
+    });
+};
+
 const tokenHeader = () => {
     const t =
         localStorage.getItem("access_token") ||
@@ -313,6 +334,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [errors, setErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState({ open: false, type: "success", msg: "" });
+    const [eventPlatforms, setEventPlatforms] = useState([]);
+    const [platformsLoading, setPlatformsLoading] = useState(false);
+    const [selectedPlatformSlugs, setSelectedPlatformSlugs] = useState(() => getEnabledPlatformSlugs(event));
 
     // Participants
     const [participants, setParticipants] = useState([]);
@@ -408,6 +432,51 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             }
         };
         fetchUser();
+    }, [token]);
+
+    useEffect(() => {
+        setSelectedPlatformSlugs(getEnabledPlatformSlugs(event));
+    }, [event?.id, event?.platforms, event?.platform_slugs]);
+
+    useEffect(() => {
+        let active = true;
+        const controller = new AbortController();
+
+        const fetchPlatforms = async () => {
+            setPlatformsLoading(true);
+            try {
+                const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                const res = await fetch(`${API_ROOT}/event-platforms/`, {
+                    headers,
+                    signal: controller.signal,
+                });
+                const data = await res.json().catch(() => []);
+                if (!active) return;
+                if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+                const platforms = asList(data);
+                setEventPlatforms(platforms);
+                setSelectedPlatformSlugs((current) => {
+                    if (current.length > 0) return current;
+                    const hasConnect = platforms.some((platform) => platform.slug === CONNECT_PLATFORM_SLUG);
+                    return [hasConnect ? CONNECT_PLATFORM_SLUG : platforms[0]?.slug].filter(Boolean);
+                });
+            } catch (err) {
+                if (err?.name !== "AbortError") {
+                    console.error("Failed to load event platforms", err);
+                    if (active) setEventPlatforms([]);
+                }
+            } finally {
+                if (active) setPlatformsLoading(false);
+            }
+        };
+
+        fetchPlatforms();
+
+        return () => {
+            active = false;
+            controller.abort();
+        };
     }, [token]);
 
     const isScheduleDirty = useMemo(() => {
@@ -1200,6 +1269,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             e.location = "Required";
         }
         if (!description.trim()) e.description = "Description is required";
+        if (!selectedPlatformSlugs.length) e.platforms = "Select at least one platform";
         const priceValue = Number(price);
         if (!isFree) {
             // Price is now optional — only validate format if a value is provided
@@ -1312,6 +1382,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("title", title.trim());
         fd.append("slug", slug.trim());
         fd.append("description", description);
+        appendPlatformSlugsToFormData(fd, selectedPlatformSlugs);
 
         // Build location string and send separate fields
         if (format === "virtual") {
@@ -1545,6 +1616,66 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                     error={!!errors.slug}
                     helperText={errors.slug || "Lowercase letters, numbers, underscores, special chars (@$&) allowed. No forward slashes."}
                 />
+
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 2,
+                        mb: 2,
+                        borderRadius: 2,
+                        border: errors.platforms ? "1px solid #ef4444" : "1px solid #e2e8f0",
+                        bgcolor: "#f8fafc",
+                    }}
+                >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                        Event availability
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                        Choose where this event should be visible. Registration stays inside each selected platform.
+                    </Typography>
+                    {platformsLoading ? (
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                            <CircularProgress size={16} />
+                            <Typography variant="body2" color="text.secondary">Loading platforms...</Typography>
+                        </Stack>
+                    ) : eventPlatforms.length ? (
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                            {eventPlatforms.map((platform) => {
+                                const checked = selectedPlatformSlugs.includes(platform.slug);
+                                return (
+                                    <FormControlLabel
+                                        key={platform.slug}
+                                        control={
+                                            <Checkbox
+                                                checked={checked}
+                                                onChange={(changeEvent) => {
+                                                    const isChecked = changeEvent.target.checked;
+                                                    setSelectedPlatformSlugs((current) => {
+                                                        const next = isChecked
+                                                            ? Array.from(new Set([...current, platform.slug]))
+                                                            : current.filter((slug) => slug !== platform.slug);
+                                                        return next;
+                                                    });
+                                                    setErrors((prev) => ({ ...prev, platforms: "" }));
+                                                }}
+                                            />
+                                        }
+                                        label={platform.name}
+                                    />
+                                );
+                            })}
+                        </Stack>
+                    ) : (
+                        <Typography variant="body2" color="error">
+                            No event platforms found. Run backend migrations and check /api/event-platforms/.
+                        </Typography>
+                    )}
+                    {errors.platforms && (
+                        <Typography variant="caption" color="error" sx={{ display: "block", mt: 1 }}>
+                            {errors.platforms}
+                        </Typography>
+                    )}
+                </Paper>
 
                 <TextField
                     label="Format"
