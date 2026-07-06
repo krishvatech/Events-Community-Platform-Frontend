@@ -992,6 +992,7 @@ function WordPressGroupSyncPanel({ token }) {
   const [search, setSearch] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [syncingEnabled, setSyncingEnabled] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
 
   const loadSources = React.useCallback(async () => {
@@ -1048,6 +1049,31 @@ function WordPressGroupSyncPanel({ token }) {
     }
   };
 
+  const syncEnabledGroups = async () => {
+    setSyncingEnabled(true);
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-groups/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+      setToast({
+        open: true,
+        type: json.failed ? "warning" : "success",
+        msg: `Connect groups synced. Created ${json.created || 0}, updated ${json.updated || 0}${json.failed ? `, failed ${json.failed}` : ""}.`,
+      });
+      await loadSources();
+    } catch (e) {
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setSyncingEnabled(false);
+    }
+  };
+
   const toggleSync = async (row, checked) => {
     const previous = items;
     setItems((prev) => prev.map((x) => x.wp_group_id === row.wp_group_id ? { ...x, sync_enabled: checked } : x));
@@ -1066,7 +1092,11 @@ function WordPressGroupSyncPanel({ token }) {
       setToast({
         open: true,
         type: "success",
-        msg: checked ? "Group marked for sync." : "Group sync disabled.",
+        msg: checked
+          ? json?.group_created
+            ? "Connect group created and sync enabled."
+            : "Connect group updated and sync enabled."
+          : "Group sync disabled. Linked Connect group was not deleted.",
       });
     } catch (e) {
       setItems(previous);
@@ -1083,7 +1113,7 @@ function WordPressGroupSyncPanel({ token }) {
               WordPress IMAA Group Sync
             </Typography>
             <Typography variant="body2" className="text-slate-500">
-              Phase 1 only imports the WordPress group list. It does not create users or group memberships yet.
+              Phase 2 creates/updates selected Connect groups. It still does not create users or group memberships yet.
             </Typography>
           </Box>
           <TextField
@@ -1095,13 +1125,22 @@ function WordPressGroupSyncPanel({ token }) {
           />
           <Button
             onClick={refreshFromWordPress}
-            disabled={refreshing}
+            disabled={refreshing || syncingEnabled}
             startIcon={<CloudSyncRoundedIcon />}
             variant="outlined"
             className="rounded-xl"
             sx={{ textTransform: "none" }}
           >
             {refreshing ? "Refreshing…" : "Refresh from WP"}
+          </Button>
+          <Button
+            onClick={syncEnabledGroups}
+            disabled={refreshing || syncingEnabled}
+            variant="contained"
+            className="rounded-xl"
+            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          >
+            {syncingEnabled ? "Syncing…" : "Sync Enabled"}
           </Button>
         </Stack>
 
@@ -1123,6 +1162,7 @@ function WordPressGroupSyncPanel({ token }) {
                   <TableCell>WordPress Group</TableCell>
                   <TableCell>WP ID</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Connect Group</TableCell>
                   <TableCell align="right">Members</TableCell>
                   <TableCell align="center">Sync?</TableCell>
                 </TableRow>
@@ -1142,6 +1182,18 @@ function WordPressGroupSyncPanel({ token }) {
                     <TableCell>
                       <Chip size="small" label={row.status || "unknown"} className="bg-slate-100 text-slate-700" />
                     </TableCell>
+                    <TableCell>
+                      {row.linked_group_id ? (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip size="small" color="success" label="Linked" />
+                          <Typography variant="caption" className="text-slate-500">
+                            {row.linked_group_name || `#${row.linked_group_id}`}
+                          </Typography>
+                        </Stack>
+                      ) : (
+                        <Chip size="small" label="Not created" className="bg-slate-100 text-slate-500" />
+                      )}
+                    </TableCell>
                     <TableCell align="right">{row.member_count ?? 0}</TableCell>
                     <TableCell align="center">
                       <Switch
@@ -1158,7 +1210,7 @@ function WordPressGroupSyncPanel({ token }) {
         )}
 
         <Typography variant="caption" className="text-slate-500">
-          Showing {items.length} of {count} imported WordPress groups. Enabling sync only marks selected groups for the next phase.
+          Showing {items.length} of {count} imported WordPress groups. Enabling sync now creates/updates the Connect group only; members/users will be synced in the next phase.
         </Typography>
       </Box>
 
