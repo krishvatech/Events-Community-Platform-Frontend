@@ -1472,29 +1472,30 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   <Typography variant="body2" color="text.secondary">Loading platforms...</Typography>
                 </Stack>
               ) : eventPlatforms.length ? (
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="stretch">
                   {eventPlatforms.map((platform) => {
                     const checked = selectedPlatformSlugs.includes(platform.slug);
                     return (
-                      <FormControlLabel
-                        key={platform.slug}
-                        control={
-                          <Checkbox
-                            checked={checked}
-                            onChange={(event) => {
-                              const isChecked = event.target.checked;
-                              setSelectedPlatformSlugs((current) => {
-                                const next = isChecked
-                                  ? Array.from(new Set([...current, platform.slug]))
-                                  : current.filter((slug) => slug !== platform.slug);
-                                return next;
-                              });
-                              setErrors((prev) => ({ ...prev, platforms: "" }));
-                            }}
-                          />
-                        }
-                        label={platform.name}
-                      />
+                      <Paper key={platform.slug} variant="outlined" sx={{ p: 1.25, minWidth: 210, bgcolor: checked ? "#fff" : "transparent" }}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={checked}
+                              onChange={(event) => {
+                                const isChecked = event.target.checked;
+                                setSelectedPlatformSlugs((current) => {
+                                  const next = isChecked
+                                    ? Array.from(new Set([...current, platform.slug]))
+                                    : current.filter((slug) => slug !== platform.slug);
+                                  return next;
+                                });
+                                setErrors((prev) => ({ ...prev, platforms: "" }));
+                              }}
+                            />
+                          }
+                          label={platform.name}
+                        />
+                      </Paper>
                     );
                   })}
                 </Stack>

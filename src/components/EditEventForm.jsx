@@ -438,6 +438,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setSelectedPlatformSlugs(getEnabledPlatformSlugs(event));
     }, [event?.id, event?.platforms, event?.platform_slugs]);
 
+    const lockedPlatformSlugs = Array.isArray(event?.locked_platform_slugs) ? event.locked_platform_slugs : [];
+    const isPlatformLocked = useCallback((slug) => lockedPlatformSlugs.includes(slug), [lockedPlatformSlugs]);
+
     useEffect(() => {
         let active = true;
         const controller = new AbortController();
@@ -1633,35 +1636,49 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                         Choose where this event should be visible. Registration stays inside each selected platform.
                     </Typography>
+                    {event?.platform_management_note && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                            {event.platform_management_note}
+                        </Typography>
+                    )}
                     {platformsLoading ? (
                         <Stack direction="row" alignItems="center" spacing={1}>
                             <CircularProgress size={16} />
                             <Typography variant="body2" color="text.secondary">Loading platforms...</Typography>
                         </Stack>
                     ) : eventPlatforms.length ? (
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="stretch">
                             {eventPlatforms.map((platform) => {
                                 const checked = selectedPlatformSlugs.includes(platform.slug);
+                                const locked = isPlatformLocked(platform.slug);
                                 return (
-                                    <FormControlLabel
-                                        key={platform.slug}
-                                        control={
-                                            <Checkbox
-                                                checked={checked}
-                                                onChange={(changeEvent) => {
-                                                    const isChecked = changeEvent.target.checked;
-                                                    setSelectedPlatformSlugs((current) => {
-                                                        const next = isChecked
-                                                            ? Array.from(new Set([...current, platform.slug]))
-                                                            : current.filter((slug) => slug !== platform.slug);
-                                                        return next;
-                                                    });
-                                                    setErrors((prev) => ({ ...prev, platforms: "" }));
-                                                }}
-                                            />
-                                        }
-                                        label={platform.name}
-                                    />
+                                    <Paper key={platform.slug} variant="outlined" sx={{ p: 1.25, minWidth: 210, bgcolor: checked ? "#fff" : "transparent" }}>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={checked}
+                                                    disabled={locked}
+                                                    onChange={(changeEvent) => {
+                                                        if (locked) return;
+                                                        const isChecked = changeEvent.target.checked;
+                                                        setSelectedPlatformSlugs((current) => {
+                                                            const next = isChecked
+                                                                ? Array.from(new Set([...current, platform.slug]))
+                                                                : current.filter((slug) => slug !== platform.slug);
+                                                            return next;
+                                                        });
+                                                        setErrors((prev) => ({ ...prev, platforms: "" }));
+                                                    }}
+                                                />
+                                            }
+                                            label={platform.name}
+                                        />
+                                        {locked && (
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                                                Source platform locked here. Change it from the source platform.
+                                            </Typography>
+                                        )}
+                                    </Paper>
                                 );
                             })}
                         </Stack>
