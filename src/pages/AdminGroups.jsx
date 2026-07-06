@@ -995,7 +995,29 @@ function WordPressGroupSyncPanel({ token }) {
   const [syncingEnabled, setSyncingEnabled] = React.useState(false);
   const [syncingMembers, setSyncingMembers] = React.useState(false);
   const [syncingMemberId, setSyncingMemberId] = React.useState(null);
+  const [stats, setStats] = React.useState(null);
+  const [statsLoading, setStatsLoading] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
+
+  const loadStats = React.useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/stats/`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+      setStats(json);
+    } catch (e) {
+      // Stats are helpful but should not block the group table.
+      setStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [token]);
 
   const loadSources = React.useCallback(async () => {
     setLoading(true);
@@ -1022,9 +1044,12 @@ function WordPressGroupSyncPanel({ token }) {
   }, [search, token]);
 
   React.useEffect(() => {
-    const t = setTimeout(() => loadSources(), 250);
+    const t = setTimeout(() => {
+      loadSources();
+      loadStats();
+    }, 250);
     return () => clearTimeout(t);
-  }, [loadSources]);
+  }, [loadSources, loadStats]);
 
   const refreshFromWordPress = async () => {
     setRefreshing(true);
@@ -1044,6 +1069,7 @@ function WordPressGroupSyncPanel({ token }) {
         msg: `WordPress groups refreshed. Created ${json.created || 0}, updated ${json.updated || 0}.`,
       });
       await loadSources();
+      await loadStats();
     } catch (e) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
     } finally {
@@ -1069,6 +1095,7 @@ function WordPressGroupSyncPanel({ token }) {
         msg: `Connect groups synced. Created ${json.created || 0}, updated ${json.updated || 0}${json.failed ? `, failed ${json.failed}` : ""}.`,
       });
       await loadSources();
+      await loadStats();
     } catch (e) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
     } finally {
@@ -1077,6 +1104,10 @@ function WordPressGroupSyncPanel({ token }) {
   };
 
   const syncEnabledMembers = async () => {
+    const ok = window.confirm(
+      "Sync members for ALL enabled WordPress groups? This can create many Connect users. Test individual groups first before running this."
+    );
+    if (!ok) return;
     setSyncingMembers(true);
     try {
       const res = await fetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-members/`, {
@@ -1094,6 +1125,7 @@ function WordPressGroupSyncPanel({ token }) {
         msg: `Members synced. Groups ${json.groups_processed || 0}, users created ${json.users_created || 0}, memberships created ${json.memberships_created || 0}${json.skipped_missing_email ? `, skipped email ${json.skipped_missing_email}` : ""}.`,
       });
       await loadSources();
+      await loadStats();
     } catch (e) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
     } finally {
@@ -1120,6 +1152,7 @@ function WordPressGroupSyncPanel({ token }) {
         type: stats.failed || stats.skipped_missing_email ? "warning" : "success",
         msg: `Members synced for ${json.name}. Users created ${stats.users_created || 0}, memberships created ${stats.memberships_created || 0}${stats.skipped_missing_email ? `, skipped email ${stats.skipped_missing_email}` : ""}.`,
       });
+      await loadStats();
     } catch (e) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
     } finally {
@@ -1151,6 +1184,7 @@ function WordPressGroupSyncPanel({ token }) {
             : "Connect group updated and sync enabled."
           : "Group sync disabled. Linked Connect group was not deleted.",
       });
+      await loadStats();
     } catch (e) {
       setItems(previous);
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
@@ -1207,6 +1241,32 @@ function WordPressGroupSyncPanel({ token }) {
         </Stack>
 
         <Divider />
+
+        <Box className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            ["Imported WP groups", stats?.imported_groups],
+            ["Sync enabled", stats?.sync_enabled_groups],
+            ["Linked Connect groups", stats?.linked_connect_groups],
+            ["WP users synced", stats?.wordpress_users_total],
+            ["Active memberships", stats?.wordpress_memberships_active],
+            ["Selected WP members", stats?.selected_wp_member_total],
+            ["SSO linked users", stats?.wordpress_users_with_cognito_identity],
+            ["No local password", stats?.wordpress_users_with_unusable_password],
+          ].map(([label, value]) => (
+            <Box key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <Typography variant="caption" className="text-slate-500 block">{label}</Typography>
+              <Typography variant="body1" className="font-extrabold text-slate-900">
+                {statsLoading ? "…" : Number(value || 0).toLocaleString()}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        {stats?.wordpress_users_with_usable_password > 0 && (
+          <Alert severity="warning" variant="outlined">
+            {stats.wordpress_users_with_usable_password} WordPress-mapped user(s) have a usable local password. This can be valid for pre-existing users, but newly imported sync users should normally show no local password.
+          </Alert>
+        )}
 
         {loading ? (
           <Box className="py-2"><LinearProgress /></Box>
