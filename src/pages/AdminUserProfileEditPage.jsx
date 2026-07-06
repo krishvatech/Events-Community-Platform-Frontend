@@ -1467,7 +1467,14 @@ export default function AdminUserProfileEditPage() {
   const [websiteErrors, setWebsiteErrors] = useState({});
   const [integrityPromptDismissed, setIntegrityPromptDismissed] = useState(false);
   const [schedulerError, setSchedulerError] = useState("");
-  const [locationForm, setLocationForm] = useState({ city: "", country: "", timezone: "" });
+  const [locationForm, setLocationForm] = useState({
+    city: "",
+    country: "",
+    country_code: "",
+    lat: null,
+    lng: null,
+    timezone: "",
+  });
   const [workOpen, setWorkOpen] = useState(false);
   const [workForm, setWorkForm] = useState({ sector: "", industry: "", employees: "" });
 
@@ -1887,6 +1894,18 @@ export default function AdminUserProfileEditPage() {
           anonymous_profile_views: prof.anonymous_profile_views || false,
           pending_verification_request: prof.pending_verification_request || false,
         });
+        if (prof.location_city || prof.location_country || prof.location_lat != null) {
+          setLocationForm({
+            city: prof.location_city || "",
+            country: prof.location_country || "",
+            country_code: prof.location_country_code || "",
+            lat: prof.location_lat ?? null,
+            lng: prof.location_lng ?? null,
+            timezone: prof.timezone || "",
+          });
+        } else if (prof.location) {
+          setLocationForm((prev) => ({ ...prev, timezone: prof.timezone || "" }));
+        }
         setPostsCount(Number(data?.posts_count) || 0);
         setFriendCount(Number(data?.contacts_count) || 0);
       } catch (e) {
@@ -2536,6 +2555,11 @@ export default function AdminUserProfileEditPage() {
           job_title: form.job_title,
           company: form.company,
           location: locationString,
+          location_city: city,
+          location_country: country,
+          location_country_code: locationForm.country_code || "",
+          location_lat: locationForm.lat,
+          location_lng: locationForm.lng,
           links: parseLinks(form.linksText),
         },
       };
@@ -2545,7 +2569,11 @@ export default function AdminUserProfileEditPage() {
         body: JSON.stringify(payload),
       });
       if (!r.ok) throw new Error("Save failed");
-      setForm((prev) => ({ ...prev, location: locationString, timezone: locationForm.timezone || prev.timezone }));
+      setForm((prev) => ({
+        ...prev,
+        location: locationString,
+        timezone: locationForm.timezone || prev.timezone,
+      }));
       showNotification("success", "Location updated");
       setLocationOpen(false);
     } catch (e) {
@@ -5120,12 +5148,14 @@ export default function AdminUserProfileEditPage() {
                   : null
               }
               onSelect={(place) => {
-                const tz = (place?.timezone || "").trim();
                 setLocationForm((prev) => ({
                   ...prev,
                   city: place?.name || "",
                   country: place?.country || prev.country || "",
-                  timezone: tz ? tz : prev.timezone,
+                  country_code: place?.country_code || prev.country_code || "",
+                  lat: place?.latitude ?? null,
+                  lng: place?.longitude ?? null,
+                  timezone: (place?.timezone || "").trim() || prev.timezone,
                 }));
               }}
             />

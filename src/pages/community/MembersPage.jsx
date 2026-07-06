@@ -262,6 +262,19 @@ function resolveCityName(user) {
   return extractCityFromLocation(loc);
 }
 
+function resolveStoredCoordinates(user) {
+  const lat = user?.profile?.location_lat;
+  const lng = user?.profile?.location_lng;
+
+  const latNum = lat === null || lat === undefined || lat === "" ? null : Number(lat);
+  const lngNum = lng === null || lng === undefined || lng === "" ? null : Number(lng);
+
+  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
+  if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) return null;
+
+  return [lngNum, latNum];
+}
+
 function displayCountry(user) {
   // 1) direct country fields
   const direct =
@@ -1543,6 +1556,8 @@ export default function MembersPage() {
   const cityKeyEntries = useMemo(() => {
     const map = new Map();
     for (const u of filteredMapUsers) {
+      const stored = resolveStoredCoordinates(u);
+      if (stored) continue;
       const city = resolveCityName(u);
       if (!city) continue;
       const code = resolveCountryCode(u);
@@ -1601,7 +1616,8 @@ export default function MembersPage() {
       const key = city
         ? `${String(city).trim().toLowerCase()}|${String(code || "").trim().toUpperCase()}`
         : "";
-      const center = (key && cityCenters[key]) || getCenterForISO2(code);
+      const stored = resolveStoredCoordinates(u);
+      const center = stored || (key && cityCenters[key]) || getCenterForISO2(code);
       if (!center) continue;
       const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
       const bucket = key || code;
