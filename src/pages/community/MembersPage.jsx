@@ -1141,7 +1141,7 @@ export default function MembersPage() {
   const [tabValue, setTabValue] = useState(0);
 
   // map controls
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);  // Map OFF by default
   const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 });
 
   const hasSideMap = true;
