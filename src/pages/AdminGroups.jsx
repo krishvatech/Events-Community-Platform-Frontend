@@ -5,9 +5,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
-  DialogTitle, DialogContent, DialogActions, Popper, Skeleton, Container, Tooltip
+  DialogTitle, DialogContent, DialogActions, Popper, Skeleton, Container, Tooltip,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Divider
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CloudSyncRoundedIcon from "@mui/icons-material/CloudSyncRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
@@ -984,6 +986,196 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
   );
 }
 
+function WordPressGroupSyncPanel({ token }) {
+  const [items, setItems] = React.useState([]);
+  const [count, setCount] = React.useState(0);
+  const [search, setSearch] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
+
+  const loadSources = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page_size: "20" });
+      if (search.trim()) params.set("search", search.trim());
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/?${params.toString()}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+      setItems(Array.isArray(json?.results) ? json.results : []);
+      setCount(Number(json?.count || 0));
+    } catch (e) {
+      setItems([]);
+      setCount(0);
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setLoading(false);
+    }
+  }, [search, token]);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => loadSources(), 250);
+    return () => clearTimeout(t);
+  }, [loadSources]);
+
+  const refreshFromWordPress = async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/refresh/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+      setToast({
+        open: true,
+        type: "success",
+        msg: `WordPress groups refreshed. Created ${json.created || 0}, updated ${json.updated || 0}.`,
+      });
+      await loadSources();
+    } catch (e) {
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const toggleSync = async (row, checked) => {
+    const previous = items;
+    setItems((prev) => prev.map((x) => x.wp_group_id === row.wp_group_id ? { ...x, sync_enabled: checked } : x));
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/${row.wp_group_id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ sync_enabled: checked }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+      setItems((prev) => prev.map((x) => x.wp_group_id === row.wp_group_id ? json : x));
+      setToast({
+        open: true,
+        type: "success",
+        msg: checked ? "Group marked for sync." : "Group sync disabled.",
+      });
+    } catch (e) {
+      setItems(previous);
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    }
+  };
+
+  return (
+    <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-6 overflow-hidden">
+      <Box className="p-4 flex flex-col gap-3">
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }}>
+          <Box className="flex-1">
+            <Typography variant="h6" className="font-extrabold text-slate-900">
+              WordPress IMAA Group Sync
+            </Typography>
+            <Typography variant="body2" className="text-slate-500">
+              Phase 1 only imports the WordPress group list. It does not create users or group memberships yet.
+            </Typography>
+          </Box>
+          <TextField
+            size="small"
+            placeholder="Search WP groups…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ width: { xs: "100%", md: 280 } }}
+          />
+          <Button
+            onClick={refreshFromWordPress}
+            disabled={refreshing}
+            startIcon={<CloudSyncRoundedIcon />}
+            variant="outlined"
+            className="rounded-xl"
+            sx={{ textTransform: "none" }}
+          >
+            {refreshing ? "Refreshing…" : "Refresh from WP"}
+          </Button>
+        </Stack>
+
+        <Divider />
+
+        {loading ? (
+          <Box className="py-2"><LinearProgress /></Box>
+        ) : items.length === 0 ? (
+          <Box className="py-6 text-center">
+            <Typography variant="body2" className="text-slate-500">
+              No WordPress groups imported yet. Click “Refresh from WP” after WP API credentials are configured.
+            </Typography>
+          </Box>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>WordPress Group</TableCell>
+                  <TableCell>WP ID</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Members</TableCell>
+                  <TableCell align="center">Sync?</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {items.map((row) => (
+                  <TableRow key={row.wp_group_id} hover>
+                    <TableCell>
+                      <Typography variant="body2" className="font-semibold text-slate-800">
+                        {row.name}
+                      </Typography>
+                      <Typography variant="caption" className="text-slate-500 block">
+                        {row.slug || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{row.wp_group_id}</TableCell>
+                    <TableCell>
+                      <Chip size="small" label={row.status || "unknown"} className="bg-slate-100 text-slate-700" />
+                    </TableCell>
+                    <TableCell align="right">{row.member_count ?? 0}</TableCell>
+                    <TableCell align="center">
+                      <Switch
+                        checked={!!row.sync_enabled}
+                        onChange={(e) => toggleSync(row, e.target.checked)}
+                        inputProps={{ "aria-label": `Toggle sync for ${row.name}` }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+
+        <Typography variant="caption" className="text-slate-500">
+          Showing {items.length} of {count} imported WordPress groups. Enabling sync only marks selected groups for the next phase.
+        </Typography>
+      </Box>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3500}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert severity={toast.type} variant="filled" onClose={() => setToast((t) => ({ ...t, open: false }))}>
+          {toast.msg}
+        </Alert>
+      </Snackbar>
+    </Paper>
+  );
+}
+
 // ---- Page ----
 export default function AdminGroups() {
   const token = getToken();
@@ -1187,6 +1379,8 @@ export default function AdminGroups() {
         />
         <Box sx={{ flex: 1 }} />
       </Stack >
+
+      {owner && <WordPressGroupSyncPanel token={token} />}
 
       {/* Grid */}
       {
