@@ -1230,8 +1230,26 @@ export default function EventDetailsPage() {
         return;
       }
 
+      const okData = await res.json().catch(() => ({}));
+      const responseRegistration = okData?.registration || null;
       const mineForEvent = await fetchMyRegistrationForEvent(event.id, token);
-      setRegistration(mineForEvent || null);
+      const nextRegistration = mineForEvent || responseRegistration || null;
+      setRegistration(nextRegistration);
+
+      if (nextRegistration?.status === "registered" && nextRegistration?.attendee_status !== "cancelled") {
+        setEvent((prev) => prev ? {
+          ...prev,
+          is_confirmed_registered: nextRegistration.attendee_status === "confirmed" || !nextRegistration.attendee_status,
+          registration_status: nextRegistration.status,
+          attendee_status: nextRegistration.attendee_status || "confirmed",
+          user_status: prev.user_status ? {
+            ...prev.user_status,
+            registration_status: nextRegistration.status,
+            attendee_status: nextRegistration.attendee_status || "confirmed",
+            is_confirmed_registered: nextRegistration.attendee_status === "confirmed" || !nextRegistration.attendee_status,
+          } : prev.user_status,
+        } : prev);
+      }
 
       // Refetch event to update can_signup_for_replay and has_replay_access fields
       try {
