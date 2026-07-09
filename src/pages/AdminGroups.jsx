@@ -6,7 +6,7 @@ import {
   Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
   DialogTitle, DialogContent, DialogActions, Popper, Skeleton, Container, Tooltip,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Divider
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Divider, Tabs, Tab
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import CloudSyncRoundedIcon from "@mui/icons-material/CloudSyncRounded";
@@ -998,6 +998,32 @@ function WordPressGroupSyncPanel({ token }) {
   const [stats, setStats] = React.useState(null);
   const [statsLoading, setStatsLoading] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
+  const [sourcePage, setSourcePage] = React.useState(1);
+  const [sourcePageSize, setSourcePageSize] = React.useState(20);
+  const [syncFilter, setSyncFilter] = React.useState("all");
+  const [linkedFilter, setLinkedFilter] = React.useState("all");
+  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [membersFilter, setMembersFilter] = React.useState("all");
+
+  const hasFilters =
+    !!search.trim() ||
+    syncFilter !== "all" ||
+    linkedFilter !== "all" ||
+    statusFilter !== "all" ||
+    membersFilter !== "all";
+
+  const pageCount = Math.max(1, Math.ceil(count / sourcePageSize));
+  const showingFrom = count === 0 ? 0 : ((sourcePage - 1) * sourcePageSize) + 1;
+  const showingTo = count === 0 ? 0 : Math.min(sourcePage * sourcePageSize, count);
+
+  const resetFilters = () => {
+    setSearch("");
+    setSyncFilter("all");
+    setLinkedFilter("all");
+    setStatusFilter("all");
+    setMembersFilter("all");
+    setSourcePage(1);
+  };
 
   const loadStats = React.useCallback(async () => {
     setStatsLoading(true);
@@ -1022,8 +1048,18 @@ function WordPressGroupSyncPanel({ token }) {
   const loadSources = React.useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page_size: "20" });
+      const params = new URLSearchParams({
+        page: String(sourcePage),
+        page_size: String(sourcePageSize),
+      });
       if (search.trim()) params.set("search", search.trim());
+      if (syncFilter === "enabled") params.set("sync_enabled", "true");
+      if (syncFilter === "disabled") params.set("sync_enabled", "false");
+      if (linkedFilter === "linked") params.set("linked", "true");
+      if (linkedFilter === "not_linked") params.set("linked", "false");
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (membersFilter === "has_members") params.set("has_members", "true");
+      if (membersFilter === "empty") params.set("has_members", "false");
       const res = await fetch(`${API_ROOT}/groups/wordpress-sources/?${params.toString()}`, {
         headers: {
           "Content-Type": "application/json",
@@ -1041,7 +1077,15 @@ function WordPressGroupSyncPanel({ token }) {
     } finally {
       setLoading(false);
     }
-  }, [search, token]);
+  }, [search, token, sourcePage, sourcePageSize, syncFilter, linkedFilter, statusFilter, membersFilter]);
+
+  React.useEffect(() => {
+    setSourcePage(1);
+  }, [search, sourcePageSize, syncFilter, linkedFilter, statusFilter, membersFilter]);
+
+  React.useEffect(() => {
+    if (sourcePage > pageCount) setSourcePage(pageCount);
+  }, [sourcePage, pageCount]);
 
   React.useEffect(() => {
     const t = setTimeout(() => {
@@ -1068,6 +1112,7 @@ function WordPressGroupSyncPanel({ token }) {
         type: "success",
         msg: `WordPress groups refreshed. Created ${json.created || 0}, updated ${json.updated || 0}.`,
       });
+      setSourcePage(1);
       await loadSources();
       await loadStats();
     } catch (e) {
@@ -1200,7 +1245,7 @@ function WordPressGroupSyncPanel({ token }) {
               WordPress IMAA Group Sync
             </Typography>
             <Typography variant="body2" className="text-slate-500">
-              Phase 3 creates/updates selected Connect groups and can sync members into Connect users/group memberships.
+              Import WordPress groups, enable only selected groups, create linked Connect groups, and sync members when needed.
             </Typography>
           </Box>
           <TextField
@@ -1238,6 +1283,81 @@ function WordPressGroupSyncPanel({ token }) {
           >
             {syncingMembers ? "Syncing Members…" : "Sync Members"}
           </Button>
+        </Stack>
+
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
+          <TextField
+            size="small"
+            select
+            label="Sync status"
+            value={syncFilter}
+            onChange={(e) => setSyncFilter(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 150 } }}
+          >
+            <MenuItem value="all">All groups</MenuItem>
+            <MenuItem value="enabled">Sync enabled</MenuItem>
+            <MenuItem value="disabled">Sync disabled</MenuItem>
+          </TextField>
+          <TextField
+            size="small"
+            select
+            label="Connect link"
+            value={linkedFilter}
+            onChange={(e) => setLinkedFilter(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 160 } }}
+          >
+            <MenuItem value="all">All links</MenuItem>
+            <MenuItem value="linked">Linked</MenuItem>
+            <MenuItem value="not_linked">Not linked</MenuItem>
+          </TextField>
+          <TextField
+            size="small"
+            select
+            label="WP status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 140 } }}
+          >
+            <MenuItem value="all">All statuses</MenuItem>
+            <MenuItem value="public">Public</MenuItem>
+            <MenuItem value="private">Private</MenuItem>
+            <MenuItem value="hidden">Hidden</MenuItem>
+          </TextField>
+          <TextField
+            size="small"
+            select
+            label="Members"
+            value={membersFilter}
+            onChange={(e) => setMembersFilter(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 140 } }}
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="has_members">Has members</MenuItem>
+            <MenuItem value="empty">No members</MenuItem>
+          </TextField>
+          <TextField
+            size="small"
+            select
+            label="Rows"
+            value={sourcePageSize}
+            onChange={(e) => setSourcePageSize(Number(e.target.value) || 20)}
+            sx={{ minWidth: { xs: "100%", md: 110 } }}
+          >
+            {[20, 50, 100].map((n) => (
+              <MenuItem key={n} value={n}>{n}</MenuItem>
+            ))}
+          </TextField>
+          <Box sx={{ flex: 1 }} />
+          {hasFilters && (
+            <Button
+              onClick={resetFilters}
+              variant="text"
+              className="rounded-xl"
+              sx={{ textTransform: "none" }}
+            >
+              Clear filters
+            </Button>
+          )}
         </Stack>
 
         <Divider />
@@ -1345,9 +1465,24 @@ function WordPressGroupSyncPanel({ token }) {
           </TableContainer>
         )}
 
-        <Typography variant="caption" className="text-slate-500">
-          Showing {items.length} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members creates missing local users and memberships for selected groups.
-        </Typography>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          justifyContent="space-between"
+        >
+          <Typography variant="caption" className="text-slate-500">
+            Showing {showingFrom}-{showingTo} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members creates missing local users and memberships for selected groups.
+          </Typography>
+          <Pagination
+            count={pageCount}
+            page={sourcePage}
+            onChange={(_, v) => setSourcePage(v)}
+            shape="rounded"
+            size="small"
+            disabled={loading}
+          />
+        </Stack>
       </Box>
 
       <Snackbar
@@ -1395,6 +1530,14 @@ export default function AdminGroups() {
   const [page, setPage] = React.useState(1);
   const owner = isOwnerUser();
   const staff = isStaffUser();
+
+  const query = React.useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const activeTab = owner && query.get("tab") === "wordpress-sync" ? "wordpress-sync" : "connect-groups";
+
+  const changeTab = (_, value) => {
+    const search = value === "wordpress-sync" ? "?tab=wordpress-sync" : "";
+    navigate({ pathname: location.pathname, search }, { replace: false });
+  };
 
   const onUpdated = (updated) => {
     setGroups((prev) =>
@@ -1549,6 +1692,29 @@ export default function AdminGroups() {
         }
       </Box >
 
+      {owner && (
+        <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-5 overflow-hidden">
+          <Tabs
+            value={activeTab}
+            onChange={changeTab}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              px: 2,
+              minHeight: 48,
+              "& .MuiTab-root": { textTransform: "none", fontWeight: 700, minHeight: 48 },
+              "& .Mui-selected": { color: "#0ea5a4 !important" },
+              "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+            }}
+          >
+            <Tab value="connect-groups" label="Groups" />
+            <Tab value="wordpress-sync" label="WordPress Sync" />
+          </Tabs>
+        </Paper>
+      )}
+
+      {activeTab === "connect-groups" && (
+        <>
       {/* Search */}
       < Stack
         direction={{ xs: "column", sm: "row" }
@@ -1567,8 +1733,6 @@ export default function AdminGroups() {
         />
         <Box sx={{ flex: 1 }} />
       </Stack >
-
-      {owner && <WordPressGroupSyncPanel token={token} />}
 
       {/* Grid */}
       {
@@ -1636,6 +1800,12 @@ export default function AdminGroups() {
           </Box>
         )
       }
+        </>
+      )}
+
+      {owner && activeTab === "wordpress-sync" && (
+        <WordPressGroupSyncPanel token={token} />
+      )}
 
       {/* Create Group Dialog */}
       <CreateGroupDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={onCreated} />
