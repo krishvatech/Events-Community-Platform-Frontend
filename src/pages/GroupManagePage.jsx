@@ -3,7 +3,7 @@ import React from "react";
 import {
     Alert, Avatar, AvatarGroup, Box, Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogContentText,
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
-    TextField, Typography, Switch, FormControlLabel, CircularProgress,
+    TextField, Typography, Switch, FormControlLabel, CircularProgress, Pagination,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
     IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar, Autocomplete,
     FormControl, RadioGroup, Radio, Checkbox, ListItemButton
@@ -37,6 +37,9 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
 
+
+// Number of members shown per page in the Members tab list.
+const MEMBERS_PER_PAGE = 20;
 
 // ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -3520,6 +3523,8 @@ export default function GroupManagePage() {
     const [members, setMembers] = React.useState([]);
     const [memLoading, setMemLoading] = React.useState(true);
     const [memError, setMemError] = React.useState("");
+    // Current page (1-based) for the Members tab list.
+    const [memberPage, setMemberPage] = React.useState(1);
     const [addOpen, setAddOpen] = React.useState(false);
     const [inviteEmailsOpen, setInviteEmailsOpen] = React.useState(false);
     const [requestAddOpen, setRequestAddOpen] = React.useState(false);
@@ -4646,6 +4651,30 @@ export default function GroupManagePage() {
         return ids.size; // => at least 1 when owner exists
     }, [membersWithOwner]);
 
+    // Members sorted once (Owner → Admin → Moderator → Member → Name), then paged
+    // for display. Sorting the full list keeps ordering stable across pages.
+    const sortedMembersWithOwner = React.useMemo(() => {
+        const rank = { owner: 0, admin: 1, moderator: 2, member: 3 };
+        return (membersWithOwner || []).slice().sort((a, b) => {
+            const ar = (a.user?.id === ownerId) ? 0 : (rank[a.role] ?? 99);
+            const br = (b.user?.id === ownerId) ? 0 : (rank[b.role] ?? 99);
+            if (ar !== br) return ar - br;
+            return (a.user?.name || "").localeCompare(b.user?.name || "");
+        });
+    }, [membersWithOwner, ownerId]);
+
+    const memberPageCount = Math.max(1, Math.ceil(sortedMembersWithOwner.length / MEMBERS_PER_PAGE));
+
+    // Keep the current page within range when the member list changes (add/remove/refresh).
+    React.useEffect(() => {
+        setMemberPage((p) => Math.min(Math.max(1, p), memberPageCount));
+    }, [memberPageCount]);
+
+    const pagedMembersWithOwner = React.useMemo(() => {
+        const start = (memberPage - 1) * MEMBERS_PER_PAGE;
+        return sortedMembersWithOwner.slice(start, start + MEMBERS_PER_PAGE);
+    }, [sortedMembersWithOwner, memberPage]);
+
     // action menu handlers
     const openMemberMenu = (evt, m) => {
         if (myRole === "admin" && currentUserId && Number(m.user.id) === Number(currentUserId)) return;
@@ -5283,16 +5312,7 @@ export default function GroupManagePage() {
                                         ) : (
                                             <>
                                                 <Stack divider={<Divider />} spacing={1}>
-                                                    {membersWithOwner
-                                                        .slice()
-                                                        .sort((a, b) => {
-                                                            // Owner → Admin → Moderator → Member → Name
-                                                            const rank = { owner: 0, admin: 1, moderator: 2, member: 3 };
-                                                            const ar = (a.user?.id === ownerId) ? 0 : (rank[a.role] ?? 99);
-                                                            const br = (b.user?.id === ownerId) ? 0 : (rank[b.role] ?? 99);
-                                                            if (ar !== br) return ar - br;
-                                                            return (a.user?.name || "").localeCompare(b.user?.name || "");
-                                                        })
+                                                    {pagedMembersWithOwner
                                                         .map((m) => {
                                                             const isOwnerRow = ownerId && Number(m.user.id) === Number(ownerId);
                                                             const role = isOwnerRow ? "owner" : m.role;
@@ -5357,6 +5377,31 @@ export default function GroupManagePage() {
                                                             );
                                                         })}
                                                 </Stack>
+
+                                                {sortedMembersWithOwner.length > MEMBERS_PER_PAGE && (
+                                                    <Stack
+                                                        direction={{ xs: "column", sm: "row" }}
+                                                        alignItems="center"
+                                                        justifyContent="space-between"
+                                                        spacing={1}
+                                                        className="mt-4"
+                                                    >
+                                                        <Typography variant="caption" className="text-slate-500">
+                                                            Showing {(memberPage - 1) * MEMBERS_PER_PAGE + 1}
+                                                            –{Math.min(memberPage * MEMBERS_PER_PAGE, sortedMembersWithOwner.length)}
+                                                            {" "}of {sortedMembersWithOwner.length}
+                                                        </Typography>
+                                                        <Pagination
+                                                            count={memberPageCount}
+                                                            page={memberPage}
+                                                            onChange={(_, value) => setMemberPage(value)}
+                                                            color="primary"
+                                                            shape="rounded"
+                                                            siblingCount={1}
+                                                            boundaryCount={1}
+                                                        />
+                                                    </Stack>
+                                                )}
 
                                                 {/* Per-member action menu */}
                                                 <Menu
