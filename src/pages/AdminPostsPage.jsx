@@ -1306,6 +1306,7 @@ function CommentsDialog({
       const r = await fetch(toApiUrl(`engagements/comments/${confirmDelId}/`), { method: "DELETE", headers: { ...authHeaders() } });
       if (!r.ok) throw new Error();
       await load();
+      alert("The comment was removed from the platform and remains stored in the database with its replies, reactions and reports.");
     } catch { alert("Could not delete comment."); }
     finally { setDelBusy(false); setConfirmDelId(null); }
   }
@@ -1314,7 +1315,7 @@ function CommentsDialog({
     <Dialog open={!!confirmDelId} onClose={() => !delBusy && setConfirmDelId(null)} maxWidth="xs" fullWidth>
       <DialogTitle>Delete comment?</DialogTitle>
       <DialogContent>
-        <DialogContentText>Are you sure you want to delete this comment?</DialogContentText>
+        <DialogContentText>This comment will be removed from the platform, but it and its replies, reactions, reports and history will remain stored in the database.</DialogContentText>
       </DialogContent>
       <DialogActions>
         <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>Cancel</Button>

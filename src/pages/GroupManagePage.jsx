@@ -1988,6 +1988,7 @@ function GroupCommentsDialog({
     inline = false,
     initialCount = 3,
     inputRef = null,
+    onNotify = () => {},
 }) {
     const [loading, setLoading] = React.useState(false);
     const [me, setMe] = React.useState(null);
@@ -2187,11 +2188,12 @@ function GroupCommentsDialog({
             if (r.ok) {
                 await load();
                 setConfirmDelId(null);
+                onNotify("The comment was removed from the platform and remains stored in the database with its replies, reactions and reports.", "success");
             } else {
                 throw new Error("Failed to delete");
             }
         } catch {
-            alert("Could not delete comment.");
+            onNotify("Could not delete comment.", "error");
         } finally {
             setDelBusy(false);
         }
@@ -2207,8 +2209,7 @@ function GroupCommentsDialog({
             <DialogTitle>Delete Comment?</DialogTitle>
             <DialogContent>
                 <DialogContentText>
-                    Are you sure you want to delete this comment?
-                    This action cannot be undone.
+                    This comment will be removed from the platform, but it and its replies, reactions, reports and history will remain stored in the database.
                 </DialogContentText>
             </DialogContent>
             <DialogActions>
@@ -2551,7 +2552,7 @@ function GroupSharePickerDialog({ open, onClose, groupIdOrSlug, postId, onShared
 }
 
 // ---------- Social row under each post (Updated with Reactions) ----------
-function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
+function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post, onNotify = () => {} }) {
     const [likesOpen, setLikesOpen] = React.useState(false);
     const [commentsOpen, setCommentsOpen] = React.useState(false);
     const [sharesOpen, setSharesOpen] = React.useState(false);
@@ -2847,6 +2848,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                 postId={Number(post.feed_item_id ?? post.id)}
                 groupOwnerId={groupOwnerId}
                 onBumpCount={bumpCommentCount}
+                onNotify={onNotify}
             />
 
             <GroupLikesDialog
@@ -4396,13 +4398,19 @@ export default function GroupManagePage() {
         }
 
         if (!ok) {
-            alert(`Failed to delete: ${lastErr || "Unknown error"}`);
+            showSnackbar(`Failed to delete: ${lastErr || "Unknown error"}`, "error");
             return;
         }
 
         setDeleteConfirmOpen(false);
         await fetchPosts();
         setPostMenuAnchor(null);
+        showSnackbar(
+            String(activePost.type).toLowerCase() === "poll"
+                ? "The poll was removed from the platform and remains stored in the database with its options, votes, comments, reactions and reports."
+                : "The post was removed from the platform and remains stored in the database with its comments, reactions, reports and history.",
+            "success"
+        );
     };
 
 
@@ -6180,6 +6188,7 @@ export default function GroupManagePage() {
                                                                     groupIdOrSlug={idOrSlug}
                                                                     groupOwnerId={group?.created_by?.id}
                                                                     post={p}
+                                                                    onNotify={showSnackbar}
                                                                 />
                                                             </Paper>
                                                         );
@@ -6796,7 +6805,7 @@ export default function GroupManagePage() {
                         <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
                             <DialogTitle>Delete this post?</DialogTitle>
                             <DialogContent>
-                                <Typography>This action can’t be undone. The post will be permanently removed for this group.</Typography>
+                                <Typography>This content will be removed from the platform, but it and all related comments, reactions, poll votes, reports and history will remain stored in the database.</Typography>
                             </DialogContent>
                             <DialogActions>
                                 <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>

@@ -98,10 +98,12 @@ const LINKEDIN_COMPANY_SIZES = [
   "10000+",
 ];
 
-const RAW_BASE =
-  (typeof window !== "undefined" && window.API_BASE_URL) ||
-  import.meta?.env?.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000";
+const ENV_API_BASE = String(import.meta.env.VITE_API_BASE_URL || "").trim();
+const RUNTIME_API_BASE =
+  typeof window !== "undefined" ? String(window.API_BASE_URL || "").trim() : "";
+
+// Prefer Vite's environment value. A stale runtime global must not override .env.
+const RAW_BASE = ENV_API_BASE || RUNTIME_API_BASE || "http://127.0.0.1:8001/api";
 
 const ORIGIN = String(RAW_BASE).trim().replace(/\/+$/, "");
 const API_BASE = /\/api(\/|$)/i.test(ORIGIN) ? ORIGIN : `${ORIGIN}/api`;
@@ -540,7 +542,7 @@ function normalizeCommentRow(c) {
   };
 }
 
-function CommentsDialog({ open, onClose, postId, target, inline = false, initialCount = 3, onBumpCount, inputRef }) {
+function CommentsDialog({ open, onClose, postId, target, inline = false, initialCount = 3, onBumpCount, inputRef, onNotify = () => {} }) {
   const [loading, setLoading] = React.useState(false);
   const [items, setItems] = React.useState([]);
   const [text, setText] = React.useState("");
@@ -670,15 +672,24 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
     // Optimistic remove
     const cid = confirmDelId;
     try {
-      await fetch(toApiUrl(`engagements/comments/${cid}/`), {
+      const response = await fetch(toApiUrl(`engagements/comments/${cid}/`), {
         method: "DELETE", headers: authHeaders(),
       });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.detail || "Could not delete comment");
+      }
       // Remove from UI
       setItems(curr => curr.filter(x => x.id !== cid));
       setConfirmDelId(null);
       await load();
-    } catch {
+      onNotify(
+        "The comment was removed from the platform and remains stored in the database with its replies, reactions and reports.",
+        "success"
+      );
+    } catch (error) {
       await load(); // Rollback
+      onNotify(error?.message || "Could not delete comment.", "error");
     } finally {
       setDelBusy(false);
     }
@@ -778,7 +789,7 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
       <Dialog open={!!confirmDelId} onClose={() => { if (!delBusy) setConfirmDelId(null); }}>
         <DialogTitle>Delete Comment?</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete this comment? This action cannot be undone.</Typography>
+          <Typography>This comment will be removed from the platform, but it and its replies, reactions, reports and history will remain stored in the database.</Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>Cancel</Button>
@@ -1174,7 +1185,7 @@ function ReportDialog({ open, onClose, onSubmit, loading, targetLabel }) {
 // -----------------------------------------------------------------------------
 // 6. POST CARD
 // -----------------------------------------------------------------------------
-function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, onDelete, canEdit, canDelete, viewerId, viewerIsStaff, commentsEnabled }) {
+function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, onDelete, canEdit, canDelete, viewerId, viewerIsStaff, commentsEnabled, onNotify = () => {} }) {
   const [local, setLocal] = React.useState(post);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
@@ -1513,6 +1524,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
           target={engageTargetOf(local)}
           onBumpCount={bumpCommentCount}
           inputRef={commentInputRef}
+          onNotify={onNotify}
         />
       )}
 
@@ -1534,7 +1546,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
 // 7. TABS CONTENT
 // -----------------------------------------------------------------------------
 
-function PostsTab({ groupId, group, moderatorCanI }) {
+function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
   const [posts, setPosts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [postsMeta, setPostsMeta] = React.useState(null);
@@ -1686,7 +1698,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
           }))
         } : x));
       }
-    } catch { alert("Vote failed"); }
+    } catch (error) { onNotify(error?.message || "Vote failed.", "error"); }
   };
 
   const handleReact = async (postId, reactionId) => {
@@ -1776,7 +1788,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
       });
 
       if (res.status === 409) {
-        alert("You already reported this content.");
+        onNotify("You already reported this content.", "warning");
         setReportBusy(false);
         return;
       }
@@ -1790,7 +1802,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
       setReportOpen(false);
       setReportTarget(null);
     } catch (e) {
-      alert("Could not submit report. Please try again.");
+      onNotify(e?.message || "Could not submit report. Please try again.", "error");
     } finally {
       setReportBusy(false);
     }
@@ -1904,7 +1916,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
       setEditPost(null);
       await fetchPosts();
     } catch (e) {
-      alert(e.message || "Failed to edit post");
+      onNotify(e?.message || "Failed to edit post", "error");
     } finally {
       setEditBusy(false);
     }
@@ -1942,9 +1954,16 @@ function PostsTab({ groupId, group, moderatorCanI }) {
       }
       await fetchPosts();
       setDeleteOpen(false);
+      const deletedType = String(deletePost.type).toLowerCase();
       setDeletePost(null);
+      onNotify(
+        deletedType === "poll"
+          ? "The poll was removed from the platform and remains stored in the database with its options, votes, comments, reactions and reports."
+          : "The post was removed from the platform and remains stored in the database with its comments, reactions, reports and history.",
+        "success"
+      );
     } catch (e) {
-      alert(e.message || "Failed to delete post");
+      onNotify(e?.message || "Failed to delete post", "error");
     } finally {
       setDeleteBusy(false);
     }
@@ -2001,9 +2020,18 @@ function PostsTab({ groupId, group, moderatorCanI }) {
           headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify(payload),
         });
+        const responseData = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || "Failed to create poll");
+          const fieldMessages = Object.entries(responseData || {})
+            .flatMap(([field, value]) => {
+              if (field === "detail" || field === "error") return [];
+              const values = Array.isArray(value) ? value : [value];
+              return values.filter(Boolean).map((entry) => `${field}: ${typeof entry === "string" ? entry : entry?.detail || "Invalid value"}`);
+            });
+          throw new Error(responseData.detail || responseData.error || fieldMessages.join(" ") || "Failed to create poll");
+        }
+        if (!responseData?.feed_item_id) {
+          console.warn("Poll created without a feed_item_id; refreshing the group feed.", responseData);
         }
       } else {
         const text = postText.trim();
@@ -2025,8 +2053,9 @@ function PostsTab({ groupId, group, moderatorCanI }) {
       setPollQuestion("");
       setPollOptions(["", ""]);
       await fetchPosts();
+      onNotify(postType === "poll" ? "Poll created successfully." : "Post created successfully.", "success");
     } catch (e) {
-      alert(e.message || "Failed to create post");
+      onNotify(e?.message || (postType === "poll" ? "Failed to create poll" : "Failed to create post"), "error");
     } finally {
       setPostBusy(false);
     }
@@ -2192,6 +2221,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
               viewerId={viewerId}
               viewerIsStaff={viewerIsStaff}
               commentsEnabled={Boolean(group?.posts_comments_enabled)}
+              onNotify={onNotify}
             />
           );
         })
@@ -2281,7 +2311,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
         <DialogTitle>Delete Post?</DialogTitle>
         <DialogContent dividers>
           <Typography>
-            This will permanently delete the post. This action cannot be undone.
+            This content will be removed from the platform, but it and all related comments, reactions, poll votes, reports and history will remain stored in the database.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -3730,6 +3760,9 @@ export default function GroupDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [group, setGroup] = React.useState(null);
+  const [groupLoading, setGroupLoading] = React.useState(true);
+  const [groupError, setGroupError] = React.useState("");
+  const groupRequestIdRef = React.useRef(0);
   const [tab, setTab] = React.useState(0);
   const requestedTab = React.useMemo(() => {
     const value = new URLSearchParams(location.search).get("tab");
@@ -3741,6 +3774,9 @@ export default function GroupDetailsPage() {
   const [moderatorCanI, setModeratorCanI] = React.useState(null);
 
   const [toast, setToast] = React.useState({ open: false, msg: "", type: "info" });
+  const notify = React.useCallback((msg, type = "info") => {
+    setToast({ open: true, msg: String(msg || ""), type });
+  }, []);
   const [leaveDialogOpen, setLeaveDialogOpen] = React.useState(false);
 
   // Back Button Logic
@@ -3749,25 +3785,72 @@ export default function GroupDetailsPage() {
 
   // --- Actions ---
   const fetchGroup = React.useCallback(async () => {
-    try {
-      const rMe = await fetch(toApiUrl("users/me/"), { headers: { Accept: "application/json", ...authHeaders() } });
-      if (rMe.ok) setMe(await rMe.json());
+    const requestId = ++groupRequestIdRef.current;
+    const headers = { Accept: "application/json", ...authHeaders() };
 
-      const rGroup = await fetch(toApiUrl(`groups/${groupId}/`), { headers: { Accept: "application/json", ...authHeaders() } });
-      if (rGroup.ok) setGroup(await rGroup.json());
+    setGroupLoading(true);
+    setGroupError("");
 
-      const rCan = await fetch(toApiUrl(`groups/${groupId}/moderator/can-i/`), { headers: { Accept: "application/json", ...authHeaders() } });
-      if (rCan.ok) {
-        const can = await rCan.json();
-        setCanSeeRequests(Boolean(can?.is_admin || can?.is_moderator));
-        setCanApproveRequests(Boolean(can?.is_admin));
-        setModeratorCanI(can);
-      } else {
+    // Start all independent requests together. The group request controls the
+    // visible page, so it is no longer blocked by users/me or moderator checks.
+    const meTask = (async () => {
+      try {
+        const response = await fetch(toApiUrl("users/me/"), { headers });
+        if (response.ok && requestId === groupRequestIdRef.current) {
+          setMe(await response.json());
+        }
+      } catch {
+        // The group page can still render without refreshing the current user.
+      }
+    })();
+
+    const permissionsTask = (async () => {
+      try {
+        const response = await fetch(
+          toApiUrl(`groups/${groupId}/moderator/can-i/`),
+          { headers }
+        );
+        if (requestId !== groupRequestIdRef.current) return;
+        if (response.ok) {
+          const can = await response.json();
+          setCanSeeRequests(Boolean(can?.is_admin || can?.is_moderator));
+          setCanApproveRequests(Boolean(can?.is_admin));
+          setModeratorCanI(can);
+          return;
+        }
+      } catch {
+        // Fall through to the safe no-permission state below.
+      }
+
+      if (requestId === groupRequestIdRef.current) {
         setCanSeeRequests(false);
         setCanApproveRequests(false);
         setModeratorCanI(null);
       }
-    } catch { }
+    })();
+
+    try {
+      const response = await fetch(toApiUrl(`groups/${groupId}/`), { headers });
+      const data = await response.json().catch(() => ({}));
+      if (requestId !== groupRequestIdRef.current) return;
+
+      if (!response.ok) {
+        throw new Error(data?.detail || "Failed to load this group.");
+      }
+      setGroup(data);
+    } catch (error) {
+      if (requestId === groupRequestIdRef.current) {
+        setGroup(null);
+        setGroupError(error?.message || "Failed to load this group.");
+      }
+    } finally {
+      if (requestId === groupRequestIdRef.current) {
+        setGroupLoading(false);
+      }
+    }
+
+    // Prevent rejected background requests from becoming unhandled promises.
+    void Promise.allSettled([meTask, permissionsTask]);
   }, [groupId]);
 
   React.useEffect(() => {
@@ -3987,7 +4070,7 @@ export default function GroupDetailsPage() {
           />
         )
       },
-      { key: "posts", label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} /> },
+      { key: "posts", label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} onNotify={notify} /> },
     ];
     if (canSeeRequests) {
       items.push({
@@ -4015,7 +4098,7 @@ export default function GroupDetailsPage() {
       });
     }
     return items;
-  }, [canApproveRequests, canSeeRequests, group, groupId]);
+  }, [canApproveRequests, canSeeRequests, group, groupId, me, moderatorCanI]);
 
   React.useEffect(() => {
     if (tab >= tabDefs.length) setTab(0);
@@ -4086,24 +4169,34 @@ export default function GroupDetailsPage() {
               }}
             >
               <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar
-                  src={toMediaUrl(group?.logo || group?.avatar || group?.photo || group?.image)}
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    fontSize: 32,
-                    bgcolor: "primary.light",
-                  }}
-                >
-                  {(group?.name || "G")[0]}
-                </Avatar>
+                {groupLoading && !group ? (
+                  <Skeleton variant="circular" width={80} height={80} />
+                ) : (
+                  <Avatar
+                    src={toMediaUrl(group?.logo || group?.avatar || group?.photo || group?.image)}
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      fontSize: 32,
+                      bgcolor: "primary.light",
+                    }}
+                  >
+                    {(group?.name || "G")[0]}
+                  </Avatar>
+                )}
                 <Box>
-                  <Typography variant="h5" fontWeight={700}>
-                    {group?.name || "Loading..."}
+                  <Typography variant="h5" fontWeight={700} component="div">
+                    {groupLoading && !group ? (
+                      <Skeleton width={240} height={36} />
+                    ) : (group?.name || "Group unavailable")}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {group?.member_count || 0} Members
-                    {group?.parent_groups?.length > 0 ? (
+                  <Typography variant="body2" color="text.secondary" component="div">
+                    {groupLoading && !group ? (
+                      <Skeleton width={90} />
+                    ) : (
+                      <>{group?.member_count || 0} Members</>
+                    )}
+                    {!groupLoading && group?.parent_groups?.length > 0 ? (
                       <>
                         {" • Subgroup of "}
                         {group.parent_groups.map((pg, idx) => (
@@ -4139,10 +4232,19 @@ export default function GroupDetailsPage() {
                   variant="outlined"
                   startIcon={<ChatBubbleOutlineRoundedIcon />}
                   onClick={() => navigate(`/community?view=messages`)} // Example route
+                  disabled={groupLoading || !group}
                 >
                   Message
                 </Button>
                 {(() => {
+                  if (groupLoading || !group) {
+                    return (
+                      <Button variant="contained" disabled>
+                        Loading…
+                      </Button>
+                    );
+                  }
+
                   const status = group?.membership_status;
                   const role = group?.current_user_role;
                   const isMember = status === "active" || (role && role !== "none");
@@ -4193,7 +4295,18 @@ export default function GroupDetailsPage() {
               </Tabs>
             </Box>
             <CardContent sx={{ p: 3 }}>
-              {tabDefs[tab]?.render?.()}
+              {groupError && !group ? (
+                <Alert
+                  severity="error"
+                  action={<Button color="inherit" size="small" onClick={fetchGroup}>Retry</Button>}
+                >
+                  {groupError}
+                </Alert>
+              ) : groupLoading && !group ? (
+                <ListSkeleton count={4} />
+              ) : (
+                tabDefs[tab]?.render?.()
+              )}
             </CardContent>
           </Card>
         </Box>
@@ -4290,9 +4403,9 @@ export default function GroupDetailsPage() {
 
       <Snackbar
         open={toast.open}
-        autoHideDuration={3000}
+        autoHideDuration={4500}
         onClose={() => setToast(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert severity={toast.type} onClose={() => setToast(prev => ({ ...prev, open: false }))}>
           {toast.msg}

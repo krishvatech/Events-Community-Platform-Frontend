@@ -96,6 +96,31 @@ const bubbleSx = (mine) => (theme) => ({
   },
 });
 
+function mergeMessageRows(existing = [], incoming = []) {
+  const byId = new Map();
+  for (const message of existing) {
+    if (message?.id == null) continue;
+    byId.set(String(message.id), message);
+  }
+  for (const message of incoming) {
+    if (message?.id == null) continue;
+    const key = String(message.id);
+    byId.set(key, { ...(byId.get(key) || {}), ...message });
+  }
+
+  return Array.from(byId.values()).sort((a, b) => {
+    const timeA = new Date(a?.created_at || 0).getTime();
+    const timeB = new Date(b?.created_at || 0).getTime();
+    if (timeA !== timeB) return timeA - timeB;
+
+    const idA = Number(a?.id);
+    const idB = Number(b?.id);
+    if (Number.isFinite(idA) && Number.isFinite(idB)) return idA - idB;
+    return String(a?.id || "").localeCompare(String(b?.id || ""));
+  });
+}
+
+
 function SharePreview({ attachment, mine }) {
   if (!attachment) return null;
 
@@ -1807,6 +1832,13 @@ export default function MessagesPage() {
   const wsProcessedIdsRef = React.useRef(new Set()); // Deduplicate WebSocket events
   React.useEffect(() => {
     isFirstLoadRef.current = true;
+    latestMessagesRequestRef.current += 1;
+    olderMessagesRequestRef.current += 1;
+    setMessages([]);
+    setHasOlderMessages(false);
+    setOldestMessageId(null);
+    setInitialMessagesLoading(Boolean(activeId));
+    setOlderMessagesLoading(false);
   }, [activeId]);
   React.useEffect(() => {
     if (activeId) shouldScrollOnOpenRef.current = true;
@@ -1814,6 +1846,12 @@ export default function MessagesPage() {
 
   // CENTER: chat
   const [messages, setMessages] = React.useState([]); // API: /conversations/:id/messages/
+  const [initialMessagesLoading, setInitialMessagesLoading] = React.useState(false);
+  const [olderMessagesLoading, setOlderMessagesLoading] = React.useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = React.useState(false);
+  const [oldestMessageId, setOldestMessageId] = React.useState(null);
+  const olderMessagesRequestRef = React.useRef(0);
+  const latestMessagesRequestRef = React.useRef(0);
   const [eventMetaById, setEventMetaById] = React.useState({});
   const [pinned, setPinned] = React.useState([]);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
@@ -2683,20 +2721,69 @@ export default function MessagesPage() {
     })();
   }, []);
 
-  // fetch messages for active thread
+  // Normalize the different backend/WebSocket message shapes in one place.
+  const normalizeMessageRows = React.useCallback((rowsRaw) => (rowsRaw || []).map((m) => {
+    const senderId =
+      m.sender_id ??
+      m.user_id ??
+      (typeof m.sender === "object" ? m.sender?.id : m.sender) ??
+      (typeof m.user === "object" ? m.user?.id : m.user);
 
-  // fetch messages for active thread
-  const loadMessages = React.useCallback(async () => {
+    const createdIso =
+      m.created_at ?? m.created ?? m.timestamp ?? m.sent_at ?? m.createdOn;
+
+    const isMine = me
+      ? String(senderId) === String(me.id)
+      : Boolean(m.mine);
+
+    return {
+      id: m.id ?? m.pk ?? m.uuid ?? String(Math.random()),
+      body: m.body ?? m.text ?? m.message ?? "",
+      event_id:
+        m.event_id ??
+        (typeof m.event === "object" ? m.event?.id : m.event) ??
+        null,
+      sender_id: senderId,
+      sender_name: m.sender_name ?? m.sender_display ?? m.senderUsername ?? "",
+      sender_display: isMine
+        ? "You"
+        : (m.sender_display ?? m.sender_name ?? m.senderUsername ?? ""),
+      sender_avatar:
+        m.sender_avatar ??
+        (typeof m.sender === "object" ? m.sender?.avatar : undefined) ??
+        "",
+      attachments: Array.isArray(m.attachments) ? m.attachments : [],
+      read_by_me: Boolean(m.read_by_me ?? m.seen ?? m.is_read),
+      mine: isMine,
+      created_at: createdIso,
+      _time: createdIso
+        ? new Date(createdIso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : "",
+      is_edited: Boolean(m.is_edited),
+      is_deleted: Boolean(m.is_deleted),
+    };
+  }), [me]);
+
+  // Load the latest page. Initial open replaces the conversation; fallback
+  // polling merges the newest page so already-loaded history is not lost.
+  const loadMessages = React.useCallback(async ({ mode = "latest" } = {}) => {
     if (!activeId) return;
-    try {
-      const res = await apiFetch(ENDPOINTS.conversationMessages(activeId));
-      if (!res.ok) { console.error("Messages load failed", res.status); return; }
-      const payload = await res.json();
+    const conversationId = activeId;
+    const requestId = ++latestMessagesRequestRef.current;
 
-      // Accept many possible server shapes:
-      // - DRF pagination:   { results: [...] }
-      // - Our custom:       { items: [...] } or { messages: [...] } or { data: [...] }
-      // - Bare array:       [ ... ]
+    if (mode === "initial") setInitialMessagesLoading(true);
+
+    try {
+      const separator = ENDPOINTS.conversationMessages(conversationId).includes("?") ? "&" : "?";
+      const url = `${ENDPOINTS.conversationMessages(conversationId)}${separator}cursor=true&limit=30`;
+      const res = await apiFetch(url);
+      if (!res.ok) {
+        console.error("Messages load failed", res.status);
+        return;
+      }
+      const payload = await res.json();
+      if (conversationId !== activeId || requestId !== latestMessagesRequestRef.current) return;
+
       const rowsRaw =
         (Array.isArray(payload?.results) && payload.results) ||
         (Array.isArray(payload?.items) && payload.items) ||
@@ -2705,62 +2792,25 @@ export default function MessagesPage() {
         (Array.isArray(payload) && payload) ||
         [];
 
-      // Normalize fields used by the UI  ✅ sets "mine"
-      const mapped = rowsRaw.map((m) => {
-        const senderId =
-          m.sender_id ??
-          m.user_id ??
-          (typeof m.sender === "object" ? m.sender?.id : m.sender) ??
-          (typeof m.user === "object" ? m.user?.id : m.user);
+      const mapped = normalizeMessageRows(rowsRaw);
+      setMessages((previous) =>
+        mode === "initial" ? mapped : mergeMessageRows(previous, mapped)
+      );
 
-        const createdIso =
-          m.created_at ?? m.created ?? m.timestamp ?? m.sent_at ?? m.createdOn;
+      if (mode === "initial") {
+        setHasOlderMessages(Boolean(payload?.has_more));
+        setOldestMessageId(
+          payload?.oldest_id ?? payload?.next_before_id ?? mapped[0]?.id ?? null
+        );
+      }
 
-        // >>> THE IMPORTANT BIT: decide if this message is mine (logged-in user)
-        const isMine = me
-          ? String(senderId) === String(me.id)
-          : Boolean(m.mine);
-
-        return {
-          id: m.id ?? m.pk ?? m.uuid ?? String(Math.random()),
-          body: m.body ?? m.text ?? m.message ?? "",
-          event_id:
-            m.event_id ??
-            (typeof m.event === "object" ? m.event?.id : m.event) ??
-            null,
-          sender_id: senderId,
-          sender_name: m.sender_name ?? m.sender_display ?? m.senderUsername ?? "",
-          sender_display: isMine
-            ? "You"
-            : (m.sender_display ?? m.sender_name ?? m.senderUsername ?? ""),
-          sender_avatar:
-            m.sender_avatar ??
-            (typeof m.sender === "object" ? m.sender?.avatar : undefined) ??
-            "",
-
-          attachments: Array.isArray(m.attachments) ? m.attachments : [],
-          read_by_me: Boolean(m.read_by_me ?? m.seen ?? m.is_read),
-
-          // ✅ include mine flag so Bubble can right-align like WhatsApp
-          mine: isMine,
-
-          created_at: createdIso,
-          _time: createdIso
-            ? new Date(createdIso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            : "",
-        };
-      });
-
-      setMessages(mapped);
-      // 🔧 Update the active conversation row's last-time from the newest message
       const last = mapped[mapped.length - 1];
       const lastIso = last?.created_at || null;
-
       if (lastIso) {
         setThreads((cur) =>
           cur
             .map((t) => {
-              if (t.id !== activeId) return t;
+              if (t.id !== conversationId) return t;
               const prevTs = t._last_ts;
               const better =
                 new Date(lastIso || 0).getTime() >= new Date(prevTs || 0).getTime()
@@ -2776,37 +2826,26 @@ export default function MessagesPage() {
             .sort((a, b) => {
               const pinA = Boolean(a.is_pinned);
               const pinB = Boolean(b.is_pinned);
-
-              // 1. Pinned items go to top
               if (pinA !== pinB) return pinA ? -1 : 1;
-
-              // 2. Then sort by time
               return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
             })
         );
       }
 
-
-      // 1. Scroll Logic (Updated to handle First Load)
       requestAnimationFrame(() => {
         const el = document.getElementById("chat-scroll");
         if (!el) return;
-
         const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
         const isNearBottom = distanceFromBottom < 80;
-
-        // 🟢 FIX: Scroll if it's the first load OR if user is already near bottom
-        if (isFirstLoadRef.current || isNearBottom) {
+        if (mode === "initial" || isFirstLoadRef.current || isNearBottom) {
           el.scrollTop = el.scrollHeight;
-          isFirstLoadRef.current = false; // Mark first load as complete
+          isFirstLoadRef.current = false;
         }
       });
 
-      // 2. Mark inbound bubbles as read once ~60% visible
       requestAnimationFrame(() => {
         const container = document.getElementById("chat-scroll");
         if (!container) return;
-
         const io = new IntersectionObserver((entries) => {
           entries.forEach((entry) => {
             if (!entry.isIntersecting) return;
@@ -2815,24 +2854,76 @@ export default function MessagesPage() {
             const mine = el.getAttribute("data-mine") === "1";
             const byme = el.getAttribute("data-readbyme") === "1";
             if (!mid || mine || byme) return;
-
-            markMessageRead(mid); // fire-and-forget
+            markMessageRead(mid);
             el.setAttribute("data-readbyme", "1");
             io.unobserve(el);
           });
         }, { root: container, threshold: 0.6 });
-
-        container.querySelectorAll("[data-mid]").forEach((n) => io.observe(n));
+        container.querySelectorAll("[data-mid]").forEach((node) => io.observe(node));
       });
 
-      // (Deleted duplicate scroll block here)
-
-      // Important: immediately mark-all-read for visible conversation
       markAllReadDebounced();
     } catch (e) {
       console.error("Failed to load messages", e);
+    } finally {
+      if (mode === "initial" && conversationId === activeId) {
+        setInitialMessagesLoading(false);
+      }
     }
-  }, [activeId, me, markAllReadDebounced]);
+  }, [activeId, normalizeMessageRows, markAllReadDebounced]);
+
+  const loadOlderMessages = React.useCallback(async () => {
+    if (
+      !activeId ||
+      !hasOlderMessages ||
+      !oldestMessageId ||
+      olderMessagesLoading
+    ) return;
+
+    const conversationId = activeId;
+    const requestId = ++olderMessagesRequestRef.current;
+    const scrollContainer = document.getElementById("chat-scroll");
+    const previousHeight = scrollContainer?.scrollHeight || 0;
+    const previousTop = scrollContainer?.scrollTop || 0;
+
+    setOlderMessagesLoading(true);
+    try {
+      const separator = ENDPOINTS.conversationMessages(conversationId).includes("?") ? "&" : "?";
+      const url = `${ENDPOINTS.conversationMessages(conversationId)}${separator}cursor=true&limit=30&before_id=${encodeURIComponent(oldestMessageId)}`;
+      const res = await apiFetch(url);
+      if (!res.ok) {
+        console.error("Older messages load failed", res.status);
+        return;
+      }
+      const payload = await res.json();
+      if (conversationId !== activeId || requestId !== olderMessagesRequestRef.current) return;
+
+      const rowsRaw =
+        (Array.isArray(payload?.results) && payload.results) ||
+        (Array.isArray(payload) && payload) ||
+        [];
+      const mapped = normalizeMessageRows(rowsRaw);
+
+      setMessages((previous) => mergeMessageRows(previous, mapped));
+      setHasOlderMessages(Boolean(payload?.has_more));
+      setOldestMessageId(
+        payload?.oldest_id ?? payload?.next_before_id ?? mapped[0]?.id ?? null
+      );
+
+      requestAnimationFrame(() => {
+        const el = document.getElementById("chat-scroll");
+        if (!el) return;
+        const addedHeight = el.scrollHeight - previousHeight;
+        el.scrollTop = previousTop + Math.max(0, addedHeight);
+      });
+    } catch (e) {
+      console.error("Failed to load older messages", e);
+    } finally {
+      if (conversationId === activeId && requestId === olderMessagesRequestRef.current) {
+        setOlderMessagesLoading(false);
+      }
+    }
+  }, [activeId, hasOlderMessages, oldestMessageId, olderMessagesLoading, normalizeMessageRows]);
 
 
   // WebSocket + polling for real-time message updates
@@ -2847,8 +2938,9 @@ export default function MessagesPage() {
       return;
     }
 
-    // Load messages immediately
-    loadMessages();
+    // Load the newest page immediately. Older pages are fetched only when
+    // the user scrolls to the top of the conversation.
+    loadMessages({ mode: "initial" });
 
     // Helper to normalize and add message to state (with deduplication)
     const addOrUpdateMessage = (msg, action = 'create') => {
@@ -2954,7 +3046,10 @@ export default function MessagesPage() {
     });
 
     // Fallback polling (slower than WebSocket frequency)
-    const pollInterval = setInterval(loadMessages, 8000); // Poll every 8 seconds (fallback)
+    const pollInterval = setInterval(
+      () => loadMessages({ mode: "latest" }),
+      8000
+    ); // Fallback when WebSocket delivery is unavailable
 
     return () => {
       clearInterval(pollInterval);
@@ -3203,17 +3298,19 @@ export default function MessagesPage() {
     };
   }, []);
 
-  // scroll listener: if near bottom, mark-all-read (new inbound messages)
+  // Scroll listener: read receipts near the bottom and cursor-based lazy
+  // loading when the user reaches the top of the conversation.
   React.useEffect(() => {
     const el = document.getElementById("chat-scroll");
     if (!el) return;
     const onScroll = () => {
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
       if (nearBottom) markAllReadDebounced();
+      if (el.scrollTop < 80) loadOlderMessages();
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [activeId, markAllReadDebounced]);
+  }, [activeId, loadOlderMessages, markAllReadDebounced]);
 
   const topTitle = (active?.group?.name)
     || active?.display_title
@@ -3998,6 +4095,25 @@ export default function MessagesPage() {
                       "&::-webkit-scrollbar": { display: "none" },
                     }}
                   >
+                    {(initialMessagesLoading && messages.length === 0) && (
+                      <Stack alignItems="center" spacing={1} sx={{ py: 3 }}>
+                        <CircularProgress size={24} />
+                        <Typography variant="caption" color="text.secondary">
+                          Loading messages…
+                        </Typography>
+                      </Stack>
+                    )}
+                    {(olderMessagesLoading || hasOlderMessages) && messages.length > 0 && (
+                      <Stack alignItems="center" sx={{ py: 1 }}>
+                        {olderMessagesLoading ? (
+                          <CircularProgress size={18} />
+                        ) : (
+                          <Button size="small" onClick={loadOlderMessages}>
+                            Load older messages
+                          </Button>
+                        )}
+                      </Stack>
+                    )}
                     {pinnedMessages.length > 0 && (
                       <Box
                         sx={{

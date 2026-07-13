@@ -1895,6 +1895,7 @@ function CommentsDialog({
       // success: nothing else to do, optimistic update was NOT done here so we load
       await load();
       setConfirmDelId(null);
+      alert("The comment was removed from the platform and remains stored in the database with its replies, reactions and reports.");
     } catch (e) {
       await load();
       alert("Could not delete comment. Please try again.");
@@ -1913,8 +1914,7 @@ function CommentsDialog({
       <DialogTitle>Delete Comment?</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          Are you sure you want to delete this comment?
-          This action cannot be undone.
+          This comment will be removed from the platform, but it and its replies, reactions, reports and history will remain stored in the database.
         </DialogContentText>
       </DialogContent>
       <DialogActions>

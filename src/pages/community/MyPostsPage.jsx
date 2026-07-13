@@ -970,6 +970,7 @@ function CommentsDialog({ open, postId, onClose, isPostOwner }) {
       setConfirmDelId(null);
       const list = await fetchComments(postId, meId);
       setComments(list);
+      alert("The comment was removed from the platform and remains stored in the database with its replies, reactions and reports.");
     } catch {
       alert("Could not delete comment.");
     } finally {
@@ -1022,8 +1023,7 @@ function CommentsDialog({ open, postId, onClose, isPostOwner }) {
       <DialogTitle sx={{ pb: 1 }}>Delete Comment?</DialogTitle>
       <DialogContent>
         <DialogContentText color="text.secondary">
-          Are you sure you want to delete this comment?
-          This action cannot be undone.
+          This comment will be removed from the platform, but it and its replies, reactions, reports and history will remain stored in the database.
         </DialogContentText>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
@@ -1673,7 +1673,32 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
 
 function PostDeleteConfirm({ open, post, onClose, onDeleted }) {
   const [busy, setBusy] = React.useState(false);
-  const handleDelete = async () => { setBusy(true); let url; if (post.type === "poll") url = `${API_ROOT}/activity/feed/${post.id}/poll/delete/`; else { const communityId = post.raw_metadata?.community_id || post.community_id; url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/delete/`; } try { const res = await fetch(url, { method: "DELETE", headers: authHeader() }); if (res.ok || res.status === 204) { onDeleted(post.id); onClose(); return; } throw new Error("Delete failed"); } catch { alert("Could not delete post."); } finally { setBusy(false); } };
+  const handleDelete = async () => {
+    setBusy(true);
+    let url;
+    if (post.type === "poll") {
+      url = `${API_ROOT}/activity/feed/${post.id}/poll/delete/`;
+    } else {
+      const communityId = post.raw_metadata?.community_id || post.community_id;
+      url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/delete/`;
+    }
+    try {
+      const res = await fetch(url, { method: "DELETE", headers: authHeader() });
+      if (!res.ok && res.status !== 204) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.detail || "Delete failed");
+      }
+      onDeleted(post.id);
+      onClose();
+      alert(post.type === "poll"
+        ? "The poll was removed from the platform and remains stored in the database with its options, votes, comments, reactions and reports."
+        : "The post was removed from the platform and remains stored in the database with its comments, reactions, reports and history.");
+    } catch (error) {
+      alert(error?.message || "Could not delete post.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Dialog
@@ -1688,7 +1713,7 @@ function PostDeleteConfirm({ open, post, onClose, onDeleted }) {
       <DialogTitle sx={{ pb: 1 }}>Delete Post?</DialogTitle>
       <DialogContent>
         <DialogContentText color="text.secondary">
-          Are you sure you want to delete this post? This action cannot be undone.
+          This content will be removed from the platform, but it and all related comments, reactions, poll votes, reports and history will remain stored in the database.
         </DialogContentText>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
