@@ -342,6 +342,7 @@ const computeStatus = (ev) => {
   const s = ev.start_time ? new Date(ev.start_time).getTime() : 0;
   const e = ev.end_time ? new Date(ev.end_time).getTime() : 0;
 
+  if (ev.status === "archived") return "archived";
   if (ev.status === "cancelled") return "cancelled";
 
   // If meeting is manually ended, always treat as past
@@ -363,6 +364,8 @@ const statusChip = (status) => {
       return { label: "Past", className: "bg-slate-100 text-slate-700" };
     case "cancelled":
       return { label: "Cancelled", className: "bg-red-100 text-red-700" };
+    case "archived":
+      return { label: "Deleted", className: "bg-slate-200 text-slate-800" };
     default:
       return { label: "—", className: "bg-slate-100 text-slate-700" };
   }
@@ -3953,7 +3956,7 @@ function EventsPage() {
           url.searchParams.set("bucket", bucket); // upcoming | live | past
         }
 
-        // Tab 5: Hidden events
+        // Tab 5: Hidden events. Soft-deleted events are excluded by the backend.
         if (tab === 5) {
           url.searchParams.set("is_hidden", "true");
         }

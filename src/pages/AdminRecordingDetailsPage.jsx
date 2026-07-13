@@ -180,11 +180,10 @@ export default function AdminRecordingDetailsPage() {
     const [notificationAttendanceFilter, setNotificationAttendanceFilter] = useState("all"); // all, noshow, partial, full
     const [allRegistrations, setAllRegistrations] = useState([]); // Store ALL registrations for attendance filtering
 
-    // --- Delete Event State ---
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [deleteConfirmStep, setDeleteConfirmStep] = useState(1);
-    const [deleteConfirmText, setDeleteConfirmText] = useState("");
-    const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+    // --- Soft Delete Event State ---
+    const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+    const [archiveReason, setArchiveReason] = useState("");
+    const [isArchivingEvent, setIsArchivingEvent] = useState(false);
 
     // Fetch all registrations when in attendance filter mode
     useEffect(() => {
@@ -656,6 +655,24 @@ export default function AdminRecordingDetailsPage() {
     // Determine if recording is still being processed
     const meetingEnded = !!(event?.live_ended_at || event?.status === "ended" || event?.end_time);
     const isRecordingProcessing = meetingEnded && !hasRec && event?.replay_available;
+    const lifecycleSource = event?.wordpress_event_id
+        ? "wordpress"
+        : (event?.locked_platform_slugs?.[0] || "imaa_connect");
+    const eventEndTimestamp = event?.end_time ? new Date(event.end_time).getTime() : null;
+    const hasEndedByTime = Number.isFinite(eventEndTimestamp) && eventEndTimestamp <= Date.now();
+    const canDeleteEvent = Boolean(
+        lifecycleSource === "imaa_connect"
+        && event?.status !== "archived"
+        && !event?.is_live
+        && event?.status !== "live"
+        && (
+            event?.status === "draft"
+            || event?.status === "published"
+            || event?.status === "cancelled"
+            || event?.status === "ended"
+            || hasEndedByTime
+        )
+    );
 
     const handleBack = () => {
         if (location.state?.from === "admin") {
@@ -667,48 +684,39 @@ export default function AdminRecordingDetailsPage() {
         }
     };
 
-    const handleDeleteClick = () => {
-        setDeleteConfirmStep(1);
-        setDeleteConfirmText("");
-        setDeleteDialogOpen(true);
+    const handleArchiveClick = () => {
+        setArchiveReason("");
+        setArchiveDialogOpen(true);
     };
 
-    const handleDeleteConfirm = async () => {
-        if (deleteConfirmStep === 1) {
-            setDeleteConfirmStep(2);
-            return;
-        }
-
-        if (deleteConfirmText.toUpperCase() !== "DELETE") {
-            alert("Please type DELETE to confirm");
-            return;
-        }
-
-        setIsDeletingEvent(true);
+    const handleArchiveConfirm = async () => {
+        setIsArchivingEvent(true);
         try {
-            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/`, {
-                method: "DELETE",
-                headers: getTokenHeader(),
+            const res = await fetch(`${API}/events/${encodeURIComponent(slug)}/soft-delete/`, {
+                method: "POST",
+                headers: {
+                    ...getTokenHeader(),
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ deletion_reason: archiveReason.trim() }),
             });
 
+            const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data?.error || "Failed to delete event");
+                throw new Error(data?.detail || "Failed to delete event");
             }
 
-            // Redirect back after successful deletion
             navigate("/admin/events");
         } catch (err) {
             alert(`Failed to delete event: ${err.message}`);
         } finally {
-            setIsDeletingEvent(false);
+            setIsArchivingEvent(false);
         }
     };
 
-    const handleDeleteCancel = () => {
-        setDeleteDialogOpen(false);
-        setDeleteConfirmStep(1);
-        setDeleteConfirmText("");
+    const handleArchiveCancel = () => {
+        setArchiveDialogOpen(false);
+        setArchiveReason("");
     };
 
     return (
@@ -743,14 +751,14 @@ export default function AdminRecordingDetailsPage() {
                     >
                         Export CSV
                     </Button>
-                    {isOwnerUser() && (
+                    {isOwnerUser() && canDeleteEvent && (
                         <Button
                             variant="outlined"
                             color="error"
                             startIcon={<DeleteOutlineRoundedIcon />}
-                            onClick={handleDeleteClick}
+                            onClick={handleArchiveClick}
                         >
-                            Delete Permanently
+                            Delete Event
                         </Button>
                     )}
                 </Box>
@@ -1305,67 +1313,44 @@ export default function AdminRecordingDetailsPage() {
                 </Grid>
             </Grid>
 
-            {/* Delete Event Dialog */}
+            {/* Soft Delete Event Dialog */}
             <Dialog
-                open={deleteDialogOpen}
-                onClose={handleDeleteCancel}
+                open={archiveDialogOpen}
+                onClose={handleArchiveCancel}
                 maxWidth="sm"
                 fullWidth
             >
-                <DialogTitle>Delete Event Permanently</DialogTitle>
+                <DialogTitle>Delete Event</DialogTitle>
                 <DialogContent>
-                    {deleteConfirmStep === 1 ? (
-                        <>
-                            <Typography sx={{ mb: 1.5, mt: 2 }}>
-                                This will <strong>permanently delete</strong> the entire event, including all recordings and registration data.
-                            </Typography>
-                            <Typography
-                                variant="body2"
-                                sx={{
-                                    color: "error.main",
-                                    bgcolor: "rgba(244,67,54,0.1)",
-                                    p: 1.5,
-                                    borderRadius: 1,
-                                    border: "1px solid rgba(244,67,54,0.3)",
-                                    mb: 1,
-                                }}
-                            >
-                                Warning: This action cannot be undone.
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                All participant data, registrations, and recordings will be permanently removed from the system.
-                            </Typography>
-                        </>
-                    ) : (
-                        <>
-                            <Typography sx={{ mb: 1.25, mt: 2 }}>
-                                Type <strong>DELETE</strong> to confirm permanent deletion.
-                            </Typography>
-                            <TextField
-                                fullWidth
-                                placeholder='Type "DELETE"'
-                                value={deleteConfirmText}
-                                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                                sx={{ mt: 1 }}
-                            />
-                        </>
-                    )}
+                    <Alert severity="warning" sx={{ mt: 2, mb: 2 }}>
+                        This event will be removed from all event lists and will no longer be available to host or join.
+                    </Alert>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        This is a soft delete. The event remains in the database together with its recording,
+                        registrations, participant history, orders, invoices, WordPress/MANDA mappings,
+                        canonical IDs, and Saleor IDs.
+                    </Alert>
+                    <TextField
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        label="Deletion reason (optional)"
+                        value={archiveReason}
+                        onChange={(e) => setArchiveReason(e.target.value)}
+                    />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleDeleteCancel} disabled={isDeletingEvent}>
-                        Cancel
+                    <Button onClick={handleArchiveCancel} disabled={isArchivingEvent}>
+                        Keep Event
                     </Button>
                     <Button
-                        onClick={handleDeleteConfirm}
+                        onClick={handleArchiveConfirm}
                         color="error"
                         variant="contained"
-                        disabled={isDeletingEvent}
+                        disabled={isArchivingEvent}
+                        startIcon={isArchivingEvent ? <CircularProgress size={18} color="inherit" /> : <DeleteOutlineRoundedIcon />}
                     >
-                        {isDeletingEvent
-                            ? "Deleting..."
-                            : deleteConfirmStep === 1
-                            ? "Continue"
-                            : "Delete Permanently"}
+                        {isArchivingEvent ? "Deleting..." : "Delete Event"}
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -17,12 +17,13 @@ import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSetting
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import RestoreIcon from "@mui/icons-material/Restore";
 import EmailIcon from "@mui/icons-material/Email";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
-import { apiClient, listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deleteAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff } from "../utils/api";
+import { apiClient, listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deactivateAdminUser, restoreAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff } from "../utils/api";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 
@@ -683,6 +684,8 @@ export default function AdminStaffPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
     const [userToDelete, setUserToDelete] = React.useState(null);
     const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = React.useState(false);
+    const [deactivationReason, setDeactivationReason] = React.useState("");
+    const [restoreBusyId, setRestoreBusyId] = React.useState(null);
 
     // Duplicate Accounts Tab State
     const [dupGroups, setDupGroups] = React.useState([]);
@@ -829,6 +832,7 @@ export default function AdminStaffPage() {
 
     const confirmDeleteUser = (user) => {
         setUserToDelete(user);
+        setDeactivationReason("");
         setDeleteDialogOpen(true);
     };
 
@@ -836,18 +840,45 @@ export default function AdminStaffPage() {
         if (!userToDelete) return;
         setActionLoading(true);
         try {
-            await deleteAdminUser(userToDelete.id);
+            await deactivateAdminUser(userToDelete.id, deactivationReason);
             await fetchData();
             setDeleteDialogOpen(false);
             setUserToDelete(null);
+            setDeactivationReason("");
+            setSnack({
+                open: true,
+                severity: "success",
+                message: "User deactivated. Group, event, and sync history were preserved.",
+            });
         } catch (err) {
             setSnack({
                 open: true,
                 severity: "error",
-                message: "Failed to delete user: " + (err.response?.data?.detail || err.message),
+                message: "Failed to deactivate user: " + (err.response?.data?.detail || err.message),
             });
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleRestoreUser = async (targetUser) => {
+        setRestoreBusyId(targetUser.id);
+        try {
+            await restoreAdminUser(targetUser.id, "Restored from Admin Users page");
+            await fetchData();
+            setSnack({
+                open: true,
+                severity: "success",
+                message: `Access restored for ${targetUser.email || targetUser.username}.`,
+            });
+        } catch (err) {
+            setSnack({
+                open: true,
+                severity: "error",
+                message: "Failed to restore user: " + (err.response?.data?.detail || err.message),
+            });
+        } finally {
+            setRestoreBusyId(null);
         }
     };
 
@@ -979,7 +1010,9 @@ export default function AdminStaffPage() {
         setActionLoading(true);
         const ids = [...selected];
         try {
-            const results = await Promise.allSettled(ids.map(id => deleteAdminUser(id)));
+            const results = await Promise.allSettled(
+                ids.map(id => deactivateAdminUser(id, "Bulk deactivation from Admin Users page"))
+            );
             const failed = results.filter(r => r.status === "rejected").length;
             const succeeded = ids.length - failed;
 
@@ -991,14 +1024,14 @@ export default function AdminStaffPage() {
                 open: true,
                 severity: failed > 0 ? "warning" : "success",
                 message: failed > 0
-                    ? `⚠️ Deleted ${succeeded}, failed to delete ${failed}`
-                    : `✅ Deleted ${ids.length} user${ids.length !== 1 ? "s" : ""}`,
+                    ? `⚠️ Deactivated ${succeeded}, failed to deactivate ${failed}`
+                    : `✅ Deactivated ${ids.length} user${ids.length !== 1 ? "s" : ""}`,
             });
         } catch (err) {
             setSnack({
                 open: true,
                 severity: "error",
-                message: "Bulk delete failed: " + (err.response?.data?.detail || err.message),
+                message: "Bulk deactivation failed: " + (err.response?.data?.detail || err.message),
             });
         } finally {
             setActionLoading(false);
@@ -1118,6 +1151,7 @@ export default function AdminStaffPage() {
                         <Tab label="Superuser" value="superuser" />
                         <Tab label="Staff" value="staff" />
                         <Tab label="Normal User" value="normal" />
+                        {owner && <Tab label="Deactivated" value="deleted" />}
                         {owner && <Tab label="Saleor Staff" value="saleor-staff" />}
                         {owner && <Tab label="Duplicate Accounts" value="duplicates" />}
                     </Tabs>
@@ -1127,7 +1161,7 @@ export default function AdminStaffPage() {
                     ) : userTypeFilter !== "duplicates" ? (
                         <Box>
                             {/* Bulk Delete Action Bar */}
-                            {selected.size >= 2 && (
+                            {userTypeFilter !== "deleted" && selected.size >= 2 && (
                                 <Box sx={{
                                     display: "flex",
                                     alignItems: "center",
@@ -1152,7 +1186,7 @@ export default function AdminStaffPage() {
                                         disabled={actionLoading}
                                         sx={{ textTransform: "none", ml: "auto" }}
                                     >
-                                        {actionLoading ? "Deleting..." : "Delete Selected"}
+                                        {actionLoading ? "Deactivating..." : "Deactivate Selected"}
                                     </Button>
                                     <Button
                                         variant="outlined"
@@ -1211,7 +1245,7 @@ export default function AdminStaffPage() {
                                                 <Checkbox
                                                     checked={selected.has(u.id)}
                                                     onChange={() => handleSelectRow(u.id)}
-                                                    disabled={isCurrentUserRow(u)}
+                                                    disabled={isCurrentUserRow(u) || u.profile?.profile_status === "deleted"}
                                                 />
                                             </TableCell>
 
@@ -1246,9 +1280,11 @@ export default function AdminStaffPage() {
                                                             {u.is_superuser && (
                                                                 <Chip size="small" color="secondary" label="Superuser" sx={{ height: 20, fontSize: "0.65rem" }} />
                                                             )}
-                                                            {!u.is_active && (
+                                                            {u.profile?.profile_status === "deleted" ? (
+                                                                <Chip size="small" color="error" label="Deactivated" sx={{ height: 20, fontSize: "0.65rem" }} />
+                                                            ) : !u.is_active ? (
                                                                 <Chip size="small" label="Inactive" sx={{ height: 20, fontSize: "0.65rem" }} />
-                                                            )}
+                                                            ) : null}
                                                         </Stack>
                                                     </Box>
                                                 </Stack>
@@ -1287,7 +1323,11 @@ export default function AdminStaffPage() {
 
                                                 {/* Status instead of Switch */}
                                                 <TableCell align="center">
-                                                    {u.is_superuser ? (
+                                                    {u.profile?.profile_status === "deleted" ? (
+                                                        <Tooltip title={u.profile?.profile_status_reason || "Account deactivated"}>
+                                                            <Chip label="Deactivated" color="error" size="small" variant="outlined" />
+                                                        </Tooltip>
+                                                    ) : u.is_superuser ? (
                                                         <Chip label="Superuser" color="secondary" size="small" variant="filled" />
                                                     ) : u.is_staff ? (
                                                         <Chip label="Staff" color="success" size="small" variant="outlined" />
@@ -1299,6 +1339,23 @@ export default function AdminStaffPage() {
                                                 {/* Actions */}
                                                 <TableCell align="right">
                                                     <Stack direction="row" justifyContent="flex-end">
+                                                        {u.profile?.profile_status === "deleted" ? (
+                                                            <Tooltip title="Restore User Access">
+                                                                <span>
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        color="success"
+                                                                        onClick={() => handleRestoreUser(u)}
+                                                                        disabled={!owner || restoreBusyId === u.id}
+                                                                    >
+                                                                        {restoreBusyId === u.id
+                                                                            ? <CircularProgress size={18} />
+                                                                            : <RestoreIcon fontSize="small" />}
+                                                                    </IconButton>
+                                                                </span>
+                                                            </Tooltip>
+                                                        ) : (
+                                                            <>
                                                         <Tooltip title="Edit Details">
                                                             <span>
                                                                 <IconButton 
@@ -1343,7 +1400,7 @@ export default function AdminStaffPage() {
                                                                 </IconButton>
                                                             </span>
                                                         </Tooltip>
-                                                        <Tooltip title="Delete User">
+                                                        <Tooltip title="Deactivate User">
                                                             <span>
                                                                 <IconButton 
                                                                     size="small" 
@@ -1355,6 +1412,8 @@ export default function AdminStaffPage() {
                                                                 </IconButton>
                                                             </span>
                                                         </Tooltip>
+                                                            </>
+                                                        )}
                                                     </Stack>
                                                 </TableCell>
                                         </TableRow>
@@ -1495,14 +1554,25 @@ export default function AdminStaffPage() {
                         maxWidth="xs"
                         fullWidth
                     >
-                        <DialogTitle>Delete User?</DialogTitle>
+                        <DialogTitle>Deactivate User?</DialogTitle>
                         <DialogContent>
                             <Typography variant="body2" color="text.secondary">
-                                Are you sure you want to delete <strong>{userToDelete?.username || userToDelete?.email}</strong>?
+                                Deactivate <strong>{userToDelete?.username || userToDelete?.email}</strong>?
                             </Typography>
                             <Alert severity="warning" sx={{ mt: 2 }}>
-                                This action is permanent. The user will be removed from the platform.
+                                The user will be logged out and cannot sign in. Their WordPress identity,
+                                group memberships, event ownership, registrations, orders, and sync mappings
+                                will remain in the database.
                             </Alert>
+                            <TextField
+                                fullWidth
+                                multiline
+                                minRows={2}
+                                label="Reason (optional)"
+                                value={deactivationReason}
+                                onChange={(e) => setDeactivationReason(e.target.value)}
+                                sx={{ mt: 2 }}
+                            />
 
                         </DialogContent>
                         <DialogActions>
@@ -1516,7 +1586,7 @@ export default function AdminStaffPage() {
                                 disabled={actionLoading}
                                 startIcon={actionLoading ? <CircularProgress size={20} color="inherit" /> : null}
                             >
-                                {actionLoading ? "Deleting..." : "Delete User"}
+                                {actionLoading ? "Deactivating..." : "Deactivate User"}
                             </Button>
                         </DialogActions>
                     </Dialog>
@@ -1528,13 +1598,13 @@ export default function AdminStaffPage() {
                         maxWidth="xs"
                         fullWidth
                     >
-                        <DialogTitle>Delete {selected.size} Users?</DialogTitle>
+                        <DialogTitle>Deactivate {selected.size} Users?</DialogTitle>
                         <DialogContent>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                Are you sure you want to delete {selected.size} selected users?
+                                Deactivate {selected.size} selected users?
                             </Typography>
                             <Alert severity="error">
-                                ⚠️ This action is permanent. These users will be removed from the platform.
+                                These users will lose access, but their group, event, order, and sync history will be preserved.
                             </Alert>
                         </DialogContent>
                         <DialogActions>
@@ -1548,7 +1618,7 @@ export default function AdminStaffPage() {
                                 disabled={actionLoading}
                                 startIcon={actionLoading ? <CircularProgress size={20} color="inherit" /> : null}
                             >
-                                {actionLoading ? "Deleting..." : "Delete All"}
+                                {actionLoading ? "Deactivating..." : "Deactivate All"}
                             </Button>
                         </DialogActions>
                     </Dialog>

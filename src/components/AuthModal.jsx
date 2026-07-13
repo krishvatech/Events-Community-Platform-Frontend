@@ -24,6 +24,7 @@ import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/rol
 import { API_BASE } from "../utils/api";
 import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
 import { wordpressAuthService } from "../services/wordpressAuth";
+import { assertAccountCanLogin } from "../services/accountStatus";
 
 const GOOGLE_ICON = (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -40,6 +41,42 @@ const LINKEDIN_ICON = (
     <path d="M5.4521 15.0938V6.9375H2.7207V15.0938H5.4521ZM4.0869 5.8008C5.0039 5.8008 5.5713 5.1973 5.5713 4.4414C5.5547 3.668 5.0039 3.082 4.1035 3.082C3.2031 3.082 2.6191 3.668 2.6191 4.4414C2.6191 5.1973 3.1865 5.8008 4.0693 5.8008H4.0869ZM9.9707 15.0938V10.6055C9.9707 10.3594 9.9883 10.1133 10.0605 9.9375C10.2559 9.4453 10.7012 8.9355 11.4551 8.9355C12.4414 8.9355 12.832 9.6914 12.832 10.7871V15.0938H15.5635V10.4824C15.5635 7.9512 14.2148 6.7793 12.4238 6.7793C10.9629 6.7793 10.3438 7.5879 10.0078 8.1504H10.0254V6.9375H7.2939C7.3281 7.6758 7.2939 15.0938 7.2939 15.0938H9.9707Z" fill="white" />
   </svg>
 );
+
+const DEACTIVATED_ACCOUNT_MESSAGE =
+  "This account has been deactivated by an administrator. Please contact support.";
+
+const ACCOUNT_STATUS_MESSAGES = {
+  account_deleted: DEACTIVATED_ACCOUNT_MESSAGE,
+  account_inactive: DEACTIVATED_ACCOUNT_MESSAGE,
+  account_suspended: "Your account has been suspended. Please contact support for assistance.",
+  account_disabled: "This account has been disabled due to policy violations.",
+  account_memorialized: "This account has been memorialized.",
+};
+
+const getErrorCode = (error) =>
+  String(error?.code || error?.name || "").trim();
+
+const isCognitoDisabledAccountError = (error) => {
+  const code = getErrorCode(error);
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    code === "UserDisabledException" ||
+    message.includes("user is disabled") ||
+    message.includes("account is disabled") ||
+    message.includes("user disabled")
+  );
+};
+
+const getAccountStatusMessage = (error) => {
+  const code = getErrorCode(error);
+  if (ACCOUNT_STATUS_MESSAGES[code]) return ACCOUNT_STATUS_MESSAGES[code];
+
+  const message = String(error?.message || "");
+  if (message.toLowerCase().includes("deactivated by an administrator")) {
+    return DEACTIVATED_ACCOUNT_MESSAGE;
+  }
+  return "";
+};
 
 const inputSx = {
   "& .MuiOutlinedInput-root": {
@@ -120,6 +157,10 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
     }
     setLoading(true);
     try {
+      // Check the authoritative local status first so an administrator-deactivated
+      // account shows a stable message instead of entering Cognito/WordPress retries.
+      await assertAccountCanLogin(trimmedEmail);
+
       // Step 1: Try primary Cognito login
       try {
         const result = await cognitoSignIn({ usernameOrEmail: trimmedEmail, password: loginPassword });
@@ -142,7 +183,15 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           navigate("/community?view=home", { replace: true });
         }
       } catch (cognitoErr) {
-        // Step 2: Cognito failed, try WordPress fallback
+        // A disabled Cognito account is a terminal account-state failure. Do
+        // not repeatedly retry WordPress or replace it with "invalid password".
+        if (isCognitoDisabledAccountError(cognitoErr)) {
+          const disabledError = new Error(DEACTIVATED_ACCOUNT_MESSAGE);
+          disabledError.code = "account_deleted";
+          throw disabledError;
+        }
+
+        // Step 2: Cognito failed for a non-terminal reason; try WordPress fallback.
         console.log("Cognito login failed, attempting WordPress fallback...");
         
         try {
@@ -175,13 +224,23 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
             navigate("/community?view=home", { replace: true });
           }
         } catch (wpErr) {
-          // Both failed
           console.error("WordPress fallback also failed:", wpErr);
+          const accountStatusMessage = getAccountStatusMessage(wpErr);
+          if (accountStatusMessage) {
+            const statusError = new Error(accountStatusMessage);
+            statusError.code = wpErr?.code || "account_deleted";
+            throw statusError;
+          }
           throw new Error("Invalid email or password. Please try again.");
         }
       }
     } catch (err) {
-      setError(err?.message || "Invalid email or password. Please try again.");
+      const accountStatusMessage = getAccountStatusMessage(err);
+      setError(
+        accountStatusMessage ||
+        err?.message ||
+        "Invalid email or password. Please try again."
+      );
     } finally {
       setLoading(false);
     }

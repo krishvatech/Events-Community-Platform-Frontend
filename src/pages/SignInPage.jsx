@@ -145,10 +145,20 @@ export default function SignInPage() {
           }
 
           // Show suspension-specific message only for account status codes
-          const suspensionCodes = ["account_suspended", "account_disabled", "account_memorialized"];
+          const suspensionCodes = [
+            "account_suspended",
+            "account_disabled",
+            "account_memorialized",
+            "account_deleted",
+            "account_inactive",
+          ];
           if (suspensionCodes.includes(errorCode)) {
             console.error("Backend blocked login (Account status issue).", errorCode);
-            toast.error("Your account has been suspended. Please contact support.");
+            toast.error(
+              ["account_deleted", "account_inactive"].includes(errorCode)
+                ? "This account has been deactivated by an administrator. Please contact support."
+                : "Your account has been suspended. Please contact support."
+            );
           } else {
             console.error("Backend blocked login (403 Forbidden).", errorCode);
             toast.error("Authentication failed. Please try again or contact support.");

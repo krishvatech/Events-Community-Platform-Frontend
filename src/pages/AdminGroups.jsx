@@ -1515,13 +1515,31 @@ export default function AdminGroups() {
   const [loading, setLoading] = React.useState(true);
 
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [pageToast, setPageToast] = React.useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   React.useEffect(() => {
-    if (location.state?.openCreateGroup) {
+    const state = location.state || {};
+    if (state.openCreateGroup) {
       setCreateOpen(true);
-      window.history.replaceState({}, document.title);
     }
-  }, [location.state]);
+    if (state.toast?.message) {
+      setPageToast({
+        open: true,
+        message: state.toast.message,
+        severity: state.toast.severity || "success",
+      });
+    }
+    if (state.openCreateGroup || state.toast) {
+      navigate(
+        { pathname: location.pathname, search: location.search },
+        { replace: true, state: null },
+      );
+    }
+  }, [location.pathname, location.search, location.state, navigate]);
 
   const [editOpen, setEditOpen] = React.useState(false);
   const [editing, setEditing] = React.useState(null);
@@ -1818,6 +1836,25 @@ export default function AdminGroups() {
         onClose={() => { setEditOpen(false); setEditing(null); }}
         onUpdated={onUpdated}
       />
+
+      <Snackbar
+        open={pageToast.open}
+        autoHideDuration={6000}
+        onClose={(_, reason) => {
+          if (reason !== "clickaway") {
+            setPageToast((prev) => ({ ...prev, open: false }));
+          }
+        }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={pageToast.severity}
+          variant="filled"
+          onClose={() => setPageToast((prev) => ({ ...prev, open: false }))}
+        >
+          {pageToast.message}
+        </Alert>
+      </Snackbar>
     </Container >
   );
 }

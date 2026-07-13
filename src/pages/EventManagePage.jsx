@@ -148,6 +148,7 @@ const computeStatus = (ev) => {
   const s = ev.start_time ? dayjs(ev.start_time).valueOf() : 0;
   const e = ev.end_time ? dayjs(ev.end_time).valueOf() : 0;
 
+  if (ev.status === "archived") return "archived";
   if (ev.status === "cancelled") return "cancelled";
   if (ev.status === "ended") return "past";
   if (ev.is_live && ev.status !== "ended") return "live";
@@ -155,6 +156,14 @@ const computeStatus = (ev) => {
   if (s && now < s) return "upcoming";
   if (e && now > e) return "past";
   return "upcoming";
+};
+
+const hasActiveArchiveMarker = (ev) => {
+  if (!ev) return false;
+  if (String(ev.status || "").toLowerCase() === "archived") return true;
+  if (!ev.archived_at) return false;
+  if (!ev.restored_at) return true;
+  return new Date(ev.archived_at).getTime() > new Date(ev.restored_at).getTime();
 };
 
 const statusChip = (status) => {
@@ -169,6 +178,8 @@ const statusChip = (status) => {
       return { label: "Deregistered", color: "default", bg: "rgba(100,116,139,0.16)" };
     case "cancelled":
       return { label: "Cancelled", color: "default", bg: "rgba(100,116,139,0.16)" };
+    case "archived":
+      return { label: "Deleted", color: "default", bg: "rgba(71,85,105,0.16)" };
     default:
       return { label: "—", color: "default", bg: "rgba(148,163,184,0.16)" };
   }
@@ -525,6 +536,15 @@ export default function EventManagePage() {
 
   const isOwner = (event?.created_by_id === currentUser?.id) || isOwnerUser();
   const isStaff = isStaffUser();
+  const lifecycleSource = event?.wordpress_event_id
+    ? "wordpress"
+    : (event?.locked_platform_slugs?.[0] || "imaa_connect");
+  const isLocalLifecycle = lifecycleSource === "imaa_connect";
+  const lifecycleManagementNote = event?.wordpress_event_id
+    ? "This event is owned by WordPress. Change cancellation/archive state in WordPress so sync remains authoritative."
+    : (!isLocalLifecycle
+      ? `This event is owned by ${lifecycleSource}. Change its lifecycle on the source platform.`
+      : "");
   const canManageLounge = isOwner; // Only owner can manage lounge now
 
   // Q&A Export State
@@ -564,9 +584,11 @@ export default function EventManagePage() {
   const [hideEventOpen, setHideEventOpen] = useState(false);
   const [hideEventLoading, setHideEventLoading] = useState(false);
 
-  // Delete Event State (platform_admin only, for cancelled events)
-  const [deleteEventOpen, setDeleteEventOpen] = useState(false);
-  const [deleteEventLoading, setDeleteEventLoading] = useState(false);
+  // Archive / restore lifecycle state. This preserves registrations, orders,
+  // recordings, WordPress/MANDA mappings, canonical IDs, and Saleor IDs.
+  const [archiveEventOpen, setArchiveEventOpen] = useState(false);
+  const [archiveEventLoading, setArchiveEventLoading] = useState(false);
+  const [archiveReason, setArchiveReason] = useState("");
 
   // Saleor Product Management State
   const [saleorProduct, setSaleorProduct] = useState(null);
@@ -1163,25 +1185,32 @@ export default function EventManagePage() {
     }
   };
 
-  const handleDeleteEvent = async () => {
-    if (!event?.id || deleteEventLoading) return;
-    setDeleteEventLoading(true);
+  const handleArchiveEvent = async () => {
+    if (!event?.id || archiveEventLoading) return;
+    setArchiveEventLoading(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${event?.id}/`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${API_ROOT}/events/${event?.id}/soft-delete/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ deletion_reason: archiveReason.trim() }),
       });
-      if (!res.ok && res.status !== 204) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.detail || `HTTP ${res.status}`);
-      }
-      toast.success("Event deleted permanently.");
-      navigate(-1);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.detail || `HTTP ${res.status}`);
+      toast.success(
+        `${event?.title || "Event"} was removed from the platform. It remains stored in the database with all related history.`,
+        { autoClose: 8000 }
+      );
+      setArchiveEventOpen(false);
+      setArchiveReason("");
+      navigate("/admin/events", { replace: true });
     } catch (err) {
       toast.error(err.message);
     } finally {
-      setDeleteEventLoading(false);
+      setArchiveEventLoading(false);
     }
   };
 
@@ -2190,6 +2219,15 @@ export default function EventManagePage() {
   const onHost = async () => {
     if (!event?.id) return;
 
+    if (hasActiveArchiveMarker(event)) {
+      toast.error("Deleted events cannot be hosted.");
+      return;
+    }
+    if (event?.status === "cancelled") {
+      toast.error("Cancelled events cannot be hosted.");
+      return;
+    }
+
     // If external streaming enabled, redirect to external platform instead of RTK
     if (event?.use_external_streaming && event?.external_streaming_url) {
       // Use host link if available (for organizer), otherwise use participant link
@@ -2268,6 +2306,22 @@ export default function EventManagePage() {
 
   // ---- derived values ----
   const status = useMemo(() => computeStatus(event || {}), [event]);
+  const isArchivedLifecycle = hasActiveArchiveMarker(event) || status === "archived";
+  const isLiveLifecycleBlocked = isArchivedLifecycle || event?.status === "cancelled" || status === "cancelled";
+  const canArchiveLocally = Boolean(
+    isLocalLifecycle
+    && !isArchivedLifecycle
+    && !event?.is_live
+    && event?.status !== "live"
+    && status !== "live"
+    && (
+      event?.status === "draft"
+      || event?.status === "published"
+      || event?.status === "ended"
+      || event?.status === "cancelled"
+      || status === "past"
+    )
+  );
 
   // Logic for Join Button (Staff / Admin view context)
   const isPostEventLounge = isPostEventLoungeOpen(event);
@@ -2728,7 +2782,18 @@ export default function EventManagePage() {
               <Box sx={{ mb: 2 }}>
                 {isOwner ? (
                   <Stack spacing={1.5}>
-                    <Tooltip title={event?.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
+                    <Tooltip
+                      title={
+                        isArchivedLifecycle
+                          ? "Deleted events cannot be hosted."
+                          : (event?.status === "cancelled" || status === "cancelled")
+                            ? "Cancelled events cannot be hosted."
+                            : (event?.is_hidden && !isOwner)
+                              ? "Please unhide the event to host it"
+                              : ""
+                      }
+                      disableInteractive={false}
+                    >
                       <Button
                         onClick={onHost}
                         startIcon={<LiveTvRoundedIcon />}
@@ -2737,11 +2802,11 @@ export default function EventManagePage() {
                         sx={{
                           borderRadius: 2,
                           textTransform: "none",
-                          bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
+                          bgcolor: (isPast || isLiveLifecycleBlocked) ? "#CBD5E1" : "#10b8a6",
                           py: 1,
                           fontSize: 15,
                           fontWeight: 600,
-                          "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
+                          "&:hover": { bgcolor: (isPast || isLiveLifecycleBlocked) ? "#CBD5E1" : "#0ea5a4" },
                           ...(status === "cancelled" && {
                             "&.Mui-disabled": {
                               bgcolor: "#fef2f2",
@@ -2749,7 +2814,7 @@ export default function EventManagePage() {
                             }
                           })
                         }}
-                        disabled={!!hostingId || isPast || status === "cancelled" || (event?.is_hidden && !isOwner)}
+                        disabled={!!hostingId || isPast || isLiveLifecycleBlocked || (event?.is_hidden && !isOwner)}
                       >
                         {hostingId ? (
                           <Stack direction="row" spacing={1} alignItems="center">
@@ -2757,13 +2822,19 @@ export default function EventManagePage() {
                             <span>Starting...</span>
                           </Stack>
                         ) : (
-                          isPast ? "Event Ended" : status === "cancelled" ? "Cancelled" : "Host Event"
+                          isArchivedLifecycle
+                            ? "Deleted"
+                            : isPast
+                              ? "Event Ended"
+                              : (status === "cancelled" || event?.status === "cancelled")
+                                ? "Cancelled"
+                                : "Host Event"
                         )}
                       </Button>
                     </Tooltip>
 
                     {/* Mark as Live Button - For External Streaming Events */}
-                    {event?.use_external_streaming && status !== "live" && status !== "past" && status !== "cancelled" && (
+                    {event?.use_external_streaming && !isArchivedLifecycle && status !== "live" && status !== "past" && status !== "cancelled" && (
                       <Button
                         onClick={async () => {
                           try {
@@ -2809,7 +2880,25 @@ export default function EventManagePage() {
                       </Button>
                     )}
 
-                    {status !== "cancelled" && status !== "past" && event.status !== "ended" && event.status !== "cancelled" && (
+                    {(isOwner || isStaff) && canArchiveLocally && (
+                      <Button
+                        onClick={() => setArchiveEventOpen(true)}
+                        variant="outlined"
+                        color="error"
+                        fullWidth
+                        startIcon={<DeleteOutlineRoundedIcon />}
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: "none",
+                          fontSize: 15,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Delete Event
+                      </Button>
+                    )}
+
+                    {isLocalLifecycle && status !== "cancelled" && status !== "past" && status !== "archived" && event.status !== "ended" && event.status !== "cancelled" && (
                       <Button
                         onClick={() => setCancelEventOpen(true)}
                         variant="outlined"
@@ -2822,46 +2911,37 @@ export default function EventManagePage() {
                           fontWeight: 600,
                         }}
                       >
-                        Cancel Event
+                        Cancel Event & Notify Participants
                       </Button>
                     )}
-                    {/* Platform Admin: Hide / Delete any event */}
-                    {isOwner && (
-                      <>
-                        <Button
-                          onClick={() => setHideEventOpen(true)}
-                          variant="outlined"
-                          fullWidth
-                          startIcon={event.is_hidden ? <VisibilityRoundedIcon /> : <VisibilityOffRoundedIcon />}
-                          sx={{
-                            borderRadius: 2,
-                            textTransform: "none",
-                            fontSize: 15,
-                            fontWeight: 600,
-                            borderColor: event.is_hidden ? "success.main" : "text.disabled",
-                            color: event.is_hidden ? "success.main" : "text.secondary",
-                            "&:hover": { borderColor: event.is_hidden ? "success.dark" : "text.secondary", bgcolor: "action.hover" },
-                          }}
-                        >
-                          {event.is_hidden ? "Unhide from Platform" : "Hide from Platform"}
-                        </Button>
-                        <Button
-                          onClick={() => setDeleteEventOpen(true)}
-                          variant="outlined"
-                          color="error"
-                          fullWidth
-                          startIcon={<DeleteOutlineRoundedIcon />}
-                          sx={{
-                            borderRadius: 2,
-                            textTransform: "none",
-                            fontSize: 15,
-                            fontWeight: 600,
-                          }}
-                        >
-                          Delete Event Permanently
-                        </Button>
-                      </>
+
+                    {!isLocalLifecycle && lifecycleManagementNote && (
+                      <Alert severity="info" sx={{ borderRadius: 2 }}>
+                        {lifecycleManagementNote}
+                      </Alert>
                     )}
+
+                    {/* Local visibility is still manageable independently of source content. */}
+                    {isOwner && status !== "archived" && (
+                      <Button
+                        onClick={() => setHideEventOpen(true)}
+                        variant="outlined"
+                        fullWidth
+                        startIcon={event.is_hidden ? <VisibilityRoundedIcon /> : <VisibilityOffRoundedIcon />}
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: "none",
+                          fontSize: 15,
+                          fontWeight: 600,
+                          borderColor: event.is_hidden ? "success.main" : "text.disabled",
+                          color: event.is_hidden ? "success.main" : "text.secondary",
+                          "&:hover": { borderColor: event.is_hidden ? "success.dark" : "text.secondary", bgcolor: "action.hover" },
+                        }}
+                      >
+                        {event.is_hidden ? "Unhide from Platform" : "Hide from Platform"}
+                      </Button>
+                    )}
+
                   </Stack>
                 ) : (
                   canShowActiveJoin && (
@@ -10025,46 +10105,52 @@ export default function EventManagePage() {
           </DialogActions>
         </Dialog>
 
-        {/* Delete Event Dialog (platform_admin only) */}
+        {/* Soft Delete Event Dialog */}
         <Dialog
-          open={deleteEventOpen}
-          onClose={() => !deleteEventLoading && setDeleteEventOpen(false)}
+          open={archiveEventOpen}
+          onClose={() => !archiveEventLoading && setArchiveEventOpen(false)}
           maxWidth="sm"
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
-          <DialogTitle sx={{ fontWeight: 800, color: "error.main" }}>Delete Event Permanently</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 800 }}>Delete Event</DialogTitle>
           <DialogContent dividers>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              <strong>This action is permanent and cannot be undone.</strong>
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Deleting this event will permanently remove all associated data, including registrations, sessions, resources, lounge tables, speed networking sessions, and all other related records. This cannot be reversed.
-            </Typography>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <strong>{event?.title || "This event"}</strong> will be removed from the platform and will no longer
+              appear in All, Upcoming, Live, Past, Cancelled, or Hidden event lists.
+            </Alert>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              This is a soft delete, not a permanent database deletion. The event record, registrations,
+              applications, participants, attendance, orders, invoices, recordings, WordPress/MANDA mappings,
+              canonical IDs, and Saleor IDs will remain stored. No cancellation email will be sent.
+            </Alert>
+            <TextField
+              fullWidth
+              multiline
+              minRows={3}
+              label="Deletion reason (optional)"
+              value={archiveReason}
+              onChange={(e) => setArchiveReason(e.target.value)}
+              placeholder="Why is this event being removed from the platform?"
+            />
           </DialogContent>
           <DialogActions sx={{ px: 3, py: 2 }}>
             <Button
-              onClick={() => setDeleteEventOpen(false)}
-              disabled={deleteEventLoading}
-              sx={{ textTransform: "none", color: "text.secondary", fontWeight: 600 }}
+              onClick={() => setArchiveEventOpen(false)}
+              disabled={archiveEventLoading}
+              sx={{ textTransform: "none" }}
             >
               Keep Event
             </Button>
             <Button
-              onClick={handleDeleteEvent}
-              disabled={deleteEventLoading}
+              onClick={handleArchiveEvent}
+              disabled={archiveEventLoading}
               variant="contained"
               color="error"
+              startIcon={archiveEventLoading ? <CircularProgress size={18} color="inherit" /> : <DeleteOutlineRoundedIcon />}
               sx={{ textTransform: "none", borderRadius: 2, fontWeight: 600 }}
             >
-              {deleteEventLoading ? (
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <CircularProgress size={20} color="inherit" />
-                  <span>Deleting...</span>
-                </Stack>
-              ) : (
-                "Yes, Delete Permanently"
-              )}
+              {archiveEventLoading ? "Deleting..." : "Delete Event"}
             </Button>
           </DialogActions>
         </Dialog>

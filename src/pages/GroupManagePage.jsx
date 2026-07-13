@@ -3645,7 +3645,13 @@ export default function GroupManagePage() {
     const [deleteGroupOpen, setDeleteGroupOpen] = React.useState(false);
     const [deletingGroup, setDeletingGroup] = React.useState(false);
     const [confirmName, setConfirmName] = React.useState("");
-    React.useEffect(() => { if (!deleteGroupOpen) setConfirmName(""); }, [deleteGroupOpen]);
+    const [deleteReason, setDeleteReason] = React.useState("");
+    React.useEffect(() => {
+        if (!deleteGroupOpen) {
+            setConfirmName("");
+            setDeleteReason("");
+        }
+    }, [deleteGroupOpen]);
 
     // --- Modern UI: Confirm Dialog + Snackbar state (replaces window.confirm / alert) ---
     const [confirmDialog, setConfirmDialog] = React.useState({ open: false, title: "", content: "", onConfirm: null });
@@ -4251,6 +4257,9 @@ export default function GroupManagePage() {
     }, [subgroups, isOwnerRole, isAdminRole, currentUserId]);
 
     const canEditGroup = isOwnerRole || isAdminRole || isPlatformAdmin;
+    const isWordPressManaged =
+        group?.source === "wordpress" || Boolean(group?.source_group_id);
+    const canDeleteGroup = canEditGroup && !isWordPressManaged;
     const canReviewRequests = isOwnerRole || isAdminRole;
 
     // ✅ Strong member management (only owner + admin can remove/change roles)
@@ -5887,6 +5896,11 @@ export default function GroupManagePage() {
 
                                         <Divider className="my-3" />
 
+                                        {isWordPressManaged && (
+                                            <Alert severity="info" sx={{ mb: 2 }}>
+                                                This group is managed by IMAA Main WordPress. Delete or deactivate it on WordPress so synchronization remains authoritative.
+                                            </Alert>
+                                        )}
 
                                         <Stack direction="row" spacing={1}>
                                             {canEditGroup && (
@@ -5911,15 +5925,26 @@ export default function GroupManagePage() {
                                                     Edit Group Icon
                                                 </Button>
                                             )}
-                                            {canEditGroup && (
+                                            {canDeleteGroup && (
                                                 <Button
                                                     variant="outlined"
                                                     color="error"
                                                     className="rounded-xl"
+                                                    startIcon={<DeleteOutlineRoundedIcon fontSize="small" />}
                                                     sx={{ textTransform: "none" }}
                                                     onClick={() => setDeleteGroupOpen(true)}
                                                 >
                                                     Delete Group
+                                                </Button>
+                                            )}
+                                            {canEditGroup && isWordPressManaged && (
+                                                <Button
+                                                    variant="outlined"
+                                                    disabled
+                                                    className="rounded-xl"
+                                                    sx={{ textTransform: "none" }}
+                                                >
+                                                    Managed by WordPress
                                                 </Button>
                                             )}
                                         </Stack>
@@ -6635,8 +6660,20 @@ export default function GroupManagePage() {
                             <DialogTitle sx={{ fontWeight: 800 }}>Delete this group?</DialogTitle>
                             <DialogContent>
                                 <Alert severity="warning" sx={{ mb: 2 }}>
-                                    This action cannot be undone. All group posts, polls and memberships will be removed.
+                                    This is a soft delete. The group will disappear from My Groups, public group pages, feeds, chat and forum access, but it will remain stored in the database.
                                 </Alert>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Memberships, posts, comments, polls, votes, messages, reports, notifications and audit history will not be permanently deleted. Primary sub-groups will also be removed from the platform and retained in the database. There is no Deleted or Archived tab.
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    label="Reason (optional)"
+                                    value={deleteReason}
+                                    onChange={(e) => setDeleteReason(e.target.value)}
+                                    multiline
+                                    minRows={2}
+                                    sx={{ mb: 2 }}
+                                />
                                 <Typography sx={{ mb: 1 }}>
                                     Type the group name to confirm:
                                 </Typography>
@@ -6663,18 +6700,30 @@ export default function GroupManagePage() {
                                         try {
                                             const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
                                                 method: "DELETE",
-                                                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                                headers: {
+                                                    "Content-Type": "application/json",
+                                                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                                },
+                                                body: JSON.stringify({ reason: deleteReason.trim() }),
                                             });
-                                            if (!res.ok && res.status !== 204) {
-                                                const j = await res.json().catch(() => ({}));
-                                                throw new Error(j?.detail || `HTTP ${res.status}`);
+                                            const data = await res.json().catch(() => ({}));
+                                            if (!res.ok) {
+                                                throw new Error(data?.detail || `HTTP ${res.status}`);
                                             }
                                             setDeletingGroup(false);
                                             setDeleteGroupOpen(false);
-                                            navigate("/admin/groups"); // adjust route if your list lives elsewhere
+                                            navigate("/admin/groups", {
+                                                replace: true,
+                                                state: {
+                                                    toast: {
+                                                        severity: "success",
+                                                        message: data?.detail || "The group was removed from the platform and remains stored in the database.",
+                                                    },
+                                                },
+                                            });
                                         } catch (e) {
                                             setDeletingGroup(false);
-                                            alert(`Failed to delete group: ${e?.message || e}`);
+                                            showSnackbar(e?.message || "Failed to delete group.", "error");
                                         }
                                     }}
                                 >

@@ -26,8 +26,20 @@ export const wordpressAuthService = {
       });
 
       if (!syncResponse.ok) {
-        const error = await syncResponse.json();
-        throw new Error(error.error || 'Sync failed');
+        let errorData = {};
+        try {
+          errorData = await syncResponse.json();
+        } catch {
+          // Keep the fallback message when the backend returns a non-JSON error.
+        }
+
+        const authError = new Error(
+          errorData.detail || errorData.error || 'Login failed'
+        );
+        authError.code = errorData.code || '';
+        authError.profileStatus = errorData.profile_status || '';
+        authError.status = syncResponse.status;
+        throw authError;
       }
 
       const syncData = await syncResponse.json();

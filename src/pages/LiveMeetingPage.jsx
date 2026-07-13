@@ -322,6 +322,25 @@ function toApiUrl(pathOrUrl) {
   }
 }
 
+function hasActiveEventArchiveMarker(eventLike) {
+  if (!eventLike) return false;
+  if (String(eventLike.status || "").toLowerCase() === "archived") return true;
+  if (!eventLike.archived_at) return false;
+  if (!eventLike.restored_at) return true;
+  return new Date(eventLike.archived_at).getTime() > new Date(eventLike.restored_at).getTime();
+}
+
+function getEventLiveLifecycleBlockReason(eventLike) {
+  if (!eventLike) return "";
+  if (hasActiveEventArchiveMarker(eventLike)) {
+    return "This event is archived. Restore it before hosting or joining the live meeting.";
+  }
+  if (String(eventLike.status || "").toLowerCase() === "cancelled") {
+    return "This event has been cancelled and cannot be hosted or joined.";
+  }
+  return "";
+}
+
 function toWsUrl(pathOrUrl) {
   const token = getToken();
   const root = API_ROOT.replace(/^http/i, "ws").replace(/\/api\/?$/, "");
@@ -7589,6 +7608,12 @@ export default function NewLiveMeeting() {
           console.log("[DEBUG] Event live context fetched from API:", data);
           console.log("[DEBUG] pre_event_qna_enabled value:", data?.pre_event_qna_enabled);
           setEventData(data); // ✅ Store live context for images, timezone, flags, roles, and permissions
+          const lifecycleBlockReason = getEventLiveLifecycleBlockReason(data);
+          if (lifecycleBlockReason) {
+            setJoinError(lifecycleBlockReason);
+            setLoadingJoin(false);
+            setJoinMainRequested(false);
+          }
           if (data?.qna_moderation_enabled !== undefined) {
             setQnaModerationEnabled(data.qna_moderation_enabled);
           }
@@ -7673,7 +7698,16 @@ export default function NewLiveMeeting() {
     // 1. If we are in a breakout room, we don't manage tokens here
     // (Breakout tokens are managed by LoungeOverlay -> handleEnterBreakout)
     if (isBreakout) return;
-    if (role !== "publisher" && !eventData && !eventFromState) return;
+    // Wait for lifecycle context for every role, including publisher. Previously
+    // publishers fetched an RTK token before the archived status was known.
+    if (!eventData && !eventFromState) return;
+
+    const lifecycleBlockReason = getEventLiveLifecycleBlockReason(eventData || eventFromState);
+    if (lifecycleBlockReason) {
+      setJoinError(lifecycleBlockReason);
+      setLoadingJoin(false);
+      return;
+    }
     if (waitingRoomActive) {
       console.log("[LiveMeeting] Skipping token fetch - user is in waiting room");
       return;
@@ -11748,16 +11782,24 @@ export default function NewLiveMeeting() {
   // ---------- Update DB live-status (start/end) ----------
   const updateLiveStatus = useCallback(
     async (action, extraParams = {}) => {
-      if (!eventId) return;
-      try {
-        await fetch(toApiUrl(`events/${eventId}/live-status/`), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({ action, ...extraParams }),
-        });
-      } catch (e) {
-        console.warn("Failed to update live status", e);
+      if (!eventId) return null;
+
+      const res = await fetch(toApiUrl(`events/${eventId}/live-status/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ action, ...extraParams }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const message = data?.detail || `Failed to ${action} the live meeting.`;
+        if (data?.error === "event_archived" || data?.error === "event_cancelled") {
+          setJoinError(message);
+        }
+        throw new Error(message);
       }
+
+      return data;
     },
     [eventId]
   );
@@ -11791,34 +11833,71 @@ export default function NewLiveMeeting() {
 
   // ✅ NEW: Start Webinar with lounge transition options
   const handleStartWebinar = useCallback(async () => {
+    const lifecycleBlockReason = getEventLiveLifecycleBlockReason(eventData || eventFromState);
+    if (lifecycleBlockReason) {
+      setJoinError(lifecycleBlockReason);
+      return;
+    }
+
     if (filteredPreEventLoungeParticipants.length > 0 && eventData?.lounge_enabled_waiting_room) {
       // Show dialog for host to choose lounge transition
       setShowLoungeStartDialog(true);
     } else {
       // No lounge participants, start immediately
-      await updateLiveStatus("start");
-      setDbStatus("live");
+      try {
+        const result = await updateLiveStatus("start");
+        if (result?.status === "live") setDbStatus("live");
+      } catch (error) {
+        setJoinError(error?.message || "Unable to start the live meeting.");
+      }
     }
-  }, [filteredPreEventLoungeParticipants.length, eventData?.lounge_enabled_waiting_room, updateLiveStatus]);
+  }, [filteredPreEventLoungeParticipants.length, eventData, eventFromState, updateLiveStatus]);
 
   // ✅ NEW: Confirm and execute lounge transition with countdown
   const confirmStartWithLoungeTransition = useCallback(async () => {
     setShowLoungeStartDialog(false);
-    await updateLiveStatus("start", {
-      lounge_transition: loungeTransitionOption,
-      lounge_countdown_seconds: loungeCountdownSeconds,
-    });
-    setDbStatus("live");
+    try {
+      const result = await updateLiveStatus("start", {
+        lounge_transition: loungeTransitionOption,
+        lounge_countdown_seconds: loungeCountdownSeconds,
+      });
+      if (result?.status === "live") setDbStatus("live");
+    } catch (error) {
+      setJoinError(error?.message || "Unable to start the live meeting.");
+    }
   }, [loungeTransitionOption, loungeCountdownSeconds, updateLiveStatus]);
 
   // Host triggers LIVE on init done (without dialog - starts immediately)
   useEffect(() => {
     if (!initDone || role !== "publisher") return;
-    // Do not reactivate main meeting from lounge/breakout or after it ended
+    // Do not reactivate main meeting from lounge/breakout or after a terminal
+    // lifecycle state. The backend enforces the same rule for direct API calls.
     if (isBreakout || dbStatus === "ended") return;
-    updateLiveStatus("start");
-    setDbStatus("live"); // ✅ show LIVE chip immediately for host too
-  }, [initDone, role, isBreakout, dbStatus, updateLiveStatus]);
+
+    const lifecycleBlockReason = getEventLiveLifecycleBlockReason(eventData || eventFromState);
+    if (lifecycleBlockReason) {
+      setJoinError(lifecycleBlockReason);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await updateLiveStatus("start");
+        if (!cancelled && result?.status === "live") {
+          setDbStatus("live");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setJoinError(error?.message || "Unable to start the live meeting.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initDone, role, isBreakout, dbStatus, eventData, eventFromState, updateLiveStatus]);
 
   const ignoreRoomLeftRef = useRef(false);
   const rejoinFromLoungeRef = useRef(false);

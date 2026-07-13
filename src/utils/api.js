@@ -336,8 +336,17 @@ export const createAdminUserWithPassword = (data) =>
 export const updateAdminUser = (id, data) =>
   apiClient.patch(`${ADMIN_USERS_BASE}/${id}/`, data).then((r) => r.data);
 
-export const deleteAdminUser = (id) =>
-  apiClient.delete(`${ADMIN_USERS_BASE}/${id}/`).then((r) => r.data);
+// Soft-deactivate only. The backend preserves user IDs, memberships, events,
+// registrations, WordPress mappings, and Saleor/Cognito identity mappings.
+export const deactivateAdminUser = (id, reason = "") =>
+  apiClient.post(`${ADMIN_USERS_BASE}/${id}/deactivate/`, { reason }).then((r) => r.data);
+
+export const restoreAdminUser = (id, reason = "") =>
+  apiClient.post(`${ADMIN_USERS_BASE}/${id}/restore/`, { reason }).then((r) => r.data);
+
+// Backward-compatible alias for older callers. This no longer hard-deletes.
+export const deleteAdminUser = (id, reason = "") =>
+  deactivateAdminUser(id, reason);
 
 export const mergeAdminUsers = (primaryUserId, secondaryUserId, dryRun = false) =>
   apiClient.post(`/auth/admin/merge-users/`, {
