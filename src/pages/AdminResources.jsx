@@ -582,6 +582,13 @@ export default function MyResourcesAdmin() {
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [registeredEventsLoading, setRegisteredEventsLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deletingResource, setDeletingResource] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
   const [currentUser, setCurrentUser] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -844,14 +851,48 @@ export default function MyResourcesAdmin() {
     resourcesTotal / RESOURCE_ITEMS_PER_PAGE
   );
 
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const closeSnackbar = (_event, reason) => {
+    if (reason === "clickaway") return;
+    setSnackbar((current) => ({ ...current, open: false }));
+  };
+
+  const closeDeleteDialog = () => {
+    if (deletingResource) return;
+    setPendingDelete(null);
+    setDeleteReason("");
+  };
+
   const onDelete = async (row) => {
+    if (!row) return false;
+
+    setDeletingResource(true);
     try {
       const token = localStorage.getItem("access_token");
-      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { reason: deleteReason.trim() },
+      };
       await axios.delete(`${API}/content/resources/${row.id}/`, config);
-      fetchResources();
+      await fetchResources();
+      showSnackbar(
+        "The resource was removed from the platform and remains stored in the database with its file/link, event association and history.",
+        "success"
+      );
+      return true;
     } catch (error) {
       console.error("Error deleting resource:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.error ||
+        "Unable to delete this resource. Please try again.";
+      showSnackbar(message, "error");
+      return false;
+    } finally {
+      setDeletingResource(false);
     }
   };
 
@@ -1400,39 +1441,82 @@ export default function MyResourcesAdmin() {
         onSaved={handleResourceSaved}
       />
 
-      {/* Confirm Delete Dialog */}
+      {/* Confirm soft delete dialog */}
       <Dialog
         open={!!pendingDelete}
-        onClose={() => setPendingDelete(null)}
-        maxWidth="xs"
+        onClose={closeDeleteDialog}
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle>
-          {pendingDelete ? <>Delete "{pendingDelete.title}"?</> : "Delete resource?"}
+          {pendingDelete ? <>Delete resource "{pendingDelete.title}"?</> : "Delete resource?"}
         </DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete this resource?</Typography>
+          <Stack spacing={2} sx={{ pt: 0.5 }}>
+            <Alert severity="warning">
+              This is a soft delete. The resource will disappear from Resources,
+              My Resources, event resource lists and downloads, but its database
+              row and uploaded file/link will remain stored.
+            </Alert>
+            <Typography variant="body2" color="text.secondary">
+              Event associations, uploader details, activity history and existing
+              audit references are preserved. The resource will not be published
+              again by a scheduled task. It can be restored by an administrator,
+              and restored resources remain unpublished until reviewed.
+            </Typography>
+            <TextField
+              label="Reason (optional)"
+              value={deleteReason}
+              onChange={(event) => setDeleteReason(event.target.value)}
+              multiline
+              minRows={2}
+              fullWidth
+              disabled={deletingResource}
+              inputProps={{ maxLength: 1000 }}
+            />
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={() => setPendingDelete(null)}
+            onClick={closeDeleteDialog}
             color="secondary"
             variant="outlined"
+            disabled={deletingResource}
           >
             Cancel
           </Button>
           <Button
             onClick={async () => {
-              await onDelete(pendingDelete);
-              setPendingDelete(null);
+              const deleted = await onDelete(pendingDelete);
+              if (deleted) {
+                setPendingDelete(null);
+                setDeleteReason("");
+              }
             }}
             color="error"
             variant="contained"
+            disabled={deletingResource}
           >
-            Delete
+            {deletingResource ? "Deleting..." : "Delete Resource"}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={closeSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={closeSnackbar}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }
