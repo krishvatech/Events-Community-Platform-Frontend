@@ -17667,6 +17667,7 @@ export default function NewLiveMeeting() {
 
   // Delete confirmation
   const [qnaDeleteId, setQnaDeleteId] = useState(null);
+  const [qnaReplyDeleteId, setQnaReplyDeleteId] = useState(null);
 
   // Moderation state
   const [qnaModerationEnabled, setQnaModerationEnabled] = useState(false);
@@ -18660,12 +18661,20 @@ export default function NewLiveMeeting() {
     try {
       const res = await fetch(toApiUrl(`interactions/questions/${qnaDeleteId}/`), {
         method: "DELETE",
-        headers: { ...authHeader() },
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ reason: "Removed from live Q&A" }),
       });
-      if (!res.ok) throw new Error("Failed to delete");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Failed to delete question");
+      setQuestions((prev) => prev.filter((q) => q.id !== qnaDeleteId));
       setQnaDeleteId(null);
+      showSnackbar(
+        data.detail || "The question was removed from the live Q&A and remains stored in the database with its replies, votes and moderation history.",
+        "success"
+      );
     } catch (e) {
-      setQnaError("Failed to delete question");
+      setQnaError(e.message || "Failed to delete question");
+      showSnackbar(e.message || "Failed to delete question", "error");
     }
   };
 
@@ -18951,23 +18960,36 @@ export default function NewLiveMeeting() {
     }
   };
 
-  const deleteReply = async (replyId) => {
-    if (!window.confirm("Delete this reply?")) return;
+  const deleteReply = (replyId) => {
+    setQnaReplyDeleteId(replyId);
+  };
+
+  const confirmReplyDelete = async () => {
+    if (!qnaReplyDeleteId) return;
     setQnaError("");
     try {
-      await fetch(toApiUrl(`interactions/replies/${replyId}/`), {
+      const res = await fetch(toApiUrl(`interactions/replies/${qnaReplyDeleteId}/`), {
         method: "DELETE",
-        headers: authHeader(),
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ reason: "Removed from live Q&A" }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Failed to delete reply.");
       setQuestions((prev) =>
         prev.map((q) => ({
           ...q,
-          replies: (q.replies || []).filter((r) => r.id !== replyId),
+          replies: (q.replies || []).filter((r) => r.id !== qnaReplyDeleteId),
           reply_count: Math.max(0, (q.reply_count ?? 1) - 1),
         }))
       );
+      setQnaReplyDeleteId(null);
+      showSnackbar(
+        data.detail || "The reply was removed from the live Q&A and remains stored in the database with its votes and moderation history.",
+        "success"
+      );
     } catch (e) {
-      setQnaError("Failed to delete reply.");
+      setQnaError(e.message || "Failed to delete reply.");
+      showSnackbar(e.message || "Failed to delete reply.", "error");
     }
   };
 
@@ -20818,7 +20840,7 @@ export default function NewLiveMeeting() {
               <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete message?</DialogTitle>
               <DialogContent>
                 <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
-                  This action cannot be undone.
+                  This removes the message from the public chat for everyone, but it remains stored in the database for moderation and audit history.
                 </Typography>
               </DialogContent>
               <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -20855,7 +20877,7 @@ export default function NewLiveMeeting() {
               <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete question?</DialogTitle>
               <DialogContent>
                 <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
-                  This action cannot be undone.
+                  This removes the question from the live Q&A, but it remains stored in the database. Replies, votes and moderation history are preserved.
                 </Typography>
               </DialogContent>
               <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -20869,6 +20891,36 @@ export default function NewLiveMeeting() {
                   variant="contained"
                   color="error"
                   onClick={confirmQnaDelete}
+                  sx={{ textTransform: "none" }}
+                >
+                  Delete
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Q&A Reply Delete Dialog */}
+            <Dialog
+              open={Boolean(qnaReplyDeleteId)}
+              onClose={() => setQnaReplyDeleteId(null)}
+              PaperProps={MODAL_PAPER_PROPS}
+            >
+              <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete reply?</DialogTitle>
+              <DialogContent>
+                <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
+                  This removes the reply from the live Q&A, but it remains stored in the database. Votes and moderation history are preserved.
+                </Typography>
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button
+                  onClick={() => setQnaReplyDeleteId(null)}
+                  sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  color="error"
+                  onClick={confirmReplyDelete}
                   sx={{ textTransform: "none" }}
                 >
                   Delete

@@ -474,7 +474,7 @@ function DeleteDialog({ open, question, token, onClose, onDeleted }) {
             <DialogTitle sx={{ fontWeight: 700 }}>Delete question?</DialogTitle>
             <DialogContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    This will permanently remove your pre-event question. This action cannot be undone.
+                    This removes your pre-event question from the platform, but it remains stored in the database with its votes and moderation history.
                 </Typography>
                 {question && (
                     <Paper

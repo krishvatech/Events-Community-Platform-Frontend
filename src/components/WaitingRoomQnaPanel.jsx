@@ -406,7 +406,7 @@ function QuestionRow({ q, isBeforeEventStart, token, eventId, onUpdated, onDelet
                 /* ── Delete confirm ── */
                 <Box>
                     <Typography sx={{ fontSize: 12, color: "#f59e0b", mb: 0.8 }}>
-                        Delete this question? This cannot be undone.
+                        Delete this question? It will disappear from the platform but remain stored in the database.
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: dark.subtext, fontStyle: "italic", mb: 1 }}>
                         "{q.content}"

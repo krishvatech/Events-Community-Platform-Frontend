@@ -22,6 +22,8 @@ import {
   DialogActions,
   Card,
   CardContent,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbUpAltIcon from "@mui/icons-material/ThumbUpAlt";
@@ -1353,6 +1355,9 @@ export default function LiveQnAPanel({
   const [newQuestion, setNewQuestion] = useState("");
   const [adoptedSuggestionId, setAdoptedSuggestionId] = useState(null); // A3: track source suggeston
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null); // { type: "question"|"reply", id }
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [notice, setNotice] = useState({ open: false, severity: "success", message: "" });
   const [hasOlderQuestions, setHasOlderQuestions] = useState(false);
   const [loadingOlderQuestions, setLoadingOlderQuestions] = useState(false);
   const questionListRef = useRef(null);
@@ -2030,17 +2035,8 @@ export default function LiveQnAPanel({
     }
   };
 
-  const handleDeleteQuestion = async (qId) => {
-    if (!window.confirm("Delete this question?")) return;
-    try {
-      await fetch(toApiUrl(`interactions/questions/${qId}/`), {
-        method: "DELETE",
-        headers: authHeader(),
-      });
-      setQuestions((prev) => prev.filter((q) => q.id !== qId));
-    } catch (e) {
-      setError("Failed to delete question.");
-    }
+  const handleDeleteQuestion = (qId) => {
+    setDeleteTarget({ type: "question", id: qId });
   };
 
   // ── Reply create ─────────────────────────────────────────────────────────
@@ -2108,22 +2104,48 @@ export default function LiveQnAPanel({
   };
 
   // ── Reply delete ─────────────────────────────────────────────────────────
-  const handleReplyDelete = async (replyId) => {
-    if (!window.confirm("Delete this reply?")) return;
+  const handleReplyDelete = (replyId) => {
+    setDeleteTarget({ type: "reply", id: replyId });
+  };
+
+  const confirmSoftDelete = async () => {
+    if (!deleteTarget || deleteBusy) return;
+    setDeleteBusy(true);
+    setError("");
     try {
-      await fetch(toApiUrl(`interactions/replies/${replyId}/`), {
+      const isQuestion = deleteTarget.type === "question";
+      const path = isQuestion
+        ? `interactions/questions/${deleteTarget.id}/`
+        : `interactions/replies/${deleteTarget.id}/`;
+      const res = await fetch(toApiUrl(path), {
         method: "DELETE",
-        headers: authHeader(),
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ reason: "Removed from live Q&A" }),
       });
-      setQuestions((prev) =>
-        prev.map((q) => ({
-          ...q,
-          replies: (q.replies || []).filter((r) => r.id !== replyId),
-          reply_count: Math.max(0, (q.reply_count ?? 1) - 1),
-        }))
-      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Failed to delete ${deleteTarget.type}.`);
+
+      if (isQuestion) {
+        setQuestions((prev) => prev.filter((q) => q.id !== deleteTarget.id));
+      } else {
+        setQuestions((prev) =>
+          prev.map((q) => ({
+            ...q,
+            replies: (q.replies || []).filter((r) => r.id !== deleteTarget.id),
+            reply_count: Math.max(0, (q.reply_count ?? 1) - 1),
+          }))
+        );
+      }
+      setNotice({
+        open: true,
+        severity: "success",
+        message: data.detail || `The ${deleteTarget.type} was removed from the live Q&A and remains stored in the database.`,
+      });
+      setDeleteTarget(null);
     } catch (e) {
-      setError("Failed to delete reply.");
+      setNotice({ open: true, severity: "error", message: e.message || "Delete failed." });
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -3436,6 +3458,60 @@ export default function LiveQnAPanel({
           </Box>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => !deleteBusy && setDeleteTarget(null)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: "#151515", color: "#fff", borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Delete {deleteTarget?.type || "item"}?
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "rgba(255,255,255,0.72)", mb: 1 }}>
+            This removes it from the live Q&A, but it remains stored in the database.
+          </Typography>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+            Existing replies, votes and moderation history are preserved.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setDeleteTarget(null)}
+            disabled={deleteBusy}
+            sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmSoftDelete}
+            disabled={deleteBusy}
+            sx={{ textTransform: "none" }}
+          >
+            {deleteBusy ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={notice.open}
+        autoHideDuration={4500}
+        onClose={() => setNotice((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={notice.severity}
+          variant="filled"
+          onClose={() => setNotice((prev) => ({ ...prev, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {notice.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
