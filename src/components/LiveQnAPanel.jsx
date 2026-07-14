@@ -1357,6 +1357,9 @@ export default function LiveQnAPanel({
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null); // { type: "question"|"reply", id }
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [groupDeleteTarget, setGroupDeleteTarget] = useState(null); // { id, title, questionCount }
+  const [groupDeleteReason, setGroupDeleteReason] = useState("");
+  const [groupDeleteBusy, setGroupDeleteBusy] = useState(false);
   const [notice, setNotice] = useState({ open: false, severity: "success", message: "" });
   const [hasOlderQuestions, setHasOlderQuestions] = useState(false);
   const [loadingOlderQuestions, setLoadingOlderQuestions] = useState(false);
@@ -2149,6 +2152,42 @@ export default function LiveQnAPanel({
     }
   };
 
+  const confirmGroupSoftDelete = async () => {
+    if (!groupDeleteTarget || groupDeleteBusy) return;
+    setGroupDeleteBusy(true);
+    try {
+      const res = await fetch(
+        toApiUrl(`interactions/qna-groups/${groupDeleteTarget.id}/`),
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ reason: groupDeleteReason.trim() }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Failed to delete Q&A group.");
+
+      setGroups((prev) => prev.filter((group) => group.id !== groupDeleteTarget.id));
+      setGroupDeleteTarget(null);
+      setGroupDeleteReason("");
+      setNotice({
+        open: true,
+        severity: "success",
+        message:
+          data.detail ||
+          "The Q&A group was removed from the live view and remains stored in the database with its grouping history.",
+      });
+    } catch (e) {
+      setNotice({
+        open: true,
+        severity: "error",
+        message: e.message || "Failed to delete Q&A group.",
+      });
+    } finally {
+      setGroupDeleteBusy(false);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -2680,11 +2719,14 @@ export default function LiveQnAPanel({
                           g={g}
                           memberedQuestions={groupedQuestions[g.id]}
                           isHost={isHost}
-                          onDelete={async (gId) => {
-                            if (window.confirm('Delete this group?')) {
-                              await fetch(toApiUrl(`interactions/qna-groups/${gId}/`), { method: "DELETE", headers: authHeader() });
-                              loadGroups();
-                            }
+                          onDelete={(gId) => {
+                            const group = groups.find((item) => item.id === gId);
+                            setGroupDeleteTarget({
+                              id: gId,
+                              title: group?.title || "Q&A group",
+                              questionCount: group?.memberships?.length || 0,
+                            });
+                            setGroupDeleteReason("");
                           }}
                           onGroupAction={(gId, action) => {
                             if (action === "answered") {
@@ -3457,6 +3499,69 @@ export default function LiveQnAPanel({
             )}
           </Box>
         </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(groupDeleteTarget)}
+        onClose={() => {
+          if (!groupDeleteBusy) {
+            setGroupDeleteTarget(null);
+            setGroupDeleteReason("");
+          }
+        }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: "#151515", color: "#fff", borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Delete Q&A group?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "rgba(255,255,255,0.78)", mb: 1.5 }}>
+            <strong>{groupDeleteTarget?.title}</strong> will disappear from the live Q&A,
+            but the group will remain stored in the database.
+          </Typography>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.56)", mb: 2 }}>
+            Its title, summary, AI source and a snapshot of its {groupDeleteTarget?.questionCount || 0}
+            {" "}grouped question{groupDeleteTarget?.questionCount === 1 ? "" : "s"} are preserved.
+            The questions, replies and votes are not deleted and will appear as ungrouped questions.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            value={groupDeleteReason}
+            onChange={(e) => setGroupDeleteReason(e.target.value)}
+            placeholder="Reason (optional)"
+            disabled={groupDeleteBusy}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                color: "#fff",
+                bgcolor: "rgba(255,255,255,0.04)",
+                "& fieldset": { borderColor: "rgba(255,255,255,0.18)" },
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => {
+              setGroupDeleteTarget(null);
+              setGroupDeleteReason("");
+            }}
+            disabled={groupDeleteBusy}
+            sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmGroupSoftDelete}
+            disabled={groupDeleteBusy}
+            sx={{ textTransform: "none" }}
+          >
+            {groupDeleteBusy ? "Deleting…" : "Delete Group"}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Dialog
