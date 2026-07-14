@@ -388,6 +388,7 @@ export default function EventManagePage() {
   const [loungeEditPreview, setLoungeEditPreview] = useState("");
   const [loungeDeleteOpen, setLoungeDeleteOpen] = useState(false);
   const [loungeDeleteTarget, setLoungeDeleteTarget] = useState(null);
+  const [loungeDeleteReason, setLoungeDeleteReason] = useState("");
   const [loungeDeleteSaving, setLoungeDeleteSaving] = useState(false);
 
   // Speed Networking State
@@ -1844,6 +1845,7 @@ export default function EventManagePage() {
 
   const handleOpenDeleteLoungeTable = (table) => {
     setLoungeDeleteTarget(table);
+    setLoungeDeleteReason("");
     setLoungeDeleteOpen(true);
   };
 
@@ -1858,7 +1860,10 @@ export default function EventManagePage() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ table_id: loungeDeleteTarget.id }),
+        body: JSON.stringify({
+          table_id: loungeDeleteTarget.id,
+          reason: loungeDeleteReason.trim(),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -1869,6 +1874,11 @@ export default function EventManagePage() {
       );
       setLoungeDeleteOpen(false);
       setLoungeDeleteTarget(null);
+      setLoungeDeleteReason("");
+      toast.success(
+        json?.detail ||
+          "The table was removed from the platform and remains stored in the database."
+      );
     } catch (e) {
       setLoungeError(e?.message || "Failed to delete lounge table");
     } finally {
@@ -9432,6 +9442,7 @@ export default function EventManagePage() {
           onClose={() => {
             setLoungeDeleteOpen(false);
             setLoungeDeleteTarget(null);
+            setLoungeDeleteReason("");
           }}
           maxWidth="xs"
           fullWidth
@@ -9446,15 +9457,25 @@ export default function EventManagePage() {
             {(loungeDeleteTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'Delete Breakout Room?' : 'Delete Lounge Table?'}
           </DialogTitle>
           <DialogContent>
-            <DialogContentText>
-              This will remove the {(loungeDeleteTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'room' : 'table'} "{loungeDeleteTarget?.name || "Table"}" and clear its seats.
+            <DialogContentText sx={{ mb: 2 }}>
+              This is a soft delete. The {(loungeDeleteTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'room' : 'table'} "{loungeDeleteTarget?.name || "Table"}" will disappear from the event, but its configuration, icon, event link, and meeting identifier will remain stored in the database. Current seats will be cleared.
             </DialogContentText>
+            <TextField
+              fullWidth
+              label="Reason (optional)"
+              value={loungeDeleteReason}
+              onChange={(event) => setLoungeDeleteReason(event.target.value)}
+              multiline
+              minRows={2}
+              inputProps={{ maxLength: 500 }}
+            />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button
               onClick={() => {
                 setLoungeDeleteOpen(false);
                 setLoungeDeleteTarget(null);
+                setLoungeDeleteReason("");
               }}
               sx={{ textTransform: "none" }}
             >

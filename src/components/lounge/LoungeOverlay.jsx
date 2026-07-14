@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography, CircularProgress, Backdrop, Button, TextField, Tooltip } from '@mui/material';
+import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography, CircularProgress, Backdrop, Button, TextField, Tooltip, Snackbar, Alert } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -52,6 +52,7 @@ const LoungeOverlay = ({
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteSaving, setDeleteSaving] = useState(false);
+    const [deleteFeedback, setDeleteFeedback] = useState({ open: false, severity: 'success', message: '' });
     const [lateJoiners, setLateJoiners] = useState([]);
     const [isWaitingForAssignment, setIsWaitingForAssignment] = useState(false);
     const [waitingJoinedAt, setWaitingJoinedAt] = useState(null);
@@ -827,15 +828,25 @@ const LoungeOverlay = ({
                 },
                 body: JSON.stringify({ table_id: deleteTarget.id }),
             });
+            const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                console.error("[Lounge] Failed to delete table:", res.status);
-                return;
+                throw new Error(data?.detail || `Failed to delete table (HTTP ${res.status})`);
             }
             setTables((prev) => prev.filter((t) => String(t.id) !== String(deleteTarget.id)));
             setDeleteOpen(false);
             setDeleteTarget(null);
+            setDeleteFeedback({
+                open: true,
+                severity: 'success',
+                message: data?.detail || 'The table was removed from the platform and remains stored in the database.',
+            });
         } catch (err) {
             console.error("[Lounge] Failed to delete table", err);
+            setDeleteFeedback({
+                open: true,
+                severity: 'error',
+                message: err?.message || 'Failed to delete table.',
+            });
         } finally {
             setDeleteSaving(false);
         }
@@ -1378,7 +1389,7 @@ const LoungeOverlay = ({
                 </DialogTitle>
                 <DialogContent>
                     <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
-                        This will remove the table "{deleteTarget?.name || "Table"}".
+                        This is a soft delete. The table "{deleteTarget?.name || "Table"}" will disappear from the live lounge, but its configuration and meeting identifier will remain stored in the database. Current seats will be cleared.
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -1402,6 +1413,22 @@ const LoungeOverlay = ({
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <Snackbar
+                open={deleteFeedback.open}
+                autoHideDuration={4500}
+                onClose={() => setDeleteFeedback((prev) => ({ ...prev, open: false }))}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    severity={deleteFeedback.severity}
+                    variant="filled"
+                    onClose={() => setDeleteFeedback((prev) => ({ ...prev, open: false }))}
+                    sx={{ width: '100%' }}
+                >
+                    {deleteFeedback.message}
+                </Alert>
+            </Snackbar>
 
             {/* ✅ NEW: Lounge Closed Dialog - Shows when lounge is closed and user is removed */}
             <Dialog
