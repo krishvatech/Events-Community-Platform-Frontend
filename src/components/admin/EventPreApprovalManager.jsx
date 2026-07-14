@@ -5,12 +5,17 @@ import {
   Button,
   Chip,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
   Pagination,
   Paper,
   Select,
+  Snackbar,
   Stack,
   Switch,
   FormControlLabel,
@@ -67,6 +72,16 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
   const [allowEmail, setAllowEmail] = React.useState("");
   const [allowTrackId, setAllowTrackId] = React.useState(""); // FIX 2
   const [allowSubmissionMode, setAllowSubmissionMode] = React.useState(""); // FIX 2
+  const [removeDialog, setRemoveDialog] = React.useState({
+    open: false,
+    type: "",
+    item: null,
+  });
+  const [notice, setNotice] = React.useState({
+    open: false,
+    severity: "success",
+    message: "",
+  });
 
   React.useEffect(() => {
     setConfig({
@@ -199,14 +214,8 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
     }
   };
 
-  const revokeCode = async (codeId) => {
-    try {
-      // FIX 11: Use apiClient instead of fetch
-      await apiClient.post(`/events/${event.id}/preapproval/codes/${codeId}/revoke/`, {});
-      fetchCodes();
-    } catch (err) {
-      console.error("Failed to revoke code:", err);
-    }
+  const revokeCode = (code) => {
+    setRemoveDialog({ open: true, type: "code", item: code });
   };
 
   const markCodeUsed = async (codeId) => {
@@ -243,13 +252,46 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
     }
   };
 
-  const removeAllowlist = async (entryId) => {
+  const removeAllowlist = (entry) => {
+    setRemoveDialog({ open: true, type: "allowlist", item: entry });
+  };
+
+  const confirmSoftRemove = async () => {
+    const { type, item } = removeDialog;
+    if (!item?.id) return;
+
     try {
-      // FIX 11: Use apiClient instead of fetch
-      await apiClient.delete(`/events/${event.id}/preapproval/allowlist/${entryId}/`);
-      fetchAllowlist();
+      let response;
+      if (type === "code") {
+        response = await apiClient.post(
+          `/events/${event.id}/preapproval/codes/${item.id}/revoke/`,
+          {}
+        );
+        await fetchCodes();
+      } else {
+        response = await apiClient.delete(
+          `/events/${event.id}/preapproval/allowlist/${item.id}/`
+        );
+        await fetchAllowlist();
+      }
+
+      setNotice({
+        open: true,
+        severity: "success",
+        message:
+          response?.data?.detail ||
+          (type === "code"
+            ? "The code was removed from active use and remains stored in the database."
+            : "The email was removed from active pre-approval and remains stored in the database."),
+      });
+      setRemoveDialog({ open: false, type: "", item: null });
     } catch (err) {
-      console.error("Failed to remove allowlist entry:", err);
+      console.error("Failed to remove pre-approval record:", err);
+      setNotice({
+        open: true,
+        severity: "error",
+        message: err.response?.data?.detail || "Failed to remove the pre-approval record.",
+      });
     }
   };
 
@@ -385,7 +427,7 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
                   <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : "-"}</TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1}>
-                      {row.status === "active" && <Button size="small" onClick={() => revokeCode(row.id)}>Revoke</Button>}
+                      {row.status === "active" && <Button size="small" onClick={() => revokeCode(row)}>Revoke</Button>}
                       {row.status === "active" && <Button size="small" onClick={() => markCodeUsed(row.id)}>Mark Used</Button>}
                     </Stack>
                   </TableCell>
@@ -465,13 +507,57 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
                   <TableCell>{row.email}</TableCell>
                   <TableCell>{row.is_active ? "Yes" : "No"}</TableCell>
                   <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : "-"}</TableCell>
-                  <TableCell>{row.is_active && <Button size="small" onClick={() => removeAllowlist(row.id)}>Remove</Button>}</TableCell>
+                  <TableCell>{row.is_active && <Button size="small" onClick={() => removeAllowlist(row)}>Remove</Button>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </Box>
       </Stack>
+
+      <Dialog
+        open={removeDialog.open}
+        onClose={() => setRemoveDialog({ open: false, type: "", item: null })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {removeDialog.type === "code"
+            ? "Remove Pre-Approval Code"
+            : "Remove Email from Allowlist"}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mt: 1 }}>
+            {removeDialog.type === "code"
+              ? `Code "${removeDialog.item?.code || "this code"}" will stop working immediately, but it will remain stored in the database with its scope and audit history.`
+              : `"${removeDialog.item?.email || "This email"}" will no longer receive pre-approved access, but the allowlist record will remain stored in the database with its scope and audit history.`}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemoveDialog({ open: false, type: "", item: null })}>
+            Cancel
+          </Button>
+          <Button color="error" variant="contained" onClick={confirmSoftRemove}>
+            {removeDialog.type === "code" ? "Remove Code" : "Remove Email"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={notice.open}
+        autoHideDuration={4500}
+        onClose={() => setNotice((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={notice.severity}
+          variant="filled"
+          onClose={() => setNotice((prev) => ({ ...prev, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {notice.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }

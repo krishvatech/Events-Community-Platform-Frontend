@@ -74,6 +74,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
     open: false,
     title: "",
     message: "",
+    confirmLabel: "Delete",
     action: null,
     data: null,
   });
@@ -310,17 +311,15 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
     }
   };
 
-  const handleRevokeCode = async (codeId) => {
-    try {
-      setLoadingPreapproval(true);
-      await apiClient.post(`/events/${eventId}/preapproval/codes/${codeId}/revoke/`);
-      setShowRevokedCodes(false);
-      await loadPreapprovalCodes(false);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to revoke code");
-    } finally {
-      setLoadingPreapproval(false);
-    }
+  const handleRevokeCode = (code) => {
+    setConfirmDialog({
+      open: true,
+      title: "Remove Pre-Approval Code",
+      message: `Code "${code?.code || "this code"}" will stop working immediately, but it will remain stored in the database with its track, submission mode, creator, and audit history.`,
+      confirmLabel: "Remove Code",
+      action: "revoke_code",
+      data: code,
+    });
   };
 
   const handleAddToAllowlist = async () => {
@@ -345,16 +344,15 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
     }
   };
 
-  const handleRemoveFromAllowlist = async (entryId) => {
-    try {
-      setLoadingPreapproval(true);
-      await apiClient.delete(`/events/${eventId}/preapproval/allowlist/${entryId}/`);
-      await loadPreapprovalAllowlist();
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to remove from allowlist");
-    } finally {
-      setLoadingPreapproval(false);
-    }
+  const handleRemoveFromAllowlist = (entry) => {
+    setConfirmDialog({
+      open: true,
+      title: "Remove Email from Allowlist",
+      message: `"${entry?.email || "This email"}" will no longer receive pre-approved access for the selected track and submission mode, but the allowlist record will remain stored in the database with its audit history.`,
+      confirmLabel: "Remove Email",
+      action: "remove_allowlist",
+      data: entry,
+    });
   };
 
   const handleToggleRevokedCodes = async (newValue) => {
@@ -465,22 +463,24 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
   };
 
   const handleDeletePricingTier = (tierId) => {
-    const tier = pricingTiers.find(t => t.id === tierId);
+    const tier = pricingTiers.find((item) => item.id === tierId);
     setConfirmDialog({
       open: true,
       title: "Delete Pricing Tier",
-      message: `Are you sure you want to delete "${tier?.label}"? This action cannot be undone.`,
+      message: `"${tier?.label || "This pricing tier"}" will be removed from new applications, but it will remain stored in the database. Existing tier preferences, accepted applications, attendee origins, and payment history will not be deleted.`,
+      confirmLabel: "Delete Tier",
       action: "delete_tier",
       data: tierId,
     });
   };
 
   const handleDeleteTrack = (trackId) => {
-    const track = tracks.find(t => t.id === trackId);
+    const track = tracks.find((item) => item.id === trackId);
     setConfirmDialog({
       open: true,
       title: "Delete Application Track",
-      message: `Are you sure you want to delete the track "${track?.label}"? All associated applications will also be deleted.`,
+      message: `"${track?.label || "This application track"}" will disappear from the application form, but it will remain stored in the database. Existing applications, form answers, pricing tiers, pre-approval records, and decision history will not be deleted.`,
+      confirmLabel: "Delete Track",
       action: "delete_track",
       data: trackId,
     });
@@ -490,21 +490,55 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
     const { action, data } = confirmDialog;
 
     try {
+      let response;
       if (action === "delete_tier") {
-        await apiClient.delete(
+        response = await apiClient.delete(
           `/events/${eventId}/application-tracks/${editingTrack.id}/pricing-tiers/${data}/`
         );
         await loadPricingTiers(editingTrack.id);
-      } else if (action === "delete_track") {
-        await apiClient.delete(`/events/${eventId}/application-tracks/${data}/`);
         await loadTracks();
+      } else if (action === "delete_track") {
+        response = await apiClient.delete(`/events/${eventId}/application-tracks/${data}/`);
+        await loadTracks();
+        if (editingTrack?.id === data) {
+          handleCloseDialog();
+        }
+      } else if (action === "revoke_code") {
+        setLoadingPreapproval(true);
+        response = await apiClient.post(
+          `/events/${eventId}/preapproval/codes/${data.id}/revoke/`,
+          {}
+        );
+        setShowRevokedCodes(false);
+        await loadPreapprovalCodes(false);
+      } else if (action === "remove_allowlist") {
+        setLoadingPreapproval(true);
+        response = await apiClient.delete(
+          `/events/${eventId}/preapproval/allowlist/${data.id}/`
+        );
+        await loadPreapprovalAllowlist();
       }
 
+      const fallbackMessages = {
+        delete_tier:
+          "The pricing tier was removed from new applications and remains stored in the database.",
+        delete_track:
+          "The application track was removed from the platform and remains stored in the database.",
+        revoke_code:
+          "The pre-approval code was removed from active use and remains stored in the database.",
+        remove_allowlist:
+          "The email was removed from active pre-approval and remains stored in the database.",
+      };
+      setPublishMessage(response?.data?.detail || fallbackMessages[action] || "Operation completed.");
       setError(null);
       setConfirmDialog({ ...confirmDialog, open: false });
     } catch (err) {
       console.error("Failed to execute action:", err);
       setError(err.response?.data?.detail || "Operation failed");
+    } finally {
+      if (action === "revoke_code" || action === "remove_allowlist") {
+        setLoadingPreapproval(false);
+      }
     }
   };
 
@@ -1251,7 +1285,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                                       {code.status === "active" && (
                                         <IconButton
                                           size="small"
-                                          onClick={() => handleRevokeCode(code.id)}
+                                          onClick={() => handleRevokeCode(code)}
                                           color="error"
                                           disabled={loadingPreapproval}
                                           title="Revoke code"
@@ -1395,7 +1429,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                                 </Box>
                                 <IconButton
                                   size="small"
-                                  onClick={() => handleRemoveFromAllowlist(entry.id)}
+                                  onClick={() => handleRemoveFromAllowlist(entry)}
                                   color="error"
                                   disabled={loadingPreapproval}
                                 >
@@ -1496,7 +1530,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
             color="error"
             sx={{ textTransform: "none" }}
           >
-            Delete
+            {confirmDialog.confirmLabel || "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
