@@ -7579,15 +7579,19 @@ export default function EventManagePage() {
           method: "DELETE",
           headers: { Authorization: `Bearer ${getToken()}` },
         });
-        if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
         setCompanionLabels(prev => prev.filter(l => l.id !== labelId));
         setCompanionRegs(prev => prev.map(r => ({
           ...r,
           badge_labels: (r.badge_labels || []).filter(bl => bl.id !== labelId),
         })));
-        toast.success("Label deleted");
+        toast.success(
+          json?.detail ||
+            "The badge label was removed from active use but remains stored with participant history."
+        );
       } catch (e) {
-        toast.error("Failed to delete label");
+        toast.error(e.message || "Failed to remove badge label");
       } finally {
         setCompanionDeleteLoading(false);
         setCompanionDeleteOpen(false);
@@ -8405,15 +8409,20 @@ export default function EventManagePage() {
           </DialogActions>
         </Dialog>
 
-        <Dialog open={companionDeleteOpen} onClose={() => setCompanionDeleteOpen(false)} maxWidth="xs">
-          <DialogTitle>Delete Badge Label</DialogTitle>
+        <Dialog open={companionDeleteOpen} onClose={() => setCompanionDeleteOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Delete Badge Label?</DialogTitle>
           <DialogContent>
-            <DialogContentText>Delete label "<strong>{companionDeleteTarget?.name}</strong>"? It will be removed from all participants assigned to it.</DialogContentText>
+            <DialogContentText>
+              The label <strong>{companionDeleteTarget?.name}</strong> will disappear from active
+              badge management and can no longer be assigned to participants. This is a soft
+              delete: the label and all existing participant assignments remain stored in the
+              database for badge and attendance history.
+            </DialogContentText>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setCompanionDeleteOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
             <Button variant="contained" color="error" disabled={companionDeleteLoading} onClick={() => companionDeleteTarget && deleteLabel(companionDeleteTarget.id)} sx={{ textTransform: "none" }}>
-              {companionDeleteLoading ? "Deleting..." : "Delete"}
+              {companionDeleteLoading ? "Deleting..." : "Delete Badge Label"}
             </Button>
           </DialogActions>
         </Dialog>
