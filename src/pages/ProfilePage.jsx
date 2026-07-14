@@ -6237,18 +6237,17 @@ export default function ProfilePage() {
               </>
             ) : (
               <>
-                This will permanently remove{" "}
                 <Box component="span" sx={{ fontWeight: 700 }}>
-                  {confirm.label || "this item"}
-                </Box>
-                .
+                  {confirm.label || "This item"}
+                </Box>{" "}
+                will be deleted from your profile.
               </>
             )}
           </DialogContentText>
           <DialogContentText variant="body2" color="text.secondary">
             {confirm.type === "edu" || confirm.type === "exp"
               ? "Are you sure you want to continue?"
-              : "This action cannot be undone."}
+              : "Are you sure you want to continue?"}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>

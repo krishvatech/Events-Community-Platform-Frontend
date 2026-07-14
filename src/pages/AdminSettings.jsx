@@ -4719,7 +4719,7 @@ export default function AdminSettings() {
             </Box>
             .
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
+          <DialogContentText>Are you sure you want to continue?</DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={handleCloseDeleteDoc} disabled={deletingDoc} variant="outlined" color="inherit">
@@ -5047,13 +5047,12 @@ export default function AdminSettings() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText sx={{ color: "text.primary", mb: 1 }}>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {confirm.label || "this item"}
-            </Box>
-            .
+              {confirm.label || "This item"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
+          <DialogContentText>Are you sure you want to continue?</DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={closeConfirm} disabled={saving} variant="outlined" color="inherit">

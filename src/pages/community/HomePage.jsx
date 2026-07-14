@@ -1354,7 +1354,7 @@ export default function HomePage() {
             <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
               {deleteLangDialog.name}
             </Box>
-            ? This action cannot be undone.
+            ?
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1390,11 +1390,11 @@ export default function HomePage() {
         </DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
-            This will permanently delete the file{" "}
+            Delete{" "}
             <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
               {deleteCertDialog.name}
-            </Box>
-            .
+            </Box>{" "}
+            from your profile?
           </Typography>
         </DialogContent>
         <DialogActions>

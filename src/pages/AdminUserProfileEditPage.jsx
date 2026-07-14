@@ -6177,18 +6177,17 @@ export default function AdminUserProfileEditPage() {
               </>
             ) : (
               <>
-                This will permanently remove{" "}
                 <Box component="span" sx={{ fontWeight: 700 }}>
-                  {confirm.label || "this item"}
-                </Box>
-                .
+                  {confirm.label || "This item"}
+                </Box>{" "}
+                will be removed from the visible profile.
               </>
             )}
           </DialogContentText>
           <DialogContentText variant="body2" color="text.secondary">
             {confirm.type === "edu" || confirm.type === "exp"
               ? "Attached documents and historical details are preserved. An administrator can restore the record later."
-              : "This action cannot be undone."}
+              : "The skill, language or certificate record remains stored and can be restored by an administrator."}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
