@@ -3,7 +3,7 @@ import {
   Paper, Button, TextField, Box, Typography, CircularProgress,
   Table, TableContainer, TableHead, TableRow, TableCell, TableBody,
   Chip, Select, MenuItem, FormControl, InputLabel, Pagination, Stack, Grid,
-  Card, CardContent, CardMedia, IconButton, Dialog, DialogTitle, DialogContent, DialogActions
+  Card, CardContent, CardMedia, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Alert
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -30,6 +30,8 @@ const SeriesList = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [seriestoDelete, setSeriesToDelete] = useState(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedSeries, setSelectedSeries] = useState(null);
 
   const itemsPerPage = 10;
@@ -73,28 +75,37 @@ const SeriesList = () => {
 
   const handleDeleteClick = (s) => {
     setSeriesToDelete(s);
+    setDeleteReason('');
     setDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!seriestoDelete) return;
+    if (!seriestoDelete || deleteLoading) return;
+    setDeleteLoading(true);
     try {
       const response = await fetch(`${API_BASE}/series/${seriestoDelete.id}/`, {
         method: 'DELETE',
-        headers: authConfig().headers,
+        headers: {
+          ...authConfig().headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: deleteReason.trim() }),
       });
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        toast.success(`Series "${seriestoDelete.title}" deleted successfully`);
-        fetchSeries();
+        toast.success(data.detail || `Series "${seriestoDelete.title}" deleted successfully`);
+        await fetchSeries();
+        setDeleteDialogOpen(false);
+        setSeriesToDelete(null);
+        setDeleteReason('');
       } else {
-        toast.error(`Failed to delete series (${response.status})`);
+        toast.error(data.detail || data.error || `Failed to delete series (${response.status})`);
       }
     } catch (error) {
       console.error('Error deleting series:', error);
-      toast.error('Error deleting series');
+      toast.error('Unable to delete the series. Please try again.');
     } finally {
-      setDeleteDialogOpen(false);
-      setSeriesToDelete(null);
+      setDeleteLoading(false);
     }
   };
 
@@ -283,20 +294,39 @@ const SeriesList = () => {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Delete Series?</DialogTitle>
         <DialogContent>
-          <Typography sx={{ mt: 2 }}>
-            Are you sure you want to delete <strong>"{seriestoDelete?.title}"</strong>?
+          <Typography sx={{ mt: 1, mb: 2 }}>
+            Delete <strong>"{seriestoDelete?.title}"</strong>?
           </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            This action cannot be undone.
-          </Typography>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            This is a soft delete. The series will disappear from the platform but will remain stored in the database, even if it is an unused draft created by mistake.
+          </Alert>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Child events are never deleted, cancelled, detached, or re-synced by this action. Their WordPress, MANDA, participant, Saleor, order, and registration data remains unchanged.
+          </Alert>
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            label="Deletion reason (optional)"
+            value={deleteReason}
+            onChange={(event) => setDeleteReason(event.target.value)}
+            disabled={deleteLoading}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained">
-            Delete
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>
+            Keep Series
+          </Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained" disabled={deleteLoading}>
+            {deleteLoading ? <CircularProgress size={20} color="inherit" /> : 'Delete Series'}
           </Button>
         </DialogActions>
       </Dialog>

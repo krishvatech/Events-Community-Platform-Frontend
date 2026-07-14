@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API_BASE, authConfig } from '../utils/api';
+import { toast } from 'react-toastify';
 
 const SeriesManagePage = () => {
   const { seriesId } = useParams();
@@ -28,6 +29,7 @@ const SeriesManagePage = () => {
   const [errors, setErrors] = useState({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
 
   const tabLabels = ['Overview', 'Events', 'Registrations', 'Analytics', 'Edit'];
 
@@ -114,25 +116,38 @@ const SeriesManagePage = () => {
   };
 
   const handleDeleteSeries = () => {
+    setDeleteReason('');
     setDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
+    if (deleteLoading) return;
     setDeleteLoading(true);
     try {
       const response = await fetch(
         `${API_BASE}/series/${seriesId}/`,
-        { method: 'DELETE', headers: authConfig().headers }
+        {
+          method: 'DELETE',
+          headers: {
+            ...authConfig().headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ reason: deleteReason.trim() }),
+        }
       );
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
+        toast.success(data.detail || 'Series deleted successfully.');
         navigate('/admin/series');
       } else {
-        setErrors({ general: 'Failed to delete series' });
-        setDeleteDialogOpen(false);
+        const message = data.detail || data.error || 'Failed to delete series';
+        toast.error(message);
+        setErrors({ general: message });
       }
     } catch (error) {
-      setErrors({ general: 'Failed to delete series' });
-      setDeleteDialogOpen(false);
+      const message = 'Unable to delete the series. Please try again.';
+      toast.error(message);
+      setErrors({ general: message });
     } finally {
       setDeleteLoading(false);
     }
@@ -234,22 +249,34 @@ const SeriesManagePage = () => {
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
+        onClose={() => !deleteLoading && setDeleteDialogOpen(false)}
         maxWidth="sm"
         fullWidth
       >
         <DialogTitle>Delete Series</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
-          <Typography>
-            Are you sure you want to delete <strong>{series?.title}</strong>?
+          <Typography sx={{ mb: 2 }}>
+            Delete <strong>{series?.title}</strong>?
           </Typography>
-          <Alert severity="info" sx={{ mt: 2 }}>
-            The series will be deleted, but all linked events will be preserved and detached from this series.
+          <Alert severity="info" sx={{ mb: 2 }}>
+            This is a soft delete. The series will be removed from the platform but will remain stored in the database, including an unused draft created by mistake.
           </Alert>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Linked events stay attached for historical reporting. This action does not delete, cancel, or re-sync events, registrations, participants, orders, WordPress/MANDA mappings, or Saleor IDs.
+          </Alert>
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            label="Deletion reason (optional)"
+            value={deleteReason}
+            onChange={(event) => setDeleteReason(event.target.value)}
+            disabled={deleteLoading}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>
-            Cancel
+            Keep Series
           </Button>
           <Button
             variant="contained"
@@ -257,7 +284,7 @@ const SeriesManagePage = () => {
             onClick={handleConfirmDelete}
             disabled={deleteLoading}
           >
-            {deleteLoading ? <CircularProgress size={24} /> : 'Delete'}
+            {deleteLoading ? <CircularProgress size={24} color="inherit" /> : 'Delete Series'}
           </Button>
         </DialogActions>
       </Dialog>
