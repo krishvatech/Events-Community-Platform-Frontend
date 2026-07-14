@@ -5574,13 +5574,11 @@ function AboutTab({
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {trainingToDelete?.program_title || "this item"}
-            </Box>
-            .
+              {trainingToDelete?.program_title || "This training"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setTrainingDeleteId(null)} disabled={deletingTraining} variant="outlined" color="inherit">
@@ -5618,13 +5616,11 @@ function AboutTab({
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {certToDelete?.certification_name || "this item"}
-            </Box>
-            .
+              {certToDelete?.certification_name || "This certification"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCertDeleteId(null)} disabled={deletingCert} variant="outlined" color="inherit">
@@ -5662,13 +5658,11 @@ function AboutTab({
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {memberToDelete?.organization_name || "this item"}
-            </Box>
-            .
+              {memberToDelete?.organization_name || "This membership"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMemberDeleteId(null)} disabled={deletingMember} variant="outlined" color="inherit">
@@ -5706,13 +5700,11 @@ function AboutTab({
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {eduToDelete ? `${eduToDelete.school || ""} ${eduToDelete.degree || ""}`.trim() || "this item" : "this item"}
-            </Box>
-            .
+              {eduToDelete ? `${eduToDelete.school || ""} ${eduToDelete.degree || ""}`.trim() || "This education" : "This education"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEduDeleteId(null)} disabled={deletingEdu} variant="outlined" color="inherit">
@@ -5750,13 +5742,11 @@ function AboutTab({
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {expToDelete ? `${expToDelete.org || expToDelete.community_name || ""} ${expToDelete.position || ""}`.trim() || "this item" : "this item"}
-            </Box>
-            .
+              {expToDelete ? `${expToDelete.org || expToDelete.community_name || ""} ${expToDelete.position || ""}`.trim() || "This experience" : "This experience"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setExpDeleteId(null)} disabled={deletingExp} variant="outlined" color="inherit">

@@ -2253,7 +2253,7 @@ export default function ProfilePage() {
       }
       else {
         // Existing Edu/Exp handling
-        showNotification("success", type === "edu" ? "Education deleted" : "Experience deleted");
+        showNotification("success", type === "edu" ? "Education deleted." : "Experience deleted.");
         setEduOpen(false);
         setExpOpen(false);
         setEditEduId(null);
@@ -6096,13 +6096,11 @@ export default function ProfilePage() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {trainingToDelete?.program_title || "this item"}
-            </Box>
-            .
+              {trainingToDelete?.program_title || "This training"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setTrainingDeleteId(null)} disabled={deletingTraining} variant="outlined" color="inherit">
@@ -6140,13 +6138,11 @@ export default function ProfilePage() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {certToDelete?.certification_name || "this item"}
-            </Box>
-            .
+              {certToDelete?.certification_name || "This certification"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCertDeleteId(null)} disabled={deletingCert} variant="outlined" color="inherit">
@@ -6184,13 +6180,11 @@ export default function ProfilePage() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {memberToDelete?.organization_name || "this item"}
-            </Box>
-            .
+              {memberToDelete?.organization_name || "This membership"}
+            </Box>{" "}
+            will be deleted from your profile.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMemberDeleteId(null)} disabled={deletingMember} variant="outlined" color="inherit">
@@ -6234,14 +6228,27 @@ export default function ProfilePage() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText sx={{ color: "text.primary", mb: 1 }}>
-            This will permanently remove{" "}
-            <Box component="span" sx={{ fontWeight: 700 }}>
-              {confirm.label || "this item"}
-            </Box>
-            .
+            {confirm.type === "edu" || confirm.type === "exp" ? (
+              <>
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {confirm.label || "This profile record"}
+                </Box>{" "}
+                will be deleted from your profile.
+              </>
+            ) : (
+              <>
+                This will permanently remove{" "}
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {confirm.label || "this item"}
+                </Box>
+                .
+              </>
+            )}
           </DialogContentText>
           <DialogContentText variant="body2" color="text.secondary">
-            This action cannot be undone.
+            {confirm.type === "edu" || confirm.type === "exp"
+              ? "Are you sure you want to continue?"
+              : "This action cannot be undone."}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>

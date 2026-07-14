@@ -2219,7 +2219,7 @@ export default function AdminUserProfileEditPage() {
       }
       else {
         // Existing Edu/Exp handling
-        showNotification("success", type === "edu" ? "Education deleted" : "Experience deleted");
+        showNotification("success", type === "edu" ? "Education removed from profile; the record remains stored." : "Experience removed from profile; the record remains stored.");
         setEduOpen(false);
         setExpOpen(false);
         setEditEduId(null);
@@ -6033,13 +6033,12 @@ export default function AdminUserProfileEditPage() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {trainingToDelete?.program_title || "this item"}
-            </Box>
-            .
+              {trainingToDelete?.program_title || "This training"}
+            </Box>{" "}
+            will be removed from the visible profile but will remain stored in the database.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
+          <DialogContentText>Attached documents and historical details are preserved. An administrator can restore this record later.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setTrainingDeleteId(null)} disabled={deletingTraining} variant="outlined" color="inherit">
@@ -6054,7 +6053,7 @@ export default function AdminUserProfileEditPage() {
               try {
                 await deleteTrainingApi(userId, trainingDeleteId);
                 await loadMeExtras();
-                showNotification("success", "Training deleted.");
+                showNotification("success", "Training removed from profile; the record and documents remain stored.");
                 setTrainingDeleteId(null);
               } catch (e) {
                 console.error(e);
@@ -6077,13 +6076,12 @@ export default function AdminUserProfileEditPage() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {certToDelete?.certification_name || "this item"}
-            </Box>
-            .
+              {certToDelete?.certification_name || "This certification"}
+            </Box>{" "}
+            will be removed from the visible profile but will remain stored in the database.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
+          <DialogContentText>Attached documents and historical details are preserved. An administrator can restore this record later.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCertDeleteId(null)} disabled={deletingCert} variant="outlined" color="inherit">
@@ -6098,7 +6096,7 @@ export default function AdminUserProfileEditPage() {
               try {
                 await deleteCertificationApi(userId, certDeleteId);
                 await loadMeExtras();
-                showNotification("success", "Certification deleted.");
+                showNotification("success", "Certification removed from profile; the record and documents remain stored.");
                 setCertDeleteId(null);
               } catch (e) {
                 console.error(e);
@@ -6121,13 +6119,12 @@ export default function AdminUserProfileEditPage() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText>
-            This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              {memberToDelete?.organization_name || "this item"}
-            </Box>
-            .
+              {memberToDelete?.organization_name || "This membership"}
+            </Box>{" "}
+            will be removed from the visible profile but will remain stored in the database.
           </DialogContentText>
-          <DialogContentText>This action cannot be undone.</DialogContentText>
+          <DialogContentText>Attached documents and historical details are preserved. An administrator can restore this record later.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMemberDeleteId(null)} disabled={deletingMember} variant="outlined" color="inherit">
@@ -6142,7 +6139,7 @@ export default function AdminUserProfileEditPage() {
               try {
                 await deleteMembershipApi(userId, memberDeleteId);
                 await loadMeExtras();
-                showNotification("success", "Membership deleted.");
+                showNotification("success", "Membership removed from profile; the record and documents remain stored.");
                 setMemberDeleteId(null);
               } catch (e) {
                 console.error(e);
@@ -6171,14 +6168,27 @@ export default function AdminUserProfileEditPage() {
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText sx={{ color: "text.primary", mb: 1 }}>
-            This will permanently remove{" "}
-            <Box component="span" sx={{ fontWeight: 700 }}>
-              {confirm.label || "this item"}
-            </Box>
-            .
+            {confirm.type === "edu" || confirm.type === "exp" ? (
+              <>
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {confirm.label || "This profile record"}
+                </Box>{" "}
+                will be removed from the visible profile but will remain stored in the database.
+              </>
+            ) : (
+              <>
+                This will permanently remove{" "}
+                <Box component="span" sx={{ fontWeight: 700 }}>
+                  {confirm.label || "this item"}
+                </Box>
+                .
+              </>
+            )}
           </DialogContentText>
           <DialogContentText variant="body2" color="text.secondary">
-            This action cannot be undone.
+            {confirm.type === "edu" || confirm.type === "exp"
+              ? "Attached documents and historical details are preserved. An administrator can restore the record later."
+              : "This action cannot be undone."}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
