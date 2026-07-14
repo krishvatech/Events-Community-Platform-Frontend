@@ -1959,7 +1959,9 @@ export default function EventManagePage() {
 
       setSpeedNetworkingDeleteOpen(false);
       setSpeedNetworkingDeleteTarget(null);
-      toast.success("Session deleted successfully");
+      toast.success(
+        "The session was removed from the schedule and remains stored in the database with its participants, attendance, bookmarks, recording and history."
+      );
     } catch (err) {
       toast.error(err?.message || "Failed to delete session");
       console.error("Delete speed networking error:", err);
@@ -4850,8 +4852,10 @@ export default function EventManagePage() {
         {
           method: "DELETE",
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
+          body: JSON.stringify({ reason: "Removed from the event programme." }),
         }
       );
 
@@ -4860,9 +4864,11 @@ export default function EventManagePage() {
         throw new Error(json?.detail || `HTTP ${res.status}`);
       }
 
-      // Remove session from list
+      // Remove the soft-deleted session from the visible schedule.
       setSessions(sessions.filter(s => s.id !== sessionToDelete.id));
-      toast.success("Session deleted successfully");
+      toast.success(
+        "The session was removed from the schedule and remains stored in the database with its participants, attendance, bookmarks, recording and history."
+      );
       closeDeleteSessionDialog();
     } catch (e) {
       toast.error(e?.message || "Failed to delete session");
@@ -9871,11 +9877,15 @@ export default function EventManagePage() {
           open={sessionDeleteDialogOpen}
           onClose={closeDeleteSessionDialog}
         >
-          <DialogTitle sx={{ fontWeight: 700 }}>Delete Session</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>Delete Session?</DialogTitle>
           <DialogContent>
-            <DialogContentText>
-              Are you sure you want to delete the session "<strong>{sessionToDelete?.title}</strong>"?
-              This action cannot be undone.
+            <DialogContentText component="div">
+              <Typography component="p" sx={{ mb: 1.5 }}>
+                This removes <strong>{sessionToDelete?.title || "this session"}</strong> from the event schedule.
+              </Typography>
+              <Typography component="p" variant="body2" color="text.secondary">
+                This is a soft delete. The session remains stored in the database with its speakers, participants, attendance, bookmarks, meeting identifiers, recording and break history. It will no longer be visible or joinable in the event schedule.
+              </Typography>
             </DialogContentText>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -9889,7 +9899,7 @@ export default function EventManagePage() {
               disabled={sessionActionLoading}
               sx={{ textTransform: "none" }}
             >
-              {sessionActionLoading ? "Deleting..." : "Delete"}
+              {sessionActionLoading ? "Deleting..." : "Delete Session"}
             </Button>
           </DialogActions>
         </Dialog>

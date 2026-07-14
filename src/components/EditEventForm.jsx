@@ -398,6 +398,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
     const [editingSessionIndex, setEditingSessionIndex] = useState(null);
     const [sessionSubmitting, setSessionSubmitting] = useState(false);
+    const [sessionDeleteTarget, setSessionDeleteTarget] = useState(null);
     const [savedSchedule, setSavedSchedule] = useState(() => ({
         startISO: event?.start_time ? dayjs(event.start_time).toISOString() : null,
         endISO: event?.end_time ? dayjs(event.end_time).toISOString() : null,
@@ -1246,7 +1247,12 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             }
 
             setSessions((prev) => withSequentialSessionOrder(prev.filter((_, idx) => idx !== index)));
-            setToast({ open: true, type: "success", msg: "Session deleted" });
+            setSessionDeleteTarget(null);
+            setToast({
+                open: true,
+                type: "success",
+                msg: "The session was removed from the schedule and remains stored in the database with its participants, attendance, bookmarks, recording and history.",
+            });
         } catch (err) {
             setSessionsError(err?.message || "Unable to delete session");
             setToast({ open: true, type: "error", msg: err?.message || "Unable to delete session" });
@@ -2715,7 +2721,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                                 setSessionDialogOpen(true);
                                             }}
                                             onDelete={(session, idx) => {
-                                                deleteSession(session?.id, idx);
+                                                setSessionDeleteTarget({ session, index: idx });
                                             }}
                                         />
                                     </Box>
@@ -3161,6 +3167,45 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                     eventEndDate={endDate}
                     isMultiDay={isMultiDay}
                 />
+
+                {/* Session soft-delete confirmation */}
+                <Dialog
+                    open={Boolean(sessionDeleteTarget)}
+                    onClose={() => !sessionSubmitting && setSessionDeleteTarget(null)}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle>Delete Session?</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText component="div">
+                            <Typography component="p" sx={{ mb: 1.5 }}>
+                                This removes <strong>{sessionDeleteTarget?.session?.title || "this session"}</strong> from the event schedule.
+                            </Typography>
+                            <Typography component="p" variant="body2" color="text.secondary">
+                                This is a soft delete. The session remains stored in the database with its speakers, participants, attendance, bookmarks, meeting identifiers, recording and break history. It will no longer be visible or joinable in the event schedule.
+                            </Typography>
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button
+                            onClick={() => setSessionDeleteTarget(null)}
+                            disabled={sessionSubmitting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            color="error"
+                            variant="contained"
+                            disabled={sessionSubmitting}
+                            onClick={() => {
+                                const target = sessionDeleteTarget;
+                                if (target) deleteSession(target.session?.id, target.index);
+                            }}
+                        >
+                            {sessionSubmitting ? "Deleting..." : "Delete Session"}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
 
                 {/* Multi-day to Single-day Conversion Confirmation Dialog */}
                 <Dialog open={showSingleDayConversionDialog} onClose={() => setShowSingleDayConversionDialog(false)}>
