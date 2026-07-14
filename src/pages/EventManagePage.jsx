@@ -460,6 +460,8 @@ export default function EventManagePage() {
   const [networkingTableDeleteTarget, setNetworkingTableDeleteTarget] = useState(null);
   const [networkingTableDeleteOpen, setNetworkingTableDeleteOpen] = useState(false);
   const [networkingTableDeleteLoading, setNetworkingTableDeleteLoading] = useState(false);
+  const [networkingTableDeleteCheckingId, setNetworkingTableDeleteCheckingId] = useState(null);
+  const [networkingTableDeleteReason, setNetworkingTableDeleteReason] = useState("");
   const [networkingDurations, setNetworkingDurations] = useState([5, 10, 15]);
   const [customDurationInput, setCustomDurationInput] = useState("");
   const [customDurationError, setCustomDurationError] = useState("");
@@ -7794,6 +7796,35 @@ export default function EventManagePage() {
       }
     };
 
+    const formatNetworkingTableAvailableAfter = (value) => {
+      if (!value) return "";
+      const viewerTz = currentUser?.profile?.timezone || dayjs.tz.guess();
+      return dayjs(value).tz(viewerTz).format("MMM D, YYYY [at] h:mm A z");
+    };
+
+    const openNetworkingTableDeleteDialog = async (table) => {
+      if (!table?.id || networkingTableDeleteCheckingId) return;
+      setNetworkingTableDeleteCheckingId(table.id);
+      try {
+        const token = getToken();
+        const res = await fetch(
+          `${API_ROOT}/events/${event?.id}/networking-tables/${table.id}/`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+
+        setNetworkingTables(prev => prev.map(item => item.id === json.id ? json : item));
+        setNetworkingTableDeleteTarget(json);
+        setNetworkingTableDeleteReason("");
+        setNetworkingTableDeleteOpen(true);
+      } catch (e) {
+        toast.error(e.message || "Failed to check whether the networking table is free");
+      } finally {
+        setNetworkingTableDeleteCheckingId(null);
+      }
+    };
+
     const deleteNetworkingTable = async () => {
       if (!networkingTableDeleteTarget) return;
       setNetworkingTableDeleteLoading(true);
@@ -7801,15 +7832,35 @@ export default function EventManagePage() {
         const token = getToken();
         const res = await fetch(`${API_ROOT}/events/${event?.id}/networking-tables/${networkingTableDeleteTarget.id}/`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ reason: networkingTableDeleteReason.trim() }),
         });
-        if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (res.status === 409 && json?.code === "networking_table_in_use") {
+            const refreshedTarget = { ...networkingTableDeleteTarget, ...json };
+            setNetworkingTableDeleteTarget(refreshedTarget);
+            setNetworkingTables(prev => prev.map(table =>
+              table.id === networkingTableDeleteTarget.id ? refreshedTarget : table
+            ));
+            toast.warning(json.detail);
+            return;
+          }
+          throw new Error(json?.detail || `HTTP ${res.status}`);
+        }
         setNetworkingTables(prev => prev.filter(t => t.id !== networkingTableDeleteTarget.id));
         setNetworkingTableDeleteOpen(false);
         setNetworkingTableDeleteTarget(null);
-        toast.success("Table deleted");
+        setNetworkingTableDeleteReason("");
+        toast.success(
+          json?.detail ||
+            "The networking table was removed from active use but remains stored with its meeting history."
+        );
       } catch (e) {
-        toast.error(e.message || "Failed to delete table");
+        toast.error(e.message || "Failed to remove networking table");
       } finally {
         setNetworkingTableDeleteLoading(false);
       }
@@ -8226,7 +8277,23 @@ export default function EventManagePage() {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{table.name}</Typography>
                         {table.location_note && <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>{table.location_note}</Typography>}
-                        <Chip size="small" label={table.is_active ? "Active" : "Inactive"} variant="outlined" sx={{ mt: 1, fontWeight: 600 }} color={table.is_active ? "success" : "default"} />
+                        <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                          <Chip
+                            size="small"
+                            label={table.is_active ? "Active" : "Inactive"}
+                            variant="outlined"
+                            sx={{ fontWeight: 600 }}
+                            color={table.is_active ? "success" : "default"}
+                          />
+                          {table.is_in_use && (
+                            <Chip
+                              size="small"
+                              label="In use"
+                              color="warning"
+                              sx={{ fontWeight: 700 }}
+                            />
+                          )}
+                        </Stack>
                       </Box>
                       <Box sx={{ display: "flex", gap: 0.5 }}>
                         <Tooltip title="Edit">
@@ -8242,10 +8309,21 @@ export default function EventManagePage() {
                             <EditRoundedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton size="small" onClick={() => { setNetworkingTableDeleteTarget(table); setNetworkingTableDeleteOpen(true); }} color="error">
-                            <DeleteOutlineRoundedIcon fontSize="small" />
-                          </IconButton>
+                        <Tooltip title={table.is_in_use ? "Table is in use — click for details" : "Delete table"}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => openNetworkingTableDeleteDialog(table)}
+                              color="error"
+                              disabled={networkingTableDeleteCheckingId === table.id}
+                            >
+                              {networkingTableDeleteCheckingId === table.id ? (
+                                <CircularProgress size={18} />
+                              ) : (
+                                <DeleteOutlineRoundedIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </span>
                         </Tooltip>
                       </Box>
                     </Box>
@@ -8648,22 +8726,81 @@ export default function EventManagePage() {
         </Dialog>
 
         {/* ---- Networking Table Delete Dialog ---- */}
-        <Dialog open={networkingTableDeleteOpen} onClose={() => setNetworkingTableDeleteOpen(false)} maxWidth="xs">
-          <DialogTitle>Delete Networking Table</DialogTitle>
+        <Dialog
+          open={networkingTableDeleteOpen}
+          onClose={() => {
+            if (networkingTableDeleteLoading) return;
+            setNetworkingTableDeleteOpen(false);
+            setNetworkingTableDeleteTarget(null);
+            setNetworkingTableDeleteReason("");
+          }}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>
+            {networkingTableDeleteTarget?.is_in_use
+              ? "Networking Table Already in Use"
+              : "Delete Networking Table?"}
+          </DialogTitle>
           <DialogContent>
-            <DialogContentText>Delete table <strong>{networkingTableDeleteTarget?.name}</strong>? This action cannot be undone.</DialogContentText>
+            {networkingTableDeleteTarget?.is_in_use ? (
+              <Alert severity="warning" sx={{ mt: 0.5 }}>
+                <AlertTitle>Already in use</AlertTitle>
+                <strong>{networkingTableDeleteTarget?.name}</strong> is assigned to {" "}
+                {networkingTableDeleteTarget?.active_meeting_count || 1} accepted meeting
+                {(networkingTableDeleteTarget?.active_meeting_count || 1) === 1 ? "" : "s"} and cannot be deleted now.
+                {networkingTableDeleteTarget?.available_after && (
+                  <>
+                    {" "}The last assigned meeting is scheduled to end on {" "}
+                    <strong>{formatNetworkingTableAvailableAfter(networkingTableDeleteTarget.available_after)}</strong>.
+                  </>
+                )}
+                <Box sx={{ mt: 1 }}>
+                  Cancel or move the assigned meeting, or wait until it finishes. When the table is free, open this action again and delete it.
+                </Box>
+              </Alert>
+            ) : (
+              <>
+                <DialogContentText sx={{ mb: 2 }}>
+                  <strong>{networkingTableDeleteTarget?.name}</strong> is currently free and can be removed from active networking-table management.
+                  This is a soft delete: the table remains stored in the database, and completed or cancelled meeting history keeps its table reference.
+                </DialogContentText>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Reason (optional)"
+                  value={networkingTableDeleteReason}
+                  onChange={(event) => setNetworkingTableDeleteReason(event.target.value)}
+                  inputProps={{ maxLength: 500 }}
+                  multiline
+                  minRows={2}
+                />
+              </>
+            )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setNetworkingTableDeleteOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
             <Button
-              variant="contained"
-              color="error"
+              onClick={() => {
+                setNetworkingTableDeleteOpen(false);
+                setNetworkingTableDeleteTarget(null);
+                setNetworkingTableDeleteReason("");
+              }}
               disabled={networkingTableDeleteLoading}
-              onClick={deleteNetworkingTable}
               sx={{ textTransform: "none" }}
             >
-              {networkingTableDeleteLoading ? "Deleting..." : "Delete"}
+              {networkingTableDeleteTarget?.is_in_use ? "Close" : "Cancel"}
             </Button>
+            {!networkingTableDeleteTarget?.is_in_use && (
+              <Button
+                variant="contained"
+                color="error"
+                disabled={networkingTableDeleteLoading}
+                onClick={deleteNetworkingTable}
+                sx={{ textTransform: "none" }}
+              >
+                {networkingTableDeleteLoading ? "Removing..." : "Delete Table"}
+              </Button>
+            )}
           </DialogActions>
         </Dialog>
       </Stack>
