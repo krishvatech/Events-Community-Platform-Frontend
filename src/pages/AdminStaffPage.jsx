@@ -1554,22 +1554,15 @@ export default function AdminStaffPage() {
                         maxWidth="xs"
                         fullWidth
                     >
-                        <DialogTitle>Deactivate account across platforms?</DialogTitle>
+                        <DialogTitle>Deactivate User</DialogTitle>
                         <DialogContent>
                             <Typography variant="body2" color="text.secondary">
                                 You are deactivating <strong>{userToDelete?.username || userToDelete?.email}</strong>.
                             </Typography>
                             <Alert severity="warning" sx={{ mt: 2 }}>
                                 <Typography variant="body2">
-                                    This action will deactivate the user&apos;s shared login account.
+                                    This action will deactivate the user account.
                                 </Typography>
-                                <Typography variant="body2" sx={{ mt: 1 }}>
-                                    The user will lose access to:
-                                </Typography>
-                                <Box component="ul" sx={{ my: 0.5, pl: 3 }}>
-                                    <li>ECP</li>
-                                    <li>MANDA</li>
-                                </Box>
                             </Alert>
                             <TextField
                                 fullWidth
@@ -1605,22 +1598,15 @@ export default function AdminStaffPage() {
                         maxWidth="xs"
                         fullWidth
                     >
-                        <DialogTitle>Deactivate accounts across platforms?</DialogTitle>
+                        <DialogTitle>Deactivate Users</DialogTitle>
                         <DialogContent>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                                 You are deactivating {selected.size} selected user{selected.size !== 1 ? "s" : ""}.
                             </Typography>
                             <Alert severity="warning">
                                 <Typography variant="body2">
-                                    This action will deactivate each user&apos;s shared login account.
+                                    This action will deactivate these user accounts.
                                 </Typography>
-                                <Typography variant="body2" sx={{ mt: 1 }}>
-                                    The selected user{selected.size !== 1 ? "s" : ""} will lose access to:
-                                </Typography>
-                                <Box component="ul" sx={{ my: 0.5, pl: 3 }}>
-                                    <li>ECP</li>
-                                    <li>MANDA</li>
-                                </Box>
                             </Alert>
                         </DialogContent>
                         <DialogActions>
