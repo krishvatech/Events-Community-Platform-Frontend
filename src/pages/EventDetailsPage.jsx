@@ -1617,6 +1617,15 @@ export default function EventDetailsPage() {
   const canJoinEventNow = event.is_multi_day
     ? (joinState?.enabled || isPreEventLounge || isPostEventLounge || isHost)
     : (isHost || confirmedRegistered);
+  const hasApprovedApplication = ["accepted", "approved"].includes(applicationStatus);
+  const canShowWaitingForSession = Boolean(
+    event.is_multi_day &&
+    joinState &&
+    !joinState.enabled &&
+    joinState.status === "waiting_for_session" &&
+    !paymentPending &&
+    (isEventOwner || isHost || confirmedRegistered || hasApprovedApplication)
+  );
   const canWatch = isPast && !!event.recording_url;
 
   // Replay access variables
@@ -2207,7 +2216,7 @@ export default function EventDetailsPage() {
                           >
                             {primaryActionLabel}
                           </Button>
-                        ) : event.is_multi_day && joinState && !joinState.enabled && joinState.status === "waiting_for_session" && (event.registration_type !== 'apply' || (myApplication && myApplication.status === 'approved')) ? (
+                        ) : canShowWaitingForSession ? (
                           <Button
                             disabled
                             variant="contained"
