@@ -336,8 +336,9 @@ export const createAdminUserWithPassword = (data) =>
 export const updateAdminUser = (id, data) =>
   apiClient.patch(`${ADMIN_USERS_BASE}/${id}/`, data).then((r) => r.data);
 
-// Soft-deactivate only. The backend preserves user IDs, memberships, events,
-// registrations, WordPress mappings, and Saleor/Cognito identity mappings.
+// Soft-deactivate the local records and disable the shared Cognito login.
+// The backend preserves user IDs, memberships, events, registrations,
+// WordPress mappings, and Saleor/Cognito identity mappings.
 export const deactivateAdminUser = (id, reason = "") =>
   apiClient.post(`${ADMIN_USERS_BASE}/${id}/deactivate/`, { reason }).then((r) => r.data);
 

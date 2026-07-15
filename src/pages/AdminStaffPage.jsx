@@ -848,7 +848,7 @@ export default function AdminStaffPage() {
             setSnack({
                 open: true,
                 severity: "success",
-                message: "User deactivated. Group, event, and sync history were preserved.",
+                message: "User deactivated across ECP and MANDA.",
             });
         } catch (err) {
             setSnack({
@@ -1400,11 +1400,11 @@ export default function AdminStaffPage() {
                                                                 </IconButton>
                                                             </span>
                                                         </Tooltip>
-                                                        <Tooltip title="Deactivate User">
+                                                        <Tooltip title="Deactivate Across Platforms">
                                                             <span>
-                                                                <IconButton 
-                                                                    size="small" 
-                                                                    color="error" 
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="error"
                                                                     onClick={() => confirmDeleteUser(u)}
                                                                     disabled={!owner || isCurrentUserRow(u)}
                                                                 >
@@ -1554,15 +1554,22 @@ export default function AdminStaffPage() {
                         maxWidth="xs"
                         fullWidth
                     >
-                        <DialogTitle>Deactivate User?</DialogTitle>
+                        <DialogTitle>Deactivate account across platforms?</DialogTitle>
                         <DialogContent>
                             <Typography variant="body2" color="text.secondary">
-                                Deactivate <strong>{userToDelete?.username || userToDelete?.email}</strong>?
+                                You are deactivating <strong>{userToDelete?.username || userToDelete?.email}</strong>.
                             </Typography>
                             <Alert severity="warning" sx={{ mt: 2 }}>
-                                The user will be logged out and cannot sign in. Their WordPress identity,
-                                group memberships, event ownership, registrations, orders, and sync mappings
-                                will remain in the database.
+                                <Typography variant="body2">
+                                    This action will deactivate the user&apos;s shared login account.
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 1 }}>
+                                    The user will lose access to:
+                                </Typography>
+                                <Box component="ul" sx={{ my: 0.5, pl: 3 }}>
+                                    <li>ECP</li>
+                                    <li>MANDA</li>
+                                </Box>
                             </Alert>
                             <TextField
                                 fullWidth
@@ -1586,7 +1593,7 @@ export default function AdminStaffPage() {
                                 disabled={actionLoading}
                                 startIcon={actionLoading ? <CircularProgress size={20} color="inherit" /> : null}
                             >
-                                {actionLoading ? "Deactivating..." : "Deactivate User"}
+                                {actionLoading ? "Deactivating..." : "Deactivate"}
                             </Button>
                         </DialogActions>
                     </Dialog>
@@ -1598,13 +1605,22 @@ export default function AdminStaffPage() {
                         maxWidth="xs"
                         fullWidth
                     >
-                        <DialogTitle>Deactivate {selected.size} Users?</DialogTitle>
+                        <DialogTitle>Deactivate accounts across platforms?</DialogTitle>
                         <DialogContent>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                Deactivate {selected.size} selected users?
+                                You are deactivating {selected.size} selected user{selected.size !== 1 ? "s" : ""}.
                             </Typography>
-                            <Alert severity="error">
-                                These users will lose access, but their group, event, order, and sync history will be preserved.
+                            <Alert severity="warning">
+                                <Typography variant="body2">
+                                    This action will deactivate each user&apos;s shared login account.
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 1 }}>
+                                    The selected user{selected.size !== 1 ? "s" : ""} will lose access to:
+                                </Typography>
+                                <Box component="ul" sx={{ my: 0.5, pl: 3 }}>
+                                    <li>ECP</li>
+                                    <li>MANDA</li>
+                                </Box>
                             </Alert>
                         </DialogContent>
                         <DialogActions>
@@ -1618,7 +1634,7 @@ export default function AdminStaffPage() {
                                 disabled={actionLoading}
                                 startIcon={actionLoading ? <CircularProgress size={20} color="inherit" /> : null}
                             >
-                                {actionLoading ? "Deactivating..." : "Deactivate All"}
+                                {actionLoading ? "Deactivating..." : "Deactivate"}
                             </Button>
                         </DialogActions>
                     </Dialog>
