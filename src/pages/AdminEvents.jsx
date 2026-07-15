@@ -456,7 +456,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   // Event fields
   const [title, setTitle] = React.useState("");
   const [slug, setSlug] = React.useState("");
-  const [slugStatus, setSlugStatus] = React.useState({ checking: false, available: null });
+  const [slugStatus, setSlugStatus] = React.useState({ checking: false, available: null, suggestedSlug: "" });
   const [description, setDescription] = React.useState("");
   const [location, setLocation] = React.useState("Germany");
   const [locationCity, setLocationCity] = React.useState(null); // city object from autocomplete
@@ -560,6 +560,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [participants, setParticipants] = React.useState([]);
   const [participantDialogOpen, setParticipantDialogOpen] = React.useState(false);
   const [editingParticipantIndex, setEditingParticipantIndex] = React.useState(null);
+  const [participantToRemove, setParticipantToRemove] = React.useState(null);
+  const [confirmRemoveDialogOpen, setConfirmRemoveDialogOpen] = React.useState(false);
 
   // Sessions (for multi-day events)
   const [sessions, setSessions] = React.useState([]);
@@ -569,6 +571,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [outOfRangeSessions, setOutOfRangeSessions] = React.useState([]);
   const [actualEventStartTime, setActualEventStartTime] = React.useState(null);
   const [actualEventEndTime, setActualEventEndTime] = React.useState(null);
+  const [sessionToDelete, setSessionToDelete] = React.useState(null);
+  const [confirmDeleteSessionDialogOpen, setConfirmDeleteSessionDialogOpen] = React.useState(false);
 
   // ----- Seed Questions (draft — submitted after event creation) -----
   const [draftSeeds, setDraftSeeds] = React.useState([]);
@@ -878,6 +882,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setExternalStreamingHostLink("");
 
     setSelectedPlatformSlugs([CONNECT_PLATFORM_SLUG]);
+    setSlugStatus({ checking: false, available: null, suggestedSlug: "" });
     setErrors({});
   };
 
@@ -885,8 +890,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     const e = {};
     if (!title.trim()) e.title = "Required";
     if (!slug.trim()) e.slug = "Required";
-    else if (slugStatus.checking) e.slug = "Checking slug availability. Please wait.";
-    else if (slugStatus.available === false) e.slug = "This slug is already taken.";
     // For in-person/hybrid, check locationCity; for virtual, check location
     if (format === "virtual" && !location) {
       e.location = "Required";
@@ -937,12 +940,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   React.useEffect(() => {
     const candidate = String(slug || "").trim();
     if (!candidate) {
-      setSlugStatus({ checking: false, available: null });
+      setSlugStatus({ checking: false, available: null, suggestedSlug: "" });
       return;
     }
 
     const controller = new AbortController();
-    setSlugStatus({ checking: true, available: null });
+    setSlugStatus({ checking: true, available: null, suggestedSlug: "" });
 
     const timer = setTimeout(async () => {
       try {
@@ -955,13 +958,17 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         );
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setSlugStatus({ checking: false, available: null });
+          setSlugStatus({ checking: false, available: null, suggestedSlug: "" });
           return;
         }
-        setSlugStatus({ checking: false, available: Boolean(json?.available) });
+        setSlugStatus({
+          checking: false,
+          available: Boolean(json?.available),
+          suggestedSlug: String(json?.suggested_slug || candidate),
+        });
       } catch (err) {
         if (err?.name !== "AbortError") {
-          setSlugStatus({ checking: false, available: null });
+          setSlugStatus({ checking: false, available: null, suggestedSlug: "" });
         }
       }
     }, 350);
@@ -975,6 +982,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const submit = async () => {
     if (!validate()) return;
     setSubmitting(true);
+    // Use suggested slug if available is false, otherwise use the slug state
+    const displayedSlug = slugStatus.available === false ? slugStatus.suggestedSlug : slug;
+    const requestedSlug = String(displayedSlug || "").trim();
 
     // 🔴 DEBUG: Log sessions state at submission time
     console.log("🚨 AT FORM SUBMISSION - Sessions state:", {
@@ -1006,7 +1016,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("is_live", "false");
 
     fd.append("title", title.trim());
-    fd.append("slug", slug.trim());
+    fd.append("slug", displayedSlug.trim());
     fd.append("description", description);
     appendPlatformSlugsToFormData(fd, selectedPlatformSlugs);
 
@@ -1355,9 +1365,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       }
 
       onCreated?.(json);
-      const msg = isMultiDay && sessions.length > 0
+      const createdSlug = String(json?.slug || requestedSlug);
+      const baseMessage = isMultiDay && sessions.length > 0
         ? `Event created with ${sessions.length} session(s). Resources attached.`
         : "Event created. Resources attached.";
+      const msg = createdSlug !== requestedSlug
+        ? `${baseMessage} The slug was changed from "${requestedSlug}" to "${createdSlug}" because the original slug was already reserved.`
+        : baseMessage;
       setToast({ open: true, type: "success", msg });
 
       // 🔹 CLEAR FORM FOR NEXT TIME
@@ -1433,13 +1447,15 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               label="Slug *"
               placeholder="enter-event-slug"
               InputLabelProps={{ shrink: true }}
-              value={slug}
+              value={slugStatus.available === false ? slugStatus.suggestedSlug : slug}
               onChange={(e) => {
-                setSlug(sanitizeSlugInput(e.target.value));
+                const newVal = sanitizeSlugInput(e.target.value);
+                setSlug(newVal);
+                setSlugStatus({ checking: false, available: null, suggestedSlug: "" });
                 setErrors((prev) => ({ ...prev, slug: "" }));
               }}
               fullWidth
-              error={!!errors.slug || slugStatus.available === false}
+              error={!!errors.slug}
               helperText={
                 errors.slug ||
                 (slugStatus.checking
@@ -1447,7 +1463,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   : slugStatus.available === true
                     ? "Slug is available."
                     : slugStatus.available === false
-                      ? "This slug is already taken."
+                      ? `Slug automatically changed to "${slugStatus.suggestedSlug}" (original already in use).`
                       : "Lowercase, numbers, underscores, special chars (@$&#) allowed. No forward slashes.")
               }
               sx={{ mb: 2 }}
@@ -2492,8 +2508,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       setSessionDialogOpen(true);
                     }}
                     onDelete={(session, idx) => {
-                      setSessions(prev => prev.filter((_, i) => i !== idx));
-                      setToast({ open: true, type: "success", msg: "Session removed" });
+                      setSessionToDelete({ session, index: idx });
+                      setConfirmDeleteSessionDialogOpen(true);
                     }}
                   />
                 </Box>
@@ -2523,8 +2539,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     setParticipantDialogOpen(true);
                   }}
                   onRemove={(p, idx) => {
-                    setParticipants(prev => prev.filter((_, i) => i !== idx));
-                    toast.success("Participant removed");
+                    setParticipantToRemove({ participant: p, index: idx });
+                    setConfirmRemoveDialogOpen(true);
                   }}
                   onReorder={(reorderedParticipants) => {
                     setParticipants(reorderedParticipants);
@@ -2974,6 +2990,105 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           }
           existingParticipants={participants}
         />
+
+        {/* Remove Participant Confirmation Dialog */}
+        <Dialog
+          open={confirmRemoveDialogOpen}
+          onClose={() => {
+            setConfirmRemoveDialogOpen(false);
+            setParticipantToRemove(null);
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Remove Participant?</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to remove <strong>{participantToRemove?.participant?.name || participantToRemove?.participant?.guest_name || "this participant"}</strong>?
+              This action will use soft delete, preserving the record for audit purposes.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setConfirmRemoveDialogOpen(false);
+                setParticipantToRemove(null);
+              }}
+              variant="outlined"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (participantToRemove) {
+                  const removedName = participantToRemove.participant?.name || participantToRemove.participant?.guest_name || "Participant";
+                  setParticipants(prev => prev.filter((_, i) => i !== participantToRemove.index));
+                  setToast({ open: true, type: "success", msg: `${removedName} removed` });
+                }
+                setConfirmRemoveDialogOpen(false);
+                setParticipantToRemove(null);
+              }}
+              variant="contained"
+              color="error"
+            >
+              Remove
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Session Confirmation Dialog */}
+        <Dialog
+          open={confirmDeleteSessionDialogOpen}
+          onClose={() => {
+            setConfirmDeleteSessionDialogOpen(false);
+            setSessionToDelete(null);
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Delete Session?</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2}>
+              <Typography>
+                Are you sure you want to delete <strong>{sessionToDelete?.session?.title}</strong>?
+              </Typography>
+              {sessionToDelete?.session?.start_time && (
+                <Typography variant="body2" color="text.secondary">
+                  {dayjs(sessionToDelete.session.start_time).format('MMM DD, YYYY [at] h:mm A')}
+                </Typography>
+              )}
+              <Typography variant="body2">
+                This action will use soft delete, preserving the record and all session participants for audit purposes.
+              </Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setConfirmDeleteSessionDialogOpen(false);
+                setSessionToDelete(null);
+              }}
+              variant="outlined"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (sessionToDelete) {
+                  const deletedSessionTitle = sessionToDelete.session?.title || "Session";
+                  setSessions(prev => prev.filter((_, i) => i !== sessionToDelete.index));
+                  setToast({ open: true, type: "success", msg: `${deletedSessionTitle} deleted` });
+                }
+                setConfirmDeleteSessionDialogOpen(false);
+                setSessionToDelete(null);
+              }}
+              variant="contained"
+              color="error"
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Session Dialog */}
         <SessionDialog

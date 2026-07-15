@@ -1225,7 +1225,15 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     };
 
     const deleteSession = async (sessionId, index) => {
-        if (!event?.id || !sessionId) return;
+        // A newly-added session has not been stored yet, so removing it only
+        // updates the local draft. Persisted sessions use the backend DELETE
+        // endpoint, which performs the soft delete.
+        if (!sessionId) {
+            setSessions((prev) => withSequentialSessionOrder(prev.filter((_, idx) => idx !== index)));
+            setSessionDeleteTarget(null);
+            return;
+        }
+        if (!event?.id) return;
         setSessionSubmitting(true);
         setSessionsError("");
         try {
@@ -1248,11 +1256,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
             setSessions((prev) => withSequentialSessionOrder(prev.filter((_, idx) => idx !== index)));
             setSessionDeleteTarget(null);
-            setToast({
-                open: true,
-                type: "success",
-                msg: "The session was removed from the schedule and remains stored in the database with its participants, attendance, bookmarks, recording and history.",
-            });
+            setToast({ open: true, type: "success", msg: "Session deleted successfully." });
         } catch (err) {
             setSessionsError(err?.message || "Unable to delete session");
             setToast({ open: true, type: "error", msg: err?.message || "Unable to delete session" });
@@ -2850,7 +2854,6 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                         }}
                                         onRemove={(p, idx) => {
                                             setParticipants(prev => prev.filter((_, i) => i !== idx));
-                                            setToast({ open: true, type: "success", msg: "Participant removed" });
                                         }}
                                         onReorder={(reorderedParticipants) => {
                                             setParticipants(reorderedParticipants);
@@ -3178,11 +3181,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                     <DialogTitle>Delete Session?</DialogTitle>
                     <DialogContent>
                         <DialogContentText component="div">
-                            <Typography component="p" sx={{ mb: 1.5 }}>
-                                This removes <strong>{sessionDeleteTarget?.session?.title || "this session"}</strong> from the event schedule.
-                            </Typography>
-                            <Typography component="p" variant="body2" color="text.secondary">
-                                This is a soft delete. The session remains stored in the database with its speakers, participants, attendance, bookmarks, meeting identifiers, recording and break history. It will no longer be visible or joinable in the event schedule.
+                            <Typography component="p">
+                                Are you sure you want to delete <strong>{sessionDeleteTarget?.session?.title || "this session"}</strong> from the event schedule?
                             </Typography>
                         </DialogContentText>
                     </DialogContent>

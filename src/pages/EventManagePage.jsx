@@ -1971,9 +1971,7 @@ export default function EventManagePage() {
 
       setSpeedNetworkingDeleteOpen(false);
       setSpeedNetworkingDeleteTarget(null);
-      toast.success(
-        "The session was removed from the schedule and remains stored in the database with its participants, attendance, bookmarks, recording and history."
-      );
+      toast.success("Session deleted successfully.");
     } catch (err) {
       toast.error(err?.message || "Failed to delete session");
       console.error("Delete speed networking error:", err);
@@ -4876,11 +4874,9 @@ export default function EventManagePage() {
         throw new Error(json?.detail || `HTTP ${res.status}`);
       }
 
-      // Remove the soft-deleted session from the visible schedule.
+      // The backend retains the record; the normal schedule only shows active sessions.
       setSessions(sessions.filter(s => s.id !== sessionToDelete.id));
-      toast.success(
-        "The session was removed from the schedule and remains stored in the database with its participants, attendance, bookmarks, recording and history."
-      );
+      toast.success("Session deleted successfully.");
       closeDeleteSessionDialog();
     } catch (e) {
       toast.error(e?.message || "Failed to delete session");
@@ -10047,11 +10043,8 @@ export default function EventManagePage() {
           <DialogTitle sx={{ fontWeight: 700 }}>Delete Session?</DialogTitle>
           <DialogContent>
             <DialogContentText component="div">
-              <Typography component="p" sx={{ mb: 1.5 }}>
-                This removes <strong>{sessionToDelete?.title || "this session"}</strong> from the event schedule.
-              </Typography>
-              <Typography component="p" variant="body2" color="text.secondary">
-                This is a soft delete. The session remains stored in the database with its speakers, participants, attendance, bookmarks, meeting identifiers, recording and break history. It will no longer be visible or joinable in the event schedule.
+              <Typography component="p">
+                Are you sure you want to delete <strong>{sessionToDelete?.title || "this session"}</strong> from the event schedule?
               </Typography>
             </DialogContentText>
           </DialogContent>
