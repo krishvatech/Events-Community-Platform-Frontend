@@ -42,6 +42,30 @@ const LINKEDIN_ICON = (
   </svg>
 );
 
+const IMAA_ICON = (
+  <Box
+    component="span"
+    sx={{
+      width: 18,
+      height: 18,
+      borderRadius: "50%",
+      bgcolor: "#0F2040",
+      color: "#14B8A6",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 800,
+      lineHeight: 1,
+    }}
+  >
+    I
+  </Box>
+);
+
+const ENABLE_IMAA_SSO = String(import.meta.env.VITE_ENABLE_IMAA_SSO || "false").toLowerCase() === "true";
+const IMAA_SSO_IDP_NAME = import.meta.env.VITE_COGNITO_IMAA_IDP_NAME || "IMAAWordPress";
+
 const DEACTIVATED_ACCOUNT_MESSAGE =
   "This account has been deactivated by an administrator. Please contact support.";
 
@@ -715,33 +739,50 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 <Typography variant="caption" sx={{ color: "#94A3B8", fontWeight: 500, whiteSpace: "nowrap" }}>Continue with</Typography>
                 <Box sx={{ flex: 1, height: "1px", bgcolor: "#E2E8F0" }} />
               </Box>
-              <Box sx={{ display: "flex", gap: 1.5 }}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={GOOGLE_ICON}
-                  onClick={() => handleSocialLogin("Google")}
-                  sx={{
-                    textTransform: "none", fontWeight: 500, fontSize: 14,
-                    borderColor: "#E2E8F0", color: "#374151", borderRadius: 2, py: 1,
-                    "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" },
-                  }}
-                >
-                  Google
-                </Button>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={LINKEDIN_ICON}
-                  onClick={() => handleSocialLogin("LinkedIn")}
-                  sx={{
-                    textTransform: "none", fontWeight: 500, fontSize: 14,
-                    borderColor: "#E2E8F0", color: "#374151", borderRadius: 2, py: 1,
-                    "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" },
-                  }}
-                >
-                  LinkedIn
-                </Button>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+                {ENABLE_IMAA_SSO && (
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={IMAA_ICON}
+                    onClick={() => handleSocialLogin(IMAA_SSO_IDP_NAME)}
+                    sx={{
+                      textTransform: "none", fontWeight: 600, fontSize: 14,
+                      borderColor: "#0F2040", color: "#0F2040", borderRadius: 2, py: 1,
+                      "&:hover": { borderColor: "#0F2040", bgcolor: "#F8FAFC" },
+                    }}
+                  >
+                    Continue with IMAA
+                  </Button>
+                )}
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={GOOGLE_ICON}
+                    onClick={() => handleSocialLogin("Google")}
+                    sx={{
+                      textTransform: "none", fontWeight: 500, fontSize: 14,
+                      borderColor: "#E2E8F0", color: "#374151", borderRadius: 2, py: 1,
+                      "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" },
+                    }}
+                  >
+                    Google
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={LINKEDIN_ICON}
+                    onClick={() => handleSocialLogin("LinkedIn")}
+                    sx={{
+                      textTransform: "none", fontWeight: 500, fontSize: 14,
+                      borderColor: "#E2E8F0", color: "#374151", borderRadius: 2, py: 1,
+                      "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" },
+                    }}
+                  >
+                    LinkedIn
+                  </Button>
+                </Box>
               </Box>
             </>
           )}
