@@ -1668,44 +1668,26 @@ export default function EventDetailsPage() {
     setActiveTab(newValue);
   };
 
-  // Build absolute media URLs. The visible page keeps preferring cover_image,
-  // while social sharing intentionally prefers preview_image when available.
-  const resolveMediaUrl = (value) => {
-    if (!value || value.startsWith('http')) return value || '';
+  // Build cover image URL
+  let coverImageUrl = event?.cover_image || event?.preview_image || '';
+  if (coverImageUrl && !coverImageUrl.startsWith('http')) {
     const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '');
-    return `${apiBase}${value}`;
-  };
-  const coverImageUrl = resolveMediaUrl(event?.cover_image || event?.preview_image || '');
-  const socialImageUrl = resolveMediaUrl(event?.preview_image || event?.cover_image || '');
-  const socialDescription = (event?.description || '')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 200) || 'Join this event.';
-  const canonicalUrl = event?.slug
-    ? `${window.location.origin}/events/${event.slug}`
-    : window.location.href;
+    coverImageUrl = `${apiBase}${coverImageUrl}`;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
       {event && (
         <Helmet>
           <title>{event.title}</title>
-          <meta name="description" content={socialDescription} />
-          <link rel="canonical" href={canonicalUrl} />
-          <meta property="og:type" content="website" />
-          <meta property="og:site_name" content="IMAA Events & Community" />
           <meta property="og:title" content={event.title} />
-          <meta property="og:description" content={socialDescription} />
-          <meta property="og:url" content={canonicalUrl} />
-          {socialImageUrl && <meta property="og:image" content={socialImageUrl} />}
-          {socialImageUrl && <meta property="og:image:secure_url" content={socialImageUrl} />}
-          {socialImageUrl && <meta property="og:image:alt" content={event.title} />}
+          <meta property="og:description" content={(event.description || '').slice(0, 160)} />
+          {coverImageUrl && <meta property="og:image" content={coverImageUrl} />}
+          <meta property="og:url" content={window.location.href} />
+          <meta property="og:type" content="website" />
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:title" content={event.title} />
-          <meta name="twitter:description" content={socialDescription} />
-          {socialImageUrl && <meta name="twitter:image" content={socialImageUrl} />}
-          {socialImageUrl && <meta name="twitter:image:alt" content={event.title} />}
+          {coverImageUrl && <meta name="twitter:image" content={coverImageUrl} />}
         </Helmet>
       )}
       {/* BODY with LEFT NAV + MAIN */}
