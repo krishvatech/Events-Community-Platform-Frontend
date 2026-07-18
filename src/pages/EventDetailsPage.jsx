@@ -2546,14 +2546,64 @@ export default function EventDetailsPage() {
                             Watch Recording
                           </Button>
                         ) : isPast ? (
-                          <Button
-                            disabled
-                            variant="contained"
-                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
-                            className="rounded-xl"
-                          >
-                            Event Ended
-                          </Button>
+                          // ✅ Past event opened by direct URL: allow non-registered users to
+                          // register/apply. Owners and already-registered users (with no replay/
+                          // recording available) still see the "Event Ended" state.
+                          (!isEventOwner && !confirmedRegistered) ? (
+                            event.registration_type === 'apply' ? (
+                              hasOpenApplicationTracks(event) ? (
+                                <Button
+                                  onClick={openApplyModalAfterProfileCheck}
+                                  variant="contained"
+                                  sx={{
+                                    textTransform: "none",
+                                    backgroundColor: "#10b8a6",
+                                    "&:hover": { backgroundColor: "#0ea5a4" },
+                                  }}
+                                  className="rounded-xl"
+                                >
+                                  {token ? "Apply Now" : "Apply as Guest"}
+                                </Button>
+                              ) : (
+                                <Button
+                                  disabled
+                                  variant="contained"
+                                  sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                                  className="rounded-xl"
+                                >
+                                  Event Ended
+                                </Button>
+                              )
+                            ) : (
+                              <Button
+                                onClick={handleRegister}
+                                variant="contained"
+                                disabled={addingPaidEventToCart}
+                                sx={{
+                                  textTransform: "none",
+                                  backgroundColor: "#10b8a6",
+                                  "&:hover": { backgroundColor: "#0ea5a4" },
+                                  "&.Mui-disabled": { backgroundColor: "#9adbd3", color: "#ffffff" },
+                                }}
+                                className="rounded-xl"
+                              >
+                                {!event?.is_free && addingPaidEventToCart
+                                  ? "Adding to cart..."
+                                  : !event?.is_free && paidCartNotice
+                                    ? "Added to cart"
+                                    : "Register Now"}
+                              </Button>
+                            )
+                          ) : (
+                            <Button
+                              disabled
+                              variant="contained"
+                              sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                              className="rounded-xl"
+                            >
+                              Event Ended
+                            </Button>
+                          )
                         ) : (
                           <Button
                             disabled
