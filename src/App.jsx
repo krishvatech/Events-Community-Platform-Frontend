@@ -59,6 +59,7 @@ import { RequireSuperAdmin, RequireStaffOrAdmin } from "./components/RoleBasedRo
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
 import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
+import ImaaSsoRedirect from "./pages/ImaaSsoRedirect.jsx";
 import MagicLinkPage from "./pages/MagicLinkPage.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import CmsBridge from "./pages/CmsBridge.jsx";
@@ -172,6 +173,7 @@ const AppShell = () => {
     normalizedPath.startsWith("/recognition/");
 
   const isCompanionPage = location.pathname.includes("/companion");
+  const isSsoRedirectPage = normalizedPath === "/sso/imaa";
   const isSingleEventPage = (location.pathname.startsWith("/landing/") && location.pathname !== "/landing") ||
                             (!location.pathname.startsWith("/events") &&
                             !location.pathname.startsWith("/account") &&
@@ -183,6 +185,7 @@ const AppShell = () => {
                             location.pathname !== "/cms" &&
                             location.pathname.match(/^\/[a-zA-Z0-9\-]+\/?$/));
   const hideChrome =
+    isSsoRedirectPage ||
     isImaaStandalonePublicPage ||
     location.pathname === "/signin" ||
     location.pathname === "/signup" ||
@@ -229,7 +232,7 @@ const AppShell = () => {
         </>
       )}
 
-      {!isCompanionPage && !isImaaStandalonePublicPage && <KYCNotification />}
+      {!isCompanionPage && !isImaaStandalonePublicPage && !isSsoRedirectPage && <KYCNotification />}
 
       {/* Main Content Wrapper */}
       <Box
@@ -253,6 +256,7 @@ const AppShell = () => {
           <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
           <Route path="/oauth/callback" element={<SocialOAuthCallback />} />
           <Route path="/cognito/callback" element={<CognitoOAuthCallback />} />
+          <Route path="/sso/imaa" element={<ImaaSsoRedirect />} />
 
           {/* Admin routes - Layout is handled globally now, so AdminLayout just renders Outlet? */}
           <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
