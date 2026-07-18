@@ -2157,7 +2157,7 @@ export default function EventDetailsPage() {
                         {event.replay_available && (
                           <Box className="mt-2 mb-3 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
                             <Typography variant="subtitle2" className="text-indigo-800 font-semibold">
-                              Replay will be available
+                              {event.replay_visible_to_participants ? "Replay is available now" : "Replay will be available"}
                             </Typography>
                             {event.replay_availability_duration && (
                               <Typography variant="caption" className="text-indigo-600 block mt-0.5">
