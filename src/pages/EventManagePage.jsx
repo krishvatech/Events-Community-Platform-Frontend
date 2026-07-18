@@ -7537,6 +7537,7 @@ export default function EventManagePage() {
       >
         <EditEventForm
           event={event}
+          isOwner={isOwner}
           onUpdated={(updated) => {
             setEvent(updated);
             toast.success("Event updated successfully");

@@ -252,7 +252,7 @@ function parseLocationString(locationString, format) {
     return null;
 }
 
-export default function EditEventForm({ event, onUpdated, onCancel }) {
+export default function EditEventForm({ event, onUpdated, onCancel, isOwner = false }) {
     const token = getToken();
 
     // --- local state from existing event ---
@@ -1316,7 +1316,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             e.endTime = "Invalid end time format.";
         }
 
-        // Timezone-aware validation for event times
+        // Timezone-aware validation for event times (skip past-date check for owners/admins editing ended events)
         if (!e.startTime && !e.endTime && startDate && startTime && endDate && endTime) {
             if (isMultiDay) {
                 // Multiday event: start_date >= today, end_date >= start_date
@@ -1326,20 +1326,23 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                     endDate,
                     endTime,
                     timezone,
-                    event
+                    event,
+                    isOwner
                 );
                 if (!validation.valid) {
                     Object.assign(e, validation.errors);
                 }
             } else {
                 // Non-multiday event: start_date today or future, today requires +30min buffer
+                // Owners/admins can edit past events
                 const validation = validateNonMultidayEvent(
                     startDate,
                     startTime,
                     startDate, // for non-multiday, end date is same as start date
                     endTime,
                     timezone,
-                    event
+                    event,
+                    isOwner
                 );
                 if (!validation.valid) {
                     Object.assign(e, validation.errors);
