@@ -79,6 +79,7 @@ export const isUnchanged = (newDt, oldDt, toleranceSeconds = 60) => {
  * - if start_date == today: start_time >= now + 30 minutes
  * - if start_date > today: any time 00:00–23:59 is allowed
  * - end_time must always be greater than start_time
+ * - Owners/admins can edit events even after they end (isOwner=true skips date validation)
  *
  * @param {string} startDate - YYYY-MM-DD in user's timezone
  * @param {string} startTime - HH:mm in user's timezone
@@ -86,6 +87,7 @@ export const isUnchanged = (newDt, oldDt, toleranceSeconds = 60) => {
  * @param {string} endTime - HH:mm in user's timezone
  * @param {string} tzName - IANA timezone name
  * @param {Object} existingEvent - Existing event object (for PATCH). null for POST.
+ * @param {boolean} isOwner - Whether user is event owner/admin (can edit past events)
  * @returns {Object} { valid: boolean, errors: { field: message } }
  */
 export const validateNonMultidayEvent = (
@@ -94,14 +96,15 @@ export const validateNonMultidayEvent = (
   endDate,
   endTime,
   tzName,
-  existingEvent = null
+  existingEvent = null,
+  isOwner = false
 ) => {
   const errors = {};
   const { nowLocal, today } = getLocalNow(tzName);
   const minStartLocal = nowLocal.add(30, "minute");
 
-  // Check: start_date must be today or future
-  if (startDate && startTime) {
+  // Check: start_date must be today or future (skip for owners editing ended events)
+  if (startDate && startTime && !isOwner) {
     if (startDate < today) {
       // Past date
       const existingStart = existingEvent?.start_time;
@@ -149,6 +152,7 @@ export const validateNonMultidayEvent = (
  * Rules:
  * - start_date >= today (in user's timezone)
  * - end_date >= start_date (date-level comparison)
+ * - Owners/admins can edit events even after they end (isOwner=true skips date validation)
  *
  * @param {string} startDate - YYYY-MM-DD in user's timezone
  * @param {string} startTime - HH:mm in user's timezone
@@ -156,6 +160,7 @@ export const validateNonMultidayEvent = (
  * @param {string} endTime - HH:mm in user's timezone
  * @param {string} tzName - IANA timezone name
  * @param {Object} existingEvent - Existing event object (for PATCH). null for POST.
+ * @param {boolean} isOwner - Whether user is event owner/admin (can edit past events)
  * @returns {Object} { valid: boolean, errors: { field: message } }
  */
 export const validateMultidayEvent = (
@@ -164,13 +169,14 @@ export const validateMultidayEvent = (
   endDate,
   endTime,
   tzName,
-  existingEvent = null
+  existingEvent = null,
+  isOwner = false
 ) => {
   const errors = {};
   const { today } = getLocalNow(tzName);
 
-  // Check: start_date >= today
-  if (startDate && startTime) {
+  // Check: start_date >= today (skip for owners editing ended events)
+  if (startDate && startTime && !isOwner) {
     if (startDate < today) {
       const existingStart = existingEvent?.start_time;
       if (!isUnchanged(dayjs(`${startDate}T${startTime}`), existingStart)) {

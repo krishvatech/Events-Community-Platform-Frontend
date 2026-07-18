@@ -3009,7 +3009,7 @@ export default function EventManagePage() {
               {event.replay_available && (
                 <Box sx={{ mt: 2, mb: 1, p: 2, bgcolor: "rgba(99, 102, 241, 0.08)", borderRadius: 2, border: "1px solid rgba(99, 102, 241, 0.2)" }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "indigo.main" }}>
-                    Replay will be available
+                    {event.replay_visible_to_participants ? "Replay is available now" : "Replay will be available"}
                   </Typography>
                   {event.replay_availability_duration && (
                     <Typography variant="caption" sx={{ color: "indigo.dark", display: "block", mt: 0.5 }}>
@@ -7537,6 +7537,7 @@ export default function EventManagePage() {
       >
         <EditEventForm
           event={event}
+          isOwner={isOwner}
           onUpdated={(updated) => {
             setEvent(updated);
             toast.success("Event updated successfully");
