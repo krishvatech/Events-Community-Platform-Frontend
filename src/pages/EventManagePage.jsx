@@ -99,6 +99,7 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
+import { isReplayReadyForSignup } from "../utils/eventUtils";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
@@ -2337,7 +2338,9 @@ export default function EventManagePage() {
 
   // Logic for Join Button (Staff / Admin view context)
   const isPostEventLounge = isPostEventLoungeOpen(event);
-  const isPast = (status === "past" || event?.status === "ended") && !isPostEventLounge;
+  const isEventEnded = status === "past" || event?.status === "ended";
+  const isPast = isEventEnded && !isPostEventLounge;
+  const replayReady = isReplayReadyForSignup(event);
   const isLive = status === "live" && event?.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(event, 15);
   const isPreEventLounge = isPreEventLoungeOpen(event);
@@ -2814,11 +2817,11 @@ export default function EventManagePage() {
                         sx={{
                           borderRadius: 2,
                           textTransform: "none",
-                          bgcolor: (isPast || isLiveLifecycleBlocked) ? "#CBD5E1" : "#10b8a6",
+                          bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "#CBD5E1" : "#10b8a6",
                           py: 1,
                           fontSize: 15,
                           fontWeight: 600,
-                          "&:hover": { bgcolor: (isPast || isLiveLifecycleBlocked) ? "#CBD5E1" : "#0ea5a4" },
+                          "&:hover": { bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "#CBD5E1" : "#0ea5a4" },
                           ...(status === "cancelled" && {
                             "&.Mui-disabled": {
                               bgcolor: "#fef2f2",
@@ -2826,7 +2829,7 @@ export default function EventManagePage() {
                             }
                           })
                         }}
-                        disabled={!!hostingId || isPast || isLiveLifecycleBlocked || (event?.is_hidden && !isOwner)}
+                        disabled={!!hostingId || isEventEnded || isLiveLifecycleBlocked || (event?.is_hidden && !isOwner)}
                       >
                         {hostingId ? (
                           <Stack direction="row" spacing={1} alignItems="center">
@@ -2836,7 +2839,7 @@ export default function EventManagePage() {
                         ) : (
                           isArchivedLifecycle
                             ? "Deleted"
-                            : isPast
+                            : isEventEnded
                               ? "Event Ended"
                               : (status === "cancelled" || event?.status === "cancelled")
                                 ? "Cancelled"
@@ -3006,10 +3009,10 @@ export default function EventManagePage() {
               </Typography>
 
               {/* Replay Info Badge - similar to EventDetailsPage */}
-              {event.replay_available && (
+              {(replayReady || (event.replay_enabled && event.replay_available)) && (
                 <Box sx={{ mt: 2, mb: 1, p: 2, bgcolor: "rgba(99, 102, 241, 0.08)", borderRadius: 2, border: "1px solid rgba(99, 102, 241, 0.2)" }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "indigo.main" }}>
-                    {event.replay_visible_to_participants ? "Replay is available now" : "Replay will be available"}
+                    {replayReady ? "Replay is available now" : "Replay will be available"}
                   </Typography>
                   {event.replay_availability_duration && (
                     <Typography variant="caption" sx={{ color: "indigo.dark", display: "block", mt: 0.5 }}>

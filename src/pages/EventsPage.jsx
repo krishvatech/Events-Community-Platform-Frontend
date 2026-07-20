@@ -66,7 +66,7 @@ import { getUniqueSeries } from "../utils/seriesEventUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
-import { getDisplayPrice, getReplayCtaText } from "../utils/eventUtils";
+import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast } from "../utils/eventUtils";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -574,6 +574,7 @@ function toCard(ev, isPinnedTopCopy = false) {
     is_pinned: ev.is_pinned || false,
     isPinnedTopCopy: isPinnedTopCopy,
     replay_enabled: !!ev.replay_enabled,
+    replay_ready: !!ev.replay_ready,
     replay_visible_to_participants: !!ev.replay_visible_to_participants,
     replay_video_url: ev.replay_video_url || "",
     youtube_summary_url: ev.youtube_summary_url || "",
@@ -708,12 +709,13 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const isHost = isEventOwner || Boolean(reg?.is_host);
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
+  const isEffectivelyPast = status === "past" || isEventEffectivelyPast(ev);
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
   const isPreEventLounge = isPreEventLoungeOpen(ev);
   const isPostEventLounge = isPostEventLoungeOpen(ev);
   const canShowActiveJoin =
     isPostEventLounge ||
-    (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
+    (!isEffectivelyPast && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
   const multiDayJoinState = ev.is_multi_day ? determineJoinState(ev) : null;
   const canJoinNow = ev.is_multi_day
     ? (multiDayJoinState?.enabled || isPreEventLounge || isPostEventLounge)
@@ -725,7 +727,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
 
   const joinButtonLabel = getResolvedJoinLabel(ev, isLive, false, reg, isEventOwner, fallbackLabel);
-  const effectiveJoinLabel = isEventOwner ? "Host Now" : joinButtonLabel;
+  const effectiveJoinLabel = isPostEventLounge
+    ? getJoinButtonText(ev, false, false, reg)
+    : (isEventOwner ? "Host Now" : joinButtonLabel);
 
   // State for expandable "Read More" section
   const [expandSessions, setExpandSessions] = React.useState(false);
@@ -1298,7 +1302,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           ) : isConfirmedRegistered ? (
             <div className="flex items-center gap-2">
               {/* Application-required events can also enter the hosted live room after acceptance. */}
-              {shouldShowJoinAction(ev) && (
+              {isEffectivelyPast && !isPostEventLounge ? (
+                <Chip label="Event Ended" color="default" variant="outlined" />
+              ) : shouldShowJoinAction(ev) && (
                 !isEventOwner && joinButtonLabel === "Join (Not Live Yet)" ? (
                   <Button
                     size="small"
@@ -1379,7 +1385,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              {ev.registration_type === 'apply' ? (
+              {isEffectivelyPast && !isReplayEvent ? (
+                <Chip label="Event Ended" color="default" variant="outlined" />
+              ) : ev.registration_type === 'apply' ? (
                 // APPLY FLOW
                 (<>
                   {applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined'
@@ -1597,12 +1605,13 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const isHost = isEventOwner || Boolean(reg?.is_host);
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
+  const isEffectivelyPast = status === "past" || isEventEffectivelyPast(ev);
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
   const isPreEventLounge = isPreEventLoungeOpen(ev);
   const isPostEventLounge = isPostEventLoungeOpen(ev);
   const canShowActiveJoin =
     isPostEventLounge ||
-    (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
+    (!isEffectivelyPast && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
   const multiDayJoinState = ev.is_multi_day ? determineJoinState(ev) : null;
   const canJoinNow = ev.is_multi_day
     ? (multiDayJoinState?.enabled || isPreEventLounge || isPostEventLounge)
@@ -1614,7 +1623,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
     : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
 
   const joinButtonLabel = getResolvedJoinLabel(ev, isLive, false, reg, isEventOwner, fallbackLabel);
-  const effectiveJoinLabel = isEventOwner ? "Host Now" : joinButtonLabel;
+  const effectiveJoinLabel = isPostEventLounge
+    ? getJoinButtonText(ev, false, false, reg)
+    : (isEventOwner ? "Host Now" : joinButtonLabel);
 
   // Timezone logic
   // Timezone logic
@@ -1946,7 +1957,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               ) : isEventOwner || isConfirmedRegistered ?
                 <div className="flex flex-col items-end gap-2">
                     {/* Application-required events can also enter the hosted live room after acceptance. */}
-                    {shouldShowJoinAction(ev) && (
+                    {isEffectivelyPast && !isPostEventLounge ? (
+                      <Chip label="Event Ended" color="default" variant="outlined" />
+                    ) : shouldShowJoinAction(ev) && (
                       !isEventOwner && joinButtonLabel === "Join (Not Live Yet)" ? (
                         <Button
                           size="small"
@@ -2025,7 +2038,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                       </Button>
                     )}
                   </div>
-                 : ev.registration_type === 'apply' ? (
+                 : isEffectivelyPast && !isReplayEvent ? (
+                  <Chip label="Event Ended" color="default" variant="outlined" />
+                ) : ev.registration_type === 'apply' ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     {applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined' ? (
                       <div className="flex flex-col items-start gap-1">

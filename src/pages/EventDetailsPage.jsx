@@ -46,7 +46,7 @@ import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { normalizeTimezoneName, getBrowserTimezone } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
-import { getDisplayPrice, getReplayCtaText } from "../utils/eventUtils";
+import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast, isReplayReadyForSignup } from "../utils/eventUtils";
 import { toast } from "react-toastify";
 import { Helmet } from "react-helmet-async";
 
@@ -1307,6 +1307,14 @@ export default function EventDetailsPage() {
             }
           });
           if (cancelled) return;
+          if (res.status === 401) {
+            const data = await res.json().catch(() => ({}));
+            if (data?.code === "past_event_login_required") {
+              const nextPath = `${location.pathname}${location.search}`;
+              navigate(`/signin?next=${encodeURIComponent(nextPath)}`, { replace: true });
+              return;
+            }
+          }
           if (res.ok) {
             const data = await res.json();
             // DEBUG: Log payment pending data
@@ -1345,6 +1353,14 @@ export default function EventDetailsPage() {
           },
         });
         if (cancelled) return;
+        if (resSlug.status === 401) {
+          const data = await resSlug.json().catch(() => ({}));
+          if (data?.code === "past_event_login_required") {
+            const nextPath = `${location.pathname}${location.search}`;
+            navigate(`/signin?next=${encodeURIComponent(nextPath)}`, { replace: true });
+            return;
+          }
+        }
         if (resSlug.ok) {
           const data = await resSlug.json();
           // DEBUG: Log payment pending data
@@ -1382,7 +1398,17 @@ export default function EventDetailsPage() {
     }
     fetchEvent();
     return () => { cancelled = true; };
-  }, [slug, token, fallbackId]);
+  }, [slug, token, fallbackId, location.pathname, location.search, navigate]);
+
+  // A preloaded stale event can reach this component before the detail API runs.
+  // Apply the same member-only rule client-side to avoid briefly exposing it.
+  useEffect(() => {
+    if (!event || (token && !isGuest)) return;
+    if (!isEventEffectivelyPast(event) || isReplayReadyForSignup(event)) return;
+
+    const nextPath = `${location.pathname}${location.search}`;
+    navigate(`/signin?next=${encodeURIComponent(nextPath)}`, { replace: true });
+  }, [event, token, isGuest, location.pathname, location.search, navigate]);
 
 
   // Check for Speed Networking Session
@@ -1596,15 +1622,19 @@ export default function EventDetailsPage() {
   }
   const livePath = `/live/${encodeURIComponent(event.slug || event.id)}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
 
-  // Declare isLive and multiDayJoinLabel before they're used in primaryActionLabel
+  // Treat a stale published event as ended once its scheduled end time passes.
   const isLive = status === "live" && event.status !== "ended";
-  const multiDayJoinLabel = event.is_multi_day ? joinState?.buttonText : null;
-
-  const primaryActionLabel = isEventOwner ? (event?.use_external_streaming ? "Host on External Platform" : "Host Now") : getResolvedJoinLabel(event, isLive, false, registration, isEventOwner, multiDayJoinLabel);
+  const isEffectivelyPast = status === "past" || isEventEffectivelyPast(event);
   const isPostEventLounge = isPostEventLoungeOpen(event);
-  const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
+  const isPast = isEffectivelyPast && !isPostEventLounge;
+  const multiDayJoinLabel = event.is_multi_day ? joinState?.buttonText : null;
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
   const isPreEventLounge = isPreEventLoungeOpen(event);
+  const primaryActionLabel = isPostEventLounge
+    ? getJoinButtonText(event, false, false, registration)
+    : isEventOwner
+      ? (event?.use_external_streaming ? "Host on External Platform" : "Host Now")
+      : getResolvedJoinLabel(event, isLive, false, registration, isEventOwner, multiDayJoinLabel);
   const shouldOpenLoungeOnEntry =
     isPostEventLounge || (isPreEventLounge && (isHost || !willGoToWaitingRoom(event)));
 
@@ -1612,11 +1642,11 @@ export default function EventDetailsPage() {
   const multiDayCanJoin = event.is_multi_day ? joinState?.enabled : null;
 
   const canShowActiveJoin = event.is_multi_day
-    ? (joinState?.enabled || isPreEventLounge || isPostEventLounge)
-    : (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge);
+    ? (isPostEventLounge || (!isEffectivelyPast && (joinState?.enabled || isPreEventLounge)))
+    : (isPostEventLounge || (!isEffectivelyPast && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge)));
   const canJoinEventNow = event.is_multi_day
-    ? (joinState?.enabled || isPreEventLounge || isPostEventLounge || isHost)
-    : (isHost || confirmedRegistered);
+    ? (isPostEventLounge || (!isEffectivelyPast && (joinState?.enabled || isPreEventLounge || isHost)))
+    : (isPostEventLounge || (!isEffectivelyPast && (isHost || confirmedRegistered)));
   const hasApprovedApplication = ["accepted", "approved"].includes(applicationStatus);
   const canShowWaitingForSession = Boolean(
     event.is_multi_day &&
@@ -1630,12 +1660,13 @@ export default function EventDetailsPage() {
 
   // Replay access variables
   const replayEnabled = !!event?.replay_enabled;
-  const replayVideoUrl = event?.replay_video_url || null;
+  const replayReady = isReplayReadyForSignup(event);
+  const replayVideoUrl = event?.replay_video_url || event?.recording_url || null;
   const replayCtaText = getReplayCtaText(event, Boolean(token) && !isGuest);
   const canSignupForReplay = !!event?.can_signup_for_replay;
   const hasReplayAccess = !!event?.has_replay_access;
-  const showReplayCTA = replayEnabled && canSignupForReplay;
-  const showReplayAccess = hasReplayAccess && replayEnabled;
+  const showReplayCTA = isEffectivelyPast && replayReady && canSignupForReplay;
+  const showReplayAccess = isEffectivelyPast && replayEnabled && hasReplayAccess;
 
   const desc = event?.description ?? "";
 
@@ -2154,10 +2185,10 @@ export default function EventDetailsPage() {
                       </Typography>
                       <div className="mt-3 flex flex-col gap-2">
                         {/* Replay Info Badge */}
-                        {event.replay_available && (
+                        {(replayReady || (replayEnabled && event.replay_available)) && (
                           <Box className="mt-2 mb-3 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
                             <Typography variant="subtitle2" className="text-indigo-800 font-semibold">
-                              {event.replay_visible_to_participants ? "Replay is available now" : "Replay will be available"}
+                              {replayReady ? "Replay is available now" : "Replay will be available"}
                             </Typography>
                             {event.replay_availability_duration && (
                               <Typography variant="caption" className="text-indigo-600 block mt-0.5">
@@ -2495,7 +2526,7 @@ export default function EventDetailsPage() {
                               </Alert>
                             )}
                           </>
-                        ) : hasReplayAccess && replayVideoUrl ? (
+                        ) : showReplayAccess && replayReady && replayVideoUrl ? (
                           <Button
                             component="a"
                             href={replayVideoUrl}
@@ -2511,7 +2542,7 @@ export default function EventDetailsPage() {
                           >
                             Watch Replay
                           </Button>
-                        ) : hasReplayAccess && !replayVideoUrl ? (
+                        ) : showReplayAccess && !replayReady ? (
                           <Button
                             disabled
                             variant="contained"
@@ -2546,64 +2577,14 @@ export default function EventDetailsPage() {
                             Watch Recording
                           </Button>
                         ) : isPast ? (
-                          // ✅ Past event opened by direct URL: allow non-registered users to
-                          // register/apply. Owners and already-registered users (with no replay/
-                          // recording available) still see the "Event Ended" state.
-                          (!isEventOwner && !confirmedRegistered) ? (
-                            event.registration_type === 'apply' ? (
-                              hasOpenApplicationTracks(event) ? (
-                                <Button
-                                  onClick={openApplyModalAfterProfileCheck}
-                                  variant="contained"
-                                  sx={{
-                                    textTransform: "none",
-                                    backgroundColor: "#10b8a6",
-                                    "&:hover": { backgroundColor: "#0ea5a4" },
-                                  }}
-                                  className="rounded-xl"
-                                >
-                                  {token ? "Apply Now" : "Apply as Guest"}
-                                </Button>
-                              ) : (
-                                <Button
-                                  disabled
-                                  variant="contained"
-                                  sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
-                                  className="rounded-xl"
-                                >
-                                  Event Ended
-                                </Button>
-                              )
-                            ) : (
-                              <Button
-                                onClick={handleRegister}
-                                variant="contained"
-                                disabled={addingPaidEventToCart}
-                                sx={{
-                                  textTransform: "none",
-                                  backgroundColor: "#10b8a6",
-                                  "&:hover": { backgroundColor: "#0ea5a4" },
-                                  "&.Mui-disabled": { backgroundColor: "#9adbd3", color: "#ffffff" },
-                                }}
-                                className="rounded-xl"
-                              >
-                                {!event?.is_free && addingPaidEventToCart
-                                  ? "Adding to cart..."
-                                  : !event?.is_free && paidCartNotice
-                                    ? "Added to cart"
-                                    : "Register Now"}
-                              </Button>
-                            )
-                          ) : (
-                            <Button
-                              disabled
-                              variant="contained"
-                              sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
-                              className="rounded-xl"
-                            >
-                              Event Ended
-                            </Button>
-                          )
+                          <Button
+                            disabled
+                            variant="contained"
+                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            className="rounded-xl"
+                          >
+                            Event Ended
+                          </Button>
                         ) : (
                           <Button
                             disabled

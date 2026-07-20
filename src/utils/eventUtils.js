@@ -157,6 +157,39 @@ export const getReplayCtaText = (event, isAuthenticated = false) => {
   return ctaText.replace(/^sign(?:\s|-)?up\b/i, "Register");
 };
 
+/**
+ * Treat stale published/imported events as past once their end time passes.
+ * A meeting that is genuinely live may continue past its scheduled end time.
+ */
+export const isEventEffectivelyPast = (event, nowMs = Date.now()) => {
+  if (!event) return false;
+  if (event.status === "ended") return true;
+  if (event.is_live) return false;
+
+  const rawEnd = event.end_time || event.end;
+  if (!rawEnd) return false;
+
+  const endMs = new Date(rawEnd).getTime();
+  return Number.isFinite(endMs) && endMs <= nowMs;
+};
+
+/**
+ * Replay signup is valid only after the event and only when participants can
+ * actually open a published recording. Prefer the backend-derived flag when
+ * available and keep a fallback for preloaded/older API payloads.
+ */
+export const isReplayReadyForSignup = (event) => {
+  if (!event) return false;
+  if (typeof event.replay_ready === "boolean") return event.replay_ready;
+
+  return Boolean(
+    isEventEffectivelyPast(event) &&
+    event.replay_enabled &&
+    event.replay_visible_to_participants &&
+    (event.replay_video_url || event.recording_url)
+  );
+};
+
 export const getDisplayPrice = (event) => {
   const label = String(event?.price_label || event?.price_display_label || "").trim();
 
