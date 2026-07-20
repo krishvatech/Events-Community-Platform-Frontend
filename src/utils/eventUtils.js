@@ -139,6 +139,24 @@ export const sanitizeSlugInput = (s) =>
         .replace(/^-+/g, ""); // trim leading hyphens (allow trailing while editing)
 // Allows: @, #, $, &, ?, !, (, ), *, +, ;, :, ~, ' and other special chars
 
+/**
+ * Return the replay registration CTA that matches the viewer's auth state.
+ *
+ * Event administrators may configure public copy such as
+ * "Sign up to watch full replay". For a signed-in user, clicking the same
+ * button creates an event registration rather than a new account, so the
+ * leading "Sign up" wording would be misleading. Preserve all other custom
+ * CTA copy and only replace a leading sign-up phrase for authenticated users.
+ */
+export const getReplayCtaText = (event, isAuthenticated = false) => {
+  const configuredText = String(event?.replay_cta_text || "").trim();
+  const ctaText = configuredText || "Sign up to watch full replay";
+
+  if (!isAuthenticated) return ctaText;
+
+  return ctaText.replace(/^sign(?:\s|-)?up\b/i, "Register");
+};
+
 export const getDisplayPrice = (event) => {
   const label = String(event?.price_label || event?.price_display_label || "").trim();
 

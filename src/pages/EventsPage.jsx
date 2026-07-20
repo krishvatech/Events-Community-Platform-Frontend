@@ -66,7 +66,7 @@ import { getUniqueSeries } from "../utils/seriesEventUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
-import { getDisplayPrice } from "../utils/eventUtils";
+import { getDisplayPrice, getReplayCtaText } from "../utils/eventUtils";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -1521,7 +1521,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           onClick={(e) => { e.stopPropagation(); handleRegisterCard(false); }}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
-                          {ev.replay_cta_text || "Sign up to watch full replay"}
+                          {getReplayCtaText(ev, isAuthenticatedUser)}
                         </Button>
                       ) : (
                         <Chip
@@ -2113,7 +2113,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             onClick={(e) => { e.stopPropagation(); handleRegisterRow(false); }}
                             className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                           >
-                            {ev.replay_cta_text || "Sign up to watch full replay"}
+                            {getReplayCtaText(ev, isAuthenticatedUser)}
                           </Button>
                         ) : (
                           <Chip

@@ -46,7 +46,7 @@ import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { normalizeTimezoneName, getBrowserTimezone } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
-import { getDisplayPrice } from "../utils/eventUtils";
+import { getDisplayPrice, getReplayCtaText } from "../utils/eventUtils";
 import { toast } from "react-toastify";
 import { Helmet } from "react-helmet-async";
 
@@ -1631,7 +1631,7 @@ export default function EventDetailsPage() {
   // Replay access variables
   const replayEnabled = !!event?.replay_enabled;
   const replayVideoUrl = event?.replay_video_url || null;
-  const replayCtaText = event?.replay_cta_text || "Sign up to watch full replay";
+  const replayCtaText = getReplayCtaText(event, Boolean(token) && !isGuest);
   const canSignupForReplay = !!event?.can_signup_for_replay;
   const hasReplayAccess = !!event?.has_replay_access;
   const showReplayCTA = replayEnabled && canSignupForReplay;
