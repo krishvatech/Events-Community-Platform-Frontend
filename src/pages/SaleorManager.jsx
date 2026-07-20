@@ -46,10 +46,12 @@ import {
   disconnectSaleorSso,
 } from "../utils/api";
 import { isOwnerUser } from "../utils/adminRole";
+import InvoiceSettingsTab from "../components/saleor/InvoiceSettingsTab";
 
 const ORANGE = "#E8532F";
 const TEXT = "#2C3E5A";
 const BG_GRADIENT = "linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)";
+const INVOICE_SETTINGS_TAB = 6;
 const SALEOR_PERMISSION_OPTIONS = [
   "MANAGE_USERS",
   "MANAGE_STAFF",
@@ -174,6 +176,8 @@ export default function SaleorManager() {
 
   useEffect(() => {
     if (!saleorStatus?.connected || !saleorStatus?.can_manage_staff) return;
+    // Invoice settings are stored locally in ECP and must not trigger a Saleor sync.
+    if (tab === INVOICE_SETTINGS_TAB) return;
     handleSync(tab); // Combined fetch and sync for smoother UX
   }, [tab, saleorStatus]);
 
@@ -265,6 +269,12 @@ export default function SaleorManager() {
     else if (tabIndex === 4) endpoint = "/events/saleor/staff-users/";
     else if (tabIndex === 5) endpoint = "/events/saleor/permission-groups/";
 
+    // Guard against future/local-only tabs accidentally issuing a GET to the API root.
+    if (!endpoint) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await apiClient.get(endpoint);
       const data = Array.isArray(response.data) ? response.data : response.data.results || [];
@@ -288,6 +298,7 @@ export default function SaleorManager() {
   const handleSync = async (tabIndex = null) => {
     if (!saleorStatus?.connected || !saleorStatus?.can_manage_staff) return;
     const activeTab = tabIndex !== null ? tabIndex : tab;
+    if (activeTab === INVOICE_SETTINGS_TAB) return;
     setLoading(true); // Use main loading state for initial sync
     setError(null);
     let endpoint = "";
@@ -1587,23 +1598,25 @@ export default function SaleorManager() {
             <Typography variant="caption" sx={{ color: "#6b7280" }}>
               Connected as: {saleorStatus.saleor_email}
             </Typography>
-            <Button
-              variant="contained"
-              startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
-              onClick={handleSync}
-              disabled={syncing}
-              sx={{
-                bgcolor: TEXT,
-                color: "white",
-                borderRadius: "12px",
-                px: 3,
-                textTransform: "none",
-                fontWeight: 600,
-                "&:hover": { bgcolor: "#1a253a" },
-              }}
-            >
-              Sync {tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : tab === 2 ? "Shipping Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
-            </Button>
+            {tab !== INVOICE_SETTINGS_TAB && (
+              <Button
+                variant="contained"
+                startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+                onClick={handleSync}
+                disabled={syncing}
+                sx={{
+                  bgcolor: TEXT,
+                  color: "white",
+                  borderRadius: "12px",
+                  px: 3,
+                  textTransform: "none",
+                  fontWeight: 600,
+                  "&:hover": { bgcolor: "#1a253a" },
+                }}
+              >
+                Sync {tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : tab === 2 ? "Shipping Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
+              </Button>
+            )}
             <Button
               variant="outlined"
               startIcon={<OpenInNewIcon />}
@@ -1645,6 +1658,9 @@ export default function SaleorManager() {
           <Tabs
             value={tab}
             onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
             sx={{
               px: 2,
               pt: 2,
@@ -1671,9 +1687,14 @@ export default function SaleorManager() {
             <Tab label="Product Types" />
             <Tab label="Staff Users" />
             <Tab label="Permission Groups" />
+            <Tab label="Invoice Settings" />
           </Tabs>
 
           <Box sx={{ p: 4 }}>
+            {tab === INVOICE_SETTINGS_TAB ? (
+              <InvoiceSettingsTab />
+            ) : (
+              <>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
                 {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : tab === 2 ? "Shipping Policy Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
@@ -1971,12 +1992,16 @@ export default function SaleorManager() {
                 </TableBody>
               </Table>
             )}
+              </>
+            )}
           </Box>
         </Paper>
 
         <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
           <Typography variant="caption" sx={{ color: "#9ca3af" }}>
-            Last Synced: {new Date().toLocaleString()} • ECP-Saleor Bridge v2.0
+            {tab === INVOICE_SETTINGS_TAB
+              ? "Invoice settings are stored securely in ECP and are not synchronized from Saleor."
+              : `Last Synced: ${new Date().toLocaleString()} • ECP-Saleor Bridge v2.0`}
           </Typography>
         </Box>
       </Container>
