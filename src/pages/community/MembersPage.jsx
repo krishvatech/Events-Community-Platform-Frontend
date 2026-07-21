@@ -66,6 +66,33 @@ const BORDER = "#e2e8f0";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
+const MEMBER_PERF_LOGS = String(
+  import.meta.env.VITE_MEMBER_DIRECTORY_PERF_LOGS || "false"
+).toLowerCase() === "true";
+
+function perfNow() {
+  return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
+function memberPerfLog(stage, startedAt, details = {}) {
+  if (!MEMBER_PERF_LOGS) return;
+  const durationMs = Math.max(0, perfNow() - startedAt);
+  console.info(`[MEMBER_PERF][frontend] ${stage}`, {
+    duration_ms: Number(durationMs.toFixed(2)),
+    ...details,
+  });
+}
+
+function useDebouncedValue(value, delay = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedValue(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 const tokenHeader = () => {
   const t =
@@ -158,6 +185,14 @@ const normalizeFriendStatus = (s) => {
   if (["pending_incoming", "incoming_pending", "received", "request_received"].includes(v)) return "pending_incoming";
   return "none";
 };
+
+function isFriendForUser(user, statusMap) {
+  if (!user?.id) return false;
+  if (Object.prototype.hasOwnProperty.call(statusMap || {}, user.id)) {
+    return normalizeFriendStatus(statusMap[user.id]) === "friends";
+  }
+  return Boolean(user?.is_contact);
+}
 
 const cancelFriendRequestApi = async (reqId) => {
   const r = await fetch(`${API_BASE}/friend-requests/${reqId}/cancel/`, {
@@ -381,8 +416,16 @@ function useCountryCentroids(geoUrl) {
   useEffect(() => {
     let alive = true;
     (async () => {
+      const startedAt = perfNow();
       try {
-        const topo = await (await fetch(geoUrl)).json();
+        const fetchStartedAt = perfNow();
+        const response = await fetch(geoUrl);
+        const topo = await response.json();
+        memberPerfLog("country_atlas_fetch_and_parse", fetchStartedAt, {
+          status: response.status,
+        });
+
+        const processingStartedAt = perfNow();
         const gj = topoFeature(topo, topo.objects.countries);
         const map = {};
         for (const f of gj.features) {
@@ -390,9 +433,16 @@ function useCountryCentroids(geoUrl) {
           if (!name) continue;
           map[normName(name)] = geoCentroid(f);
         }
+        memberPerfLog("country_centroid_processing", processingStartedAt, {
+          country_count: Object.keys(map).length,
+        });
         if (alive) setCentroidsByName(map);
+        memberPerfLog("country_atlas_total", startedAt, {
+          country_count: Object.keys(map).length,
+        });
       } catch (e) {
         console.error("centroids load failed", e);
+        memberPerfLog("country_atlas_failed", startedAt, { error: String(e) });
       }
     })();
     return () => { alive = false; };
@@ -813,13 +863,33 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
   );
 }
 
-function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOpenProfile }) {
+function MembersLeafletMap({ markers, countryAgg, showMap, loading = false, minHeight = 580, onOpenProfile }) {
+  const renderStartedAt = perfNow();
   const hasMarkers = markers && markers.length > 0;
   const SHOW_INDIVIDUAL_DOTS = true;
+
+  React.useEffect(() => {
+    if (!MEMBER_PERF_LOGS || !showMap) return undefined;
+    let frame1 = 0;
+    let frame2 = 0;
+    frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => {
+        memberPerfLog("leaflet_map_react_commit", renderStartedAt, {
+          marker_count: markers?.length || 0,
+          country_count: countryAgg?.length || 0,
+        });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame1);
+      cancelAnimationFrame(frame2);
+    };
+  }, [showMap, markers?.length, countryAgg?.length]);
   function AutoZoom({ markers }) {
     const map = useMap();
 
     React.useEffect(() => {
+      const effectStartedAt = perfNow();
       try {
         if (!markers || markers.length === 0 || !map) return;
 
@@ -862,6 +932,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
               padding: [40, 40],
               maxZoom: 10, // more zoom than before, but not too tight
             });
+            memberPerfLog("leaflet_auto_zoom", effectStartedAt, { marker_count: markers.length });
           } catch (error) {
             console.error('Error in MarkerFitLayer timeout:', error);
           }
@@ -883,6 +954,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
     const map = useMap();
 
     React.useEffect(() => {
+      const effectStartedAt = perfNow();
       try {
         if (!map || !markers || markers.length === 0) return;
 
@@ -907,11 +979,16 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
           .filter(p => p !== null);
 
         if (points.length === 0) return;
+        memberPerfLog("heat_points_processing", effectStartedAt, {
+          marker_count: markers.length,
+          heat_point_count: points.length,
+        });
 
         // Small delay to ensure map is fully rendered
+        let heat = null;
         const timer = setTimeout(() => {
           try {
-            const heat = L.heatLayer(points, {
+            heat = L.heatLayer(points, {
               radius: 38,
               blur: 32,
               maxZoom: 18,
@@ -924,17 +1001,8 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
                 1.0: '#dc2626'
               }
             }).addTo(map);
+            memberPerfLog("heat_layer_add", effectStartedAt, { heat_point_count: points.length });
 
-            // cleanup when markers change / component unmounts
-            return () => {
-              try {
-                if (map && map.hasLayer && map.hasLayer(heat)) {
-                  map.removeLayer(heat);
-                }
-              } catch (e) {
-                console.error('Error removing heat layer:', e);
-              }
-            };
           } catch (error) {
             console.error('Error creating heatmap:', error);
           }
@@ -942,6 +1010,13 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
 
         return () => {
           clearTimeout(timer);
+          try {
+            if (heat && map && map.hasLayer && map.hasLayer(heat)) {
+              map.removeLayer(heat);
+            }
+          } catch (e) {
+            console.error('Error removing heat layer:', e);
+          }
         };
       } catch (error) {
         console.error('Error in MembersHeatLayer:', error);
@@ -982,7 +1057,25 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
         overflow: "hidden",
       }}
     >
-      {showMap && hasMarkers ? (
+      {!showMap ? (
+        <Stack
+          alignItems="center"
+          justifyContent="center"
+          sx={{ height: "100%", color: "text.secondary" }}
+        >
+          <Typography>Map hidden.</Typography>
+        </Stack>
+      ) : loading && !hasMarkers ? (
+        <Stack
+          alignItems="center"
+          justifyContent="center"
+          spacing={1.5}
+          sx={{ height: "100%", color: "text.secondary" }}
+        >
+          <Skeleton variant="circular" width={42} height={42} />
+          <Typography>Loading member locations…</Typography>
+        </Stack>
+      ) : hasMarkers ? (
         <MapContainer
           center={center}
           zoom={3}
@@ -991,6 +1084,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
           style={{ width: "100%", height: "100%" }}
           scrollWheelZoom
           worldCopyJump
+          preferCanvas
           attributionControl={false}
         >
           {/* Auto-adjust view when search/filter changes */}
@@ -1052,7 +1146,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
 
               return (
                 <CircleMarker
-                  key={i}
+                  key={m.user?.id || `${lng}-${lat}-${i}`}
                   center={[lat, lng]}
                   radius={3}
                   eventHandlers={{
@@ -1093,7 +1187,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
           justifyContent="center"
           sx={{ height: "100%", color: "text.secondary" }}
         >
-          <Typography>Map hidden.</Typography>
+          <Typography>No members with map locations match your filters.</Typography>
         </Stack>
       )}
     </Box>
@@ -1113,12 +1207,16 @@ export default function MembersPage() {
 
   // state
   const [loading, setLoading] = useState(true);
+  const [mapLoading, setMapLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
   const [mapUsers, setMapUsers] = useState([]);
   const [rosterTotal, setRosterTotal] = useState(0);
+  const [allMembersTotal, setAllMembersTotal] = useState(0);
+  const [contactsTotal, setContactsTotal] = useState(0);
   const [q, setQ] = useState("");
+  const debouncedQuery = useDebouncedValue(q, 350);
 
   const [selectedCompanies, setSelectedCompanies] = useState([]);
   const [selectedCountries, setSelectedCountries] = useState([]);
@@ -1141,7 +1239,7 @@ export default function MembersPage() {
   const [tabValue, setTabValue] = useState(0);
 
   // map controls
-  const [showMap, setShowMap] = useState(false);  // Map OFF by default
+  const [showMap, setShowMap] = useState(true);
   const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 });
 
   const hasSideMap = true;
@@ -1167,22 +1265,26 @@ export default function MembersPage() {
   const viewerIsStaff = isAdminUser();
   const viewerIsVerified = isVerifiedStatus(me?.profile?.kyc_status || me?.kyc_status);
 
-  async function fetchFriendStatus(id) {
-    const r = await fetch(`${API_BASE}/friends/status/?user_id=${id}`, {
+  async function fetchFriendStatuses(ids) {
+    const uniqueIds = Array.from(new Set((ids || []).map(Number).filter(Boolean)));
+    if (!uniqueIds.length) return { statuses: {}, requestIds: {} };
+
+    const r = await fetch(`${API_BASE}/friends/status-bulk/?user_ids=${uniqueIds.join(",")}`, {
       headers: tokenHeader(),
       credentials: "include",
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d?.detail || `Failed status for ${id}`);
+    if (!r.ok) throw new Error(d?.detail || "Failed to load contact statuses");
 
-    if (d?.status === "incoming_pending" && d?.request_id) {
-      setFriendRequestsByUser((prev) => ({ ...prev, [id]: d.request_id }));
-    }
-    if (d?.status === "outgoing_pending" && d?.request_id) {
-      setFriendRequestsByUser((prev) => ({ ...prev, [id]: d.request_id }));
-    }
-
-    return normalizeFriendStatus(d?.status || d?.friendship || "none");
+    const statuses = {};
+    const requestIds = {};
+    const results = d?.results || {};
+    uniqueIds.forEach((id) => {
+      const item = results[String(id)] || {};
+      statuses[id] = normalizeFriendStatus(item?.status || "none");
+      if (item?.request_id) requestIds[id] = item.request_id;
+    });
+    return { statuses, requestIds };
   }
 
   async function sendFriendRequest(id) {
@@ -1304,11 +1406,15 @@ export default function MembersPage() {
   useEffect(() => {
     let alive = true;
     (async () => {
+      const startedAt = perfNow();
       try {
         const res = await fetch(`${API_BASE}/users/filters/`, {
           headers: tokenHeader(),
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          memberPerfLog("filters_request_failed", startedAt, { status: res.status });
+          return;
+        }
         const data = await res.json();
 
         if (!alive) return;
@@ -1336,6 +1442,13 @@ export default function MembersPage() {
           sizes: sortedSizes, // Uses new numeric sort
           countries: sortedCountries,
         });
+        memberPerfLog("filters_request_total", startedAt, {
+          companies: (data.companies || []).length,
+          titles: (data.titles || []).length,
+          industries: (data.industries || []).length,
+          sizes: sortedSizes.length,
+          countries: sortedCountries.length,
+        });
       } catch (e) {
         console.error("Failed to load filter options", e);
       }
@@ -1351,6 +1464,7 @@ export default function MembersPage() {
     let alive = true;
 
     (async () => {
+      const startedAt = perfNow();
       try {
         if (!alive) return;
         setLoading(true);
@@ -1358,8 +1472,8 @@ export default function MembersPage() {
 
         // Build URL with search, page, page_size, and filter parameters
         const params = new URLSearchParams();
-        if (q && q.trim()) {
-          params.append('search', q.trim());
+        if (debouncedQuery && debouncedQuery.trim()) {
+          params.append('search', debouncedQuery.trim());
         }
         // ✅ Add filters to backend request
         selectedCompanies.forEach(c => params.append('company', c));
@@ -1367,19 +1481,24 @@ export default function MembersPage() {
         selectedTitles.forEach(t => params.append('job_title', t));
         selectedIndustries.forEach(i => params.append('industry', i));
         selectedCompanySizes.forEach(s => params.append('company_size', s));
+        if (tabValue === 1) params.append('contacts_only', '1');
         params.append('page', page);
         params.append('page_size', ROWS_PER_PAGE);
 
         const url = `${API_BASE}/users/roster/?${params.toString()}`;
 
+        const requestStartedAt = perfNow();
         const res = await fetch(url, {
           headers: tokenHeader(),
           signal: ctrl.signal,
           credentials: "include",
         });
+        const headersReceivedAt = perfNow();
 
         const text = await res.text();
+        const bodyReadAt = perfNow();
         const json = text ? JSON.parse(text) : null;
+        const parsedAt = perfNow();
 
         if (!res.ok) {
           throw new Error((json && json.detail) || `HTTP ${res.status} while fetching users`);
@@ -1400,7 +1519,23 @@ export default function MembersPage() {
         }
 
         setUsers((list || []).filter(u => !u.is_superuser));
-        setRosterTotal(total || (list || []).length);
+        const resolvedTotal = total || (list || []).length;
+        setRosterTotal(resolvedTotal);
+        if (tabValue === 1) {
+          setContactsTotal(resolvedTotal);
+        } else {
+          setAllMembersTotal(resolvedTotal);
+        }
+        memberPerfLog("roster_request_total", startedAt, {
+          url,
+          status: res.status,
+          response_bytes: text.length,
+          returned_members: list.length,
+          total_members: total,
+          headers_ms: Number((headersReceivedAt - requestStartedAt).toFixed(2)),
+          body_read_ms: Number((bodyReadAt - headersReceivedAt).toFixed(2)),
+          json_parse_ms: Number((parsedAt - bodyReadAt).toFixed(2)),
+        });
       } catch (e) {
         if (isAbort(e)) return;
         console.error(e);
@@ -1411,7 +1546,7 @@ export default function MembersPage() {
     })();
 
     return () => { alive = false; ctrl.abort(); };
-  }, [q, page, ROWS_PER_PAGE, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes, me?.id]);
+  }, [debouncedQuery, page, ROWS_PER_PAGE, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes, tabValue, me?.id]);
 
   // Fetch map users separately (all members, no pagination) with filters
   useEffect(() => {
@@ -1419,10 +1554,14 @@ export default function MembersPage() {
     let alive = true;
 
     (async () => {
+      const startedAt = perfNow();
       try {
         const params = new URLSearchParams();
-        if (q && q.trim()) {
-          params.append('search', q.trim());
+        setMapLoading(true);
+        setMapUsers([]);
+
+        if (debouncedQuery && debouncedQuery.trim()) {
+          params.append('search', debouncedQuery.trim());
         }
         // ✅ Add filters to backend request for map
         selectedCompanies.forEach(c => params.append('company', c));
@@ -1430,17 +1569,35 @@ export default function MembersPage() {
         selectedTitles.forEach(t => params.append('job_title', t));
         selectedIndustries.forEach(i => params.append('industry', i));
         selectedCompanySizes.forEach(s => params.append('company_size', s));
+        if (tabValue === 1) params.append('contacts_only', '1');
 
-        const url = `${API_BASE}/users/roster-map/?${params.toString()}`;
+        const compactUrl = `${API_BASE}/users/roster-map-points/?${params.toString()}`;
+        const fallbackUrl = `${API_BASE}/users/roster-map/?${params.toString()}`;
 
-        const res = await fetch(url, {
+        const requestStartedAt = perfNow();
+        let requestUrl = compactUrl;
+        let res = await fetch(requestUrl, {
           headers: tokenHeader(),
           signal: ctrl.signal,
           credentials: "include",
         });
 
+        // Safe rollout fallback: older backends can continue serving the
+        // existing endpoint until the new compact endpoint is deployed.
+        if (res.status === 404 && !ctrl.signal.aborted) {
+          requestUrl = fallbackUrl;
+          res = await fetch(requestUrl, {
+            headers: tokenHeader(),
+            signal: ctrl.signal,
+            credentials: "include",
+          });
+        }
+        const headersReceivedAt = perfNow();
+
         const text = await res.text();
+        const bodyReadAt = perfNow();
         const json = text ? JSON.parse(text) : null;
+        const parsedAt = perfNow();
 
         if (!res.ok) {
           console.error("Failed to load map users");
@@ -1457,15 +1614,35 @@ export default function MembersPage() {
         }
 
         setMapUsers((list || []).filter(u => !u.is_superuser));
+        const contactCount = (list || []).filter((u) => Boolean(u?.is_contact)).length;
+        const hasContactFlags = (list || []).some((u) =>
+          Object.prototype.hasOwnProperty.call(u || {}, "is_contact")
+        );
+        if (tabValue === 1) {
+          setContactsTotal(list.length);
+        } else if (hasContactFlags) {
+          setContactsTotal(contactCount);
+        }
+        memberPerfLog("map_roster_request_total", startedAt, {
+          url: requestUrl,
+          status: res.status,
+          response_bytes: text.length,
+          returned_members: list.length,
+          headers_ms: Number((headersReceivedAt - requestStartedAt).toFixed(2)),
+          body_read_ms: Number((bodyReadAt - headersReceivedAt).toFixed(2)),
+          json_parse_ms: Number((parsedAt - bodyReadAt).toFixed(2)),
+        });
       } catch (e) {
         if (!isAbort(e)) {
           console.error("Error fetching map users:", e);
         }
+      } finally {
+        if (alive) setMapLoading(false);
       }
     })();
 
     return () => { alive = false; ctrl.abort(); };
-  }, [q, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]);
+  }, [debouncedQuery, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes, tabValue]);
 
 
   const filtered = useMemo(() => {
@@ -1481,20 +1658,9 @@ export default function MembersPage() {
       return !isHidden || isCurrentUser || isAdmin;
     });
 
-    // Tab filter (All Members / My Contacts)
-    // ✅ NOTE: Company, country, job_title, industry, and company_size filtering is now done on backend
-    if (tabValue === 1) {
-      sourceList = sourceList.filter((u) => {
-        const status = (friendStatusByUser[u.id] || "").toLowerCase();
-        return status === "friends";
-      });
-    }
-
     return sourceList;
   }, [
     users,
-    tabValue,
-    friendStatusByUser,
     me?.id,
     viewerIsStaff,
   ]);
@@ -1513,47 +1679,16 @@ export default function MembersPage() {
       return !isHidden || isCurrentUser || isAdmin;
     });
 
-    // Tab filter (All Members / My Contacts)
-    // ✅ NOTE: Company, country, job_title, industry, and company_size filtering is now done on backend
-    if (tabValue === 1) {
-      sourceList = sourceList.filter((u) => {
-        const status = (friendStatusByUser[u.id] || "").toLowerCase();
-        return status === "friends";
-      });
-    }
-
     return sourceList;
   }, [
     mapUsers,
-    tabValue,
-    friendStatusByUser,
     me?.id,
     viewerIsStaff,
   ]);
 
 
-  useEffect(() => {
-    let alive = true;
-    const ids = filtered
-      .map((u) => u.id)
-      .filter((id) => friendStatusByUser[id] === undefined)
-      .slice(0, 300);
-    if (!ids.length) return;
-    (async () => {
-      try {
-        const entries = await Promise.all(
-          ids.map(async (id) => {
-            try { const s = await fetchFriendStatus(id); return [id, s]; }
-            catch { return [id, "none"]; }
-          })
-        );
-        if (alive) setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
-      } catch { }
-    })();
-    return () => { alive = false; };
-  }, [filtered.map((u) => u.id).join("|")]);
-
   const cityKeyEntries = useMemo(() => {
+    const startedAt = perfNow();
     const map = new Map();
     for (const u of filteredMapUsers) {
       const stored = resolveStoredCoordinates(u);
@@ -1564,7 +1699,12 @@ export default function MembersPage() {
       const key = `${String(city).trim().toLowerCase()}|${String(code || "").trim().toUpperCase()}`;
       if (!map.has(key)) map.set(key, { city, countryCode: code });
     }
-    return Array.from(map.entries()).map(([key, val]) => ({ key, ...val }));
+    const entries = Array.from(map.entries()).map(([key, val]) => ({ key, ...val }));
+    memberPerfLog("city_key_processing", startedAt, {
+      map_users: filteredMapUsers.length,
+      missing_coordinate_city_count: entries.length,
+    });
+    return entries;
   }, [filteredMapUsers]);
 
   useEffect(() => {
@@ -1578,6 +1718,7 @@ export default function MembersPage() {
     const batch = missing.slice(0, MAX_CITY_LOOKUPS);
 
     (async () => {
+      const startedAt = perfNow();
       const updates = {};
       await Promise.all(
         batch.map(async ({ key, city, countryCode }) => {
@@ -1603,12 +1744,19 @@ export default function MembersPage() {
         Object.assign(cityCentersRef.current, updates);
         setCityCenters((prev) => ({ ...prev, ...updates }));
       }
+      memberPerfLog("city_lookup_batch", startedAt, {
+        requested: batch.length,
+        resolved: Object.values(updates).filter(Boolean).length,
+        unresolved: Object.values(updates).filter((value) => !value).length,
+        remaining_after_batch: Math.max(0, missing.length - batch.length),
+      });
     })();
 
     return () => { alive = false; };
   }, [cityKeyEntries]);
 
   const liveMarkers = useMemo(() => {
+    const startedAt = perfNow();
     const byCity = {};
     for (const u of filteredMapUsers) {
       const code = resolveCountryCode(u).toLowerCase();
@@ -1619,7 +1767,7 @@ export default function MembersPage() {
       const stored = resolveStoredCoordinates(u);
       const center = stored || (key && cityCenters[key]) || getCenterForISO2(code);
       if (!center) continue;
-      const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
+      const isFriend = isFriendForUser(u, friendStatusByUser);
       const bucket = key || code;
       if (!byCity[bucket]) byCity[bucket] = [];
       byCity[bucket].push({ center, isFriend, user: u });
@@ -1654,16 +1802,22 @@ export default function MembersPage() {
         });
       });
     });
+    memberPerfLog("marker_generation", startedAt, {
+      map_users: filteredMapUsers.length,
+      marker_count: out.length,
+      grouped_locations: Object.keys(byCity).length,
+    });
     return out;
   }, [filteredMapUsers, friendStatusByUser, cityCenters, getCenterForISO2]);
 
   const countryAgg = useMemo(() => {
+    const startedAt = perfNow();
     const map = {};
     for (const u of filteredMapUsers) {
       const code = resolveCountryCode(u).toLowerCase();
       const center = getCenterForISO2(code);
       if (!center) continue;
-      const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
+      const isFriend = isFriendForUser(u, friendStatusByUser);
       if (!map[code]) {
         map[code] = {
           code,
@@ -1676,14 +1830,24 @@ export default function MembersPage() {
       map[code].users.push(userDisplayName(u));
       if (isFriend) map[code].friends += 1;
     }
-    return Object.values(map).map((e) => ({ ...e, total: e.users.length }));
+    const aggregated = Object.values(map).map((e) => ({ ...e, total: e.users.length }));
+    memberPerfLog("country_aggregation", startedAt, {
+      map_users: filteredMapUsers.length,
+      country_count: aggregated.length,
+    });
+    return aggregated;
   }, [filteredMapUsers, friendStatusByUser]);
 
   const markers = liveMarkers;
 
+  const displayedContactsTotal = useMemo(() => {
+    if (!mapUsers.length) return contactsTotal;
+    return mapUsers.filter((user) => isFriendForUser(user, friendStatusByUser)).length;
+  }, [mapUsers, friendStatusByUser, contactsTotal]);
+
   useEffect(() => {
     setPage(1);
-  }, [q, tabValue, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]);
+  }, [debouncedQuery, tabValue, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -1698,40 +1862,26 @@ export default function MembersPage() {
   useEffect(() => {
     let alive = true;
     const idsToLoad = current.map((u) => u.id).filter((id) => friendStatusByUser[id] === undefined);
-    if (!idsToLoad.length) return;
+    if (!idsToLoad.length) return undefined;
     (async () => {
+      const startedAt = perfNow();
       try {
-        const entries = await Promise.all(
-          idsToLoad.map(async (id) => {
-            try { const s = await fetchFriendStatus(id); return [id, s]; }
-            catch { return [id, "none"]; }
-          })
-        );
-        if (alive) setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
+        const { statuses, requestIds } = await fetchFriendStatuses(idsToLoad);
+        if (!alive) return;
+        setFriendStatusByUser((previous) => ({ ...previous, ...statuses }));
+        setFriendRequestsByUser((previous) => {
+          const next = { ...previous };
+          idsToLoad.forEach((id) => delete next[id]);
+          return { ...next, ...requestIds };
+        });
+        memberPerfLog("friend_status_current_page_bulk", startedAt, {
+          member_count: idsToLoad.length,
+          request_count: 1,
+        });
       } catch { }
     })();
     return () => { alive = false; };
   }, [current.map((u) => u.id).join(",")]);
-
-  // Load friend status for map users only when on "My Contacts" tab
-  useEffect(() => {
-    if (tabValue !== 1) return; // Only load for "My Contacts" tab
-    let alive = true;
-    const idsToLoad = mapUsers.map((u) => u.id).filter((id) => friendStatusByUser[id] === undefined);
-    if (!idsToLoad.length) return;
-    (async () => {
-      try {
-        const entries = await Promise.all(
-          idsToLoad.map(async (id) => {
-            try { const s = await fetchFriendStatus(id); return [id, s]; }
-            catch { return [id, "none"]; }
-          })
-        );
-        if (alive) setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
-      } catch { }
-    })();
-    return () => { alive = false; };
-  }, [tabValue, mapUsers.map((u) => u.id).join("|")]);
 
   const handleOpenProfile = (m) => {
     const id = m?.id;
@@ -1858,8 +2008,8 @@ export default function MembersPage() {
 	              {/* Tab pills */}
 	              <Box sx={{ display: "flex", gap: "4px", mb: 1.5, pb: 1.5, borderBottom: "1px solid #EEECEA" }}>
                 {[
-                  { label: "All Members", count: rosterTotal || users.length },
-                  { label: "My Contacts", count: Object.values(friendStatusByUser).filter((s) => s === "friends").length },
+                  { label: "All Members", count: allMembersTotal || (tabValue === 0 ? rosterTotal : 0) },
+                  { label: "My Contacts", count: displayedContactsTotal },
                 ].map((tab, i) => (
                   <Box
                     key={i}
@@ -2304,6 +2454,7 @@ export default function MembersPage() {
                 markers={markers}
                 countryAgg={countryAgg}
                 showMap={showMap}
+                loading={mapLoading}
                 onOpenProfile={handleOpenProfile}
               />
             </Paper>
@@ -2413,6 +2564,7 @@ export default function MembersPage() {
               markers={markers}
               countryAgg={countryAgg}
               showMap={showMap}
+              loading={mapLoading}
               minHeight={360}
               onOpenProfile={handleOpenProfile}
             />
