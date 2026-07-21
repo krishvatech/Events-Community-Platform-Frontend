@@ -1084,7 +1084,6 @@ function MembersLeafletMap({ markers, countryAgg, showMap, loading = false, minH
           style={{ width: "100%", height: "100%" }}
           scrollWheelZoom
           worldCopyJump
-          preferCanvas
           attributionControl={false}
         >
           {/* Auto-adjust view when search/filter changes */}
