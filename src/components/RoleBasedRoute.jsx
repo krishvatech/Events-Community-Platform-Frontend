@@ -24,3 +24,14 @@ export const RequireStaffOrAdmin = ({ children }) => {
   }
   return children;
 };
+
+/**
+ * HOC to protect routes that only Super Admin (Platform Admin) can access.
+ * Redirects to "/account/resources" if user is not a Super Admin.
+ */
+export const RequireStaffOrAdminForResources = ({ children }) => {
+  if (!isOwnerUser()) {
+    return <Navigate to="/account/resources" replace />;
+  }
+  return children;
+};

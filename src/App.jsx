@@ -55,7 +55,7 @@ import AdminCarts from "./pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
 import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
 import { useParams, useNavigate } from "react-router-dom";
-import { RequireSuperAdmin, RequireStaffOrAdmin } from "./components/RoleBasedRoute.jsx";
+import { RequireSuperAdmin, RequireStaffOrAdmin, RequireStaffOrAdminForResources } from "./components/RoleBasedRoute.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
 import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
@@ -260,13 +260,13 @@ const AppShell = () => {
 
           {/* Admin routes - Layout is handled globally now, so AdminLayout just renders Outlet? */}
           <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
-            <Route index element={<AdminResources />} />
+            <Route index element={<RequireStaffOrAdminForResources><AdminResources /></RequireStaffOrAdminForResources>} />
 
             {/* main admin pages */}
             <Route path="events" element={<AdminEvents />} />
             <Route path="series" element={<SeriesList />} />
             <Route path="series/:seriesId" element={<SeriesManagePage />} />
-            <Route path="resources" element={<AdminResources />} />
+            <Route path="resources" element={<RequireStaffOrAdminForResources><AdminResources /></RequireStaffOrAdminForResources>} />
             <Route path="posts" element={<AdminPostsPage />} />
             <Route path="groups" element={<AdminGroups />} />
             <Route path="messages" element={<AdminMessagesPage />} />

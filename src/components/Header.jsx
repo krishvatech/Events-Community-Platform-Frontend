@@ -1,4 +1,4 @@
-﻿// src/components/Header.jsx
+// src/components/Header.jsx
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -118,7 +118,7 @@ const Header = () => {
   const [roleFlags, setRoleFlags] = useState(getRoleFlags());
   const { isAdmin, isOwner: owner, isStaff: staff } = roleFlags;
   const accountHref = isAdmin ? "/admin/events" : "/account/profile";
-  const resourcesHref = isAdmin ? "/admin/resources" : "/account/resources";
+  const resourcesHref = owner ? "/admin/resources" : "/account/resources";
   const [mobileOpen, setMobileOpen] = useState(false);
   const openDrawer = () => setMobileOpen(true);
   const closeDrawer = () => setMobileOpen(false);

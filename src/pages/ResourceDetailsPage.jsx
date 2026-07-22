@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
+import { isOwnerUser } from "../utils/adminRole";
 
 import Container from "@mui/material/Container";
 import Box from "@mui/material/Box";
@@ -335,15 +336,10 @@ export default function ResourceDetailsPage() {
 
   const searchParams = new URLSearchParams(location.search);
   const refParam = searchParams.get("ref");
-  // Logic: if from my_resources -> /account/resources
-  // else -> default to /admin/resources (if admin/staff) or /account/resources? 
-  // Actually, better default might be logic dependent, but let's stick to the requested pattern.
-  // If no ref, "Resources" could mean generic. 
-  // Given user request "also in resource detailpage set back button", default to /account/resources if not specified or "my_resources".
-  // Wait, "Explore Resources" isn't a main feature for normal users.
-  // So likely it's always "My Resources". 
-  const backLabel = "My Resources";
-  const backPath = "/account/resources";
+
+  const isUserOwner = isOwnerUser();
+  const backLabel = isUserOwner && refParam !== "my_resources" ? "Admin Resources" : "My Resources";
+  const backPath = isUserOwner && refParam !== "my_resources" ? "/admin/resources" : "/account/resources";
   // The user only asked for "back button set back button" similar to event page.
   // Event page had "Explore" vs "My Events".
   // Here we mostly have "My Resources".
@@ -477,7 +473,7 @@ export default function ResourceDetailsPage() {
                   <Button
                     variant="contained"
                     startIcon={<ArrowBackRoundedIcon />}
-                    onClick={() => navigate("/account/resources")}
+                    onClick={() => navigate(backPath)}
                     sx={{ mt: 2 }}
                   >
                     Back to resources

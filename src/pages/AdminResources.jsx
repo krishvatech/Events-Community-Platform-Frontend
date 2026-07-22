@@ -823,11 +823,9 @@ export default function MyResourcesAdmin() {
   useEffect(() => {
     if (!currentUser) return;
 
-    // ✅ Staff must wait until registrations are fetched at least once
-    if (!isOwner && !registrationsLoadedOnce) return;
-
-    // ✅ Staff: still keep this guard
-    if (!isOwner && registeredEventsLoading) return;
+    // Wait until registrations are loaded at least once to prevent double-loading
+    if (!registrationsLoadedOnce) return;
+    if (registeredEventsLoading) return;
 
     fetchResources();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -837,13 +835,8 @@ export default function MyResourcesAdmin() {
     resourceQuery,
     resourceFilterType,
     resourceSort,
-
-    // keep your smart deps
-    isOwner ? "ignore-loading" : registeredEventsLoading,
-    isOwner ? "ignore-ids" : registeredEventIds.join(","),
-
-    // ✅ NEW
     registrationsLoadedOnce,
+    registeredEventsLoading,
   ]);
 
 

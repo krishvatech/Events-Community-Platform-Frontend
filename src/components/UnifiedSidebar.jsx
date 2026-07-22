@@ -262,8 +262,6 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
-            { label: "My Resources", to: "/admin/resources", icon: LibraryBooksRoundedIcon },
-            { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
         adminItems = [
