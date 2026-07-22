@@ -73,7 +73,15 @@ export default function MyResourcesPage() {
   const [filterType, setFilterType] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [page, setPage] = useState(1);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const itemsPerPage = 5;
+
+  const renderRangeText = (total, page, size) => {
+    if (total === 0) return "Showing 0 resources";
+    const start = (page - 1) * size + 1;
+    const end = Math.min(page * size, total);
+    return `Showing ${start}–${end} of ${total} resources`;
+  };
 
   const [currentUser, setCurrentUser] = useState(null);
   const [registeredEvents, setRegisteredEvents] = useState([]);
@@ -156,8 +164,19 @@ export default function MyResourcesPage() {
   }, [refreshTrigger]);
 
 
-  // Fetch resources with pagination
+  // Debounce search input
   useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Fetch resources with pagination and AbortController
+  useEffect(() => {
+    const controller = new AbortController();
+
     const fetchResources = async () => {
       if (!currentUser || !registrationsLoaded) return;
       if (registeredEvents.length === 0) {
@@ -180,8 +199,8 @@ export default function MyResourcesPage() {
         });
 
         // Add search query if exists
-        if (searchQuery) {
-          params.append('search', searchQuery);
+        if (debouncedSearchQuery) {
+          params.append('search', debouncedSearchQuery);
         }
 
         // Add type filter if exists
@@ -191,40 +210,48 @@ export default function MyResourcesPage() {
 
         // Add ordering
         if (sortBy === 'newest') {
-          params.append('ordering', '-created_at');
+          params.append('ordering', '-created_at,-id');
         } else if (sortBy === 'oldest') {
-          params.append('ordering', 'created_at');
+          params.append('ordering', 'created_at,id');
         }
 
         const response = await fetch(`${API_URL}/content/resources/?${params.toString()}`, {
           headers: { "Authorization": `Bearer ${token}` },
+          signal: controller.signal,
         });
 
         if (!response.ok) throw new Error("Failed to fetch resources");
         const data = await response.json();
 
-        // Handle both paginated and non-paginated responses
-        if (data.results) {
-          // Paginated response
+        // Enforce paginated response structure
+        if (data && typeof data.count === "number" && Array.isArray(data.results)) {
           setResources(data.results);
           setResourcesTotal(data.count);
         } else {
-          // Non-paginated response
-          const allResources = Array.isArray(data) ? data : [];
-          setResources(allResources);
-          setResourcesTotal(allResources.length);
+          alert("Invalid response format from server.");
+          setResources([]);
+          setResourcesTotal(0);
         }
       } catch (error) {
+        if (error.name === 'AbortError') {
+          return;
+        }
         console.error("Error fetching resources:", error);
         setResources([]);
         setResourcesTotal(0);
       } finally {
-        setResourcesLoading(false);
+        if (!controller.signal.aborted) {
+          setResourcesLoading(false);
+        }
       }
     };
 
     fetchResources();
-  }, [currentUser, registrationsLoaded, registeredEvents, page, searchQuery, filterType, sortBy]);
+
+    return () => {
+      controller.abort();
+    };
+  }, [currentUser, registrationsLoaded, registeredEvents, page, debouncedSearchQuery, filterType, sortBy, refreshTrigger]);
 
 
   const getResourceIcon = (type) => {
@@ -330,8 +357,15 @@ export default function MyResourcesPage() {
                   setPage(1);
                 }}
                   displayEmpty
-                  renderValue={(value) => value || 'All Types'}
+                  renderValue={(value) => {
+                    if (value === "") return "All Types";
+                    if (value === "file") return "File";
+                    if (value === "video") return "Video";
+                    if (value === "link") return "Link";
+                    return value;
+                  }}
                 >
+                  <MenuItem value="">All Types</MenuItem>
                   <MenuItem value="file">File</MenuItem>
                   <MenuItem value="video">Video</MenuItem>
                   <MenuItem value="link">Link</MenuItem>
@@ -380,7 +414,7 @@ export default function MyResourcesPage() {
               {/* RESOURCES LIST (unchanged content) */}
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Showing {resources.length > 0 ? (page - 1) * itemsPerPage + 1 : 0}–{Math.min(page * itemsPerPage, resourcesTotal)} of {resourcesTotal} resources
+                  {renderRangeText(resourcesTotal, page, itemsPerPage)}
                 </Typography>
                 <IconButton
                   onClick={() => setRefreshTrigger(prev => prev + 1)}

@@ -579,8 +579,6 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
 export default function MyResourcesAdmin() {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const [events, setEvents] = useState([]);
-  const [registeredEventIds, setRegisteredEventIds] = useState([]);
-  const [registeredEventsLoading, setRegisteredEventsLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleteReason, setDeleteReason] = useState("");
   const [deletingResource, setDeletingResource] = useState(false);
@@ -595,7 +593,6 @@ export default function MyResourcesAdmin() {
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [actionMenuRow, setActionMenuRow] = useState(null);
   const [viewResource, setViewResource] = useState(null);
-  const [registrationsLoadedOnce, setRegistrationsLoadedOnce] = useState(false);
   const [resourcesBootstrapped, setResourcesBootstrapped] = useState(false);
 
   const isOwner = currentUser ? isOwnerUser(currentUser) : false;
@@ -605,10 +602,21 @@ export default function MyResourcesAdmin() {
   const [resourcesTotal, setResourcesTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [resourceQuery, setResourceQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [resourceFilterType, setResourceFilterType] = useState("");
   const [resourceSort, setResourceSort] = useState("newest");
   const [resourcePage, setResourcePage] = useState(1);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const RESOURCE_ITEMS_PER_PAGE = 10;
+
+  const renderRangeText = (total, page, size) => {
+    if (total === 0) {
+      return "Showing 0 resources";
+    }
+    const start = (page - 1) * size + 1;
+    const end = Math.min(page * size, total);
+    return `Showing ${start}–${end} of ${total} resources`;
+  };
 
   const fetchCurrentUser = async () => {
     try {
@@ -623,81 +631,9 @@ export default function MyResourcesAdmin() {
     }
   };
 
-  const fetchRegisteredEvents = async () => {
-    setRegistrationsLoadedOnce(false);
-    setRegisteredEventsLoading(true);
-    try {
-      const token = localStorage.getItem("access_token");
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const response = await axios.get(`${API}/event-registrations/mine/`, config);
-
-      const data = response.data;
-      const registrations = Array.isArray(data) ? data : data.results || [];
-
-      const ids = registrations
-        .map((reg) => {
-          if (reg.event && typeof reg.event === "object") return reg.event.id;
-          return reg.event_id || reg.event;
-        })
-        .filter(Boolean)
-        .map((id) => String(id));
-
-      setRegisteredEventIds(ids);
-    } catch (error) {
-      console.error("Error fetching registered events:", error);
-      setRegisteredEventIds([]);
-    } finally {
-      setRegisteredEventsLoading(false);
-      setRegistrationsLoadedOnce(true);
-    }
-  };
-
-
-  const filterResourcesForUser = (allResources) => {
-    if (!currentUser) return [];
-
-    const ownerUser = isOwnerUser(currentUser);
-
-    // ✅ Superuser/Owner: show all resources
-    if (ownerUser) {
-      return allResources;
-    }
-
-    // ✅ Normal user: ONLY events they purchased / registered for
-    if (!registeredEventIds || registeredEventIds.length === 0) {
-      return [];
-    }
-
-    const allowedEventIds = new Set(registeredEventIds.map((id) => String(id)));
-
-    return allResources.filter((r) => {
-      const rawEventId =
-        r.event_id ??
-        (r.event && (r.event.id ?? r.event)) ??
-        null;
-
-      if (!rawEventId) return false;
-      return allowedEventIds.has(String(rawEventId));
-    });
-  };
-
   // Fetch resources with server-side pagination
-  const fetchResources = async () => {
+  const fetchResources = async (signal) => {
     if (!currentUser) return;
-
-    const ownerUser = isOwnerUser(currentUser);
-
-    // ✅ Staff: if no purchased events -> no resources, skip API call
-    if (
-      !ownerUser &&
-      (!registeredEventIds || registeredEventIds.length === 0)
-    ) {
-      setItems([]);
-      setResourcesTotal(0);
-      setLoading(false);
-      setResourcesBootstrapped(true);
-      return;
-    }
 
     setLoading(true);
     try {
@@ -709,37 +645,49 @@ export default function MyResourcesAdmin() {
         offset: offset.toString(),
       });
 
-      if (resourceQuery) params.append("search", resourceQuery);
+      if (debouncedSearchQuery) params.append("search", debouncedSearchQuery);
       if (resourceFilterType) params.append("type", resourceFilterType);
-      if (resourceSort === "newest") params.append("ordering", "-created_at");
-      else if (resourceSort === "oldest") params.append("ordering", "created_at");
+      if (resourceSort === "newest") params.append("ordering", "-created_at,-id");
+      else if (resourceSort === "oldest") params.append("ordering", "created_at,id");
 
-      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const config = { 
+        headers: { Authorization: `Bearer ${token}` }
+      };
+      if (signal) {
+        config.signal = signal;
+      }
       const response = await axios.get(
         `${API}/content/resources/?${params.toString()}`,
         config
       );
 
-      if (response.data.results) {
-        setItems(response.data.results);
-        setResourcesTotal(response.data.count);
+      const data = response.data;
+      if (data && typeof data.count === "number" && Array.isArray(data.results)) {
+        setItems(data.results);
+        setResourcesTotal(data.count);
       } else {
-        const allResources = Array.isArray(response.data) ? response.data : [];
-        setItems(allResources);
-        setResourcesTotal(allResources.length);
+        showSnackbar("Invalid response format from server.", "error");
+        setItems([]);
+        setResourcesTotal(0);
       }
     } catch (error) {
+      if (axios.isCancel(error)) {
+        return;
+      }
       console.error("Error fetching resources:", error);
       setItems([]);
       setResourcesTotal(0);
+      showSnackbar("Failed to load resources from server", "error");
     } finally {
-      setLoading(false);
-      setResourcesBootstrapped(true);
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+        setResourcesBootstrapped(true);
+      }
     }
   };
 
   const handleResourceSaved = () => {
-    fetchResources();
+    setRefreshTrigger((prev) => prev + 1);
   };
 
   const isActionMenuOpen = Boolean(actionMenuAnchor);
@@ -788,29 +736,33 @@ export default function MyResourcesAdmin() {
     }
   }, [currentUser]);
 
+  // Search Debounce Effect
   useEffect(() => {
-    if (currentUser) {
-      fetchRegisteredEvents();
-    }
-  }, [currentUser]);
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(resourceQuery);
+      setResourcePage(1);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [resourceQuery]);
 
+  // Main Fetch Effect with AbortController
   useEffect(() => {
     if (!currentUser) return;
 
-    // Wait until registrations are loaded at least once to prevent double-loading
-    if (!registrationsLoadedOnce) return;
-    if (registeredEventsLoading) return;
+    const controller = new AbortController();
+    fetchResources(controller.signal);
 
-    fetchResources();
+    return () => {
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentUser?.id,
     resourcePage,
-    resourceQuery,
+    debouncedSearchQuery,
     resourceFilterType,
     resourceSort,
-    registrationsLoadedOnce,
-    registeredEventsLoading,
+    refreshTrigger,
   ]);
 
 
@@ -844,7 +796,17 @@ export default function MyResourcesAdmin() {
         data: { reason: deleteReason.trim() },
       };
       await axios.delete(`${API}/content/resources/${row.id}/`, config);
-      await fetchResources();
+
+      const newCount = Math.max(0, resourcesTotal - 1);
+      const newTotalPages = Math.ceil(newCount / RESOURCE_ITEMS_PER_PAGE);
+      const targetPage = resourcePage > newTotalPages ? Math.max(1, newTotalPages) : resourcePage;
+
+      if (targetPage !== resourcePage) {
+        setResourcePage(targetPage);
+      } else {
+        setRefreshTrigger((prev) => prev + 1);
+      }
+
       showSnackbar(
         "The resource was removed from the platform and remains stored in the database with its file/link, event association and history.",
         "success"
@@ -879,7 +841,7 @@ export default function MyResourcesAdmin() {
   }
 
   const showSkeleton =
-    !resourcesBootstrapped || loading || !currentUser || (!isOwner && registeredEventsLoading);
+    !resourcesBootstrapped || loading || !currentUser;
 
   const ResourceTableSkeleton = () => (
     <TableContainer component={Paper}>
@@ -1024,10 +986,17 @@ export default function MyResourcesAdmin() {
                 setResourceFilterType(e.target.value);
               }}
               displayEmpty
-              renderValue={(value) => value || 'All Types'}
+              renderValue={(value) => {
+                if (value === "") return "All Types";
+                if (value === "file") return "File";
+                if (value === "video") return "Video";
+                if (value === "link") return "Link";
+                return value;
+              }}
               size="small"
               sx={{ minWidth: { xs: "100%", sm: 120 } }}
             >
+              <MenuItem value="">All Types</MenuItem>
               <MenuItem value="file">File</MenuItem>
               <MenuItem value="link">Link</MenuItem>
               <MenuItem value="video">Video</MenuItem>
@@ -1081,13 +1050,7 @@ export default function MyResourcesAdmin() {
 
       {/* Resources table */}
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Showing{" "}
-        {items.length > 0
-          ? (resourcePage - 1) * RESOURCE_ITEMS_PER_PAGE + 1
-          : 0}
-        –
-        {Math.min(resourcePage * RESOURCE_ITEMS_PER_PAGE, resourcesTotal)} of{" "}
-        {resourcesTotal} resources
+        {renderRangeText(resourcesTotal, resourcePage, RESOURCE_ITEMS_PER_PAGE)}
       </Typography>
 
       {showSkeleton ? (
