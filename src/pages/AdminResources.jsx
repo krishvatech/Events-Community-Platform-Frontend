@@ -721,38 +721,12 @@ export default function MyResourcesAdmin() {
       );
 
       if (response.data.results) {
-        const allResources = response.data.results;
-        const visibleResources = filterResourcesForUser(allResources);
-
-        // 🔍 Check if backend is *actually* paginating
-        const hasServerPagination =
-          typeof response.data.count === "number" &&
-          response.data.count > allResources.length;
-
-        if (hasServerPagination) {
-          // Backend respected limit/offset => use server page as-is
-          setItems(visibleResources);
-          setResourcesTotal(response.data.count);
-        } else {
-          // Backend returned full list => do client-side pagination
-          const totalVisible = visibleResources.length;
-          const start = (resourcePage - 1) * RESOURCE_ITEMS_PER_PAGE;
-          const end = start + RESOURCE_ITEMS_PER_PAGE;
-
-          setResourcesTotal(totalVisible);
-          setItems(visibleResources.slice(start, end));
-        }
+        setItems(response.data.results);
+        setResourcesTotal(response.data.count);
       } else {
-        // Plain array response, no count/results wrapper
         const allResources = Array.isArray(response.data) ? response.data : [];
-        const visibleResources = filterResourcesForUser(allResources);
-
-        const totalVisible = visibleResources.length;
-        const start = (resourcePage - 1) * RESOURCE_ITEMS_PER_PAGE;
-        const end = start + RESOURCE_ITEMS_PER_PAGE;
-
-        setResourcesTotal(totalVisible);
-        setItems(visibleResources.slice(start, end));
+        setItems(allResources);
+        setResourcesTotal(allResources.length);
       }
     } catch (error) {
       console.error("Error fetching resources:", error);

@@ -176,6 +176,7 @@ export default function MyResourcesPage() {
         const params = new URLSearchParams({
           limit: itemsPerPage.toString(),
           offset: offset.toString(),
+          event_isnull: "false",
         });
 
         // Add search query if exists
@@ -205,20 +206,13 @@ export default function MyResourcesPage() {
         // Handle both paginated and non-paginated responses
         if (data.results) {
           // Paginated response
-          const allResources = data.results;
-          const filteredResources = allResources.filter(r =>
-            registeredEvents.includes(r.event_id) && r.is_published
-          );
-          setResources(filteredResources);
-          setResourcesTotal(data.count || filteredResources.length);
+          setResources(data.results);
+          setResourcesTotal(data.count);
         } else {
           // Non-paginated response
           const allResources = Array.isArray(data) ? data : [];
-          const filteredResources = allResources.filter(r =>
-            registeredEvents.includes(r.event_id) && r.is_published
-          );
-          setResources(filteredResources);
-          setResourcesTotal(filteredResources.length);
+          setResources(allResources);
+          setResourcesTotal(allResources.length);
         }
       } catch (error) {
         console.error("Error fetching resources:", error);
