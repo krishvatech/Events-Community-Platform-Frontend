@@ -20,6 +20,7 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 
 const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
 const API_URL = API.endsWith("/api") ? API : `${API}/api`;
@@ -85,6 +86,7 @@ export default function MyResourcesPage() {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [menuResource, setMenuResource] = useState(null);
   const [registrationsLoaded, setRegistrationsLoaded] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleMenuOpen = (event, resource) => {
     event.preventDefault();
@@ -131,6 +133,7 @@ export default function MyResourcesPage() {
         const registrations = Array.isArray(data) ? data : data.results || [];
 
         const eventIds = registrations
+          .filter((reg) => reg.status === "registered" && reg.attendee_status === "confirmed")
           .map((reg) => {
             if (reg.event && typeof reg.event === "object") return reg.event.id;
             return reg.event_id || reg.event;
@@ -150,7 +153,7 @@ export default function MyResourcesPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshTrigger]);
 
 
   // Fetch resources with pagination
@@ -381,9 +384,34 @@ export default function MyResourcesPage() {
 
             <>
               {/* RESOURCES LIST (unchanged content) */}
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Showing {resources.length > 0 ? (page - 1) * itemsPerPage + 1 : 0}–{Math.min(page * itemsPerPage, resourcesTotal)} of {resourcesTotal} resources
-              </Typography>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {resources.length > 0 ? (page - 1) * itemsPerPage + 1 : 0}–{Math.min(page * itemsPerPage, resourcesTotal)} of {resourcesTotal} resources
+                </Typography>
+                <IconButton
+                  onClick={() => setRefreshTrigger(prev => prev + 1)}
+                  disabled={resourcesLoading}
+                  size="small"
+                  title="Refresh resources"
+                  sx={{
+                    color: '#0ea5a4',
+                    '&:hover': {
+                      bgcolor: '#f0fdfa',
+                    }
+                  }}
+                >
+                  <RefreshRoundedIcon
+                    fontSize="small"
+                    sx={{
+                      animation: resourcesLoading ? "spin 1s linear infinite" : "none",
+                      "@keyframes spin": {
+                        "0%": { transform: "rotate(0deg)" },
+                        "100%": { transform: "rotate(360deg)" }
+                      }
+                    }}
+                  />
+                </IconButton>
+              </Box>
               <Paper variant="outlined" sx={{ borderRadius: 2 }}>
                 {resourcesLoading ? (
                   <ResourcesListSkeleton rows={itemsPerPage} isMobile={isMobile} />
