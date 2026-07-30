@@ -345,7 +345,48 @@ function createEmptyContactForm() {
   };
 }
 
-function buildContactFormFromLinks(links) {
+function emailKey(value) {
+  return (value || "").trim().toLowerCase();
+}
+
+function dedupeSecondaryEmails(emails, currentMainEmail = "", defaultVisibility = "contacts") {
+  const mainKey = emailKey(currentMainEmail);
+  const seen = new Set();
+  return (Array.isArray(emails) ? emails : [])
+    .map((item) => ({
+      email: (item?.email || "").trim(),
+      type: item?.type || "professional",
+      visibility: item?.visibility || defaultVisibility,
+    }))
+    .filter((item) => {
+      const key = emailKey(item.email);
+      if (!key || key === mainKey || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function getApiErrorMessage(data, fallback) {
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+  if (data.detail) return Array.isArray(data.detail) ? data.detail.join(" ") : String(data.detail);
+  if (data.error) return Array.isArray(data.error) ? data.error.join(" ") : String(data.error);
+
+  if (typeof data === "object") {
+    const messages = [];
+    Object.entries(data).forEach(([field, value]) => {
+      if (Array.isArray(value)) messages.push(`${field}: ${value.join(" ")}`);
+      else if (value && typeof value === "object") messages.push(`${field}: ${getApiErrorMessage(value, "")}`);
+      else if (value) messages.push(`${field}: ${String(value)}`);
+    });
+    const message = messages.filter(Boolean).join(" ");
+    if (message) return message;
+  }
+
+  return fallback;
+}
+
+function buildContactFormFromLinks(links, currentMainEmail = "") {
   const contact = links?.contact && typeof links.contact === "object" ? links.contact : {};
   const emails = Array.isArray(contact.emails) ? contact.emails : [];
   let phones = Array.isArray(contact.phones) ? contact.phones : [];
@@ -378,11 +419,7 @@ function buildContactFormFromLinks(links) {
   }
 
   return {
-    emails: emails.map((item) => ({
-      email: item?.email || "",
-      type: item?.type || "professional",
-      visibility: item?.visibility || "contacts",
-    })),
+    emails: dedupeSecondaryEmails(emails, currentMainEmail),
     phones: phones.map((item) => ({
       number: item?.number || "",
       type: item?.type || "professional",
@@ -418,7 +455,7 @@ function orderPhonesForDisplay(phones) {
   return [phones[primaryIndex], ...phones.filter((_, i) => i !== primaryIndex)];
 }
 
-function buildLinksWithContact(existingLinks, contactForm) {
+function buildLinksWithContact(existingLinks, contactForm, currentMainEmail = "") {
   const newLinks = { ...(existingLinks || {}) };
   const socials = contactForm?.socials || {};
   const socialKeys = ["linkedin", "x", "facebook", "instagram", "github"];
@@ -429,13 +466,7 @@ function buildLinksWithContact(existingLinks, contactForm) {
     else delete newLinks[key];
   });
 
-  const emails = (contactForm?.emails || [])
-    .map((item) => ({
-      email: (item?.email || "").trim(),
-      type: item?.type || "professional",
-      visibility: item?.visibility || "private",
-    }))
-    .filter((item) => item.email);
+  const emails = dedupeSecondaryEmails(contactForm?.emails || [], currentMainEmail, "private");
 
   let phones = (contactForm?.phones || [])
     .map((item) => ({
@@ -1804,8 +1835,8 @@ export default function ProfilePage() {
     [form.location]
   );
   const contactLinks = useMemo(
-    () => buildContactFormFromLinks(parseLinks(form.linksText)),
-    [form.linksText]
+    () => buildContactFormFromLinks(parseLinks(form.linksText), form.email),
+    [form.linksText, form.email]
   );
   const orderedPhones = useMemo(
     () => orderPhonesForDisplay(contactLinks.phones),
@@ -2194,7 +2225,7 @@ export default function ProfilePage() {
   const openContactEditor = (section = "all") => {
     setContactEditSection(section);
     const linksObj = parseLinks(form.linksText);
-    setContactForm(buildContactFormFromLinks(linksObj));
+    setContactForm(buildContactFormFromLinks(linksObj, form.email));
     setContactOpen(true);
   };
 
@@ -2428,10 +2459,22 @@ export default function ProfilePage() {
       // Validate Emails
       const newEmailErrors = {};
       let hasEmailError = false;
+      const seenEmails = new Set();
+      const currentMainEmailKey = emailKey(form.email);
       contactForm.emails.forEach((item, idx) => {
-        if (item.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.email)) {
+        const value = (item.email || "").trim();
+        const key = emailKey(value);
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
           newEmailErrors[idx] = "Invalid email format";
           hasEmailError = true;
+        } else if (key && key === currentMainEmailKey) {
+          newEmailErrors[idx] = "This is already your main email";
+          hasEmailError = true;
+        } else if (key && seenEmails.has(key)) {
+          newEmailErrors[idx] = "Duplicate email";
+          hasEmailError = true;
+        } else if (key) {
+          seenEmails.add(key);
         }
       });
 
@@ -2513,7 +2556,7 @@ export default function ProfilePage() {
 
       setSaving(true);
       const existingLinks = parseLinks(form.linksText);
-      const newLinks = buildLinksWithContact(existingLinks, contactForm);
+      const newLinks = buildLinksWithContact(existingLinks, contactForm, form.email);
 
       const payload = {
         first_name: form.first_name,
@@ -2542,23 +2585,81 @@ export default function ProfilePage() {
   }
 
   // --- Email Verification Handlers ---
+  async function refreshCurrentUserProfile(verifiedEmail = "") {
+    const r = await fetch(`${API_BASE}/users/me/`, {
+      method: "GET",
+      headers: tokenHeader(),
+      cache: "no-store",
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(getApiErrorMessage(data, "Failed to refresh profile"));
+
+    const refreshedEmail =
+      data?.email ||
+      data?.user?.email ||
+      data?.data?.email ||
+      verifiedEmail;
+    const nextEmail =
+      verifiedEmail && emailKey(refreshedEmail) !== emailKey(verifiedEmail)
+        ? verifiedEmail
+        : refreshedEmail;
+    const prof = data?.profile || data?.user?.profile || data?.data?.profile || {};
+    const links = prof.links && typeof prof.links === "object" ? prof.links : {};
+    const nextLinksText = Object.keys(links).length > 0 ? JSON.stringify(links) : "";
+
+    setForm((prev) => ({
+      ...prev,
+      email: nextEmail || prev.email,
+      linksText: nextLinksText || prev.linksText,
+    }));
+    if (Object.keys(links).length > 0) {
+      setContactForm(buildContactFormFromLinks(links, nextEmail));
+    }
+  }
+
+  function applyConfirmedEmailState(newEmail, contact) {
+    if (!newEmail) return;
+
+    setForm((prev) => {
+      const links = parseLinks(prev.linksText);
+      if (contact && typeof contact === "object") {
+        links.contact = contact;
+      }
+
+      return {
+        ...prev,
+        email: newEmail,
+        linksText: Object.keys(links).length > 0 ? JSON.stringify(links) : "",
+      };
+    });
+
+    if (contact && typeof contact === "object") {
+      setContactForm(buildContactFormFromLinks({ contact }, newEmail));
+    }
+  }
+
   async function handleMakePrimary(email) {
-    if (!email) return;
+    const normalizedEmail = (email || "").trim();
+    if (!normalizedEmail) return;
+    if (emailKey(normalizedEmail) === emailKey(form.email)) {
+      showNotification("info", "This email is already your main email.");
+      return;
+    }
     try {
       setVerifyingEmail(true);
       const r = await fetch(`${API_BASE}/users/me/email/initiate/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tokenHeader() },
-        body: JSON.stringify({ new_email: email }),
+        body: JSON.stringify({ new_email: normalizedEmail }),
       });
 
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.detail || "Failed to initiate email change");
+      const data = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(getApiErrorMessage(data, "Failed to initiate email change"));
 
-      setPendingNewEmail(email);
+      setPendingNewEmail(normalizedEmail);
       setVerificationCode("");
       setEmailVerificationOpen(true);
-      if (data.detail) showNotification("success", data.detail);
+      if (data?.detail) showNotification("success", data.detail);
 
     } catch (e) {
       showNotification("error", e.message);
@@ -2580,17 +2681,26 @@ export default function ProfilePage() {
         body: JSON.stringify({ new_email: pendingNewEmail, code: verificationCode }),
       });
 
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.detail || "Verification failed");
+      const data = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(getApiErrorMessage(data, "Verification failed"));
 
+      const verifiedEmail = data?.new_email || pendingNewEmail;
+      setForm((prev) => ({
+        ...prev,
+        email: verifiedEmail || prev.email,
+      }));
+      applyConfirmedEmailState(verifiedEmail, data?.contact);
       showNotification("success", "Your account Main Email Changed Successfully.");
 
       // Close dialogs
       setEmailVerificationOpen(false);
       setContactOpen(false);
 
-      // Reload profile to reflect changes
-      await loadMeExtras();
+      try {
+        await refreshCurrentUserProfile(verifiedEmail);
+      } catch {
+        // The confirmation response already contains the new email/contact state.
+      }
 
     } catch (e) {
       showNotification("error", e.message);
@@ -4784,7 +4894,10 @@ export default function ProfilePage() {
                       </Stack>
                     </Paper>
                   )}
-                  {contactForm.emails.map((item, idx) => (
+                  {contactForm.emails.map((item, idx) => {
+                    const isCurrentMainEmail = emailKey(item.email) === emailKey(form.email);
+                    const canSetPrimary = !!(item.email || "").trim() && !isCurrentMainEmail && !verifyingEmail;
+                    return (
                     <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
                       <Grid item xs={12} sm={6}>
                         <TextField
@@ -4844,15 +4957,18 @@ export default function ProfilePage() {
                       </Grid>
                       <Grid item xs={1} sm={1}>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="Set as Primary">
+                          <Tooltip title={isCurrentMainEmail ? "Already main email" : "Set as Primary"}>
+                            <span>
                             <IconButton
                               onClick={() => handleMakePrimary(item.email)}
                               color="primary"
                               size="small"
+                              disabled={!canSetPrimary}
                               sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
                             >
                               <VerifiedRoundedIcon fontSize="small" />
                             </IconButton>
+                            </span>
                           </Tooltip>
                           <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
                             <DeleteOutlineIcon fontSize="small" />
@@ -4860,7 +4976,8 @@ export default function ProfilePage() {
                         </Box>
                       </Grid>
                     </Grid>
-                  ))}
+                    );
+                  })}
                   <Button
                     variant="outlined"
                     startIcon={<AddRoundedIcon fontSize="small" />}
