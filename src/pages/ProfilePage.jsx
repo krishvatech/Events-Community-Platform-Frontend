@@ -2638,6 +2638,70 @@ export default function ProfilePage() {
     }
   }
 
+  function validateContactEmailsForPrimary() {
+    const newEmailErrors = {};
+    let hasEmailError = false;
+    const seenEmails = new Set();
+    const currentMainEmailKey = emailKey(form.email);
+
+    contactForm.emails.forEach((item, idx) => {
+      const value = (item.email || "").trim();
+      const key = emailKey(value);
+      if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        newEmailErrors[idx] = "Invalid email format";
+        hasEmailError = true;
+      } else if (key && key === currentMainEmailKey) {
+        newEmailErrors[idx] = "This is already your main email";
+        hasEmailError = true;
+      } else if (key && seenEmails.has(key)) {
+        newEmailErrors[idx] = "Duplicate email";
+        hasEmailError = true;
+      } else if (key) {
+        seenEmails.add(key);
+      }
+    });
+
+    setEmailErrors(newEmailErrors);
+    return !hasEmailError;
+  }
+
+  async function saveContactBeforePrimary() {
+    if (!validateContactEmailsForPrimary()) {
+      throw new Error("Please fix invalid emails");
+    }
+
+    const existingLinks = parseLinks(form.linksText);
+    const newLinks = buildLinksWithContact(existingLinks, contactForm, form.email);
+    const payload = {
+      first_name: form.first_name,
+      last_name: form.last_name,
+      profile: {
+        full_name: form.full_name,
+        timezone: form.timezone,
+        bio: form.bio,
+        headline: form.headline,
+        job_title: form.job_title,
+        company: form.company,
+        location: form.location,
+        links: newLinks,
+      },
+    };
+
+    const r = await fetch(`${API_BASE}/users/me/`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...tokenHeader() },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(getApiErrorMessage(data, "Save failed"));
+
+    setForm((prev) => ({
+      ...prev,
+      linksText: Object.keys(newLinks).length > 0 ? JSON.stringify(newLinks) : "",
+    }));
+    setContactForm(buildContactFormFromLinks(newLinks, form.email));
+  }
+
   async function handleMakePrimary(email) {
     const normalizedEmail = (email || "").trim();
     if (!normalizedEmail) return;
@@ -2647,6 +2711,9 @@ export default function ProfilePage() {
     }
     try {
       setVerifyingEmail(true);
+      await saveContactBeforePrimary();
+      showNotification("info", `Sending verification code to ${normalizedEmail}...`);
+
       const r = await fetch(`${API_BASE}/users/me/email/initiate/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...tokenHeader() },
@@ -2659,7 +2726,7 @@ export default function ProfilePage() {
       setPendingNewEmail(normalizedEmail);
       setVerificationCode("");
       setEmailVerificationOpen(true);
-      if (data?.detail) showNotification("success", data.detail);
+      showNotification("success", `Verification code sent to ${normalizedEmail}. Please check your inbox or spam folder.`);
 
     } catch (e) {
       showNotification("error", e.message);
