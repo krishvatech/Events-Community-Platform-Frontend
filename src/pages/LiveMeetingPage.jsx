@@ -86,7 +86,6 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import AnnouncementIcon from "@mui/icons-material/Announcement"; // ✅ NEW for waiting room announcements
 import SettingsInputAntennaIcon from "@mui/icons-material/SettingsInputAntenna"; // Radio icon for Q&A broadcast
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
-import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 import CheckIcon from "@mui/icons-material/Check"; // <--- ADDED for moderation approve button
 import CheckCircleIcon from "@mui/icons-material/CheckCircle"; // <--- ADDED for answered status
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"; // <--- ADDED for answered toggle
@@ -178,6 +177,13 @@ import {
   fetchUserKycStatusCached,
 } from "../utils/entityCache.js";
 import { getUserName } from "../utils/authStorage.js";
+import {
+  acceptLiveMeetingConnectionRequest,
+  cacheLiveMeetingConnectionStatus,
+  fetchLiveMeetingConnectionStatus,
+  resolveLiveMeetingParticipantUserId,
+  sendLiveMeetingConnectionRequest,
+} from "./liveMeetingConnectUtils.js";
 import { isPreEventLoungeOpen, willGoToWaitingRoom } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { getBrowserTimezone } from "../utils/timezoneUtils.js";
@@ -2497,6 +2503,7 @@ export default function NewLiveMeeting() {
   const intentionalMainSocketCloseRef = useRef(false);
   const pageUnloadRef = useRef(false);
   const [mainSocketReconnectKey, setMainSocketReconnectKey] = useState(0);
+  const mainSocketGenerationRef = useRef(0);
 
   const clearReconnectTimer = () => {
     if (reconnectTimerRef.current) {
@@ -3150,6 +3157,7 @@ export default function NewLiveMeeting() {
 
   const [memberInfoOpen, setMemberInfoOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [liveMeetingConnectionStatusByUserId, setLiveMeetingConnectionStatusByUserId] = useState({});
   const [participantKycCache, setParticipantKycCache] = useState({}); // Cache for kyc_status by userId
   const [moodMap, setMoodMap] = useState({});
   const [recentMoods, setRecentMoods] = useState(() => {
@@ -3163,6 +3171,20 @@ export default function NewLiveMeeting() {
   const [moodAnchorEl, setMoodAnchorEl] = useState(null);
   const moodUpdateInFlightRef = useRef(false);
   const lastMoodSentAtRef = useRef(0);
+
+  const applyLiveMeetingConnectionStatus = useCallback(({ userId, status, requestId = null }) => {
+    const normalized = cacheLiveMeetingConnectionStatus(userId, {
+      status,
+      requestId,
+      request_id: requestId,
+    });
+    if (!normalized) return null;
+    setLiveMeetingConnectionStatusByUserId((prev) => ({
+      ...(prev || {}),
+      [normalized.userId]: normalized,
+    }));
+    return normalized;
+  }, []);
 
   const fetchAndCacheKycStatus = useCallback((userId, seededStatus = "", options = {}) => {
     const force = Boolean(options.force);
@@ -8451,12 +8473,32 @@ export default function NewLiveMeeting() {
     const WS_ROOT = API_ROOT.replace(/^http/, "ws").replace(/\/api\/?$/, "");
     const wsUrl = `${WS_ROOT}/ws/events/${eventId}/${qs}`.replace(/([^:]\/)\/+/g, "$1");
 
+    clearReconnectTimer();
+    const existingSocket = mainSocketRef.current;
+    if (
+      existingSocket &&
+      (existingSocket.readyState === WebSocket.CONNECTING || existingSocket.readyState === WebSocket.OPEN)
+    ) {
+      existingSocket.onopen = null;
+      existingSocket.onmessage = null;
+      existingSocket.onerror = null;
+      existingSocket.onclose = null;
+      try {
+        existingSocket.close();
+      } catch (e) {
+        console.warn("[MainSocket] Failed to close previous socket:", e);
+      }
+    }
+
+    const socketGeneration = mainSocketGenerationRef.current + 1;
+    mainSocketGenerationRef.current = socketGeneration;
     intentionalMainSocketCloseRef.current = false;
     console.log("[MainSocket] Connecting to:", wsUrl);
     const ws = new WebSocket(wsUrl);
     mainSocketRef.current = ws;
 
     ws.onopen = () => {
+      if (mainSocketRef.current !== ws || mainSocketGenerationRef.current !== socketGeneration) return;
       console.log("[MainSocket] Connected");
       mainSocketReadyRef.current = true;
       if (pendingMainSocketActionsRef.current.length > 0) {
@@ -8473,6 +8515,7 @@ export default function NewLiveMeeting() {
     };
 
     ws.onmessage = async (event) => {
+      if (mainSocketRef.current !== ws || mainSocketGenerationRef.current !== socketGeneration) return;
       try {
         const msg = JSON.parse(event.data);
         setLastMessage(msg);
@@ -8717,6 +8760,22 @@ export default function NewLiveMeeting() {
             ...(prev || {}),
             [senderId]: Number(prev?.[senderId] || 0) + 1,
           }));
+        } else if (msg.type === "friendship_status_changed") {
+          const status = msg.status || "connected";
+          const userIds = Array.isArray(msg.user_ids)
+            ? msg.user_ids.map((value) => String(value)).filter(Boolean)
+            : [];
+          const myId = String(myUserIdRef.current || currentUserId || "");
+          if (myId && userIds.includes(myId)) {
+            const otherUserId = userIds.find((value) => value !== myId);
+            if (otherUserId) {
+              applyLiveMeetingConnectionStatus({
+                userId: otherUserId,
+                status,
+                requestId: msg.request_id || null,
+              });
+            }
+          }
         } else if (msg.type === "breakout_timer") {
           //  ENHANCED DUAL-TIMER WEBSOCKET PROTOCOL
           // Support both legacy (msg.duration) and new dual-timer format
@@ -9629,11 +9688,13 @@ export default function NewLiveMeeting() {
     };
 
     ws.onerror = (err) => {
+      if (mainSocketRef.current !== ws || mainSocketGenerationRef.current !== socketGeneration) return;
       console.error("[MainSocket] Error:", err);
       console.warn("[MainSocket] Pending actions will be retried on reconnect:", pendingMainSocketActionsRef.current.length);
     };
 
     ws.onclose = (e) => {
+      if (mainSocketRef.current !== ws || mainSocketGenerationRef.current !== socketGeneration) return;
       console.log("[MainSocket] Disconnected");
       console.log("[MainSocket] Close event:", {
         code: e.code,
@@ -9657,7 +9718,7 @@ export default function NewLiveMeeting() {
       // DO NOT clear pendingMainSocketActionsRef.current here
 
       // ✅ AUTO-RECONNECT: Trigger reconnect on WebSocket close
-      if (!reconnectLocked.current) {
+      if (!reconnectLocked.current && !reconnectTimerRef.current) {
         reconnectLocked.current = true;
         reconnectAttemptRef.current = 0;
         setIsReconnecting(true);
@@ -9671,6 +9732,10 @@ export default function NewLiveMeeting() {
     return () => {
       console.log("[MainSocket] Cleanup function called - closing WebSocket");
       intentionalMainSocketCloseRef.current = true;
+      if (mainSocketRef.current === ws) {
+        mainSocketRef.current = null;
+        mainSocketReadyRef.current = false;
+      }
       if (ws.readyState <= WebSocket.OPEN) ws.close();
     };
   }, [eventId, isGuest, mainSocketReconnectKey]);
@@ -9745,6 +9810,18 @@ export default function NewLiveMeeting() {
     console.warn("[MainSocket] Unable to send action; socket state:", ws?.readyState, payload);
     return false;
   }, []);
+
+  const broadcastLiveMeetingConnectionStatus = useCallback(({ targetUserId, status = "connected", requestId = null }) => {
+    const myId = String(myUserIdRef.current || currentUserId || "");
+    const otherId = targetUserId != null ? String(targetUserId) : "";
+    if (!myId || !otherId || myId === otherId) return false;
+    return sendMainSocketAction({
+      action: "friendship_status_changed",
+      status,
+      user_ids: [myId, otherId],
+      request_id: requestId,
+    });
+  }, [currentUserId, sendMainSocketAction]);
 
   const markSupportRequestsViewed = useCallback(() => {
     setSupportRequests((prev) =>
@@ -19038,6 +19115,7 @@ export default function NewLiveMeeting() {
   const [displayedQuestion, setDisplayedQuestion] = useState(null);
   const [displayedQuestionSubOpen, setDisplayedQuestionSubOpen] = useState(false);
   const [qnaDisplayConnStatus, setQnaDisplayConnStatus] = useState("none");
+  const [qnaDisplayRequestId, setQnaDisplayRequestId] = useState(null);
   const [qnaDisplayConnLoading, setQnaDisplayConnLoading] = useState(false);
 
   // Unified stage queue: groups appear as single entries; their sub-questions are excluded.
@@ -19352,22 +19430,92 @@ export default function NewLiveMeeting() {
   }, [broadcastDisplayedQuestionState, showSnackbar]);
 
   const handleQnaDisplayConnect = useCallback(async () => {
-    const userId = displayedQuestion?.user_id;
-    if (!userId) return;
+    if (qnaDisplayConnLoading) return;
+    const participant = displayedQuestion ? {
+      id: displayedQuestion.user_id,
+      name: displayedQuestion.asked_by || "Audience",
+      display_name: displayedQuestion.asked_by || "Audience",
+      _raw: {
+        user_id: displayedQuestion.user_id,
+        customParticipantId: displayedQuestion.user_id,
+      },
+    } : null;
+
     setQnaDisplayConnLoading(true);
     try {
-      const res = await fetch(toApiUrl("friend-requests/"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ to_user: Number(userId) }),
+      const result = await sendLiveMeetingConnectionRequest({
+        participant,
+        toApiUrl,
+        authHeader,
+        logger: console,
       });
-      if (res.ok) setQnaDisplayConnStatus("pending_outgoing");
+
+      showSnackbar(result.message, result.ok ? "success" : "error");
+      if (result.connectionStatus) {
+        setQnaDisplayConnStatus(result.connectionStatus);
+        setQnaDisplayRequestId(result.requestId || null);
+        applyLiveMeetingConnectionStatus({
+          userId: result.userId,
+          status: result.connectionStatus,
+          requestId: result.requestId || null,
+        });
+      } else if (result.ok) {
+        setQnaDisplayConnStatus("pending_outgoing");
+      }
     } catch (e) {
       console.error("[Q&A Display] Connect error:", e);
+      showSnackbar("Network or server error while sending connection request. Please try again.", "error");
     } finally {
       setQnaDisplayConnLoading(false);
     }
-  }, [displayedQuestion?.user_id]);
+  }, [applyLiveMeetingConnectionStatus, displayedQuestion, qnaDisplayConnLoading, showSnackbar]);
+
+  const handleQnaDisplayAcceptRequest = useCallback(async () => {
+    if (qnaDisplayConnLoading) return;
+    const participant = displayedQuestion ? {
+      id: displayedQuestion.user_id,
+      name: displayedQuestion.asked_by || "Audience",
+      display_name: displayedQuestion.asked_by || "Audience",
+      _raw: {
+        user_id: displayedQuestion.user_id,
+        customParticipantId: displayedQuestion.user_id,
+      },
+    } : null;
+
+    setQnaDisplayConnLoading(true);
+    try {
+      const result = await acceptLiveMeetingConnectionRequest({
+        participant,
+        requestId: qnaDisplayRequestId,
+        toApiUrl,
+        authHeader,
+        logger: console,
+      });
+
+      showSnackbar(result.message, result.ok ? "success" : "error");
+      if (result.connectionStatus) {
+        setQnaDisplayConnStatus(result.connectionStatus);
+        setQnaDisplayRequestId(result.requestId || null);
+        applyLiveMeetingConnectionStatus({
+          userId: result.userId,
+          status: result.connectionStatus,
+          requestId: result.requestId || null,
+        });
+        if (result.connectionStatus === "connected") {
+          broadcastLiveMeetingConnectionStatus({
+            targetUserId: result.userId,
+            status: "connected",
+            requestId: result.requestId || qnaDisplayRequestId || null,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[Q&A Display] Accept request error:", e);
+      showSnackbar("Network or server error while accepting connection request. Please try again.", "error");
+    } finally {
+      setQnaDisplayConnLoading(false);
+    }
+  }, [applyLiveMeetingConnectionStatus, broadcastLiveMeetingConnectionStatus, displayedQuestion, qnaDisplayConnLoading, qnaDisplayRequestId, showSnackbar]);
 
   const handleShowNextDisplayedQuestion = useCallback(() => {
     if (qnaUnifiedStageQueue.length === 0) {
@@ -19471,9 +19619,63 @@ export default function NewLiveMeeting() {
   }, [buildDisplayedQuestionPayload, displayedQuestion?.question_id, questions]);
 
   useEffect(() => {
-    setQnaDisplayConnStatus("none");
+    let alive = true;
+    const userId = resolveLiveMeetingParticipantUserId({
+      _raw: {
+        user_id: displayedQuestion?.user_id,
+        customParticipantId: displayedQuestion?.user_id,
+      },
+      user_id: displayedQuestion?.user_id,
+    });
+
     setQnaDisplayConnLoading(false);
-  }, [displayedQuestion?.question_id]);
+    setQnaDisplayRequestId(null);
+
+    if (!displayedQuestion?.question_id || !userId) {
+      setQnaDisplayConnStatus("none");
+      return () => { alive = false; };
+    }
+
+    (async () => {
+      try {
+        const result = await fetchLiveMeetingConnectionStatus({
+          userId,
+          toApiUrl,
+          authHeader,
+          logger: console,
+          force: true,
+        });
+        if (!alive) return;
+        setQnaDisplayConnStatus(result.status || "none");
+        setQnaDisplayRequestId(result.requestId || null);
+        applyLiveMeetingConnectionStatus({
+          userId,
+          status: result.status || "none",
+          requestId: result.requestId || null,
+        });
+      } catch (e) {
+        if (!alive) return;
+        setQnaDisplayConnStatus("none");
+      }
+    })();
+
+    return () => { alive = false; };
+  }, [applyLiveMeetingConnectionStatus, displayedQuestion?.question_id, displayedQuestion?.user_id]);
+
+  useEffect(() => {
+    const userId = resolveLiveMeetingParticipantUserId({
+      _raw: {
+        user_id: displayedQuestion?.user_id,
+        customParticipantId: displayedQuestion?.user_id,
+      },
+      user_id: displayedQuestion?.user_id,
+    });
+    const synced = userId ? liveMeetingConnectionStatusByUserId[userId] : null;
+    if (!synced) return;
+    setQnaDisplayConnStatus(synced.status || "none");
+    setQnaDisplayRequestId(synced.requestId || null);
+    setQnaDisplayConnLoading(false);
+  }, [displayedQuestion?.user_id, liveMeetingConnectionStatusByUserId]);
 
   const polls = useMemo(
     () => [
@@ -27197,10 +27399,12 @@ export default function NewLiveMeeting() {
                                         textTransform: "none",
                                         fontWeight: 700,
                                         fontSize: 12,
+                                        width: 136,
+                                        whiteSpace: "nowrap",
                                         "&:hover": { bgcolor: "#0e8e88" },
                                       }}
                                     >
-                                      {qnaDisplayConnLoading ? "Sending..." : "Connect"}
+                                      {qnaDisplayConnLoading ? "Connecting..." : "Connect"}
                                     </Button>
                                   )}
 
@@ -27217,29 +27421,35 @@ export default function NewLiveMeeting() {
                                         textTransform: "none",
                                         fontWeight: 600,
                                         fontSize: 12,
+                                        width: 136,
+                                        whiteSpace: "nowrap",
                                       }}
                                     >
                                       Request Sent
                                     </Button>
                                   )}
 
-                                  {canOpenQnaProfile && qnaDisplayConnStatus === "friends" && (
+                                  {canOpenQnaProfile && qnaDisplayConnStatus === "pending_incoming" && (
                                     <Button
-                                      disabled
-                                      variant="outlined"
-                                      startIcon={<CheckRoundedIcon />}
+                                      variant="contained"
+                                      disabled={qnaDisplayConnLoading}
+                                      onClick={handleQnaDisplayAcceptRequest}
+                                      startIcon={<PersonAddAlt1RoundedIcon />}
                                       sx={{
                                         py: 0.75,
                                         px: 1.5,
                                         borderRadius: 2,
-                                        borderColor: "rgba(20,184,177,0.5) !important",
-                                        color: "#14b8b1 !important",
+                                        bgcolor: "#14b8b1",
+                                        color: "#fff",
                                         textTransform: "none",
-                                        fontWeight: 600,
+                                        fontWeight: 700,
                                         fontSize: 12,
+                                        width: 136,
+                                        whiteSpace: "nowrap",
+                                        "&:hover": { bgcolor: "#0e8e88" },
                                       }}
                                     >
-                                      Connected
+                                      Accept Request
                                     </Button>
                                   )}
 
@@ -28508,6 +28718,10 @@ export default function NewLiveMeeting() {
                 isGuest={isGuest}
                 onSignUp={() => setGuestRegModalOpen(true)}
                 eventId={eventId}
+                showSnackbar={showSnackbar}
+                liveConnectionStatus={liveMeetingConnectionStatusByUserId[resolveLiveMeetingParticipantUserId(selectedMember)] || null}
+                onConnectionStatusChange={applyLiveMeetingConnectionStatus}
+                onBroadcastConnectionStatus={broadcastLiveMeetingConnectionStatus}
               />
             ) : (
               <Box sx={{ py: 4, textAlign: "center", opacity: 0.5 }}>
@@ -30389,13 +30603,29 @@ export default function NewLiveMeeting() {
 }
 
 // ✅ Separate sub-component to handle async friendship logic locally
-function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp = () => { }, eventId = null }) {
-  const [connStatus, setConnStatus] = useState("loading"); // "loading" | "none" | "friends" | "pending_outgoing" | "pending_incoming"
+function MemberInfoContent({
+  selectedMember,
+  onClose,
+  isGuest = false,
+  onSignUp = () => { },
+  eventId = null,
+  showSnackbar = () => { },
+  liveConnectionStatus = null,
+  onConnectionStatusChange = () => null,
+  onBroadcastConnectionStatus = () => false,
+}) {
+  const [connStatus, setConnStatus] = useState("loading"); // "loading" | "self" | "none" | "connected" | "pending_outgoing" | "pending_incoming"
+  const [connRequestId, setConnRequestId] = useState(null);
   const [connLoading, setConnLoading] = useState(false);
   const [profileInfo, setProfileInfo] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
-  const memberUserId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
-  const isGuestMember = typeof memberUserId === "string" && /^guest[_:-]/i.test(memberUserId);
+  const memberUserId = resolveLiveMeetingParticipantUserId(selectedMember);
+  const participantRawId =
+    selectedMember?._raw?.customParticipantId ||
+    selectedMember?._raw?.user_id ||
+    selectedMember?.user_id ||
+    selectedMember?.id;
+  const isGuestMember = typeof participantRawId === "string" && /^guest[_:-]/i.test(participantRawId);
 
   // ✅ Current user is guest AND viewed member is a registered user → blur their profile
   const showProfileRestriction = isGuest && !isGuestMember;
@@ -30404,58 +30634,72 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
   useEffect(() => {
     let alive = true;
     const checkStatus = async () => {
-      // Use DB ID if available, else RTK ID (though friends API needs DB ID usually)
-      const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
+      const userId = resolveLiveMeetingParticipantUserId(selectedMember);
       if (!userId) {
-        if (alive) setConnStatus("none");
-        return;
-      }
-      if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
-        if (alive) setConnStatus("none");
+        if (alive) {
+          setConnStatus("none");
+          setConnRequestId(null);
+        }
         return;
       }
 
       try {
-        const res = await fetch(toApiUrl(`friends/status/?user_id=${userId}`), {
-          headers: { ...authHeader() },
+        const result = await fetchLiveMeetingConnectionStatus({
+          userId,
+          participant: selectedMember,
+          toApiUrl,
+          authHeader,
+          logger: console,
+          force: true,
         });
-        const d = await res.json().catch(() => ({}));
         if (alive) {
-          // backend returning 'incoming_pending' etc.
-          const map = { incoming_pending: "pending_incoming", outgoing_pending: "pending_outgoing" };
-          const s = (map[d?.status] || d?.status || "none").toLowerCase();
-          setConnStatus(s);
+          setConnStatus(result.status || "none");
+          setConnRequestId(result.requestId || null);
+          onConnectionStatusChange({
+            userId,
+            status: result.status || "none",
+            requestId: result.requestId || null,
+          });
         }
       } catch (e) {
-        if (alive) setConnStatus("none");
+        if (alive) {
+          setConnStatus("none");
+          setConnRequestId(null);
+        }
       }
     };
+    setConnStatus("loading");
+    setConnRequestId(null);
+    setConnLoading(false);
     checkStatus();
     return () => { alive = false; };
-  }, [selectedMember]);
+  }, [onConnectionStatusChange, selectedMember]);
+
+  useEffect(() => {
+    if (!liveConnectionStatus) return;
+    setConnStatus(liveConnectionStatus.status || "none");
+    setConnRequestId(liveConnectionStatus.requestId || null);
+    setConnLoading(false);
+  }, [liveConnectionStatus]);
 
   // 1b. Fetch profile info for job title/company/location
   useEffect(() => {
     let alive = true;
-    const userId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
-    if (!userId) {
-      setProfileInfo(null);
-      setProfileLoading(false);
-      return () => { };
-    }
-    if (typeof userId === "string" && /^guest[_:-]/i.test(userId)) {
+    const userId = resolveLiveMeetingParticipantUserId(selectedMember);
+    const guestParticipantId = selectedMember?._raw?.customParticipantId || selectedMember?._raw?.user_id || selectedMember?.user_id || selectedMember?.id;
+    if (typeof guestParticipantId === "string" && /^guest[_:-]/i.test(guestParticipantId)) {
       // For guests, try to fetch profile data from backend
       const fetchGuestProfile = async () => {
         try {
           setProfileLoading(true);
 
-          console.debug("[MemberInfoContent] Guest participant detected:", { userId, eventId });
+          console.debug("[MemberInfoContent] Guest participant detected:", { userId: guestParticipantId, eventId });
 
           // Extract guest_id from userId (format: "guest_123" or "guest:123" or "guest-123")
-          const guestIdMatch = userId.match(/^guest[_:-]?(\d+)/i);
+          const guestIdMatch = guestParticipantId.match(/^guest[_:-]?(\d+)/i);
           const guestId = guestIdMatch ? guestIdMatch[1] : null;
 
-          console.debug("[MemberInfoContent] Guest ID extraction:", { userId, guestId, match: guestIdMatch });
+          console.debug("[MemberInfoContent] Guest ID extraction:", { userId: guestParticipantId, guestId, match: guestIdMatch });
 
           if (!guestId) {
             console.debug("[MemberInfoContent] No guest ID extracted, using fallback");
@@ -30514,6 +30758,11 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
       };
 
       fetchGuestProfile();
+      return () => { };
+    }
+    if (!userId) {
+      setProfileInfo(null);
+      setProfileLoading(false);
       return () => { };
     }
 
@@ -30615,26 +30864,68 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
 
   // 2. Send request
   const handleConnect = async () => {
-    const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
-    if (!userId) return;
-
+    if (connLoading) return;
     setConnLoading(true);
     try {
-      const res = await fetch(toApiUrl("friend-requests/"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ to_user: Number(userId) }),
+      const result = await sendLiveMeetingConnectionRequest({
+        participant: selectedMember,
+        toApiUrl,
+        authHeader,
+        logger: console,
       });
-      if (res.ok) {
-        // success
+
+      showSnackbar(result.message, result.ok ? "success" : "error");
+      if (result.connectionStatus) {
+        setConnStatus(result.connectionStatus);
+        setConnRequestId(result.requestId || null);
+        onConnectionStatusChange({
+          userId: result.userId,
+          status: result.connectionStatus,
+          requestId: result.requestId || null,
+        });
+      } else if (result.ok) {
         setConnStatus("pending_outgoing");
-      } else {
-        const msg = await res.text();
-        console.error("Failed to send request:", msg);
-        alert("Failed to send connection request.");
       }
     } catch (e) {
       console.error("Connect error:", e);
+      showSnackbar("Network or server error while sending connection request. Please try again.", "error");
+    } finally {
+      setConnLoading(false);
+    }
+  };
+
+  const handleAcceptRequest = async () => {
+    if (connLoading) return;
+    setConnLoading(true);
+    try {
+      const result = await acceptLiveMeetingConnectionRequest({
+        participant: selectedMember,
+        requestId: connRequestId,
+        toApiUrl,
+        authHeader,
+        logger: console,
+      });
+
+      showSnackbar(result.message, result.ok ? "success" : "error");
+      if (result.connectionStatus) {
+        setConnStatus(result.connectionStatus);
+        setConnRequestId(result.requestId || null);
+        onConnectionStatusChange({
+          userId: result.userId,
+          status: result.connectionStatus,
+          requestId: result.requestId || null,
+        });
+        if (result.connectionStatus === "connected") {
+          onBroadcastConnectionStatus({
+            targetUserId: result.userId,
+            status: "connected",
+            requestId: result.requestId || connRequestId || null,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Accept connection request error:", e);
+      showSnackbar("Network or server error while accepting connection request. Please try again.", "error");
     } finally {
       setConnLoading(false);
     }
@@ -30690,8 +30981,8 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
 
   const hasProfileInfo = Boolean(jobTitle || companyName || locationLabel);
 
-  const userId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
-  const profileLink = `/community/rich-profile/${userId}`;
+  const userId = resolveLiveMeetingParticipantUserId(selectedMember);
+  const profileLink = userId ? `/community/rich-profile/${userId}` : "#";
 
   return (
     <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -30836,15 +31127,27 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
 
 
         {/* 5. Actions: View Profile + Connect */}
-        <Stack direction="row" spacing={1.5} sx={{ mt: 3, width: "100%" }}>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{
+            mt: 3,
+            width: "100%",
+            "& > .MuiButton-root": {
+              flex: "1 1 0",
+              minWidth: 0,
+              whiteSpace: "nowrap",
+            },
+          }}
+        >
           {/* View Profile */}
           <Button
             fullWidth
             variant="outlined"
             startIcon={<Box component="span" sx={{ fontSize: 18, display: "flex" }}>👤</Box>}
-            disabled={isGuestMember}
+            disabled={isGuestMember || !userId}
             onClick={() => {
-              if (isGuestMember) return;
+              if (isGuestMember || !userId) return;
               window.open(profileLink, "_blank");
             }}
             sx={{
@@ -30866,6 +31169,27 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
           </Button>
 
           {/* Connect Button */}
+          {!isGuestMember && connStatus === "loading" && (
+            <Button
+              fullWidth
+              disabled
+              variant="contained"
+              startIcon={<PersonAddAlt1RoundedIcon />}
+              sx={{
+                py: 1.5,
+                borderRadius: 3,
+                bgcolor: "#14b8b1",
+                color: "#fff",
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: 14,
+                "&:hover": { bgcolor: "#0e8e88" },
+              }}
+            >
+              Connecting...
+            </Button>
+          )}
+
           {!isGuestMember && connStatus === "none" && (
             <Button
               fullWidth
@@ -30884,7 +31208,7 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
                 "&:hover": { bgcolor: "#0e8e88" },
               }}
             >
-              {connLoading ? "Sending..." : "Connect"}
+              {connLoading ? "Connecting..." : "Connect"}
             </Button>
           )}
 
@@ -30907,23 +31231,25 @@ function MemberInfoContent({ selectedMember, onClose, isGuest = false, onSignUp 
             </Button>
           )}
 
-          {!isGuestMember && connStatus === "friends" && (
+          {!isGuestMember && connStatus === "pending_incoming" && (
             <Button
               fullWidth
-              disabled
-              variant="outlined"
-              startIcon={<CheckRoundedIcon />}
+              variant="contained"
+              disabled={connLoading}
+              onClick={handleAcceptRequest}
+              startIcon={<PersonAddAlt1RoundedIcon />}
               sx={{
                 py: 1.5,
                 borderRadius: 3,
-                borderColor: "rgba(20,184,177,0.5) !important",
-                color: "#14b8b1 !important",
+                bgcolor: "#14b8b1",
+                color: "#fff",
                 textTransform: "none",
-                fontWeight: 600,
+                fontWeight: 700,
                 fontSize: 14,
+                "&:hover": { bgcolor: "#0e8e88" },
               }}
             >
-              Connected
+              Accept Request
             </Button>
           )}
         </Stack>
