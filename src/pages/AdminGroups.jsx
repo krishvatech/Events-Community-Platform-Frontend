@@ -995,6 +995,8 @@ function WordPressGroupSyncPanel({ token }) {
   const [syncingEnabled, setSyncingEnabled] = React.useState(false);
   const [syncingMembers, setSyncingMembers] = React.useState(false);
   const [syncingMemberId, setSyncingMemberId] = React.useState(null);
+  const [syncingContent, setSyncingContent] = React.useState(false);
+  const [syncingContentId, setSyncingContentId] = React.useState(null);
   const [stats, setStats] = React.useState(null);
   const [statsLoading, setStatsLoading] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
@@ -1178,6 +1180,37 @@ function WordPressGroupSyncPanel({ token }) {
     }
   };
 
+  const syncEnabledContent = async () => {
+    const ok = window.confirm(
+      "Import WordPress group posts for ALL enabled and linked groups? This is additive and will not delete existing Connect posts."
+    );
+    if (!ok) return;
+    setSyncingContent(true);
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-content/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ dry_run: false }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+      setToast({
+        open: true,
+        type: json.groups_failed || json.failed ? "warning" : "success",
+        msg: `Content imported. Groups ${json.groups_processed || 0}, posts imported ${json.imported || 0}, existing skipped ${json.skipped_existing || 0}${json.failed ? `, failed ${json.failed}` : ""}.`,
+      });
+      await loadSources();
+      await loadStats();
+    } catch (e) {
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setSyncingContent(false);
+    }
+  };
+
   const syncOneMembers = async (row) => {
     setSyncingMemberId(row.wp_group_id);
     try {
@@ -1202,6 +1235,34 @@ function WordPressGroupSyncPanel({ token }) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
     } finally {
       setSyncingMemberId(null);
+    }
+  };
+
+  const syncOneContent = async (row) => {
+    setSyncingContentId(row.wp_group_id);
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/${row.wp_group_id}/sync-content/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ dry_run: false }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+      setItems((prev) => prev.map((x) => x.wp_group_id === row.wp_group_id ? json : x));
+      const stats = json?.content_sync || {};
+      setToast({
+        open: true,
+        type: stats.failed ? "warning" : "success",
+        msg: `Content imported for ${json.name}. Posts imported ${stats.imported || 0}, existing skipped ${stats.skipped_existing || 0}${stats.failed ? `, failed ${stats.failed}` : ""}.`,
+      });
+      await loadStats();
+    } catch (e) {
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setSyncingContentId(null);
     }
   };
 
@@ -1257,7 +1318,7 @@ function WordPressGroupSyncPanel({ token }) {
           />
           <Button
             onClick={refreshFromWordPress}
-            disabled={refreshing || syncingEnabled || syncingMembers}
+            disabled={refreshing || syncingEnabled || syncingMembers || syncingContent}
             startIcon={<CloudSyncRoundedIcon />}
             variant="outlined"
             className="rounded-xl"
@@ -1267,7 +1328,7 @@ function WordPressGroupSyncPanel({ token }) {
           </Button>
           <Button
             onClick={syncEnabledGroups}
-            disabled={refreshing || syncingEnabled || syncingMembers}
+            disabled={refreshing || syncingEnabled || syncingMembers || syncingContent}
             variant="contained"
             className="rounded-xl"
             sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
@@ -1276,12 +1337,21 @@ function WordPressGroupSyncPanel({ token }) {
           </Button>
           <Button
             onClick={syncEnabledMembers}
-            disabled={refreshing || syncingEnabled || syncingMembers}
+            disabled={refreshing || syncingEnabled || syncingMembers || syncingContent}
             variant="outlined"
             className="rounded-xl"
             sx={{ textTransform: "none" }}
           >
             {syncingMembers ? "Syncing Members…" : "Sync Members"}
+          </Button>
+          <Button
+            onClick={syncEnabledContent}
+            disabled={refreshing || syncingEnabled || syncingMembers || syncingContent}
+            variant="outlined"
+            className="rounded-xl"
+            sx={{ textTransform: "none" }}
+          >
+            {syncingContent ? "Importing Content…" : "Import Content"}
           </Button>
         </Stack>
 
@@ -1372,6 +1442,7 @@ function WordPressGroupSyncPanel({ token }) {
             ["Selected WP members", stats?.selected_wp_member_total],
             ["SSO linked users", stats?.wordpress_users_with_cognito_identity],
             ["No local password", stats?.wordpress_users_with_unusable_password],
+            ["WP posts imported", stats?.wordpress_group_posts_imported],
           ].map(([label, value]) => (
             <Box key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <Typography variant="caption" className="text-slate-500 block">{label}</Typography>
@@ -1407,8 +1478,10 @@ function WordPressGroupSyncPanel({ token }) {
                   <TableCell>Connect Group</TableCell>
                   <TableCell align="right">WP Members</TableCell>
                   <TableCell align="right">Synced</TableCell>
+                  <TableCell align="right">WP Posts</TableCell>
                   <TableCell align="center">Sync?</TableCell>
                   <TableCell align="center">Members</TableCell>
+                  <TableCell align="center">Content</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1440,6 +1513,7 @@ function WordPressGroupSyncPanel({ token }) {
                     </TableCell>
                     <TableCell align="right">{row.member_count ?? 0}</TableCell>
                     <TableCell align="right">{row.synced_member_count ?? 0}</TableCell>
+                    <TableCell align="right">{row.synced_post_count ?? 0}</TableCell>
                     <TableCell align="center">
                       <Switch
                         checked={!!row.sync_enabled}
@@ -1451,11 +1525,22 @@ function WordPressGroupSyncPanel({ token }) {
                       <Button
                         size="small"
                         variant="outlined"
-                        disabled={!row.sync_enabled || !row.linked_group_id || syncingMemberId === row.wp_group_id || syncingMembers}
+                        disabled={!row.sync_enabled || !row.linked_group_id || syncingMemberId === row.wp_group_id || syncingMembers || syncingContent}
                         onClick={() => syncOneMembers(row)}
                         sx={{ textTransform: "none" }}
                       >
                         {syncingMemberId === row.wp_group_id ? "Syncing…" : "Sync"}
+                      </Button>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={!row.sync_enabled || !row.linked_group_id || syncingContentId === row.wp_group_id || syncingContent || syncingMembers}
+                        onClick={() => syncOneContent(row)}
+                        sx={{ textTransform: "none" }}
+                      >
+                        {syncingContentId === row.wp_group_id ? "Importing…" : "Import"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -1472,7 +1557,7 @@ function WordPressGroupSyncPanel({ token }) {
           justifyContent="space-between"
         >
           <Typography variant="caption" className="text-slate-500">
-            Showing {showingFrom}-{showingTo} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members creates missing local users and memberships for selected groups.
+            Showing {showingFrom}-{showingTo} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members adds/updates memberships; Import Content brings WordPress group posts into Connect without deleting existing data.
           </Typography>
           <Pagination
             count={pageCount}
