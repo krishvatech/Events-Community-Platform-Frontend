@@ -167,6 +167,31 @@ function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
 
+function formatDateOnly(ts) {
+  if (!ts) return "—";
+  try {
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
+function toDateOnlyValue(ts) {
+  if (!ts) return "";
+  try {
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  } catch {
+    return "";
+  }
+}
+
 function extractCountryFromLocation(raw) {
   if (!raw) return "";
   const parts = String(raw)
@@ -2620,6 +2645,7 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
 }
 
 function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMemberRemoved }) {
+  const navigate = useNavigate();
   const [members, setMembers] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [q, setQ] = React.useState("");
@@ -2641,6 +2667,12 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
 
   const [selectedIndustries, setSelectedIndustries] = React.useState([]);
   const [selectedCompanySizes, setSelectedCompanySizes] = React.useState([]);
+  const [roleFilter, setRoleFilter] = React.useState("all");
+  const [joinedFrom, setJoinedFrom] = React.useState("");
+  const [joinedTo, setJoinedTo] = React.useState("");
+  const [sortBy, setSortBy] = React.useState("joined_desc");
+  const [memberPage, setMemberPage] = React.useState(1);
+  const [memberPageSize, setMemberPageSize] = React.useState(25);
 
   const [globalOptions, setGlobalOptions] = React.useState({
 
@@ -2744,7 +2776,6 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
   const filtered = React.useMemo(() => {
     let list = membersWithOwner;
 
-
     if (selectedRegions.length) {
       list = list.filter((m) => selectedRegions.includes(getCountryFromUser(m.user || m)));
     }
@@ -2756,28 +2787,106 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
       list = list.filter((m) => selectedCompanySizes.includes(getCompanySizeFromUser(m.user || m)));
     }
 
-    const t = q.trim().toLowerCase();
-    if (!t) return list;
+    if (roleFilter !== "all") {
+      list = list.filter((m) => {
+        const u = m.user || m;
+        const isOwner = ownerId && String(u.id) === String(ownerId);
+        const role = isOwner ? "owner" : String(m.role || "member").toLowerCase();
+        return role === roleFilter;
+      });
+    }
 
-    return list.filter((m) => {
-      const u = m.user || m;
-      const name = (u?.name || u?.full_name || u?.username || "").toLowerCase();
-      const email = (u?.email || "").toLowerCase();
-      const company = getCompanyFromUser(u).toLowerCase();
-      const title = getJobTitleFromUser(u).toLowerCase();
-      const industry = getIndustryFromUser(u).toLowerCase();
-      const location = getLocationFromUser(u).toLowerCase();
-      const hay = `${name} ${email} ${company} ${title} ${industry} ${location}`;
-      return hay.includes(t);
+    if (joinedFrom) {
+      list = list.filter((m) => {
+        const joined = toDateOnlyValue(m.joined_at);
+        return joined && joined >= joinedFrom;
+      });
+    }
+
+    if (joinedTo) {
+      list = list.filter((m) => {
+        const joined = toDateOnlyValue(m.joined_at);
+        return joined && joined <= joinedTo;
+      });
+    }
+
+    const t = q.trim().toLowerCase();
+    if (t) {
+      list = list.filter((m) => {
+        const u = m.user || m;
+        const name = (u?.name || u?.full_name || u?.username || "").toLowerCase();
+        const email = (u?.email || "").toLowerCase();
+        const company = getCompanyFromUser(u).toLowerCase();
+        const title = getJobTitleFromUser(u).toLowerCase();
+        const industry = getIndustryFromUser(u).toLowerCase();
+        const location = getLocationFromUser(u).toLowerCase();
+        const hay = `${name} ${email} ${company} ${title} ${industry} ${location}`;
+        return hay.includes(t);
+      });
+    }
+
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      const au = a.user || a;
+      const bu = b.user || b;
+      const an = (au?.name || au?.full_name || au?.username || au?.email || "").toLowerCase();
+      const bn = (bu?.name || bu?.full_name || bu?.username || bu?.email || "").toLowerCase();
+      const at = a.joined_at ? new Date(a.joined_at).getTime() : 0;
+      const bt = b.joined_at ? new Date(b.joined_at).getTime() : 0;
+
+      if (sortBy === "name_asc") return an.localeCompare(bn);
+      if (sortBy === "name_desc") return bn.localeCompare(an);
+      if (sortBy === "joined_asc") return at - bt || an.localeCompare(bn);
+      return bt - at || an.localeCompare(bn);
     });
+
+    return sorted;
   }, [
     membersWithOwner,
     q,
     selectedRegions,
-
     selectedIndustries,
     selectedCompanySizes,
+    roleFilter,
+    joinedFrom,
+    joinedTo,
+    sortBy,
+    ownerId,
   ]);
+
+  React.useEffect(() => {
+    setMemberPage(1);
+  }, [q, selectedRegions, selectedIndustries, selectedCompanySizes, roleFilter, joinedFrom, joinedTo, sortBy, memberPageSize]);
+
+  const totalFilteredMembers = filtered.length;
+  const totalMemberPages = Math.max(1, Math.ceil(totalFilteredMembers / memberPageSize));
+  const currentMemberPage = Math.min(memberPage, totalMemberPages);
+  const pageStartIndex = (currentMemberPage - 1) * memberPageSize;
+  const pagedMembers = filtered.slice(pageStartIndex, pageStartIndex + memberPageSize);
+  const showingFrom = totalFilteredMembers ? pageStartIndex + 1 : 0;
+  const showingTo = Math.min(pageStartIndex + memberPageSize, totalFilteredMembers);
+
+  const clearMemberFilters = () => {
+    setQ("");
+    setSelectedRegions([]);
+    setSelectedIndustries([]);
+    setSelectedCompanySizes([]);
+    setRoleFilter("all");
+    setJoinedFrom("");
+    setJoinedTo("");
+    setSortBy("joined_desc");
+    setMemberPage(1);
+  };
+
+  const openMemberProfile = (member) => {
+    const u = member?.user || member;
+    if (!u?.id) return;
+    if (me?.id && String(me.id) === String(u.id)) {
+      navigate("/account/profile");
+      return;
+    }
+    navigate(`/community/rich-profile/${u.id}`, { state: { user: u } });
+  };
 
   const handleMenuClick = (event, member) => {
     setAnchorEl(event.currentTarget);
@@ -3011,6 +3120,84 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
               ))}
             </TextField>
           </Stack>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <TextField
+              size="small"
+              select
+              fullWidth
+              label="Role"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              sx={{ flex: 1 }}
+            >
+              <MenuItem value="all">All roles</MenuItem>
+              <MenuItem value="owner">Owner</MenuItem>
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="moderator">Moderator</MenuItem>
+              <MenuItem value="member">Member</MenuItem>
+            </TextField>
+
+            <TextField
+              size="small"
+              fullWidth
+              type="date"
+              label="Joined from"
+              value={joinedFrom}
+              onChange={(e) => setJoinedFrom(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: 1 }}
+            />
+
+            <TextField
+              size="small"
+              fullWidth
+              type="date"
+              label="Joined to"
+              value={joinedTo}
+              onChange={(e) => setJoinedTo(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: 1 }}
+            />
+
+            <TextField
+              size="small"
+              select
+              fullWidth
+              label="Sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              sx={{ flex: 1 }}
+            >
+              <MenuItem value="joined_desc">Newest joined first</MenuItem>
+              <MenuItem value="joined_asc">Oldest joined first</MenuItem>
+              <MenuItem value="name_asc">Name A-Z</MenuItem>
+              <MenuItem value="name_desc">Name Z-A</MenuItem>
+            </TextField>
+          </Stack>
+
+          <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between" spacing={1}>
+            <Typography variant="caption" color="text.secondary">
+              Showing {showingFrom}-{showingTo} of {totalFilteredMembers} members
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TextField
+                size="small"
+                select
+                label="Rows"
+                value={memberPageSize}
+                onChange={(e) => setMemberPageSize(Number(e.target.value) || 25)}
+                sx={{ width: 110 }}
+              >
+                {[25, 50, 100].map((size) => (
+                  <MenuItem key={size} value={size}>{size}</MenuItem>
+                ))}
+              </TextField>
+              <Button size="small" variant="text" onClick={clearMemberFilters} sx={{ textTransform: "none" }}>
+                Clear filters
+              </Button>
+            </Stack>
+          </Stack>
         </Stack>
       </Paper>
 
@@ -3021,7 +3208,7 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
       )}
 
       <List>
-        {filtered.map(m => {
+        {pagedMembers.map(m => {
           const u = m.user || m;
           const isOwner = ownerId && String(u.id) === String(ownerId);
           const isSelf = String(u.id) === String(me?.id);
@@ -3029,33 +3216,77 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
           const role = isOwner ? "owner" : String(m.role || "member").toLowerCase();
 
           return (
-            <ListItem key={u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
-              <ListItemAvatar>
-                <Avatar src={toMediaUrl(u.avatar || u.user_image)} sx={{ width: 40, height: 40 }}>
-                  {(u.name || u.full_name || u.username || "U")[0]}
-                </Avatar>
-              </ListItemAvatar>
-              <ListItemText
-                primary={
-                  <Typography component="span" variant="body1">
-                    {u.name || u.full_name || u.username}
-                    {u.kyc_status === "approved" && (
-                      <VerifiedIcon
-                        sx={{
-                          fontSize: 16,
-                          color: "#22d3ee",
-                          ml: 0.5,
-                          verticalAlign: "middle",
-                        }}
-                      />
-                    )}
-                  </Typography>
-                }
-                secondary={<RoleBadge role={role} />}
-              />
+            <ListItem
+              key={u.id}
+              sx={{
+                border: "1px solid #eee",
+                borderRadius: 2,
+                mb: 1,
+                pr: showMenu ? 7 : 2,
+                alignItems: "center",
+                transition: "border-color .15s ease, box-shadow .15s ease",
+                "&:hover": {
+                  borderColor: "#99f6e4",
+                  boxShadow: "0 8px 22px rgba(15, 118, 110, 0.08)",
+                },
+              }}
+            >
+              <ListItemButton
+                onClick={() => openMemberProfile(m)}
+                sx={{ borderRadius: 2, p: 0, pr: 1 }}
+              >
+                <ListItemAvatar>
+                  <Avatar src={toMediaUrl(u.avatar || u.user_image)} sx={{ width: 40, height: 40 }}>
+                    {(u.name || u.full_name || u.username || "U")[0]}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 0.5, sm: 1 }} alignItems={{ xs: "flex-start", sm: "center" }}>
+                      <Typography component="span" variant="body1" sx={{ fontWeight: 600 }}>
+                        {u.name || u.full_name || u.username}
+                        {u.kyc_status === "approved" && (
+                          <VerifiedIcon
+                            sx={{
+                              fontSize: 16,
+                              color: "#22d3ee",
+                              ml: 0.5,
+                              verticalAlign: "middle",
+                            }}
+                          />
+                        )}
+                      </Typography>
+                      <RoleBadge role={role} />
+                    </Stack>
+                  }
+                  secondary={
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 0.25, sm: 1.5 }} sx={{ mt: 0.25 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Joined {formatDateOnly(m.joined_at)}
+                      </Typography>
+                      {getJobTitleFromUser(u) && (
+                        <Typography variant="caption" color="text.secondary">
+                          {getJobTitleFromUser(u)}
+                        </Typography>
+                      )}
+                      {getCompanyFromUser(u) && (
+                        <Typography variant="caption" color="text.secondary">
+                          {getCompanyFromUser(u)}
+                        </Typography>
+                      )}
+                    </Stack>
+                  }
+                />
+              </ListItemButton>
               {showMenu && (
                 <ListItemSecondaryAction>
-                  <IconButton edge="end" onClick={(e) => handleMenuClick(e, m)}>
+                  <IconButton
+                    edge="end"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMenuClick(e, m);
+                    }}
+                  >
                     <MoreVertRoundedIcon />
                   </IconButton>
                 </ListItemSecondaryAction>
@@ -3064,6 +3295,27 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
           );
         })}
       </List>
+
+      {totalFilteredMembers > memberPageSize && (
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems="center"
+          justifyContent="space-between"
+          spacing={1.5}
+          sx={{ mt: 1.5 }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            Showing {showingFrom}-{showingTo} of {totalFilteredMembers} members
+          </Typography>
+          <Pagination
+            count={totalMemberPages}
+            page={currentMemberPage}
+            onChange={(_, page) => setMemberPage(page)}
+            shape="rounded"
+            color="primary"
+          />
+        </Stack>
+      )}
 
       <Menu
         anchorEl={anchorEl}
