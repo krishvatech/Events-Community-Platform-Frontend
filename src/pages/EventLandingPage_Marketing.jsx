@@ -15,6 +15,24 @@ import jesuCollegeLogo from "../assets/oxford/Jesus_College_Crest_Logo.png";
 import bancorLogo from "../assets/Bancor Gray Different file format/Bancor Gray Transparent BG.png";
 import "../styles/OxfordSymposium2026.css";
 
+// Strategic partner artwork lives in assets/oxford/partners/. It is resolved through
+// import.meta.glob rather than a static import so that a partner listed below whose
+// artwork has not been committed yet degrades to "not shown" instead of failing the
+// build. Drop the file in and it appears; no other change needed.
+const partnerLogos = import.meta.glob(
+  "../assets/oxford/partners/*.{png,jpg,jpeg,svg}",
+  { eager: true, import: "default" }
+);
+
+const STRATEGIC_PARTNERS = [
+  { name: "Global Group Corp.", file: "GGCI_Logo.png", logoHeight: 80 },
+]
+  .map((partner) => ({
+    ...partner,
+    logo: partnerLogos[`../assets/oxford/partners/${partner.file}`] || null,
+  }))
+  .filter((partner) => partner.logo);
+
 // Design System
 const C = {
   deepBlue: "#284D61",
@@ -1954,21 +1972,24 @@ function About() {
             </div>
           ))}
         </div>
-        {/* Strategic Partners - Hidden for now */}
-        {/* <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${C.cool20}` }}>
-          <div style={{ textAlign: "center", marginBottom: 18 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.cool50, fontFamily: F.body }}>Strategic Partners</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 36, alignItems: "center", flexWrap: "wrap" }}>
-            {["Partner 1", "Partner 2", "Partner 3", "Partner 4"].map((n, i) => (
-              <div key={i} style={{ opacity: 0.35 }}>
-                <div style={{ width: 100, height: 32, border: `1.5px solid ${C.cool50}`, borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontSize: 8, fontWeight: 700, color: C.cool50, fontFamily: F.body, letterSpacing: "0.06em" }}>{n}</span>
+        {/* Strategic Partners */}
+        {STRATEGIC_PARTNERS.length > 0 && (
+          <div style={{ marginTop: 28, paddingTop: 24, borderTop: `1px solid ${C.cool20}` }}>
+            <div style={{ textAlign: "center", marginBottom: 18 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.cool50, fontFamily: F.body }}>Strategic Partners</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 36, alignItems: "center", flexWrap: "wrap" }}>
+              {STRATEGIC_PARTNERS.map((p) => (
+                <div key={p.name} style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+                  <div style={{ height: 96, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                    <img src={p.logo} alt={p.name} style={{ height: p.logoHeight, objectFit: "contain" }} />
+                  </div>
+                  <div style={{ fontFamily: F.display, fontSize: 14, fontWeight: 700, color: C.deepBlue }}>{p.name}</div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div> */}
+        )}
       </FadeIn>
     </Section>
   );
