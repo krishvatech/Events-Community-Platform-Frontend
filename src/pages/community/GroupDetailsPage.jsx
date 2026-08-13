@@ -1593,6 +1593,8 @@ function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deletePost, setDeletePost] = React.useState(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [postPage, setPostPage] = React.useState(1);
+  const [postPageSize, setPostPageSize] = React.useState(10);
 
   // Report state management
   const [reportOpen, setReportOpen] = React.useState(false);
@@ -1703,6 +1705,29 @@ function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
   }, [groupId, group]);
 
   React.useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  React.useEffect(() => {
+    setPostPage(1);
+  }, [groupId, postPageSize]);
+
+  React.useEffect(() => {
+    const nextTotalPages = Math.max(1, Math.ceil(posts.length / postPageSize));
+    if (postPage > nextTotalPages) {
+      setPostPage(nextTotalPages);
+    }
+  }, [posts.length, postPage, postPageSize]);
+
+  const handlePostPageChange = (_event, page) => {
+    setPostPage(page);
+    const el = document.getElementById("group-posts-list");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const handlePostPageSizeChange = (event) => {
+    setPostPageSize(Number(event.target.value) || 10);
+  };
 
   const handlePollVote = async (post, optionId) => {
     if (!optionId) return;
@@ -2077,6 +2102,7 @@ function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
       setPostLinkUrl("");
       setPollQuestion("");
       setPollOptions(["", ""]);
+      setPostPage(1);
       await fetchPosts();
       onNotify(postType === "poll" ? "Poll created successfully." : "Post created successfully.", "success");
     } catch (e) {
@@ -2099,6 +2125,11 @@ function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
   }
 
   const hasRemovedPosts = postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0);
+  const totalPostPages = Math.max(1, Math.ceil(posts.length / postPageSize));
+  const postStartIndex = (postPage - 1) * postPageSize;
+  const pagedPosts = posts.slice(postStartIndex, postStartIndex + postPageSize);
+  const showingPostsFrom = posts.length ? postStartIndex + 1 : 0;
+  const showingPostsTo = Math.min(postStartIndex + postPageSize, posts.length);
 
   return (
     <Box>
@@ -2228,7 +2259,31 @@ function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
           </Typography>
         </Paper>
       ) : (
-        posts.map(p => {
+        <Box id="group-posts-list">
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
+            spacing={1.5}
+            sx={{ mb: 2 }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              Showing {showingPostsFrom}-{showingPostsTo} of {posts.length} posts
+            </Typography>
+            <TextField
+              select
+              size="small"
+              label="Rows"
+              value={postPageSize}
+              onChange={handlePostPageSizeChange}
+              sx={{ width: 120 }}
+            >
+              {[10, 25, 50].map(size => (
+                <MenuItem key={size} value={size}>{size}</MenuItem>
+              ))}
+            </TextField>
+          </Stack>
+          {pagedPosts.map(p => {
           const isOwn = viewerId && (Number(viewerId) === Number(p.author_id || p.author?.id));
           const canEdit = canManageAny || (canMemberManageOwn && isOwn);
           const canDelete = canManageAny || (canMemberManageOwn && isOwn);
@@ -2249,7 +2304,20 @@ function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
               onNotify={onNotify}
             />
           );
-        })
+          })}
+          {totalPostPages > 1 && (
+            <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+              <Pagination
+                count={totalPostPages}
+                page={postPage}
+                onChange={handlePostPageChange}
+                color="primary"
+                showFirstButton
+                showLastButton
+              />
+            </Box>
+          )}
+        </Box>
       )}
       <ReportDialog
         open={reportOpen}

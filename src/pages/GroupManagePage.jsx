@@ -4111,6 +4111,8 @@ export default function GroupManagePage() {
     const [postsLoading, setPostsLoading] = React.useState(true);
     const [postsError, setPostsError] = React.useState("");
     const [postsMeta, setPostsMeta] = React.useState(null);
+    const [postsPage, setPostsPage] = React.useState(1);
+    const [postsRowsPerPage, setPostsRowsPerPage] = React.useState(10);
 
     // Compose state
     const [postType, setPostType] = React.useState("text"); // text | image | link | poll
@@ -4492,6 +4494,27 @@ export default function GroupManagePage() {
             setPostsLoading(false);
         }
     }, [idOrSlug, token, group?.id, group?.slug]);
+
+    const postsTotalPages = React.useMemo(
+        () => Math.max(1, Math.ceil(posts.length / postsRowsPerPage)),
+        [posts.length, postsRowsPerPage]
+    );
+
+    const paginatedPosts = React.useMemo(() => {
+        const start = (postsPage - 1) * postsRowsPerPage;
+        return posts.slice(start, start + postsRowsPerPage);
+    }, [posts, postsPage, postsRowsPerPage]);
+
+    const postsShowingFrom = posts.length ? ((postsPage - 1) * postsRowsPerPage) + 1 : 0;
+    const postsShowingTo = posts.length ? Math.min(postsPage * postsRowsPerPage, posts.length) : 0;
+
+    React.useEffect(() => {
+        setPostsPage(1);
+    }, [idOrSlug, postsRowsPerPage]);
+
+    React.useEffect(() => {
+        if (postsPage > postsTotalPages) setPostsPage(postsTotalPages);
+    }, [postsPage, postsTotalPages]);
 
 
     // Load posts only when Posts tab is active (saves calls)
@@ -6107,7 +6130,33 @@ export default function GroupManagePage() {
                                                 </Typography>
                                             ) : (
                                                 <Stack spacing={2}>
-                                                    {posts.map((p) => {
+                                                    <Stack
+                                                        direction={{ xs: "column", sm: "row" }}
+                                                        alignItems={{ xs: "stretch", sm: "center" }}
+                                                        justifyContent="space-between"
+                                                        spacing={1.5}
+                                                    >
+                                                        <Typography variant="caption" className="text-slate-500">
+                                                            Showing {postsShowingFrom}-{postsShowingTo} of {posts.length} posts
+                                                        </Typography>
+                                                        <TextField
+                                                            select
+                                                            size="small"
+                                                            label="Rows"
+                                                            value={postsRowsPerPage}
+                                                            onChange={(e) => {
+                                                                setPostsRowsPerPage(Number(e.target.value) || 10);
+                                                                setPostsPage(1);
+                                                            }}
+                                                            sx={{ width: { xs: "100%", sm: 110 } }}
+                                                        >
+                                                            {[10, 25, 50].map((size) => (
+                                                                <MenuItem key={size} value={size}>{size}</MenuItem>
+                                                            ))}
+                                                        </TextField>
+                                                    </Stack>
+
+                                                    {paginatedPosts.map((p) => {
                                                         const m = p.metadata || {};
                                                         const isRemoved = p.is_removed || (p.moderation_status === "removed") || (p.status === "removed") || (m.status === "removed") || (m.moderationStatus === "removed") || (p.moderationStatus === "removed");
 
@@ -6193,6 +6242,20 @@ export default function GroupManagePage() {
                                                             </Paper>
                                                         );
                                                     })}
+
+                                                    {postsTotalPages > 1 && (
+                                                        <Stack direction="row" justifyContent="center" sx={{ pt: 1 }}>
+                                                            <Pagination
+                                                                page={postsPage}
+                                                                count={postsTotalPages}
+                                                                onChange={(_, value) => setPostsPage(value)}
+                                                                color="primary"
+                                                                shape="rounded"
+                                                                showFirstButton
+                                                                showLastButton
+                                                            />
+                                                        </Stack>
+                                                    )}
                                                 </Stack>
                                             )}
                                         </Stack>
