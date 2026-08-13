@@ -1182,25 +1182,31 @@ function WordPressGroupSyncPanel({ token }) {
 
   const syncEnabledContent = async () => {
     const ok = window.confirm(
-      "Import WordPress group posts for ALL enabled and linked groups? This is additive and will not delete existing Connect posts."
+      "Import full WordPress group content for ALL enabled and linked groups? This imports group posts, group post comments, and group-connected forum topics/replies. It is additive and will not delete existing Connect content."
     );
     if (!ok) return;
     setSyncingContent(true);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-content/`, {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-full-content/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ dry_run: false }),
+        body: JSON.stringify({
+          dry_run: false,
+          include_members: false,
+          include_posts: true,
+          include_comments: true,
+          include_forum: true,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
       setToast({
         open: true,
         type: json.groups_failed || json.failed ? "warning" : "success",
-        msg: `Content imported. Groups ${json.groups_processed || 0}, posts imported ${json.imported || 0}, existing skipped ${json.skipped_existing || 0}${json.failed ? `, failed ${json.failed}` : ""}.`,
+        msg: `Full content imported. Groups ${json.groups_processed || 0}, posts ${json.post_imported || 0}, comments ${json.comment_imported || 0}, forum topics ${json.forum_topics_imported || 0}, forum replies ${json.forum_replies_imported || 0}${json.failed ? `, failed ${json.failed}` : ""}.`,
       });
       await loadSources();
       await loadStats();
@@ -1241,22 +1247,32 @@ function WordPressGroupSyncPanel({ token }) {
   const syncOneContent = async (row) => {
     setSyncingContentId(row.wp_group_id);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/${row.wp_group_id}/sync-content/`, {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/${row.wp_group_id}/sync-full-content/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ dry_run: false }),
+        body: JSON.stringify({
+          dry_run: false,
+          include_members: false,
+          include_posts: true,
+          include_comments: true,
+          include_forum: true,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
       setItems((prev) => prev.map((x) => x.wp_group_id === row.wp_group_id ? json : x));
-      const stats = json?.content_sync || {};
+      const result = json?.full_content_sync || {};
+      const postStats = result?.post_sync || {};
+      const commentStats = result?.comment_sync || {};
+      const forumStats = result?.forum_sync || {};
+      const failed = postStats.failed || commentStats.failed || forumStats.failed;
       setToast({
         open: true,
-        type: stats.failed ? "warning" : "success",
-        msg: `Content imported for ${json.name}. Posts imported ${stats.imported || 0}, existing skipped ${stats.skipped_existing || 0}${stats.failed ? `, failed ${stats.failed}` : ""}.`,
+        type: failed ? "warning" : "success",
+        msg: `Full content imported for ${json.name}. Posts ${postStats.imported || 0}, comments ${commentStats.comments_imported || 0}, forum topics ${forumStats.topics_imported || 0}, forum replies ${forumStats.replies_imported || 0}${failed ? `, failed ${failed}` : ""}.`,
       });
       await loadStats();
     } catch (e) {
@@ -1351,7 +1367,7 @@ function WordPressGroupSyncPanel({ token }) {
             className="rounded-xl"
             sx={{ textTransform: "none" }}
           >
-            {syncingContent ? "Importing Content…" : "Import Content"}
+            {syncingContent ? "Importing Content…" : "Import Full Content"}
           </Button>
         </Stack>
 
@@ -1540,7 +1556,7 @@ function WordPressGroupSyncPanel({ token }) {
                         onClick={() => syncOneContent(row)}
                         sx={{ textTransform: "none" }}
                       >
-                        {syncingContentId === row.wp_group_id ? "Importing…" : "Import"}
+                        {syncingContentId === row.wp_group_id ? "Importing…" : "Full Import"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -1557,7 +1573,7 @@ function WordPressGroupSyncPanel({ token }) {
           justifyContent="space-between"
         >
           <Typography variant="caption" className="text-slate-500">
-            Showing {showingFrom}-{showingTo} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members adds/updates memberships; Import Content brings WordPress group posts into Connect without deleting existing data.
+            Showing {showingFrom}-{showingTo} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members adds/updates memberships; Import Full Content brings group posts, comments, and group-connected forum topics/replies into Connect without deleting existing data.
           </Typography>
           <Pagination
             count={pageCount}
