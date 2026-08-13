@@ -1,5 +1,15 @@
 /* Oxford Symposium 2026 - Mobile Responsive Styles */
 
+/* Large tablet / small laptop (1024px) - four partner logos are too cramped
+   in one row below this width, so drop them to a 2x2 grid. Must stay ABOVE the
+   768px block: both rules match on phones and the later one has to win. */
+@media (max-width: 1024px) {
+  #partners {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 48px !important;
+  }
+}
+
 /* Tablet and below (768px) */
 @media (max-width: 768px) {
   /* Hero content (not navbar) */

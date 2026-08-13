@@ -13,6 +13,7 @@ import puntingImg from "../assets/oxford/Oxford_Punting.png";
 import bbqImg from "../assets/oxford/Oxford_BBQ_2.png";
 import jesuCollegeLogo from "../assets/oxford/Jesus_College_Crest_Logo.png";
 import bancorLogo from "../assets/Bancor Gray Different file format/Bancor Gray Transparent BG.png";
+import polskyLogo from "../assets/oxford/Polsky_logo_stacked_Color_RGB.png";
 import "../styles/OxfordSymposium2026.css";
 
 // Strategic partner artwork lives in assets/oxford/partners/. It is resolved through
@@ -1953,18 +1954,21 @@ function About() {
         <p style={{ fontFamily: F.body, fontSize: 15, lineHeight: 1.7, color: C.cool60, margin: "0 0 36px", maxWidth: 700 }}>Organised in partnership by Jesus College at Oxford University with the Institute for Mergers, Acquisitions and Alliances (IMAA) and Bancor International Limited, the Symposium brings together senior dealmakers, sovereign wealth principals, defence and technology leaders, corporate strategists, and leading international academic faculty for four days of rigorous dialogue, case discussions, and high-level peer exchange culminating in a College Dinner.</p>
       </FadeIn>
       <FadeIn delay={0.1}>
-        <div id="partners" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 60 }}>
+        <div id="partners" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 48 }}>
           {[
-            { name: "Jesus College", sub: "Oxford University", logo: jesuCollegeLogo },
+            { name: "Jesus College", sub: "Oxford University", logo: jesuCollegeLogo, logoHeight: 120 },
             { name: "IMAA", sub: "Institute for Mergers, Acquisitions & Alliances", textOnly: true },
-            { name: "Bancor International Limited", sub: "Hong Kong", logo: bancorLogo },
+            { name: "Bancor International Limited", sub: "Hong Kong", logo: bancorLogo, logoHeight: 45 },
+            { name: "POLSKY Center for Entrepreneurship and Innovation", sub: "University of Chicago", logo: polskyLogo, logoHeight: 70 },
           ].map((p, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", minWidth: 0 }}>
               <div style={{ height: 140, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                 {p.textOnly ? (
                   <div style={{ fontFamily: F.display, fontSize: 48, fontWeight: 700, color: C.deepBlue, letterSpacing: "0.05em" }}>IMAA</div>
                 ) : (
-                  <img src={p.logo} alt={p.name} style={{ height: i === 0 ? 120 : i === 2 ? 45 : 100, objectFit: "contain" }} />
+                  // maxWidth keeps wide logos (Bancor is ~5:1) inside their grid cell
+                  // instead of forcing the track wider and overflowing the section.
+                  <img src={p.logo} alt={p.name} style={{ height: p.logoHeight, maxWidth: "100%", objectFit: "contain" }} />
                 )}
               </div>
               <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.deepBlue, marginBottom: 2 }}>{p.name}</div>
