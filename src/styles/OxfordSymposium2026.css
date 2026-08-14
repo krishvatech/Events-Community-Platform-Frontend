@@ -1,124 +1,985 @@
-/* Oxford Symposium 2026 - Mobile Responsive Styles */
+/* Oxford Symposium 2026 reference layout. Scoped to this page wrapper. */
 
-/* Large tablet / small laptop (1024px) - four partner logos are too cramped
-   in one row below this width, so drop them to a 2x2 grid. Must stay ABOVE the
-   768px block: both rules match on phones and the later one has to win. */
+.ox-reference-page {
+  --ox-ivory: #f7f2ea;
+  --ox-ivory-soft: #fbf8f2;
+  --ox-ink-green: #31564a;
+  --ox-muted-green: #476a5e;
+  --ox-action-green: #66bd5a;
+  --ox-deep-shadow: rgba(7, 28, 21, 0.34);
+  background: var(--ox-ivory);
+  color: var(--ox-ink-green);
+  overflow-x: hidden;
+}
+
+.ox-reference-page *,
+.ox-reference-page *::before,
+.ox-reference-page *::after {
+  box-sizing: border-box;
+}
+
+.ox-reference-container {
+  width: min(100% - 48px, 1120px);
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.ox-reference-centered {
+  max-width: 900px;
+  text-align: center;
+}
+
+.ox-reference-section {
+  position: relative;
+  padding: 92px 0;
+}
+
+.ox-reference-section-light {
+  background: var(--ox-ivory-soft);
+}
+
+.ox-reference-kicker {
+  margin: 0 0 10px;
+  color: var(--ox-muted-green);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.ox-reference-section h2 {
+  margin: 0;
+  color: var(--ox-ink-green);
+  font-family: "Roboto Slab", Georgia, serif;
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.12;
+}
+
+.ox-reference-section p {
+  color: #6c716e;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.ox-reference-button,
+.ox-reference-pill-button,
+.ox-reference-nav-apply {
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  min-height: 42px;
+  padding: 0 24px;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  white-space: nowrap;
+}
+
+.ox-reference-button:hover,
+.ox-reference-pill-button:hover,
+.ox-reference-nav-apply:hover {
+  transform: translateY(-1px);
+}
+
+.ox-reference-button-primary,
+.ox-reference-nav-apply,
+.ox-reference-pill-button {
+  background: var(--ox-action-green);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(38, 114, 50, 0.22);
+}
+
+.ox-reference-button-light {
+  background: #ffffff;
+  color: #2b4f43;
+}
+
+.ox-reference-hero {
+  background: #17382d;
+  min-height: 720px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ox-reference-hero-bg,
+.ox-reference-section-bg {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  object-position: center 42%;
+  position: absolute;
+  width: 100%;
+}
+
+.ox-reference-hero-bg {
+  filter: saturate(0.78) contrast(1.02) blur(1px);
+  opacity: 0.5;
+  transform: scale(1.02);
+}
+
+.ox-reference-hero-overlay {
+  background:
+    linear-gradient(90deg, rgba(18, 54, 42, 0.92) 0%, rgba(24, 69, 53, 0.84) 42%, rgba(19, 57, 44, 0.76) 100%),
+    linear-gradient(180deg, rgba(14, 45, 35, 0.84) 0%, rgba(14, 45, 35, 0.56) 58%, rgba(14, 45, 35, 0.32) 100%);
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.ox-reference-nav {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 auto;
+  padding: 48px 0 18px;
+  position: relative;
+  width: min(100% - 48px, 980px);
+  z-index: 5;
+}
+
+.ox-reference-brand {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 0;
+}
+
+.ox-reference-brand img {
+  display: block;
+  filter: brightness(0) invert(1);
+  height: auto;
+  max-width: none;
+  object-fit: contain;
+  width: 154px;
+}
+
+.ox-reference-nav-links {
+  align-items: center;
+  display: flex;
+  gap: 27px;
+}
+
+.ox-reference-nav-links > button:not(.ox-reference-nav-apply) {
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 0;
+}
+
+.ox-reference-menu-button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.ox-reference-menu-button span {
+  background: #ffffff;
+  border-radius: 2px;
+  height: 2px;
+  width: 20px;
+}
+
+.ox-reference-hero-inner {
+  align-items: center;
+  display: grid;
+  gap: 52px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.8fr);
+  margin: 0 auto;
+  min-height: 500px;
+  padding: 58px 0 112px;
+  position: relative;
+  width: min(100% - 48px, 980px);
+  z-index: 2;
+}
+
+.ox-reference-hero-copy {
+  max-width: 510px;
+}
+
+.ox-reference-badge {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  color: #254f41;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+  line-height: 1;
+  margin-bottom: 31px;
+  min-height: 33px;
+  padding: 5px 15px 5px 7px;
+  white-space: nowrap;
+}
+
+.ox-reference-badge-icon {
+  align-items: center;
+  background: #315d51;
+  border-radius: 50%;
+  color: #ffffff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.ox-reference-title-lockup {
+  align-items: center;
+  color: #ffffff;
+  display: flex;
+  gap: 13px;
+  margin-bottom: 18px;
+}
+
+.ox-reference-oxford {
+  font-family: Georgia, "Roboto Slab", serif;
+  font-size: 68px;
+  font-weight: 700;
+  line-height: 0.9;
+}
+
+.ox-reference-symposium {
+  display: flex;
+  flex-direction: column;
+  font-family: "Roboto", Arial, sans-serif;
+  text-transform: uppercase;
+}
+
+.ox-reference-symposium strong {
+  font-size: 30px;
+  line-height: 0.95;
+}
+
+.ox-reference-symposium span {
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+.ox-reference-hero-description {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.42;
+  margin: 0 0 14px;
+  max-width: 500px;
+}
+
+.ox-reference-theme {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 0 0 28px;
+}
+
+.ox-reference-hero-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.ox-reference-date-panel {
+  color: #ffffff;
+  justify-self: end;
+  max-width: 390px;
+  width: 100%;
+}
+
+.ox-reference-date-top {
+  display: flex;
+  font-size: 22px;
+  font-weight: 700;
+  justify-content: space-between;
+  line-height: 1.1;
+  margin: 0 auto;
+  max-width: 295px;
+  padding: 0 0 3px;
+}
+
+.ox-reference-date-range {
+  font-size: 104px;
+  font-weight: 300;
+  letter-spacing: 0;
+  line-height: 0.9;
+  margin: 0 0 20px;
+  text-align: center;
+}
+
+.ox-reference-stat-grid {
+  display: grid;
+  gap: 14px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ox-reference-stat-card {
+  background: #fbf8f2;
+  border: 1px solid rgba(49, 86, 74, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 7px 15px rgba(8, 31, 24, 0.22);
+  color: var(--ox-ink-green);
+  min-height: 80px;
+  padding: 14px 18px 12px;
+}
+
+.ox-reference-stat-card strong {
+  display: block;
+  font-size: 39px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 0.88;
+}
+
+.ox-reference-stat-card span {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-top: 9px;
+  text-transform: uppercase;
+}
+
+.ox-reference-why {
+  padding: 126px 0 120px;
+}
+
+.ox-reference-why h2 {
+  font-size: 42px;
+  max-width: 850px;
+}
+
+.ox-reference-why p:last-child {
+  margin: 22px auto 0;
+  max-width: 640px;
+}
+
+.ox-reference-highlights {
+  background: #17382d;
+  overflow: hidden;
+}
+
+.ox-reference-highlights .ox-reference-section-bg {
+  filter: saturate(0.74) contrast(1.04);
+  opacity: 0.22;
+}
+
+.ox-reference-section-overlay {
+  background: rgba(20, 64, 49, 0.86);
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.ox-reference-section-header {
+  align-items: flex-end;
+  display: flex;
+  gap: 28px;
+  justify-content: space-between;
+  margin-bottom: 34px;
+}
+
+.ox-reference-highlights .ox-reference-kicker,
+.ox-reference-faq .ox-reference-kicker {
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.ox-reference-highlights h2,
+.ox-reference-faq h2 {
+  color: #ffffff;
+}
+
+.ox-reference-highlight-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ox-reference-highlight-card {
+  aspect-ratio: 0.68;
+  border-radius: 8px;
+  box-shadow: 0 24px 50px var(--ox-deep-shadow);
+  color: #ffffff;
+  min-height: 360px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ox-reference-highlight-card img {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  transition: transform 400ms ease;
+  width: 100%;
+}
+
+.ox-reference-highlight-card:hover img {
+  transform: scale(1.035);
+}
+
+.ox-reference-card-shade,
+.ox-reference-speaker-shade {
+  background: linear-gradient(180deg, rgba(7, 21, 17, 0.02) 25%, rgba(7, 21, 17, 0.94) 100%);
+  inset: 0;
+  position: absolute;
+}
+
+.ox-reference-highlight-card > div:last-child {
+  bottom: 0;
+  left: 0;
+  padding: 0 18px 22px;
+  position: absolute;
+  right: 0;
+  z-index: 2;
+}
+
+.ox-reference-highlight-card h3,
+.ox-reference-speaker-card h3 {
+  font-family: "Roboto Slab", Georgia, serif;
+  font-size: 18px;
+  line-height: 1.14;
+  margin: 0 0 7px;
+}
+
+.ox-reference-highlight-card p {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.ox-reference-speakers {
+  padding: 86px 0 96px;
+}
+
+.ox-reference-speaker-grid {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.ox-reference-speaker-link {
+  color: inherit;
+  display: block;
+  text-decoration: none;
+}
+
+.ox-reference-speaker-card {
+  aspect-ratio: 0.82;
+  background: #254d3f;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(31, 70, 56, 0.16);
+  color: #ffffff;
+  overflow: hidden;
+  position: relative;
+}
+
+.ox-reference-speaker-card img,
+.ox-reference-speaker-fallback {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  object-position: center top;
+  position: absolute;
+  width: 100%;
+}
+
+.ox-reference-speaker-fallback {
+  align-items: center;
+  background: linear-gradient(145deg, #2f6753, #1c3b31);
+  color: rgba(255, 255, 255, 0.82);
+  display: flex;
+  font-family: "Roboto Slab", Georgia, serif;
+  font-size: 38px;
+  font-weight: 800;
+  justify-content: center;
+}
+
+.ox-reference-speaker-meta {
+  bottom: 0;
+  left: 0;
+  padding: 0 13px 15px;
+  position: absolute;
+  right: 0;
+  text-align: center;
+  z-index: 2;
+}
+
+.ox-reference-speaker-meta h3 {
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+
+.ox-reference-speaker-meta p {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.ox-reference-partners {
+  background: #ffffff;
+  border-top: 1px solid rgba(49, 86, 74, 0.14);
+}
+
+.ox-reference-partners p {
+  margin: 16px auto 34px;
+  max-width: 690px;
+}
+
+.ox-reference-logo-grid {
+  align-items: center;
+  display: grid;
+  gap: 28px 58px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-items: center;
+  margin: 0 auto;
+  max-width: 860px;
+}
+
+.ox-reference-logo-cell {
+  align-items: center;
+  display: flex;
+  height: 88px;
+  justify-content: center;
+  max-width: 250px;
+  width: 100%;
+}
+
+.ox-reference-logo-cell img {
+  display: block;
+  max-height: 78px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.ox-reference-logo-cell.jesus-logo img {
+  max-height: 96px;
+}
+
+.ox-reference-logo-cell.imaa-logo img {
+  max-height: 58px;
+}
+
+.ox-reference-logo-cell.bancor-logo img {
+  max-height: 48px;
+}
+
+.ox-reference-logo-cell.polsky-logo img {
+  max-height: 56px;
+}
+
+.ox-reference-faq {
+  background: #254f41;
+  padding: 92px 0 104px;
+}
+
+.ox-reference-faq .ox-reference-container {
+  max-width: 940px;
+}
+
+.ox-reference-faq-intro {
+  color: rgba(255, 255, 255, 0.74) !important;
+  margin: 16px 0 34px;
+  max-width: 720px;
+}
+
+.ox-reference-faq-list {
+  display: grid;
+  gap: 22px;
+}
+
+.ox-reference-faq-item {
+  background: #fbf8f2;
+  border-radius: 8px;
+  color: #2e5146;
+  overflow: hidden;
+}
+
+.ox-reference-faq-item button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 0 22px;
+  text-align: left;
+  width: 100%;
+}
+
+.ox-reference-faq-item svg {
+  flex: 0 0 auto;
+  transition: transform 180ms ease;
+}
+
+.ox-reference-faq-item.is-open svg {
+  transform: rotate(180deg);
+}
+
+.ox-reference-faq-answer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms ease;
+}
+
+.ox-reference-faq-item.is-open .ox-reference-faq-answer {
+  grid-template-rows: 1fr;
+}
+
+.ox-reference-faq-answer > p {
+  color: #5d6862;
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 22px;
+}
+
+.ox-reference-faq-item.is-open .ox-reference-faq-answer > p {
+  padding-bottom: 20px;
+}
+
+.ox-reference-cta {
+  padding: 96px 0 98px;
+}
+
+.ox-reference-cta p {
+  margin: 18px auto 30px;
+}
+
+.ox-reference-footer {
+  background: #254f41;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 34px 0;
+}
+
+.ox-reference-footer span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
 @media (max-width: 1024px) {
-  #partners {
+  .ox-public-page #partners {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 48px !important;
   }
+
+  .ox-reference-hero-inner {
+    gap: 42px;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 0.78fr);
+  }
+
+  .ox-reference-oxford {
+    font-size: 62px;
+  }
+
+  .ox-reference-date-range {
+    font-size: 86px;
+  }
+
+  .ox-reference-highlight-grid,
+  .ox-reference-speaker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ox-reference-highlight-card {
+    aspect-ratio: 0.92;
+  }
 }
 
-/* Tablet and below (768px) */
 @media (max-width: 768px) {
-  /* Hero content (not navbar) */
-  section:first-child > div:nth-child(2) {
+  .ox-public-page section:first-child > div:nth-child(2) {
     padding: 32px 20px 48px !important;
   }
 
-  section:first-child > div:nth-child(2) > div {
+  .ox-public-page section:first-child > div:nth-child(2) > div {
     grid-template-columns: 1fr !important;
     gap: 24px !important;
   }
 
-  section:first-child h1 {
+  .ox-public-page section:first-child h1 {
     font-size: 28px !important;
   }
 
-  /* All sections padding */
-  section > div {
+  .ox-public-page section > div {
     padding: 0 20px !important;
   }
 
-  /* Section titles */
-  h2 {
+  .ox-public-page h2 {
     font-size: 26px !important;
   }
 
-  h3 {
+  .ox-public-page h3 {
     font-size: 24px !important;
   }
 
-  /* Speakers carousel */
-  #speakers > div {
+  .ox-public-page #speakers > div {
     padding: 0 20px !important;
   }
 
-  /* More Than Sessions buttons - stack vertically */
-  #experience > div:first-child {
+  .ox-public-page #experience > div:first-child {
     grid-template-columns: 1fr !important;
   }
 
-  /* Evening cards - keep 4 columns on tablet */
-  #evenings {
+  .ox-public-page #evenings {
     gap: 12px !important;
   }
 
-  #evenings > div {
+  .ox-public-page #evenings > div {
     min-height: 320px !important;
   }
 
-  /* Programme schedule - keep responsive on tablet */
-
-  /* About partners - stack vertically on mobile */
-  #partners {
+  .ox-public-page #partners {
     grid-template-columns: 1fr !important;
     gap: 40px !important;
   }
 
-  /* CTA section */
-  #apply > div {
+  .ox-public-page #apply > div {
     padding: 0 20px !important;
   }
 
-  #apply h2,
-  #apply h3 {
+  .ox-public-page #apply h2,
+  .ox-public-page #apply h3 {
     font-size: 28px !important;
   }
 
-  /* Footer */
-  footer > div {
+  .ox-public-page footer > div {
     padding: 0 20px !important;
   }
+
+  .ox-reference-container,
+  .ox-reference-nav,
+  .ox-reference-hero-inner {
+    width: min(100% - 32px, 1120px);
+  }
+
+  .ox-reference-section {
+    padding: 72px 0;
+  }
+
+  .ox-reference-nav {
+    padding-top: 24px;
+  }
+
+  .ox-reference-brand img {
+    width: 154px;
+  }
+
+  .ox-reference-menu-button {
+    display: flex;
+  }
+
+  .ox-reference-nav-links {
+    align-items: stretch;
+    background: rgba(20, 64, 49, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    box-shadow: 0 20px 40px rgba(7, 28, 21, 0.3);
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    position: absolute;
+    right: 0;
+    top: 76px;
+    width: min(280px, calc(100vw - 32px));
+  }
+
+  .ox-reference-nav-links.is-open {
+    display: flex;
+  }
+
+  .ox-reference-nav-links > button:not(.ox-reference-nav-apply) {
+    min-height: 42px;
+    padding: 0 10px;
+    text-align: left;
+  }
+
+  .ox-reference-hero {
+    min-height: 0;
+  }
+
+  .ox-reference-hero-inner {
+    gap: 36px;
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding: 48px 0 122px;
+  }
+
+  .ox-reference-date-panel {
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .ox-reference-title-lockup {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ox-reference-oxford {
+    font-size: 54px;
+  }
+
+  .ox-reference-symposium strong {
+    font-size: 26px;
+  }
+
+  .ox-reference-symposium span {
+    font-size: 22px;
+  }
+
+  .ox-reference-hero-description {
+    font-size: 16px;
+  }
+
+  .ox-reference-date-top {
+    font-size: 20px;
+    max-width: 270px;
+  }
+
+  .ox-reference-date-range {
+    font-size: 84px;
+  }
+
+  .ox-reference-section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ox-reference-section h2,
+  .ox-reference-why h2 {
+    font-size: 30px;
+  }
+
+  .ox-reference-why {
+    padding: 84px 0;
+  }
+
+  .ox-reference-logo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-/* Mobile phones (640px and below) - 2 column scrollable */
 @media (max-width: 640px) {
-  /* Evening cards - 2 column scrollable */
-  #evenings {
+  .ox-public-page #evenings {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* Programme schedule - 2 column scrollable */
-  #programme > div {
+  .ox-public-page #programme > div {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
-/* Small mobile (480px and below) - single column */
 @media (max-width: 480px) {
-  /* Evening cards - single column */
-  #evenings {
+  .ox-public-page #evenings {
     grid-template-columns: 1fr !important;
   }
 
-  /* Programme schedule - single column */
-  #programme > div {
+  .ox-public-page #programme > div {
     grid-template-columns: 1fr !important;
   }
 
-  /* Hero title */
-  section:first-child h1 {
+  .ox-public-page section:first-child h1 {
     font-size: 24px !important;
   }
 
-  /* Section titles */
-  h2 {
+  .ox-public-page h2 {
     font-size: 22px !important;
   }
 
-  h3 {
+  .ox-public-page h3 {
     font-size: 20px !important;
+  }
+
+  .ox-reference-container,
+  .ox-reference-nav,
+  .ox-reference-hero-inner {
+    width: min(100% - 28px, 1120px);
+  }
+
+  .ox-reference-brand img {
+    width: 134px;
+  }
+
+  .ox-reference-oxford {
+    font-size: 46px;
+  }
+
+  .ox-reference-date-range {
+    font-size: 62px;
+  }
+
+  .ox-reference-date-top {
+    font-size: 18px;
+    max-width: 225px;
+  }
+
+  .ox-reference-stat-card {
+    min-height: 76px;
+    padding: 14px 18px 12px;
+  }
+
+  .ox-reference-stat-card strong {
+    font-size: 34px;
+  }
+
+  .ox-reference-stat-grid,
+  .ox-reference-highlight-grid,
+  .ox-reference-speaker-grid,
+  .ox-reference-logo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ox-reference-highlight-card {
+    aspect-ratio: 0.78;
+  }
+
+  .ox-reference-speaker-card {
+    aspect-ratio: 0.72;
+  }
+
+  .ox-reference-hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ox-reference-button {
+    width: 100%;
+  }
+
+  .ox-reference-section h2,
+  .ox-reference-why h2 {
+    font-size: 27px;
   }
 }

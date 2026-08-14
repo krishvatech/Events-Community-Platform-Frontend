@@ -196,6 +196,7 @@ const AppShell = () => {
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/") ||
     location.pathname.startsWith("/public/") ||
+    location.pathname.startsWith("/staging/") ||
     isCompanionPage ||
     isSingleEventPage;
 
@@ -291,6 +292,8 @@ const AppShell = () => {
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
+          {/* Design preview (IPDT-749) - same page, green theme */}
+          <Route path="/staging/:slug" element={<EventLandingPage_Marketing theme="green" />} />
           <Route path="/landing/:slug" element={<SingleEventMarketingPage />} />
           <Route path="/series/:slug" element={<PublicSeriesLanding />} />
           <Route path="/events/:slug/companion" element={<EventCompanionAccessPage />} />

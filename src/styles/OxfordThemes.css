@@ -1,0 +1,67 @@
+/* Oxford Symposium 2026 - colour tokens.
+ *
+ * The landing page renders one set of components; only these tokens change
+ * between the live page and the /staging design preview (IPDT-749).
+ *
+ * Blue is the default and is declared on :root so any content rendered in a
+ * portal (MUI modals/snackbars mount on document.body, outside the page
+ * wrapper) still resolves every variable.
+ *
+ * The green values are hue-shifted from the blue ones with lightness preserved,
+ * so every text/background contrast pair carries over unchanged.
+ */
+
+:root {
+  --ox-deepBlue: #284D61;
+  --ox-midBlue: #37738D;
+  --ox-brightBlue: #159AC9;
+  --ox-lightBlue: #B9CED7;
+  --ox-bgBlue1: #D7E3E8;
+  --ox-bgBlue2: #E6EDF0;
+  --ox-cool10: #F0F4F5;
+  --ox-cool20: #D9DFE1;
+  --ox-cool30: #C7CDD0;
+  --ox-cool50: #93A6B0;
+  --ox-cool60: #5E7A88;
+  --ox-cool80: #3A4853;
+  --ox-cool90: #292F39;
+  --ox-cool100: #21262E;
+  --ox-coral: #F05843;
+  --ox-green: #76B82A;
+  --ox-yellow: #FED746;
+  --ox-white: #FFFFFF;
+  --ox-oxfordGold: #C9A84C;
+
+  /* Translucent variants. These exist because a few styles append a two-digit
+     hex alpha to the colour, which is not possible with a var() reference. */
+  --ox-midBlue-40: #37738D40;
+  --ox-oxfordGold-22: #C9A84C22;
+  --ox-brightBlue-10: #159AC910;
+
+  /* Channel list for gradients that need a variable alpha via rgba() */
+  --ox-deepBlue-rgb: 40, 77, 97;
+}
+
+/* /staging design preview - green theme */
+.ox-theme-green {
+  --ox-deepBlue: #286149;
+  --ox-midBlue: #378D69;
+  --ox-brightBlue: #45A83F;
+  --ox-lightBlue: #B9D7CB;
+  --ox-bgBlue1: #D7E8E1;
+  --ox-bgBlue2: #E6F0EC;
+  --ox-cool10: #F0F5F3;
+  --ox-cool20: #D9E1DE;
+  --ox-cool30: #C7D0CC;
+  --ox-cool50: #93B0A4;
+  --ox-cool60: #5E8877;
+  --ox-cool80: #3A5349;
+  --ox-cool90: #293932;
+  --ox-cool100: #212E29;
+
+  --ox-midBlue-40: #378D6940;
+  --ox-oxfordGold-22: #C9A84C22;
+  --ox-brightBlue-10: #45A83F10;
+
+  --ox-deepBlue-rgb: 40, 97, 73;
+}

@@ -12,6 +12,7 @@ import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
 import puntingImg from "../assets/oxford/Oxford_Punting.png";
 import bbqImg from "../assets/oxford/Oxford_BBQ_2.png";
 import jesuCollegeLogo from "../assets/oxford/Jesus_College_Crest_Logo.png";
+import imaaLogo from "../assets/oxford/IMAA_Logo.svg";
 import bancorLogo from "../assets/Bancor Gray Different file format/Bancor Gray Transparent BG.png";
 import polskyLogo from "../assets/oxford/Polsky_logo_stacked_Color_RGB.png";
 import "../styles/OxfordSymposium2026.css";
@@ -2098,8 +2099,569 @@ function Footer() {
   );
 }
 
+const oxfordFallbackDescription =
+  "The Oxford M&A Symposium brings together senior practitioners for a compact day of market insight, practical dealmaking conversations, and high-quality networking across founders, acquirers, investors, lenders, lawyers, and advisors.";
+
+const oxfordHeroDescription =
+  "A focused gathering for M&A practitioners, investors, founders, advisors, and corporate leaders shaping the next cycle of strategic growth.";
+
+const oxfordThemeFallback = "Sustainable Value Creation in Times of Uncertainty";
+
+function toAbsoluteMediaUrl(value) {
+  if (!value || typeof value !== "string") return "";
+  if (/^(https?:|data:|blob:)/i.test(value)) return value;
+  if (value.startsWith("/src/") || value.startsWith("/assets/")) return value;
+  const apiBase = import.meta.env.VITE_API_BASE_URL || "";
+  const apiOrigin = apiBase.replace(/\/api\/?$/, "");
+  return `${apiOrigin}${value}`;
+}
+
+function scrollToOxfordSection(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function getOxfordDate(eventData = {}) {
+  if (eventData?.slug === "the-oxford-m-a-symposium-2026") {
+    return { month: "September", range: "14–17", year: "2026", days: 4 };
+  }
+
+  if (!eventData?.start_time) {
+    return { month: "September", range: "14–17", year: "2026", days: 4 };
+  }
+
+  const timeZone = eventData.timezone || "UTC";
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const numericFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const partsFor = (value) => {
+    const result = {};
+    formatter.formatToParts(new Date(value)).forEach(({ type, value: partValue }) => {
+      result[type] = partValue;
+    });
+    return result;
+  };
+  const numericPartsFor = (value) => {
+    const result = {};
+    numericFormatter.formatToParts(new Date(value)).forEach(({ type, value: partValue }) => {
+      result[type] = Number(partValue);
+    });
+    return result;
+  };
+
+  const start = partsFor(eventData.start_time);
+  const end = partsFor(eventData.end_time || eventData.start_time);
+  const startNumeric = numericPartsFor(eventData.start_time);
+  const endNumeric = numericPartsFor(eventData.end_time || eventData.start_time);
+  const startDayUtc = Date.UTC(startNumeric.year, startNumeric.month - 1, startNumeric.day);
+  const endDayUtc = Date.UTC(endNumeric.year, endNumeric.month - 1, endNumeric.day);
+  const days = Math.max(1, Math.round((endDayUtc - startDayUtc) / 86400000) + 1);
+
+  return {
+    month: start.month || "September",
+    range: start.day === end.day ? start.day : `${start.day}–${end.day}`,
+    year: start.year || end.year || "2026",
+    days,
+  };
+}
+
+function getOxfordStats(eventData = {}) {
+  const sessionTotal = [
+    eventData.main_sessions_count,
+    eventData.breakout_sessions_count,
+    eventData.workshops_count,
+    eventData.networking_count,
+  ]
+    .map((value) => Number(value) || 0)
+    .reduce((sum, value) => sum + value, 0);
+  const sessionsFromArray = Array.isArray(eventData.sessions) ? eventData.sessions.length : 0;
+  const speakerTotal = Number(eventData.featured_participants_total || eventData.featured_participants?.length || 0);
+  const delegates = Number(eventData.capacity || eventData.max_attendees || eventData.attendee_limit || 0);
+  const date = getOxfordDate(eventData);
+
+  return [
+    { value: delegates > 0 ? `${delegates}+` : "250+", label: "Delegates" },
+    { value: speakerTotal > 0 ? `${Math.max(speakerTotal, 15)}+` : "15+", label: "Speakers" },
+    { value: date.days || 4, label: "Days" },
+    { value: sessionTotal > 0 ? `${sessionTotal}+` : sessionsFromArray > 0 ? `${sessionsFromArray}+` : "XX+", label: "Sessions" },
+  ];
+}
+
+function getOxfordEventCopy(eventData = {}) {
+  const rawDescription = (eventData.description || "").trim();
+  const slugLikeDescription =
+    rawDescription === eventData.slug ||
+    rawDescription === "the-oxford-m-a-symposium-2026" ||
+    /^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(rawDescription);
+  return {
+    title: eventData.title || "The Oxford M&A Symposium 2026",
+    description: rawDescription && !slugLikeDescription ? rawDescription : oxfordFallbackDescription,
+    theme: eventData.theme || eventData.subtitle || oxfordThemeFallback,
+    badge:
+      eventData.registration_type === "open"
+        ? "Open Registration"
+        : "By invitation & application only",
+  };
+}
+
+function getOxfordHighlights(eventData = {}) {
+  const sessionItems = Array.isArray(eventData.sessions)
+    ? eventData.sessions.filter(Boolean).slice(0, 4).map((session, index) => ({
+        title: session.title || session.name || `Session ${index + 1}`,
+        desc: session.description || session.summary || session.abstract || "Programme details will be announced soon.",
+        img: toAbsoluteMediaUrl(session.image || session.cover_image || session.preview_image) || [receptionImg, dinnerImg, puntingImg, bbqImg][index % 4],
+      }))
+    : [];
+
+  if (sessionItems.length) return sessionItems;
+
+  return [
+    {
+      title: "Welcome Reception",
+      desc: "A reception to close the first day. Informal, unhurried, and shaped by the inspiration that the first day's sessions have set in motion.",
+      img: receptionImg,
+    },
+    {
+      title: "College Dinner",
+      desc: "A black-tie dinner in the Great Hall of Jesus College, conducted in the Oxford tradition.",
+      img: dinnerImg,
+    },
+    {
+      title: "Punting",
+      desc: "An optional early evening on the Cherwell by punt. No prior punting ability required. Quintessentially Oxford.",
+      img: puntingImg,
+    },
+    {
+      title: "BBQ Dinner",
+      desc: "The final evening. By Thursday, the programme ends. The conversations do not.",
+      img: bbqImg,
+    },
+  ];
+}
+
+function getOxfordSpeakers(eventData = {}) {
+  if (!Array.isArray(eventData.featured_participants)) return [];
+  return eventData.featured_participants.map((participant) => {
+    const professionalInfo =
+      participant.professional_info?.split("\n")[0] ||
+      participant.job_title ||
+      participant.company ||
+      participant.participant_type_label ||
+      "";
+    const initials =
+      participant.display_name
+        ?.split(" ")
+        .slice(0, 2)
+        .map((word) => word[0])
+        .join("")
+        .toUpperCase() || "?";
+
+    return {
+      name: participant.display_name || "Participant",
+      role: participant.role_label || professionalInfo,
+      org: professionalInfo,
+      initials,
+      image: toAbsoluteMediaUrl(participant.avatar_url || participant.image || participant.photo_url),
+      profileUrl: participant.is_profile_clickable ? participant.profile_url : "",
+    };
+  });
+}
+
+function getOxfordFaqs(eventData = {}) {
+  const apiFaqs = eventData.faqs || eventData.faq || eventData.frequently_asked_questions;
+  if (Array.isArray(apiFaqs) && apiFaqs.length) {
+    return apiFaqs.map((item, index) => ({
+      q: item.question || item.title || `Question ${index + 1}`,
+      a: item.answer || item.content || item.description || "",
+    }));
+  }
+
+  return [
+    {
+      q: "What is Oxford M&A Symposium 2026?",
+      a: "A focused gathering for M&A practitioners, investors, founders, advisors, and corporate leaders shaping the next cycle of strategic growth.",
+    },
+    {
+      q: "When and Where is Oxford M&A Symposium 2026?",
+      a: "The Symposium is currently planned for September 14-17, 2026, in Oxford.",
+    },
+    {
+      q: "How do I apply?",
+      a: "Use the Apply button on this page. Attendance is by application or invitation, and places are allocated to preserve a senior, relevant exchange.",
+    },
+  ];
+}
+
+function OxfordApplyAction({ onApplyClick, onJoinClick, eventData, myApplication, className = "", children = "Apply" }) {
+  if (!myApplication || myApplication.status === "none") {
+    return (
+      <button type="button" className={className || "ox-reference-button ox-reference-button-primary"} onClick={onApplyClick}>
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <ApplyStatusDisplay
+      status={myApplication.status}
+      eventData={eventData}
+      onJoinClick={onJoinClick}
+      buttonSize="large"
+      style={{ borderRadius: 999 }}
+    />
+  );
+}
+
+function OxfordHeroReference({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const copy = getOxfordEventCopy(eventData);
+  const date = getOxfordDate(eventData);
+  const stats = getOxfordStats(eventData);
+  const heroImage = heroImg;
+  const navItems = [
+    { label: "Home", id: "oxford-hero" },
+    { label: "About", id: "why-attend" },
+    { label: "Partners", id: "partners" },
+    { label: "Agenda", id: "event-highlights" },
+    { label: "Speakers", id: "speakers" },
+  ];
+
+  return (
+    <>
+      {eventData && (
+        <Helmet>
+          <title>{copy.title}</title>
+          <meta property="og:title" content={copy.title} />
+          <meta property="og:description" content={copy.description.slice(0, 160)} />
+          <meta property="og:image" content={heroImage} />
+          <meta property="og:url" content={window.location.href} />
+          <meta property="og:type" content="website" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={copy.title} />
+          <meta name="twitter:image" content={heroImage} />
+        </Helmet>
+      )}
+      <section id="oxford-hero" className="ox-reference-hero">
+        <img className="ox-reference-hero-bg" src={heroImage} alt="" aria-hidden="true" />
+        <div className="ox-reference-hero-overlay" />
+        <nav className="ox-reference-nav" aria-label="Oxford Symposium navigation">
+          <button type="button" className="ox-reference-brand" onClick={() => scrollToOxfordSection("oxford-hero")}>
+            <img src={imaaLogo} alt="IMAA" />
+          </button>
+          <button
+            type="button"
+            className="ox-reference-menu-button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="oxford-mobile-menu"
+            aria-label="Toggle navigation"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <div id="oxford-mobile-menu" className={`ox-reference-nav-links ${mobileMenuOpen ? "is-open" : ""}`}>
+            {navItems.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                onClick={() => {
+                  scrollToOxfordSection(item.id);
+                  setMobileMenuOpen(false);
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+            <OxfordApplyAction
+              onApplyClick={() => {
+                onApplyClick();
+                setMobileMenuOpen(false);
+              }}
+              onJoinClick={onJoinClick}
+              eventData={eventData}
+              myApplication={myApplication}
+              className="ox-reference-nav-apply"
+            />
+          </div>
+        </nav>
+
+        <div className="ox-reference-hero-inner">
+          <div className="ox-reference-hero-copy">
+            <div className="ox-reference-badge">
+              <span className="ox-reference-badge-icon" aria-hidden="true">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3.25 14.18 5.1l2.86-.12.66 2.78 2.28 1.72-1.08 2.65 1.08 2.65-2.28 1.72-.66 2.78-2.86-.12L12 20.75l-2.18-1.85-2.86.12-.66-2.78-2.28-1.72 1.08-2.65-1.08-2.65L6.3 7.5l.66-2.78 2.86.12L12 3.25Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                  <path d="m8.7 12 2.05 2.05 4.55-4.55" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              {copy.badge}
+            </div>
+            <div className="ox-reference-title-lockup" aria-label={copy.title}>
+              <span className="ox-reference-oxford">Oxford</span>
+              <span className="ox-reference-symposium">
+                <strong>M&amp;A</strong>
+                <span>Symposium</span>
+              </span>
+            </div>
+            <p className="ox-reference-hero-description">{oxfordHeroDescription}</p>
+            {copy.theme && <p className="ox-reference-theme">"{copy.theme}"</p>}
+            <div className="ox-reference-hero-actions">
+              <OxfordApplyAction
+                onApplyClick={onApplyClick}
+                onJoinClick={onJoinClick}
+                eventData={eventData}
+                myApplication={myApplication}
+              />
+              <button type="button" className="ox-reference-button ox-reference-button-light" onClick={() => scrollToOxfordSection("event-highlights")}>
+                View Agenda
+              </button>
+            </div>
+          </div>
+
+          <aside className="ox-reference-date-panel" aria-label="Event dates and details">
+            <div className="ox-reference-date-top">
+              <span>{date.month}</span>
+              <span>{date.year}</span>
+            </div>
+            <div className="ox-reference-date-range">{date.range}</div>
+            <div className="ox-reference-stat-grid">
+              {stats.map((stat) => (
+                <div key={stat.label} className="ox-reference-stat-card">
+                  <strong>{stat.value}</strong>
+                  <span>{stat.label}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
+
+      </section>
+    </>
+  );
+}
+
+function OxfordWhyAttend({ eventData = {} }) {
+  const copy = getOxfordEventCopy(eventData);
+
+  return (
+    <section id="why-attend" className="ox-reference-section ox-reference-section-light ox-reference-why">
+      <div className="ox-reference-container ox-reference-centered">
+        <p className="ox-reference-kicker">Why Attend</p>
+        <h2>Connecting Oxford's M&amp;A, private capital and corporate growth community</h2>
+        <p>{copy.description}</p>
+      </div>
+    </section>
+  );
+}
+
+function OxfordHighlightsReference({ eventData = {} }) {
+  const highlights = getOxfordHighlights(eventData);
+
+  return (
+    <section id="event-highlights" className="ox-reference-section ox-reference-highlights">
+      <img className="ox-reference-section-bg" src={heroImg} alt="" aria-hidden="true" />
+      <div className="ox-reference-section-overlay" />
+      <div className="ox-reference-container">
+        <div className="ox-reference-section-header">
+          <div>
+            <p className="ox-reference-kicker">What's Happening</p>
+            <h2>2026 Event Highlights</h2>
+          </div>
+          <button type="button" className="ox-reference-pill-button" onClick={() => scrollToOxfordSection("event-highlights")}>
+            View Full Agenda
+          </button>
+        </div>
+        <div className="ox-reference-highlight-grid">
+          {highlights.map((item) => (
+            <article className="ox-reference-highlight-card" key={item.title}>
+              <img src={item.img} alt={item.title} />
+              <div className="ox-reference-card-shade" />
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OxfordSpeakersReference({ eventData = {} }) {
+  const [showAllSpeakers, setShowAllSpeakers] = useState(false);
+  const isBelowDesktop = useIsMobile(1025);
+  const isSmallMobile = useIsMobile(481);
+  const speakers = getOxfordSpeakers(eventData);
+  if (!speakers.length) return null;
+
+  const initialSpeakerCount = isSmallMobile ? 2 : isBelowDesktop ? 4 : 10;
+  const canExpandSpeakers = speakers.length > initialSpeakerCount;
+  const visibleSpeakers = showAllSpeakers ? speakers : speakers.slice(0, initialSpeakerCount);
+
+  return (
+    <section id="speakers" className="ox-reference-section ox-reference-section-light ox-reference-speakers">
+      <div className="ox-reference-container">
+        <div className="ox-reference-section-header">
+          <div>
+            <p className="ox-reference-kicker">Featured Speakers</p>
+            <h2>Learn from the best</h2>
+          </div>
+          {canExpandSpeakers && (
+            <button type="button" className="ox-reference-pill-button" onClick={() => setShowAllSpeakers((current) => !current)}>
+              {showAllSpeakers ? "Show Fewer" : "View All Speakers"}
+            </button>
+          )}
+        </div>
+        <div className="ox-reference-speaker-grid">
+          {visibleSpeakers.map((speaker, index) => {
+            const card = (
+              <article className="ox-reference-speaker-card">
+                {speaker.image ? (
+                  <img src={speaker.image} alt={speaker.name} />
+                ) : (
+                  <div className="ox-reference-speaker-fallback" aria-hidden="true">{speaker.initials}</div>
+                )}
+                <div className="ox-reference-speaker-shade" />
+                <div className="ox-reference-speaker-meta">
+                  <h3>{speaker.name}</h3>
+                  {(speaker.org || speaker.role) && <p>{speaker.org || speaker.role}</p>}
+                </div>
+              </article>
+            );
+
+            return speaker.profileUrl ? (
+              <a className="ox-reference-speaker-link" href={speaker.profileUrl} key={`${speaker.name}-${index}`}>
+                {card}
+              </a>
+            ) : (
+              <div key={`${speaker.name}-${index}`}>{card}</div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OxfordPartnersReference() {
+  const partners = [
+    { name: "Jesus College Oxford", logo: jesuCollegeLogo, className: "jesus-logo" },
+    { name: "IMAA Institute for Mergers, Acquisitions & Alliances", logo: imaaLogo, className: "imaa-logo" },
+    { name: "Bancor International Limited", logo: bancorLogo, className: "bancor-logo" },
+    { name: "Polsky Center for Entrepreneurship and Innovation", logo: polskyLogo, className: "polsky-logo" },
+    ...STRATEGIC_PARTNERS.map((partner) => ({ name: partner.name, logo: partner.logo, className: "strategic-logo" })),
+  ].filter((partner) => partner.logo);
+
+  return (
+    <section id="partners" className="ox-reference-section ox-reference-partners">
+      <div className="ox-reference-container ox-reference-centered">
+        <p className="ox-reference-kicker">About the Symposium</p>
+        <h2>Organised in Partnership</h2>
+        <p>
+          The Oxford M&amp;A Symposium brings together senior practitioners for a compact day of market insight, practical dealmaking conversations, and high-quality networking across founders, acquirers, investors, lenders, lawyers, and advisors.
+        </p>
+        <div className="ox-reference-logo-grid">
+          {partners.map((partner) => (
+            <div className={`ox-reference-logo-cell ${partner.className}`} key={partner.name}>
+              <img src={partner.logo} alt={partner.name} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OxfordFAQReference({ eventData = {} }) {
+  const [openIndex, setOpenIndex] = useState(0);
+  const faqs = getOxfordFaqs(eventData);
+
+  return (
+    <section id="faq" className="ox-reference-section ox-reference-faq">
+      <div className="ox-reference-container">
+        <p className="ox-reference-kicker">Questions</p>
+        <h2>Frequently Asked Questions</h2>
+        <p className="ox-reference-faq-intro">
+          This FAQ is for anyone interested in attending, partnering, or supporting Oxford M&amp;A Symposium. For any additional questions, please contact email.
+        </p>
+        <div className="ox-reference-faq-list">
+          {faqs.map((item, index) => {
+            const isOpen = openIndex === index;
+            const answerId = `oxford-faq-answer-${index}`;
+            return (
+              <div className={`ox-reference-faq-item ${isOpen ? "is-open" : ""}`} key={item.q}>
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-controls={answerId}
+                  onClick={() => setOpenIndex(isOpen ? -1 : index)}
+                >
+                  <span>{item.q}</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <div id={answerId} className="ox-reference-faq-answer">
+                  <p>{item.a}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OxfordInvitationCTAReference({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
+  return (
+    <section id="apply" className="ox-reference-section ox-reference-section-light ox-reference-cta">
+      <div className="ox-reference-container ox-reference-centered">
+        <p className="ox-reference-kicker">The Oxford M&amp;A Symposium</p>
+        <h2>Request an Invitation</h2>
+        <p>
+          Attendance is by application only.
+          <br />
+          Places are allocated to ensure the calibre of exchange that defines the Symposium.
+        </p>
+        <OxfordApplyAction
+          onApplyClick={onApplyClick}
+          onJoinClick={onJoinClick}
+          eventData={eventData}
+          myApplication={myApplication}
+        />
+      </div>
+    </section>
+  );
+}
+
+function OxfordFooterReference() {
+  return (
+    <footer className="ox-reference-footer">
+      <div className="ox-reference-container">
+        <span>© 2026 Oxford M&amp;A Symposium</span>
+      </div>
+    </footer>
+  );
+}
+
 // MAIN COMPONENT
-export default function OxfordSymposium2026() {
+/**
+ * @param {object} props
+ * @param {"blue"|"green"} [props.theme] Colour palette. "green" is the /staging
+ *   design preview; everything else about the page is identical.
+ */
+export default function OxfordSymposium2026({ theme = "blue" }) {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [applyOpen, setApplyOpen] = useState(false);
@@ -2259,18 +2821,38 @@ export default function OxfordSymposium2026() {
     // Guest token is now handled by GuestApplyModal with OTP verification
   };
 
-  return (
-    <div style={{ fontFamily: F.body, WebkitFontSmoothing: "antialiased" }}>
-      <Hero onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
-      <PositioningStatement />
-      <Speakers eventData={eventData} />
-      <Themes />
-      <MoreThanSessions />
-      <OxfordExperience eventData={eventData} />
-      <Programme eventData={eventData} />
-      <About />
-      <FinalCTA onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
-      <Footer />
+  const isStagingPreview = theme === "green";
+
+	  return (
+	    <div
+	      className={isStagingPreview ? "ox-reference-page ox-theme-green" : "ox-public-page"}
+	      style={{ fontFamily: F.body, WebkitFontSmoothing: "antialiased" }}
+	    >
+      {isStagingPreview ? (
+        <>
+          <OxfordHeroReference onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
+          <OxfordWhyAttend eventData={eventData} />
+          <OxfordHighlightsReference eventData={eventData} />
+          <OxfordSpeakersReference eventData={eventData} />
+          <OxfordPartnersReference />
+          <OxfordFAQReference eventData={eventData} />
+          <OxfordInvitationCTAReference onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
+          <OxfordFooterReference />
+        </>
+      ) : (
+        <>
+          <Hero onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
+          <PositioningStatement />
+          <Speakers eventData={eventData} />
+          <Themes />
+          <MoreThanSessions />
+          <OxfordExperience eventData={eventData} />
+          <Programme eventData={eventData} />
+          <About />
+          <FinalCTA onApplyClick={handleApplyClick} onJoinClick={handleJoinClick} eventData={eventData} myApplication={myApplication} />
+          <Footer />
+        </>
+      )}
       <ApplyNowModal
         open={applyOpen}
         onClose={() => setApplyOpen(false)}
