@@ -1600,6 +1600,345 @@ function WordPressGroupSyncPanel({ token }) {
   );
 }
 
+function WordPressPublicForumSyncPanel({ token }) {
+  const [items, setItems] = React.useState([]);
+  const [count, setCount] = React.useState(0);
+  const [search, setSearch] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [actionId, setActionId] = React.useState(null);
+  const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(20);
+  const [linkedFilter, setLinkedFilter] = React.useState("all");
+  const [contentFilter, setContentFilter] = React.useState("has_content");
+  const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
+
+  const pageCount = Math.max(1, Math.ceil(count / pageSize));
+  const showingFrom = count === 0 ? 0 : ((page - 1) * pageSize) + 1;
+  const showingTo = count === 0 ? 0 : Math.min(page * pageSize, count);
+
+  const loadForums = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        page_size: String(pageSize),
+        source_type: "public",
+      });
+      if (search.trim()) params.set("search", search.trim());
+      if (linkedFilter === "linked") params.set("linked", "true");
+      if (linkedFilter === "not_linked") params.set("linked", "false");
+      if (contentFilter === "has_content") params.set("has_content", "true");
+      if (contentFilter === "empty") params.set("has_content", "false");
+
+      const res = await fetch(`${API_ROOT}/groups/wordpress-forum-sources/?${params.toString()}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+      setItems(Array.isArray(json?.results) ? json.results : []);
+      setCount(Number(json?.count || 0));
+    } catch (e) {
+      setItems([]);
+      setCount(0);
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setLoading(false);
+    }
+  }, [contentFilter, linkedFilter, page, pageSize, search, token]);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, pageSize, linkedFilter, contentFilter]);
+
+  React.useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => loadForums(), 250);
+    return () => clearTimeout(t);
+  }, [loadForums]);
+
+  const refreshForums = async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-forum-sources/refresh/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+      setToast({
+        open: true,
+        type: "success",
+        msg: `Public forums refreshed. Created ${json.created || 0}, updated ${json.updated || 0}, skipped group forums ${json.skipped_group_forums || 0}.`,
+      });
+      setPage(1);
+      await loadForums();
+    } catch (e) {
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const createForumGroup = async (row) => {
+    setActionId(`group-${row.wp_forum_id}`);
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-forum-sources/${row.wp_forum_id}/sync-group/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+      setItems((prev) => prev.map((x) => x.wp_forum_id === row.wp_forum_id ? json : x));
+      setToast({
+        open: true,
+        type: "success",
+        msg: json?.group_created ? "Public Connect group created for forum." : "Public Connect group updated for forum.",
+      });
+    } catch (e) {
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const importForumContent = async (row) => {
+    if (!row?.linked_group_id) {
+      setToast({ open: true, type: "error", msg: "Create the Connect group before importing this forum." });
+      return;
+    }
+    setActionId(`import-${row.wp_forum_id}`);
+    setToast({
+      open: true,
+      type: "info",
+      msg: `Import started for ${row.title}. Please wait; large forums can take time.`,
+    });
+    try {
+      const res = await fetch(`${API_ROOT}/groups/wordpress-forum-sources/${row.wp_forum_id}/import-content/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ dry_run: false }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
+      setItems((prev) => prev.map((x) => x.wp_forum_id === row.wp_forum_id ? json : x));
+      const stats = json?.forum_import || {};
+      await loadForums();
+      setToast({
+        open: true,
+        type: stats.failed ? "warning" : "success",
+        msg: `Forum imported. Topics ${stats.topics_imported || 0}, replies ${stats.replies_imported || 0}, existing topics ${stats.topics_skipped_existing || 0}, existing replies ${stats.replies_skipped_existing || 0}${stats.failed ? `, failed ${stats.failed}` : ""}.`,
+      });
+    } catch (e) {
+      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  return (
+    <Paper elevation={0} className="rounded-2xl border border-slate-200 bg-white p-4">
+      <Box className="space-y-4">
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h6" className="font-extrabold text-slate-900">
+              Public WordPress Forum Import
+            </Typography>
+            <Typography variant="body2" className="text-slate-500">
+              Create public Connect groups for separate bbPress forums, then import topics and replies. No member sync runs here.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            onClick={refreshForums}
+            disabled={refreshing || loading}
+            startIcon={<CloudSyncRoundedIcon />}
+            sx={{ textTransform: "none" }}
+          >
+            {refreshing ? "Refreshing…" : "Refresh Forums"}
+          </Button>
+        </Stack>
+
+        <Alert severity="info" variant="outlined">
+          Group-connected forums continue to use the normal WordPress Group Full Import. This section is only for separate/public forums like Mergers & Acquisitions, Due Diligence, and Post Merger Integration.
+        </Alert>
+
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
+          <TextField
+            size="small"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search public forums…"
+            InputProps={{ startAdornment: <SearchRoundedIcon fontSize="small" className="mr-2 text-slate-400" /> }}
+            sx={{ minWidth: { xs: "100%", md: 260 } }}
+          />
+          <TextField
+            size="small"
+            select
+            label="Connect link"
+            value={linkedFilter}
+            onChange={(e) => setLinkedFilter(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 160 } }}
+          >
+            <MenuItem value="all">All links</MenuItem>
+            <MenuItem value="linked">Linked</MenuItem>
+            <MenuItem value="not_linked">Not linked</MenuItem>
+          </TextField>
+          <TextField
+            size="small"
+            select
+            label="Content"
+            value={contentFilter}
+            onChange={(e) => setContentFilter(e.target.value)}
+            sx={{ minWidth: { xs: "100%", md: 150 } }}
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="has_content">Has content</MenuItem>
+            <MenuItem value="empty">No content</MenuItem>
+          </TextField>
+          <TextField
+            size="small"
+            select
+            label="Rows"
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value) || 20)}
+            sx={{ minWidth: { xs: "100%", md: 110 } }}
+          >
+            {[20, 50, 100].map((n) => (
+              <MenuItem key={n} value={n}>{n}</MenuItem>
+            ))}
+          </TextField>
+        </Stack>
+
+        {loading ? (
+          <Box className="py-2"><LinearProgress /></Box>
+        ) : items.length === 0 ? (
+          <Box className="py-6 text-center">
+            <Typography variant="body2" className="text-slate-500">
+              No public forums loaded yet. Click “Refresh Forums” after the Forum Content API plugin is installed.
+            </Typography>
+          </Box>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>WordPress Forum</TableCell>
+                  <TableCell>WP ID</TableCell>
+                  <TableCell align="right">Topics</TableCell>
+                  <TableCell align="right">Replies</TableCell>
+                  <TableCell>Connect Group</TableCell>
+                  <TableCell align="center">Create Group</TableCell>
+                  <TableCell align="center">Import</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {items.map((row) => (
+                  <TableRow key={row.wp_forum_id} hover>
+                    <TableCell>
+                      <Typography variant="body2" className="font-semibold text-slate-800">
+                        {row.title}
+                      </Typography>
+                      <Typography variant="caption" className="text-slate-500 block">
+                        {row.slug || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{row.wp_forum_id}</TableCell>
+                    <TableCell align="right">{Number(row.topic_count || 0).toLocaleString()}</TableCell>
+                    <TableCell align="right">{Number(row.reply_count || 0).toLocaleString()}</TableCell>
+                    <TableCell>
+                      {row.linked_group_id ? (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip size="small" color="success" label="Linked" />
+                          <Typography variant="caption" className="text-slate-500">
+                            {row.linked_group_name || `#${row.linked_group_id}`}
+                          </Typography>
+                        </Stack>
+                      ) : (
+                        <Chip size="small" label="Not created" className="bg-slate-100 text-slate-500" />
+                      )}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Button
+                        size="small"
+                        type="button"
+                        variant="outlined"
+                        disabled={!!actionId}
+                        onClick={(event) => { event.stopPropagation(); createForumGroup(row); }}
+                        sx={{ textTransform: "none" }}
+                      >
+                        {actionId === `group-${row.wp_forum_id}` ? "Creating…" : row.linked_group_id ? "Update" : "Create"}
+                      </Button>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Button
+                        size="small"
+                        type="button"
+                        variant="contained"
+                        disabled={!row.linked_group_id || !!actionId}
+                        onClick={(event) => { event.stopPropagation(); importForumContent(row); }}
+                        sx={{ textTransform: "none" }}
+                      >
+                        {actionId === `import-${row.wp_forum_id}` ? "Importing…" : "Import"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          justifyContent="space-between"
+        >
+          <Typography variant="caption" className="text-slate-500">
+            Showing {showingFrom}-{showingTo} of {count} public WordPress forums. Create Group must be done before Import.
+          </Typography>
+          <Pagination
+            count={pageCount}
+            page={page}
+            onChange={(_, v) => setPage(v)}
+            shape="rounded"
+            size="small"
+            disabled={loading}
+          />
+        </Stack>
+      </Box>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert severity={toast.type} variant="filled" onClose={() => setToast((t) => ({ ...t, open: false }))}>
+          {toast.msg}
+        </Alert>
+      </Snackbar>
+    </Paper>
+  );
+}
+
+
 // ---- Page ----
 export default function AdminGroups() {
   const token = getToken();
@@ -1923,7 +2262,10 @@ export default function AdminGroups() {
       )}
 
       {owner && activeTab === "wordpress-sync" && (
-        <WordPressGroupSyncPanel token={token} />
+        <Stack spacing={3}>
+          <WordPressGroupSyncPanel token={token} />
+          <WordPressPublicForumSyncPanel token={token} />
+        </Stack>
       )}
 
       {/* Create Group Dialog */}
