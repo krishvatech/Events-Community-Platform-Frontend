@@ -152,7 +152,7 @@
   display: flex;
   justify-content: space-between;
   margin: 0 auto;
-  padding: 92px 0 18px;
+  padding: 48px 0 18px;
   position: relative;
   width: min(100% - 48px, 1170px);
   z-index: 5;
@@ -220,7 +220,7 @@
   gap: 80px;
   grid-template-columns: minmax(0, 1.16fr) minmax(430px, 0.84fr);
   margin: 0 auto;
-  padding: 96px 0 250px;
+  padding: 76px 0 250px;
   position: relative;
   width: min(100% - 48px, 1170px);
   z-index: 4;
