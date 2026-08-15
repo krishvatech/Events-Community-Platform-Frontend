@@ -7,6 +7,9 @@ import { isOwnerUser } from "../utils/adminRole.js";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import heroImg from "../assets/oxford/Oxford_Jesus-College.png";
+import oxfordBgHero from "../assets/oxford/BG 1.png";
+import oxfordBgSkyline from "../assets/oxford/BG 2.png";
+import oxfordBgHighlights from "../assets/oxford/BG 3.png";
 import receptionImg from "../assets/oxford/Oxford_Reception.png";
 import dinnerImg from "../assets/oxford/Oxford_CollegeDinner_2.png";
 import puntingImg from "../assets/oxford/Oxford_Punting.png";
@@ -2325,7 +2328,7 @@ function OxfordHeroReference({ onApplyClick, onJoinClick, eventData = {}, myAppl
   const copy = getOxfordEventCopy(eventData);
   const date = getOxfordDate(eventData);
   const stats = getOxfordStats(eventData);
-  const heroImage = heroImg;
+  const heroImage = oxfordBgHero;
   const navItems = [
     { label: "Home", id: "oxford-hero" },
     { label: "About", id: "why-attend" },
@@ -2352,6 +2355,7 @@ function OxfordHeroReference({ onApplyClick, onJoinClick, eventData = {}, myAppl
       <section id="oxford-hero" className="ox-reference-hero">
         <img className="ox-reference-hero-bg" src={heroImage} alt="" aria-hidden="true" />
         <div className="ox-reference-hero-overlay" />
+        <img className="ox-reference-hero-skyline" src={oxfordBgSkyline} alt="" aria-hidden="true" />
         <nav className="ox-reference-nav" aria-label="Oxford Symposium navigation">
           <button type="button" className="ox-reference-brand" onClick={() => scrollToOxfordSection("oxford-hero")}>
             <img src={imaaLogo} alt="IMAA" />
@@ -2468,7 +2472,7 @@ function OxfordHighlightsReference({ eventData = {} }) {
 
   return (
     <section id="event-highlights" className="ox-reference-section ox-reference-highlights">
-      <img className="ox-reference-section-bg" src={heroImg} alt="" aria-hidden="true" />
+      <img className="ox-reference-section-bg" src={oxfordBgHighlights} alt="" aria-hidden="true" />
       <div className="ox-reference-section-overlay" />
       <div className="ox-reference-container">
         <div className="ox-reference-section-header">
