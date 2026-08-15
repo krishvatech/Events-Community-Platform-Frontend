@@ -2215,17 +2215,7 @@ function getOxfordEventCopy(eventData = {}) {
   };
 }
 
-function getOxfordHighlights(eventData = {}) {
-  const sessionItems = Array.isArray(eventData.sessions)
-    ? eventData.sessions.filter(Boolean).slice(0, 4).map((session, index) => ({
-        title: session.title || session.name || `Session ${index + 1}`,
-        desc: session.description || session.summary || session.abstract || "Programme details will be announced soon.",
-        img: toAbsoluteMediaUrl(session.image || session.cover_image || session.preview_image) || [receptionImg, dinnerImg, puntingImg, bbqImg][index % 4],
-      }))
-    : [];
-
-  if (sessionItems.length) return sessionItems;
-
+function getOxfordHighlights() {
   return [
     {
       title: "Welcome Reception",

@@ -446,12 +446,7 @@
   inset: 0;
   object-fit: cover;
   position: absolute;
-  transition: transform 400ms ease;
   width: 100%;
-}
-
-.ox-reference-highlight-card:hover img {
-  transform: scale(1.035);
 }
 
 .ox-reference-card-shade,
