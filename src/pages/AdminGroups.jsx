@@ -16,6 +16,18 @@ import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import LockRounded from "@mui/icons-material/LockRounded";
 
+const isAbortLikeError = (err) => {
+  const name = String(err?.name || "").toLowerCase();
+  const message = String(err?.message || err || "").toLowerCase();
+  return (
+    name === "aborterror" ||
+    message.includes("aborted") ||
+    message.includes("signal is aborted") ||
+    message.includes("the user aborted a request")
+  );
+};
+
+
 // ---- API helpers (same style as your AdminEvents.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
