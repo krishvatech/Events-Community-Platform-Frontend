@@ -27,6 +27,24 @@ const isAbortLikeError = (err) => {
   );
 };
 
+// Long-running WordPress sync endpoints must not inherit the global 120s
+// mutation timeout from utils/fetchInterceptor.js. That interceptor attaches its
+// own AbortController only when the caller supplies no signal, so passing one
+// here makes it step aside for these calls without changing the global default.
+const LONG_SYNC_TIMEOUT_MS = 15 * 60 * 1000;
+
+const longRunningFetch = (url, options = {}) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), LONG_SYNC_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(timeoutId));
+};
+
+// Django keeps processing after the browser stops waiting, so an aborted sync is
+// "still running", not "failed". Never surface it as a red error.
+const SYNC_STILL_RUNNING_MSG =
+  "Still syncing on the server. This is taking longer than usual, but the import is continuing in the background - refresh in a minute to see the results.";
+
 
 // ---- API helpers (same style as your AdminEvents.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -1112,7 +1130,7 @@ function WordPressGroupSyncPanel({ token }) {
   const refreshFromWordPress = async () => {
     setRefreshing(true);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/refresh/`, {
+      const res = await longRunningFetch(`${API_ROOT}/groups/wordpress-sources/refresh/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1130,7 +1148,11 @@ function WordPressGroupSyncPanel({ token }) {
       await loadSources();
       await loadStats();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      if (isAbortLikeError(e)) {
+        setToast({ open: true, type: "info", msg: SYNC_STILL_RUNNING_MSG });
+      } else {
+        setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      }
     } finally {
       setRefreshing(false);
     }
@@ -1139,7 +1161,7 @@ function WordPressGroupSyncPanel({ token }) {
   const syncEnabledGroups = async () => {
     setSyncingEnabled(true);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-groups/`, {
+      const res = await longRunningFetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-groups/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1156,7 +1178,11 @@ function WordPressGroupSyncPanel({ token }) {
       await loadSources();
       await loadStats();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      if (isAbortLikeError(e)) {
+        setToast({ open: true, type: "info", msg: SYNC_STILL_RUNNING_MSG });
+      } else {
+        setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      }
     } finally {
       setSyncingEnabled(false);
     }
@@ -1169,7 +1195,7 @@ function WordPressGroupSyncPanel({ token }) {
     if (!ok) return;
     setSyncingMembers(true);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-members/`, {
+      const res = await longRunningFetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-members/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1186,7 +1212,11 @@ function WordPressGroupSyncPanel({ token }) {
       await loadSources();
       await loadStats();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      if (isAbortLikeError(e)) {
+        setToast({ open: true, type: "info", msg: SYNC_STILL_RUNNING_MSG });
+      } else {
+        setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      }
     } finally {
       setSyncingMembers(false);
     }
@@ -1199,7 +1229,7 @@ function WordPressGroupSyncPanel({ token }) {
     if (!ok) return;
     setSyncingContent(true);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-full-content/`, {
+      const res = await longRunningFetch(`${API_ROOT}/groups/wordpress-sources/sync-enabled-full-content/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1223,7 +1253,11 @@ function WordPressGroupSyncPanel({ token }) {
       await loadSources();
       await loadStats();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      if (isAbortLikeError(e)) {
+        setToast({ open: true, type: "info", msg: SYNC_STILL_RUNNING_MSG });
+      } else {
+        setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      }
     } finally {
       setSyncingContent(false);
     }
@@ -1232,7 +1266,7 @@ function WordPressGroupSyncPanel({ token }) {
   const syncOneMembers = async (row) => {
     setSyncingMemberId(row.wp_group_id);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/${row.wp_group_id}/sync-members/`, {
+      const res = await longRunningFetch(`${API_ROOT}/groups/wordpress-sources/${row.wp_group_id}/sync-members/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1250,7 +1284,11 @@ function WordPressGroupSyncPanel({ token }) {
       });
       await loadStats();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      if (isAbortLikeError(e)) {
+        setToast({ open: true, type: "info", msg: SYNC_STILL_RUNNING_MSG });
+      } else {
+        setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      }
     } finally {
       setSyncingMemberId(null);
     }
@@ -1259,7 +1297,7 @@ function WordPressGroupSyncPanel({ token }) {
   const syncOneContent = async (row) => {
     setSyncingContentId(row.wp_group_id);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-sources/${row.wp_group_id}/sync-full-content/`, {
+      const res = await longRunningFetch(`${API_ROOT}/groups/wordpress-sources/${row.wp_group_id}/sync-full-content/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1288,7 +1326,11 @@ function WordPressGroupSyncPanel({ token }) {
       });
       await loadStats();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      if (isAbortLikeError(e)) {
+        setToast({ open: true, type: "info", msg: SYNC_STILL_RUNNING_MSG });
+      } else {
+        setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      }
     } finally {
       setSyncingContentId(null);
     }
@@ -1678,7 +1720,7 @@ function WordPressPublicForumSyncPanel({ token }) {
   const refreshForums = async () => {
     setRefreshing(true);
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-forum-sources/refresh/`, {
+      const res = await longRunningFetch(`${API_ROOT}/groups/wordpress-forum-sources/refresh/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1695,7 +1737,11 @@ function WordPressPublicForumSyncPanel({ token }) {
       setPage(1);
       await loadForums();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      if (isAbortLikeError(e)) {
+        setToast({ open: true, type: "info", msg: SYNC_STILL_RUNNING_MSG });
+      } else {
+        setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      }
     } finally {
       setRefreshing(false);
     }
@@ -1738,7 +1784,7 @@ function WordPressPublicForumSyncPanel({ token }) {
       msg: `Import started for ${row.title}. Please wait; large forums can take time.`,
     });
     try {
-      const res = await fetch(`${API_ROOT}/groups/wordpress-forum-sources/${row.wp_forum_id}/import-content/`, {
+      const res = await longRunningFetch(`${API_ROOT}/groups/wordpress-forum-sources/${row.wp_forum_id}/import-content/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1757,7 +1803,11 @@ function WordPressPublicForumSyncPanel({ token }) {
         msg: `Forum imported. Topics ${stats.topics_imported || 0}, replies ${stats.replies_imported || 0}, existing topics ${stats.topics_skipped_existing || 0}, existing replies ${stats.replies_skipped_existing || 0}${stats.failed ? `, failed ${stats.failed}` : ""}.`,
       });
     } catch (e) {
-      setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      if (isAbortLikeError(e)) {
+        setToast({ open: true, type: "info", msg: SYNC_STILL_RUNNING_MSG });
+      } else {
+        setToast({ open: true, type: "error", msg: String(e?.message || e) });
+      }
     } finally {
       setActionId(null);
     }
