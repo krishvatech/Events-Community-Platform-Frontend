@@ -185,6 +185,19 @@ export default function PublicGroupLandingPage() {
                   >
                     {group.name}
                   </Typography>
+                  {group.short_description && (
+                    <Typography
+                      sx={{
+                        mt: 1,
+                        color: "#334e68",
+                        fontWeight: 600,
+                        fontSize: { xs: 16, md: 19 },
+                        maxWidth: 620,
+                      }}
+                    >
+                      {group.short_description}
+                    </Typography>
+                  )}
                 </Box>
               </Stack>
 

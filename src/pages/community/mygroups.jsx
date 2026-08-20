@@ -2,6 +2,11 @@
 import * as React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  GROUP_SHORT_DESCRIPTION_MAX_LENGTH,
+  describeWordCount,
+  validateDescriptionWords,
+} from "../../utils/groupValidation";
+import {
     Box,
     Button,
     InputAdornment,
@@ -239,6 +244,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
 function EditGroupDialog({ open, group, onClose, onUpdated }) {
     const token = authHeader().Authorization?.replace("Bearer ", "") || "";
     const [name, setName] = React.useState("");
+    const [shortDescription, setShortDescription] = React.useState("");
     const [description, setDescription] = React.useState("");
     const [visibility, setVisibility] = React.useState("public");
     const [joinPolicy, setJoinPolicy] = React.useState("open");
@@ -256,6 +262,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     React.useEffect(() => {
         if (!group) return;
         setName(group.name || "");
+        setShortDescription(group.short_description || "");
         setDescription(group.description || "");
         setVisibility(group.visibility || "public");
 
@@ -312,6 +319,10 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         const e = {};
         if (!name.trim()) e.name = "Required";
         if (!description.trim()) e.description = "Required";
+        else {
+            const wordError = validateDescriptionWords(description);
+            if (wordError) e.description = wordError;
+        }
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -322,6 +333,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         try {
             const fd = new FormData();
             fd.append("name", name.trim());
+            fd.append("short_description", shortDescription.trim());
             fd.append("description", description.trim());
             fd.append("visibility", visibility);
             fd.append("join_policy", visibility === "private" ? "invite" : joinPolicy);
@@ -404,15 +416,28 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     className="mb-3"
                 />
 
+                <TextField
+                    label="Short Description / Headline"
+                    value={shortDescription}
+                    onChange={(e) => setShortDescription(e.target.value)}
+                    fullWidth
+                    className="mb-3"
+                    placeholder="e.g. Connecting AI professionals worldwide"
+                    inputProps={{ maxLength: GROUP_SHORT_DESCRIPTION_MAX_LENGTH }}
+                    helperText={`${shortDescription.length}/${GROUP_SHORT_DESCRIPTION_MAX_LENGTH} characters`}
+                />
+
                 <div className="grid grid-cols-12 gap-6">
                     <div className="col-span-12 md:col-span-7">
                         <TextField
                             label="Description *"
                             multiline minRows={3}
+                            maxRows={12}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             fullWidth className="mb-3"
-                            error={!!errors.description} helperText={errors.description}
+                            error={!!errors.description}
+                            helperText={errors.description || describeWordCount(description)}
                         />
 
                         <CustomSelect
@@ -565,6 +590,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
     const role = roleLabel(g);
     const memberStatus = membershipLabel(g);
     const accent = "#0A9396";
+    const headline = g.short_description || "";
     const desc = g.description || g.topic || g.category || "";
 
     const visibility = (g.visibility || "").toLowerCase();
@@ -688,6 +714,14 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
                         </Typography>
                     ) : null}
                 </Box>
+
+                {/* Short description / headline */}
+                {headline && (
+                    <Typography sx={{ fontSize: 12.5, color: "#334155", fontWeight: 600, lineHeight: 1.5,
+                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {headline}
+                    </Typography>
+                )}
 
                 {/* Description */}
                 {desc && (
@@ -857,6 +891,12 @@ function QuickViewDialog({ open, group, onClose, onJoin, onEdit, canEdit }) {
                         variant="outlined"
                     />
                 </Stack>
+
+                {group.short_description && (
+                    <Typography variant="subtitle1" className="text-slate-700 font-semibold mb-2">
+                        {group.short_description}
+                    </Typography>
+                )}
 
                 <Typography variant="body1" className="text-slate-600 mb-4 whitespace-pre-line">
                     {group.description || "No description provided."}

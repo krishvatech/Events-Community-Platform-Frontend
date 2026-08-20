@@ -1,6 +1,11 @@
 // src/pages/AdminGroups.jsx
 import React from "react";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
+import {
+  GROUP_SHORT_DESCRIPTION_MAX_LENGTH,
+  describeWordCount,
+  validateDescriptionWords,
+} from "../utils/groupValidation";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
@@ -204,6 +209,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
+  const [shortDescription, setShortDescription] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [visibility, setVisibility] = React.useState("public");
   const [joinPolicy, setJoinPolicy] = React.useState("open");
@@ -233,6 +239,10 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
     if (!name.trim()) e.name = "Required";
     if (!slug.trim()) e.slug = "Required";
     if (!description.trim()) e.description = "Required";
+    else {
+      const wordError = validateDescriptionWords(description);
+      if (wordError) e.description = wordError;
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -260,6 +270,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
       const fd = new FormData();
       fd.append("name", name.trim());
       fd.append("slug", slug.trim());
+      fd.append("short_description", shortDescription.trim());
       fd.append("description", description.trim());
       fd.append("visibility", visibility);
       fd.append("join_policy", visibility === "private" ? "invite" : joinPolicy);
@@ -284,7 +295,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
       onCreated?.({ ...json, _cache: Date.now() });
       setToast({ open: true, type: "success", msg: "Group created" });
       onClose?.();
-      setName(""); setSlug(""); setDescription(""); setVisibility("public");
+      setName(""); setSlug(""); setShortDescription(""); setDescription(""); setVisibility("public");
       setJoinPolicy("open");
       setImageFile(null); setLocalPreview("");
       setLogoFile(null); setLogoPreview("");
@@ -314,15 +325,28 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
             className="mb-3"
           />
 
+          <TextField
+            label="Short Description / Headline"
+            value={shortDescription}
+            onChange={(e) => setShortDescription(e.target.value)}
+            fullWidth
+            className="mb-3"
+            placeholder="e.g. Connecting AI professionals worldwide"
+            inputProps={{ maxLength: GROUP_SHORT_DESCRIPTION_MAX_LENGTH }}
+            helperText={`${shortDescription.length}/${GROUP_SHORT_DESCRIPTION_MAX_LENGTH} characters`}
+          />
+
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 md:col-span-7">
               <TextField
                 label="Description *"
                 multiline minRows={3}
+                maxRows={12}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 fullWidth className="mb-3"
-                error={!!errors.description} helperText={errors.description}
+                error={!!errors.description}
+                helperText={errors.description || describeWordCount(description)}
               />
 
               <TextField
@@ -479,6 +503,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 function EditGroupDialog({ open, group, onClose, onUpdated }) {
   const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("access_token") || "";
   const [name, setName] = React.useState("");
+  const [shortDescription, setShortDescription] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [visibility, setVisibility] = React.useState("public");
   const [joinPolicy, setJoinPolicy] = React.useState("open");
@@ -496,6 +521,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
   React.useEffect(() => {
     if (!group) return;
     setName(group.name || "");
+    setShortDescription(group.short_description || "");
     setDescription(group.description || "");
     setVisibility(group.visibility || "public");
 
@@ -552,6 +578,10 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     const e = {};
     if (!name.trim()) e.name = "Required";
     if (!description.trim()) e.description = "Required";
+    else {
+      const wordError = validateDescriptionWords(description);
+      if (wordError) e.description = wordError;
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -562,6 +592,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     try {
       const fd = new FormData();
       fd.append("name", name.trim());
+      fd.append("short_description", shortDescription.trim());
       fd.append("description", description.trim());
       fd.append("visibility", visibility);
       fd.append("join_policy", visibility === "private" ? "invite" : joinPolicy);
@@ -654,15 +685,28 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
           className="mb-3"
         />
 
+        <TextField
+          label="Short Description / Headline"
+          value={shortDescription}
+          onChange={(e) => setShortDescription(e.target.value)}
+          fullWidth
+          className="mb-3"
+          placeholder="e.g. Connecting AI professionals worldwide"
+          inputProps={{ maxLength: GROUP_SHORT_DESCRIPTION_MAX_LENGTH }}
+          helperText={`${shortDescription.length}/${GROUP_SHORT_DESCRIPTION_MAX_LENGTH} characters`}
+        />
+
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 md:col-span-7">
             <TextField
               label="Description *"
               multiline minRows={3}
+              maxRows={12}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               fullWidth className="mb-3"
-              error={!!errors.description} helperText={errors.description}
+              error={!!errors.description}
+              helperText={errors.description || describeWordCount(description)}
             />
 
             <TextField
@@ -956,6 +1000,9 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
         <Typography variant="h6" className="font-extrabold !leading-snug text-slate-900">
           {g.name}
         </Typography>
+        {g.short_description && (
+          <p className="text-sm font-semibold text-slate-700 line-clamp-2">{g.short_description}</p>
+        )}
         {g.description && (
           <p className="text-sm text-slate-500 line-clamp-2">{g.description}</p>
         )}
@@ -2152,7 +2199,7 @@ export default function AdminGroups() {
     const term = q.trim().toLowerCase();
     if (!term) return groups;
     return groups.filter((g) =>
-      `${g.name || ""} ${g.description || ""}`.toLowerCase().includes(term)
+      `${g.name || ""} ${g.short_description || ""} ${g.description || ""}`.toLowerCase().includes(term)
     );
   }, [groups, q]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

@@ -2,6 +2,12 @@
 import * as React from "react";
 import { useParams, Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import {
+  GROUP_SHORT_DESCRIPTION_MAX_LENGTH,
+  describeWordCount,
+  validateDescriptionWords,
+} from "../../utils/groupValidation";
+import ClampedText from "../../components/ClampedText.jsx";
+import {
   Avatar, AvatarGroup, Box, Button, Card, CardContent,
   Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider,
   Grid, IconButton, InputAdornment, List, ListItem, ListItemAvatar,
@@ -2726,6 +2732,8 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [menuMember, setMenuMember] = React.useState(null);
   const [actionBusy, setActionBusy] = React.useState(false);
+  const [roleErrorOpen, setRoleErrorOpen] = React.useState(false);
+  const [roleErrorMsg, setRoleErrorMsg] = React.useState("");
 
   // Export CSV state
   const [exportingCSV, setExportingCSV] = React.useState(false);
@@ -2970,28 +2978,40 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
     const uid = menuMember.user?.id || menuMember.user_id || menuMember.id;
     setActionBusy(true);
     try {
-      let url = "";
-      let method = "POST";
       const hdrs = { "Content-Type": "application/json", ...authHeaders() };
+      let res;
 
       if (action === "remove") {
-        url = toApiUrl(`groups/${groupId}/members/remove-member/`);
-        // The endpoint may expect body: { user_ids: [uid] }
-        await fetch(url, { method, headers: hdrs, body: JSON.stringify({ user_ids: [uid] }) });
-        onMemberRemoved?.(uid);
+        // Backend reads a single `user_id`, not a list.
+        res = await fetch(toApiUrl(`groups/${groupId}/members/remove-member/`), {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({ user_id: uid }),
+        });
       } else {
-        url = toApiUrl(`groups/${groupId}/moderator/update-member-role/`);
-        let newRole = "";
-        if (action === "make_admin") newRole = "admin";
-        if (action === "make_moderator") newRole = "moderator";
-        if (action === "make_member") newRole = "member";
-
-        await fetch(url, { method: "PATCH", headers: hdrs, body: JSON.stringify({ user_id: uid, role: newRole }) });
+        const roleMap = {
+          make_admin: "admin",
+          make_moderator: "moderator",
+          make_member: "member",
+        };
+        res = await fetch(toApiUrl(`groups/${groupId}/set-role/`), {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({ user_id: uid, role: roleMap[action] }),
+        });
       }
 
+      // Surface the server's reason instead of failing silently.
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+
+      if (action === "remove") onMemberRemoved?.(uid);
       await fetchMembers(); // Refresh list to get updated roles
     } catch (e) {
-      alert("Action failed.");
+      setRoleErrorMsg(String(e?.message || e));
+      setRoleErrorOpen(true);
     } finally {
       setActionBusy(false);
       handleMenuClose();
@@ -3405,6 +3425,31 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
         </MenuItem>
       </Menu>
 
+      {/* Role assign — error modal */}
+      <Dialog
+        open={roleErrorOpen}
+        onClose={() => setRoleErrorOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Couldn’t update role</DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ my: 1 }}>
+            {roleErrorMsg || "Something went wrong while assigning the role."}
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setRoleErrorOpen(false)}
+            variant="contained"
+            sx={{ textTransform: "none" }}
+          >
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {addMembersOpen && (
         <AddMembersDialog
           open={addMembersOpen}
@@ -3518,7 +3563,12 @@ function OverviewTab({ group }) {
     <Stack spacing={2}>
       <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 2 }}>
         <Typography variant="h6" gutterBottom>About</Typography>
-        <Typography variant="body2">{group.description || "No description."}</Typography>
+        {group.short_description && (
+          <Typography variant="subtitle2" fontWeight={700} color="text.primary" gutterBottom>
+            {group.short_description}
+          </Typography>
+        )}
+        <ClampedText text={group.description || "No description."} />
       </Card>
       <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 2 }}>
         <Typography variant="h6" gutterBottom>Details</Typography>
@@ -3555,6 +3605,7 @@ function OverviewTab({ group }) {
 function SettingsTab({ group, onUpdate }) {
   const token = authHeaders().Authorization;
   const [name, setName] = React.useState(group?.name || "");
+  const [shortDescription, setShortDescription] = React.useState(group?.short_description || "");
   const [description, setDescription] = React.useState(group?.description || "");
   // Default to public if missing, but respect parent visibility logic handled in backend/manage page
   const [visibility, setVisibility] = React.useState(group?.visibility || "public");
@@ -3578,6 +3629,7 @@ function SettingsTab({ group, onUpdate }) {
   React.useEffect(() => {
     if (group) {
       setName(group.name || "");
+      setShortDescription(group.short_description || "");
       setDescription(group.description || "");
       setVisibility(group.visibility || "public");
       const jp = (group.join_policy || "").toLowerCase();
@@ -3670,6 +3722,13 @@ function SettingsTab({ group, onUpdate }) {
       return;
     }
 
+    // Word limit is also enforced by the API; check here to avoid a round trip.
+    const descriptionError = validateDescriptionWords(description);
+    if (descriptionError) {
+      setSnack({ open: true, message: descriptionError, severity: "error" });
+      return;
+    }
+
     setLoading(true);
     try {
       let commResult = null;
@@ -3690,6 +3749,7 @@ function SettingsTab({ group, onUpdate }) {
 
       const fd = new FormData();
       fd.append("name", name.trim());
+      fd.append("short_description", shortDescription.trim());
       fd.append("description", description.trim());
       fd.append("visibility", visibility);
       const parentVis = String(parentInfo.visibility || "").toLowerCase();
@@ -3776,15 +3836,31 @@ function SettingsTab({ group, onUpdate }) {
             }}
           />
           <TextField
+            label="Short Description / Headline"
+            value={shortDescription}
+            onChange={(e) => setShortDescription(e.target.value)}
+            fullWidth
+            disabled={loading}
+            placeholder="e.g. Connecting AI professionals worldwide"
+            helperText={`${shortDescription.length}/${GROUP_SHORT_DESCRIPTION_MAX_LENGTH} characters`}
+            inputProps={{ maxLength: GROUP_SHORT_DESCRIPTION_MAX_LENGTH }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          />
+          <TextField
             label="Description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             fullWidth
             multiline
-            rows={4}
+            minRows={4}
+            maxRows={12}
             disabled={loading}
-            helperText={`${description.length}/500 characters`}
-            inputProps={{ maxLength: 500 }}
+            error={Boolean(validateDescriptionWords(description))}
+            helperText={validateDescriptionWords(description) || describeWordCount(description)}
             sx={{
               "& .MuiOutlinedInput-root": {
                 borderRadius: 2,
@@ -4544,6 +4620,11 @@ export default function GroupDetailsPage() {
                       <Skeleton width={240} height={36} />
                     ) : (group?.name || "Group unavailable")}
                   </Typography>
+                  {!groupLoading && group?.short_description && (
+                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600} component="div">
+                      {group.short_description}
+                    </Typography>
+                  )}
                   <Typography variant="body2" color="text.secondary" component="div">
                     {groupLoading && !group ? (
                       <Skeleton width={90} />

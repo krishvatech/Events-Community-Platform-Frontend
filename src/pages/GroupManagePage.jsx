@@ -10,6 +10,11 @@ import {
 } from "@mui/material";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { isOwnerUser } from "../utils/adminRole";
+import {
+  GROUP_SHORT_DESCRIPTION_MAX_LENGTH,
+  describeWordCount,
+  validateDescriptionWords,
+} from "../utils/groupValidation";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
@@ -547,6 +552,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
     // form state
     const [name, setName] = React.useState("");
+    const [shortDescription, setShortDescription] = React.useState("");
     const [description, setDescription] = React.useState("");
     const [visibility, setVisibility] = React.useState("public");
     const [joinPolicy, setJoinPolicy] = React.useState("open");
@@ -568,6 +574,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     React.useEffect(() => {
         if (!group) return;
         setName(group.name || "");
+        setShortDescription(group.short_description || "");
         setDescription(group.description || "");
         setVisibility(group.visibility || "public");
 
@@ -673,6 +680,10 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         const e = {};
         if (!name.trim()) e.name = "Required";
         if (!description.trim()) e.description = "Required";
+        else {
+            const wordError = validateDescriptionWords(description);
+            if (wordError) e.description = wordError;
+        }
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -683,6 +694,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         try {
             const fd = new FormData();
             fd.append("name", name.trim());
+            fd.append("short_description", shortDescription.trim());
             fd.append("description", description.trim());
 
             // flexible policy: always send visibility/join_policy
@@ -759,18 +771,30 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     className="mb-3"
                 />
 
+                <TextField
+                    label="Short Description / Headline"
+                    value={shortDescription}
+                    onChange={(e) => setShortDescription(e.target.value)}
+                    fullWidth
+                    className="mb-3"
+                    placeholder="e.g. Connecting AI professionals worldwide"
+                    inputProps={{ maxLength: GROUP_SHORT_DESCRIPTION_MAX_LENGTH }}
+                    helperText={`${shortDescription.length}/${GROUP_SHORT_DESCRIPTION_MAX_LENGTH} characters`}
+                />
+
                 <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
                     <Grid xs={12} md={7}>
                         <TextField
                             label="Description *"
                             multiline
                             minRows={3}
+                            maxRows={12}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             fullWidth
                             className="mb-3"
                             error={!!errors.description}
-                            helperText={errors.description}
+                            helperText={errors.description || describeWordCount(description)}
                         />
 
                         {/* Visibility (Flexible: allow Private Subgroup in Public Parent) */}
@@ -1456,6 +1480,7 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
 
     const [name, setName] = React.useState("");
     const [slug, setSlug] = React.useState("");
+    const [shortDescription, setShortDescription] = React.useState("");
     const [description, setDescription] = React.useState("");
     const [visibility, setVisibility] = React.useState("public");  // public | private
     const [joinPolicy, setJoinPolicy] = React.useState("open");
@@ -1518,6 +1543,10 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
         if (!name.trim()) e.name = "Required";
         if (!slug.trim()) e.slug = "Required";
         if (!description.trim()) e.description = "Required";
+        else {
+            const wordError = validateDescriptionWords(description);
+            if (wordError) e.description = wordError;
+        }
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -1529,6 +1558,7 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
             const fd = new FormData();
             fd.append("name", name.trim());
             fd.append("slug", slug.trim());
+            fd.append("short_description", shortDescription.trim());
             fd.append("description", description.trim());
 
             // Flexible Policy: Use user selection
@@ -1567,7 +1597,7 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
 
             onCreated?.({ ...json, _cache: Date.now() });
             // reset form
-            setName(""); setSlug(""); setDescription("");
+            setName(""); setSlug(""); setShortDescription(""); setDescription("");
             if (parentVisibility === "private" && parentJoinPolicy === "invite") {
                 setVisibility("private"); setJoinPolicy("invite");
             } else {
@@ -1603,15 +1633,28 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
                     />
                 </Box>
 
+                <TextField
+                    label="Short Description / Headline"
+                    value={shortDescription}
+                    onChange={(e) => setShortDescription(e.target.value)}
+                    fullWidth
+                    className="mb-3"
+                    placeholder="e.g. Connecting AI professionals worldwide"
+                    inputProps={{ maxLength: GROUP_SHORT_DESCRIPTION_MAX_LENGTH }}
+                    helperText={`${shortDescription.length}/${GROUP_SHORT_DESCRIPTION_MAX_LENGTH} characters`}
+                />
+
                 <div className="grid grid-cols-12 gap-6">
                     <div className="col-span-12 md:col-span-7">
                         <TextField
                             label="Description *"
                             multiline minRows={3}
+                            maxRows={12}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             fullWidth className="mb-3"
-                            error={!!errors.description} helperText={errors.description}
+                            error={!!errors.description}
+                            helperText={errors.description || describeWordCount(description)}
                         />
 
                         {/* Visibility (Flexible) */}
@@ -5123,6 +5166,15 @@ export default function GroupManagePage() {
                                         >
                                             {group?.name || "Group"}
                                         </Typography>
+                                        {group?.short_description && (
+                                            <Typography
+                                                variant="subtitle2"
+                                                className="text-slate-600 font-semibold"
+                                                sx={{ wordBreak: "break-word" }}
+                                            >
+                                                {group.short_description}
+                                            </Typography>
+                                        )}
                                         <Stack direction="row" spacing={1} alignItems="center">
                                             <Chip
                                                 size="small"
@@ -5274,9 +5326,16 @@ export default function GroupManagePage() {
                                         <Grid item xs={12} md={8}>
                                             <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                                 <Typography variant="h6" className="font-semibold mb-1">About</Typography>
-                                                <Typography className="text-slate-600 whitespace-pre-line">
-                                                    {group.description || "No description"}
-                                                </Typography>
+                                                {group.short_description && (
+                                                    <Typography className="text-slate-700 font-semibold mb-2">
+                                                        {group.short_description}
+                                                    </Typography>
+                                                )}
+                                                <ClampedText
+                                                    text={group.description || "No description"}
+                                                    lines={10}
+                                                    sx={{ color: "#475569" }}
+                                                />
                                             </Paper>
                                         </Grid>
                                         <Grid item xs={12} md={4}>
