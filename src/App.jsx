@@ -34,6 +34,7 @@ import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
 import RichProfile from "./pages/community/RichProfile.jsx";
 import GroupDetailsPage from "./pages/community/GroupDetailsPage.jsx";
+import PublicGroupLandingPage from "./pages/community/PublicGroupLandingPage.jsx";
 import MyGroupsPage from "./pages/community/mygroups.jsx";
 import AdminLayout from "./components/layout/AdminLayout.jsx";
 import AdminPostsPage from "./pages/AdminPostsPage.jsx";
@@ -290,6 +291,7 @@ const AppShell = () => {
             <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
+          <Route path="/groups/public/:slug" element={<PublicGroupLandingPage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
           {/* Design preview (IPDT-749) - same page, green theme */}

@@ -4139,6 +4139,7 @@ export default function GroupManagePage() {
     // Settings Tab State
     const [visibilitySetting, setVisibilitySetting] = React.useState("public");
     const [joinPolicySetting, setJoinPolicySetting] = React.useState("open");
+    const [publicLandingEnabled, setPublicLandingEnabled] = React.useState(false);
     const [saveSettingsLoading, setSaveSettingsLoading] = React.useState(false);
     const [parentVis, setParentVis] = React.useState(""); // robust parent visibility
     const [parentJoinPolicy, setParentJoinPolicy] = React.useState("");
@@ -4831,6 +4832,10 @@ export default function GroupManagePage() {
             });
 
             fd.append("join_policy", validPolicy);
+            fd.append(
+                "public_landing_enabled",
+                visibilitySetting === "public" && publicLandingEnabled ? "true" : "false"
+            );
 
             const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
                 method: "PATCH",
@@ -4847,6 +4852,21 @@ export default function GroupManagePage() {
             showMessage(`Failed to update settings: ${e.message}`, "error");
         } finally {
             setSaveSettingsLoading(false);
+        }
+    };
+
+    const publicLandingUrl = React.useMemo(() => {
+        if (!group?.slug || typeof window === "undefined") return "";
+        return `${window.location.origin}/groups/public/${encodeURIComponent(group.slug)}`;
+    }, [group?.slug]);
+
+    const copyPublicLandingLink = async () => {
+        if (!publicLandingUrl) return;
+        try {
+            await navigator.clipboard.writeText(publicLandingUrl);
+            showMessage("Public group link copied.", "success");
+        } catch {
+            showMessage("Could not copy the public group link.", "error");
         }
     };
 
@@ -4923,6 +4943,7 @@ export default function GroupManagePage() {
             setVisibilitySetting(group.visibility || "public");
             const jp = String(group.join_policy || "").toLowerCase();
             setJoinPolicySetting(jp === "public_approval" ? "approval" : (jp || "open"));
+            setPublicLandingEnabled(Boolean(group.public_landing_enabled));
         }
     }, [group]);
 
@@ -5788,6 +5809,7 @@ export default function GroupManagePage() {
                                                     value={visibilitySetting}
                                                     onChange={(val) => {
                                                         setVisibilitySetting(val);
+                                                        if (val === "private") setPublicLandingEnabled(false);
                                                         const next = coerceJoinPolicy({
                                                             visibility: val,
                                                             joinPolicy: joinPolicySetting,
@@ -5823,6 +5845,86 @@ export default function GroupManagePage() {
                                                             }))
                                                     }
                                                 />
+                                            </Grid>
+                                            <Grid item xs={12}>
+                                                <Box
+                                                    sx={{
+                                                        border: "1px solid #e2e8f0",
+                                                        borderRadius: 2,
+                                                        p: 2,
+                                                        bgcolor: "#f8fafc",
+                                                    }}
+                                                >
+                                                    <Stack
+                                                        direction={{ xs: "column", sm: "row" }}
+                                                        spacing={2}
+                                                        alignItems={{ xs: "flex-start", sm: "center" }}
+                                                        justifyContent="space-between"
+                                                    >
+                                                        <Box>
+                                                            <Typography variant="subtitle1" className="font-semibold">
+                                                                Public Landing Page
+                                                            </Typography>
+                                                            <Typography variant="body2" className="text-slate-600">
+                                                                Allow logged-out visitors to preview this public group before signing in or registering.
+                                                            </Typography>
+                                                        </Box>
+                                                        <FormControlLabel
+                                                            control={
+                                                                <Switch
+                                                                    checked={!!publicLandingEnabled}
+                                                                    onChange={(e) => setPublicLandingEnabled(e.target.checked)}
+                                                                    disabled={visibilitySetting !== "public" || saveSettingsLoading}
+                                                                />
+                                                            }
+                                                            label={publicLandingEnabled ? "On" : "Off"}
+                                                        />
+                                                    </Stack>
+
+                                                    {visibilitySetting !== "public" && (
+                                                        <Alert severity="info" sx={{ mt: 2 }}>
+                                                            Public landing pages are available only for groups with Public visibility.
+                                                        </Alert>
+                                                    )}
+
+                                                    {visibilitySetting === "public" && publicLandingEnabled && !group?.public_landing_enabled && (
+                                                        <Alert severity="warning" sx={{ mt: 2 }}>
+                                                            Save Changes to activate the public landing page and share its link.
+                                                        </Alert>
+                                                    )}
+
+                                                    {visibilitySetting === "public" && publicLandingEnabled && group?.public_landing_enabled && publicLandingUrl && (
+                                                        <Stack
+                                                            direction={{ xs: "column", md: "row" }}
+                                                            spacing={1.5}
+                                                            alignItems={{ xs: "stretch", md: "center" }}
+                                                            sx={{ mt: 2 }}
+                                                        >
+                                                            <TextField
+                                                                fullWidth
+                                                                size="small"
+                                                                label="Public URL"
+                                                                value={publicLandingUrl}
+                                                                InputProps={{ readOnly: true }}
+                                                            />
+                                                            <Button
+                                                                variant="outlined"
+                                                                onClick={copyPublicLandingLink}
+                                                                sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+                                                            >
+                                                                Copy Link
+                                                            </Button>
+                                                            <Button
+                                                                variant="text"
+                                                                endIcon={<OpenInNewRoundedIcon />}
+                                                                onClick={() => window.open(publicLandingUrl, "_blank", "noopener,noreferrer")}
+                                                                sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+                                                            >
+                                                                Preview
+                                                            </Button>
+                                                        </Stack>
+                                                    )}
+                                                </Box>
                                             </Grid>
                                             <Grid item xs={12}>
                                                 <Button

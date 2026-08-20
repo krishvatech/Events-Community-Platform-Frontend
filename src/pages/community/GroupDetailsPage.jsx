@@ -4212,8 +4212,26 @@ export default function GroupDetailsPage() {
 
   const handleJoin = async () => {
     if (!group?.id) return;
+
+    const visibility = String(group?.visibility || "").toLowerCase();
+    const joinPolicy = String(group?.join_policy || "").toLowerCase();
+    const isApproval =
+      visibility === "public" &&
+      (joinPolicy === "approval" || joinPolicy === "public_approval");
+
+    if (joinPolicy === "invite") {
+      setToast({
+        open: true,
+        msg: "This group is invite only. An invitation is required to join.",
+        type: "info",
+      });
+      return;
+    }
+
+    const joinPath = isApproval ? "join-group/request" : "join-group";
+
     try {
-      const res = await fetch(toApiUrl(`groups/${group.id}/join/`), {
+      const res = await fetch(toApiUrl(`groups/${group.id}/${joinPath}/`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: "{}"
@@ -4223,7 +4241,11 @@ export default function GroupDetailsPage() {
         setToast({ open: true, msg: data?.detail || "Failed to join group", type: "error" });
         return;
       }
-      setToast({ open: true, msg: "Joined successfully!", type: "success" });
+      setToast({
+        open: true,
+        msg: isApproval ? "Join request submitted." : "Joined successfully!",
+        type: "success",
+      });
       fetchGroup();
     } catch (e) {
       setToast({ open: true, msg: e.message || "Error joining group", type: "error" });
@@ -4375,23 +4397,35 @@ export default function GroupDetailsPage() {
 
 
 
+  const membershipStatus = String(group?.membership_status || "").toLowerCase();
+  const currentRole = String(group?.current_user_role || "").toLowerCase();
+  const isElevatedGroupUser = ["owner", "admin", "moderator"].includes(currentRole);
+  const canAccessGroupContent = Boolean(
+    membershipStatus === "active" || isElevatedGroupUser || canSeeRequests
+  );
+
   const tabDefs = React.useMemo(() => {
     const items = [
       { key: "overview", label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> },
-      {
-        key: "members", label: "MEMBERS", icon: <PeopleOutlineIcon />, render: () => (
-          <MembersTab
-            groupId={groupId}
-            group={group}
-            me={me}
-            canManageMembers={canApproveRequests}
-            onMembersAdded={(count) => setGroup((prev) => prev ? { ...prev, member_count: Number(prev.member_count || 0) + count } : prev)}
-            onMemberRemoved={() => setGroup((prev) => prev ? { ...prev, member_count: Math.max(0, Number(prev.member_count || 0) - 1) } : prev)}
-          />
-        )
-      },
-      { key: "posts", label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} onNotify={notify} /> },
     ];
+
+    if (canAccessGroupContent) {
+      items.push(
+        {
+          key: "members", label: "MEMBERS", icon: <PeopleOutlineIcon />, render: () => (
+            <MembersTab
+              groupId={groupId}
+              group={group}
+              me={me}
+              canManageMembers={canApproveRequests}
+              onMembersAdded={(count) => setGroup((prev) => prev ? { ...prev, member_count: Number(prev.member_count || 0) + count } : prev)}
+              onMemberRemoved={() => setGroup((prev) => prev ? { ...prev, member_count: Math.max(0, Number(prev.member_count || 0) - 1) } : prev)}
+            />
+          )
+        },
+        { key: "posts", label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} onNotify={notify} /> },
+      );
+    }
     if (canSeeRequests) {
       items.push({
         key: "requests",
@@ -4418,7 +4452,7 @@ export default function GroupDetailsPage() {
       });
     }
     return items;
-  }, [canApproveRequests, canSeeRequests, group, groupId, me, moderatorCanI]);
+  }, [canAccessGroupContent, canApproveRequests, canSeeRequests, group, groupId, me, moderatorCanI]);
 
   React.useEffect(() => {
     if (tab >= tabDefs.length) setTab(0);
@@ -4548,14 +4582,16 @@ export default function GroupDetailsPage() {
                 </Box>
               </Stack>
               <Stack direction="row" spacing={1}>
-                <Button
-                  variant="outlined"
-                  startIcon={<ChatBubbleOutlineRoundedIcon />}
-                  onClick={() => navigate(`/community?view=messages`)} // Example route
-                  disabled={groupLoading || !group}
-                >
-                  Message
-                </Button>
+                {canAccessGroupContent && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<ChatBubbleOutlineRoundedIcon />}
+                    onClick={() => navigate(`/community?view=messages`)} // Example route
+                    disabled={groupLoading || !group}
+                  >
+                    Message
+                  </Button>
+                )}
                 {(() => {
                   if (groupLoading || !group) {
                     return (
@@ -4565,10 +4601,16 @@ export default function GroupDetailsPage() {
                     );
                   }
 
-                  const status = group?.membership_status;
-                  const role = group?.current_user_role;
-                  const isMember = status === "active" || (role && role !== "none");
+                  const status = String(group?.membership_status || "").toLowerCase();
+                  const role = String(group?.current_user_role || "").toLowerCase();
+                  const joinPolicy = String(group?.join_policy || "").toLowerCase();
+                  const visibility = String(group?.visibility || "").toLowerCase();
+                  const isElevated = ["owner", "admin", "moderator"].includes(role);
+                  const isMember = status === "active" || isElevated;
                   const isPending = status === "pending";
+                  const isApproval =
+                    visibility === "public" &&
+                    (joinPolicy === "approval" || joinPolicy === "public_approval");
 
                   if (isMember) {
                     return (
@@ -4586,6 +4628,12 @@ export default function GroupDetailsPage() {
                         Pending
                       </Button>
                     );
+                  } else if (joinPolicy === "invite") {
+                    return (
+                      <Button variant="outlined" disabled>
+                        Invitation Required
+                      </Button>
+                    );
                   } else {
                     return (
                       <Button
@@ -4593,7 +4641,7 @@ export default function GroupDetailsPage() {
                         onClick={handleJoin}
                         sx={{ bgcolor: "#0ea5a4", "&:hover": { bgcolor: "#0d9488" } }}
                       >
-                        Join Group
+                        {isApproval ? "Request to Join" : "Join Group"}
                       </Button>
                     );
                   }
