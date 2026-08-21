@@ -270,7 +270,9 @@ const AppShell = () => {
             <Route path="series/:seriesId" element={<SeriesManagePage />} />
             <Route path="resources" element={<RequireStaffOrAdminForResources><AdminResources /></RequireStaffOrAdminForResources>} />
             <Route path="posts" element={<AdminPostsPage />} />
-            <Route path="groups" element={<AdminGroups />} />
+            {/* Platform-level pages: group admins/moderators are scoped to their
+                own group and must not reach these. */}
+            <Route path="groups" element={<RequireStaffOrAdmin><AdminGroups /></RequireStaffOrAdmin>} />
             <Route path="messages" element={<AdminMessagesPage />} />
             <Route path="notifications" element={<AdminNotificationsPage />} />
             <Route path="settings" element={<AdminSettings />} />
@@ -281,7 +283,7 @@ const AppShell = () => {
             {/* recordings with slug-based routing */}
             <Route path="recordings" element={<AdminRecordingsPage />} />
             <Route path="recordings/:slug" element={<AdminRecordingDetailsPage />} />
-            <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
+            <Route path="groups/:idOrSlug" element={<RequireStaffOrAdmin><GroupManagePage /></RequireStaffOrAdmin>} />
             <Route path="carts" element={<AdminCarts />} />
             <Route path="users" element={<AdminStaffPage />} />
             <Route path="users/:userId/edit-profile" element={<AdminUserProfileEditPage />} />

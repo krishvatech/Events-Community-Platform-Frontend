@@ -41,6 +41,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
@@ -2718,7 +2719,7 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
   );
 }
 
-function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMemberRemoved }) {
+function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMembersAdded, onMemberRemoved }) {
   const navigate = useNavigate();
   const [members, setMembers] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -3411,13 +3412,17 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
         onClose={handleMenuClose}
         PaperProps={{ elevation: 2, sx: { minWidth: 150, borderRadius: 2 } }}
       >
-        {String(menuMember?.role || "").toLowerCase() !== "admin" && (
+        {/* Granting/removing the admin role is reserved for the group owner and
+            platform staff, mirroring the backend rule. */}
+        {canAssignAdmin && String(menuMember?.role || "").toLowerCase() !== "admin" && (
           <MenuItem onClick={() => handleRoleAction("make_admin")} disabled={actionBusy}>Make Admin</MenuItem>
         )}
-        {String(menuMember?.role || "").toLowerCase() !== "moderator" && (
+        {String(menuMember?.role || "").toLowerCase() !== "admin"
+          && String(menuMember?.role || "").toLowerCase() !== "moderator" && (
           <MenuItem onClick={() => handleRoleAction("make_moderator")} disabled={actionBusy}>Make Moderator</MenuItem>
         )}
-        {(String(menuMember?.role || "").toLowerCase() === "admin" || String(menuMember?.role || "").toLowerCase() === "moderator") && (
+        {(String(menuMember?.role || "").toLowerCase() === "moderator"
+          || (canAssignAdmin && String(menuMember?.role || "").toLowerCase() === "admin")) && (
           <MenuItem onClick={() => handleRoleAction("make_member")} disabled={actionBusy}>Make Member</MenuItem>
         )}
         <MenuItem onClick={() => handleRoleAction("remove")} color="error" sx={{ color: "error.main" }} disabled={actionBusy}>
@@ -3611,6 +3616,8 @@ function SettingsTab({ group, onUpdate }) {
   const [visibility, setVisibility] = React.useState(group?.visibility || "public");
   // Default to open. If private, backend/UI usually forces invite.
   const [joinPolicy, setJoinPolicy] = React.useState(group?.join_policy || "open");
+  // Public landing page — mirrors the same setting on the admin Group Manage page.
+  const [publicLandingEnabled, setPublicLandingEnabled] = React.useState(Boolean(group?.public_landing_enabled));
   const isSubgroup = Boolean(group?.parent_id || group?.parent_group?.id || group?.parent?.id || group?.parent);
   const [parentInfo, setParentInfo] = React.useState({ visibility: "", join_policy: "" });
 
@@ -3639,6 +3646,7 @@ function SettingsTab({ group, onUpdate }) {
       setForumEnabled(Boolean(group.forum_enabled));
       setPostsCreationRestricted(Boolean(group.posts_creation_restricted));
       setPostsCommentsEnabled(Boolean(group.posts_comments_enabled));
+      setPublicLandingEnabled(Boolean(group.public_landing_enabled));
     }
   }, [group]);
 
@@ -3694,6 +3702,21 @@ function SettingsTab({ group, onUpdate }) {
       .catch(() => { });
     return () => { active = false; };
   }, [group, isSubgroup]);
+
+  const publicLandingUrl = React.useMemo(() => {
+    if (!group?.slug || typeof window === "undefined") return "";
+    return `${window.location.origin}/groups/public/${encodeURIComponent(group.slug)}`;
+  }, [group?.slug]);
+
+  const copyPublicLandingLink = async () => {
+    if (!publicLandingUrl) return;
+    try {
+      await navigator.clipboard.writeText(publicLandingUrl);
+      setSnack({ open: true, message: "Public group link copied.", severity: "success" });
+    } catch {
+      setSnack({ open: true, message: "Could not copy the public group link.", severity: "error" });
+    }
+  };
 
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0];
@@ -3759,6 +3782,12 @@ function SettingsTab({ group, onUpdate }) {
       if (visibility === "private") safePolicy = "invite";
       else if (!parentAllowsOpen && safePolicy === "open") safePolicy = "approval";
       fd.append("join_policy", safePolicy);
+      // Only public groups can expose a landing page; keep this in sync with the
+      // visibility being saved rather than the stale value on `group`.
+      fd.append(
+        "public_landing_enabled",
+        visibility === "public" && publicLandingEnabled ? "true" : "false"
+      );
 
       if (logoFile) {
         fd.append("logo", logoFile);
@@ -3916,6 +3945,79 @@ function SettingsTab({ group, onUpdate }) {
             )}
           </FormControl>
         </Stack>
+      </Card>
+
+      {/* Public Landing Page Section */}
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          justifyContent="space-between"
+        >
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              Public Landing Page
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Allow logged-out visitors to preview this public group before signing in or registering.
+            </Typography>
+          </Box>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={!!publicLandingEnabled}
+                onChange={(e) => setPublicLandingEnabled(e.target.checked)}
+                disabled={visibility !== "public" || loading}
+              />
+            }
+            label={publicLandingEnabled ? "On" : "Off"}
+          />
+        </Stack>
+
+        {visibility !== "public" && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Public landing pages are available only for groups with Public visibility.
+          </Alert>
+        )}
+
+        {visibility === "public" && publicLandingEnabled && !group?.public_landing_enabled && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Save Changes to activate the public landing page and share its link.
+          </Alert>
+        )}
+
+        {visibility === "public" && publicLandingEnabled && group?.public_landing_enabled && publicLandingUrl && (
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            spacing={1.5}
+            alignItems={{ xs: "stretch", md: "center" }}
+            sx={{ mt: 2 }}
+          >
+            <TextField
+              fullWidth
+              size="small"
+              label="Public URL"
+              value={publicLandingUrl}
+              InputProps={{ readOnly: true }}
+            />
+            <Button
+              variant="outlined"
+              onClick={copyPublicLandingLink}
+              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
+              Copy Link
+            </Button>
+            <Button
+              variant="text"
+              endIcon={<OpenInNewRoundedIcon />}
+              onClick={() => window.open(publicLandingUrl, "_blank", "noopener,noreferrer")}
+              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
+              Preview
+            </Button>
+          </Stack>
+        )}
       </Card>
 
       {/* Communication / Forum Section */}
@@ -4166,7 +4268,10 @@ export default function GroupDetailsPage() {
   }, [location.search]);
   const [me, setMe] = React.useState(null);
   const [canSeeRequests, setCanSeeRequests] = React.useState(false);
+  // Member management (Settings tab, role menu) — owner/group admin/staff.
   const [canApproveRequests, setCanApproveRequests] = React.useState(false);
+  // Approving/declining join requests — also allowed for group moderators.
+  const [canReviewRequests, setCanReviewRequests] = React.useState(false);
   const [moderatorCanI, setModeratorCanI] = React.useState(null);
 
   const [toast, setToast] = React.useState({ open: false, msg: "", type: "info" });
@@ -4209,8 +4314,18 @@ export default function GroupDetailsPage() {
         if (requestId !== groupRequestIdRef.current) return;
         if (response.ok) {
           const can = await response.json();
-          setCanSeeRequests(Boolean(can?.is_admin || can?.is_moderator));
-          setCanApproveRequests(Boolean(can?.is_admin));
+          // The backend is the single source of truth for group-scoped rights.
+          // `can_manage_members` covers owner / group admin / platform staff;
+          // moderators get content moderation but no member management.
+          const perms = can?.permissions || {};
+          const isModOrAdmin = Boolean(can?.is_moderator || can?.is_admin);
+          setCanSeeRequests(Boolean(perms.can_manage_members || isModOrAdmin));
+          setCanApproveRequests(Boolean(perms.can_manage_members ?? can?.is_admin));
+          // Moderators can act on join requests even though they cannot manage
+          // members or edit the group.
+          setCanReviewRequests(
+            Boolean(perms.can_review_join_requests ?? (perms.can_manage_members || isModOrAdmin))
+          );
           setModeratorCanI(can);
           return;
         }
@@ -4221,6 +4336,7 @@ export default function GroupDetailsPage() {
       if (requestId === groupRequestIdRef.current) {
         setCanSeeRequests(false);
         setCanApproveRequests(false);
+        setCanReviewRequests(false);
         setModeratorCanI(null);
       }
     })();
@@ -4476,6 +4592,9 @@ export default function GroupDetailsPage() {
   const membershipStatus = String(group?.membership_status || "").toLowerCase();
   const currentRole = String(group?.current_user_role || "").toLowerCase();
   const isElevatedGroupUser = ["owner", "admin", "moderator"].includes(currentRole);
+  // Group-scoped capability flags, resolved server-side.
+  const groupPerms = moderatorCanI?.permissions || group?.permissions || {};
+  const canAssignAdmin = Boolean(groupPerms.can_assign_admin_role);
   const canAccessGroupContent = Boolean(
     membershipStatus === "active" || isElevatedGroupUser || canSeeRequests
   );
@@ -4494,6 +4613,7 @@ export default function GroupDetailsPage() {
               group={group}
               me={me}
               canManageMembers={canApproveRequests}
+              canAssignAdmin={canAssignAdmin}
               onMembersAdded={(count) => setGroup((prev) => prev ? { ...prev, member_count: Number(prev.member_count || 0) + count } : prev)}
               onMemberRemoved={() => setGroup((prev) => prev ? { ...prev, member_count: Math.max(0, Number(prev.member_count || 0) - 1) } : prev)}
             />
@@ -4510,7 +4630,7 @@ export default function GroupDetailsPage() {
         render: () => (
           <RequestsTab
             groupId={groupId}
-            canApprove={canApproveRequests}
+            canApprove={canReviewRequests}
             onApproved={() =>
               setGroup((prev) => prev ? { ...prev, member_count: Number(prev.member_count || 0) + 1 } : prev)
             }
@@ -4528,7 +4648,7 @@ export default function GroupDetailsPage() {
       });
     }
     return items;
-  }, [canAccessGroupContent, canApproveRequests, canSeeRequests, group, groupId, me, moderatorCanI]);
+  }, [canAccessGroupContent, canApproveRequests, canAssignAdmin, canReviewRequests, canSeeRequests, group, groupId, me, moderatorCanI]);
 
   React.useEffect(() => {
     if (tab >= tabDefs.length) setTab(0);
