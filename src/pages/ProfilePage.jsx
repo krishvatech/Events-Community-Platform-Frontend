@@ -48,6 +48,7 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import RichProfile from "./community/RichProfile";
+import LinkedInProfileImportDialog from "../components/LinkedInProfileImportDialog";
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -1358,6 +1359,7 @@ export default function ProfilePage() {
   const [deletingCert, setDeletingCert] = useState(false);
   const [deletingMember, setDeletingMember] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [linkedinImportOpen, setLinkedinImportOpen] = useState(false);
 
   // New helper for consistent toast notifications
   const showNotification = (type, msg) => {
@@ -3615,6 +3617,17 @@ export default function ProfilePage() {
                             ) : (
                               "Sync Profile"
                             )}
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Import your profile from a LinkedIn PDF export">
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<LinkedInIcon />}
+                            onClick={() => setLinkedinImportOpen(true)}
+                            sx={{ textTransform: "none", borderRadius: 2 }}
+                          >
+                            Import LinkedIn Profile
                           </Button>
                         </Tooltip>
                         <Tooltip title="Identity Details">
@@ -6603,6 +6616,11 @@ export default function ProfilePage() {
           }
         }}
         showToast={showNotification}
+      />
+      <LinkedInProfileImportDialog
+        open={linkedinImportOpen}
+        onClose={() => setLinkedinImportOpen(false)}
+        onImported={() => window.location.reload()}
       />
     </div >
   );
