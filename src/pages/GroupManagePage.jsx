@@ -4759,8 +4759,31 @@ export default function GroupManagePage() {
         return sortedMembersWithOwner.slice(start, start + MEMBERS_PER_PAGE);
     }, [sortedMembersWithOwner, memberPage]);
 
+    const openMemberProfile = (member) => {
+        const u = member?.user || member;
+        const profileId = u?.id || member?.user_id || member?.userId;
+        if (!profileId) return;
+
+        if (currentUserId && Number(profileId) === Number(currentUserId)) {
+            navigate("/account/profile");
+            return;
+        }
+
+        navigate(`/community/rich-profile/${profileId}`, { state: { user: u } });
+    };
+
+    const handleMemberRowKeyDown = (event, member) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openMemberProfile(member);
+        }
+    };
+
     // action menu handlers
     const openMemberMenu = (evt, m) => {
+        evt?.stopPropagation?.();
+
         if (myRole === "admin" && currentUserId && Number(m.user.id) === Number(currentUserId)) return;
 
         // NEW: moderators cannot open menu for others or for admin/owner rows
@@ -5451,7 +5474,37 @@ export default function GroupManagePage() {
                                                                 if (!isSelf) disabled = true;
                                                             }
                                                             return (
-                                                                <Stack key={m.user.id} direction="row" alignItems="center" spacing={2} className="py-2">
+                                                                <Stack
+                                                                    key={m.user.id}
+                                                                    direction="row"
+                                                                    alignItems="center"
+                                                                    spacing={2}
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    onClick={() => openMemberProfile(m)}
+                                                                    onKeyDown={(event) => handleMemberRowKeyDown(event, m)}
+                                                                    sx={{
+                                                                        width: "100%",
+                                                                        minHeight: 54,
+                                                                        px: 1.5,
+                                                                        py: 1,
+                                                                        cursor: "pointer",
+                                                                        border: "1px solid transparent",
+                                                                        borderRadius: "18px",
+                                                                        boxSizing: "border-box",
+                                                                        transition: "background-color .15s ease, border-color .15s ease, box-shadow .15s ease",
+                                                                        "&:hover": {
+                                                                            bgcolor: "#f3f4f6",
+                                                                            borderColor: "#99f6e4",
+                                                                        },
+                                                                        "&:focus-visible": {
+                                                                            bgcolor: "#f3f4f6",
+                                                                            borderColor: "#99f6e4",
+                                                                            boxShadow: "0 0 0 1px #99f6e4",
+                                                                            outline: "none",
+                                                                        },
+                                                                    }}
+                                                                >
                                                                     <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
                                                                     <Box sx={{ flex: 1 }}>
                                                                         <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -5481,6 +5534,7 @@ export default function GroupManagePage() {
                                                                         <IconButton
                                                                             size="small"
                                                                             onClick={(e) => openMemberMenu(e, m)}
+                                                                            onKeyDown={(e) => e.stopPropagation()}
                                                                             disabled={disabled}
                                                                             title={
                                                                                 isOwnerRow
@@ -7525,4 +7579,3 @@ export default function GroupManagePage() {
     );
 
 }
-
