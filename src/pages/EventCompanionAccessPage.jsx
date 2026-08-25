@@ -21,6 +21,7 @@ import HowToRegIcon from '@mui/icons-material/HowToReg';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { LeadGenModal } from '../components/LeadGenModal.jsx';
+import ApplyNowModal from '../components/ApplyNowModal.jsx';
 import EventCompanionDirectoryPage from './EventCompanionDirectoryPage';
 
 dayjs.extend(utc);
@@ -51,6 +52,7 @@ function EventCompanionAccessPage() {
   const [eventStarted, setEventStarted] = useState(false);
   const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
   const [missingLeadGenFields, setMissingLeadGenFields] = useState({});
+  const [showApplicationForm, setShowApplicationForm] = useState(false);
 
   useEffect(() => {
     // Extract invite_token from URL and call checkAccess with it
@@ -392,6 +394,15 @@ function EventCompanionAccessPage() {
     }, 500);
   };
 
+  const handleApplicationSuccess = (applicationData) => {
+    console.log('Application submitted successfully:', applicationData);
+    // Close the form and refresh access
+    setShowApplicationForm(false);
+    setTimeout(() => {
+      checkAccess();
+    }, 1000);
+  };
+
   if (loading || processingInvite) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', flexDirection: 'column' }}>
@@ -646,8 +657,72 @@ function EventCompanionAccessPage() {
     );
   }
 
-  // If authenticated but not registered, show registration prompt
+  // If authenticated but not registered, show application form for 'apply' events, or registration prompt for 'open' events
   if (isAuthenticated && !isRegistered && event && userData) {
+    // For 'apply' type events, show the full application form
+    if (event.registration_type === 'apply') {
+      return (
+        <>
+          <Helmet>
+            <title>Apply for Event - {event?.title || 'Event'}</title>
+          </Helmet>
+
+          <Container maxWidth="md" sx={{ py: 6 }}>
+            <Box sx={{ mb: 4 }}>
+              <Button
+                startIcon={<ArrowBackIcon />}
+                onClick={() => navigate(`/events/${slug}`)}
+                sx={{ textTransform: 'none', mb: 2 }}
+              >
+                Back to Event
+              </Button>
+
+              <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: 2 }}>
+                <Box sx={{ textAlign: 'center', mb: 4 }}>
+                  <EventNoteIcon sx={{ fontSize: 48, color: '#E8532F', mb: 2 }} />
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
+                    Apply to Event Companion
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, mb: 2, color: '#333' }}>
+                    {event.title}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#666' }}>
+                    Welcome back, {userData.first_name || userData.username}! Complete the application form below to access the Event Companion.
+                  </Typography>
+                </Box>
+
+                {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+              </Paper>
+            </Box>
+
+            {/* Embedded Application Modal/Form */}
+            <ApplyNowModal
+              open={true}
+              onClose={() => {
+                // On close, go back to event details
+                navigate(`/events/${slug}`);
+              }}
+              event={event}
+              token={getToken()}
+              onSuccess={handleApplicationSuccess}
+            />
+
+            <LeadGenModal
+              open={leadGenModalOpen}
+              onClose={() => {
+                setLeadGenModalOpen(false);
+                setMissingLeadGenFields({});
+              }}
+              onSuccess={handleLeadGenSuccess}
+              user={userData}
+              missingFields={missingLeadGenFields}
+            />
+          </Container>
+        </>
+      );
+    }
+
+    // For 'open' type events, show simple registration prompt
     return (
       <>
         <Helmet>
@@ -690,9 +765,7 @@ function EventCompanionAccessPage() {
                     Welcome back, {userData.first_name || userData.username}!
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#333' }}>
-                    {event.registration_type === 'apply'
-                      ? 'To access the Event Companion, you need to submit an application. The event organizer will review and approve your application.'
-                      : 'To access the Event Companion, you need to register for this event first.'}
+                    To access the Event Companion, you need to register for this event first.
                   </Typography>
                 </Box>
 
@@ -711,20 +784,18 @@ function EventCompanionAccessPage() {
                   {registering ? (
                     <>
                       <CircularProgress size={20} sx={{ mr: 1 }} />
-                      {event.registration_type === 'apply' ? 'Submitting...' : 'Registering...'}
+                      Registering...
                     </>
                   ) : (
                     <>
                       <HowToRegIcon sx={{ mr: 1 }} />
-                      {event.registration_type === 'apply' ? 'Submit Application' : 'Register for Event'}
+                      Register for Event
                     </>
                   )}
                 </Button>
 
                 <Typography variant="caption" sx={{ textAlign: 'center', color: '#666' }}>
-                  {event.registration_type === 'apply'
-                    ? 'Your application will be reviewed by the event organizer.'
-                    : 'Registration is free. You\'ll be able to access the Event Companion immediately after.'}
+                  Registration is free. You'll be able to access the Event Companion immediately after.
                 </Typography>
               </Stack>
             </Paper>
