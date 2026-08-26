@@ -43,6 +43,7 @@ import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 // -----------------------------------------------------------------------------
@@ -3311,7 +3312,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
                 border: "1px solid #eee",
                 borderRadius: 2,
                 mb: 1,
-                pr: showMenu ? 7 : 2,
+                pr: showMenu ? 10 : 5,
                 alignItems: "center",
                 transition: "border-color .15s ease, box-shadow .15s ease",
                 "&:hover": {
@@ -3367,19 +3368,40 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
                   }
                 />
               </ListItemButton>
-              {showMenu && (
-                <ListItemSecondaryAction>
-                  <IconButton
-                    edge="end"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMenuClick(e, m);
-                    }}
-                  >
-                    <MoreVertRoundedIcon />
-                  </IconButton>
-                </ListItemSecondaryAction>
-              )}
+              <ListItemSecondaryAction>
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Tooltip title="View Profile">
+                    <IconButton
+                      edge="end"
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openMemberProfile(m);
+                      }}
+                      sx={{
+                        cursor: "pointer",
+                        "&:hover": {
+                          bgcolor: "rgba(16, 184, 166, 0.1)",
+                        },
+                      }}
+                    >
+                      <PersonOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  {showMenu && (
+                    <IconButton
+                      edge="end"
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMenuClick(e, m);
+                      }}
+                    >
+                      <MoreVertRoundedIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </Stack>
+              </ListItemSecondaryAction>
             </ListItem>
           );
         })}
