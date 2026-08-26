@@ -1668,6 +1668,16 @@ export default function EventDetailsPage() {
   const showReplayCTA = isEffectivelyPast && replayReady && canSignupForReplay;
   const showReplayAccess = isEffectivelyPast && replayEnabled && hasReplayAccess;
 
+  // Guest apply is only meaningful right before the event starts. Outside that
+  // window an anonymous visitor still needs a way in, so send them to sign-in
+  // and bring them back to this exact page afterwards.
+  const canApplyAsGuestNow = !token && isWithinGuestJoinWindow(event.start_time);
+  const mustSignInToApply = !token && !canApplyAsGuestNow;
+  const goToSignInForApply = () => {
+    const nextPath = `${location.pathname}${location.search}`;
+    navigate(`/signin?next=${encodeURIComponent(nextPath)}`);
+  };
+
   const desc = event?.description ?? "";
 
   // Pre-event Q&A eligibility
@@ -2263,11 +2273,11 @@ export default function EventDetailsPage() {
                           <>
                             {paymentPending
                               ? <PaymentPendingDetails registration={registration} event={event} />
-                              : (!myApplication || applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined') && (!token ? isWithinGuestJoinWindow(event.start_time) : true)
+                              : (!myApplication || applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined')
                               ? (
                                 <>
                                   <Button
-                                    onClick={openApplyModalAfterProfileCheck}
+                                    onClick={mustSignInToApply ? goToSignInForApply : openApplyModalAfterProfileCheck}
                                     variant="contained"
                                     sx={{
                                       textTransform: "none",
@@ -2276,7 +2286,11 @@ export default function EventDetailsPage() {
                                     }}
                                     className="rounded-xl"
                                   >
-                                    {applicationStatus === 'declined' ? (token ? 'Apply Again' : 'Apply Again as Guest') : (token ? 'Apply Now' : 'Apply as Guest')}
+                                    {mustSignInToApply
+                                      ? (applicationStatus === 'declined' ? 'Sign in to Apply Again' : 'Sign in to Apply')
+                                      : applicationStatus === 'declined'
+                                        ? (token ? 'Apply Again' : 'Apply Again as Guest')
+                                        : (token ? 'Apply Now' : 'Apply as Guest')}
                                   </Button>
                                   {applicationStatus === 'declined' && (
                                     <Typography variant="caption" sx={{ color: "#666" }}>
