@@ -49,6 +49,7 @@ import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import EmojiEventsRoundedIcon from "@mui/icons-material/EmojiEventsRounded";
 import MicRoundedIcon from "@mui/icons-material/MicRounded";
 import MarkEmailReadRoundedIcon from "@mui/icons-material/MarkEmailReadRounded";
+import NewspaperRoundedIcon from "@mui/icons-material/NewspaperRounded";
 import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
 import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -241,6 +242,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/admin/notifications", icon: NotificationsRoundedIcon, badge: "notifications" },
+            { label: "Newsletter", to: "/newsletter", icon: NewspaperRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
@@ -258,6 +260,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         manageItems = [
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
+            { label: "Newsletter", to: "/newsletter", icon: NewspaperRoundedIcon },
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
@@ -274,6 +277,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         manageItems = [
             { label: "Messages", to: "/community?view=messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
+            { label: "Newsletter", to: "/newsletter", icon: NewspaperRoundedIcon },
             { label: "My Events", to: "/account/events", icon: EventNoteRoundedIcon },
             { label: "My Groups", to: "/community/mygroups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
