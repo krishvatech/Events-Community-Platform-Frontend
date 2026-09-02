@@ -89,6 +89,8 @@ const blankForm = {
   audience_slugs: [],
 };
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const formatDateTime = (value) => {
   if (!value) return "-";
   const date = new Date(value);
@@ -305,10 +307,14 @@ function NewsletterForm({ value, categories, readOnly, errors, onChange }) {
     else set.add(slug);
     setField("audience_slugs", Array.from(set));
   };
+  const campaignHasErrors = Boolean(errors.name || errors.subject);
+  const senderHasErrors = Boolean(errors.from_name || errors.from_email);
+  const audienceHasErrors = Boolean(errors.audience_slugs);
+  const contentHasErrors = Boolean(errors.html_content);
 
   return (
     <Stack spacing={3}>
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: campaignHasErrors ? "error.main" : "#F0EEEB" }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 2 }}>Campaign Details</Typography>
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
@@ -323,25 +329,24 @@ function NewsletterForm({ value, categories, readOnly, errors, onChange }) {
         </Grid>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: senderHasErrors ? "error.main" : "#F0EEEB" }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 2 }}>Sender</Typography>
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <TextField label="From Name" value={value.from_name} onChange={(e) => setField("from_name", e.target.value)} fullWidth InputProps={{ readOnly }} />
+            <TextField label="From Name" value={value.from_name} onChange={(e) => setField("from_name", e.target.value)} error={Boolean(errors.from_name)} helperText={errors.from_name} fullWidth required InputProps={{ readOnly }} />
           </Grid>
           <Grid item xs={12} md={6}>
-            <TextField label="From Email" type="email" value={value.from_email} onChange={(e) => setField("from_email", e.target.value)} error={Boolean(errors.from_email)} helperText={errors.from_email} fullWidth InputProps={{ readOnly }} />
+            <TextField label="From Email" type="email" value={value.from_email} onChange={(e) => setField("from_email", e.target.value)} error={Boolean(errors.from_email)} helperText={errors.from_email} fullWidth required InputProps={{ readOnly }} />
           </Grid>
         </Grid>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: audienceHasErrors ? "error.main" : "#F0EEEB" }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 1 }}>Audience</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Choose one or more newsletter audiences.
         </Typography>
-        {errors.audience_slugs && <Alert severity="error" sx={{ mb: 2 }}>{errors.audience_slugs}</Alert>}
-        <FormControl component="fieldset" fullWidth disabled={readOnly}>
+        <FormControl component="fieldset" fullWidth disabled={readOnly} error={audienceHasErrors}>
           <FormGroup>
             <Grid container spacing={1}>
               {categories.map((category) => (
@@ -359,11 +364,12 @@ function NewsletterForm({ value, categories, readOnly, errors, onChange }) {
               ))}
             </Grid>
           </FormGroup>
+          {errors.audience_slugs && <FormHelperText>{errors.audience_slugs}</FormHelperText>}
           {categories.length === 0 && <FormHelperText>No active newsletter audiences found.</FormHelperText>}
         </FormControl>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: contentHasErrors ? "error.main" : "#F0EEEB" }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 2 }}>Email Content</Typography>
         <Stack spacing={2}>
           <TextField label="HTML Content" value={value.html_content} onChange={(e) => setField("html_content", e.target.value)} multiline minRows={12} fullWidth required error={Boolean(errors.html_content)} helperText={errors.html_content || "Enter the HTML email body."} InputProps={{ readOnly }} />
@@ -480,9 +486,18 @@ export default function AdminNewsletterPage() {
   const validate = () => {
     const errors = {};
     if (!form.name.trim()) errors.name = "Campaign name is required.";
-    if (form.from_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.from_email.trim())) errors.from_email = "Enter a valid sender email.";
+    if (!form.subject.trim()) errors.subject = "Subject is required.";
+    if (!form.from_name.trim()) errors.from_name = "From name is required.";
+    if (!form.from_email.trim()) errors.from_email = "From email is required.";
+    else if (!emailPattern.test(form.from_email.trim())) errors.from_email = "Enter a valid sender email.";
+    if (!form.html_content.trim()) errors.html_content = "HTML content is required.";
+    if (!form.audience_slugs?.length) errors.audience_slugs = "Select at least one audience.";
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    const isValid = Object.keys(errors).length === 0;
+    if (!isValid) {
+      setError("Complete the required newsletter fields before continuing.");
+    }
+    return isValid;
   };
 
   const saveDraft = async () => {
@@ -594,6 +609,16 @@ export default function AdminNewsletterPage() {
     setError("Save your changes before previewing, testing, scheduling, or sending.");
   };
 
+  const openIfValid = (openAction) => {
+    if (isDirty) {
+      blockIfDirty();
+      return;
+    }
+    if (!validate()) return;
+    setError("");
+    openAction();
+  };
+
   const openPreview = async () => {
     if (isNew) return;
     if (isDirty) {
@@ -610,6 +635,7 @@ export default function AdminNewsletterPage() {
   };
 
   const sendTest = async (email) => {
+    if (!validate()) return;
     setTestState((s) => ({ ...s, loading: true, error: "" }));
     try {
       await sendNewsletterTestEmail(campaignId, email);
@@ -625,6 +651,7 @@ export default function AdminNewsletterPage() {
       blockIfDirty();
       return;
     }
+    if (!validate()) return;
     setScheduleState((s) => ({ ...s, loading: true, error: "" }));
     try {
       const data = await scheduleNewsletterCampaign(campaignId, scheduledAt);
@@ -637,6 +664,11 @@ export default function AdminNewsletterPage() {
     } catch (err) {
       setScheduleState((s) => ({ ...s, loading: false, error: getErrorMessage(err, "We could not schedule this campaign.") }));
     }
+  };
+
+  const sendNow = () => {
+    if (!validate()) return;
+    runAndRefresh(() => sendNewsletterCampaign(campaignId), "Newsletter send accepted.", { refetchOnly: true, poll: true });
   };
 
   const filteredCampaigns = useMemo(
@@ -746,10 +778,10 @@ export default function AdminNewsletterPage() {
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {detailLoaded && !isNew && <Button startIcon={<PreviewRoundedIcon />} onClick={openPreview} disabled={actionsDisabledForDirty} sx={{ textTransform: "none" }}>Preview</Button>}
-          {detailLoaded && !isNew && editable && <Button startIcon={<EmailRoundedIcon />} onClick={() => isDirty ? blockIfDirty() : setTestState({ open: true, loading: false, error: "" })} disabled={actionsDisabledForDirty} sx={{ textTransform: "none" }}>Send Test Email</Button>}
-          {canSchedule && <Button startIcon={<ScheduleRoundedIcon />} onClick={() => isDirty ? blockIfDirty() : setScheduleState({ open: true, loading: false, error: "" })} disabled={actionsDisabledForDirty} sx={{ textTransform: "none" }}>{status === "scheduled" ? "Reschedule" : "Schedule"}</Button>}
+          {detailLoaded && !isNew && editable && <Button startIcon={<EmailRoundedIcon />} onClick={() => openIfValid(() => setTestState({ open: true, loading: false, error: "" }))} disabled={actionsDisabledForDirty} sx={{ textTransform: "none" }}>Send Test Email</Button>}
+          {canSchedule && <Button startIcon={<ScheduleRoundedIcon />} onClick={() => openIfValid(() => setScheduleState({ open: true, loading: false, error: "" }))} disabled={actionsDisabledForDirty} sx={{ textTransform: "none" }}>{status === "scheduled" ? "Reschedule" : "Schedule"}</Button>}
           {canCancel && <Button color="warning" startIcon={<StopCircleRoundedIcon />} onClick={() => setConfirmState({ type: "cancel", loading: false })} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Cancel Scheduled Send</Button>}
-          {canSendNow && <Button color="success" variant="contained" startIcon={<SendRoundedIcon />} onClick={() => isDirty ? blockIfDirty() : setConfirmState({ type: "send", loading: false })} disabled={sendNowDisabled} sx={{ textTransform: "none" }}>Send Now</Button>}
+          {canSendNow && <Button color="success" variant="contained" startIcon={<SendRoundedIcon />} onClick={() => openIfValid(() => setConfirmState({ type: "send", loading: false }))} disabled={sendNowDisabled} sx={{ textTransform: "none" }}>Send Now</Button>}
           {editable && <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={saveDraft} disabled={saving || loading} sx={{ textTransform: "none" }}>{saving ? "Saving..." : "Save Draft"}</Button>}
           {canDelete && <Button color="error" startIcon={<DeleteRoundedIcon />} onClick={() => setConfirmState({ type: "delete", loading: false })} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Delete</Button>}
         </Stack>
@@ -801,7 +833,7 @@ export default function AdminNewsletterPage() {
         confirmColor="success"
         loading={confirmState.loading}
         onClose={() => setConfirmState({ type: "", loading: false })}
-        onConfirm={() => runAndRefresh(() => sendNewsletterCampaign(campaignId), "Newsletter send accepted.", { refetchOnly: true, poll: true })}
+        onConfirm={sendNow}
       >
         <Stack spacing={2}>
           <Typography>This newsletter will be sent immediately. Once provider delivery starts, it cannot safely be recalled.</Typography>
