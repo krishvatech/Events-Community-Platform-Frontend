@@ -50,6 +50,7 @@ import {
   cancelNewsletterCampaign,
   createNewsletterCampaign,
   deleteNewsletterCampaign,
+  getNewsletterCampaignAnalytics,
   getNewsletterCampaign,
   listNewsletterCampaigns,
   listNewsletterCategories,
@@ -110,6 +111,18 @@ const formatDateTimeLocalInput = (value) => {
   if (Number.isNaN(date.getTime())) return "";
   const offsetMs = date.getTimezoneOffset() * 60 * 1000;
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
+const formatNumber = (value) => {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number)) return "0";
+  return new Intl.NumberFormat().format(number);
+};
+
+const formatPercent = (rate) => {
+  const number = Number(rate ?? 0);
+  if (!Number.isFinite(number)) return "0%";
+  return `${Math.round(number * 100)}%`;
 };
 
 const getCampaignAudienceSlugs = (campaign) => {
@@ -380,6 +393,117 @@ function NewsletterForm({ value, categories, readOnly, errors, onChange }) {
   );
 }
 
+function MetricValue({ label, value }) {
+  return (
+    <Box>
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>{value}</Typography>
+    </Box>
+  );
+}
+
+function CampaignPerformance({ analyticsState }) {
+  const analytics = analyticsState.data || {};
+  const sendSummary = analytics.send_summary || {};
+  const engagement = analytics.engagement || {};
+  const rates = analytics.rates || {};
+
+  return (
+    <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A" }}>Campaign Performance</Typography>
+          {sendSummary.send_status && <Chip size="small" label={`Send: ${sendSummary.send_status}`} variant="outlined" />}
+        </Stack>
+
+        {analyticsState.loading ? (
+          <Grid container spacing={2}>
+            {Array.from({ length: 11 }).map((_, index) => (
+              <Grid item xs={6} sm={4} md={3} key={index}>
+                <Skeleton height={54} />
+              </Grid>
+            ))}
+          </Grid>
+        ) : analyticsState.error ? (
+          <Alert severity="warning" variant="outlined">{analyticsState.error}</Alert>
+        ) : (
+          <Stack spacing={2.5}>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#2C3E5A", mb: 1 }}>Send Summary</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Sent" value={formatNumber(sendSummary.sent_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Failed" value={formatNumber(sendSummary.failed_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Success Rate" value={formatPercent(sendSummary.success_rate)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Attempt Count" value={formatNumber(sendSummary.attempt_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Send Status" value={sendSummary.send_status || "-"} />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#2C3E5A", mb: 1 }}>Engagement</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Delivered" value={formatNumber(engagement.delivered_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Opened" value={formatNumber(engagement.opened_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Unique Opens" value={formatNumber(engagement.unique_open_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Clicked" value={formatNumber(engagement.clicked_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Unique Clicks" value={formatNumber(engagement.unique_click_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Unsubscribed" value={formatNumber(engagement.unsubscribe_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Bounced" value={formatNumber(engagement.bounced_count)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Failed" value={formatNumber(engagement.failed_count)} />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#2C3E5A", mb: 1 }}>Rates</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Open Rate" value={formatPercent(rates.open_rate)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Click Rate" value={formatPercent(rates.click_rate)} />
+                </Grid>
+                <Grid item xs={6} sm={4} md={3}>
+                  <MetricValue label="Unsubscribe Rate" value={formatPercent(rates.unsubscribe_rate)} />
+                </Grid>
+              </Grid>
+            </Box>
+          </Stack>
+        )}
+      </Stack>
+    </Paper>
+  );
+}
+
 export default function AdminNewsletterPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -402,6 +526,8 @@ export default function AdminNewsletterPage() {
   const [testState, setTestState] = useState({ open: false, loading: false, error: "" });
   const [scheduleState, setScheduleState] = useState({ open: false, loading: false, error: "" });
   const [confirmState, setConfirmState] = useState({ type: "", loading: false });
+  const [analyticsState, setAnalyticsState] = useState({ loading: false, data: null, error: "" });
+  const [activeTab, setActiveTab] = useState("manage");
   const [sendPending, setSendPending] = useState(false);
   const mountedRef = useRef(false);
   const currentCampaignIdRef = useRef(campaignId);
@@ -432,6 +558,7 @@ export default function AdminNewsletterPage() {
 
   useEffect(() => {
     currentCampaignIdRef.current = campaignId;
+    setActiveTab("manage");
     stopSendPolling();
   }, [campaignId, isNew]);
 
@@ -454,6 +581,23 @@ export default function AdminNewsletterPage() {
     }
   };
 
+  const loadAnalytics = async (campaignUuid) => {
+    if (!campaignUuid) return;
+    setAnalyticsState((state) => ({ ...state, loading: true, error: "" }));
+    try {
+      const data = await getNewsletterCampaignAnalytics(campaignUuid);
+      if (!mountedRef.current || currentCampaignIdRef.current !== campaignUuid) return;
+      setAnalyticsState({ loading: false, data, error: "" });
+    } catch (err) {
+      if (!mountedRef.current || currentCampaignIdRef.current !== campaignUuid) return;
+      setAnalyticsState({
+        loading: false,
+        data: null,
+        error: getErrorMessage(err, "We could not load campaign analytics."),
+      });
+    }
+  };
+
   const loadDetail = async () => {
     setLoading(true);
     setError("");
@@ -463,15 +607,18 @@ export default function AdminNewsletterPage() {
         setCampaign(null);
         setForm(blankForm);
         setSavedForm(blankForm);
+        setAnalyticsState({ loading: false, data: null, error: "" });
       } else {
         const data = await getNewsletterCampaign(campaignId);
         const nextForm = campaignToForm(data);
         setCampaign(data);
         setForm(nextForm);
         setSavedForm(nextForm);
+        loadAnalytics(campaignId);
       }
     } catch (err) {
       setCampaign(null);
+      setAnalyticsState({ loading: false, data: null, error: "" });
       setError(getErrorMessage(err, "We could not load this campaign."));
     } finally {
       setLoading(false);
@@ -538,6 +685,7 @@ export default function AdminNewsletterPage() {
     setCampaign(data);
     setForm(nextForm);
     setSavedForm(nextForm);
+    loadAnalytics(campaignId);
     if (["sending", "sent", "failed"].includes(String(data?.status || "").toLowerCase())) {
       setSendPending(false);
     }
@@ -685,6 +833,9 @@ export default function AdminNewsletterPage() {
   const canSendNow = detailLoaded && !isNew && status === "draft";
   const sendNowDisabled = actionsDisabledForDirty || sendPending;
   const canCancel = detailLoaded && !isNew && status === "scheduled";
+  const showDetailTabs = detailLoaded && !isNew;
+  const showManageTab = isNew || activeTab === "manage";
+  const showAnalyticsTab = showDetailTabs && activeTab === "analytics";
   const audienceLabels = getCampaignAudienceLabels(campaign);
 
   if (!isDetail) {
@@ -805,20 +956,33 @@ export default function AdminNewsletterPage() {
         </Paper>
       )}
       {detailLoaded && !isNew && campaign?.last_error && <Alert severity="error">{campaign.last_error}</Alert>}
-      {detailLoaded && !isNew && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
-          <Stack direction={{ xs: "column", md: "row" }} divider={<Divider flexItem orientation="vertical" />} spacing={2}>
-            <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Audience</Typography><Typography sx={{ fontWeight: 700 }}>{audienceLabels.join(", ") || "-"}</Typography></Box>
-            <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Scheduled</Typography><Typography sx={{ fontWeight: 700 }}>{formatDateTime(campaign.scheduled_at)}</Typography></Box>
-            <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Sent</Typography><Typography sx={{ fontWeight: 700 }}>{formatDateTime(campaign.sent_at || campaign.send_started_at)}</Typography></Box>
-            <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Last Synced</Typography><Typography sx={{ fontWeight: 700 }}>{formatDateTime(campaign.last_synced_to_mautic_at)}</Typography></Box>
-          </Stack>
+      {showDetailTabs && (
+        <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#F0EEEB", overflow: "hidden" }}>
+          <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ minHeight: 44, px: { xs: 1, md: 2 }, "& .MuiTab-root": { textTransform: "none", minHeight: 44 }, "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 }, "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" } }}>
+            <Tab label="Manage" value="manage" />
+            <Tab label="Analytics" value="analytics" />
+          </Tabs>
         </Paper>
       )}
 
+      {showManageTab && detailLoaded && !isNew && (
+        <Stack spacing={3}>
+          <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+            <Stack direction={{ xs: "column", md: "row" }} divider={<Divider flexItem orientation="vertical" />} spacing={2}>
+              <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Audience</Typography><Typography sx={{ fontWeight: 700 }}>{audienceLabels.join(", ") || "-"}</Typography></Box>
+              <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Scheduled</Typography><Typography sx={{ fontWeight: 700 }}>{formatDateTime(campaign.scheduled_at)}</Typography></Box>
+              <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Sent</Typography><Typography sx={{ fontWeight: 700 }}>{formatDateTime(campaign.sent_at || campaign.send_started_at)}</Typography></Box>
+              <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Last Synced</Typography><Typography sx={{ fontWeight: 700 }}>{formatDateTime(campaign.last_synced_to_mautic_at)}</Typography></Box>
+            </Stack>
+          </Paper>
+        </Stack>
+      )}
+
+      {showAnalyticsTab && <CampaignPerformance analyticsState={analyticsState} />}
+
       {loading ? (
         <Stack spacing={2}>{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} variant="rectangular" height={140} />)}</Stack>
-      ) : detailLoaded ? (
+      ) : detailLoaded && showManageTab ? (
         <NewsletterForm value={form} categories={categories} readOnly={!editable} errors={formErrors} onChange={setForm} />
       ) : null}
 
