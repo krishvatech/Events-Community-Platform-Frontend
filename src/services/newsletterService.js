@@ -20,6 +20,9 @@ export const createNewsletterCampaign = (payload) =>
 export const getNewsletterCampaign = (uuid) =>
   unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/`));
 
+export const getNewsletterCampaignAnalytics = (uuid) =>
+  unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/analytics/`));
+
 export const updateNewsletterCampaign = (uuid, payload) =>
   unwrap(apiClient.patch(`${adminCampaignsEndpoint}${uuid}/`, payload));
 
