@@ -455,7 +455,12 @@ function CampaignPerformance({ analyticsState }) {
               <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#2C3E5A", mb: 1 }}>Engagement</Typography>
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={4} md={3}>
-                  <MetricValue label="Delivered" value={formatNumber(engagement.delivered_count)} />
+                  <Box>
+                    <MetricValue label="Provider Sent Events" value={formatNumber(engagement.delivered_count)} />
+                    <Typography variant="caption" color="text.secondary">
+                      Number of emails Mautic processed for sending. This does not confirm inbox delivery.
+                    </Typography>
+                  </Box>
                 </Grid>
                 <Grid item xs={6} sm={4} md={3}>
                   <MetricValue label="Opened" value={formatNumber(engagement.opened_count)} />
@@ -476,7 +481,7 @@ function CampaignPerformance({ analyticsState }) {
                   <MetricValue label="Bounced" value={formatNumber(engagement.bounced_count)} />
                 </Grid>
                 <Grid item xs={6} sm={4} md={3}>
-                  <MetricValue label="Failed" value={formatNumber(engagement.failed_count)} />
+                  <MetricValue label="Tracking Failed Events" value={formatNumber(engagement.failed_count)} />
                 </Grid>
               </Grid>
             </Box>
