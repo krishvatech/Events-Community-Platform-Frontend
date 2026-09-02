@@ -30,6 +30,7 @@ import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
 import ProfilePage from "./pages/ProfilePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import NewsletterPage from "./pages/NewsletterPage.jsx";
+import AdminNewsletterPage from "./pages/AdminNewsletterPage.jsx";
 import ResourceDetailsPage from "./pages/ResourceDetailsPage.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
@@ -292,6 +293,9 @@ const AppShell = () => {
             <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
             <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
             <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
+            <Route path="newsletter" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/new" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/:campaignId" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
             <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
