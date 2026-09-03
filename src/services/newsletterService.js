@@ -33,6 +33,9 @@ export const deleteNewsletterCampaign = (uuid) =>
 export const previewNewsletterCampaign = (uuid) =>
   unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/preview/`));
 
+export const duplicateNewsletterCampaign = (uuid) =>
+  unwrap(apiClient.post(`${adminCampaignsEndpoint}${uuid}/duplicate/`));
+
 export const sendNewsletterTestEmail = (uuid, email) =>
   unwrap(apiClient.post(`${adminCampaignsEndpoint}${uuid}/test-email/`, { email }));
 
@@ -65,3 +68,17 @@ export const updateNewsletterAudience = (uuid, payload) =>
 
 export const deleteNewsletterAudience = (uuid) =>
   unwrap(apiClient.delete(`${adminAudiencesEndpoint}${uuid}/`));
+
+const adminCategoriesEndpoint = "/newsletter/admin/categories/";
+
+export const listNewsletterCategoriesAdmin = () =>
+  unwrap(apiClient.get(adminCategoriesEndpoint));
+
+export const createNewsletterCategory = (payload) =>
+  unwrap(apiClient.post(adminCategoriesEndpoint, payload));
+
+export const updateNewsletterCategory = (slug, payload) =>
+  unwrap(apiClient.patch(`${adminCategoriesEndpoint}${slug}/`, payload));
+
+export const deleteNewsletterCategory = (slug) =>
+  unwrap(apiClient.delete(`${adminCategoriesEndpoint}${slug}/`));

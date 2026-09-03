@@ -35,6 +35,7 @@ import {
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
@@ -50,8 +51,10 @@ import {
   cancelNewsletterCampaign,
   createNewsletterCampaign,
   deleteNewsletterCampaign,
+  duplicateNewsletterCampaign,
   getNewsletterCampaignAnalytics,
   getNewsletterCampaign,
+  listNewsletterAudiences,
   listNewsletterCampaigns,
   listNewsletterCategories,
   previewNewsletterCampaign,
@@ -60,6 +63,7 @@ import {
   sendNewsletterTestEmail,
   updateNewsletterCampaign,
 } from "../services/newsletterService";
+import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -79,14 +83,35 @@ const STATUS_COLORS = {
   cancelled: "default",
 };
 
+const starterHtml = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-family: Arial, sans-serif; color: #1B2A4A; background: #ffffff;">
+  <tr>
+    <td style="padding: 24px;">
+      <h1 style="margin: 0 0 16px; font-size: 28px; line-height: 1.25;">Newsletter headline</h1>
+      <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.6;">Write a short introduction for this newsletter.</p>
+      <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6;">Add the most important update, event, article, or deal alert here.</p>
+      <p style="margin: 0;">
+        <a href="https://imaa-institute.org" style="display: inline-block; padding: 12px 18px; background: #10b8a6; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: 700;">Read more</a>
+      </p>
+    </td>
+  </tr>
+</table>`;
+
+const starterPlainText = `Newsletter headline
+
+Write a short introduction for this newsletter.
+
+Add the most important update, event, article, or deal alert here.
+
+Read more: https://imaa-institute.org`;
+
 const blankForm = {
   name: "",
   subject: "",
   preview_text: "",
-  from_name: "",
-  from_email: "",
-  html_content: "",
-  plain_text: "",
+  from_name: "IMAA Connect",
+  from_email: "eventncommunity@gmail.com",
+  html_content: starterHtml,
+  plain_text: starterPlainText,
   audience_slugs: [],
 };
 
@@ -189,6 +214,7 @@ function NewsletterAdminNav({ value, onChange }) {
       >
         <Tab label="Campaigns" value="campaigns" />
         <Tab label="Audiences" value="audiences" />
+        <Tab label="Categories" value="categories" />
       </Tabs>
     </Paper>
   );
@@ -585,8 +611,11 @@ export default function AdminNewsletterPage() {
   const [scheduleState, setScheduleState] = useState({ open: false, loading: false, error: "" });
   const [confirmState, setConfirmState] = useState({ type: "", loading: false });
   const [analyticsState, setAnalyticsState] = useState({ loading: false, data: null, error: "" });
-  const [activeTab, setActiveTab] = useState("manage");
+  const [activeTab, setActiveTab] = useState("campaigns");
   const [sendPending, setSendPending] = useState(false);
+  const [audiences, setAudiences] = useState([]);
+  const [audiencesLoading, setAudiencesLoading] = useState(false);
+  const [loadedTabs, setLoadedTabs] = useState(new Set(["campaigns"]));
   const mountedRef = useRef(false);
   const currentCampaignIdRef = useRef(campaignId);
   const pollTimeoutRef = useRef(null);
@@ -613,6 +642,12 @@ export default function AdminNewsletterPage() {
       clearPollTimeout();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isDetail && (activeTab === "manage" || activeTab === "analytics")) {
+      setActiveTab("campaigns");
+    }
+  }, [isDetail, activeTab]);
 
   useEffect(() => {
     currentCampaignIdRef.current = campaignId;
@@ -770,6 +805,33 @@ export default function AdminNewsletterPage() {
     }
   };
 
+  const loadAudiences = async () => {
+    setAudiencesLoading(true);
+    try {
+      const data = await listNewsletterAudiences();
+      setAudiences(Array.isArray(data) ? data : data?.results || []);
+    } catch (err) {
+      console.error("Failed to load audiences:", err);
+    } finally {
+      setAudiencesLoading(false);
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (!loadedTabs.has(tab)) {
+      const newLoadedTabs = new Set(loadedTabs);
+      newLoadedTabs.add(tab);
+      setLoadedTabs(newLoadedTabs);
+      // Load data for the tab
+      if (tab === "campaigns") {
+        loadList();
+      } else if (tab === "audiences") {
+        loadAudiences();
+      }
+    }
+  };
+
   const runAndRefresh = async (runner, successMessage, { refetchOnly = false, poll = false } = {}) => {
     const startedCampaignId = campaignId;
     setConfirmState((s) => ({ ...s, loading: true }));
@@ -808,6 +870,18 @@ export default function AdminNewsletterPage() {
       if (mountedRef.current && currentCampaignIdRef.current === startedCampaignId) {
         setConfirmState((s) => ({ ...s, loading: false }));
       }
+    }
+  };
+
+  const duplicateCampaign = async (uuid) => {
+    if (!uuid) return;
+    setError("");
+    try {
+      const data = await duplicateNewsletterCampaign(uuid);
+      setSnack({ open: true, severity: "success", message: "Campaign duplicated as a new draft." });
+      navigate(`/admin/newsletter/${data.uuid}`);
+    } catch (err) {
+      setError(getErrorMessage(err, "We could not duplicate this campaign."));
     }
   };
 
@@ -903,83 +977,160 @@ export default function AdminNewsletterPage() {
   if (!isDetail) {
     return (
       <Stack spacing={3}>
-        <NewsletterAdminNav value="campaigns" onChange={handleNewsletterNavChange} />
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 0.75 }}>Newsletter Campaigns</Typography>
-            <Typography color="text.secondary">Create, schedule, and review newsletter campaigns.</Typography>
-          </Box>
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate("/admin/newsletter/new")} sx={{ textTransform: "none" }}>
-            Create Campaign
-          </Button>
-        </Box>
-
-        <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#F0EEEB", overflow: "hidden" }}>
-          <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderBottom: "1px solid #F0EEEB", display: "flex", justifyContent: "space-between", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
-            <Tabs value={filter} onChange={(_, v) => setFilter(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ minHeight: 40, "& .MuiTab-root": { textTransform: "none", minHeight: 40 }, "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 }, "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" } }}>
-              <Tab label="All" value="all" />
-              <Tab label="Draft" value="draft" />
-              <Tab label="Scheduled" value="scheduled" />
-              <Tab label="Sent" value="sent" />
-              <Tab label="Failed" value="failed" />
-              <Tab label="Cancelled" value="cancelled" />
-            </Tabs>
-            <Button startIcon={<RefreshRoundedIcon />} onClick={loadList} disabled={loading} sx={{ textTransform: "none", alignSelf: { xs: "flex-start", md: "center" } }}>
-              Refresh
+        <NewsletterAdminNav value={activeTab} onChange={handleTabChange} />
+        {activeTab === "campaigns" && (
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
+            <Box>
+              <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 0.75 }}>Newsletter Campaigns</Typography>
+              <Typography color="text.secondary">Create, schedule, and review newsletter campaigns.</Typography>
+            </Box>
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate("/admin/newsletter/new")} sx={{ textTransform: "none" }}>
+              Create Campaign
             </Button>
           </Box>
+        )}
 
-          {loading ? (
-            <Box sx={{ p: 3 }}><Stack spacing={1}>{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={46} />)}</Stack></Box>
-          ) : error ? (
-            <Box sx={{ p: 3 }}><Alert severity="error" action={<Button color="inherit" size="small" onClick={loadList}>Retry</Button>}>{error}</Alert></Box>
-          ) : filteredCampaigns.length === 0 ? (
-            <Box sx={{ p: 3 }}><Alert severity="info" variant="outlined">No newsletter campaigns found.</Alert></Box>
-          ) : (
-            <TableContainer sx={{ overflowX: "auto" }}>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: "#f3f4f6" }}>
-                    <TableCell>Campaign</TableCell>
-                    <TableCell>Audience</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Scheduled / Sent Time</TableCell>
-                    <TableCell>Updated</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredCampaigns.map((row) => (
-                    <TableRow hover key={row.uuid} sx={{ cursor: "pointer" }} onClick={() => navigate(`/admin/newsletter/${row.uuid}`)}>
-                      <TableCell>
-                        <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>{row.name || "Untitled campaign"}</Typography>
-                        <Typography variant="body2" color="text.secondary">{row.subject || "-"}</Typography>
-                      </TableCell>
-                      <TableCell>{getCampaignAudienceLabels(row).join(", ") || "-"}</TableCell>
-                      <TableCell><StatusChip status={row.status} /></TableCell>
-                      <TableCell>{formatDateTime(row.sent_at || row.scheduled_at || row.send_started_at)}</TableCell>
-                      <TableCell>{formatDateTime(row.updated_at)}</TableCell>
-                      <TableCell align="right">
-                        <Tooltip title="Open campaign">
-                          <IconButton onClick={(e) => { e.stopPropagation(); navigate(`/admin/newsletter/${row.uuid}`); }}>
-                            <EditRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
+        {activeTab === "campaigns" && (
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#F0EEEB", overflow: "hidden" }}>
+            <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderBottom: "1px solid #F0EEEB", display: "flex", justifyContent: "space-between", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
+              <Tabs value={filter} onChange={(_, v) => setFilter(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ minHeight: 40, "& .MuiTab-root": { textTransform: "none", minHeight: 40 }, "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 }, "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" } }}>
+                <Tab label="All" value="all" />
+                <Tab label="Draft" value="draft" />
+                <Tab label="Scheduled" value="scheduled" />
+                <Tab label="Sent" value="sent" />
+                <Tab label="Failed" value="failed" />
+                <Tab label="Cancelled" value="cancelled" />
+              </Tabs>
+              <Button startIcon={<RefreshRoundedIcon />} onClick={loadList} disabled={loading} sx={{ textTransform: "none", alignSelf: { xs: "flex-start", md: "center" } }}>
+                Refresh
+              </Button>
+            </Box>
+
+            {loading ? (
+              <Box sx={{ p: 3 }}><Stack spacing={1}>{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} height={46} />)}</Stack></Box>
+            ) : error ? (
+              <Box sx={{ p: 3 }}><Alert severity="error" action={<Button color="inherit" size="small" onClick={loadList}>Retry</Button>}>{error}</Alert></Box>
+            ) : filteredCampaigns.length === 0 ? (
+              <Box sx={{ p: 3 }}><Alert severity="info" variant="outlined">No newsletter campaigns found.</Alert></Box>
+            ) : (
+              <TableContainer sx={{ overflowX: "auto" }}>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: "#f3f4f6" }}>
+                      <TableCell>Campaign</TableCell>
+                      <TableCell>Audience</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Scheduled / Sent Time</TableCell>
+                      <TableCell>Updated</TableCell>
+                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredCampaigns.map((row) => (
+                      <TableRow hover key={row.uuid} sx={{ cursor: "pointer" }} onClick={() => navigate(`/admin/newsletter/${row.uuid}`)}>
+                        <TableCell>
+                          <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>{row.name || "Untitled campaign"}</Typography>
+                          <Typography variant="body2" color="text.secondary">{row.subject || "-"}</Typography>
+                        </TableCell>
+                        <TableCell>{getCampaignAudienceLabels(row).join(", ") || "-"}</TableCell>
+                        <TableCell><StatusChip status={row.status} /></TableCell>
+                        <TableCell>{formatDateTime(row.sent_at || row.scheduled_at || row.send_started_at)}</TableCell>
+                        <TableCell>{formatDateTime(row.updated_at)}</TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Duplicate campaign">
+                            <IconButton onClick={(e) => { e.stopPropagation(); duplicateCampaign(row.uuid); }}>
+                              <ContentCopyRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Open campaign">
+                            <IconButton onClick={(e) => { e.stopPropagation(); navigate(`/admin/newsletter/${row.uuid}`); }}>
+                              <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
+        )}
+
+        {activeTab === "audiences" && loadedTabs.has("audiences") && (
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#F0EEEB", overflow: "hidden" }}>
+            <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mb: 3 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A" }}>
+                    Newsletter Audiences
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Manage audience segments for newsletter campaigns
+                  </Typography>
+                </Box>
+                <Button startIcon={<RefreshRoundedIcon />} onClick={loadAudiences} disabled={audiencesLoading} sx={{ textTransform: "none" }}>
+                  Refresh
+                </Button>
+              </Box>
+
+              {audiencesLoading ? (
+                <Stack spacing={1}>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} height={60} variant="rectangular" sx={{ borderRadius: 1 }} />
                   ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Paper>
+                </Stack>
+              ) : audiences.length === 0 ? (
+                <Alert severity="info" variant="outlined">
+                  No audiences found. Create an audience to target newsletter campaigns.
+                </Alert>
+              ) : (
+                <TableContainer sx={{ mt: 2 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: "#f3f4f6" }}>
+                        <TableCell sx={{ fontWeight: 700 }}>Audience Name</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Slug</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }} align="center">
+                          Status
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {audiences.map((audience) => (
+                        <TableRow key={audience.uuid} sx={{ "&:hover": { bgcolor: "#fafafa" } }}>
+                          <TableCell sx={{ fontWeight: 700, color: "#1B2A4A" }}>{audience.name}</TableCell>
+                          <TableCell>
+                            <code style={{ fontSize: "12px", color: "#666" }}>{audience.slug}</code>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={audience.is_active ? "Active" : "Inactive"}
+                              color={audience.is_active ? "success" : "default"}
+                              size="small"
+                              variant="filled"
+                              sx={{ fontWeight: 700 }}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          </Paper>
+        )}
+
+        {activeTab === "categories" && loadedTabs.has("categories") && (
+          <AdminNewsletterCategoriesTab onDataReady={() => {}} />
+        )}
       </Stack>
     );
   }
 
   return (
     <Stack spacing={3}>
-      <NewsletterAdminNav value="campaigns" onChange={handleNewsletterNavChange} />
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", md: "center" }, gap: 2, flexDirection: { xs: "column", md: "row" } }}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
           <IconButton onClick={() => navigate("/admin/newsletter")}><ArrowBackRoundedIcon /></IconButton>
@@ -993,6 +1144,7 @@ export default function AdminNewsletterPage() {
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {detailLoaded && !isNew && <Button startIcon={<PreviewRoundedIcon />} onClick={openPreview} disabled={actionsDisabledForDirty} sx={{ textTransform: "none" }}>Preview</Button>}
+          {detailLoaded && !isNew && <Button startIcon={<ContentCopyRoundedIcon />} onClick={() => duplicateCampaign(campaignId)} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Duplicate</Button>}
           {detailLoaded && !isNew && editable && <Button startIcon={<EmailRoundedIcon />} onClick={() => openIfValid(() => setTestState({ open: true, loading: false, error: "" }))} disabled={actionsDisabledForDirty} sx={{ textTransform: "none" }}>Send Test Email</Button>}
           {canSchedule && <Button startIcon={<ScheduleRoundedIcon />} onClick={() => openIfValid(() => setScheduleState({ open: true, loading: false, error: "" }))} disabled={actionsDisabledForDirty} sx={{ textTransform: "none" }}>{status === "scheduled" ? "Reschedule" : "Schedule"}</Button>}
           {canCancel && <Button color="warning" startIcon={<StopCircleRoundedIcon />} onClick={() => setConfirmState({ type: "cancel", loading: false })} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Cancel Scheduled Send</Button>}
