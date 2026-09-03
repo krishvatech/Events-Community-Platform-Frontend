@@ -98,7 +98,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      setSnack({ open: true, severity: "error", message: "Category name is required" });
+      setSnack({ open: true, severity: "error", message: "List name is required" });
       return;
     }
 
@@ -109,13 +109,13 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
           name: form.name.trim(),
           description: form.description.trim(),
         });
-        setSnack({ open: true, severity: "success", message: "Category updated" });
+        setSnack({ open: true, severity: "success", message: "Subscription list updated" });
       } else {
         await createNewsletterCategory({
           name: form.name.trim(),
           description: form.description.trim(),
         });
-        setSnack({ open: true, severity: "success", message: "Category created" });
+        setSnack({ open: true, severity: "success", message: "Subscription list created" });
       }
       setOpen(false);
       loadCategories();
@@ -130,7 +130,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
     setSaving(true);
     try {
       await deleteNewsletterCategory(slug);
-      setSnack({ open: true, severity: "success", message: "Category deleted" });
+      setSnack({ open: true, severity: "success", message: "Subscription list deleted" });
       setDeleteConfirm(null);
       loadCategories();
     } catch (err) {
@@ -146,10 +146,10 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2 }}>
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A" }}>
-            Newsletter Categories
+            Subscription Lists
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage newsletter subscriptions that users can opt into
+            Manage the newsletter lists that members can subscribe to.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1}>
@@ -172,7 +172,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
             disabled={loading}
             sx={{ textTransform: "none" }}
           >
-            Create Category
+            Create List
           </Button>
         </Stack>
       </Box>
@@ -199,10 +199,10 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
       {!loading && categories.length === 0 && (
         <Paper variant="outlined" sx={{ p: 3, textAlign: "center", borderRadius: 2, borderColor: "#F0EEEB" }}>
           <Typography color="text.secondary" sx={{ mb: 2 }}>
-            No newsletter categories yet
+            No subscription lists yet
           </Typography>
           <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => handleOpen()}>
-            Create the first category
+            Create the first list
           </Button>
         </Paper>
       )}
@@ -213,7 +213,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: "#f3f4f6" }}>
-                <TableCell sx={{ fontWeight: 700 }}>Category Name</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>List Name</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Slug</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Description</TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="center">
@@ -246,7 +246,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Edit category">
+                    <Tooltip title="Edit list">
                       <IconButton
                         size="small"
                         onClick={() => handleOpen(category)}
@@ -256,7 +256,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Delete category">
+                    <Tooltip title="Delete list">
                       <IconButton
                         size="small"
                         onClick={() => setDeleteConfirm(category.slug)}
@@ -282,12 +282,12 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
         fullWidth
       >
         <DialogTitle sx={{ fontWeight: 700, color: "#1B2A4A" }}>
-          {editing ? "Edit Category" : "Create New Category"}
+          {editing ? "Edit List" : "Create New List"}
         </DialogTitle>
         <DialogContent dividers sx={{ pt: 3 }}>
           <Stack spacing={2.5}>
             <TextField
-              label="Category Name"
+              label="List Name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="e.g., IMAA Events"
@@ -330,10 +330,10 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={Boolean(deleteConfirm)} onClose={() => !saving && setDeleteConfirm(null)}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete Category?</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Delete List?</DialogTitle>
         <DialogContent>
           <Typography color="text.secondary">
-            Are you sure you want to delete this category? Users will no longer be able to subscribe to it.
+            Are you sure you want to delete this list? Members will no longer be able to subscribe to it.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

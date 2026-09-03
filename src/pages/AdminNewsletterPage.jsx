@@ -45,6 +45,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import PreviewRoundedIcon from "@mui/icons-material/PreviewRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
@@ -70,6 +71,7 @@ import {
   sendNewsletterTestEmail,
   updateNewsletterCampaign,
 } from "../services/newsletterService";
+import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -124,6 +126,7 @@ const blankForm = {
 const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
+  { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
@@ -998,6 +1001,7 @@ export default function AdminNewsletterPage() {
             onCreate={() => navigate("/admin/newsletter/new")}
           />
         )}
+        {activeTab === "lists" && <AdminNewsletterCategoriesTab />}
         {activeTab === "templates" && <TemplatesPage />}
         {activeTab === "analytics" && (
           <AnalyticsOverview
