@@ -10,6 +10,7 @@ export const updateNewsletterPreferences = (preferences) =>
   unwrap(apiClient.patch(endpoint(), { preferences }));
 
 const adminCampaignsEndpoint = "/newsletter/admin/campaigns/";
+const adminAudiencesEndpoint = "/newsletter/admin/audiences/";
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -49,3 +50,18 @@ export const cancelNewsletterCampaign = (uuid) =>
 
 export const listNewsletterCategories = () =>
   unwrap(apiClient.get("/newsletter/admin/categories/"));
+
+export const listNewsletterAudiences = () =>
+  unwrap(apiClient.get(adminAudiencesEndpoint));
+
+export const createNewsletterAudience = (payload) =>
+  unwrap(apiClient.post(adminAudiencesEndpoint, payload));
+
+export const getNewsletterAudience = (uuid) =>
+  unwrap(apiClient.get(`${adminAudiencesEndpoint}${uuid}/`));
+
+export const updateNewsletterAudience = (uuid, payload) =>
+  unwrap(apiClient.patch(`${adminAudiencesEndpoint}${uuid}/`, payload));
+
+export const deleteNewsletterAudience = (uuid) =>
+  unwrap(apiClient.delete(`${adminAudiencesEndpoint}${uuid}/`));
