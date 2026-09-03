@@ -20,13 +20,21 @@ import {
   Skeleton,
   Snackbar,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
+import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ArchiveRoundedIcon from "@mui/icons-material/ArchiveRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -58,6 +66,15 @@ const STATUS_COLORS = {
   active: "success",
   archived: "default",
 };
+
+const marketingTabs = [
+  { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
+  { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
+  { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
+  { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
+  { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
+  { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
+];
 
 const formatDateTime = (value) => {
   if (!value) return "-";
@@ -126,50 +143,84 @@ function ConfirmDialog({ open, title, children, confirmLabel, confirmColor = "pr
   );
 }
 
+function NewsletterAdminTabs({ onChange }) {
+  return (
+    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Tabs
+        value="audiences"
+        onChange={(_, value) => onChange(value)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{
+          minHeight: 52,
+          px: { xs: 1, md: 2 },
+          "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
+          "& .Mui-selected": { color: "#0f766e !important" },
+          "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
+        }}
+      >
+        {marketingTabs.map((tab) => (
+          <Tab key={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} value={tab.value} />
+        ))}
+      </Tabs>
+    </Paper>
+  );
+}
+
 function AudienceForm({ value, errors, readOnly, onChange }) {
   const setField = (field, nextValue) => onChange({ ...value, [field]: nextValue });
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: Object.keys(errors).length ? "error.main" : "#F0EEEB" }}>
-      <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 2 }}>Audience Details</Typography>
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
-          <TextField
-            label="Name"
-            value={value.name}
-            onChange={(e) => setField("name", e.target.value)}
-            error={Boolean(errors.name)}
-            helperText={errors.name}
-            fullWidth
-            required
-            InputProps={{ readOnly }}
-          />
+    <Stack spacing={3}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: Object.keys(errors).length ? "error.main" : "#F0EEEB" }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 2 }}>Audience Details</Typography>
+        <Grid container spacing={2} sx={{ maxWidth: 920 }}>
+          <Grid item xs={12} md={6}>
+            <TextField
+              label="Name"
+              value={value.name}
+              onChange={(e) => setField("name", e.target.value)}
+              error={Boolean(errors.name)}
+              helperText={errors.name}
+              fullWidth
+              required
+              InputProps={{ readOnly }}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth disabled={readOnly} error={Boolean(errors.audience_type)}>
+              <InputLabel>Audience Type</InputLabel>
+              <Select
+                label="Audience Type"
+                value={value.audience_type}
+                onChange={(e) => setField("audience_type", e.target.value)}
+              >
+                <MenuItem value="static">Static</MenuItem>
+                <MenuItem value="dynamic">Dynamic</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              label="Description"
+              value={value.description}
+              onChange={(e) => setField("description", e.target.value)}
+              multiline
+              minRows={4}
+              fullWidth
+              sx={{ maxWidth: 920 }}
+              InputProps={{ readOnly }}
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} md={6}>
-          <FormControl fullWidth disabled={readOnly} error={Boolean(errors.audience_type)}>
-            <InputLabel>Audience Type</InputLabel>
-            <Select
-              label="Audience Type"
-              value={value.audience_type}
-              onChange={(e) => setField("audience_type", e.target.value)}
-            >
-              <MenuItem value="static">Static</MenuItem>
-              <MenuItem value="dynamic">Dynamic</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            label="Description"
-            value={value.description}
-            onChange={(e) => setField("description", e.target.value)}
-            multiline
-            minRows={4}
-            fullWidth
-            InputProps={{ readOnly }}
-          />
-        </Grid>
-      </Grid>
-    </Paper>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 1 }}>Rules</Typography>
+        <Alert severity="info" variant="outlined">
+          Advanced segmentation coming soon
+        </Alert>
+      </Paper>
+    </Stack>
   );
 }
 
@@ -280,9 +331,27 @@ export default function AdminNewsletterAudienceDetailPage() {
   const isDirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
   const readOnly = !editing;
   const canArchive = !isNew && audience?.status !== "archived" && audience?.is_active !== false;
+  const handleTabChange = (tab) => {
+    if (tab === "audiences") {
+      navigate("/admin/newsletter/audiences");
+      return;
+    }
+    navigate("/admin/newsletter", { state: { newsletterTab: tab } });
+  };
 
   return (
     <Stack spacing={3}>
+      <Box>
+        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
+          Newsletter
+        </Typography>
+        <Typography color="text.secondary">
+          Manage campaigns, audiences, templates, and performance from ECP.
+        </Typography>
+      </Box>
+
+      <NewsletterAdminTabs onChange={handleTabChange} />
+
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", md: "center" }, gap: 2, flexDirection: { xs: "column", md: "row" } }}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
           <IconButton onClick={() => navigate("/admin/newsletter/audiences")}>
@@ -293,7 +362,7 @@ export default function AdminNewsletterAudienceDetailPage() {
               <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A" }}>{isNew ? "Create Audience" : audience?.name || "Newsletter Audience"}</Typography>
               {!isNew && audience?.status && <AudienceStatusChip status={audience.status} />}
             </Stack>
-            <Typography color="text.secondary">{editing ? "Save audience details before using future audience tools." : "Audience details are ready for future targeting phases."}</Typography>
+            <Typography color="text.secondary">{editing ? "Save this audience segment before adding future rules." : "Audience segment details are ready for future targeting phases."}</Typography>
           </Box>
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -319,7 +388,7 @@ export default function AdminNewsletterAudienceDetailPage() {
       </Box>
 
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
-      {editing && isDirty && !isNew && <Alert severity="info">Save your changes before leaving this audience.</Alert>}
+      {editing && isDirty && !isNew && <Alert severity="info">Save your changes before leaving this audience segment.</Alert>}
 
       {loading ? (
         <Stack spacing={2}>{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} variant="rectangular" height={120} />)}</Stack>

@@ -8,6 +8,7 @@ import {
   Paper,
   Skeleton,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
@@ -18,9 +19,15 @@ import {
   Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
+import Tabs from "@mui/material/Tabs";
 import { useNavigate } from "react-router-dom";
 
 import { listNewsletterAudiences } from "../services/newsletterService";
@@ -41,6 +48,15 @@ const STATUS_COLORS = {
   active: "success",
   archived: "default",
 };
+
+const marketingTabs = [
+  { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
+  { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
+  { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
+  { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
+  { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
+  { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
+];
 
 const formatDateTime = (value) => {
   if (!value) return "-";
@@ -88,6 +104,31 @@ function AudienceStatusChip({ status }) {
   );
 }
 
+function NewsletterAdminTabs({ onChange }) {
+  return (
+    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Tabs
+        value="audiences"
+        onChange={(_, value) => onChange(value)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{
+          minHeight: 52,
+          px: { xs: 1, md: 2 },
+          "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
+          "& .Mui-selected": { color: "#0f766e !important" },
+          "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
+        }}
+      >
+        {marketingTabs.map((tab) => (
+          <Tab key={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} value={tab.value} />
+        ))}
+      </Tabs>
+    </Paper>
+  );
+}
+
 export default function AdminNewsletterAudiencesPage() {
   const navigate = useNavigate();
   const [audiences, setAudiences] = useState([]);
@@ -113,18 +154,29 @@ export default function AdminNewsletterAudiencesPage() {
 
   const rows = useMemo(() => audiences || [], [audiences]);
 
+  const handleTabChange = (tab) => {
+    if (tab === "audiences") return;
+    navigate("/admin/newsletter", { state: { newsletterTab: tab } });
+  };
+
   return (
     <Stack spacing={3}>
+      <Box>
+        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
+          Newsletter
+        </Typography>
+        <Typography color="text.secondary">
+          Manage campaigns, audiences, templates, and performance from ECP.
+        </Typography>
+      </Box>
+
+      <NewsletterAdminTabs onChange={handleTabChange} />
+
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
-        <Stack direction="row" spacing={1.5} alignItems="flex-start">
-          <IconButton onClick={() => navigate("/admin/newsletter")}>
-            <ArrowBackRoundedIcon />
-          </IconButton>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 0.75 }}>Newsletter Audiences</Typography>
-            <Typography color="text.secondary">Create and manage ECP-owned newsletter audiences.</Typography>
-          </Box>
-        </Stack>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>Audiences</Typography>
+          <Typography color="text.secondary">Create advanced audience segments for future targeting.</Typography>
+        </Box>
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate("/admin/newsletter/audiences/new")} sx={{ textTransform: "none" }}>
           Create Audience
         </Button>
@@ -147,7 +199,7 @@ export default function AdminNewsletterAudiencesPage() {
           </Box>
         ) : rows.length === 0 ? (
           <Box sx={{ p: 3 }}>
-            <Alert severity="info" variant="outlined">No newsletter audiences found.</Alert>
+            <Alert severity="info" variant="outlined">No audience segments found.</Alert>
           </Box>
         ) : (
           <TableContainer sx={{ overflowX: "auto" }}>
@@ -155,9 +207,9 @@ export default function AdminNewsletterAudiencesPage() {
               <TableHead>
                 <TableRow sx={{ bgcolor: "#f3f4f6" }}>
                   <TableCell>Name</TableCell>
-                  <TableCell>Audience Type</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Subscriber Count</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell>Estimated Count</TableCell>
                   <TableCell>Created Date</TableCell>
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>
@@ -167,11 +219,15 @@ export default function AdminNewsletterAudiencesPage() {
                   <TableRow hover key={row.uuid} sx={{ cursor: "pointer" }} onClick={() => navigate(`/admin/newsletter/audiences/${row.uuid}`)}>
                     <TableCell>
                       <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>{row.name || "Untitled audience"}</Typography>
-                      {row.description && <Typography variant="body2" color="text.secondary">{row.description}</Typography>}
+                      <Typography variant="body2" color="text.secondary">{TYPE_LABELS[row.audience_type] || row.audience_type || "Static"}</Typography>
                     </TableCell>
-                    <TableCell>{TYPE_LABELS[row.audience_type] || row.audience_type || "-"}</TableCell>
-                    <TableCell><AudienceStatusChip status={row.status} /></TableCell>
+                    <TableCell sx={{ maxWidth: 360 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
+                        {row.description || "-"}
+                      </Typography>
+                    </TableCell>
                     <TableCell>{formatNumber(row.estimated_count)}</TableCell>
+                    <TableCell><AudienceStatusChip status={row.status} /></TableCell>
                     <TableCell>{formatDateTime(row.created_at)}</TableCell>
                     <TableCell align="right">
                       <Tooltip title="Open audience">

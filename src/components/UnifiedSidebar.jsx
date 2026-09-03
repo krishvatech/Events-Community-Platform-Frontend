@@ -252,7 +252,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Users", to: "/admin/users", icon: AdminPanelSettingsRoundedIcon },
             { label: "Saleor Manager", to: "/admin/saleor", icon: ShoppingCartRoundedIcon },
             { label: "Email Templates", to: "/admin/email-templates", icon: MarkEmailReadRoundedIcon },
-            { label: "Newsletter", to: "/admin/newsletter", icon: NewspaperRoundedIcon },
+            { label: "Marketing Hub", to: "/admin/newsletter", icon: NewspaperRoundedIcon },
             { label: "CMS", action: "cms", icon: ArticleRoundedIcon },
             { label: "Admin Guide", to: "/admin/guide", icon: MenuBookRoundedIcon },
         ];
@@ -270,7 +270,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         ];
         adminItems = [
             { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
-            { label: "Newsletter", to: "/admin/newsletter", icon: NewspaperRoundedIcon },
+            { label: "Marketing Hub", to: "/admin/newsletter", icon: NewspaperRoundedIcon },
             ...(userCanEditProfiles ? [{ label: "Users", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon }] : []),
             { label: "Admin Guide", to: "/admin/guide", icon: MenuBookRoundedIcon },
         ];
