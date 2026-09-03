@@ -176,6 +176,24 @@ function StatusChip({ status }) {
   );
 }
 
+function NewsletterAdminNav({ value, onChange }) {
+  return (
+    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#F0EEEB", overflow: "hidden" }}>
+      <Tabs
+        value={value}
+        onChange={(_, nextValue) => onChange(nextValue)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{ minHeight: 44, px: { xs: 1, md: 2 }, "& .MuiTab-root": { textTransform: "none", minHeight: 44 }, "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 }, "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" } }}
+      >
+        <Tab label="Campaigns" value="campaigns" />
+        <Tab label="Audiences" value="audiences" />
+      </Tabs>
+    </Paper>
+  );
+}
+
 function ConfirmDialog({ open, title, children, confirmLabel, confirmColor = "primary", loading, onClose, onConfirm }) {
   return (
     <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="sm" fullWidth>
@@ -877,10 +895,15 @@ export default function AdminNewsletterPage() {
   const showManageTab = isNew || activeTab === "manage";
   const showAnalyticsTab = showDetailTabs && activeTab === "analytics";
   const audienceLabels = getCampaignAudienceLabels(campaign);
+  const handleNewsletterNavChange = (value) => {
+    if (value === "audiences") navigate("/admin/newsletter/audiences");
+    else navigate("/admin/newsletter");
+  };
 
   if (!isDetail) {
     return (
       <Stack spacing={3}>
+        <NewsletterAdminNav value="campaigns" onChange={handleNewsletterNavChange} />
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 0.75 }}>Newsletter Campaigns</Typography>
@@ -956,6 +979,7 @@ export default function AdminNewsletterPage() {
 
   return (
     <Stack spacing={3}>
+      <NewsletterAdminNav value="campaigns" onChange={handleNewsletterNavChange} />
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", md: "center" }, gap: 2, flexDirection: { xs: "column", md: "row" } }}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
           <IconButton onClick={() => navigate("/admin/newsletter")}><ArrowBackRoundedIcon /></IconButton>
