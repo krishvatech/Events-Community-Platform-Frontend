@@ -407,6 +407,17 @@ function CampaignPerformance({ analyticsState }) {
   const sendSummary = analytics.send_summary || {};
   const engagement = analytics.engagement || {};
   const rates = analytics.rates || {};
+  const metadata = analytics.metadata || {};
+  const sources = Array.isArray(metadata.sources) ? metadata.sources : [];
+  const metadataWarnings = Array.isArray(metadata.warnings) ? metadata.warnings : [];
+  const refreshedAt = metadata.last_refreshed_at;
+  const hasMetadata = Boolean(
+    sources.length ||
+    metadata.mautic_email_id ||
+    refreshedAt ||
+    metadata.mautic_available === false ||
+    metadataWarnings.length
+  );
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
@@ -428,6 +439,30 @@ function CampaignPerformance({ analyticsState }) {
           <Alert severity="warning" variant="outlined">{analyticsState.error}</Alert>
         ) : (
           <Stack spacing={2.5}>
+            {hasMetadata && (
+              <Stack spacing={1.25}>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#2C3E5A", mb: 1 }}>Analytics Source</Typography>
+                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                    {sources.includes("mautic") && <Chip size="small" label="Mautic" color="info" variant="outlined" />}
+                    {sources.includes("ecp") && <Chip size="small" label="ECP" variant="outlined" />}
+                    {metadata.mautic_email_id && <Typography variant="body2" color="text.secondary">Mautic Email ID: {metadata.mautic_email_id}</Typography>}
+                    {refreshedAt && <Typography variant="body2" color="text.secondary">Last refreshed: {formatDateTime(refreshedAt)}</Typography>}
+                  </Stack>
+                </Box>
+                {metadata.mautic_available === false && (
+                  <Alert severity="warning" variant="outlined">
+                    Mautic analytics unavailable. Showing available ECP tracking data.
+                  </Alert>
+                )}
+                {metadataWarnings.map((warning, index) => (
+                  <Alert severity="warning" variant="outlined" key={`${warning}-${index}`}>
+                    {warning}
+                  </Alert>
+                ))}
+              </Stack>
+            )}
+
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#2C3E5A", mb: 1 }}>Send Summary</Typography>
               <Grid container spacing={2}>
