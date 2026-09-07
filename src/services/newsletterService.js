@@ -71,8 +71,12 @@ export const deleteNewsletterAudience = (uuid) =>
 
 const adminCategoriesEndpoint = "/newsletter/admin/categories/";
 
-export const listNewsletterCategoriesAdmin = () =>
-  unwrap(apiClient.get(adminCategoriesEndpoint));
+export const listNewsletterCategoriesAdmin = ({ includeMautic = false } = {}) =>
+  unwrap(
+    apiClient.get(adminCategoriesEndpoint, {
+      params: includeMautic ? { include_mautic: true } : {},
+    })
+  );
 
 export const createNewsletterCategory = (payload) =>
   unwrap(apiClient.post(adminCategoriesEndpoint, payload));
@@ -82,3 +86,16 @@ export const updateNewsletterCategory = (slug, payload) =>
 
 export const deleteNewsletterCategory = (slug) =>
   unwrap(apiClient.delete(`${adminCategoriesEndpoint}${slug}/`));
+
+export const listMauticSegments = () =>
+  unwrap(apiClient.get("/newsletter/admin/mautic/segments/"));
+
+export const linkNewsletterCategoryMauticSegment = (slug, mauticSegmentId) =>
+  unwrap(
+    apiClient.post(`${adminCategoriesEndpoint}${slug}/link-mautic-segment/`, {
+      mautic_segment_id: String(mauticSegmentId),
+    })
+  );
+
+export const syncNewsletterCategoryMautic = (slug) =>
+  unwrap(apiClient.post(`${adminCategoriesEndpoint}${slug}/sync-mautic/`));
