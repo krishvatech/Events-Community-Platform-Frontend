@@ -47,6 +47,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import {
   deleteNewsletterCategory,
+  getNewsletterCategoryContactAnalytics,
   linkNewsletterCategoryMauticSegment,
   listMauticSegments,
   listNewsletterCategoriesAdmin,
@@ -143,6 +144,241 @@ const syncStatusPresentation = (status) => {
   }
 };
 
+const toIsoDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const buildDefaultTimelineRange = () => {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - 29);
+  return { from: toIsoDate(start), to: toIsoDate(end) };
+};
+
+const DEFAULT_TIMELINE_RANGE = buildDefaultTimelineRange();
+
+function ContactTimelineChart({ series = [] }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const width = 1000;
+  const height = 300;
+  const margin = { top: 24, right: 28, bottom: 48, left: 52 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const safeSeries = Array.isArray(series) ? series : [];
+  const maxValue = Math.max(
+    1,
+    ...safeSeries.flatMap((item) => [
+      Number(item?.added || 0),
+      Number(item?.removed || 0),
+      Number(item?.total || 0),
+    ])
+  );
+  const rowWidth = safeSeries.length <= 1 ? plotWidth : plotWidth / (safeSeries.length - 1);
+  const xFor = (index) =>
+    margin.left +
+    (safeSeries.length <= 1 ? plotWidth / 2 : (index / (safeSeries.length - 1)) * plotWidth);
+  const yFor = (value) =>
+    margin.top + plotHeight - (Math.max(0, Number(value || 0)) / maxValue) * plotHeight;
+  const pointsFor = (key) =>
+    safeSeries.map((item, index) => `${xFor(index)},${yFor(item?.[key])}`).join(" ");
+  const labelEvery = Math.max(1, Math.ceil(safeSeries.length / 6));
+  const yTicks = Array.from({ length: 5 }, (_, index) =>
+    Math.round((maxValue * index) / 4)
+  );
+  const hoveredPoint = hoveredIndex !== null ? safeSeries[hoveredIndex] : null;
+  const tooltipWidth = 158;
+  const tooltipHeight = 92;
+  const tooltipX = hoveredIndex === null
+    ? 0
+    : Math.max(
+        margin.left,
+        Math.min(
+          width - margin.right - tooltipWidth,
+          xFor(hoveredIndex) - tooltipWidth / 2
+        )
+      );
+  const tooltipBaseY = hoveredPoint
+    ? Math.min(
+        yFor(Math.max(
+          Number(hoveredPoint?.added || 0),
+          Number(hoveredPoint?.removed || 0),
+          Number(hoveredPoint?.total || 0)
+        )),
+        yFor(0)
+      )
+    : margin.top;
+  const tooltipY = Math.max(margin.top, tooltipBaseY - tooltipHeight - 16);
+
+  if (safeSeries.length === 0) {
+    return (
+      <Box sx={{ py: 7, textAlign: "center" }} onMouseLeave={() => setHoveredIndex(null)}>
+        <Typography color="text.secondary">No contact activity is available for this range.</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ width: "100%", overflowX: "auto" }} onMouseLeave={() => setHoveredIndex(null)}>
+      <Box
+        component="svg"
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Contacts in time chart showing added, removed, and total subscribers"
+        sx={{ display: "block", width: "100%", minWidth: 720, height: "auto" }}
+      >
+        {safeSeries.map((item, index) => {
+          const centerX = xFor(index);
+          const rectX = index === 0
+            ? margin.left
+            : centerX - rowWidth / 2;
+          const rectWidth = index === safeSeries.length - 1
+            ? width - margin.right - rectX
+            : rowWidth;
+          return (
+            <rect
+              key={`hover-target-${item.date}`}
+              x={rectX}
+              y={margin.top}
+              width={Math.max(16, rectWidth)}
+              height={plotHeight}
+              fill="transparent"
+              onMouseEnter={() => setHoveredIndex(index)}
+              onFocus={() => setHoveredIndex(index)}
+            />
+          );
+        })}
+
+        {yTicks.map((tick) => {
+          const y = yFor(tick);
+          return (
+            <g key={tick}>
+              <line
+                x1={margin.left}
+                x2={width - margin.right}
+                y1={y}
+                y2={y}
+                stroke="#E7ECEF"
+                strokeWidth="1"
+              />
+              <text
+                x={margin.left - 10}
+                y={y + 4}
+                textAnchor="end"
+                fontSize="12"
+                fill="#64748B"
+              >
+                {tick}
+              </text>
+            </g>
+          );
+        })}
+
+        <polyline points={pointsFor("total")} fill="none" stroke="#F97360" strokeWidth="3" />
+        <polyline points={pointsFor("added")} fill="none" stroke="#6172D9" strokeWidth="2.5" />
+        <polyline points={pointsFor("removed")} fill="none" stroke="#20B8A6" strokeWidth="2.5" />
+
+        {hoveredPoint && (
+          <>
+            <line
+              x1={xFor(hoveredIndex)}
+              x2={xFor(hoveredIndex)}
+              y1={margin.top}
+              y2={margin.top + plotHeight}
+              stroke="#94A3B8"
+              strokeDasharray="4 4"
+              strokeWidth="1.5"
+            />
+
+            <circle
+              cx={xFor(hoveredIndex)}
+              cy={yFor(hoveredPoint.total)}
+              r="5"
+              fill="#FFFFFF"
+              stroke="#F97360"
+              strokeWidth="3"
+            />
+            <circle
+              cx={xFor(hoveredIndex)}
+              cy={yFor(hoveredPoint.added)}
+              r="4.5"
+              fill="#FFFFFF"
+              stroke="#6172D9"
+              strokeWidth="2.5"
+            />
+            <circle
+              cx={xFor(hoveredIndex)}
+              cy={yFor(hoveredPoint.removed)}
+              r="4.5"
+              fill="#FFFFFF"
+              stroke="#20B8A6"
+              strokeWidth="2.5"
+            />
+
+            <g>
+              <rect
+                x={tooltipX}
+                y={tooltipY}
+                rx="10"
+                ry="10"
+                width={tooltipWidth}
+                height={tooltipHeight}
+                fill="#FFFFFF"
+                stroke="#E2E8F0"
+              />
+              <text
+                x={tooltipX + 12}
+                y={tooltipY + 20}
+                fontSize="12"
+                fontWeight="700"
+                fill="#1E293B"
+              >
+                {new Date(`${hoveredPoint.date}T00:00:00`).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </text>
+
+              <text x={tooltipX + 12} y={tooltipY + 42} fontSize="12" fill="#6172D9">
+                {`Added: ${Number(hoveredPoint.added || 0)}`}
+              </text>
+              <text x={tooltipX + 12} y={tooltipY + 58} fontSize="12" fill="#20B8A6">
+                {`Removed: ${Number(hoveredPoint.removed || 0)}`}
+              </text>
+              <text x={tooltipX + 12} y={tooltipY + 74} fontSize="12" fill="#F97360">
+                {`Total: ${Number(hoveredPoint.total || 0)}`}
+              </text>
+            </g>
+          </>
+        )}
+
+        {safeSeries.map((item, index) => {
+          if (index % labelEvery !== 0 && index !== safeSeries.length - 1) return null;
+          const label = new Date(`${item.date}T00:00:00`).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          });
+          return (
+            <text
+              key={item.date}
+              x={xFor(index)}
+              y={height - 16}
+              textAnchor="middle"
+              fontSize="12"
+              fill="#64748B"
+            >
+              {label}
+            </text>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
 function NewsletterTabs({ onChange }) {
   return (
     <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
@@ -190,6 +426,12 @@ export default function AdminNewsletterListManagePage() {
   const [segmentsLoading, setSegmentsLoading] = useState(false);
   const [segmentsError, setSegmentsError] = useState("");
   const [selectedSegmentId, setSelectedSegmentId] = useState("");
+  const [timelineData, setTimelineData] = useState(null);
+  const [timelineLoading, setTimelineLoading] = useState(true);
+  const [timelineError, setTimelineError] = useState("");
+  const [timelineFrom, setTimelineFrom] = useState(DEFAULT_TIMELINE_RANGE.from);
+  const [timelineTo, setTimelineTo] = useState(DEFAULT_TIMELINE_RANGE.to);
+  const [timelineAppliedRange, setTimelineAppliedRange] = useState(DEFAULT_TIMELINE_RANGE);
   const pageSize = 25;
 
   const loadCategory = useCallback(async () => {
@@ -233,9 +475,30 @@ export default function AdminNewsletterListManagePage() {
     [slug, page, search]
   );
 
+  const loadTimeline = useCallback(
+    async ({ from = timelineAppliedRange.from, to = timelineAppliedRange.to } = {}) => {
+      setTimelineLoading(true);
+      setTimelineError("");
+      try {
+        const data = await getNewsletterCategoryContactAnalytics(slug, { from, to });
+        setTimelineData(data);
+        setTimelineAppliedRange({ from, to });
+      } catch (err) {
+        setTimelineData(null);
+        setTimelineError(getErrorMessage(err, "We could not load contact timeline analytics."));
+      } finally {
+        setTimelineLoading(false);
+      }
+    },
+    [slug, timelineAppliedRange]
+  );
+
   useEffect(() => {
     loadCategory();
     loadContacts({ nextPage: 1, nextSearch: "" });
+    setTimelineFrom(DEFAULT_TIMELINE_RANGE.from);
+    setTimelineTo(DEFAULT_TIMELINE_RANGE.to);
+    loadTimeline(DEFAULT_TIMELINE_RANGE);
   }, [slug]);
 
   const contacts = Array.isArray(contactsData?.results) ? contactsData.results : [];
@@ -262,7 +525,16 @@ export default function AdminNewsletterListManagePage() {
     await Promise.all([
       loadCategory(),
       loadContacts({ nextPage: page, nextSearch: search }),
+      loadTimeline(),
     ]);
+  };
+
+  const applyTimelineRange = () => {
+    if (!timelineFrom || !timelineTo) {
+      setTimelineError("Select both From and To dates.");
+      return;
+    }
+    loadTimeline({ from: timelineFrom, to: timelineTo });
   };
 
   const handleTabChange = (value) => {
@@ -495,6 +767,109 @@ export default function AdminNewsletterListManagePage() {
           </Grid>
         </Grid>
       ) : null}
+
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+        <Stack
+          direction={{ xs: "column", lg: "row" }}
+          spacing={2}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", lg: "center" }}
+          sx={{ p: 2.25, borderBottom: "1px solid #E7ECEF" }}
+        >
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+              Contacts in time
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Subscriber additions, removals, and total active subscribers from ECP history.
+            </Typography>
+          </Box>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+            <TextField
+              type="date"
+              label="From"
+              size="small"
+              value={timelineFrom}
+              onChange={(event) => setTimelineFrom(event.target.value)}
+              InputLabelProps={{ shrink: true }}
+              disabled={timelineLoading}
+              sx={{ minWidth: 160 }}
+            />
+            <TextField
+              type="date"
+              label="To"
+              size="small"
+              value={timelineTo}
+              onChange={(event) => setTimelineTo(event.target.value)}
+              InputLabelProps={{ shrink: true }}
+              disabled={timelineLoading}
+              sx={{ minWidth: 160 }}
+            />
+            <Button
+              variant="outlined"
+              onClick={applyTimelineRange}
+              disabled={timelineLoading || !timelineFrom || !timelineTo}
+              sx={{ minWidth: 92 }}
+            >
+              Apply
+            </Button>
+          </Stack>
+        </Stack>
+
+        {timelineError && <Alert severity="error" sx={{ m: 2 }}>{timelineError}</Alert>}
+
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", md: "center" }}
+          sx={{ px: 2.25, pt: 2 }}
+        >
+          <Stack direction="row" spacing={2.5} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#6172D9" }} />
+              <Typography variant="body2">Added</Typography>
+            </Stack>
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#20B8A6" }} />
+              <Typography variant="body2">Removed</Typography>
+            </Stack>
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "#F97360" }} />
+              <Typography variant="body2">Total</Typography>
+            </Stack>
+          </Stack>
+
+          {timelineData && (
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`Start ${timelineData.range_start_total ?? 0}`}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`End ${timelineData.range_end_total ?? 0}`}
+              />
+              <Chip
+                size="small"
+                color="primary"
+                variant="outlined"
+                label={`Current ${timelineData.current_total ?? count}`}
+              />
+            </Stack>
+          )}
+        </Stack>
+
+        <Box sx={{ px: 2.25, pb: 2.25 }}>
+          {timelineLoading ? (
+            <Skeleton variant="rectangular" height={300} sx={{ mt: 2, borderRadius: 1.5 }} />
+          ) : (
+            <ContactTimelineChart series={timelineData?.series || []} />
+          )}
+        </Box>
+      </Paper>
 
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
         <Stack
