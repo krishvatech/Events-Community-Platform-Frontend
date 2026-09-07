@@ -5,7 +5,6 @@ import { Helmet } from "react-helmet-async";
 import ApplyNowModal from "../components/ApplyNowModal";
 import { isOwnerUser } from "../utils/adminRole.js";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
-import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import heroImg from "../assets/oxford/Oxford_Jesus-College.png";
 import oxfordBgHero from "../assets/oxford/BG 1.png";
 import oxfordBgSkyline from "../assets/oxford/BG 2.png";
@@ -2674,9 +2673,6 @@ export default function OxfordSymposium2026({ theme = "blue" }) {
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestJoinEvent, setGuestJoinEvent] = useState(null);
 
-  // Guest apply modal state (for apply-type events)
-  const [guestApplyModalOpen, setGuestApplyModalOpen] = useState(false);
-
   const ALLOWED_SLUG = 'the-oxford-m-a-symposium-2026';
 
   const handleGuestJoinRequested = (eventData) => {
@@ -2771,10 +2767,6 @@ export default function OxfordSymposium2026({ theme = "blue" }) {
     return <div style={{ padding: "100px 40px", textAlign: "center", color: "red" }}>Error: {error}</div>;
   }
 
-  const handleGuestApplyRequested = (eventData) => {
-    setGuestApplyModalOpen(true);
-  };
-
   const handleApplyClick = () => {
     if (isAdminViewer) {
       setAdminApplyNoticeOpen(true);
@@ -2791,9 +2783,10 @@ export default function OxfordSymposium2026({ theme = "blue" }) {
         return;
       }
 
-      // Apply registration + free = show guest apply modal
-      if (eventData?.registration_type === 'apply' && isFreeEvent) {
-        handleGuestApplyRequested(eventData);
+      // Application events use the shared application modal for both signed-in
+      // users and guests. The modal enforces the per-event guest toggle.
+      if (eventData?.registration_type === 'apply') {
+        setApplyOpen(true);
         return;
       }
     }
@@ -2812,7 +2805,7 @@ export default function OxfordSymposium2026({ theme = "blue" }) {
 
   const handleApplicationSuccess = (app) => {
     setMyApplication(app);
-    // Guest token is now handled by GuestApplyModal with OTP verification
+    // Guest application access is handled by ApplyNowModal and the per-event guest setting
   };
 
   const isStagingPreview = theme === "green";
@@ -2865,13 +2858,6 @@ export default function OxfordSymposium2026({ theme = "blue" }) {
           livePath={`/live/${guestJoinEvent.slug || guestJoinEvent.id}?id=${guestJoinEvent.id}&role=audience`}
         />
       )}
-      <GuestApplyModal
-        open={guestApplyModalOpen}
-        onClose={() => setGuestApplyModalOpen(false)}
-        event={eventData}
-        livePath={eventData ? `/live/${eventData.slug || eventData.id}?id=${eventData.id}&role=audience` : ""}
-      />
-
       <Snackbar
         open={adminApplyNoticeOpen}
         autoHideDuration={5000}

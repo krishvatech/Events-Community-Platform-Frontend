@@ -23,7 +23,6 @@ import {
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
-import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import PreEventQnaManager from "../components/PreEventQnaManager.jsx";
@@ -604,9 +603,6 @@ export default function EventDetailsPage() {
   // Guest Join Modal
   const [guestModalOpen, setGuestModalOpen] = useState(false);
 
-  // Guest Apply Modal (for apply-type events)
-  const [guestApplyModalOpen, setGuestApplyModalOpen] = useState(false);
-
   // Apply Modal
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [myApplication, setMyApplication] = useState(null);
@@ -1124,7 +1120,11 @@ export default function EventDetailsPage() {
 
   const openApplyModalAfterProfileCheck = async () => {
     if (!token) {
-      setGuestApplyModalOpen(true);
+      if (event?.allow_guest_applications === true) {
+        setApplyModalOpen(true);
+      } else {
+        goToSignInForApply();
+      }
       return;
     }
 
@@ -1668,11 +1668,10 @@ export default function EventDetailsPage() {
   const showReplayCTA = isEffectivelyPast && replayReady && canSignupForReplay;
   const showReplayAccess = isEffectivelyPast && replayEnabled && hasReplayAccess;
 
-  // Guest apply is only meaningful right before the event starts. Outside that
-  // window an anonymous visitor still needs a way in, so send them to sign-in
-  // and bring them back to this exact page afterwards.
-  const canApplyAsGuestNow = !token && isWithinGuestJoinWindow(event.start_time);
-  const mustSignInToApply = !token && !canApplyAsGuestNow;
+  // Guest application access is controlled per application-required event.
+  // It is intentionally independent from the separate 1-2 hour guest *join* window.
+  const guestApplicationsAllowed = event?.allow_guest_applications === true;
+  const mustSignInToApply = !token && !guestApplicationsAllowed;
   const goToSignInForApply = () => {
     const nextPath = `${location.pathname}${location.search}`;
     navigate(`/signin?next=${encodeURIComponent(nextPath)}`);
@@ -2411,7 +2410,7 @@ export default function EventDetailsPage() {
                                       ? (
                                         <>
                                           <Button
-                                            onClick={openApplyModalAfterProfileCheck}
+                                            onClick={mustSignInToApply ? goToSignInForApply : openApplyModalAfterProfileCheck}
                                             variant="contained"
                                             sx={{
                                               textTransform: "none",
@@ -3399,13 +3398,6 @@ export default function EventDetailsPage() {
             onSuccess={() => {
               setPreEventQnaRefreshTrigger((prev) => prev + 1);
             }}
-          />
-
-          <GuestApplyModal
-            open={guestApplyModalOpen}
-            onClose={() => setGuestApplyModalOpen(false)}
-            event={event}
-            livePath={livePath}
           />
 
           <LeadGenModal

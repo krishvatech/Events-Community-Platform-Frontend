@@ -36,6 +36,8 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
   const [loadingTracks, setLoadingTracks] = useState(false);
   const [tracksError, setTracksError] = useState("");
   const [submittedApplication, setSubmittedApplication] = useState(null);
+  const guestApplicationsAllowed = event?.allow_guest_applications === true;
+  const isGuestApplication = !token;
 
   useEffect(() => {
     if (!open || !event?.id) return;
@@ -105,6 +107,16 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
     });
 
     setSubmittedApplication(data);
+
+    // Guests have no account/profile to look the application up later, so keep
+    // only the event + email needed by the existing public status check.
+    if (isGuestApplication && data?.email && event?.id) {
+      localStorage.setItem(
+        "application_cache",
+        JSON.stringify({ event_id: event.id, email: data.email })
+      );
+    }
+
     if (onSuccess) {
       console.log('📤 Calling parent onSuccess callback with application data');
       onSuccess(data);
@@ -202,7 +214,7 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
               Your application has been submitted for review.
             </Typography>
           </Stack>
-        ) : !token ? (
+        ) : isGuestApplication && !guestApplicationsAllowed ? (
           <Alert
             severity="info"
             action={
@@ -217,7 +229,7 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
               </Button>
             }
           >
-            Please sign in to apply for this event.
+            Guest applications are disabled for this event. Please sign in to apply.
           </Alert>
         ) : loadingTracks ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
@@ -246,6 +258,7 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
               event={event}
               selectedTracks={selectedTrackIds}
               onSuccess={handleApplicationSuccess}
+              isGuestApplication={isGuestApplication}
             />
           </>
         )}
