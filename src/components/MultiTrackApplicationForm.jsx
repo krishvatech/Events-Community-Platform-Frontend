@@ -53,6 +53,7 @@ const MultiTrackApplicationForm = ({
   const [activeStep, setActiveStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [emailError, setEmailError] = useState('');
   const [submittedApplication, setSubmittedApplication] = useState(null);
 
   // Applicant data (shared)
@@ -342,6 +343,9 @@ const MultiTrackApplicationForm = ({
       ...prev,
       [field]: value,
     }));
+    if (field === 'email' && emailError) {
+      setEmailError('');
+    }
   };
 
   const handleTrackDataChange = (trackId, field, value) => {
@@ -364,10 +368,22 @@ const MultiTrackApplicationForm = ({
   };
 
   const validateApplicantData = () => {
+    const email = applicantData.email?.trim() || '';
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!isApplicantDataValid()) {
+      setEmailError(email ? '' : 'Email is required');
       setSubmitError('Please fill in all required fields');
       return false;
     }
+
+    if (!emailPattern.test(email)) {
+      setEmailError('Please enter a valid email address');
+      setSubmitError('Please enter a valid email address');
+      return false;
+    }
+
+    setEmailError('');
     setSubmitError(null);
     return true;
   };
@@ -1138,6 +1154,8 @@ const MultiTrackApplicationForm = ({
                     type="email"
                     value={applicantData.email}
                     onChange={(e) => handleApplicantChange('email', e.target.value)}
+                    error={Boolean(emailError)}
+                    helperText={emailError}
                     required
                   />
                 </Grid>
