@@ -90,6 +90,9 @@ export const deleteNewsletterCategory = (slug) =>
 export const listMauticSegments = () =>
   unwrap(apiClient.get("/newsletter/admin/mautic/segments/"));
 
+export const listNewsletterCategoryContacts = (slug, params = {}) =>
+  unwrap(apiClient.get(`${adminCategoriesEndpoint}${slug}/contacts/`, { params }));
+
 export const linkNewsletterCategoryMauticSegment = (slug, mauticSegmentId) =>
   unwrap(
     apiClient.post(`${adminCategoriesEndpoint}${slug}/link-mautic-segment/`, {

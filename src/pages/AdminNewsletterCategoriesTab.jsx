@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -29,6 +30,7 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import RestoreRoundedIcon from "@mui/icons-material/RestoreRounded";
@@ -109,6 +111,7 @@ const categoryMauticId = (category) => {
 };
 
 export default function AdminNewsletterCategoriesTab({ onDataReady }) {
+  const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -371,7 +374,19 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                 return (
                   <TableRow key={category.slug} sx={{ "&:hover": { bgcolor: "#fafafa" } }}>
                     <TableCell sx={{ minWidth: 220 }}>
-                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>{category.name}</Typography>
+                      <Typography
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate(`/admin/newsletter/lists/${category.slug}`)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            navigate(`/admin/newsletter/lists/${category.slug}`);
+                          }
+                        }}
+                        sx={{ fontWeight: 700, color: "#1B2A4A", cursor: "pointer", "&:hover": { color: "#0f766e" } }}
+                      >
+                        {category.name}
+                      </Typography>
                       {category.description && (
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.4, maxWidth: 360 }}>
                           {category.description}
@@ -403,6 +418,19 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                       )}
                     </TableCell>
                     <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      <Tooltip title="View subscribers">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => navigate(`/admin/newsletter/lists/${category.slug}`)}
+                            disabled={saving || Boolean(actionKey)}
+                            sx={{ color: "#475569" }}
+                          >
+                            <PeopleAltRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+
                       <Tooltip title="Edit list">
                         <span>
                           <IconButton
