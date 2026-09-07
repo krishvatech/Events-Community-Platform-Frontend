@@ -31,6 +31,7 @@ import ArchiveRoundedIcon from "@mui/icons-material/ArchiveRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
@@ -72,6 +73,7 @@ const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
+  { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
@@ -336,6 +338,10 @@ export default function AdminNewsletterAudienceDetailPage() {
   const handleTabChange = (tab) => {
     if (tab === "audiences") {
       navigate("/admin/newsletter/audiences");
+      return;
+    }
+    if (tab === "contacts") {
+      navigate("/admin/newsletter/contacts");
       return;
     }
     navigate("/admin/newsletter", { state: { newsletterTab: tab } });

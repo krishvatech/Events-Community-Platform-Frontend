@@ -44,6 +44,7 @@ import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import PreviewRoundedIcon from "@mui/icons-material/PreviewRounded";
@@ -127,6 +128,7 @@ const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
+  { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
@@ -984,6 +986,7 @@ export default function AdminNewsletterPage() {
         active={activeTab}
         onChange={(value) => {
           if (value === "audiences") navigate("/admin/newsletter/audiences");
+          else if (value === "contacts") navigate("/admin/newsletter/contacts");
           else setActiveTab(value);
         }}
       >

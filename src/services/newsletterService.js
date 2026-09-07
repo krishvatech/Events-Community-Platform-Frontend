@@ -11,6 +11,7 @@ export const updateNewsletterPreferences = (preferences) =>
 
 const adminCampaignsEndpoint = "/newsletter/admin/campaigns/";
 const adminAudiencesEndpoint = "/newsletter/admin/audiences/";
+const adminContactsEndpoint = "/newsletter/admin/contacts/";
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -56,6 +57,18 @@ export const listNewsletterCategories = () =>
 
 export const listNewsletterAudiences = () =>
   unwrap(apiClient.get(adminAudiencesEndpoint));
+
+export const listNewsletterAdminContacts = (params = {}) =>
+  unwrap(apiClient.get(adminContactsEndpoint, { params }));
+
+export const getNewsletterAdminContact = (mauticContactId) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/`));
+
+export const listNewsletterAdminContactActivity = (mauticContactId, params = {}) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/activity/`, { params }));
+
+export const getNewsletterAdminContactEngagement = (mauticContactId, params = {}) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/engagement-analytics/`, { params }));
 
 export const createNewsletterAudience = (payload) =>
   unwrap(apiClient.post(adminAudiencesEndpoint, payload));
