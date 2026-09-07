@@ -4028,6 +4028,8 @@ export default function EventManagePage() {
                     <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Job Title</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Country / Region</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Contact Number</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Pre-Approval</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>{event?.attendee_marker_label || 'Marker'}</TableCell>
@@ -4051,6 +4053,8 @@ export default function EventManagePage() {
                       <TableCell>{app.email}</TableCell>
                       <TableCell>{app.job_title}</TableCell>
                       <TableCell>{app.company_name}</TableCell>
+                      <TableCell>{app.location || "—"}</TableCell>
+                      <TableCell>{app.phone || "—"}</TableCell>
                       <TableCell>
                         <Chip
                           label={app.status.charAt(0).toUpperCase() + app.status.slice(1)}

@@ -9,7 +9,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
-import GuestApplyModal from "../components/GuestApplyModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import { LeadGenModal } from "../components/LeadGenModal.jsx";
 import {
@@ -542,6 +541,7 @@ function toCard(ev, isPinnedTopCopy = false) {
     event_format: ev.event_format || ev.format, // virtual, hybrid, in_person
     application_tracks: Array.isArray(ev.application_tracks) ? ev.application_tracks : [],
     registration_type: ev.registration_type || (Array.isArray(ev.application_tracks) && ev.application_tracks.length > 0 ? 'apply' : 'open'),
+    allow_guest_applications: ev.allow_guest_applications === true,
     preapproval_code_enabled: !!ev.preapproval_code_enabled,
     preapproval_allowlist_enabled: !!ev.preapproval_allowlist_enabled,
     attendee_marker_enabled: !!ev.attendee_marker_enabled,
@@ -737,12 +737,15 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
-  const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
   const applicationStatus = getApplicationStatus(myApplication || {});
 
   const openApplyModalAfterProfileCheck = async () => {
     if (!token) {
-      setGuestApplyModalOpen(true);
+      if (ev.allow_guest_applications === true) {
+        setApplyModalOpen(true);
+      } else {
+        navigate(`/signin?next=${encodeURIComponent(`/events/${ev.slug || ev.id}`)}`);
+      }
       return;
     }
 
@@ -1400,7 +1403,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           onClick={openApplyModalAfterProfileCheck}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
-                          {applicationStatus === 'declined' ? 'Apply Again' : 'Apply Now'}
+                          {applicationStatus === 'declined'
+                            ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
+                            : (token ? 'Apply Now' : ev.allow_guest_applications === true ? 'Apply as Guest' : 'Sign in to Apply')}
                         </Button>
                         {applicationStatus === 'cancelled' && (
                           <span className="text-sm text-gray-600">You previously cancelled this application</span>
@@ -1499,17 +1504,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     )
                     : null
                   }
-                  {!isAuthenticatedUser && isFreeEvent && applicationStatus !== 'accepted' && isWithinGuestJoinWindow(ev.start) && (
-                    <Button
-                      variant="outlined"
-                      size="medium"
-                      color="primary"
-                      onClick={() => setGuestApplyModalOpen(true)}
-                      className="normal-case rounded-full px-4"
-                    >
-                      {isGuest ? "Continue Applying as Guest" : "Apply as Guest"}
-                    </Button>
-                  )}
                 </>)
               ) : (
                 // REGISTER FLOW or REPLAY FLOW
@@ -1576,12 +1570,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         event={ev}
         token={token}
         onSuccess={() => setApplyModalOpen(false)}
-      />
-      <GuestApplyModal
-        open={guestApplyModalOpen}
-        onClose={() => setGuestApplyModalOpen(false)}
-        event={ev}
-        livePath={`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`}
       />
     </MUICard>
   );
@@ -1657,12 +1645,15 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
 
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
-  const [guestApplyModalOpen, setGuestApplyModalOpen] = React.useState(false);
   const applicationStatus = getApplicationStatus(myApplication || {});
 
   const openApplyModalAfterProfileCheck = async () => {
     if (!token) {
-      setGuestApplyModalOpen(true);
+      if (ev.allow_guest_applications === true) {
+        setApplyModalOpen(true);
+      } else {
+        navigate(`/signin?next=${encodeURIComponent(`/events/${ev.slug || ev.id}`)}`);
+      }
       return;
     }
 
@@ -2051,7 +2042,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           onClick={openApplyModalAfterProfileCheck}
                           className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                         >
-                          {applicationStatus === 'declined' ? 'Apply Again' : 'Apply Now'}
+                          {applicationStatus === 'declined'
+                            ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
+                            : (token ? 'Apply Now' : ev.allow_guest_applications === true ? 'Apply as Guest' : 'Sign in to Apply')}
                         </Button>
                         {applicationStatus === 'cancelled' && (
                           <span className="text-xs text-gray-600">You previously cancelled this application</span>
@@ -2099,17 +2092,6 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     ) : applicationStatus === 'declined' ? (
                       <Chip label="Application Declined" color="error" variant="outlined" />
                     ) : null}
-                    {!isAuthenticatedUser && isFreeEvent && applicationStatus !== 'accepted' && (
-                      <Button
-                        variant="outlined"
-                        size="medium"
-                        color="primary"
-                        onClick={() => setGuestApplyModalOpen(true)}
-                        className="normal-case rounded-full px-4"
-                      >
-                        {isGuest ? "Continue Applying as Guest" : "Apply as Guest"}
-                      </Button>
-                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-end gap-2">
@@ -2177,12 +2159,6 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
         event={ev}
         token={token}
         onSuccess={() => setApplyModalOpen(false)}
-      />
-      <GuestApplyModal
-        open={guestApplyModalOpen}
-        onClose={() => setGuestApplyModalOpen(false)}
-        event={ev}
-        livePath={`/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`}
       />
     </MUICard>
   );
