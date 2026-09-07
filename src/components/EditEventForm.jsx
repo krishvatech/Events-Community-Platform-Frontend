@@ -293,6 +293,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
     const [isFree, setIsFree] = useState(event?.is_free || false);
     const [priceLabel, setPriceLabel] = useState(event?.price_label || "");
     const [registrationType, setRegistrationType] = useState(event?.registration_type || "open");
+    const [allowGuestApplications, setAllowGuestApplications] = useState(event?.allow_guest_applications === true);
     const [attendeeMarkerEnabled, setAttendeeMarkerEnabled] = useState(Boolean(event?.attendee_marker_enabled));
     const [attendeeMarkerLabel, setAttendeeMarkerLabel] = useState(event?.attendee_marker_label || "");
     const [cpdCpeMinutes, setCpdCpeMinutes] = useState(
@@ -1426,6 +1427,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
         fd.append("price_label", priceLabel.trim());  // always send, never clear
         fd.append("is_free", String(isFree));
         fd.append("registration_type", registrationType);
+        fd.append("allow_guest_applications", String(allowGuestApplications));
         // Event-level optional application checkbox. Only meaningful for apply-type events;
         // disabling it (or switching away from apply) clears the saved label.
         const markerEnabled = registrationType === "apply" && attendeeMarkerEnabled;
@@ -2210,6 +2212,18 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             )}
                             {registrationType === 'apply' && (
                                 <Box sx={{ mt: 2 }}>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={allowGuestApplications}
+                                                onChange={(e) => setAllowGuestApplications(e.target.checked)}
+                                            />
+                                        }
+                                        label="Allow guest applications"
+                                    />
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", ml: 0.5, mb: 1.5 }}>
+                                        When enabled, people can submit an application without signing in. Enabled by default.
+                                    </Typography>
                                     <FormControlLabel
                                         control={
                                             <Switch

@@ -47,6 +47,7 @@ const MultiTrackApplicationForm = ({
   selectedTracks,
   onSuccess,
   event,
+  isGuestApplication = false,
 }) => {
   // Step management
   const [activeStep, setActiveStep] = useState(0);
@@ -83,8 +84,10 @@ const MultiTrackApplicationForm = ({
 
   // Load user data if authenticated
   useEffect(() => {
-    loadUserProfile();
-  }, []);
+    if (!isGuestApplication) {
+      loadUserProfile();
+    }
+  }, [isGuestApplication]);
 
   const loadUserProfile = async () => {
     try {
@@ -382,6 +385,8 @@ const MultiTrackApplicationForm = ({
   };
 
   const saveRegistrationProfile = async () => {
+    if (isGuestApplication) return;
+
     await apiClient.post('/events/save-lead-gen-fields/', {
       first_name: applicantData.first_name.trim(),
       last_name: applicantData.last_name.trim(),
@@ -580,14 +585,16 @@ const MultiTrackApplicationForm = ({
       });
 
       // Extract form_schema fields and include them as top-level payload for validation.
-      // Keep the /apply/ payload limited to EventApplication fields; profile-only
-      // fields such as location and phone are saved through save-lead-gen-fields.
+      // Shared applicant contact fields are also stored on EventApplication so guest
+      // submissions retain the same review data without requiring a user profile.
       const payloadFields = {
         first_name: applicantData.first_name,
         last_name: applicantData.last_name,
         email: applicantData.email,
         job_title: applicantData.job_title,
         company_name: applicantData.company_name,
+        location: applicantData.location,
+        phone: applicantData.phone,
         linkedin_url: applicantData.linkedin_url,
         comments: applicantData.comments,
         // Event-level optional checkbox. Backend re-gates this on the event's
@@ -648,9 +655,9 @@ const MultiTrackApplicationForm = ({
         })),
       });
 
-      // Save shared profile fields first because the backend lead-gen validation
-      // checks request.user.profile, not only the /apply/ payload.
-      // Contact Number is optional, but location/job/company must be persisted before submit.
+      // Signed-in applicants still keep their shared profile in sync because backend
+      // lead-gen validation checks request.user.profile. Guests skip this profile call;
+      // the same contact fields are already included in the application payload above.
       await saveRegistrationProfile();
 
       const response = await apiClient.post(
@@ -716,7 +723,7 @@ const MultiTrackApplicationForm = ({
         // Handle 400 errors - could be validation or duplicate application
         errorMessage = 'Unable to submit application. ' + (detail || 'Please check your information and try again.');
       } else if (status === 401) {
-        errorMessage = 'You must be logged in to apply for this event.';
+        errorMessage = detail || 'You must be logged in to apply for this event.';
       } else if (status === 404) {
         errorMessage = 'Event or application track not found.';
       }
