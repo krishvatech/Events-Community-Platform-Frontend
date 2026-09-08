@@ -3,8 +3,14 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Skeleton,
   Stack,
   Tab,
@@ -30,7 +36,11 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "react-router-dom";
 
-import { listNewsletterAdminContacts } from "../services/newsletterService";
+import {
+  bulkUpdateNewsletterAdminContactStage,
+  listNewsletterAdminContacts,
+  listNewsletterStages,
+} from "../services/newsletterService";
 
 const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
@@ -103,17 +113,45 @@ export default function AdminNewsletterContactsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [stageFilter, setStageFilter] = useState("");
+  const [stages, setStages] = useState([]);
+  const [stagesLoading, setStagesLoading] = useState(true);
+  const [stagesError, setStagesError] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkStageId, setBulkStageId] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState(null);
   const pageSize = 25;
 
+  const loadStages = useCallback(async () => {
+    setStagesLoading(true);
+    setStagesError("");
+    try {
+      const response = await listNewsletterStages({ page: 1, page_size: 100 });
+      setStages(Array.isArray(response?.results) ? response.results : []);
+    } catch (err) {
+      setStages([]);
+      setStagesError(getErrorMessage(err, "We could not load lifecycle stages."));
+    } finally {
+      setStagesLoading(false);
+    }
+  }, []);
+
   const loadContacts = useCallback(
-    async ({ nextPage = page, nextSearch = search } = {}) => {
+    async ({
+      nextPage = page,
+      nextSearch = search,
+      nextStageFilter = stageFilter,
+    } = {}) => {
       setLoading(true);
       setError("");
+      setSelectedIds([]);
       try {
         const response = await listNewsletterAdminContacts({
           page: nextPage,
           page_size: pageSize,
           ...(nextSearch ? { search: nextSearch } : {}),
+          ...(nextStageFilter ? { stage_id: nextStageFilter } : {}),
         });
         setData(response);
         setPage(response?.page || nextPage);
@@ -124,11 +162,12 @@ export default function AdminNewsletterContactsPage() {
         setLoading(false);
       }
     },
-    [page, search]
+    [page, search, stageFilter]
   );
 
   useEffect(() => {
-    loadContacts({ nextPage: 1, nextSearch: "" });
+    loadContacts({ nextPage: 1, nextSearch: "", nextStageFilter: "" });
+    loadStages();
   }, []);
 
   const contacts = Array.isArray(data?.results) ? data.results : [];
@@ -152,13 +191,79 @@ export default function AdminNewsletterContactsPage() {
     const nextSearch = searchInput.trim();
     setSearch(nextSearch);
     setPage(1);
-    loadContacts({ nextPage: 1, nextSearch });
+    loadContacts({ nextPage: 1, nextSearch, nextStageFilter: stageFilter });
+  };
+
+  const handleStageFilterChange = (event) => {
+    const nextStageFilter = String(event.target.value || "");
+    setStageFilter(nextStageFilter);
+    setPage(1);
+    setBulkMessage(null);
+    loadContacts({
+      nextPage: 1,
+      nextSearch: search,
+      nextStageFilter,
+    });
   };
 
   const handlePageChange = (nextPage) => {
     if (loading || nextPage < 1 || nextPage > numPages) return;
     setPage(nextPage);
-    loadContacts({ nextPage, nextSearch: search });
+    loadContacts({ nextPage, nextSearch: search, nextStageFilter: stageFilter });
+  };
+
+  const toggleContactSelection = (contactId) => {
+    const normalized = String(contactId);
+    setSelectedIds((current) =>
+      current.includes(normalized)
+        ? current.filter((id) => id !== normalized)
+        : [...current, normalized]
+    );
+  };
+
+  const togglePageSelection = () => {
+    const pageIds = contacts.map((contact) => String(contact.mautic_contact_id));
+    setSelectedIds((current) =>
+      pageIds.length > 0 && current.length === pageIds.length ? [] : pageIds
+    );
+  };
+
+  const runBulkStageAction = async (action) => {
+    if (!selectedIds.length) return;
+    if (action === "move" && !bulkStageId) {
+      setBulkMessage({ severity: "warning", text: "Select a target Stage first." });
+      return;
+    }
+
+    setBulkLoading(true);
+    setBulkMessage(null);
+    try {
+      const result = await bulkUpdateNewsletterAdminContactStage({
+        action,
+        contact_ids: selectedIds,
+        ...(action === "move" ? { stage_id: bulkStageId } : {}),
+      });
+      const succeeded = Number(result?.succeeded || 0);
+      const failed = Number(result?.failed || 0);
+      const changed = Number(result?.changed || 0);
+      setBulkMessage({
+        severity: failed ? "warning" : "success",
+        text: `${succeeded} succeeded, ${failed} failed, ${changed} changed.`,
+      });
+      setSelectedIds([]);
+      await loadContacts({
+        nextPage: page,
+        nextSearch: search,
+        nextStageFilter: stageFilter,
+      });
+    } catch (err) {
+      setBulkMessage({
+        severity: "error",
+        text: getErrorMessage(err, "Bulk Stage update failed."),
+      });
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
   return (
@@ -190,7 +295,13 @@ export default function AdminNewsletterContactsPage() {
         </Box>
         <Button
           startIcon={<RefreshRoundedIcon />}
-          onClick={() => loadContacts({ nextPage: page, nextSearch: search })}
+          onClick={() =>
+            loadContacts({
+              nextPage: page,
+              nextSearch: search,
+              nextStageFilter: stageFilter,
+            })
+          }
           disabled={loading}
           sx={{ textTransform: "none" }}
         >
@@ -219,7 +330,29 @@ export default function AdminNewsletterContactsPage() {
               />
             )}
           </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ minWidth: { md: 440 } }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ minWidth: { md: 680 } }}
+          >
+            <FormControl size="small" sx={{ minWidth: { sm: 190 } }}>
+              <InputLabel id="newsletter-contact-stage-filter-label">Stage</InputLabel>
+              <Select
+                labelId="newsletter-contact-stage-filter-label"
+                value={stageFilter}
+                label="Stage"
+                onChange={handleStageFilterChange}
+                disabled={loading}
+              >
+                <MenuItem value="">All stages</MenuItem>
+                <MenuItem value="none">No stage</MenuItem>
+                {stages.map((stage) => (
+                  <MenuItem key={stage.id} value={String(stage.id)}>
+                    {stage.name || `Stage #${stage.id}`}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <TextField
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
@@ -245,6 +378,81 @@ export default function AdminNewsletterContactsPage() {
           </Stack>
         </Stack>
 
+        {stagesError && (
+          <Alert
+            severity="warning"
+            action={
+              <Button color="inherit" size="small" onClick={loadStages}>
+                Retry
+              </Button>
+            }
+            sx={{ mx: 2, mt: 2 }}
+          >
+            {stagesError}
+          </Alert>
+        )}
+
+        {bulkMessage && (
+          <Alert
+            severity={bulkMessage.severity}
+            onClose={() => setBulkMessage(null)}
+            sx={{ mx: 2, mt: 2 }}
+          >
+            {bulkMessage.text}
+          </Alert>
+        )}
+
+        {selectedIds.length > 0 && (
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            spacing={1.5}
+            alignItems={{ xs: "stretch", md: "center" }}
+            sx={{ p: 2, borderBottom: "1px solid #E7ECEF", bgcolor: "#F8FAFC" }}
+          >
+            <Chip
+              label={`${selectedIds.length} selected`}
+              color="primary"
+              variant="outlined"
+            />
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <InputLabel id="newsletter-bulk-stage-label">Move to Stage</InputLabel>
+              <Select
+                labelId="newsletter-bulk-stage-label"
+                value={bulkStageId}
+                label="Move to Stage"
+                onChange={(event) => setBulkStageId(String(event.target.value))}
+                disabled={bulkLoading || stagesLoading}
+              >
+                {stages.map((stage) => (
+                  <MenuItem key={stage.id} value={String(stage.id)}>
+                    {stage.name || `Stage #${stage.id}`}
+                    {stage.weight !== null && stage.weight !== undefined
+                      ? ` · Weight ${stage.weight}`
+                      : ""}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Button
+              variant="contained"
+              onClick={() => runBulkStageAction("move")}
+              disabled={bulkLoading || !bulkStageId}
+              sx={{ textTransform: "none" }}
+            >
+              {bulkLoading ? <CircularProgress size={20} color="inherit" /> : "Move to Stage"}
+            </Button>
+            <Button
+              variant="outlined"
+              color="warning"
+              onClick={() => runBulkStageAction("clear")}
+              disabled={bulkLoading}
+              sx={{ textTransform: "none" }}
+            >
+              Clear Stage
+            </Button>
+          </Stack>
+        )}
+
         {error ? (
           <Box sx={{ p: 2 }}>
             <Alert
@@ -253,7 +461,13 @@ export default function AdminNewsletterContactsPage() {
                 <Button
                   color="inherit"
                   size="small"
-                  onClick={() => loadContacts({ nextPage: page, nextSearch: search })}
+                  onClick={() =>
+                    loadContacts({
+                      nextPage: page,
+                      nextSearch: search,
+                      nextStageFilter: stageFilter,
+                    })
+                  }
                 >
                   Retry
                 </Button>
@@ -273,6 +487,18 @@ export default function AdminNewsletterContactsPage() {
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={
+                        contacts.length > 0 && selectedIds.length === contacts.length
+                      }
+                      indeterminate={
+                        selectedIds.length > 0 && selectedIds.length < contacts.length
+                      }
+                      onChange={togglePageSelection}
+                      inputProps={{ "aria-label": "Select all contacts on this page" }}
+                    />
+                  </TableCell>
                   <TableCell>Name</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Location</TableCell>
@@ -301,6 +527,18 @@ export default function AdminNewsletterContactsPage() {
                     }}
                     sx={{ cursor: "pointer" }}
                   >
+                    <TableCell
+                      padding="checkbox"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <Checkbox
+                        checked={selectedIds.includes(String(contact.mautic_contact_id))}
+                        onChange={() =>
+                          toggleContactSelection(contact.mautic_contact_id)
+                        }
+                        inputProps={{ "aria-label": `Select ${contact.name || `Contact ${contact.mautic_contact_id}`}` }}
+                      />
+                    </TableCell>
                     <TableCell sx={{ minWidth: 170 }}>
                       <Typography
                         sx={{ fontWeight: 800, color: "#1B2A4A", "&:hover": { color: "#0f766e" } }}
@@ -384,9 +622,11 @@ export default function AdminNewsletterContactsPage() {
 
                 {contacts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
                       <Typography color="text.secondary">
-                        {search ? "No contacts match this search." : "No Mautic contacts found."}
+                        {search || stageFilter
+                          ? "No contacts match the current filters."
+                          : "No Mautic contacts found."}
                       </Typography>
                     </TableCell>
                   </TableRow>

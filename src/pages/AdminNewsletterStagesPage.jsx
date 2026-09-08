@@ -11,6 +11,7 @@ import {
   DialogTitle,
   FormControlLabel,
   IconButton,
+  LinearProgress,
   Paper,
   Skeleton,
   Stack,
@@ -45,6 +46,7 @@ import { useNavigate } from "react-router-dom";
 import {
   createNewsletterStage,
   deleteNewsletterStage,
+  getNewsletterStageAnalytics,
   listNewsletterStages,
   updateNewsletterStage,
 } from "../services/newsletterService";
@@ -248,6 +250,9 @@ export default function AdminNewsletterStagesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState("");
   const [dialog, setDialog] = useState({ open: false, stage: null, saving: false, error: "" });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, stage: null, deleting: false, error: "" });
   const pageSize = 25;
@@ -274,13 +279,34 @@ export default function AdminNewsletterStagesPage() {
     [page, search]
   );
 
+  const loadAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    setAnalyticsError("");
+    try {
+      const response = await getNewsletterStageAnalytics();
+      setAnalytics(response);
+    } catch (err) {
+      setAnalytics(null);
+      setAnalyticsError(
+        getErrorMessage(err, "We could not load Stage distribution analytics.")
+      );
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStages({ nextPage: 1, nextSearch: "" });
+    loadAnalytics();
   }, []);
 
   const rows = Array.isArray(data?.results) ? data.results : [];
   const count = Number(data?.count || 0);
   const numPages = Math.max(1, Number(data?.num_pages || 1));
+  const analyticsStages = Array.isArray(analytics?.stages) ? analytics.stages : [];
+  const analyticsByStage = new Map(
+    analyticsStages.map((stage) => [String(stage.id), stage])
+  );
 
   const handleTabChange = (tab) => {
     if (tab === "stages") return;
@@ -305,6 +331,7 @@ export default function AdminNewsletterStagesPage() {
       setDialog({ open: false, stage: null, saving: false, error: "" });
       setSuccess(editing ? "Stage updated in Mautic." : "Stage created in Mautic.");
       await loadStages({ nextPage: editing ? page : 1, nextSearch: search });
+      await loadAnalytics();
     } catch (err) {
       setDialog((current) => ({
         ...current,
@@ -323,6 +350,7 @@ export default function AdminNewsletterStagesPage() {
       setSuccess("Stage deleted from Mautic.");
       const nextPage = rows.length === 1 && page > 1 ? page - 1 : page;
       await loadStages({ nextPage, nextSearch: search });
+      await loadAnalytics();
     } catch (err) {
       setDeleteDialog((current) => ({
         ...current,
@@ -364,8 +392,11 @@ export default function AdminNewsletterStagesPage() {
         <Stack direction="row" spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
-            onClick={() => loadStages({ nextPage: page, nextSearch: search })}
-            disabled={loading}
+            onClick={() => {
+              loadStages({ nextPage: page, nextSearch: search });
+              loadAnalytics();
+            }}
+            disabled={loading || analyticsLoading}
             sx={{ textTransform: "none" }}
           >
             Refresh
@@ -384,6 +415,106 @@ export default function AdminNewsletterStagesPage() {
       <Alert severity="info" variant="outlined">
         Mautic is the source of truth. Weight is lifecycle metadata; direct Mautic Stage moves can still move contacts between any stages.
       </Alert>
+
+      {analyticsError ? (
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" onClick={loadAnalytics}>
+              Retry
+            </Button>
+          }
+        >
+          {analyticsError}
+        </Alert>
+      ) : analyticsLoading ? (
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} variant="rounded" height={112} sx={{ flex: 1 }} />
+          ))}
+        </Stack>
+      ) : analytics ? (
+        <>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", flex: 1 }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Total Contacts
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+                {Number(analytics.total_contacts || 0)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Current Mautic contact directory
+              </Typography>
+            </Paper>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", flex: 1 }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Staged Contacts
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+                {Number(analytics.staged_contacts || 0)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {Number(analytics.staged_percentage || 0).toFixed(2)}% of contacts
+              </Typography>
+            </Paper>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", flex: 1 }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                No Stage
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+                {Number(analytics.unstaged_contacts || 0)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {Number(analytics.unstaged_percentage || 0).toFixed(2)}% of contacts
+              </Typography>
+            </Paper>
+          </Stack>
+
+          <Paper
+            variant="outlined"
+            sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF" }}
+          >
+            <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1.5 }}>
+              Stage Distribution
+            </Typography>
+            {analyticsStages.length ? (
+              <Stack spacing={1.5}>
+                {analyticsStages.map((stage) => (
+                  <Box key={stage.id}>
+                    <Stack direction="row" justifyContent="space-between" spacing={2}>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {stage.name || `Stage #${stage.id}`}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {Number(stage.count || 0)} · {Number(stage.percentage || 0).toFixed(2)}%
+                      </Typography>
+                    </Stack>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(100, Math.max(0, Number(stage.percentage || 0)))}
+                      sx={{ mt: 0.75, height: 8, borderRadius: 4 }}
+                    />
+                  </Box>
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No lifecycle stages are configured yet.
+              </Typography>
+            )}
+          </Paper>
+        </>
+      ) : null}
 
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
         <Stack
@@ -434,6 +565,7 @@ export default function AdminNewsletterStagesPage() {
                   <TableCell>Stage</TableCell>
                   <TableCell>Weight</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Contacts</TableCell>
                   <TableCell>Category</TableCell>
                   <TableCell>Modified</TableCell>
                   <TableCell align="right">Actions</TableCell>
@@ -442,6 +574,7 @@ export default function AdminNewsletterStagesPage() {
               <TableBody>
                 {rows.map((stage) => {
                   const category = stage.category?.title || stage.category?.name || "—";
+                  const stageStats = analyticsByStage.get(String(stage.id));
                   return (
                     <TableRow hover key={stage.id}>
                       <TableCell sx={{ minWidth: 220 }}>
@@ -464,6 +597,18 @@ export default function AdminNewsletterStagesPage() {
                           color={stage.isPublished === false ? "default" : "success"}
                           variant={stage.isPublished === false ? "outlined" : "filled"}
                         />
+                      </TableCell>
+                      <TableCell sx={{ minWidth: 110 }}>
+                        {stageStats ? (
+                          <Stack spacing={0.15}>
+                            <Typography sx={{ fontWeight: 750 }}>
+                              {Number(stageStats.count || 0)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {Number(stageStats.percentage || 0).toFixed(2)}%
+                            </Typography>
+                          </Stack>
+                        ) : "—"}
                       </TableCell>
                       <TableCell>{category}</TableCell>
                       <TableCell sx={{ minWidth: 165 }}>{formatDateTime(stage.dateModified || stage.dateAdded)}</TableCell>
@@ -491,7 +636,7 @@ export default function AdminNewsletterStagesPage() {
                 })}
                 {!rows.length && (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
                       <Typography color="text.secondary">
                         {search ? "No stages match this search." : "No Mautic stages found."}
                       </Typography>

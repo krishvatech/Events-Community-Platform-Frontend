@@ -84,6 +84,9 @@ export const clearNewsletterAdminContactStage = (mauticContactId) =>
 export const listNewsletterStages = (params = {}) =>
   unwrap(apiClient.get(adminStagesEndpoint, { params }));
 
+export const bulkUpdateNewsletterAdminContactStage = (payload) =>
+  unwrap(apiClient.post(`${adminContactsEndpoint}bulk-stage/`, payload));
+
 export const getNewsletterStage = (stageId) =>
   unwrap(apiClient.get(`${adminStagesEndpoint}${stageId}/`));
 
@@ -95,6 +98,9 @@ export const updateNewsletterStage = (stageId, payload) =>
 
 export const deleteNewsletterStage = (stageId) =>
   unwrap(apiClient.delete(`${adminStagesEndpoint}${stageId}/`));
+
+export const getNewsletterStageAnalytics = () =>
+  unwrap(apiClient.get(`${adminStagesEndpoint}analytics/`));
 
 export const createNewsletterAudience = (payload) =>
   unwrap(apiClient.post(adminAudiencesEndpoint, payload));
