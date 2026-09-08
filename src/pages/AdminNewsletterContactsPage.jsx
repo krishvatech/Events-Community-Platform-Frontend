@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
+import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
@@ -36,6 +37,7 @@ const marketingTabs = [
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
+  { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
   { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
@@ -137,6 +139,10 @@ export default function AdminNewsletterContactsPage() {
     if (tab === "contacts") return;
     if (tab === "audiences") {
       navigate("/admin/newsletter/audiences");
+      return;
+    }
+    if (tab === "stages") {
+      navigate("/admin/newsletter/stages");
       return;
     }
     navigate("/admin/newsletter", { state: { newsletterTab: tab } });
@@ -270,6 +276,7 @@ export default function AdminNewsletterContactsPage() {
                   <TableCell>Name</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Location</TableCell>
+                  <TableCell>Stage</TableCell>
                   <TableCell>Subscription Lists</TableCell>
                   <TableCell>ECP Mapping</TableCell>
                   <TableCell>Last Active</TableCell>
@@ -309,6 +316,26 @@ export default function AdminNewsletterContactsPage() {
                     </TableCell>
                     <TableCell sx={{ minWidth: 140 }}>
                       {contact.location || "—"}
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 180 }}>
+                      {contact.current_stage ? (
+                        <Stack spacing={0.35} alignItems="flex-start">
+                          <Chip
+                            size="small"
+                            icon={<FlagRoundedIcon />}
+                            label={contact.current_stage.name || `Stage #${contact.current_stage.id}`}
+                            color="info"
+                            variant="outlined"
+                          />
+                          {contact.current_stage.weight !== null && contact.current_stage.weight !== undefined && (
+                            <Typography variant="caption" color="text.secondary">
+                              Weight {contact.current_stage.weight}
+                            </Typography>
+                          )}
+                        </Stack>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">No stage</Typography>
+                      )}
                     </TableCell>
                     <TableCell sx={{ minWidth: 220 }}>
                       {Array.isArray(contact.subscription_lists) && contact.subscription_lists.length ? (
@@ -357,7 +384,7 @@ export default function AdminNewsletterContactsPage() {
 
                 {contacts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 5 }}>
                       <Typography color="text.secondary">
                         {search ? "No contacts match this search." : "No Mautic contacts found."}
                       </Typography>

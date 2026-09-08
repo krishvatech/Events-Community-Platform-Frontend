@@ -4,9 +4,14 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
+  FormControl,
   Grid,
   IconButton,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Skeleton,
   Stack,
   Tab,
@@ -23,6 +28,7 @@ import {
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
+import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
@@ -33,9 +39,12 @@ import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
+  clearNewsletterAdminContactStage,
   getNewsletterAdminContact,
   getNewsletterAdminContactEngagement,
   listNewsletterAdminContactActivity,
+  listNewsletterStages,
+  moveNewsletterAdminContactStage,
 } from "../services/newsletterService";
 
 const marketingTabs = [
@@ -43,6 +52,7 @@ const marketingTabs = [
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
+  { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
   { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
@@ -234,6 +244,11 @@ export default function AdminNewsletterContactDetailPage() {
   const [error, setError] = useState("");
   const [activityError, setActivityError] = useState("");
   const [engagementError, setEngagementError] = useState("");
+  const [stages, setStages] = useState([]);
+  const [stagesLoading, setStagesLoading] = useState(true);
+  const [stageActionLoading, setStageActionLoading] = useState(false);
+  const [stageError, setStageError] = useState("");
+  const [selectedStageId, setSelectedStageId] = useState("");
   const [activityPage, setActivityPage] = useState(1);
   const [rangeFrom, setRangeFrom] = useState(DEFAULT_RANGE.from);
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.to);
@@ -283,11 +298,36 @@ export default function AdminNewsletterContactDetailPage() {
     }
   }, [mauticContactId, rangeFrom, rangeTo]);
 
+  const loadStages = useCallback(async () => {
+    setStagesLoading(true);
+    setStageError("");
+    try {
+      const first = await listNewsletterStages({ page: 1, page_size: 100 });
+      const allStages = Array.isArray(first?.results) ? [...first.results] : [];
+      const pages = Math.max(1, Number(first?.num_pages || 1));
+      for (let nextPage = 2; nextPage <= pages; nextPage += 1) {
+        const next = await listNewsletterStages({ page: nextPage, page_size: 100 });
+        if (Array.isArray(next?.results)) allStages.push(...next.results);
+      }
+      setStages(allStages);
+    } catch (err) {
+      setStages([]);
+      setStageError(getErrorMessage(err, "Failed to load Mautic stages."));
+    } finally {
+      setStagesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadContact();
     loadActivity({ page: 1 });
     loadEngagement(DEFAULT_RANGE);
+    loadStages();
   }, [mauticContactId]);
+
+  useEffect(() => {
+    setSelectedStageId(contact?.current_stage?.id ? String(contact.current_stage.id) : "");
+  }, [contact?.current_stage?.id]);
 
   const subscribedSegments = useMemo(
     () => (contact?.subscription_lists || []).filter((item) => item.is_subscribed),
@@ -299,6 +339,7 @@ export default function AdminNewsletterContactDetailPage() {
   const handleTabChange = (tab) => {
     if (tab === "contacts") return navigate("/admin/newsletter/contacts");
     if (tab === "audiences") return navigate("/admin/newsletter/audiences");
+    if (tab === "stages") return navigate("/admin/newsletter/stages");
     navigate("/admin/newsletter", { state: { newsletterTab: tab } });
   };
 
@@ -306,8 +347,45 @@ export default function AdminNewsletterContactDetailPage() {
     loadContact();
     loadActivity({ page: activityPage });
     loadEngagement({ from: rangeFrom, to: rangeTo });
+    loadStages();
   };
 
+  const refreshAfterStageChange = async () => {
+    await Promise.all([
+      loadContact(),
+      loadActivity({ page: 1 }),
+      loadEngagement({ from: rangeFrom, to: rangeTo }),
+    ]);
+    setActivityPage(1);
+  };
+
+  const moveStage = async () => {
+    if (!selectedStageId || stageActionLoading) return;
+    setStageActionLoading(true);
+    setStageError("");
+    try {
+      await moveNewsletterAdminContactStage(mauticContactId, selectedStageId);
+      await refreshAfterStageChange();
+    } catch (err) {
+      setStageError(getErrorMessage(err, "Failed to move this contact to the selected stage."));
+    } finally {
+      setStageActionLoading(false);
+    }
+  };
+
+  const clearStage = async () => {
+    if (!contact?.current_stage || stageActionLoading) return;
+    setStageActionLoading(true);
+    setStageError("");
+    try {
+      await clearNewsletterAdminContactStage(mauticContactId);
+      await refreshAfterStageChange();
+    } catch (err) {
+      setStageError(getErrorMessage(err, "Failed to clear this contact's stage."));
+    } finally {
+      setStageActionLoading(false);
+    }
+  };
 
   return (
     <Stack spacing={3}>
@@ -420,6 +498,99 @@ export default function AdminNewsletterContactDetailPage() {
                     <Typography variant="body2"><strong>ECP:</strong> {contact.mapped_in_ecp ? `User #${contact.ecp_user_id}` : "Not mapped"}</Typography>
                     <Typography variant="body2"><strong>Last active:</strong> {formatDateTime(contact.last_active_at || contact.date_modified)}</Typography>
                     <Typography variant="body2"><strong>Last sync:</strong> {formatDateTime(contact.last_synced_at)}</Typography>
+                  </Stack>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Stack spacing={1.75}>
+                    <Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <FlagRoundedIcon fontSize="small" color="action" />
+                        <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Lifecycle Stage</Typography>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Mautic is the source of truth for this contact's current stage.
+                      </Typography>
+                    </Box>
+
+                    {stageError && <Alert severity="error">{stageError}</Alert>}
+
+                    {contact.current_stage ? (
+                      <Stack spacing={0.5} alignItems="flex-start">
+                        <Chip
+                          icon={<FlagRoundedIcon />}
+                          label={contact.current_stage.name || `Stage #${contact.current_stage.id}`}
+                          color="info"
+                          variant="outlined"
+                          sx={{ fontWeight: 800 }}
+                        />
+                        {contact.current_stage.weight !== null && contact.current_stage.weight !== undefined && (
+                          <Typography variant="caption" color="text.secondary">Weight {contact.current_stage.weight}</Typography>
+                        )}
+                      </Stack>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">No stage assigned.</Typography>
+                    )}
+
+                    {stagesLoading ? (
+                      <Skeleton height={48} />
+                    ) : stages.length ? (
+                      <>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="contact-stage-select-label">Move to stage</InputLabel>
+                          <Select
+                            labelId="contact-stage-select-label"
+                            label="Move to stage"
+                            value={selectedStageId}
+                            onChange={(event) => setSelectedStageId(String(event.target.value))}
+                            disabled={stageActionLoading}
+                          >
+                            {stages.map((stage) => (
+                              <MenuItem key={stage.id} value={String(stage.id)}>
+                                {stage.name || `Stage #${stage.id}`}
+                                {stage.weight !== null && stage.weight !== undefined ? ` · Weight ${stage.weight}` : ""}
+                                {stage.isPublished === false ? " · Unpublished" : ""}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={moveStage}
+                            disabled={
+                              stageActionLoading ||
+                              !selectedStageId ||
+                              String(contact.current_stage?.id || "") === selectedStageId
+                            }
+                            sx={{ textTransform: "none" }}
+                          >
+                            {stageActionLoading ? <CircularProgress size={18} color="inherit" /> : "Move to Stage"}
+                          </Button>
+                          {contact.current_stage && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={clearStage}
+                              disabled={stageActionLoading}
+                              sx={{ textTransform: "none" }}
+                            >
+                              Clear Stage
+                            </Button>
+                          )}
+                        </Stack>
+                      </>
+                    ) : (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => navigate("/admin/newsletter/stages")}
+                        sx={{ textTransform: "none", alignSelf: "flex-start" }}
+                      >
+                        Manage Stages
+                      </Button>
+                    )}
                   </Stack>
                 </Paper>
 
