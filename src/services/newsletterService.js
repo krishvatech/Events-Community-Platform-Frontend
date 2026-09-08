@@ -14,6 +14,7 @@ const adminAudiencesEndpoint = "/newsletter/admin/audiences/";
 const adminContactsEndpoint = "/newsletter/admin/contacts/";
 const adminStagesEndpoint = "/newsletter/admin/stages/";
 const adminPointsEndpoint = "/newsletter/admin/points/";
+const adminPointTriggersEndpoint = `${adminPointsEndpoint}triggers/`;
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -120,6 +121,39 @@ export const updateNewsletterPointAction = (pointId, payload) =>
 
 export const deleteNewsletterPointAction = (pointId) =>
   unwrap(apiClient.delete(`${adminPointsEndpoint}${pointId}/`));
+
+export const listNewsletterPointTriggerEventTypes = () =>
+  unwrap(apiClient.get(`${adminPointTriggersEndpoint}event-types/`));
+
+export const listNewsletterPointTriggers = (params = {}) =>
+  unwrap(apiClient.get(adminPointTriggersEndpoint, { params }));
+
+export const getNewsletterPointTrigger = (triggerId) =>
+  unwrap(apiClient.get(`${adminPointTriggersEndpoint}${triggerId}/`));
+
+export const createNewsletterPointTrigger = (payload) =>
+  unwrap(apiClient.post(adminPointTriggersEndpoint, payload));
+
+export const updateNewsletterPointTrigger = (triggerId, payload) =>
+  unwrap(apiClient.patch(`${adminPointTriggersEndpoint}${triggerId}/`, payload));
+
+export const deleteNewsletterPointTrigger = (triggerId) =>
+  unwrap(apiClient.delete(`${adminPointTriggersEndpoint}${triggerId}/`));
+
+export const listNewsletterPointTriggerEvents = (triggerId) =>
+  unwrap(apiClient.get(`${adminPointTriggersEndpoint}${triggerId}/events/`));
+
+export const createNewsletterPointTriggerEvent = (triggerId, payload) =>
+  unwrap(apiClient.post(`${adminPointTriggersEndpoint}${triggerId}/events/`, payload));
+
+export const getNewsletterPointTriggerEvent = (triggerId, eventId) =>
+  unwrap(apiClient.get(`${adminPointTriggersEndpoint}${triggerId}/events/${eventId}/`));
+
+export const updateNewsletterPointTriggerEvent = (triggerId, eventId, payload) =>
+  unwrap(apiClient.patch(`${adminPointTriggersEndpoint}${triggerId}/events/${eventId}/`, payload));
+
+export const deleteNewsletterPointTriggerEvent = (triggerId, eventId) =>
+  unwrap(apiClient.delete(`${adminPointTriggersEndpoint}${triggerId}/events/${eventId}/`));
 
 export const adjustNewsletterAdminContactPoints = (mauticContactId, payload) =>
   unwrap(

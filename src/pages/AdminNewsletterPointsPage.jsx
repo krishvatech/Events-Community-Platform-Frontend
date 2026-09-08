@@ -53,6 +53,7 @@ import {
   listNewsletterPointActionTypes,
   updateNewsletterPointAction,
 } from "../services/newsletterService";
+import AdminNewsletterPointTriggersPanel from "./AdminNewsletterPointTriggersPanel";
 
 const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
@@ -453,6 +454,7 @@ export default function AdminNewsletterPointsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [success, setSuccess] = useState("");
+  const [pointsSection, setPointsSection] = useState("actions");
   const [dialog, setDialog] = useState({ open: false, action: null, saving: false, error: "" });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, action: null, deleting: false, error: "" });
   const pageSize = 25;
@@ -574,6 +576,28 @@ export default function AdminNewsletterPointsPage() {
       <NewsletterTabs onChange={handleTabChange} />
 
       {success && <Alert severity="success" onClose={() => setSuccess("")}>{success}</Alert>}
+
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+        <Tabs
+          value={pointsSection}
+          onChange={(_, value) => setPointsSection(value)}
+          sx={{
+            px: 2,
+            minHeight: 48,
+            "& .MuiTab-root": { minHeight: 48, textTransform: "none", fontWeight: 800 },
+            "& .Mui-selected": { color: "#0f766e !important" },
+            "& .MuiTabs-indicator": { backgroundColor: "#0f766e" },
+          }}
+        >
+          <Tab value="actions" label="Point Actions" />
+          <Tab value="triggers" label="Point Triggers" />
+        </Tabs>
+      </Paper>
+
+      {pointsSection === "triggers" ? (
+        <AdminNewsletterPointTriggersPanel />
+      ) : (
+        <>
 
       <Stack
         direction={{ xs: "column", md: "row" }}
@@ -826,6 +850,8 @@ export default function AdminNewsletterPointsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+        </>
+      )}
     </Stack>
   );
 }
