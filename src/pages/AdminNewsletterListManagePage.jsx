@@ -35,7 +35,6 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
-import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
@@ -64,7 +63,6 @@ const marketingTabs = [
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
-  { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
@@ -542,10 +540,6 @@ export default function AdminNewsletterListManagePage() {
   };
 
   const handleTabChange = (value) => {
-    if (value === "audiences") {
-      navigate("/admin/newsletter/audiences");
-      return;
-    }
     if (value === "contacts") {
       navigate("/admin/newsletter/contacts");
       return;
@@ -675,7 +669,7 @@ export default function AdminNewsletterListManagePage() {
           Newsletter
         </Typography>
         <Typography color="text.secondary">
-          Manage campaigns, audiences, templates, and performance from ECP.
+          Manage campaigns, subscription lists, contacts, lifecycle stages, templates, and performance from ECP.
         </Typography>
       </Box>
 

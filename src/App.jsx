@@ -31,8 +31,6 @@ import ProfilePage from "./pages/ProfilePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import NewsletterPage from "./pages/NewsletterPage.jsx";
 import AdminNewsletterPage from "./pages/AdminNewsletterPage.jsx";
-import AdminNewsletterAudiencesPage from "./pages/AdminNewsletterAudiencesPage.jsx";
-import AdminNewsletterAudienceDetailPage from "./pages/AdminNewsletterAudienceDetailPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
 import AdminNewsletterContactDetailPage from "./pages/AdminNewsletterContactDetailPage.jsx";
 import AdminNewsletterStagesPage from "./pages/AdminNewsletterStagesPage.jsx";
@@ -301,9 +299,7 @@ const AppShell = () => {
             <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
             <Route path="newsletter" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/new" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/audiences" element={<RequireStaffOrAdmin><AdminNewsletterAudiencesPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/audiences/new" element={<RequireStaffOrAdmin><AdminNewsletterAudienceDetailPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/audiences/:audienceId" element={<RequireStaffOrAdmin><AdminNewsletterAudienceDetailPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/audiences/*" element={<Navigate to="/admin/newsletter" replace />} />
             <Route path="newsletter/contacts" element={<RequireStaffOrAdmin><AdminNewsletterContactsPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/contacts/:mauticContactId" element={<RequireStaffOrAdmin><AdminNewsletterContactDetailPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/stages" element={<RequireStaffOrAdmin><AdminNewsletterStagesPage /></RequireStaffOrAdmin>} />

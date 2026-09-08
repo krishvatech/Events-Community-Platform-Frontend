@@ -43,7 +43,6 @@ import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
-import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
@@ -131,7 +130,6 @@ const marketingTabs = [
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
-  { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
@@ -251,7 +249,7 @@ function NewsletterShell({ active, onChange, children }) {
           Newsletter
         </Typography>
         <Typography color="text.secondary">
-          Manage campaigns, audiences, templates, and performance from ECP.
+          Manage campaigns, subscription lists, contacts, lifecycle stages, templates, and performance from ECP.
         </Typography>
       </Box>
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
@@ -752,8 +750,12 @@ export default function AdminNewsletterPage() {
   const normalizedPath = location.pathname.replace(/\/+$/, "");
   const isNew = normalizedPath.endsWith("/admin/newsletter/new");
   const isDetail = isNew || Boolean(campaignId);
+  const requestedTab = location.state?.newsletterTab;
+  const initialTab = marketingTabs.some((tab) => tab.value === requestedTab)
+    ? requestedTab
+    : "dashboard";
 
-  const [activeTab, setActiveTab] = useState(location.state?.newsletterTab || "dashboard");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [campaigns, setCampaigns] = useState([]);
   const [campaign, setCampaign] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -841,7 +843,12 @@ export default function AdminNewsletterPage() {
 
   useEffect(() => {
     if (!isDetail && location.state?.newsletterTab) {
-      setActiveTab(location.state.newsletterTab);
+      const nextTab = marketingTabs.some(
+        (tab) => tab.value === location.state.newsletterTab
+      )
+        ? location.state.newsletterTab
+        : "dashboard";
+      setActiveTab(nextTab);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [isDetail, location.pathname, location.state, navigate]);
@@ -987,8 +994,7 @@ export default function AdminNewsletterPage() {
       <NewsletterShell
         active={activeTab}
         onChange={(value) => {
-          if (value === "audiences") navigate("/admin/newsletter/audiences");
-          else if (value === "contacts") navigate("/admin/newsletter/contacts");
+          if (value === "contacts") navigate("/admin/newsletter/contacts");
           else if (value === "stages") navigate("/admin/newsletter/stages");
           else setActiveTab(value);
         }}
@@ -1028,8 +1034,7 @@ export default function AdminNewsletterPage() {
     <NewsletterShell
       active="campaigns"
       onChange={(value) => {
-        if (value === "audiences") navigate("/admin/newsletter/audiences");
-        else if (value === "contacts") navigate("/admin/newsletter/contacts");
+        if (value === "contacts") navigate("/admin/newsletter/contacts");
         else if (value === "stages") navigate("/admin/newsletter/stages");
         else navigate("/admin/newsletter", { state: { newsletterTab: value } });
       }}

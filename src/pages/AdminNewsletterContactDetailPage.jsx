@@ -30,7 +30,6 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
-import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
@@ -53,7 +52,6 @@ const marketingTabs = [
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
-  { value: "audiences", label: "Audiences", icon: <GroupsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
@@ -338,7 +336,6 @@ export default function AdminNewsletterContactDetailPage() {
 
   const handleTabChange = (tab) => {
     if (tab === "contacts") return navigate("/admin/newsletter/contacts");
-    if (tab === "audiences") return navigate("/admin/newsletter/audiences");
     if (tab === "stages") return navigate("/admin/newsletter/stages");
     navigate("/admin/newsletter", { state: { newsletterTab: tab } });
   };
@@ -391,7 +388,7 @@ export default function AdminNewsletterContactDetailPage() {
     <Stack spacing={3}>
       <Box>
         <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>Newsletter</Typography>
-        <Typography color="text.secondary">Manage campaigns, subscription lists, contacts, audiences, and performance from ECP.</Typography>
+        <Typography color="text.secondary">Manage campaigns, subscription lists, contacts, lifecycle stages, and performance from ECP.</Typography>
       </Box>
 
       <NewsletterTabs onChange={handleTabChange} />
