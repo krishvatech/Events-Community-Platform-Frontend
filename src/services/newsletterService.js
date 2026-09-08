@@ -13,6 +13,7 @@ const adminCampaignsEndpoint = "/newsletter/admin/campaigns/";
 const adminAudiencesEndpoint = "/newsletter/admin/audiences/";
 const adminContactsEndpoint = "/newsletter/admin/contacts/";
 const adminStagesEndpoint = "/newsletter/admin/stages/";
+const adminPointsEndpoint = "/newsletter/admin/points/";
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -101,6 +102,29 @@ export const deleteNewsletterStage = (stageId) =>
 
 export const getNewsletterStageAnalytics = () =>
   unwrap(apiClient.get(`${adminStagesEndpoint}analytics/`));
+
+export const listNewsletterPointActionTypes = () =>
+  unwrap(apiClient.get(`${adminPointsEndpoint}types/`));
+
+export const listNewsletterPointActions = (params = {}) =>
+  unwrap(apiClient.get(adminPointsEndpoint, { params }));
+
+export const getNewsletterPointAction = (pointId) =>
+  unwrap(apiClient.get(`${adminPointsEndpoint}${pointId}/`));
+
+export const createNewsletterPointAction = (payload) =>
+  unwrap(apiClient.post(adminPointsEndpoint, payload));
+
+export const updateNewsletterPointAction = (pointId, payload) =>
+  unwrap(apiClient.patch(`${adminPointsEndpoint}${pointId}/`, payload));
+
+export const deleteNewsletterPointAction = (pointId) =>
+  unwrap(apiClient.delete(`${adminPointsEndpoint}${pointId}/`));
+
+export const adjustNewsletterAdminContactPoints = (mauticContactId, payload) =>
+  unwrap(
+    apiClient.post(`${adminContactsEndpoint}${mauticContactId}/points/`, payload)
+  );
 
 export const createNewsletterAudience = (payload) =>
   unwrap(apiClient.post(adminAudiencesEndpoint, payload));

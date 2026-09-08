@@ -34,10 +34,12 @@ import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
+  adjustNewsletterAdminContactPoints,
   clearNewsletterAdminContactStage,
   getNewsletterAdminContact,
   getNewsletterAdminContactEngagement,
@@ -52,6 +54,7 @@ const marketingTabs = [
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
+  { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
@@ -247,6 +250,11 @@ export default function AdminNewsletterContactDetailPage() {
   const [stageActionLoading, setStageActionLoading] = useState(false);
   const [stageError, setStageError] = useState("");
   const [selectedStageId, setSelectedStageId] = useState("");
+  const [pointAmount, setPointAmount] = useState("1");
+  const [pointReason, setPointReason] = useState("");
+  const [pointActionLoading, setPointActionLoading] = useState(false);
+  const [pointError, setPointError] = useState("");
+  const [pointSuccess, setPointSuccess] = useState("");
   const [activityPage, setActivityPage] = useState(1);
   const [rangeFrom, setRangeFrom] = useState(DEFAULT_RANGE.from);
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.to);
@@ -337,6 +345,7 @@ export default function AdminNewsletterContactDetailPage() {
   const handleTabChange = (tab) => {
     if (tab === "contacts") return navigate("/admin/newsletter/contacts");
     if (tab === "stages") return navigate("/admin/newsletter/stages");
+    if (tab === "points") return navigate("/admin/newsletter/points");
     navigate("/admin/newsletter", { state: { newsletterTab: tab } });
   };
 
@@ -384,11 +393,45 @@ export default function AdminNewsletterContactDetailPage() {
     }
   };
 
+  const adjustPoints = async (operation) => {
+    if (pointActionLoading) return;
+    const amountText = String(pointAmount || "").trim();
+    if (!/^\d+$/.test(amountText) || Number(amountText) <= 0) {
+      setPointSuccess("");
+      setPointError("Enter a positive whole-number point amount.");
+      return;
+    }
+    setPointActionLoading(true);
+    setPointError("");
+    setPointSuccess("");
+    try {
+      const result = await adjustNewsletterAdminContactPoints(mauticContactId, {
+        operation,
+        amount: Number(amountText),
+        ...(pointReason.trim() ? { reason: pointReason.trim() } : {}),
+      });
+      setPointSuccess(
+        `${operation === "add" ? "Added" : "Subtracted"} ${result?.amount ?? Number(amountText)} points. Current score: ${result?.points ?? "updated"}.`
+      );
+      setPointReason("");
+      await Promise.all([
+        loadContact(),
+        loadActivity({ page: 1 }),
+        loadEngagement({ from: rangeFrom, to: rangeTo }),
+      ]);
+      setActivityPage(1);
+    } catch (err) {
+      setPointError(getErrorMessage(err, "Failed to adjust this contact's points."));
+    } finally {
+      setPointActionLoading(false);
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Box>
         <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>Newsletter</Typography>
-        <Typography color="text.secondary">Manage campaigns, subscription lists, contacts, lifecycle stages, and performance from ECP.</Typography>
+        <Typography color="text.secondary">Manage campaigns, subscription lists, contacts, lifecycle stages, scoring, and performance from ECP.</Typography>
       </Box>
 
       <NewsletterTabs onChange={handleTabChange} />
@@ -495,6 +538,51 @@ export default function AdminNewsletterContactDetailPage() {
                     <Typography variant="body2"><strong>ECP:</strong> {contact.mapped_in_ecp ? `User #${contact.ecp_user_id}` : "Not mapped"}</Typography>
                     <Typography variant="body2"><strong>Last active:</strong> {formatDateTime(contact.last_active_at || contact.date_modified)}</Typography>
                     <Typography variant="body2"><strong>Last sync:</strong> {formatDateTime(contact.last_synced_at)}</Typography>
+                  </Stack>
+                  <Stack spacing={1.25} sx={{ mt: 2.25, textAlign: "left" }}>
+                    {pointError && <Alert severity="error">{pointError}</Alert>}
+                    {pointSuccess && <Alert severity="success">{pointSuccess}</Alert>}
+                    <TextField
+                      label="Point amount"
+                      type="number"
+                      size="small"
+                      value={pointAmount}
+                      onChange={(event) => setPointAmount(event.target.value)}
+                      inputProps={{ min: 1, step: 1 }}
+                      disabled={pointActionLoading}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Reason (optional)"
+                      size="small"
+                      value={pointReason}
+                      onChange={(event) => setPointReason(event.target.value)}
+                      inputProps={{ maxLength: 240 }}
+                      helperText="Saved in native Mautic point activity."
+                      disabled={pointActionLoading}
+                      fullWidth
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => adjustPoints("add")}
+                        disabled={pointActionLoading}
+                        sx={{ textTransform: "none", flex: 1 }}
+                      >
+                        {pointActionLoading ? <CircularProgress size={18} color="inherit" /> : "Add"}
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        onClick={() => adjustPoints("subtract")}
+                        disabled={pointActionLoading}
+                        sx={{ textTransform: "none", flex: 1 }}
+                      >
+                        Subtract
+                      </Button>
+                    </Stack>
                   </Stack>
                 </Paper>
 

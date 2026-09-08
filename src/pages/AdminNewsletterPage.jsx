@@ -50,6 +50,7 @@ import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import PreviewRoundedIcon from "@mui/icons-material/PreviewRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
@@ -130,6 +131,7 @@ const marketingTabs = [
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
+  { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
@@ -249,7 +251,7 @@ function NewsletterShell({ active, onChange, children }) {
           Newsletter
         </Typography>
         <Typography color="text.secondary">
-          Manage campaigns, subscription lists, contacts, lifecycle stages, templates, and performance from ECP.
+          Manage campaigns, subscription lists, contacts, lifecycle stages, scoring, templates, and performance from ECP.
         </Typography>
       </Box>
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
@@ -996,6 +998,7 @@ export default function AdminNewsletterPage() {
         onChange={(value) => {
           if (value === "contacts") navigate("/admin/newsletter/contacts");
           else if (value === "stages") navigate("/admin/newsletter/stages");
+          else if (value === "points") navigate("/admin/newsletter/points");
           else setActiveTab(value);
         }}
       >
@@ -1036,6 +1039,7 @@ export default function AdminNewsletterPage() {
       onChange={(value) => {
         if (value === "contacts") navigate("/admin/newsletter/contacts");
         else if (value === "stages") navigate("/admin/newsletter/stages");
+        else if (value === "points") navigate("/admin/newsletter/points");
         else navigate("/admin/newsletter", { state: { newsletterTab: value } });
       }}
     >

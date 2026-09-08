@@ -39,6 +39,7 @@ import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "react-router-dom";
 
@@ -56,6 +57,7 @@ const marketingTabs = [
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
+  { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
   { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
@@ -309,6 +311,7 @@ export default function AdminNewsletterStagesPage() {
   const handleTabChange = (tab) => {
     if (tab === "stages") return;
     if (tab === "contacts") return navigate("/admin/newsletter/contacts");
+    if (tab === "points") return navigate("/admin/newsletter/points");
     navigate("/admin/newsletter", { state: { newsletterTab: tab } });
   };
 
@@ -364,7 +367,7 @@ export default function AdminNewsletterStagesPage() {
           Newsletter
         </Typography>
         <Typography color="text.secondary">
-          Manage campaigns, subscription lists, contacts, lifecycle stages, and performance from ECP.
+          Manage campaigns, subscription lists, contacts, lifecycle stages, scoring, and performance from ECP.
         </Typography>
       </Box>
 
