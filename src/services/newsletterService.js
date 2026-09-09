@@ -16,6 +16,7 @@ const adminStagesEndpoint = "/newsletter/admin/stages/";
 const adminPointsEndpoint = "/newsletter/admin/points/";
 const adminPointTriggersEndpoint = `${adminPointsEndpoint}triggers/`;
 const adminPointGroupsEndpoint = `${adminPointsEndpoint}groups/`;
+const adminTemplatesEndpoint = "/newsletter/admin/templates/";
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -55,6 +56,21 @@ export const scheduleNewsletterCampaign = (uuid, scheduledAt) =>
 
 export const cancelNewsletterCampaign = (uuid) =>
   unwrap(apiClient.post(`${adminCampaignsEndpoint}${uuid}/cancel/`));
+
+export const listNewsletterTemplates = (params = {}) =>
+  unwrap(apiClient.get(adminTemplatesEndpoint, { params }));
+
+export const getNewsletterTemplate = (templateId) =>
+  unwrap(apiClient.get(`${adminTemplatesEndpoint}${templateId}/`));
+
+export const createNewsletterTemplate = (payload) =>
+  unwrap(apiClient.post(adminTemplatesEndpoint, payload));
+
+export const updateNewsletterTemplate = (templateId, payload) =>
+  unwrap(apiClient.patch(`${adminTemplatesEndpoint}${templateId}/`, payload));
+
+export const deleteNewsletterTemplate = (templateId) =>
+  unwrap(apiClient.delete(`${adminTemplatesEndpoint}${templateId}/`));
 
 export const listNewsletterCategories = () =>
   unwrap(apiClient.get("/newsletter/admin/categories/"));

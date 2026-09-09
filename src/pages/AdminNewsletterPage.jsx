@@ -74,6 +74,7 @@ import {
   updateNewsletterCampaign,
 } from "../services/newsletterService";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
+import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -589,35 +590,6 @@ function AnalyticsOverview({ campaigns, loading, selectedCampaignId, onSelectCam
   );
 }
 
-function TemplatesPage() {
-  return (
-    <Stack spacing={3}>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Newsletter Templates</Typography>
-          <Typography color="text.secondary">Reusable campaign designs will live here.</Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddRoundedIcon />} disabled sx={{ textTransform: "none", alignSelf: "flex-start" }}>
-          Create Template
-        </Button>
-      </Stack>
-      <Grid container spacing={2}>
-        {["Event Update", "Investor Brief", "Community Digest"].map((name) => (
-          <Grid item xs={12} md={4} key={name}>
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF", minHeight: 168 }}>
-              <Stack spacing={2}>
-                <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{name}</Typography>
-                <Typography color="text.secondary">Email Template Management Coming Soon</Typography>
-                <Button startIcon={<PreviewRoundedIcon />} disabled sx={{ textTransform: "none", alignSelf: "flex-start" }}>Preview</Button>
-              </Stack>
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
-    </Stack>
-  );
-}
-
 function SettingsPage() {
   const rows = [
     ["Email Provider", "Mautic is used internally for campaign delivery."],
@@ -1017,7 +989,7 @@ export default function AdminNewsletterPage() {
           />
         )}
         {activeTab === "lists" && <AdminNewsletterCategoriesTab />}
-        {activeTab === "templates" && <TemplatesPage />}
+        {activeTab === "templates" && <AdminNewsletterTemplatesPanel />}
         {activeTab === "analytics" && (
           <AnalyticsOverview
             campaigns={campaigns}
