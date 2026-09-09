@@ -1350,7 +1350,7 @@ function WordPressGroupSyncPanel({ token }) {
     }
 
     const ok = window.confirm(
-      `Sync Connect members back to WordPress for ${row.name}? This only adds missing members to WordPress and will not remove members from either system.`
+      `Sync Connect members back to WordPress for ${row.name}? This adds missing members to WordPress. If a Connect member has no WordPress account, it will create a basic WordPress user with a random internal password and request a WordPress password setup email. It will not remove members from either system.`
     );
     if (!ok) return;
 
@@ -1362,18 +1362,26 @@ function WordPressGroupSyncPanel({ token }) {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ dry_run: false }),
+        body: JSON.stringify({
+          dry_run: false,
+          create_missing_users: true,
+          send_password_setup_email: true,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.detail || json?.error || `HTTP ${res.status}`);
       setItems((prev) => prev.map((x) => x.wp_group_id === row.wp_group_id ? json : x));
       const stats = json?.wordpress_reverse_sync || {};
       const skipped = (stats.skipped_missing_wordpress_user || 0) + (stats.skipped_missing_email || 0);
-      const hasWarnings = stats.failed || skipped;
+      const createdUsers = stats.created_wordpress_users || 0;
+      const linkedUsers = stats.linked_existing_wordpress_users || 0;
+      const setupEmailsSent = stats.password_setup_emails_sent || 0;
+      const setupEmailsFailed = stats.password_setup_emails_failed || 0;
+      const hasWarnings = stats.failed || skipped || setupEmailsFailed;
       setToast({
         open: true,
         type: hasWarnings ? "warning" : "success",
-        msg: `Connect → WordPress sync completed for ${json.name}. Added ${stats.added || 0}, already in WP ${stats.already_exists || 0}${skipped ? `, skipped ${skipped}` : ""}${stats.failed ? `, failed ${stats.failed}` : ""}.`,
+        msg: `Connect → WordPress sync completed for ${json.name}. Added ${stats.added || 0}, already in WP ${stats.already_exists || 0}${createdUsers ? `, created WP users ${createdUsers}` : ""}${linkedUsers ? `, linked WP users ${linkedUsers}` : ""}${setupEmailsSent ? `, setup emails ${setupEmailsSent}` : ""}${setupEmailsFailed ? `, setup email failed ${setupEmailsFailed}` : ""}${skipped ? `, skipped ${skipped}` : ""}${stats.failed ? `, failed ${stats.failed}` : ""}.`,
       });
       await loadStats();
     } catch (e) {
@@ -1732,7 +1740,7 @@ function WordPressGroupSyncPanel({ token }) {
           justifyContent="space-between"
         >
           <Typography variant="caption" className="text-slate-500">
-            Showing {showingFrom}-{showingTo} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members pulls members from WordPress; Sync to WP pushes only missing Connect members back to WordPress; Import Full Content brings posts, comments, and group-connected forum topics/replies into Connect without deleting existing data.
+            Showing {showingFrom}-{showingTo} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members pulls members from WordPress; Sync to WP pushes missing Connect members back to WordPress and creates missing WP users with password setup emails; Import Full Content brings posts, comments, and group-connected forum topics/replies into Connect without deleting existing data.
           </Typography>
           <Pagination
             count={pageCount}
