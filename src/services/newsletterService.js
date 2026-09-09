@@ -17,6 +17,7 @@ const adminPointsEndpoint = "/newsletter/admin/points/";
 const adminPointTriggersEndpoint = `${adminPointsEndpoint}triggers/`;
 const adminPointGroupsEndpoint = `${adminPointsEndpoint}groups/`;
 const adminTemplatesEndpoint = "/newsletter/admin/templates/";
+const adminMauticCampaignsEndpoint = "/newsletter/admin/mautic-campaigns/";
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -56,6 +57,21 @@ export const scheduleNewsletterCampaign = (uuid, scheduledAt) =>
 
 export const cancelNewsletterCampaign = (uuid) =>
   unwrap(apiClient.post(`${adminCampaignsEndpoint}${uuid}/cancel/`));
+
+export const listNewsletterMauticCampaigns = (params = {}) =>
+  unwrap(apiClient.get(adminMauticCampaignsEndpoint, { params }));
+
+export const getNewsletterMauticCampaign = (campaignId) =>
+  unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}${campaignId}/`));
+
+export const createNewsletterMauticCampaign = (payload) =>
+  unwrap(apiClient.post(adminMauticCampaignsEndpoint, payload));
+
+export const updateNewsletterMauticCampaign = (campaignId, payload) =>
+  unwrap(apiClient.patch(`${adminMauticCampaignsEndpoint}${campaignId}/`, payload));
+
+export const deleteNewsletterMauticCampaign = (campaignId) =>
+  unwrap(apiClient.delete(`${adminMauticCampaignsEndpoint}${campaignId}/`));
 
 export const listNewsletterTemplates = (params = {}) =>
   unwrap(apiClient.get(adminTemplatesEndpoint, { params }));

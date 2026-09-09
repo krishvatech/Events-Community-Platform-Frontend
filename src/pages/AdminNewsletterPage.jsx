@@ -75,6 +75,7 @@ import {
 } from "../services/newsletterService";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
+import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -975,19 +976,7 @@ export default function AdminNewsletterPage() {
         }}
       >
         {activeTab === "dashboard" && <Dashboard campaigns={campaigns} loading={loading} error={error} onRefresh={loadCampaigns} />}
-        {activeTab === "campaigns" && (
-          <CampaignList
-            campaigns={campaigns}
-            loading={loading}
-            error={error}
-            filter={filter}
-            onFilter={setFilter}
-            onRefresh={loadCampaigns}
-            onOpen={(uuid) => navigate(`/admin/newsletter/${uuid}`)}
-            onDuplicate={duplicateCampaign}
-            onCreate={() => navigate("/admin/newsletter/new")}
-          />
-        )}
+        {activeTab === "campaigns" && <AdminNewsletterMauticCampaignsPanel />}
         {activeTab === "lists" && <AdminNewsletterCategoriesTab />}
         {activeTab === "templates" && <AdminNewsletterTemplatesPanel />}
         {activeTab === "analytics" && (
