@@ -174,6 +174,28 @@ export const getNewsletterPointGroupDeleteCheck = (groupId) =>
 export const deleteNewsletterPointGroup = (groupId) =>
   unwrap(apiClient.delete(`${adminPointGroupsEndpoint}${groupId}/`));
 
+export const listNewsletterAdminContactPointGroups = (mauticContactId) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/point-groups/`));
+
+export const getNewsletterAdminContactPointGroup = (mauticContactId, groupId) =>
+  unwrap(
+    apiClient.get(
+      `${adminContactsEndpoint}${mauticContactId}/point-groups/${groupId}/`
+    )
+  );
+
+export const adjustNewsletterAdminContactPointGroup = (
+  mauticContactId,
+  groupId,
+  payload
+) =>
+  unwrap(
+    apiClient.post(
+      `${adminContactsEndpoint}${mauticContactId}/point-groups/${groupId}/`,
+      payload
+    )
+  );
+
 export const adjustNewsletterAdminContactPoints = (mauticContactId, payload) =>
   unwrap(
     apiClient.post(`${adminContactsEndpoint}${mauticContactId}/points/`, payload)

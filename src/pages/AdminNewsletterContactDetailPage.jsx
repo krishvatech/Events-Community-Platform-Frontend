@@ -39,11 +39,14 @@ import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
+  adjustNewsletterAdminContactPointGroup,
   adjustNewsletterAdminContactPoints,
   clearNewsletterAdminContactStage,
   getNewsletterAdminContact,
   getNewsletterAdminContactEngagement,
   listNewsletterAdminContactActivity,
+  listNewsletterAdminContactPointGroups,
+  listNewsletterPointGroups,
   listNewsletterStages,
   moveNewsletterAdminContactStage,
 } from "../services/newsletterService";
@@ -255,6 +258,15 @@ export default function AdminNewsletterContactDetailPage() {
   const [pointActionLoading, setPointActionLoading] = useState(false);
   const [pointError, setPointError] = useState("");
   const [pointSuccess, setPointSuccess] = useState("");
+  const [pointGroups, setPointGroups] = useState([]);
+  const [groupScores, setGroupScores] = useState([]);
+  const [groupScoresLoading, setGroupScoresLoading] = useState(true);
+  const [groupScoresError, setGroupScoresError] = useState("");
+  const [selectedPointGroupId, setSelectedPointGroupId] = useState("");
+  const [groupPointAmount, setGroupPointAmount] = useState("1");
+  const [groupPointReason, setGroupPointReason] = useState("");
+  const [groupPointActionLoading, setGroupPointActionLoading] = useState(false);
+  const [groupPointSuccess, setGroupPointSuccess] = useState("");
   const [activityPage, setActivityPage] = useState(1);
   const [rangeFrom, setRangeFrom] = useState(DEFAULT_RANGE.from);
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.to);
@@ -324,11 +336,44 @@ export default function AdminNewsletterContactDetailPage() {
     }
   }, []);
 
+  const loadPointGroupScores = useCallback(async () => {
+    setGroupScoresLoading(true);
+    setGroupScoresError("");
+    try {
+      const first = await listNewsletterPointGroups({ page: 1, page_size: 100 });
+      const allGroups = Array.isArray(first?.results) ? [...first.results] : [];
+      const pages = Math.max(1, Number(first?.num_pages || 1));
+      for (let nextPage = 2; nextPage <= pages; nextPage += 1) {
+        const next = await listNewsletterPointGroups({ page: nextPage, page_size: 100 });
+        if (Array.isArray(next?.results)) allGroups.push(...next.results);
+      }
+
+      const scores = await listNewsletterAdminContactPointGroups(mauticContactId);
+      setPointGroups(allGroups);
+      setGroupScores(Array.isArray(scores?.results) ? scores.results : []);
+      setSelectedPointGroupId((current) => {
+        if (current && allGroups.some((group) => String(group.id) === String(current))) {
+          return current;
+        }
+        return allGroups[0]?.id ? String(allGroups[0].id) : "";
+      });
+    } catch (err) {
+      setPointGroups([]);
+      setGroupScores([]);
+      setGroupScoresError(
+        getErrorMessage(err, "Failed to load this contact's Mautic Point Group scores.")
+      );
+    } finally {
+      setGroupScoresLoading(false);
+    }
+  }, [mauticContactId]);
+
   useEffect(() => {
     loadContact();
     loadActivity({ page: 1 });
     loadEngagement(DEFAULT_RANGE);
     loadStages();
+    loadPointGroupScores();
   }, [mauticContactId]);
 
   useEffect(() => {
@@ -341,6 +386,16 @@ export default function AdminNewsletterContactDetailPage() {
   );
   const history = Array.isArray(activity?.results) ? activity.results : [];
   const historyPages = Math.max(1, Number(activity?.num_pages || 1));
+  const pointGroupScoreMap = useMemo(
+    () =>
+      new Map(
+        groupScores.map((item) => [
+          String(item.group_id),
+          Number(item.score || 0),
+        ])
+      ),
+    [groupScores]
+  );
 
   const handleTabChange = (tab) => {
     if (tab === "contacts") return navigate("/admin/newsletter/contacts");
@@ -354,6 +409,7 @@ export default function AdminNewsletterContactDetailPage() {
     loadActivity({ page: activityPage });
     loadEngagement({ from: rangeFrom, to: rangeTo });
     loadStages();
+    loadPointGroupScores();
   };
 
   const refreshAfterStageChange = async () => {
@@ -424,6 +480,53 @@ export default function AdminNewsletterContactDetailPage() {
       setPointError(getErrorMessage(err, "Failed to adjust this contact's points."));
     } finally {
       setPointActionLoading(false);
+    }
+  };
+
+  const adjustPointGroupScore = async (operation) => {
+    if (groupPointActionLoading) return;
+    if (!selectedPointGroupId) {
+      setGroupPointSuccess("");
+      setGroupScoresError("Select a Point Group first.");
+      return;
+    }
+
+    const amountText = String(groupPointAmount || "").trim();
+    if (!/^\d+$/.test(amountText) || Number(amountText) <= 0) {
+      setGroupPointSuccess("");
+      setGroupScoresError("Enter a positive whole-number Point Group amount.");
+      return;
+    }
+
+    setGroupPointActionLoading(true);
+    setGroupScoresError("");
+    setGroupPointSuccess("");
+    try {
+      const result = await adjustNewsletterAdminContactPointGroup(
+        mauticContactId,
+        selectedPointGroupId,
+        {
+          operation,
+          amount: Number(amountText),
+          ...(groupPointReason.trim() ? { reason: groupPointReason.trim() } : {}),
+        }
+      );
+      setGroupPointSuccess(
+        `${operation === "add" ? "Added" : "Subtracted"} ${result?.amount ?? Number(amountText)} points in ${result?.group_name || `Point Group #${selectedPointGroupId}`}. Score: ${result?.score ?? "updated"}.`
+      );
+      setGroupPointReason("");
+      await Promise.all([
+        loadPointGroupScores(),
+        loadActivity({ page: 1 }),
+        loadEngagement({ from: rangeFrom, to: rangeTo }),
+      ]);
+      setActivityPage(1);
+    } catch (err) {
+      setGroupScoresError(
+        getErrorMessage(err, "Failed to adjust this contact's Point Group score.")
+      );
+    } finally {
+      setGroupPointActionLoading(false);
     }
   };
 
@@ -583,6 +686,148 @@ export default function AdminNewsletterContactDetailPage() {
                         Subtract
                       </Button>
                     </Stack>
+                  </Stack>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Stack spacing={1.75}>
+                    <Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <StarsRoundedIcon fontSize="small" sx={{ color: "#0f766e" }} />
+                        <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Point Group Scores</Typography>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Separate provider-backed Mautic scores for each Point Group.
+                      </Typography>
+                    </Box>
+
+                    {groupScoresError && <Alert severity="error">{groupScoresError}</Alert>}
+                    {groupPointSuccess && <Alert severity="success">{groupPointSuccess}</Alert>}
+
+                    {groupScoresLoading ? (
+                      <Stack spacing={1}>
+                        <Skeleton height={38} />
+                        <Skeleton height={38} />
+                        <Skeleton height={48} />
+                      </Stack>
+                    ) : pointGroups.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No Mautic Point Groups are configured yet.
+                      </Typography>
+                    ) : (
+                      <>
+                        <Stack
+                          spacing={1}
+                          sx={{ maxHeight: 220, overflowY: "auto", pr: 0.5 }}
+                        >
+                          {pointGroups.map((group) => {
+                            const score = pointGroupScoreMap.get(String(group.id)) ?? 0;
+                            return (
+                              <Stack
+                                key={group.id}
+                                direction="row"
+                                spacing={1}
+                                justifyContent="space-between"
+                                alignItems="center"
+                                sx={{ py: 0.75, borderBottom: "1px solid #EEF2F6" }}
+                              >
+                                <Box sx={{ minWidth: 0 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 750, color: "#1B2A4A" }}>
+                                    {group.name || `Point Group #${group.id}`}
+                                  </Typography>
+                                  {group.description && (
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{
+                                        display: "block",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {group.description}
+                                    </Typography>
+                                  )}
+                                </Box>
+                                <Chip
+                                  size="small"
+                                  label={`${score} pts`}
+                                  variant="outlined"
+                                  color={score > 0 ? "success" : score < 0 ? "warning" : "default"}
+                                  sx={{ fontWeight: 800, flexShrink: 0 }}
+                                />
+                              </Stack>
+                            );
+                          })}
+                        </Stack>
+
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="contact-point-group-select-label">Adjust Point Group</InputLabel>
+                          <Select
+                            labelId="contact-point-group-select-label"
+                            label="Adjust Point Group"
+                            value={selectedPointGroupId}
+                            onChange={(event) => {
+                              setSelectedPointGroupId(String(event.target.value));
+                              setGroupScoresError("");
+                              setGroupPointSuccess("");
+                            }}
+                            disabled={groupPointActionLoading}
+                          >
+                            {pointGroups.map((group) => (
+                              <MenuItem key={group.id} value={String(group.id)}>
+                                {group.name || `Point Group #${group.id}`} · {pointGroupScoreMap.get(String(group.id)) ?? 0} pts
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+
+                        <TextField
+                          label="Group point amount"
+                          type="number"
+                          size="small"
+                          value={groupPointAmount}
+                          onChange={(event) => setGroupPointAmount(event.target.value)}
+                          inputProps={{ min: 1, step: 1 }}
+                          disabled={groupPointActionLoading}
+                          fullWidth
+                        />
+
+                        <TextField
+                          label="Reason (optional)"
+                          size="small"
+                          value={groupPointReason}
+                          onChange={(event) => setGroupPointReason(event.target.value)}
+                          inputProps={{ maxLength: 240 }}
+                          helperText="Recorded in native Mautic Point Group activity."
+                          disabled={groupPointActionLoading}
+                          fullWidth
+                        />
+
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => adjustPointGroupScore("add")}
+                            disabled={groupPointActionLoading || !selectedPointGroupId}
+                            sx={{ textTransform: "none", flex: 1 }}
+                          >
+                            {groupPointActionLoading ? <CircularProgress size={18} color="inherit" /> : "Add"}
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="warning"
+                            onClick={() => adjustPointGroupScore("subtract")}
+                            disabled={groupPointActionLoading || !selectedPointGroupId}
+                            sx={{ textTransform: "none", flex: 1 }}
+                          >
+                            Subtract
+                          </Button>
+                        </Stack>
+                      </>
+                    )}
                   </Stack>
                 </Paper>
 
