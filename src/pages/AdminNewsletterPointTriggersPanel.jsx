@@ -43,6 +43,7 @@ import {
   deleteNewsletterPointTriggerEvent,
   listNewsletterPointTriggerEvents,
   listNewsletterPointTriggerEventTypes,
+  listNewsletterPointGroups,
   listNewsletterPointTriggers,
   updateNewsletterPointTrigger,
   updateNewsletterPointTriggerEvent,
@@ -57,6 +58,7 @@ const blankTriggerForm = {
   color: "a0acb8",
   triggerExistingLeads: false,
   isPublished: false,
+  groupChoice: "",
 };
 
 const blankEventForm = {
@@ -142,7 +144,17 @@ const formatProperties = (value) => {
   return text.length > 100 ? `${text.slice(0, 97)}...` : text;
 };
 
-function PointTriggerDialog({ open, trigger, saving, error, onClose, onSave }) {
+function PointTriggerDialog({
+  open,
+  trigger,
+  groups,
+  groupsLoading,
+  groupsError,
+  saving,
+  error,
+  onClose,
+  onSave,
+}) {
   const [form, setForm] = useState(blankTriggerForm);
   const [formError, setFormError] = useState("");
 
@@ -157,6 +169,7 @@ function PointTriggerDialog({ open, trigger, saving, error, onClose, onSave }) {
             color: normalizeColor(trigger.color || "a0acb8"),
             triggerExistingLeads: Boolean(trigger.triggerExistingLeads),
             isPublished: Boolean(trigger.isPublished),
+            groupChoice: "__unchanged__",
           }
         : blankTriggerForm
     );
@@ -176,6 +189,15 @@ function PointTriggerDialog({ open, trigger, saving, error, onClose, onSave }) {
       return setFormError("Color must be a 6-digit hexadecimal value, for example a0acb8.");
     }
 
+    const groupPayload = {};
+    if (trigger) {
+      if (form.groupChoice && form.groupChoice !== "__unchanged__") {
+        groupPayload.group = form.groupChoice;
+      }
+    } else if (form.groupChoice) {
+      groupPayload.group = form.groupChoice;
+    }
+
     setFormError("");
     onSave({
       name,
@@ -184,6 +206,7 @@ function PointTriggerDialog({ open, trigger, saving, error, onClose, onSave }) {
       color,
       triggerExistingLeads: Boolean(form.triggerExistingLeads),
       isPublished: Boolean(form.isPublished),
+      ...groupPayload,
     });
   };
 
@@ -222,6 +245,44 @@ function PointTriggerDialog({ open, trigger, saving, error, onClose, onSave }) {
             fullWidth
             disabled={saving}
           />
+          {groupsError && (
+            <Alert severity="warning" variant="outlined">
+              {groupsError} You can still save this Point Trigger without changing its Point Group.
+            </Alert>
+          )}
+          <FormControl fullWidth disabled={saving || groupsLoading}>
+            <InputLabel id="point-trigger-group-label">Point Group</InputLabel>
+            <Select
+              labelId="point-trigger-group-label"
+              label="Point Group"
+              value={form.groupChoice}
+              onChange={(event) => setField("groupChoice", event.target.value)}
+              renderValue={(value) => {
+                if (value === "__unchanged__") return "Keep current Point Group";
+                if (!value) return "No Point Group";
+                const group = groups.find((item) => String(item.id) === String(value));
+                if (!group) return `Point Group #${value}`;
+                return `${group.name || `Point Group #${group.id}`}${!group.isPublished ? " (Unpublished)" : ""}`;
+              }}
+            >
+              {trigger ? (
+                <MenuItem value="__unchanged__">Keep current Point Group</MenuItem>
+              ) : (
+                <MenuItem value="">No Point Group</MenuItem>
+              )}
+              {groups.map((group) => (
+                <MenuItem key={group.id} value={String(group.id)}>
+                  {group.name || `Point Group #${group.id}`}
+                  {!group.isPublished ? " (Unpublished)" : ""}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary">
+            {trigger
+              ? "Mautic's legacy Trigger API does not expose the current Group. Keep it unchanged or move this Trigger to another Group. Mautic 7.1.3 cannot safely clear an assigned Trigger Group."
+              : "Optional. Create this Point Trigger inside one provider-backed Mautic Point Group."}
+          </Typography>
           <TextField
             label="Color"
             value={form.color}
@@ -669,6 +730,9 @@ export default function AdminNewsletterPointTriggersPanel() {
   const [typesLoading, setTypesLoading] = useState(true);
   const [error, setError] = useState("");
   const [typesError, setTypesError] = useState("");
+  const [pointGroups, setPointGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState("");
   const [success, setSuccess] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -688,6 +752,34 @@ export default function AdminNewsletterPointTriggersPanel() {
       setTypesError(getErrorMessage(err, "We could not load Mautic Point Trigger Event types."));
     } finally {
       setTypesLoading(false);
+    }
+  }, []);
+
+  const loadPointGroups = useCallback(async () => {
+    setGroupsLoading(true);
+    setGroupsError("");
+    try {
+      let nextPage = 1;
+      let totalPages = 1;
+      const allGroups = [];
+
+      do {
+        const response = await listNewsletterPointGroups({
+          page: nextPage,
+          page_size: 100,
+        });
+        const results = Array.isArray(response?.results) ? response.results : [];
+        allGroups.push(...results);
+        totalPages = Math.max(1, Number(response?.num_pages || 1));
+        nextPage += 1;
+      } while (nextPage <= totalPages);
+
+      setPointGroups(allGroups);
+    } catch (err) {
+      setPointGroups([]);
+      setGroupsError(getErrorMessage(err, "We could not load Mautic Point Groups."));
+    } finally {
+      setGroupsLoading(false);
     }
   }, []);
 
@@ -716,6 +808,7 @@ export default function AdminNewsletterPointTriggersPanel() {
   useEffect(() => {
     loadTriggers({ nextPage: 1, nextSearch: "" });
     loadEventTypes();
+    loadPointGroups();
   }, []);
 
   const rows = Array.isArray(data?.results) ? data.results : [];
@@ -800,6 +893,7 @@ export default function AdminNewsletterPointTriggersPanel() {
             onClick={() => {
               loadTriggers({ nextPage: page, nextSearch: search });
               loadEventTypes();
+              loadPointGroups();
             }}
             disabled={loading || typesLoading}
             sx={{ textTransform: "none" }}
@@ -1015,6 +1109,9 @@ export default function AdminNewsletterPointTriggersPanel() {
       <PointTriggerDialog
         open={dialog.open}
         trigger={dialog.trigger}
+        groups={pointGroups}
+        groupsLoading={groupsLoading}
+        groupsError={groupsError}
         saving={dialog.saving}
         error={dialog.error}
         onClose={() => setDialog({ open: false, trigger: null, saving: false, error: "" })}

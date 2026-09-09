@@ -51,6 +51,7 @@ import {
   deleteNewsletterPointAction,
   listNewsletterPointActions,
   listNewsletterPointActionTypes,
+  listNewsletterPointGroups,
   updateNewsletterPointAction,
 } from "../services/newsletterService";
 import AdminNewsletterPointTriggersPanel from "./AdminNewsletterPointTriggersPanel";
@@ -75,6 +76,7 @@ const blankForm = {
   delta: "1",
   repeatable: false,
   isPublished: true,
+  groupChoice: "",
   propertyInput: "",
   page_url: "",
   page_hits: "1",
@@ -175,7 +177,18 @@ function NewsletterTabs({ onChange }) {
   );
 }
 
-function PointActionDialog({ open, action, types, saving, error, onClose, onSave }) {
+function PointActionDialog({
+  open,
+  action,
+  types,
+  groups,
+  groupsLoading,
+  groupsError,
+  saving,
+  error,
+  onClose,
+  onSave,
+}) {
   const [form, setForm] = useState(blankForm);
   const [formError, setFormError] = useState("");
 
@@ -192,6 +205,7 @@ function PointActionDialog({ open, action, types, saving, error, onClose, onSave
             delta: String(action.delta ?? 0),
             repeatable: Boolean(action.repeatable),
             isPublished: action.isPublished !== false,
+            groupChoice: "__unchanged__",
             propertyInput: listConfig ? propertyListToInput(properties[listConfig.key]) : "",
             page_url: properties.page_url || "",
             page_hits: String(properties.page_hits ?? "1"),
@@ -270,6 +284,17 @@ function PointActionDialog({ open, action, types, saving, error, onClose, onSave
       return setFormError(err.message);
     }
 
+    const groupPayload = {};
+    if (action) {
+      if (form.groupChoice === "__clear_group__") {
+        groupPayload.group = "";
+      } else if (form.groupChoice && form.groupChoice !== "__unchanged__") {
+        groupPayload.group = form.groupChoice;
+      }
+    } else if (form.groupChoice) {
+      groupPayload.group = form.groupChoice;
+    }
+
     setFormError("");
     onSave({
       name,
@@ -279,6 +304,7 @@ function PointActionDialog({ open, action, types, saving, error, onClose, onSave
       repeatable: Boolean(form.repeatable),
       isPublished: Boolean(form.isPublished),
       properties,
+      ...groupPayload,
     });
   };
 
@@ -340,6 +366,53 @@ function PointActionDialog({ open, action, types, saving, error, onClose, onSave
             required
             disabled={saving}
           />
+          {groupsError && (
+            <Alert severity="warning" variant="outlined">
+              {groupsError} You can still save this Point Action without changing its Point Group.
+            </Alert>
+          )}
+          <FormControl fullWidth disabled={saving || groupsLoading}>
+            <InputLabel id="point-action-group-label">Point Group</InputLabel>
+            <Select
+              labelId="point-action-group-label"
+              label="Point Group"
+              value={form.groupChoice}
+              onChange={(event) => setField("groupChoice", event.target.value)}
+              renderValue={(value) => {
+                if (value === "__unchanged__") return "Keep current Point Group";
+                if (value === "__clear_group__") return "Clear current Point Group";
+                if (!value) return "No Point Group";
+                const group = groups.find((item) => String(item.id) === String(value));
+                if (!group) return `Point Group #${value}`;
+                return `${group.name || `Point Group #${group.id}`}${!group.isPublished ? " (Unpublished)" : ""}`;
+              }}
+            >
+              {action ? (
+                <>
+                  <MenuItem value="__unchanged__">Keep current Point Group</MenuItem>
+                  <MenuItem
+                    value="__clear_group__"
+                    onClick={() => setField("groupChoice", "__clear_group__")}
+                  >
+                    Clear current Point Group
+                  </MenuItem>
+                </>
+              ) : (
+                <MenuItem value="">No Point Group</MenuItem>
+              )}
+              {groups.map((group) => (
+                <MenuItem key={group.id} value={String(group.id)}>
+                  {group.name || `Point Group #${group.id}`}
+                  {!group.isPublished ? " (Unpublished)" : ""}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary">
+            {action
+              ? "Mautic's legacy Point API does not expose the current Group. Keep it unchanged unless you intentionally want to move or clear this Point Action."
+              : "Optional. Assign this Point Action to one provider-backed Mautic Point Group."}
+          </Typography>
 
           {listConfig && (
             <TextField
@@ -451,6 +524,9 @@ export default function AdminNewsletterPointsPage() {
   const [typesLoading, setTypesLoading] = useState(true);
   const [error, setError] = useState("");
   const [typesError, setTypesError] = useState("");
+  const [pointGroups, setPointGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -471,6 +547,34 @@ export default function AdminNewsletterPointsPage() {
       setTypesError(getErrorMessage(err, "We could not load Mautic Point Action types."));
     } finally {
       setTypesLoading(false);
+    }
+  }, []);
+
+  const loadPointGroups = useCallback(async () => {
+    setGroupsLoading(true);
+    setGroupsError("");
+    try {
+      let nextPage = 1;
+      let totalPages = 1;
+      const allGroups = [];
+
+      do {
+        const response = await listNewsletterPointGroups({
+          page: nextPage,
+          page_size: 100,
+        });
+        const results = Array.isArray(response?.results) ? response.results : [];
+        allGroups.push(...results);
+        totalPages = Math.max(1, Number(response?.num_pages || 1));
+        nextPage += 1;
+      } while (nextPage <= totalPages);
+
+      setPointGroups(allGroups);
+    } catch (err) {
+      setPointGroups([]);
+      setGroupsError(getErrorMessage(err, "We could not load Mautic Point Groups."));
+    } finally {
+      setGroupsLoading(false);
     }
   }, []);
 
@@ -500,6 +604,12 @@ export default function AdminNewsletterPointsPage() {
     loadActions({ nextPage: 1, nextSearch: "" });
     loadTypes();
   }, []);
+
+  useEffect(() => {
+    if (pointsSection === "actions") {
+      loadPointGroups();
+    }
+  }, [pointsSection, loadPointGroups]);
 
   const rows = Array.isArray(data?.results) ? data.results : [];
   const count = Number(data?.count || 0);
@@ -626,6 +736,7 @@ export default function AdminNewsletterPointsPage() {
             onClick={() => {
               loadActions({ nextPage: page, nextSearch: search });
               loadTypes();
+              loadPointGroups();
             }}
             disabled={loading || typesLoading}
             sx={{ textTransform: "none" }}
@@ -818,6 +929,9 @@ export default function AdminNewsletterPointsPage() {
         open={dialog.open}
         action={dialog.action}
         types={types}
+        groups={pointGroups}
+        groupsLoading={groupsLoading}
+        groupsError={groupsError}
         saving={dialog.saving}
         error={dialog.error}
         onClose={() => setDialog({ open: false, action: null, saving: false, error: "" })}
