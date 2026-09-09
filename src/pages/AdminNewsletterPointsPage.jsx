@@ -54,6 +54,7 @@ import {
   updateNewsletterPointAction,
 } from "../services/newsletterService";
 import AdminNewsletterPointTriggersPanel from "./AdminNewsletterPointTriggersPanel";
+import AdminNewsletterPointGroupsPanel from "./AdminNewsletterPointGroupsPanel";
 
 const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
@@ -591,11 +592,14 @@ export default function AdminNewsletterPointsPage() {
         >
           <Tab value="actions" label="Point Actions" />
           <Tab value="triggers" label="Point Triggers" />
+          <Tab value="groups" label="Point Groups" />
         </Tabs>
       </Paper>
 
       {pointsSection === "triggers" ? (
         <AdminNewsletterPointTriggersPanel />
+      ) : pointsSection === "groups" ? (
+        <AdminNewsletterPointGroupsPanel />
       ) : (
         <>
 

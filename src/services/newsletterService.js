@@ -15,6 +15,7 @@ const adminContactsEndpoint = "/newsletter/admin/contacts/";
 const adminStagesEndpoint = "/newsletter/admin/stages/";
 const adminPointsEndpoint = "/newsletter/admin/points/";
 const adminPointTriggersEndpoint = `${adminPointsEndpoint}triggers/`;
+const adminPointGroupsEndpoint = `${adminPointsEndpoint}groups/`;
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -154,6 +155,24 @@ export const updateNewsletterPointTriggerEvent = (triggerId, eventId, payload) =
 
 export const deleteNewsletterPointTriggerEvent = (triggerId, eventId) =>
   unwrap(apiClient.delete(`${adminPointTriggersEndpoint}${triggerId}/events/${eventId}/`));
+
+export const listNewsletterPointGroups = (params = {}) =>
+  unwrap(apiClient.get(adminPointGroupsEndpoint, { params }));
+
+export const getNewsletterPointGroup = (groupId) =>
+  unwrap(apiClient.get(`${adminPointGroupsEndpoint}${groupId}/`));
+
+export const createNewsletterPointGroup = (payload) =>
+  unwrap(apiClient.post(adminPointGroupsEndpoint, payload));
+
+export const updateNewsletterPointGroup = (groupId, payload) =>
+  unwrap(apiClient.patch(`${adminPointGroupsEndpoint}${groupId}/`, payload));
+
+export const getNewsletterPointGroupDeleteCheck = (groupId) =>
+  unwrap(apiClient.get(`${adminPointGroupsEndpoint}${groupId}/delete-check/`));
+
+export const deleteNewsletterPointGroup = (groupId) =>
+  unwrap(apiClient.delete(`${adminPointGroupsEndpoint}${groupId}/`));
 
 export const adjustNewsletterAdminContactPoints = (mauticContactId, payload) =>
   unwrap(
