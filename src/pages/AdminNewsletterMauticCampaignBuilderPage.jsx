@@ -434,6 +434,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [workflowTab, setWorkflowTab] = useState("workflow");
+  const [canvasNodes, setCanvasNodes] = useState([]);
 
   const actions = useMemo(() => asArray(capabilities?.actions), [capabilities]);
   const conditions = useMemo(() => asArray(capabilities?.conditions), [capabilities]);
@@ -502,6 +503,8 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       })),
       canvasSettings: isPlainObject(campaign?.canvasSettings) ? campaign.canvasSettings : { nodes: [], edges: [] },
     });
+    const savedCanvasNodes = campaign?.canvasSettings?.nodes || [];
+    setCanvasNodes(savedCanvasNodes);
   }, [campaignId]);
 
   useEffect(() => {
@@ -533,6 +536,12 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     if (incompleteEvents.length) {
       const eventNames = incompleteEvents.map(evt => getEventLabel(evt.metadata)).join(", ");
       setFormError(`Event configuration incomplete: ${eventNames}. Please configure all required fields.`);
+      return;
+    }
+
+    const canvasValidation = validateCanvasWorkflow();
+    if (!canvasValidation.valid) {
+      setFormError(canvasValidation.errors.join(" "));
       return;
     }
 
@@ -639,11 +648,19 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   };
 
   const handleCanvasNodesChange = (nodes) => {
+    const updatedCanvasNodes = nodes.map((n) => ({
+      id: n.id,
+      type: n.data?.nodeType,
+      nodeType: n.data?.nodeType,
+      position: n.position,
+      eventId: n.data?.eventId,
+    }));
+    setCanvasNodes(updatedCanvasNodes);
     setForm((current) => ({
       ...current,
       canvasSettings: {
         ...current.canvasSettings,
-        nodes: nodes,
+        nodes: updatedCanvasNodes,
       },
     }));
   };
@@ -680,7 +697,81 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   };
 
   const handleCanvasDeleteNode = (nodeId) => {
-    removeWorkflowEvent(nodeId);
+    const node = canvasNodes.find((n) => n.id === nodeId);
+    if (node?.eventId) {
+      removeWorkflowEvent(node.eventId);
+    }
+    setCanvasNodes((current) => current.filter((n) => n.id !== nodeId));
+    setForm((current) => ({
+      ...current,
+      canvasSettings: {
+        ...current.canvasSettings,
+        nodes: current.canvasSettings.nodes.filter((n) => n.id !== nodeId),
+      },
+    }));
+  };
+
+  const handleCanvasAddNode = (nodeType, position) => {
+    const nodeId = `node-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const newNode = {
+      id: nodeId,
+      type: nodeType,
+      nodeType,
+      position,
+      eventId: null,
+      label: nodeType.charAt(0).toUpperCase() + nodeType.slice(1),
+      data: { properties: {} },
+    };
+    setCanvasNodes((current) => [...current, newNode]);
+    setForm((current) => ({
+      ...current,
+      canvasSettings: {
+        ...current.canvasSettings,
+        nodes: [
+          ...current.canvasSettings.nodes,
+          { id: nodeId, type: nodeType, position, eventId: null },
+        ],
+      },
+    }));
+  };
+
+  const validateCanvasWorkflow = () => {
+    if (workflowTab !== "canvas") {
+      return { valid: true, errors: [] };
+    }
+
+    const errors = [];
+    const nodes = canvasNodes || [];
+    const edges = form.canvasSettings?.edges || [];
+
+    if (nodes.length === 0) {
+      errors.push("Canvas is empty. Add at least one node.");
+      return { valid: false, errors };
+    }
+
+    const hasTrigger = nodes.some((n) => n.nodeType === "trigger");
+    if (!hasTrigger) {
+      errors.push("Workflow must start with a Trigger node.");
+    }
+
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const edgeTargets = new Set(edges.map((e) => e.target));
+    const disconnected = nodes.filter(
+      (n) => n.nodeType !== "trigger" && !edgeTargets.has(n.id)
+    );
+    if (disconnected.length > 0) {
+      errors.push(`${disconnected.length} node(s) are disconnected from the workflow.`);
+    }
+
+    const actionNodes = nodes.filter((n) => n.nodeType === "action" && n.eventId);
+    for (const node of actionNodes) {
+      const event = form.events.find((e) => e.id === node.eventId);
+      if (event && !isEventConfigurationComplete(event)) {
+        errors.push(`Action "${node.label}" is not configured properly.`);
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
   };
 
   const publishCampaign = async () => {
@@ -1303,22 +1394,24 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                       Visual workflow representation. Click nodes to configure.
                     </Typography>
                   </Box>
-                  {form.events.length > 0 ? (
+                  {canvasNodes.length > 0 ? (
                     <WorkflowCanvas
                       events={form.events}
+                      canvasNodes={canvasNodes}
                       onNodeSelect={setSelectedWorkflowEventId}
                       onNodesChange={handleCanvasNodesChange}
                       onEdgesChange={handleCanvasEdgesChange}
                       onConnect={handleCanvasConnect}
                       canvasSettings={form.canvasSettings}
                       onDeleteNode={handleCanvasDeleteNode}
+                      onAddNode={handleCanvasAddNode}
                       getConfigurationStatus={getConfigurationStatus}
                       getEventLabel={(metadata) => getEventLabel(metadata)}
                       selectedNodeId={selectedWorkflowEventId}
                     />
                   ) : (
                     <Alert severity="info" variant="outlined">
-                      Add workflow events to see the canvas visualization.
+                      Right-click or use "Add Node" button to start building the canvas workflow.
                     </Alert>
                   )}
                 </Stack>
