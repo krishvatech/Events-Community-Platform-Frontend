@@ -305,6 +305,7 @@ const AppShell = () => {
             <Route path="newsletter/contacts" element={<RequireStaffOrAdmin><AdminNewsletterContactsPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/contacts/:mauticContactId" element={<RequireStaffOrAdmin><AdminNewsletterContactDetailPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/builder" element={<RequireStaffOrAdmin><AdminNewsletterMauticCampaignBuilderPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/builder/:campaignId" element={<RequireStaffOrAdmin><AdminNewsletterMauticCampaignBuilderPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/stages" element={<RequireStaffOrAdmin><AdminNewsletterStagesPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/points" element={<RequireStaffOrAdmin><AdminNewsletterPointsPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/lists/:slug" element={<RequireStaffOrAdmin><AdminNewsletterListManagePage /></RequireStaffOrAdmin>} />

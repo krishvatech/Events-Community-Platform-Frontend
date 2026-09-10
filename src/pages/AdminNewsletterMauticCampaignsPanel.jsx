@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -31,6 +32,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
 
 import {
   deleteNewsletterMauticCampaign,
@@ -104,6 +106,7 @@ function CampaignDetailDialog({
   onClose,
   onRefresh,
   onEdit,
+  onEditBuilder,
   onDelete,
 }) {
   const events = Array.isArray(campaign?.events) ? campaign.events : [];
@@ -340,7 +343,15 @@ function CampaignDetailDialog({
           onClick={onEdit}
           disabled={!campaign || loading}
         >
-          Edit
+          Edit Metadata
+        </Button>
+        <Button
+          startIcon={<BuildRoundedIcon />}
+          variant="contained"
+          onClick={onEditBuilder}
+          disabled={!campaign || loading}
+        >
+          Edit Campaign
         </Button>
         <Button
           color="error"
@@ -496,6 +507,7 @@ function DeleteCampaignDialog({
 }
 
 export default function AdminNewsletterMauticCampaignsPanel() {
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [page, setPage] = useState(1);
   const [count, setCount] = useState(0);
@@ -578,6 +590,11 @@ export default function AdminNewsletterMauticCampaignsPanel() {
     if (!fresh) return;
     setEditError("");
     setEditOpen(true);
+  };
+
+  const openBuilderEdit = (campaign = selected) => {
+    if (!campaign?.id) return;
+    navigate(`/admin/newsletter/builder/${campaign.id}`);
   };
 
   const saveEdit = async (payload) => {
@@ -825,6 +842,16 @@ export default function AdminNewsletterMauticCampaignsPanel() {
                             <VisibilityRoundedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Edit Campaign workflow and sources">
+                          <IconButton
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openBuilderEdit(campaign);
+                            }}
+                          >
+                            <BuildRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Edit Campaign metadata">
                           <IconButton
                             onClick={(event) => {
@@ -907,6 +934,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
         }}
         onRefresh={() => selected?.id && loadDetail(selected.id)}
         onEdit={() => openEdit(selected)}
+        onEditBuilder={() => openBuilderEdit(selected)}
         onDelete={() => setDeleteOpen(true)}
       />
 
