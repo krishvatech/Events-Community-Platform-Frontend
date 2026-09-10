@@ -15,7 +15,7 @@ import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { fetchReviewQueueStats } from '../utils/reviewQueue';
 
-const ReviewQueueStats = ({ eventId, filters }) => {
+const ReviewQueueStats = ({ eventId, filters, refreshKey }) => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,7 +35,7 @@ const ReviewQueueStats = ({ eventId, filters }) => {
     };
 
     loadStats();
-  }, [eventId, filters]);
+  }, [eventId, filters, refreshKey]);
 
   if (loading) {
     return (

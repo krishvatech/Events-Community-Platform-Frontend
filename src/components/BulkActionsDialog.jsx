@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -13,8 +13,11 @@ import {
   CircularProgress,
   Box,
   Typography,
+  TextField,
 } from '@mui/material';
 import { performBulkAction } from '../utils/reviewQueue';
+
+const DESTRUCTIVE_ACTIONS = ['decline', 'delete'];
 
 const BulkActionsDialog = ({
   open,
@@ -28,14 +31,62 @@ const BulkActionsDialog = ({
   const [action, setAction] = useState('');
   const [selectedTier, setSelectedTier] = useState('');
   const [selectedReviewer, setSelectedReviewer] = useState('');
+  const [reason, setReason] = useState('');
+  const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Reset any in-progress action when the dialog opens, so a primed destructive
+  // confirmation can never carry over to a different selection.
+  useEffect(() => {
+    setAction('');
+    setSelectedTier('');
+    setSelectedReviewer('');
+    setReason('');
+    setConfirming(false);
+    setError(null);
+  }, [open]);
 
   const handleActionChange = (e) => {
     setAction(e.target.value);
     setSelectedTier('');
     setSelectedReviewer('');
+    setReason('');
+    setConfirming(false);
     setError(null);
+  };
+
+  const runAction = async () => {
+    setLoading(true);
+    setError(null);
+
+    const options = {};
+    if (action === 'accept') {
+      options.tierId = selectedTier;
+    }
+    if (action === 'assign_reviewer') {
+      options.reviewerId = selectedReviewer;
+    }
+    if (action === 'delete' && reason) {
+      options.reason = reason;
+    }
+
+    const result = await performBulkAction(eventId, action, selectedIds, options);
+
+    if (result.success) {
+      setLoading(false);
+      setAction('');
+      setSelectedTier('');
+      setSelectedReviewer('');
+      setReason('');
+      setConfirming(false);
+      onSuccess?.(result);
+      onClose();
+    } else {
+      setError(result.error);
+      setLoading(false);
+      setConfirming(false);
+    }
   };
 
   const handleExecuteAction = async () => {
@@ -54,30 +105,13 @@ const BulkActionsDialog = ({
       return;
     }
 
-    setLoading(true);
-    setError(null);
-
-    const options = {};
-    if (action === 'accept') {
-      options.tierId = selectedTier;
-    }
-    if (action === 'assign_reviewer') {
-      options.reviewerId = selectedReviewer;
+    if (DESTRUCTIVE_ACTIONS.includes(action) && !confirming) {
+      setError(null);
+      setConfirming(true);
+      return;
     }
 
-    const result = await performBulkAction(eventId, action, selectedIds, options);
-
-    if (result.success) {
-      setLoading(false);
-      setAction('');
-      setSelectedTier('');
-      setSelectedReviewer('');
-      onSuccess?.(result);
-      onClose();
-    } else {
-      setError(result.error);
-      setLoading(false);
-    }
+    await runAction();
   };
 
   const getActionDescription = () => {
@@ -86,8 +120,19 @@ const BulkActionsDialog = ({
       decline: `Decline ${selectedIds.length} application(s)`,
       waitlist: `Waitlist ${selectedIds.length} application(s)`,
       assign_reviewer: `Assign ${selectedIds.length} application(s) to reviewer`,
+      delete: `Delete ${selectedIds.length} application(s)`,
     };
     return descriptions[action] || '';
+  };
+
+  const getConfirmationMessage = () => {
+    if (action === 'delete') {
+      return `You are about to delete ${selectedIds.length} selected application(s). They will be removed from active views but kept for audit purposes. This includes applications already accepted.`;
+    }
+    if (action === 'decline') {
+      return `You are about to decline ${selectedIds.length} selected application(s). This includes applications already accepted, whose registration and role assignments will be reversed.`;
+    }
+    return '';
   };
 
   return (
@@ -117,6 +162,7 @@ const BulkActionsDialog = ({
               <MenuItem value="decline">Decline</MenuItem>
               <MenuItem value="waitlist">Waitlist</MenuItem>
               <MenuItem value="assign_reviewer">Assign Reviewer</MenuItem>
+              <MenuItem value="delete">Delete</MenuItem>
             </Select>
           </FormControl>
 
@@ -160,10 +206,30 @@ const BulkActionsDialog = ({
             </FormControl>
           )}
 
+          {/* Reason (for delete action) */}
+          {action === 'delete' && (
+            <TextField
+              label="Reason (optional)"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              disabled={loading}
+              fullWidth
+              multiline
+              minRows={2}
+            />
+          )}
+
           {/* Action Summary */}
-          {action && (
+          {action && !confirming && (
             <Alert severity="info">
               {getActionDescription()}
+            </Alert>
+          )}
+
+          {/* Destructive-action confirmation */}
+          {confirming && (
+            <Alert severity="warning">
+              {getConfirmationMessage()}
             </Alert>
           )}
         </Box>
@@ -175,10 +241,10 @@ const BulkActionsDialog = ({
         <Button
           onClick={handleExecuteAction}
           variant="contained"
-          color="primary"
+          color={confirming ? 'error' : 'primary'}
           disabled={loading || !action}
         >
-          {loading ? <CircularProgress size={24} /> : 'Execute'}
+          {loading ? <CircularProgress size={24} /> : confirming ? 'Confirm' : 'Execute'}
         </Button>
       </DialogActions>
     </Dialog>

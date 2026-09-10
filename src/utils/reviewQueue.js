@@ -82,6 +82,9 @@ export const performBulkAction = async (eventId, action, trackAppIds, options = 
     if (action === 'assign_reviewer' && options.reviewerId) {
       payload.reviewer_id = options.reviewerId;
     }
+    if (action === 'delete' && options.reason) {
+      payload.reason = options.reason;
+    }
 
     const response = await apiClient.post(
       `/events/${eventId}/bulk-action/`,
