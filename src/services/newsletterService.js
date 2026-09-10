@@ -73,6 +73,13 @@ export const updateNewsletterMauticCampaign = (campaignId, payload) =>
 export const deleteNewsletterMauticCampaign = (campaignId) =>
   unwrap(apiClient.delete(`${adminMauticCampaignsEndpoint}${campaignId}/`));
 
+export const getMauticCampaignCapabilities = () =>
+  unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}capabilities/`));
+
+export const createNativeMauticCampaign = createNewsletterMauticCampaign;
+
+export const updateNativeMauticCampaign = updateNewsletterMauticCampaign;
+
 export const listNewsletterTemplates = (params = {}) =>
   unwrap(apiClient.get(adminTemplatesEndpoint, { params }));
 

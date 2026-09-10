@@ -55,6 +55,7 @@ import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StopCircleRoundedIcon from "@mui/icons-material/StopCircleRounded";
+import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -130,6 +131,7 @@ const blankForm = {
 const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
+  { value: "builder", label: "Builder", icon: <AccountTreeRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
@@ -970,6 +972,7 @@ export default function AdminNewsletterPage() {
         active={activeTab}
         onChange={(value) => {
           if (value === "contacts") navigate("/admin/newsletter/contacts");
+          else if (value === "builder") navigate("/admin/newsletter/builder");
           else if (value === "stages") navigate("/admin/newsletter/stages");
           else if (value === "points") navigate("/admin/newsletter/points");
           else setActiveTab(value);
