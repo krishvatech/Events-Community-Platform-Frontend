@@ -23,6 +23,8 @@ import {
   Snackbar,
   Stack,
   Switch,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -37,6 +39,7 @@ import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
+import WorkflowCanvas from "./WorkflowCanvas";
 import {
   createNativeMauticCampaign,
   deleteNewsletterMauticCampaign,
@@ -429,6 +432,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
+  const [workflowTab, setWorkflowTab] = useState("workflow");
 
   const actions = useMemo(() => asArray(capabilities?.actions), [capabilities]);
   const conditions = useMemo(() => asArray(capabilities?.conditions), [capabilities]);
@@ -1131,109 +1135,143 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             </Stack>
           </Paper>
 
-          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
-            <Stack spacing={2}>
-              <Box>
-                <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
-                  Workflow Preview
-                </Typography>
-                <Typography color="text.secondary">
-                  Local preview only. Canvas layout comes in a later phase.
-                </Typography>
-              </Box>
-
-              <Stack spacing={1.25} sx={{ maxWidth: 640 }}>
-                <Paper
-                  variant="outlined"
-                  sx={{ p: 1.5, borderRadius: 2, bgcolor: "#F6F8FA" }}
-                >
-                  <Typography sx={{ fontWeight: 850 }}>
-                    {form.name.trim() || "Campaign"}
-                  </Typography>
-                  {form.description && (
-                    <Typography variant="body2" color="text.secondary">
-                      {form.description}
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF" }}>
+            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+              <Tabs value={workflowTab} onChange={(e, val) => setWorkflowTab(val)}>
+                <Tab label="Workflow" value="workflow" />
+                <Tab label="Canvas" value="canvas" />
+              </Tabs>
+            </Box>
+            <Box sx={{ p: 2 }}>
+              {workflowTab === "workflow" ? (
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                      Workflow Preview
                     </Typography>
-                  )}
-                </Paper>
+                    <Typography color="text.secondary">
+                      Configure and preview workflow events.
+                    </Typography>
+                  </Box>
 
-                {form.events.length ? (
-                  form.events.map((event, index) => {
-                    const status = getConfigurationStatus(event);
-                    return (
-                    <React.Fragment key={event.id}>
-                      <Box
-                        sx={{
-                          width: 2,
-                          height: 20,
-                          bgcolor: "#CBD5E1",
-                          ml: 3,
-                        }}
-                      />
-                      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: !status.complete ? "#FCA5A5" : "#E7ECEF" }}>
-                        <Stack
-                          direction="row"
-                          spacing={1.5}
-                          alignItems="center"
-                          justifyContent="space-between"
-                        >
-                          <Stack spacing={0.5} sx={{ flex: 1 }}>
-                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                              <Typography sx={{ fontWeight: 800 }}>
-                                {index + 1}. {getEventLabel(event.metadata)}
-                              </Typography>
-                              <Chip
-                                size="small"
-                                label={eventTypeLabel(event.eventType)}
-                                color={eventTypeColor(event.eventType)}
-                                variant="outlined"
-                              />
-                            </Stack>
-                            <Typography component="code" variant="body2" color="text.secondary">
-                              {event.key}
-                            </Typography>
-                            <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
-                              <Chip
-                                size="small"
-                                label={status.message}
-                                color={status.complete ? "success" : "error"}
-                                variant={status.complete ? "filled" : "outlined"}
-                              />
-                            </Stack>
-                          </Stack>
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                            <Button
-                              type="button"
-                              variant={selectedWorkflowEventId === event.id ? "contained" : "outlined"}
-                              onClick={() => setSelectedWorkflowEventId(event.id)}
-                              disabled={saving}
-                              size="small"
+                  <Stack spacing={1.25} sx={{ maxWidth: 640 }}>
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 1.5, borderRadius: 2, bgcolor: "#F6F8FA" }}
+                    >
+                      <Typography sx={{ fontWeight: 850 }}>
+                        {form.name.trim() || "Campaign"}
+                      </Typography>
+                      {form.description && (
+                        <Typography variant="body2" color="text.secondary">
+                          {form.description}
+                        </Typography>
+                      )}
+                    </Paper>
+
+                    {form.events.length ? (
+                      form.events.map((event, index) => {
+                        const status = getConfigurationStatus(event);
+                        return (
+                        <React.Fragment key={event.id}>
+                          <Box
+                            sx={{
+                              width: 2,
+                              height: 20,
+                              bgcolor: "#CBD5E1",
+                              ml: 3,
+                            }}
+                          />
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: !status.complete ? "#FCA5A5" : "#E7ECEF" }}>
+                            <Stack
+                              direction="row"
+                              spacing={1.5}
+                              alignItems="center"
+                              justifyContent="space-between"
                             >
-                              Configure
-                            </Button>
-                            <Button
-                              type="button"
-                              color="error"
-                              startIcon={<DeleteRoundedIcon />}
-                              onClick={() => removeWorkflowEvent(event.id)}
-                              disabled={saving}
-                              size="small"
-                            >
-                              Remove
-                            </Button>
-                          </Stack>
-                        </Stack>
-                      </Paper>
-                    </React.Fragment>
-                    );
-                  })
-                ) : (
-                  <Alert severity="info" variant="outlined">
-                    No workflow events added.
-                  </Alert>
-                )}
-              </Stack>
-            </Stack>
+                              <Stack spacing={0.5} sx={{ flex: 1 }}>
+                                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                  <Typography sx={{ fontWeight: 800 }}>
+                                    {index + 1}. {getEventLabel(event.metadata)}
+                                  </Typography>
+                                  <Chip
+                                    size="small"
+                                    label={eventTypeLabel(event.eventType)}
+                                    color={eventTypeColor(event.eventType)}
+                                    variant="outlined"
+                                  />
+                                </Stack>
+                                <Typography component="code" variant="body2" color="text.secondary">
+                                  {event.key}
+                                </Typography>
+                                <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
+                                  <Chip
+                                    size="small"
+                                    label={status.message}
+                                    color={status.complete ? "success" : "error"}
+                                    variant={status.complete ? "filled" : "outlined"}
+                                  />
+                                </Stack>
+                              </Stack>
+                              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                                <Button
+                                  type="button"
+                                  variant={selectedWorkflowEventId === event.id ? "contained" : "outlined"}
+                                  onClick={() => setSelectedWorkflowEventId(event.id)}
+                                  disabled={saving}
+                                  size="small"
+                                >
+                                  Configure
+                                </Button>
+                                <Button
+                                  type="button"
+                                  color="error"
+                                  startIcon={<DeleteRoundedIcon />}
+                                  onClick={() => removeWorkflowEvent(event.id)}
+                                  disabled={saving}
+                                  size="small"
+                                >
+                                  Remove
+                                </Button>
+                              </Stack>
+                            </Stack>
+                          </Paper>
+                        </React.Fragment>
+                        );
+                      })
+                    ) : (
+                      <Alert severity="info" variant="outlined">
+                        No workflow events added.
+                      </Alert>
+                    )}
+                  </Stack>
+                </Stack>
+              ) : (
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                      Canvas View
+                    </Typography>
+                    <Typography color="text.secondary">
+                      Visual workflow representation. Click nodes to configure.
+                    </Typography>
+                  </Box>
+                  {form.events.length > 0 ? (
+                    <WorkflowCanvas
+                      events={form.events}
+                      onNodeSelect={setSelectedWorkflowEventId}
+                      getConfigurationStatus={getConfigurationStatus}
+                      getEventLabel={(metadata) => getEventLabel(metadata)}
+                      eventTypeLabel={eventTypeLabel}
+                    />
+                  ) : (
+                    <Alert severity="info" variant="outlined">
+                      Add workflow events to see the canvas visualization.
+                    </Alert>
+                  )}
+                </Stack>
+              )}
+            </Box>
           </Paper>
 
           <Divider />
