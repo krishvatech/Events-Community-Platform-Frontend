@@ -86,6 +86,9 @@ export const createNativeMauticCampaign = createNewsletterMauticCampaign;
 
 export const updateNativeMauticCampaign = updateNewsletterMauticCampaign;
 
+export const duplicateNativeMauticCampaign = (campaignId) =>
+  unwrap(apiClient.post(`${adminMauticCampaignsEndpoint}${campaignId}/duplicate/`));
+
 export const listNewsletterTemplates = (params = {}) =>
   unwrap(apiClient.get(adminTemplatesEndpoint, { params }));
 

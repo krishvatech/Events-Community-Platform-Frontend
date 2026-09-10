@@ -6,6 +6,10 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControl,
   FormControlLabel,
@@ -20,17 +24,23 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
   createNativeMauticCampaign,
+  deleteNewsletterMauticCampaign,
+  duplicateNativeMauticCampaign,
   getMauticCampaignCapabilities,
   getNativeMauticCampaignBuilder,
   updateNativeMauticCampaign,
@@ -163,6 +173,54 @@ const configuredPropertiesCount = (properties) => {
   }, 0);
 };
 
+const getRequiredFields = (formTypeOptions) => {
+  const fields = buildPropertyFields(formTypeOptions);
+  return fields.filter(field => {
+    const fieldMeta = getNestedValue(formTypeOptions, field.path);
+    return fieldMeta?.required === true || fieldMeta?.required === "true";
+  });
+};
+
+const isEventConfigurationComplete = (event) => {
+  if (!isPlainObject(event.metadata?.formTypeOptions)) return true;
+  const requiredFields = getRequiredFields(event.metadata.formTypeOptions);
+  if (!requiredFields.length) return true;
+
+  return requiredFields.every(field => {
+    const value = getNestedValue(event.properties, field.path);
+    return value !== undefined && value !== null && value !== "";
+  });
+};
+
+const getConfigurationStatus = (event) => {
+  if (!isPlainObject(event.metadata?.formTypeOptions)) {
+    return { complete: true, message: "No configuration fields" };
+  }
+
+  const requiredFields = getRequiredFields(event.metadata.formTypeOptions);
+  if (!requiredFields.length) {
+    const configuredCount = configuredPropertiesCount(event.properties);
+    return {
+      complete: configuredCount > 0,
+      message: configuredCount > 0 ? "Configured" : "No configuration needed",
+    };
+  }
+
+  const missingFields = requiredFields.filter(field => {
+    const value = getNestedValue(event.properties, field.path);
+    return value === undefined || value === null || value === "";
+  });
+
+  if (missingFields.length) {
+    return {
+      complete: false,
+      message: `${missingFields.length} required field${missingFields.length > 1 ? "s" : ""} missing`,
+    };
+  }
+
+  return { complete: true, message: "Configured" };
+};
+
 function CapabilityGroup({ title, description, events, loading }) {
   return (
     <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2.5 }}>
@@ -206,6 +264,7 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
     () => buildPropertyFields(event?.metadata?.formTypeOptions),
     [event]
   );
+  const status = useMemo(() => (event ? getConfigurationStatus(event) : null), [event]);
 
   if (!event) {
     return (
@@ -216,16 +275,23 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
   }
 
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: status?.complete ? "#E7ECEF" : "#FCA5A5", p: 2 }}>
       <Stack spacing={2}>
-        <Box>
-          <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
-            Selected Event Configuration
-          </Typography>
-          <Typography color="text.secondary">
-            {getEventLabel(event.metadata)}
-          </Typography>
-        </Box>
+        <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+              Selected Event Configuration
+            </Typography>
+            <Typography color="text.secondary">
+              {getEventLabel(event.metadata)}
+            </Typography>
+          </Box>
+          <Chip
+            label={status?.message || "Unknown"}
+            color={status?.complete ? "success" : "error"}
+            variant={status?.complete ? "filled" : "outlined"}
+          />
+        </Stack>
 
         <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
           <Box sx={{ flex: 1 }}>
@@ -258,6 +324,12 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
           <Stack spacing={2}>
             {fields.map((field) => {
               const value = getNestedValue(event.properties, field.path);
+              const fieldMeta = getNestedValue(event.metadata?.formTypeOptions, field.path);
+              const isRequired = fieldMeta?.required === true || fieldMeta?.required === "true";
+              const isEmpty = value === undefined || value === null || value === "";
+              const fieldLabel = isRequired ? `${field.label} *` : field.label;
+              const fieldError = isRequired && isEmpty;
+
               if (field.kind === "boolean") {
                 return (
                   <FormControlLabel
@@ -270,21 +342,21 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
                         }
                       />
                     }
-                    label={field.label}
+                    label={fieldLabel}
                   />
                 );
               }
 
               if (field.kind === "select") {
                 return (
-                  <FormControl key={field.path} fullWidth>
+                  <FormControl key={field.path} fullWidth error={fieldError}>
                     <InputLabel id={`${event.id}-${field.path}-label`}>
-                      {field.label}
+                      {fieldLabel}
                     </InputLabel>
                     <Select
                       labelId={`${event.id}-${field.path}-label`}
                       value={value ?? ""}
-                      label={field.label}
+                      label={fieldLabel}
                       onChange={(changeEvent) =>
                         onChangeProperty(event.id, field.path, changeEvent.target.value)
                       }
@@ -305,12 +377,14 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
               return (
                 <TextField
                   key={field.path}
-                  label={field.label}
+                  label={fieldLabel}
                   value={value ?? ""}
                   onChange={(changeEvent) =>
                     onChangeProperty(event.id, field.path, changeEvent.target.value)
                   }
                   fullWidth
+                  error={fieldError}
+                  helperText={fieldError ? "This field is required" : fieldMeta?.description || ""}
                 />
               );
             })}
@@ -352,6 +426,9 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     eventKey: "",
   });
   const [selectedWorkflowEventId, setSelectedWorkflowEventId] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
 
   const actions = useMemo(() => asArray(capabilities?.actions), [capabilities]);
   const conditions = useMemo(() => asArray(capabilities?.conditions), [capabilities]);
@@ -443,6 +520,13 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     }
     if (!form.events.length) {
       setFormError("Add at least one workflow event.");
+      return;
+    }
+
+    const incompleteEvents = form.events.filter(evt => !isEventConfigurationComplete(evt));
+    if (incompleteEvents.length) {
+      const eventNames = incompleteEvents.map(evt => getEventLabel(evt.metadata)).join(", ");
+      setFormError(`Event configuration incomplete: ${eventNames}. Please configure all required fields.`);
       return;
     }
 
@@ -548,6 +632,131 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     }));
   };
 
+  const publishCampaign = async () => {
+    if (!isEditMode || !campaignId) return;
+    setSaving(true);
+    setFormError("");
+    try {
+      const payload = {
+        name: form.name,
+        description: form.description,
+        isPublished: true,
+        sources: {
+          segments: form.lists,
+          forms: form.forms,
+        },
+        events: form.events.map((workflowEvent) => ({
+          key: workflowEvent.key,
+          eventType: workflowEvent.eventType,
+          properties: isPlainObject(workflowEvent.properties)
+            ? workflowEvent.properties
+            : {},
+        })),
+        canvasSettings: { nodes: [], connections: [] },
+      };
+
+      await updateNativeMauticCampaign(campaignId, payload);
+      setForm((current) => ({ ...current, isPublished: true }));
+      setSnack({
+        open: true,
+        severity: "success",
+        message: `Native Mautic Campaign #${campaignId} published.`,
+      });
+    } catch (err) {
+      setFormError(
+        getErrorMessage(err, "We could not publish this native Mautic Campaign.")
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const unpublishCampaign = async () => {
+    if (!isEditMode || !campaignId) return;
+    setSaving(true);
+    setFormError("");
+    try {
+      const payload = {
+        name: form.name,
+        description: form.description,
+        isPublished: false,
+        sources: {
+          segments: form.lists,
+          forms: form.forms,
+        },
+        events: form.events.map((workflowEvent) => ({
+          key: workflowEvent.key,
+          eventType: workflowEvent.eventType,
+          properties: isPlainObject(workflowEvent.properties)
+            ? workflowEvent.properties
+            : {},
+        })),
+        canvasSettings: { nodes: [], connections: [] },
+      };
+
+      await updateNativeMauticCampaign(campaignId, payload);
+      setForm((current) => ({ ...current, isPublished: false }));
+      setSnack({
+        open: true,
+        severity: "success",
+        message: `Native Mautic Campaign #${campaignId} unpublished.`,
+      });
+    } catch (err) {
+      setFormError(
+        getErrorMessage(err, "We could not unpublish this native Mautic Campaign.")
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteCampaign = async () => {
+    if (!isEditMode || !campaignId) return;
+    setIsDeleting(true);
+    setFormError("");
+    try {
+      await deleteNewsletterMauticCampaign(campaignId);
+      setSnack({
+        open: true,
+        severity: "success",
+        message: `Native Mautic Campaign #${campaignId} deleted.`,
+      });
+      setTimeout(() => {
+        navigate("/admin/newsletter", { state: { newsletterTab: "campaigns" } });
+      }, 1500);
+    } catch (err) {
+      setDeleteConfirmOpen(false);
+      setFormError(
+        getErrorMessage(err, "We could not delete this native Mautic Campaign.")
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const duplicateCampaign = async () => {
+    if (!isEditMode || !campaignId) return;
+    setIsDuplicating(true);
+    setFormError("");
+    try {
+      const duplicated = await duplicateNativeMauticCampaign(campaignId);
+      setSnack({
+        open: true,
+        severity: "success",
+        message: `Campaign duplicated. New ID: ${duplicated?.id}`,
+      });
+      setTimeout(() => {
+        navigate(`/admin/newsletter/builder/${duplicated?.id}`);
+      }, 1500);
+    } catch (err) {
+      setFormError(
+        getErrorMessage(err, "We could not duplicate this native Mautic Campaign.")
+      );
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Box>
@@ -563,22 +772,70 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           justifyContent="space-between"
           spacing={2}
         >
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
-              {isEditMode ? "Edit Native Mautic Campaign" : "Native Mautic Campaign Builder"}
-            </Typography>
+          <Box sx={{ flex: 1 }}>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 0.75 }}>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+                {isEditMode ? "Edit Native Mautic Campaign" : "Native Mautic Campaign Builder"}
+              </Typography>
+              {isEditMode && (
+                <Chip
+                  label={form.isPublished ? "Published" : "Draft"}
+                  color={form.isPublished ? "success" : "default"}
+                  variant={form.isPublished ? "filled" : "outlined"}
+                  size="small"
+                />
+              )}
+            </Stack>
             <Typography color="text.secondary">
               {isEditMode ? "Update provider-owned Mautic Campaign." : "Create provider-owned Campaign drafts and inspect runtime Mautic Builder capabilities."}
             </Typography>
           </Box>
-          <Button
-            startIcon={<RefreshRoundedIcon />}
-            onClick={loadCapabilities}
-            disabled={loading}
-            sx={{ textTransform: "none", alignSelf: "flex-start" }}
-          >
-            Refresh
-          </Button>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignSelf: "flex-start" }}>
+            <Button
+              startIcon={<RefreshRoundedIcon />}
+              onClick={loadCapabilities}
+              disabled={loading || saving}
+              sx={{ textTransform: "none" }}
+            >
+              Refresh
+            </Button>
+            {isEditMode && (
+              <>
+                <Tooltip title={form.isPublished ? "Unpublish campaign" : "Publish campaign"}>
+                  <Button
+                    startIcon={form.isPublished ? <UnpublishedRoundedIcon /> : <PublishRoundedIcon />}
+                    onClick={form.isPublished ? unpublishCampaign : publishCampaign}
+                    disabled={saving || isDuplicating}
+                    variant="outlined"
+                    sx={{ textTransform: "none" }}
+                  >
+                    {form.isPublished ? "Unpublish" : "Publish"}
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Create a copy of this campaign">
+                  <Button
+                    startIcon={isDuplicating ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />}
+                    onClick={duplicateCampaign}
+                    disabled={saving || isDuplicating}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Duplicate
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Delete this campaign">
+                  <Button
+                    color="error"
+                    startIcon={<DeleteRoundedIcon />}
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    disabled={saving || isDeleting}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Delete
+                  </Button>
+                </Tooltip>
+              </>
+            )}
+          </Stack>
         </Stack>
       </Box>
 
@@ -783,6 +1040,101 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             <Stack spacing={2}>
               <Box>
                 <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                  Campaign Preview
+                </Typography>
+                <Typography color="text.secondary">
+                  Review your campaign before saving.
+                </Typography>
+              </Box>
+
+              <Stack spacing={1.5}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Campaign Name
+                  </Typography>
+                  <Typography sx={{ fontWeight: 750 }}>
+                    {form.name.trim() || "Untitled"}
+                  </Typography>
+                </Box>
+
+                {form.description && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Description
+                    </Typography>
+                    <Typography variant="body2">
+                      {form.description}
+                    </Typography>
+                  </Box>
+                )}
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Status
+                  </Typography>
+                  <Chip
+                    label={form.isPublished ? "Published" : "Draft"}
+                    color={form.isPublished ? "success" : "default"}
+                    variant={form.isPublished ? "filled" : "outlined"}
+                    size="small"
+                  />
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Sources
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
+                    {form.lists.map((list) => (
+                      <Chip key={list} label={`Segment: ${list}`} size="small" variant="outlined" />
+                    ))}
+                    {form.forms.map((formId) => (
+                      <Chip key={formId} label={`Form: ${formId}`} size="small" variant="outlined" />
+                    ))}
+                    {!form.lists.length && !form.forms.length && (
+                      <Typography variant="caption" color="error">
+                        No sources selected
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Workflow Events
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    {form.events.length} event{form.events.length !== 1 ? "s" : ""} configured
+                  </Typography>
+                  {form.events.length > 0 && (
+                    <Stack spacing={0.5} sx={{ mt: 1 }}>
+                      {form.events.map((event, index) => {
+                        const status = getConfigurationStatus(event);
+                        return (
+                          <Stack key={event.id} direction="row" spacing={1} alignItems="center">
+                            <Typography variant="body2">
+                              {index + 1}. {getEventLabel(event.metadata)}
+                            </Typography>
+                            <Chip
+                              label={status.message}
+                              color={status.complete ? "success" : "error"}
+                              variant={status.complete ? "filled" : "outlined"}
+                              size="small"
+                            />
+                          </Stack>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Box>
+              </Stack>
+            </Stack>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
                   Workflow Preview
                 </Typography>
                 <Typography color="text.secondary">
@@ -807,7 +1159,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
 
                 {form.events.length ? (
                   form.events.map((event, index) => {
-                    const configuredCount = configuredPropertiesCount(event.properties);
+                    const status = getConfigurationStatus(event);
                     return (
                     <React.Fragment key={event.id}>
                       <Box
@@ -818,33 +1170,36 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                           ml: 3,
                         }}
                       />
-                      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: !status.complete ? "#FCA5A5" : "#E7ECEF" }}>
                         <Stack
                           direction="row"
                           spacing={1.5}
                           alignItems="center"
                           justifyContent="space-between"
                         >
-                          <Stack spacing={0.5}>
-                            <Stack direction="row" spacing={1} alignItems="center">
+                          <Stack spacing={0.5} sx={{ flex: 1 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                              <Typography sx={{ fontWeight: 800 }}>
+                                {index + 1}. {getEventLabel(event.metadata)}
+                              </Typography>
                               <Chip
                                 size="small"
                                 label={eventTypeLabel(event.eventType)}
                                 color={eventTypeColor(event.eventType)}
                                 variant="outlined"
                               />
-                              <Typography sx={{ fontWeight: 800 }}>
-                                {index + 1}. {getEventLabel(event.metadata)}
-                              </Typography>
                             </Stack>
                             <Typography component="code" variant="body2" color="text.secondary">
                               {event.key}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {configuredCount
-                                ? `Configured fields: ${configuredCount}`
-                                : "Configuration incomplete"}
-                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
+                              <Chip
+                                size="small"
+                                label={status.message}
+                                color={status.complete ? "success" : "error"}
+                                variant={status.complete ? "filled" : "outlined"}
+                              />
+                            </Stack>
                           </Stack>
                           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                             <Button
@@ -852,6 +1207,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                               variant={selectedWorkflowEventId === event.id ? "contained" : "outlined"}
                               onClick={() => setSelectedWorkflowEventId(event.id)}
                               disabled={saving}
+                              size="small"
                             >
                               Configure
                             </Button>
@@ -861,6 +1217,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                               startIcon={<DeleteRoundedIcon />}
                               onClick={() => removeWorkflowEvent(event.id)}
                               disabled={saving}
+                              size="small"
                             >
                               Remove
                             </Button>
@@ -937,6 +1294,29 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           />
         </Box>
       </Stack>
+
+      <Dialog open={deleteConfirmOpen} onClose={() => !isDeleting && setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Native Mautic Campaign?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            This removes the campaign from Mautic and is not reversible.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={deleteCampaign}
+            disabled={isDeleting}
+            startIcon={isDeleting ? <CircularProgress size={18} color="inherit" /> : <DeleteRoundedIcon />}
+          >
+            {isDeleting ? "Deleting..." : "Delete Campaign"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snack.open}
