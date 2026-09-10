@@ -423,6 +423,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     lists: [],
     forms: [],
     events: [],
+    canvasSettings: { nodes: [], edges: [] },
   });
   const [eventPicker, setEventPicker] = useState({
     eventType: "action",
@@ -499,6 +500,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         metadata: event.metadata,
         properties: isPlainObject(event.properties) ? event.properties : {},
       })),
+      canvasSettings: isPlainObject(campaign?.canvasSettings) ? campaign.canvasSettings : { nodes: [], edges: [] },
     });
   }, [campaignId]);
 
@@ -552,7 +554,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             ? workflowEvent.properties
             : {},
         })),
-        canvasSettings: { nodes: [], connections: [] },
+        canvasSettings: form.canvasSettings,
       };
 
       const createdCampaign = isEditMode
@@ -636,6 +638,51 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     }));
   };
 
+  const handleCanvasNodesChange = (nodes) => {
+    setForm((current) => ({
+      ...current,
+      canvasSettings: {
+        ...current.canvasSettings,
+        nodes: nodes,
+      },
+    }));
+  };
+
+  const handleCanvasEdgesChange = (edges) => {
+    setForm((current) => ({
+      ...current,
+      canvasSettings: {
+        ...current.canvasSettings,
+        edges: edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+        })),
+      },
+    }));
+  };
+
+  const handleCanvasConnect = (connection) => {
+    setForm((current) => ({
+      ...current,
+      canvasSettings: {
+        ...current.canvasSettings,
+        edges: [
+          ...current.canvasSettings.edges,
+          {
+            id: `e-${connection.source}-${connection.target}`,
+            source: connection.source,
+            target: connection.target,
+          },
+        ],
+      },
+    }));
+  };
+
+  const handleCanvasDeleteNode = (nodeId) => {
+    removeWorkflowEvent(nodeId);
+  };
+
   const publishCampaign = async () => {
     if (!isEditMode || !campaignId) return;
     setSaving(true);
@@ -656,7 +703,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             ? workflowEvent.properties
             : {},
         })),
-        canvasSettings: { nodes: [], connections: [] },
+        canvasSettings: form.canvasSettings,
       };
 
       await updateNativeMauticCampaign(campaignId, payload);
@@ -695,7 +742,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             ? workflowEvent.properties
             : {},
         })),
-        canvasSettings: { nodes: [], connections: [] },
+        canvasSettings: form.canvasSettings,
       };
 
       await updateNativeMauticCampaign(campaignId, payload);
@@ -1260,9 +1307,14 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     <WorkflowCanvas
                       events={form.events}
                       onNodeSelect={setSelectedWorkflowEventId}
+                      onNodesChange={handleCanvasNodesChange}
+                      onEdgesChange={handleCanvasEdgesChange}
+                      onConnect={handleCanvasConnect}
+                      canvasSettings={form.canvasSettings}
+                      onDeleteNode={handleCanvasDeleteNode}
                       getConfigurationStatus={getConfigurationStatus}
                       getEventLabel={(metadata) => getEventLabel(metadata)}
-                      eventTypeLabel={eventTypeLabel}
+                      selectedNodeId={selectedWorkflowEventId}
                     />
                   ) : (
                     <Alert severity="info" variant="outlined">
@@ -1287,6 +1339,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   lists: [],
                   forms: [],
                   events: [],
+                  canvasSettings: { nodes: [], edges: [] },
                 });
                 setSelectedWorkflowEventId("");
               }}

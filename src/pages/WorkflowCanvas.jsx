@@ -6,9 +6,13 @@ import {
   useNodesState,
   useEdgesState,
   MiniMap,
+  Handle,
+  Position,
+  addEdge,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
+import { Box, Chip, Paper, Stack, Typography, IconButton, Tooltip } from "@mui/material";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 
 const nodeTypeColors = {
   action: "#10B981",
@@ -17,36 +21,64 @@ const nodeTypeColors = {
   trigger: "#3B82F6",
 };
 
-function WorkflowNode({ data }) {
+function WorkflowNode({ data, isConnectable }) {
   const bgColor = nodeTypeColors[data.eventType?.toLowerCase()] || "#6B7280";
+  const isSelected = data.isSelected;
 
   return (
     <Paper
       sx={{
-        p: 1.5,
+        p: 1,
         borderRadius: 1.5,
         bgcolor: bgColor,
         color: "#fff",
-        minWidth: 150,
+        minWidth: 160,
         textAlign: "center",
-        border: "2px solid #1B2A4A",
+        border: isSelected ? "3px solid #FFD700" : "2px solid #1B2A4A",
         cursor: "pointer",
+        position: "relative",
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
-        {data.label}
-      </Typography>
-      <Chip
-        label={data.statusMessage}
-        size="small"
-        sx={{
-          bgcolor: data.complete ? "#4ade80" : "#fca5a5",
-          color: "#000",
-          fontSize: "0.65rem",
-          height: "auto",
-        }}
-      />
+      <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
+      <Stack spacing={0.5}>
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          {data.label}
+        </Typography>
+        <Chip
+          label={data.statusMessage}
+          size="small"
+          sx={{
+            bgcolor: data.complete ? "#4ade80" : "#fca5a5",
+            color: "#000",
+            fontSize: "0.65rem",
+            height: "auto",
+          }}
+        />
+        {data.onDelete && (
+          <Tooltip title="Delete event">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onDelete(data.eventId);
+              }}
+              sx={{
+                color: "#fff",
+                bgcolor: "rgba(0,0,0,0.2)",
+                p: 0.5,
+                width: 24,
+                height: 24,
+                alignSelf: "center",
+                "&:hover": { bgcolor: "rgba(0,0,0,0.4)" },
+              }}
+            >
+              <DeleteRoundedIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Stack>
+      <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
     </Paper>
   );
 }
@@ -54,13 +86,20 @@ function WorkflowNode({ data }) {
 export default function WorkflowCanvas({
   events,
   onNodeSelect,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  canvasSettings,
+  onDeleteNode,
   getConfigurationStatus,
   getEventLabel,
+  selectedNodeId,
 }) {
-  const nodes = useMemo(
+  const initialNodes = useMemo(
     () =>
       (events || []).map((event, index) => {
         const status = getConfigurationStatus(event);
+        const savedNode = canvasSettings?.nodes?.find((n) => n.id === event.id);
         return {
           id: event.id,
           data: {
@@ -68,53 +107,85 @@ export default function WorkflowCanvas({
             eventType: event.eventType,
             complete: status.complete,
             statusMessage: status.message,
+            eventId: event.id,
+            onDelete: onDeleteNode,
+            isSelected: selectedNodeId === event.id,
           },
-          position: { x: index * 240, y: 100 },
+          position: savedNode?.position || { x: index * 240, y: 100 },
           type: "default",
+          draggable: true,
         };
       }),
-    [events, getConfigurationStatus, getEventLabel]
+    [events, getConfigurationStatus, getEventLabel, canvasSettings, onDeleteNode, selectedNodeId]
   );
 
-  const edges = useMemo(() => {
-    const edgeList = [];
-    for (let i = 0; i < nodes.length - 1; i++) {
-      edgeList.push({
-        id: `e-${nodes[i].id}-${nodes[i + 1].id}`,
-        source: nodes[i].id,
-        target: nodes[i + 1].id,
-        animated: true,
-      });
-    }
-    return edgeList;
-  }, [nodes]);
+  const initialEdges = useMemo(
+    () => canvasSettings?.edges || [],
+    [canvasSettings?.edges]
+  );
 
-  const [nodesState, setNodesState] = useNodesState(nodes);
-  const [edgesState, setEdgesState] = useEdgesState(edges);
+  const [nodesState, setNodesState] = useNodesState(initialNodes);
+  const [edgesState, setEdgesState] = useEdgesState(initialEdges);
 
   useEffect(() => {
-    setNodesState(nodes);
-  }, [nodes, setNodesState]);
+    setNodesState(initialNodes);
+  }, [initialNodes, setNodesState]);
 
   useEffect(() => {
-    setEdgesState(edges);
-  }, [edges, setEdgesState]);
+    setEdgesState(initialEdges);
+  }, [initialEdges, setEdgesState]);
+
+  const handleNodesChange = useCallback(
+    (changes) => {
+      setNodesState(changes);
+      if (onNodesChange) {
+        const updatedNodes = nodesState.map((node) => {
+          const changed = changes.find((c) => c.id === node.id);
+          if (changed?.position) {
+            return { ...node, position: changed.position };
+          }
+          return node;
+        });
+        onNodesChange(updatedNodes.map((n) => ({ id: n.id, position: n.position })));
+      }
+    },
+    [nodesState, setNodesState, onNodesChange]
+  );
+
+  const handleEdgesChange = useCallback(
+    (changes) => {
+      setEdgesState(changes);
+      if (onEdgesChange) {
+        onEdgesChange(edgesState);
+      }
+    },
+    [edgesState, setEdgesState, onEdgesChange]
+  );
+
+  const handleConnect = useCallback(
+    (connection) => {
+      if (onConnect) {
+        setEdgesState((eds) => addEdge(connection, eds));
+        onConnect(connection);
+      }
+    },
+    [setEdgesState, onConnect]
+  );
 
   const handleNodeClick = useCallback(
     (_, node) => {
-      const eventObj = events?.find((e) => e.id === node.id);
-      if (eventObj && onNodeSelect) {
-        onNodeSelect(eventObj.id);
+      if (onNodeSelect) {
+        onNodeSelect(node.id);
       }
     },
-    [events, onNodeSelect]
+    [onNodeSelect]
   );
 
   return (
     <Box
       sx={{
         width: "100%",
-        height: 450,
+        height: 500,
         position: "relative",
         borderRadius: 2,
         overflow: "hidden",
@@ -124,8 +195,9 @@ export default function WorkflowCanvas({
       <ReactFlow
         nodes={nodesState}
         edges={edgesState}
-        onNodesChange={() => {}}
-        onEdgesChange={() => {}}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
+        onConnect={handleConnect}
         onNodeClick={handleNodeClick}
         nodeTypes={{ default: WorkflowNode }}
         fitView
