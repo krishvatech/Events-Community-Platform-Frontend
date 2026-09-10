@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import { useNavigate } from "react-router-dom";
@@ -56,8 +57,27 @@ const getEventKey = (event) => event?.key || event?.type || event?.eventType || 
 
 const getEventLabel = (event) => event?.label || getEventKey(event);
 
+const eventTypeLabel = (eventType) => {
+  const normalized = String(eventType || "").toLowerCase();
+  if (normalized === "action") return "Action";
+  if (normalized === "condition") return "Condition";
+  if (normalized === "decision") return "Decision";
+  return "Event";
+};
+
+const eventTypeColor = (eventType) => {
+  const normalized = String(eventType || "").toLowerCase();
+  if (normalized === "action") return "primary";
+  if (normalized === "condition") return "info";
+  if (normalized === "decision") return "warning";
+  return "default";
+};
+
 const sourceLabel = (source, fallback) =>
   source?.name || source?.alias || (source?.id ? `${fallback} #${source.id}` : fallback);
+
+const workflowEventId = () =>
+  `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 function CapabilityGroup({ title, description, events, loading }) {
   return (
@@ -115,11 +135,29 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     isPublished: false,
     lists: [],
     forms: [],
+    events: [],
+  });
+  const [eventPicker, setEventPicker] = useState({
+    eventType: "action",
+    eventKey: "",
   });
 
   const actions = useMemo(() => asArray(capabilities?.actions), [capabilities]);
   const conditions = useMemo(() => asArray(capabilities?.conditions), [capabilities]);
   const decisions = useMemo(() => asArray(capabilities?.decisions), [capabilities]);
+  const eventGroups = useMemo(
+    () => [
+      { value: "action", label: "Actions", events: actions },
+      { value: "condition", label: "Conditions", events: conditions },
+      { value: "decision", label: "Decisions", events: decisions },
+    ],
+    [actions, conditions, decisions]
+  );
+  const selectedEventOptions = useMemo(
+    () =>
+      eventGroups.find((group) => group.value === eventPicker.eventType)?.events || [],
+    [eventGroups, eventPicker.eventType]
+  );
   const segments = useMemo(
     () => asArray(capabilities?.sources?.segments),
     [capabilities]
@@ -182,6 +220,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         isPublished: false,
         lists: [],
         forms: [],
+        events: [],
       });
     } catch (err) {
       setFormError(
@@ -193,6 +232,34 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const addWorkflowEvent = () => {
+    const selected = selectedEventOptions.find(
+      (event) => getEventKey(event) === eventPicker.eventKey
+    );
+    if (!selected) return;
+
+    setForm((current) => ({
+      ...current,
+      events: [
+        ...current.events,
+        {
+          id: workflowEventId(),
+          key: getEventKey(selected),
+          eventType: selected.eventType || eventPicker.eventType,
+          metadata: selected,
+        },
+      ],
+    }));
+    setEventPicker((current) => ({ ...current, eventKey: "" }));
+  };
+
+  const removeWorkflowEvent = (eventId) => {
+    setForm((current) => ({
+      ...current,
+      events: current.events.filter((event) => event.id !== eventId),
+    }));
   };
 
   return (
@@ -344,6 +411,165 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             label={form.isPublished ? "Published" : "Draft / Unpublished"}
           />
 
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                  Workflow Events
+                </Typography>
+                <Typography color="text.secondary">
+                  Select runtime Mautic events for the local builder state.
+                </Typography>
+              </Box>
+
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <FormControl fullWidth disabled={saving || loading}>
+                  <InputLabel id="event-category-label">Category</InputLabel>
+                  <Select
+                    labelId="event-category-label"
+                    value={eventPicker.eventType}
+                    label="Category"
+                    onChange={(event) =>
+                      setEventPicker({
+                        eventType: event.target.value,
+                        eventKey: "",
+                      })
+                    }
+                  >
+                    {eventGroups.map((group) => (
+                      <MenuItem key={group.value} value={group.value}>
+                        {group.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth disabled={saving || loading || !selectedEventOptions.length}>
+                  <InputLabel id="event-option-label">Event</InputLabel>
+                  <Select
+                    labelId="event-option-label"
+                    value={eventPicker.eventKey}
+                    label="Event"
+                    onChange={(event) =>
+                      setEventPicker((current) => ({
+                        ...current,
+                        eventKey: event.target.value,
+                      }))
+                    }
+                  >
+                    {selectedEventOptions.map((event) => {
+                      const key = getEventKey(event);
+                      return (
+                        <MenuItem key={`${eventPicker.eventType}-${key}`} value={key}>
+                          <Stack spacing={0.25}>
+                            <Typography sx={{ fontWeight: 750 }}>
+                              {getEventLabel(event)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {eventTypeLabel(event.eventType || eventPicker.eventType)} · {key}
+                            </Typography>
+                          </Stack>
+                        </MenuItem>
+                      );
+                    })}
+                  </Select>
+                </FormControl>
+
+                <Button
+                  type="button"
+                  variant="outlined"
+                  onClick={addWorkflowEvent}
+                  disabled={saving || loading || !eventPicker.eventKey}
+                  sx={{ minWidth: { md: 132 } }}
+                >
+                  Add Event
+                </Button>
+              </Stack>
+            </Stack>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                  Workflow Preview
+                </Typography>
+                <Typography color="text.secondary">
+                  Local preview only. Canvas layout comes in a later phase.
+                </Typography>
+              </Box>
+
+              <Stack spacing={1.25} sx={{ maxWidth: 640 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{ p: 1.5, borderRadius: 2, bgcolor: "#F6F8FA" }}
+                >
+                  <Typography sx={{ fontWeight: 850 }}>
+                    {form.name.trim() || "Campaign"}
+                  </Typography>
+                  {form.description && (
+                    <Typography variant="body2" color="text.secondary">
+                      {form.description}
+                    </Typography>
+                  )}
+                </Paper>
+
+                {form.events.length ? (
+                  form.events.map((event, index) => (
+                    <React.Fragment key={event.id}>
+                      <Box
+                        sx={{
+                          width: 2,
+                          height: 20,
+                          bgcolor: "#CBD5E1",
+                          ml: 3,
+                        }}
+                      />
+                      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                        <Stack
+                          direction="row"
+                          spacing={1.5}
+                          alignItems="center"
+                          justifyContent="space-between"
+                        >
+                          <Stack spacing={0.5}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Chip
+                                size="small"
+                                label={eventTypeLabel(event.eventType)}
+                                color={eventTypeColor(event.eventType)}
+                                variant="outlined"
+                              />
+                              <Typography sx={{ fontWeight: 800 }}>
+                                {index + 1}. {getEventLabel(event.metadata)}
+                              </Typography>
+                            </Stack>
+                            <Typography component="code" variant="body2" color="text.secondary">
+                              {event.key}
+                            </Typography>
+                          </Stack>
+                          <Button
+                            type="button"
+                            color="error"
+                            startIcon={<DeleteRoundedIcon />}
+                            onClick={() => removeWorkflowEvent(event.id)}
+                            disabled={saving}
+                          >
+                            Remove
+                          </Button>
+                        </Stack>
+                      </Paper>
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <Alert severity="info" variant="outlined">
+                    No workflow events added.
+                  </Alert>
+                )}
+              </Stack>
+            </Stack>
+          </Paper>
+
           <Divider />
 
           <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end" spacing={1.5}>
@@ -356,6 +582,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   isPublished: false,
                   lists: [],
                   forms: [],
+                  events: [],
                 })
               }
               disabled={saving}
