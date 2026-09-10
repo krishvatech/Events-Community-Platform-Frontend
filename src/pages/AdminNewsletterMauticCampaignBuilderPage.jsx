@@ -27,11 +27,13 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import {
   createNativeMauticCampaign,
   getMauticCampaignCapabilities,
+  getNativeMauticCampaignBuilder,
+  updateNativeMauticCampaign,
 } from "../services/newsletterService";
 
 const getErrorMessage = (err, fallback = "Something went wrong. Please try again.") => {
@@ -325,6 +327,8 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
 
 export default function AdminNewsletterMauticCampaignBuilderPage() {
   const navigate = useNavigate();
+  const { campaignId } = useParams();
+  const isEditMode = Boolean(campaignId);
   const [capabilities, setCapabilities] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -395,6 +399,32 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     loadCapabilities();
   }, [loadCapabilities]);
 
+
+  const loadCampaign = useCallback(async () => {
+    if (!campaignId) return;
+
+    const campaign = await getNativeMauticCampaignBuilder(campaignId);
+
+    setForm({
+      name: campaign?.name || "",
+      description: campaign?.description || "",
+      isPublished: Boolean(campaign?.isPublished),
+      lists: (campaign?.sources?.segments || []).map((item) => item.id).filter(Boolean),
+      forms: (campaign?.sources?.forms || []).map((item) => item.id).filter(Boolean),
+      events: (campaign?.events || []).map((event) => ({
+        id: String(event.id || workflowEventId()),
+        key: event.key,
+        eventType: event.eventType,
+        metadata: event.metadata,
+        properties: isPlainObject(event.properties) ? event.properties : {},
+      })),
+    });
+  }, [campaignId]);
+
+  useEffect(() => {
+    loadCampaign();
+  }, [loadCampaign]);
+
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
     setFormError("");
@@ -419,7 +449,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setSaving(true);
     setFormError("");
     try {
-      const createdCampaign = await createNativeMauticCampaign({
+      const payload = {
         name,
         description: form.description,
         isPublished: Boolean(form.isPublished),
@@ -430,26 +460,34 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         events: form.events.map((workflowEvent) => ({
           key: workflowEvent.key,
           eventType: workflowEvent.eventType,
-          properties: workflowEvent.properties || {},
+          properties: isPlainObject(workflowEvent.properties)
+            ? workflowEvent.properties
+            : {},
         })),
         canvasSettings: { nodes: [], connections: [] },
-      });
+      };
+
+      const createdCampaign = isEditMode
+        ? await updateNativeMauticCampaign(campaignId, payload)
+        : await createNativeMauticCampaign(payload);
       setSnack({
         open: true,
         severity: "success",
         message: createdCampaign?.id
-          ? `Native Mautic Campaign #${createdCampaign.id} created.`
-          : "Native Mautic Campaign created.",
+          ? `Native Mautic Campaign #${createdCampaign.id} ${isEditMode ? "updated" : "created"}.`
+          : `Native Mautic Campaign ${isEditMode ? "updated" : "created"}.`,
       });
-      setForm({
-        name: "",
-        description: "",
-        isPublished: false,
-        lists: [],
-        forms: [],
-        events: [],
-      });
-      setSelectedWorkflowEventId("");
+      if (!isEditMode) {
+        setForm({
+          name: "",
+          description: "",
+          isPublished: false,
+          lists: [],
+          forms: [],
+          events: [],
+        });
+        setSelectedWorkflowEventId("");
+      }
     } catch (err) {
       setFormError(
         getErrorMessage(
@@ -527,10 +565,10 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         >
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
-              Native Mautic Campaign Builder
+              {isEditMode ? "Edit Native Mautic Campaign" : "Native Mautic Campaign Builder"}
             </Typography>
             <Typography color="text.secondary">
-              Create provider-owned Campaign drafts and inspect runtime Mautic Builder capabilities.
+              {isEditMode ? "Update provider-owned Mautic Campaign." : "Create provider-owned Campaign drafts and inspect runtime Mautic Builder capabilities."}
             </Typography>
           </Box>
           <Button
@@ -867,7 +905,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />}
               disabled={saving}
             >
-              Create Campaign
+              {isEditMode ? "Update Campaign" : "Create Campaign"}
             </Button>
           </Stack>
         </Stack>

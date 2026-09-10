@@ -76,6 +76,12 @@ export const deleteNewsletterMauticCampaign = (campaignId) =>
 export const getMauticCampaignCapabilities = () =>
   unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}capabilities/`));
 
+export const getNativeMauticCampaign = (campaignId) =>
+  unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}${campaignId}/`));
+
+export const getNativeMauticCampaignBuilder = (campaignId) =>
+  unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}${campaignId}/builder/`));
+
 export const createNativeMauticCampaign = createNewsletterMauticCampaign;
 
 export const updateNativeMauticCampaign = updateNewsletterMauticCampaign;
