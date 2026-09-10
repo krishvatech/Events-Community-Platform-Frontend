@@ -29,6 +29,10 @@ import Footer from "./components/Footer.jsx";
 import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
 import ProfilePage from "./pages/ProfilePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+import NewsletterPage from "./pages/NewsletterPage.jsx";
+import AdminNewsletterPage from "./pages/AdminNewsletterPage.jsx";
+import AdminNewsletterAudiencesPage from "./pages/AdminNewsletterAudiencesPage.jsx";
+import AdminNewsletterAudienceDetailPage from "./pages/AdminNewsletterAudienceDetailPage.jsx";
 import ResourceDetailsPage from "./pages/ResourceDetailsPage.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
@@ -181,6 +185,7 @@ const AppShell = () => {
                             !location.pathname.startsWith("/admin") &&
                             !location.pathname.startsWith("/community") &&
                             !location.pathname.startsWith("/landing") &&
+                            !location.pathname.startsWith("/newsletter") &&
                             location.pathname !== "/" &&
                             location.pathname !== "/about" &&
                             location.pathname !== "/cms" &&
@@ -290,6 +295,12 @@ const AppShell = () => {
             <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
             <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
             <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
+            <Route path="newsletter" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/new" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/audiences" element={<RequireStaffOrAdmin><AdminNewsletterAudiencesPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/audiences/new" element={<RequireStaffOrAdmin><AdminNewsletterAudienceDetailPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/audiences/:audienceId" element={<RequireStaffOrAdmin><AdminNewsletterAudienceDetailPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/:campaignId" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
             <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
@@ -325,6 +336,7 @@ const AppShell = () => {
           <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
           <Route path="/account/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+          <Route path="/newsletter" element={<RequireAuth><NewsletterPage /></RequireAuth>} />
 
           {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
           <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />
