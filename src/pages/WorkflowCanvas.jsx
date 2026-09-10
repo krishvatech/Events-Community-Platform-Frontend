@@ -9,6 +9,8 @@ import {
   Handle,
   Position,
   addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -45,46 +47,44 @@ const nodeTypeIcons = {
   delay: DelayIcon,
 };
 
+const nodeTypeLabels = {
+  trigger: "Trigger",
+  action: "Action",
+  condition: "Condition",
+  delay: "Delay",
+};
+
 function CanvasNode({ data, isConnectable }) {
-  const bgColor = nodeTypeColors[data.nodeType?.toLowerCase()] || nodeTypeColors.event;
-  const isSelected = data.isSelected;
+  const accent = nodeTypeColors[data.nodeType?.toLowerCase()] || nodeTypeColors.event;
   const NodeIcon = nodeTypeIcons[data.nodeType?.toLowerCase()];
 
   return (
     <Paper
+      elevation={data.isSelected ? 6 : 1}
       sx={{
-        p: 1,
         borderRadius: 1.5,
-        bgcolor: bgColor,
-        color: "#fff",
-        minWidth: 140,
-        textAlign: "center",
-        border: isSelected ? "3px solid #FFD700" : "2px solid #1B2A4A",
+        overflow: "hidden",
+        width: 200,
+        bgcolor: "#fff",
+        border: data.isSelected ? "2px solid #1B2A4A" : "1px solid #E7ECEF",
         cursor: "pointer",
-        position: "relative",
       }}
-      onClick={(e) => e.stopPropagation()}
     >
       <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
-      <Stack spacing={0.3} alignItems="center">
-        {NodeIcon && (
-          <NodeIcon sx={{ fontSize: 18 }} />
-        )}
-        <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.75rem" }}>
-          {data.label}
+
+      <Stack
+        direction="row"
+        spacing={0.75}
+        alignItems="center"
+        sx={{ bgcolor: accent, color: "#fff", px: 1, py: 0.5 }}
+      >
+        {NodeIcon && <NodeIcon sx={{ fontSize: 16 }} />}
+        <Typography
+          variant="caption"
+          sx={{ fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", flex: 1 }}
+        >
+          {data.typeLabel}
         </Typography>
-        {data.statusMessage && (
-          <Chip
-            label={data.statusMessage}
-            size="small"
-            sx={{
-              bgcolor: data.complete ? "#4ade80" : "#fca5a5",
-              color: "#000",
-              fontSize: "0.6rem",
-              height: "auto",
-            }}
-          />
-        )}
         {data.onDelete && (
           <Tooltip title="Delete node">
             <IconButton
@@ -95,11 +95,10 @@ function CanvasNode({ data, isConnectable }) {
               }}
               sx={{
                 color: "#fff",
-                bgcolor: "rgba(0,0,0,0.2)",
-                p: 0.25,
-                width: 20,
-                height: 20,
-                "&:hover": { bgcolor: "rgba(0,0,0,0.4)" },
+                p: 0.15,
+                width: 18,
+                height: 18,
+                "&:hover": { bgcolor: "rgba(0,0,0,0.25)" },
               }}
             >
               <DeleteRoundedIcon sx={{ fontSize: 12 }} />
@@ -107,10 +106,40 @@ function CanvasNode({ data, isConnectable }) {
           </Tooltip>
         )}
       </Stack>
+
+      <Stack spacing={0.5} sx={{ px: 1, py: 0.85 }}>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 750, color: "#1B2A4A", lineHeight: 1.25 }}
+        >
+          {data.eventName}
+        </Typography>
+        {data.eventKey && (
+          <Typography
+            component="code"
+            variant="caption"
+            sx={{ color: "text.secondary", wordBreak: "break-all" }}
+          >
+            {data.eventKey}
+          </Typography>
+        )}
+        {data.statusMessage && (
+          <Chip
+            label={data.statusMessage}
+            size="small"
+            color={data.complete ? "success" : "error"}
+            variant={data.complete ? "filled" : "outlined"}
+            sx={{ alignSelf: "flex-start", fontSize: "0.65rem", height: 20 }}
+          />
+        )}
+      </Stack>
+
       <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
     </Paper>
   );
 }
+
+const nodeTypes = { default: CanvasNode };
 
 export default function WorkflowCanvas({
   events,
@@ -131,44 +160,78 @@ export default function WorkflowCanvas({
 
   const initialNodes = useMemo(
     () =>
-      (canvasNodes || []).map((node) => {
-        const event = node.eventId ? events?.find((e) => e.id === node.eventId) : null;
-        const status = event ? getConfigurationStatus(event) : { complete: true, message: "" };
-        const label = node.nodeType === "trigger" ? "Trigger" :
-                      node.nodeType === "delay" ? "Delay" :
-                      node.nodeType === "condition" ? "Condition" :
-                      event ? getEventLabel(event.metadata) : node.label || "Node";
+      (canvasNodes || [])
+        .filter((node) => node && node.id)
+        .map((node, idx) => {
+          const event = node.eventId ? events?.find((e) => e.id === node.eventId) : null;
+          const status = event ? getConfigurationStatus(event) : null;
+          const typeLabel = nodeTypeLabels[node.nodeType] || "Node";
+          const eventName = event
+            ? getEventLabel(event.metadata)
+            : node.nodeType === "trigger"
+            ? "Campaign Entry"
+            : "No event linked";
 
-        return {
-          id: node.id,
-          data: {
-            label,
-            nodeType: node.nodeType,
-            nodeId: node.id,
-            eventId: node.eventId,
-            complete: status.complete,
-            statusMessage: event ? status.message : "",
-            onDelete: onDeleteNode,
-            isSelected: selectedNodeId === node.id,
-          },
-          position: node.position || { x: Math.random() * 400, y: Math.random() * 300 },
-          type: "default",
-          draggable: true,
-        };
-      }),
+          const validPosition =
+            node.position &&
+            Number.isFinite(node.position.x) &&
+            Number.isFinite(node.position.y)
+              ? node.position
+              : { x: 60 + idx * 260, y: 120 };
+
+          return {
+            id: node.id,
+            data: {
+              label: eventName,
+              typeLabel,
+              eventName,
+              eventKey: event?.key || "",
+              nodeType: node.nodeType,
+              nodeId: node.id,
+              eventId: node.eventId,
+              complete: status ? status.complete : true,
+              statusMessage: status ? status.message : "",
+              onDelete: onDeleteNode,
+              isSelected: selectedNodeId === node.id,
+            },
+            position: validPosition,
+            type: "default",
+            draggable: true,
+          };
+        }),
     [canvasNodes, events, getConfigurationStatus, getEventLabel, onDeleteNode, selectedNodeId]
   );
 
   const initialEdges = useMemo(
-    () => canvasSettings?.edges || [],
+    () => (canvasSettings?.edges || []).filter((e) => e && e.source && e.target),
     [canvasSettings?.edges]
   );
 
   const [nodesState, setNodesState] = useNodesState(initialNodes);
   const [edgesState, setEdgesState] = useEdgesState(initialEdges);
 
+  // initialNodes is a fresh array every parent render, so bail out when nothing
+  // structural actually changed — otherwise this effect loops with the parent.
   useEffect(() => {
-    setNodesState(initialNodes);
+    setNodesState((current) => {
+      const unchanged =
+        current.length === initialNodes.length &&
+        current.every((node, index) => {
+          const next = initialNodes[index];
+          return (
+            next &&
+            node.id === next.id &&
+            node.position.x === next.position.x &&
+            node.position.y === next.position.y &&
+            node.data.eventName === next.data.eventName &&
+            node.data.eventKey === next.data.eventKey &&
+            node.data.isSelected === next.data.isSelected &&
+            node.data.complete === next.data.complete &&
+            node.data.statusMessage === next.data.statusMessage
+          );
+        });
+      return unchanged ? current : initialNodes;
+    });
   }, [initialNodes, setNodesState]);
 
   useEffect(() => {
@@ -177,22 +240,16 @@ export default function WorkflowCanvas({
 
   const handleNodesChange = useCallback(
     (changes) => {
-      setNodesState(changes);
-      if (onNodesChange) {
-        const updatedNodes = nodesState.map((node) => {
-          const changed = changes.find((c) => c.id === node.id);
-          if (changed?.position) {
-            return { ...node, position: changed.position };
-          }
-          return node;
-        });
-        onNodesChange(
-          updatedNodes.map((n) => ({
-            id: n.id,
-            position: n.position,
-            data: n.data,
-          }))
-        );
+      const updated = applyNodeChanges(changes, nodesState);
+      setNodesState(updated);
+
+      const isPersistable = changes.some(
+        (change) =>
+          (change.type === "position" && change.dragging === false) ||
+          change.type === "remove"
+      );
+      if (isPersistable && onNodesChange) {
+        onNodesChange(updated);
       }
     },
     [nodesState, setNodesState, onNodesChange]
@@ -200,9 +257,11 @@ export default function WorkflowCanvas({
 
   const handleEdgesChange = useCallback(
     (changes) => {
-      setEdgesState(changes);
-      if (onEdgesChange) {
-        onEdgesChange(edgesState);
+      const updated = applyEdgeChanges(changes, edgesState);
+      setEdgesState(updated);
+
+      if (changes.some((change) => change.type === "remove") && onEdgesChange) {
+        onEdgesChange(updated);
       }
     },
     [edgesState, setEdgesState, onEdgesChange]
@@ -229,21 +288,37 @@ export default function WorkflowCanvas({
 
   const handleCanvasContextMenu = useCallback(
     (e) => {
-      e.preventDefault();
-      setMenuPosition({ x: e.clientX, y: e.clientY });
-      setAnchorEl(e.currentTarget);
+      if (e.target.closest(".react-flow")) {
+        e.preventDefault();
+        setMenuPosition({ x: e.clientX, y: e.clientY });
+        const tempAnchorEl = document.createElement("div");
+        tempAnchorEl.style.position = "absolute";
+        tempAnchorEl.style.left = `${e.clientX}px`;
+        tempAnchorEl.style.top = `${e.clientY}px`;
+        setAnchorEl(tempAnchorEl);
+      }
     },
     []
   );
 
   const handleAddNode = (nodeType) => {
-    if (onAddNode && menuPosition) {
-      const rect = document.querySelector(".react-flow__viewport")?.getBoundingClientRect();
-      if (rect) {
-        const x = menuPosition.x - rect.left;
-        const y = menuPosition.y - rect.top;
-        onAddNode(nodeType, { x, y });
+    if (onAddNode) {
+      let position = { x: 250, y: 250 };
+
+      if (menuPosition) {
+        const pane = document.querySelector(".react-flow__pane");
+        if (pane) {
+          const paneRect = pane.getBoundingClientRect();
+          const x = menuPosition.x - paneRect.left;
+          const y = menuPosition.y - paneRect.top;
+
+          if (Number.isFinite(x) && Number.isFinite(y)) {
+            position = { x: Math.round(Math.max(0, x)), y: Math.round(Math.max(0, y)) };
+          }
+        }
       }
+
+      onAddNode(nodeType, position);
     }
     setAnchorEl(null);
     setMenuPosition(null);
@@ -271,12 +346,29 @@ export default function WorkflowCanvas({
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
         onNodeClick={handleNodeClick}
-        nodeTypes={{ default: CanvasNode }}
+        nodeTypes={nodeTypes}
         fitView
       >
         <Background />
         <Controls />
         <MiniMap />
+        {nodesState.length === 0 && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              textAlign: "center",
+              pointerEvents: "none",
+              zIndex: 5,
+            }}
+          >
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              No nodes yet. Right-click or use "Add Node" button to start building.
+            </Typography>
+          </Box>
+        )}
       </ReactFlow>
 
       <Box
@@ -287,13 +379,19 @@ export default function WorkflowCanvas({
           zIndex: 10,
         }}
       >
-        <Tooltip title="Right-click canvas to add nodes">
+        <Tooltip title="Right-click canvas or click here to add nodes">
           <Button
             variant="contained"
             size="small"
             startIcon={<AddRoundedIcon />}
             onClick={(e) => {
-              setMenuPosition({ x: e.clientX, y: e.clientY });
+              const canvasBox = canvasRef.current?.getBoundingClientRect();
+              if (canvasBox) {
+                setMenuPosition({
+                  x: canvasBox.left + canvasBox.width / 2,
+                  y: canvasBox.top + canvasBox.height / 2,
+                });
+              }
               setAnchorEl(e.currentTarget);
             }}
             sx={{ textTransform: "none" }}
