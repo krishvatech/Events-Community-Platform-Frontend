@@ -407,23 +407,39 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       setFormError("Campaign name is required.");
       return;
     }
+    if (!form.lists.length && !form.forms.length) {
+      setFormError("Select at least one Segment or Form source.");
+      return;
+    }
+    if (!form.events.length) {
+      setFormError("Add at least one workflow event.");
+      return;
+    }
 
     setSaving(true);
     setFormError("");
     try {
-      await createNativeMauticCampaign({
+      const createdCampaign = await createNativeMauticCampaign({
         name,
         description: form.description,
         isPublished: Boolean(form.isPublished),
-        lists: form.lists,
-        forms: form.forms,
-        events: [],
+        sources: {
+          segments: form.lists,
+          forms: form.forms,
+        },
+        events: form.events.map((workflowEvent) => ({
+          key: workflowEvent.key,
+          eventType: workflowEvent.eventType,
+          properties: workflowEvent.properties || {},
+        })),
         canvasSettings: { nodes: [], connections: [] },
       });
       setSnack({
         open: true,
         severity: "success",
-        message: "Native Mautic Campaign created.",
+        message: createdCampaign?.id
+          ? `Native Mautic Campaign #${createdCampaign.id} created.`
+          : "Native Mautic Campaign created.",
       });
       setForm({
         name: "",
