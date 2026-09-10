@@ -79,6 +79,88 @@ const sourceLabel = (source, fallback) =>
 const workflowEventId = () =>
   `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+const isPlainObject = (value) =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const propertyPath = (parts) => parts.join(".");
+
+const getNestedValue = (value, path) =>
+  path.split(".").reduce((current, part) => {
+    if (!isPlainObject(current)) return undefined;
+    return current[part];
+  }, value);
+
+const setNestedValue = (value, path, nextValue) => {
+  const parts = path.split(".");
+  const root = isPlainObject(value) ? { ...value } : {};
+  let current = root;
+
+  parts.forEach((part, index) => {
+    if (index === parts.length - 1) {
+      current[part] = nextValue;
+      return;
+    }
+
+    current[part] = isPlainObject(current[part]) ? { ...current[part] } : {};
+    current = current[part];
+  });
+
+  return root;
+};
+
+const optionLabel = (option) => {
+  if (isPlainObject(option)) {
+    return option.label || option.name || option.title || option.value || option.id || "Option";
+  }
+  return String(option);
+};
+
+const optionValue = (option) => {
+  if (isPlainObject(option)) {
+    return option.value ?? option.id ?? option.key ?? option.label ?? option.name ?? "";
+  }
+  return option;
+};
+
+const optionChoices = (value) => {
+  if (Array.isArray(value)) return value;
+  if (isPlainObject(value?.choices)) return Object.entries(value.choices).map(([key, label]) => ({ value: key, label }));
+  if (Array.isArray(value?.choices)) return value.choices;
+  if (Array.isArray(value?.options)) return value.options;
+  return [];
+};
+
+const buildPropertyFields = (value, prefix = []) => {
+  if (!isPlainObject(value)) return [];
+
+  return Object.entries(value).flatMap(([key, child]) => {
+    const pathParts = [...prefix, key];
+    if (Array.isArray(child) || Array.isArray(child?.choices) || Array.isArray(child?.options) || isPlainObject(child?.choices)) {
+      return [{ path: propertyPath(pathParts), label: key, kind: "select", choices: optionChoices(child) }];
+    }
+    if (typeof child === "boolean") {
+      return [{ path: propertyPath(pathParts), label: key, kind: "boolean" }];
+    }
+    if (typeof child === "string" || typeof child === "number") {
+      return [{ path: propertyPath(pathParts), label: key, kind: "text" }];
+    }
+    if (isPlainObject(child)) {
+      return buildPropertyFields(child, pathParts);
+    }
+    return [];
+  });
+};
+
+const configuredPropertiesCount = (properties) => {
+  if (!isPlainObject(properties)) return 0;
+  return Object.values(properties).reduce((count, value) => {
+    if (isPlainObject(value)) return count + configuredPropertiesCount(value);
+    if (Array.isArray(value)) return count + (value.length ? 1 : 0);
+    if (value === "" || value === undefined || value === null) return count;
+    return count + 1;
+  }, 0);
+};
+
 function CapabilityGroup({ title, description, events, loading }) {
   return (
     <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2.5 }}>
@@ -117,6 +199,130 @@ function CapabilityGroup({ title, description, events, loading }) {
   );
 }
 
+function EventConfigurationPanel({ event, onChangeProperty }) {
+  const fields = useMemo(
+    () => buildPropertyFields(event?.metadata?.formTypeOptions),
+    [event]
+  );
+
+  if (!event) {
+    return (
+      <Alert severity="info" variant="outlined">
+        Select or add a workflow event to configure its provider metadata.
+      </Alert>
+    );
+  }
+
+  return (
+    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+      <Stack spacing={2}>
+        <Box>
+          <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+            Selected Event Configuration
+          </Typography>
+          <Typography color="text.secondary">
+            {getEventLabel(event.metadata)}
+          </Typography>
+        </Box>
+
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Type
+            </Typography>
+            <Typography sx={{ fontWeight: 750 }}>
+              {eventTypeLabel(event.eventType)}
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Key
+            </Typography>
+            <Typography component="code" variant="body2">
+              {event.key}
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Form
+            </Typography>
+            <Typography component="code" variant="body2">
+              {event.metadata?.formType || "No formType provided"}
+            </Typography>
+          </Box>
+        </Stack>
+
+        {fields.length ? (
+          <Stack spacing={2}>
+            {fields.map((field) => {
+              const value = getNestedValue(event.properties, field.path);
+              if (field.kind === "boolean") {
+                return (
+                  <FormControlLabel
+                    key={field.path}
+                    control={
+                      <Switch
+                        checked={Boolean(value)}
+                        onChange={(changeEvent) =>
+                          onChangeProperty(event.id, field.path, changeEvent.target.checked)
+                        }
+                      />
+                    }
+                    label={field.label}
+                  />
+                );
+              }
+
+              if (field.kind === "select") {
+                return (
+                  <FormControl key={field.path} fullWidth>
+                    <InputLabel id={`${event.id}-${field.path}-label`}>
+                      {field.label}
+                    </InputLabel>
+                    <Select
+                      labelId={`${event.id}-${field.path}-label`}
+                      value={value ?? ""}
+                      label={field.label}
+                      onChange={(changeEvent) =>
+                        onChangeProperty(event.id, field.path, changeEvent.target.value)
+                      }
+                    >
+                      {field.choices.map((choice, index) => (
+                        <MenuItem
+                          key={`${field.path}-${optionValue(choice)}-${index}`}
+                          value={optionValue(choice)}
+                        >
+                          {optionLabel(choice)}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                );
+              }
+
+              return (
+                <TextField
+                  key={field.path}
+                  label={field.label}
+                  value={value ?? ""}
+                  onChange={(changeEvent) =>
+                    onChangeProperty(event.id, field.path, changeEvent.target.value)
+                  }
+                  fullWidth
+                />
+              );
+            })}
+          </Stack>
+        ) : (
+          <Alert severity="info" variant="outlined">
+            Additional configuration is provided by Mautic form metadata.
+          </Alert>
+        )}
+      </Stack>
+    </Paper>
+  );
+}
+
 export default function AdminNewsletterMauticCampaignBuilderPage() {
   const navigate = useNavigate();
   const [capabilities, setCapabilities] = useState(null);
@@ -141,6 +347,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     eventType: "action",
     eventKey: "",
   });
+  const [selectedWorkflowEventId, setSelectedWorkflowEventId] = useState("");
 
   const actions = useMemo(() => asArray(capabilities?.actions), [capabilities]);
   const conditions = useMemo(() => asArray(capabilities?.conditions), [capabilities]);
@@ -163,6 +370,10 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     [capabilities]
   );
   const forms = useMemo(() => asArray(capabilities?.sources?.forms), [capabilities]);
+  const selectedWorkflowEvent = useMemo(
+    () => form.events.find((event) => event.id === selectedWorkflowEventId) || null,
+    [form.events, selectedWorkflowEventId]
+  );
 
   const loadCapabilities = useCallback(async () => {
     setLoading(true);
@@ -222,6 +433,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         forms: [],
         events: [],
       });
+      setSelectedWorkflowEventId("");
     } catch (err) {
       setFormError(
         getErrorMessage(
@@ -239,19 +451,22 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       (event) => getEventKey(event) === eventPicker.eventKey
     );
     if (!selected) return;
+    const id = workflowEventId();
 
     setForm((current) => ({
       ...current,
       events: [
         ...current.events,
         {
-          id: workflowEventId(),
+          id,
           key: getEventKey(selected),
           eventType: selected.eventType || eventPicker.eventType,
           metadata: selected,
+          properties: {},
         },
       ],
     }));
+    setSelectedWorkflowEventId(id);
     setEventPicker((current) => ({ ...current, eventKey: "" }));
   };
 
@@ -259,6 +474,23 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setForm((current) => ({
       ...current,
       events: current.events.filter((event) => event.id !== eventId),
+    }));
+    if (selectedWorkflowEventId === eventId) {
+      setSelectedWorkflowEventId("");
+    }
+  };
+
+  const updateWorkflowEventProperty = (eventId, path, value) => {
+    setForm((current) => ({
+      ...current,
+      events: current.events.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              properties: setNestedValue(event.properties, path, value),
+            }
+          : event
+      ),
     }));
   };
 
@@ -488,6 +720,11 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             </Stack>
           </Paper>
 
+          <EventConfigurationPanel
+            event={selectedWorkflowEvent}
+            onChangeProperty={updateWorkflowEventProperty}
+          />
+
           <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
             <Stack spacing={2}>
               <Box>
@@ -515,7 +752,9 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                 </Paper>
 
                 {form.events.length ? (
-                  form.events.map((event, index) => (
+                  form.events.map((event, index) => {
+                    const configuredCount = configuredPropertiesCount(event.properties);
+                    return (
                     <React.Fragment key={event.id}>
                       <Box
                         sx={{
@@ -547,20 +786,36 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                             <Typography component="code" variant="body2" color="text.secondary">
                               {event.key}
                             </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {configuredCount
+                                ? `Configured fields: ${configuredCount}`
+                                : "Configuration incomplete"}
+                            </Typography>
                           </Stack>
-                          <Button
-                            type="button"
-                            color="error"
-                            startIcon={<DeleteRoundedIcon />}
-                            onClick={() => removeWorkflowEvent(event.id)}
-                            disabled={saving}
-                          >
-                            Remove
-                          </Button>
+                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                            <Button
+                              type="button"
+                              variant={selectedWorkflowEventId === event.id ? "contained" : "outlined"}
+                              onClick={() => setSelectedWorkflowEventId(event.id)}
+                              disabled={saving}
+                            >
+                              Configure
+                            </Button>
+                            <Button
+                              type="button"
+                              color="error"
+                              startIcon={<DeleteRoundedIcon />}
+                              onClick={() => removeWorkflowEvent(event.id)}
+                              disabled={saving}
+                            >
+                              Remove
+                            </Button>
+                          </Stack>
                         </Stack>
                       </Paper>
                     </React.Fragment>
-                  ))
+                    );
+                  })
                 ) : (
                   <Alert severity="info" variant="outlined">
                     No workflow events added.
@@ -575,7 +830,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end" spacing={1.5}>
             <Button
               type="button"
-              onClick={() =>
+              onClick={() => {
                 setForm({
                   name: "",
                   description: "",
@@ -583,8 +838,9 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   lists: [],
                   forms: [],
                   events: [],
-                })
-              }
+                });
+                setSelectedWorkflowEventId("");
+              }}
               disabled={saving}
             >
               Reset
