@@ -178,6 +178,7 @@ const EventManageApplications = ({ eventId }) => {
     setSuccessMessage(result.message || 'Bulk action completed successfully');
     setSelectedIds([]);
     setPage(0); // Reload first page
+    setRefetchTrigger(prev => prev + 1); // Force reload even if already on page 0
   };
 
   if (loading && !event) {
@@ -220,6 +221,7 @@ const EventManageApplications = ({ eventId }) => {
           <ReviewQueueStats
             eventId={eventId}
             filters={filters}
+            refreshKey={refetchTrigger}
           />
         )}
 

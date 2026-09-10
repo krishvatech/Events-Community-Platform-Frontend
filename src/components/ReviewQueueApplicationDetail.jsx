@@ -31,11 +31,14 @@ import {
   acceptTrackApplication,
   declineTrackApplication,
   waitlistTrackApplication,
+  performBulkAction,
   formatDate,
   getStatusColor,
   fetchAttendeeOrigins,
   markOriginPaid
 } from '../utils/reviewQueue';
+
+const DESTRUCTIVE_ACTIONS = ['decline', 'delete'];
 
 const ReviewQueueApplicationDetail = ({
   open,
@@ -52,6 +55,7 @@ const ReviewQueueApplicationDetail = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   // FIX 4: Origins (payment) management
   const [origins, setOrigins] = useState([]);
@@ -60,6 +64,17 @@ const ReviewQueueApplicationDetail = ({
   const [selectedOrigin, setSelectedOrigin] = useState(null);
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
+
+  // Reset any in-progress decision when the dialog opens or switches applicant,
+  // so a primed destructive confirmation can never carry over to another applicant.
+  useEffect(() => {
+    setSelectedAction(null);
+    setConfirming(false);
+    setNotes('');
+    setSelectedTier('');
+    setError(null);
+    setSuccess(null);
+  }, [open, application?.id]);
 
   // Load origins when application detail opens and application is accepted
   useEffect(() => {
@@ -106,6 +121,7 @@ const ReviewQueueApplicationDetail = ({
     setError(null);
     setSuccess(null);
     setNotes('');
+    setConfirming(false);
 
     // Preselect tier for accept action
     if (action === 'accept') {
@@ -159,6 +175,12 @@ const ReviewQueueApplicationDetail = ({
       return;
     }
 
+    if (DESTRUCTIVE_ACTIONS.includes(selectedAction) && !confirming) {
+      setError(null);
+      setConfirming(true);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -189,19 +211,28 @@ const ReviewQueueApplicationDetail = ({
           sendEmail,
           notes
         );
+      } else if (selectedAction === 'delete') {
+        result = await performBulkAction(
+          event.id,
+          'delete',
+          [application.id],
+          { reason: notes }
+        );
       }
 
       if (result.success) {
-        setSuccess(`Application ${selectedAction} successfully!`);
+        setSuccess(`Application ${selectedAction === 'delete' ? 'deleted' : selectedAction} successfully!`);
         setTimeout(() => {
           onUpdate?.(result.data);
           onClose();
         }, 1500);
       } else {
         setError(result.error);
+        setConfirming(false);
       }
     } catch (err) {
       setError('An unexpected error occurred');
+      setConfirming(false);
     } finally {
       setLoading(false);
     }
@@ -229,11 +260,13 @@ const ReviewQueueApplicationDetail = ({
 
   const canSendEmail = !application?.opt_out_automated_communication;
 
-  // Terminal states - no further action allowed
-  // FIXED: Waitlisted is NOT terminal - admin can still accept or decline
-  const terminalStatuses = ['accepted', 'declined', 'cancelled'];
+  // Terminal states - no further action allowed.
+  // Accepted is NOT terminal: admins can still decline or delete an accepted applicant.
+  // Waitlisted is NOT terminal - admin can still accept or decline
+  const terminalStatuses = ['declined', 'cancelled'];
   const isTerminalStatus = terminalStatuses.includes(application?.status);
   const isWaitlisted = application?.status === 'waitlisted';
+  const isAccepted = application?.status === 'accepted';
 
   if (!application) {
     return (
@@ -463,16 +496,25 @@ const ReviewQueueApplicationDetail = ({
                 </Alert>
               )}
 
+              {isAccepted && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  This application is currently <strong>accepted</strong>. You can still decline or delete it;
+                  declining will roll back the registration/role effects of the acceptance.
+                </Alert>
+              )}
+
               {!selectedAction ? (
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    onClick={() => handleActionSelect('accept')}
-                    disabled={loading}
-                  >
-                    Accept
-                  </Button>
+                  {!isAccepted && (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={() => handleActionSelect('accept')}
+                      disabled={loading}
+                    >
+                      Accept
+                    </Button>
+                  )}
                   <Button
                     variant="contained"
                     color="error"
@@ -481,7 +523,7 @@ const ReviewQueueApplicationDetail = ({
                   >
                     Decline
                   </Button>
-                  {!isWaitlisted && (
+                  {!isWaitlisted && !isAccepted && (
                     <Button
                       variant="contained"
                       color="warning"
@@ -489,6 +531,16 @@ const ReviewQueueApplicationDetail = ({
                       disabled={loading}
                     >
                       Waitlist
+                    </Button>
+                  )}
+                  {isAccepted && (
+                    <Button
+                      variant="contained"
+                      color="error"
+                      onClick={() => handleActionSelect('delete')}
+                      disabled={loading}
+                    >
+                      Delete
                     </Button>
                   )}
                 </Box>
@@ -549,9 +601,9 @@ const ReviewQueueApplicationDetail = ({
                     />
                   )}
 
-                  {/* Notes */}
+                  {/* Notes / Reason */}
                   <FormControl fullWidth>
-                    <InputLabel>Notes (Optional)</InputLabel>
+                    <InputLabel>{selectedAction === 'delete' ? 'Reason (Optional)' : 'Notes (Optional)'}</InputLabel>
                     <Select
                       value="textarea"
                       disabled={loading}
@@ -564,7 +616,7 @@ const ReviewQueueApplicationDetail = ({
                             fontFamily: 'inherit',
                             fontSize: 'inherit',
                           }}
-                          placeholder="Add notes about this decision..."
+                          placeholder={selectedAction === 'delete' ? 'Add a reason for deletion...' : 'Add notes about this decision...'}
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
                           disabled={loading}
@@ -572,6 +624,16 @@ const ReviewQueueApplicationDetail = ({
                       )}
                     />
                   </FormControl>
+
+                  {confirming && (
+                    <Alert severity="warning">
+                      {selectedAction === 'delete'
+                        ? 'This applicant will be deleted from active views but kept for audit purposes. Click Confirm to proceed.'
+                        : isAccepted
+                          ? 'This applicant is already accepted. Declining will reverse the registration and role effects of that acceptance. Click Confirm to proceed.'
+                          : 'Click Confirm to proceed.'}
+                    </Alert>
+                  )}
                 </Box>
               )}
             </>
@@ -590,10 +652,10 @@ const ReviewQueueApplicationDetail = ({
             <Button
               onClick={handleExecuteDecision}
               variant="contained"
-              color="primary"
+              color={confirming ? 'error' : 'primary'}
               disabled={loading}
             >
-              {loading ? <CircularProgress size={24} /> : `Confirm ${selectedAction.toUpperCase()}`}
+              {loading ? <CircularProgress size={24} /> : confirming ? 'Confirm' : `Confirm ${selectedAction.toUpperCase()}`}
             </Button>
           </>
         )}
