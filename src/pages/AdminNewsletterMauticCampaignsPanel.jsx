@@ -27,12 +27,11 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
-import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
 
 import {
   deleteNewsletterMauticCampaign,
@@ -95,274 +94,6 @@ function PublishedChip({ published }) {
       variant={published ? "filled" : "outlined"}
       sx={{ fontWeight: 800 }}
     />
-  );
-}
-
-function CampaignDetailDialog({
-  open,
-  campaign,
-  loading,
-  error,
-  onClose,
-  onRefresh,
-  onEdit,
-  onEditBuilder,
-  onDelete,
-}) {
-  const events = Array.isArray(campaign?.events) ? campaign.events : [];
-  const lists = Array.isArray(campaign?.lists) ? campaign.lists : [];
-  const forms = Array.isArray(campaign?.forms) ? campaign.forms : [];
-  const canvas = campaign?.canvasSettings || {};
-  const nodes = Array.isArray(canvas?.nodes) ? canvas.nodes : [];
-  const connections = Array.isArray(canvas?.connections) ? canvas.connections : [];
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1.5}
-          alignItems={{ xs: "flex-start", sm: "center" }}
-          justifyContent="space-between"
-        >
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
-              {campaign?.name || "Native Mautic Campaign"}
-            </Typography>
-            {campaign?.id && (
-              <Typography variant="body2" color="text.secondary">
-                Mautic Campaign ID {campaign.id}
-              </Typography>
-            )}
-          </Box>
-          {campaign && <PublishedChip published={Boolean(campaign.isPublished)} />}
-        </Stack>
-      </DialogTitle>
-
-      <DialogContent dividers>
-        {loading ? (
-          <Stack spacing={1.5}>
-            <Skeleton height={36} />
-            <Skeleton height={80} />
-            <Skeleton variant="rectangular" height={240} />
-          </Stack>
-        ) : error ? (
-          <Alert
-            severity="error"
-            action={
-              <Button color="inherit" size="small" onClick={onRefresh}>
-                Retry
-              </Button>
-            }
-          >
-            {error}
-          </Alert>
-        ) : campaign ? (
-          <Stack spacing={3}>
-            <Alert severity="info" variant="outlined">
-              This is a native Mautic automation Campaign. Mautic is the source of truth;
-              this view does not read from the legacy ECP NewsletterCampaign model.
-            </Alert>
-
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
-              <Stack spacing={1}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                  Campaign Information
-                </Typography>
-                <Typography color="text.secondary">
-                  {campaign.description || "No description."}
-                </Typography>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={3} sx={{ pt: 1 }}>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Contacts
-                    </Typography>
-                    <Typography sx={{ fontWeight: 750 }}>
-                      {formatCount(campaign.contactCount)}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Added
-                    </Typography>
-                    <Typography sx={{ fontWeight: 750 }}>
-                      {formatDateTime(campaign.dateAdded)}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Modified
-                    </Typography>
-                    <Typography sx={{ fontWeight: 750 }}>
-                      {formatDateTime(campaign.dateModified)}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Stack>
-            </Paper>
-
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>
-                Sources
-              </Typography>
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-                    Segments
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {lists.length ? (
-                      lists.map((source) => (
-                        <Chip
-                          key={`list-${source.id}`}
-                          label={sourceLabel(source, "Segment")}
-                          variant="outlined"
-                        />
-                      ))
-                    ) : (
-                      <Typography variant="body2">No Segment sources.</Typography>
-                    )}
-                  </Stack>
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-                    Forms
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {forms.length ? (
-                      forms.map((source) => (
-                        <Chip
-                          key={`form-${source.id}`}
-                          label={sourceLabel(source, "Form")}
-                          variant="outlined"
-                        />
-                      ))
-                    ) : (
-                      <Typography variant="body2">No Form sources.</Typography>
-                    )}
-                  </Stack>
-                </Box>
-              </Stack>
-            </Paper>
-
-            <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
-              <Box
-                sx={{
-                  px: 2.5,
-                  py: 2,
-                  bgcolor: "#F6F8FA",
-                  borderBottom: "1px solid #E7ECEF",
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                  Workflow Events
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Native Mautic actions, decisions, and conditions.
-                </Typography>
-              </Box>
-
-              {events.length ? (
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Order</TableCell>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Category</TableCell>
-                        <TableCell>Provider Type</TableCell>
-                        <TableCell>Parent</TableCell>
-                        <TableCell>Path</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {events.map((event, index) => (
-                        <TableRow key={event.id || `${event.type}-${index}`}>
-                          <TableCell>{event.order ?? index + 1}</TableCell>
-                          <TableCell sx={{ fontWeight: 750 }}>
-                            {event.name || "Unnamed event"}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              size="small"
-                              label={event.eventType || "Unknown"}
-                              color={eventCategoryColor(event.eventType)}
-                              variant="outlined"
-                              sx={{ textTransform: "capitalize" }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography component="code" variant="body2">
-                              {event.type || "-"}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>{event.parent || "-"}</TableCell>
-                          <TableCell>{event.decisionPath || "-"}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              ) : (
-                <Box sx={{ p: 2.5 }}>
-                  <Alert severity="info" variant="outlined">
-                    No workflow events are present in this Campaign.
-                  </Alert>
-                </Box>
-              )}
-            </Paper>
-
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
-                Canvas
-              </Typography>
-              <Stack direction="row" spacing={3}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Nodes
-                  </Typography>
-                  <Typography sx={{ fontWeight: 800 }}>{nodes.length}</Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Connections
-                  </Typography>
-                  <Typography sx={{ fontWeight: 800 }}>{connections.length}</Typography>
-                </Box>
-              </Stack>
-            </Paper>
-          </Stack>
-        ) : null}
-      </DialogContent>
-
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-        <Button
-          startIcon={<EditRoundedIcon />}
-          onClick={onEdit}
-          disabled={!campaign || loading}
-        >
-          Edit Metadata
-        </Button>
-        <Button
-          startIcon={<BuildRoundedIcon />}
-          variant="contained"
-          onClick={onEditBuilder}
-          disabled={!campaign || loading}
-        >
-          Edit Campaign
-        </Button>
-        <Button
-          color="error"
-          startIcon={<DeleteRoundedIcon />}
-          onClick={onDelete}
-          disabled={!campaign || loading}
-        >
-          Delete
-        </Button>
-      </DialogActions>
-    </Dialog>
   );
 }
 
@@ -517,9 +248,6 @@ export default function AdminNewsletterMauticCampaignsPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState("");
   const [selected, setSelected] = useState(null);
 
   const [editOpen, setEditOpen] = useState(false);
@@ -561,41 +289,34 @@ export default function AdminNewsletterMauticCampaignsPanel() {
     loadCampaigns();
   }, [loadCampaigns]);
 
-  const loadDetail = async (campaignId, { open = true } = {}) => {
-    if (open) setDetailOpen(true);
-    setDetailLoading(true);
-    setDetailError("");
+  const loadDetail = async (campaignId) => {
     try {
       const data = await getNewsletterMauticCampaign(campaignId);
       setSelected(data);
       return data;
     } catch (err) {
-      setDetailError(
-        getErrorMessage(err, "We could not load this native Mautic Campaign.")
-      );
+      setSnack({
+        open: true,
+        severity: "error",
+        message: getErrorMessage(err, "We could not load this native Mautic Campaign."),
+      });
       return null;
-    } finally {
-      setDetailLoading(false);
     }
   };
 
   const openCampaign = (campaign) => {
-    setSelected(campaign);
-    loadDetail(campaign.id);
+    if (!campaign?.id) return;
+    navigate(`/admin/newsletter/builder/${campaign.id}`);
   };
 
   const openEdit = async (campaign = selected) => {
     if (!campaign?.id) return;
-    const fresh = await loadDetail(campaign.id, { open: false });
+    const fresh = await loadDetail(campaign.id);
     if (!fresh) return;
     setEditError("");
     setEditOpen(true);
   };
 
-  const openBuilderEdit = (campaign = selected) => {
-    if (!campaign?.id) return;
-    navigate(`/admin/newsletter/builder/${campaign.id}`);
-  };
 
   const saveEdit = async (payload) => {
     if (!selected?.id) return;
@@ -626,7 +347,6 @@ export default function AdminNewsletterMauticCampaignsPanel() {
     try {
       await deleteNewsletterMauticCampaign(selected.id);
       setDeleteOpen(false);
-      setDetailOpen(false);
       setSelected(null);
       setSnack({
         open: true,
@@ -682,14 +402,25 @@ export default function AdminNewsletterMauticCampaignsPanel() {
           </Typography>
         </Box>
 
-        <Button
-          startIcon={<RefreshRoundedIcon />}
-          onClick={loadCampaigns}
-          disabled={loading}
-          sx={{ textTransform: "none", alignSelf: "flex-start" }}
-        >
-          Refresh
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            startIcon={<RefreshRoundedIcon />}
+            onClick={loadCampaigns}
+            disabled={loading}
+            sx={{ textTransform: "none" }}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddRoundedIcon />}
+            onClick={() => navigate("/admin/newsletter/builder")}
+            disabled={loading}
+            sx={{ textTransform: "none" }}
+          >
+            Create Campaign
+          </Button>
+        </Stack>
       </Stack>
 
       <Alert severity="info" variant="outlined">
@@ -832,26 +563,6 @@ export default function AdminNewsletterMauticCampaignsPanel() {
                       <TableCell>{formatDateTime(campaign.dateModified)}</TableCell>
 
                       <TableCell align="right">
-                        <Tooltip title="View Campaign">
-                          <IconButton
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openCampaign(campaign);
-                            }}
-                          >
-                            <VisibilityRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Campaign workflow and sources">
-                          <IconButton
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openBuilderEdit(campaign);
-                            }}
-                          >
-                            <BuildRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
                         <Tooltip title="Edit Campaign metadata">
                           <IconButton
                             onClick={(event) => {
@@ -863,7 +574,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
                             <EditRoundedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete native Campaign">
+                        <Tooltip title="Delete Campaign">
                           <IconButton
                             color="error"
                             onClick={(event) => {
@@ -922,21 +633,6 @@ export default function AdminNewsletterMauticCampaignsPanel() {
           </Box>
         )}
       </Paper>
-
-      <CampaignDetailDialog
-        open={detailOpen}
-        campaign={selected}
-        loading={detailLoading}
-        error={detailError}
-        onClose={() => {
-          setDetailOpen(false);
-          setDetailError("");
-        }}
-        onRefresh={() => selected?.id && loadDetail(selected.id)}
-        onEdit={() => openEdit(selected)}
-        onEditBuilder={() => openBuilderEdit(selected)}
-        onDelete={() => setDeleteOpen(true)}
-      />
 
       <EditCampaignDialog
         open={editOpen}

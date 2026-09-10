@@ -77,6 +77,7 @@ import {
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
+import AdminNewsletterMauticCampaignBuilderPage from "./AdminNewsletterMauticCampaignBuilderPage.jsx";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -131,7 +132,6 @@ const blankForm = {
 const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
-  { value: "builder", label: "Builder", icon: <AccountTreeRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
@@ -726,9 +726,12 @@ export default function AdminNewsletterPage() {
   const { campaignId } = useParams();
   const normalizedPath = location.pathname.replace(/\/+$/, "");
   const isNew = normalizedPath.endsWith("/admin/newsletter/new");
-  const isDetail = isNew || Boolean(campaignId);
+  const isBuilderRoute = normalizedPath.includes("/admin/newsletter/builder");
+  const isDetail = (isNew || Boolean(campaignId)) && !isBuilderRoute;
   const requestedTab = location.state?.newsletterTab;
-  const initialTab = marketingTabs.some((tab) => tab.value === requestedTab)
+  const initialTab = isBuilderRoute
+    ? "campaigns"
+    : marketingTabs.some((tab) => tab.value === requestedTab)
     ? requestedTab
     : "dashboard";
 
@@ -819,16 +822,20 @@ export default function AdminNewsletterPage() {
   }, [campaignId, isNew]);
 
   useEffect(() => {
-    if (!isDetail && location.state?.newsletterTab) {
-      const nextTab = marketingTabs.some(
-        (tab) => tab.value === location.state.newsletterTab
-      )
-        ? location.state.newsletterTab
-        : "dashboard";
-      setActiveTab(nextTab);
-      navigate(location.pathname, { replace: true, state: {} });
+    if (!isDetail) {
+      if (isBuilderRoute) {
+        setActiveTab("campaigns");
+      } else if (location.state?.newsletterTab) {
+        const nextTab = marketingTabs.some(
+          (tab) => tab.value === location.state.newsletterTab
+        )
+          ? location.state.newsletterTab
+          : "dashboard";
+        setActiveTab(nextTab);
+        navigate(location.pathname, { replace: true, state: {} });
+      }
     }
-  }, [isDetail, location.pathname, location.state, navigate]);
+  }, [isDetail, isBuilderRoute, location.pathname, location.state, navigate]);
 
   useEffect(() => {
     if (!isDetail && activeTab === "analytics" && selectedAnalyticsCampaignId) {
@@ -972,27 +979,32 @@ export default function AdminNewsletterPage() {
         active={activeTab}
         onChange={(value) => {
           if (value === "contacts") navigate("/admin/newsletter/contacts");
-          else if (value === "builder") navigate("/admin/newsletter/builder");
           else if (value === "stages") navigate("/admin/newsletter/stages");
           else if (value === "points") navigate("/admin/newsletter/points");
           else setActiveTab(value);
         }}
       >
-        {activeTab === "dashboard" && <Dashboard campaigns={campaigns} loading={loading} error={error} onRefresh={loadCampaigns} />}
-        {activeTab === "campaigns" && <AdminNewsletterMauticCampaignsPanel />}
-        {activeTab === "lists" && <AdminNewsletterCategoriesTab />}
-        {activeTab === "templates" && <AdminNewsletterTemplatesPanel />}
-        {activeTab === "analytics" && (
-          <AnalyticsOverview
-            campaigns={campaigns}
-            loading={loading}
-            selectedCampaignId={selectedAnalyticsCampaignId}
-            onSelectCampaign={setSelectedAnalyticsCampaignId}
-            analyticsState={analyticsState}
-            onRefreshAnalytics={() => loadAnalytics(selectedAnalyticsCampaignId)}
-          />
+        {isBuilderRoute ? (
+          <AdminNewsletterMauticCampaignBuilderPage />
+        ) : (
+          <>
+            {activeTab === "dashboard" && <Dashboard campaigns={campaigns} loading={loading} error={error} onRefresh={loadCampaigns} />}
+            {activeTab === "campaigns" && <AdminNewsletterMauticCampaignsPanel />}
+            {activeTab === "lists" && <AdminNewsletterCategoriesTab />}
+            {activeTab === "templates" && <AdminNewsletterTemplatesPanel />}
+            {activeTab === "analytics" && (
+              <AnalyticsOverview
+                campaigns={campaigns}
+                loading={loading}
+                selectedCampaignId={selectedAnalyticsCampaignId}
+                onSelectCampaign={setSelectedAnalyticsCampaignId}
+                analyticsState={analyticsState}
+                onRefreshAnalytics={() => loadAnalytics(selectedAnalyticsCampaignId)}
+              />
+            )}
+            {activeTab === "settings" && <SettingsPage />}
+          </>
         )}
-        {activeTab === "settings" && <SettingsPage />}
       </NewsletterShell>
     );
   }
