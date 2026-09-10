@@ -224,6 +224,73 @@ const getConfigurationStatus = (event) => {
   return { complete: true, message: "Configured" };
 };
 
+const mapCanvasToExecution = (canvasNodes, canvasEdges, form) => {
+  if (!canvasNodes?.length) {
+    return { events: form.events || [], errors: [] };
+  }
+
+  const errors = [];
+  const executionEvents = [];
+  const nodeMap = new Map();
+
+  for (const node of canvasNodes) {
+    if (node.nodeType === "trigger") {
+      nodeMap.set(node.id, { nodeType: "trigger", nodeId: node.id });
+    } else if (node.nodeType === "action" && node.eventId) {
+      const event = form.events?.find((e) => e.id === node.eventId);
+      if (event) {
+        nodeMap.set(node.id, { nodeType: "action", eventId: node.eventId, event });
+        executionEvents.push(event);
+      } else {
+        errors.push(`Action node references non-existent event: ${node.label}`);
+      }
+    } else if (node.nodeType === "condition") {
+      nodeMap.set(node.id, { nodeType: "condition", nodeId: node.id });
+    } else if (node.nodeType === "delay") {
+      nodeMap.set(node.id, { nodeType: "delay", nodeId: node.id });
+    }
+  }
+
+  if (!Array.from(nodeMap.values()).some((n) => n.nodeType === "trigger")) {
+    errors.push("Workflow must contain a trigger node");
+  }
+
+  const edgeMap = new Map();
+  for (const edge of canvasEdges || []) {
+    if (!edgeMap.has(edge.source)) {
+      edgeMap.set(edge.source, []);
+    }
+    edgeMap.get(edge.source).push(edge.target);
+  }
+
+  const reachable = new Set();
+  const triggerNodes = Array.from(nodeMap.entries())
+    .filter(([, n]) => n.nodeType === "trigger")
+    .map(([id]) => id);
+
+  const queue = [...triggerNodes];
+  while (queue.length) {
+    const nodeId = queue.shift();
+    if (reachable.has(nodeId)) continue;
+    reachable.add(nodeId);
+    const nextNodes = edgeMap.get(nodeId) || [];
+    queue.push(...nextNodes);
+  }
+
+  for (const node of canvasNodes) {
+    if (!reachable.has(node.id) && node.nodeType !== "trigger") {
+      errors.push(`Node "${node.label}" is not reachable from trigger`);
+    }
+  }
+
+  return { events: executionEvents.length > 0 ? executionEvents : form.events, errors, nodeMap, edgeMap };
+};
+
+const validateExecutionMapping = (canvasNodes, canvasEdges, form) => {
+  const { errors } = mapCanvasToExecution(canvasNodes, canvasEdges, form);
+  return { valid: errors.length === 0, errors };
+};
+
 function CapabilityGroup({ title, description, events, loading }) {
   return (
     <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2.5 }}>
@@ -548,6 +615,17 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setSaving(true);
     setFormError("");
     try {
+      let executionEvents = form.events;
+      if (workflowTab === "canvas" && canvasNodes.length > 0) {
+        const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
+        if (mapping.errors.length > 0) {
+          setFormError(`Execution mapping failed: ${mapping.errors.join(" ")}`);
+          setSaving(false);
+          return;
+        }
+        executionEvents = mapping.events;
+      }
+
       const payload = {
         name,
         description: form.description,
@@ -556,7 +634,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           segments: form.lists,
           forms: form.forms,
         },
-        events: form.events.map((workflowEvent) => ({
+        events: executionEvents.map((workflowEvent) => ({
           key: workflowEvent.key,
           eventType: workflowEvent.eventType,
           properties: isPlainObject(workflowEvent.properties)
@@ -771,6 +849,11 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       }
     }
 
+    const executionValidation = validateExecutionMapping(nodes, edges, form);
+    if (!executionValidation.valid) {
+      errors.push(...executionValidation.errors);
+    }
+
     return { valid: errors.length === 0, errors };
   };
 
@@ -779,6 +862,17 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setSaving(true);
     setFormError("");
     try {
+      let executionEvents = form.events;
+      if (workflowTab === "canvas" && canvasNodes.length > 0) {
+        const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
+        if (mapping.errors.length > 0) {
+          setFormError(`Cannot publish: ${mapping.errors.join(" ")}`);
+          setSaving(false);
+          return;
+        }
+        executionEvents = mapping.events;
+      }
+
       const payload = {
         name: form.name,
         description: form.description,
@@ -787,7 +881,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           segments: form.lists,
           forms: form.forms,
         },
-        events: form.events.map((workflowEvent) => ({
+        events: executionEvents.map((workflowEvent) => ({
           key: workflowEvent.key,
           eventType: workflowEvent.eventType,
           properties: isPlainObject(workflowEvent.properties)
@@ -818,6 +912,17 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setSaving(true);
     setFormError("");
     try {
+      let executionEvents = form.events;
+      if (workflowTab === "canvas" && canvasNodes.length > 0) {
+        const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
+        if (mapping.errors.length > 0) {
+          setFormError(`Cannot unpublish: ${mapping.errors.join(" ")}`);
+          setSaving(false);
+          return;
+        }
+        executionEvents = mapping.events;
+      }
+
       const payload = {
         name: form.name,
         description: form.description,
@@ -826,7 +931,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           segments: form.lists,
           forms: form.forms,
         },
-        events: form.events.map((workflowEvent) => ({
+        events: executionEvents.map((workflowEvent) => ({
           key: workflowEvent.key,
           eventType: workflowEvent.eventType,
           properties: isPlainObject(workflowEvent.properties)
