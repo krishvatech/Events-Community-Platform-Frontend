@@ -58,19 +58,6 @@ import {
 import AdminNewsletterPointTriggersPanel from "./AdminNewsletterPointTriggersPanel";
 import AdminNewsletterPointGroupsPanel from "./AdminNewsletterPointGroupsPanel";
 
-const marketingTabs = [
-  { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
-  { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
-  { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
-  { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
-  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
-  { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
-  { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
-  { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
-  { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
-  { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
-];
-
 const blankForm = {
   name: "",
   description: "",
@@ -153,31 +140,6 @@ const propertyListToInput = (value) => {
   if (value === null || value === undefined || value === "") return "";
   return String(value);
 };
-
-function NewsletterTabs({ onChange }) {
-  return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-      <Tabs
-        value="points"
-        onChange={(_, value) => onChange(value)}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{
-          minHeight: 52,
-          px: { xs: 1, md: 2 },
-          "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
-          "& .Mui-selected": { color: "#0f766e !important" },
-          "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
-        }}
-      >
-        {marketingTabs.map((tab) => (
-          <Tab key={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} value={tab.value} />
-        ))}
-      </Tabs>
-    </Paper>
-  );
-}
 
 function PointActionDialog({
   open,
@@ -621,14 +583,6 @@ export default function AdminNewsletterPointsPage() {
     [types]
   );
 
-  const handleTabChange = (tab) => {
-    if (tab === "points") return;
-    if (tab === "contacts") return navigate("/admin/newsletter/contacts");
-    if (tab === "stages") return navigate("/admin/newsletter/stages");
-    if (tab === "companies") return navigate("/admin/newsletter/companies");
-    navigate("/admin/newsletter", { state: { newsletterTab: tab } });
-  };
-
   const handleSearch = () => {
     const nextSearch = searchInput.trim();
     setSearch(nextSearch);
@@ -678,17 +632,6 @@ export default function AdminNewsletterPointsPage() {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
-          Newsletter
-        </Typography>
-        <Typography color="text.secondary">
-          Manage campaigns, subscription lists, contacts, lifecycle stages, scoring, and performance from ECP.
-        </Typography>
-      </Box>
-
-      <NewsletterTabs onChange={handleTabChange} />
-
       {success && <Alert severity="success" onClose={() => setSuccess("")}>{success}</Alert>}
 
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>

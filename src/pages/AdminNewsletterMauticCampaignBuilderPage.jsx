@@ -1411,7 +1411,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         message: `Native Mautic Campaign #${campaignId} deleted.`,
       });
       setTimeout(() => {
-        navigate("/admin/newsletter", { state: { newsletterTab: "campaigns" } });
+        navigate("/admin/newsletter/campaigns");
       }, 1500);
     } catch (err) {
       setDeleteConfirmOpen(false);
@@ -1451,7 +1451,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       <Box>
         <Button
           startIcon={<ArrowBackRoundedIcon />}
-          onClick={() => navigate("/admin/newsletter", { state: { newsletterTab: "campaigns" } })}
+          onClick={() => navigate("/admin/newsletter/campaigns")}
           sx={{ textTransform: "none", mb: 1 }}
         >
           Back to Campaigns

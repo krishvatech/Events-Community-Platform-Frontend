@@ -74,19 +74,6 @@ import {
   updateNewsletterAdminContact,
 } from "../services/newsletterService";
 
-const marketingTabs = [
-  { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
-  { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
-  { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
-  { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
-  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
-  { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
-  { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
-  { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
-  { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
-  { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
-];
-
 const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -122,31 +109,6 @@ const getErrorMessage = (err, fallback) => {
   if (typeof data === "string") return data;
   return data.detail || data.error || fallback;
 };
-
-function NewsletterTabs({ onChange }) {
-  return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-      <Tabs
-        value="contacts"
-        onChange={(_, value) => onChange(value)}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{
-          minHeight: 52,
-          px: { xs: 1, md: 2 },
-          "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
-          "& .Mui-selected": { color: "#0f766e !important" },
-          "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
-        }}
-      >
-        {marketingTabs.map((tab) => (
-          <Tab key={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} value={tab.value} />
-        ))}
-      </Tabs>
-    </Paper>
-  );
-}
 
 /** Picks an existing Mautic company to associate with this contact. */
 function AddCompanyDialog({ open, busy, onClose, onSelect }) {
@@ -401,6 +363,7 @@ export default function AdminNewsletterContactDetailPage() {
   const [groupPointReason, setGroupPointReason] = useState("");
   const [groupPointActionLoading, setGroupPointActionLoading] = useState(false);
   const [groupPointSuccess, setGroupPointSuccess] = useState("");
+  const [contactDetailTab, setContactDetailTab] = useState("overview");
   const [activityPage, setActivityPage] = useState(1);
   const [rangeFrom, setRangeFrom] = useState(DEFAULT_RANGE.from);
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.to);
@@ -426,6 +389,10 @@ export default function AdminNewsletterContactDetailPage() {
   const [companiesError, setCompaniesError] = useState("");
   const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
   const [companyBusy, setCompanyBusy] = useState(false);
+  const [activityLoaded, setActivityLoaded] = useState(false);
+  const [scoringLoaded, setScoringLoaded] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [communicationLoaded, setCommunicationLoaded] = useState(false);
   const pageSize = 25;
 
   const loadContact = useCallback(async () => {
@@ -451,6 +418,7 @@ export default function AdminNewsletterContactDetailPage() {
       });
       setActivity(data);
       setActivityPage(data?.page || page);
+      setActivityLoaded(true);
     } catch (err) {
       setActivity(null);
       setActivityError(getErrorMessage(err, "Failed to load contact history."));
@@ -464,6 +432,7 @@ export default function AdminNewsletterContactDetailPage() {
     setEngagementError("");
     try {
       setEngagement(await getNewsletterAdminContactEngagement(mauticContactId, { from, to }));
+      setActivityLoaded(true);
     } catch (err) {
       setEngagement(null);
       setEngagementError(getErrorMessage(err, "Failed to load engagement analytics."));
@@ -507,6 +476,7 @@ export default function AdminNewsletterContactDetailPage() {
       const scores = await listNewsletterAdminContactPointGroups(mauticContactId);
       setPointGroups(allGroups);
       setGroupScores(Array.isArray(scores?.results) ? scores.results : []);
+      setScoringLoaded(true);
       setSelectedPointGroupId((current) => {
         if (current && allGroups.some((group) => String(group.id) === String(current))) {
           return current;
@@ -524,33 +494,53 @@ export default function AdminNewsletterContactDetailPage() {
     }
   }, [mauticContactId]);
 
-  const loadContactExtras = useCallback(async () => {
-    setNotesLoading(true);
+  const loadContactCompanies = useCallback(async () => {
     setCompaniesLoading(true);
-    setNoteError("");
     setCompaniesError("");
     try {
-      const [fieldsData, notesData, companiesData, definitions] = await Promise.all([
+      const companiesData = await listNewsletterAdminContactCompanies(mauticContactId);
+      setCompanies(Array.isArray(companiesData?.results) ? companiesData.results : []);
+    } catch (err) {
+      setCompaniesError(getErrorMessage(err, "Failed to load contact companies."));
+      setCompanies([]);
+    } finally {
+      setCompaniesLoading(false);
+    }
+  }, [mauticContactId]);
+
+  const loadContactMetadata = useCallback(async () => {
+    setCustomMessage(null);
+    try {
+      const [fieldsData, definitions] = await Promise.all([
         listNewsletterAdminContactFieldMetadata(),
-        listNewsletterAdminContactNotes(mauticContactId, { page: 1, page_size: 25 }),
-        listNewsletterAdminContactCompanies(mauticContactId),
         listNewsletterFields("contact", { published_only: true }),
       ]);
       setFieldMetadata(Array.isArray(fieldsData?.results) ? fieldsData.results : []);
       setContactFields(Array.isArray(definitions?.results) ? definitions.results : []);
       setCustomEdits({});
-      setNotes(Array.isArray(notesData?.results) ? notesData.results : []);
-      setCompanies(Array.isArray(companiesData?.results) ? companiesData.results : []);
+      setProfileLoaded(true);
     } catch (err) {
-      setNoteError(getErrorMessage(err, "Failed to load contact notes or metadata."));
-      setCompaniesError(getErrorMessage(err, "Failed to load contact companies."));
+      setCustomMessage({
+        severity: "error",
+        text: getErrorMessage(err, "Failed to load contact custom fields."),
+      });
       setFieldMetadata([]);
       setContactFields([]);
+    }
+  }, []);
+
+  const loadContactNotes = useCallback(async () => {
+    setNotesLoading(true);
+    setNoteError("");
+    try {
+      const notesData = await listNewsletterAdminContactNotes(mauticContactId, { page: 1, page_size: 25 });
+      setNotes(Array.isArray(notesData?.results) ? notesData.results : []);
+      setCommunicationLoaded(true);
+    } catch (err) {
+      setNoteError(getErrorMessage(err, "Failed to load contact notes or metadata."));
       setNotes([]);
-      setCompanies([]);
     } finally {
       setNotesLoading(false);
-      setCompaniesLoading(false);
     }
   }, [mauticContactId]);
 
@@ -561,14 +551,14 @@ export default function AdminNewsletterContactDetailPage() {
       setCompaniesError("");
       try {
         await removeNewsletterCompanyContact(company.id, mauticContactId);
-        await loadContactExtras();
+        await loadContactCompanies();
       } catch (err) {
         setCompaniesError(getErrorMessage(err, "Mautic rejected the company change."));
       } finally {
         setCompanyBusy(false);
       }
     },
-    [mauticContactId, loadContactExtras]
+    [mauticContactId, loadContactCompanies]
   );
 
   const handleAddCompany = useCallback(
@@ -578,24 +568,67 @@ export default function AdminNewsletterContactDetailPage() {
       try {
         await addNewsletterCompanyContact(company.id, mauticContactId);
         setCompanyDialogOpen(false);
-        await loadContactExtras();
+        await loadContactCompanies();
       } catch (err) {
         setCompaniesError(getErrorMessage(err, "Mautic rejected the company change."));
       } finally {
         setCompanyBusy(false);
       }
     },
-    [mauticContactId, loadContactExtras]
+    [mauticContactId, loadContactCompanies]
   );
 
   useEffect(() => {
+    setActivityLoaded(false);
+    setScoringLoaded(false);
+    setProfileLoaded(false);
+    setCommunicationLoaded(false);
+    setActivity(null);
+    setEngagement(null);
+    setGroupScores([]);
+    setPointGroups([]);
+    setFieldMetadata([]);
+    setContactFields([]);
+    setNotes([]);
+    setCustomEdits({});
+    setActivityPage(1);
     loadContact();
-    loadActivity({ page: 1 });
-    loadEngagement(DEFAULT_RANGE);
     loadStages();
-    loadPointGroupScores();
-    loadContactExtras();
+    loadContactCompanies();
   }, [mauticContactId]);
+
+  useEffect(() => {
+    if (contactDetailTab === "activity" && !activityLoaded) {
+      loadActivity({ page: 1 });
+      loadEngagement(DEFAULT_RANGE);
+      return;
+    }
+
+    if (contactDetailTab === "scoring" && !scoringLoaded) {
+      loadPointGroupScores();
+      return;
+    }
+
+    if (contactDetailTab === "profile" && !profileLoaded) {
+      loadContactMetadata();
+      return;
+    }
+
+    if (contactDetailTab === "communication" && !communicationLoaded) {
+      loadContactNotes();
+    }
+  }, [
+    contactDetailTab,
+    activityLoaded,
+    scoringLoaded,
+    profileLoaded,
+    communicationLoaded,
+    loadActivity,
+    loadEngagement,
+    loadPointGroupScores,
+    loadContactMetadata,
+    loadContactNotes,
+  ]);
 
   useEffect(() => {
     setSelectedStageId(contact?.current_stage?.id ? String(contact.current_stage.id) : "");
@@ -637,21 +670,25 @@ export default function AdminNewsletterContactDetailPage() {
     [groupScores]
   );
 
-  const handleTabChange = (tab) => {
-    if (tab === "contacts") return navigate("/admin/newsletter/contacts");
-    if (tab === "stages") return navigate("/admin/newsletter/stages");
-    if (tab === "points") return navigate("/admin/newsletter/points");
-    if (tab === "companies") return navigate("/admin/newsletter/companies");
-    navigate("/admin/newsletter", { state: { newsletterTab: tab } });
-  };
-
   const refreshAll = () => {
     loadContact();
-    loadActivity({ page: activityPage });
-    loadEngagement({ from: rangeFrom, to: rangeTo });
-    loadStages();
-    loadPointGroupScores();
-    loadContactExtras();
+    if (contactDetailTab === "overview") {
+      loadStages();
+      loadContactCompanies();
+    }
+    if (contactDetailTab === "activity") {
+      loadActivity({ page: activityPage });
+      loadEngagement({ from: rangeFrom, to: rangeTo });
+    }
+    if (contactDetailTab === "scoring") {
+      loadPointGroupScores();
+    }
+    if (contactDetailTab === "profile") {
+      loadContactMetadata();
+    }
+    if (contactDetailTab === "communication") {
+      loadContactNotes();
+    }
   };
 
   const saveContact = async () => {
@@ -726,7 +763,7 @@ export default function AdminNewsletterContactDetailPage() {
     try {
       await createNewsletterAdminContactNote(mauticContactId, { text: noteText.trim() });
       setNoteText("");
-      await loadContactExtras();
+      await loadContactNotes();
     } catch (err) {
       setNoteError(getErrorMessage(err, "Failed to add note."));
     } finally {
@@ -759,12 +796,14 @@ export default function AdminNewsletterContactDetailPage() {
   };
 
   const refreshAfterStageChange = async () => {
-    await Promise.all([
-      loadContact(),
-      loadActivity({ page: 1 }),
-      loadEngagement({ from: rangeFrom, to: rangeTo }),
-    ]);
-    setActivityPage(1);
+    await loadContact();
+    if (activityLoaded) {
+      await Promise.all([
+        loadActivity({ page: 1 }),
+        loadEngagement({ from: rangeFrom, to: rangeTo }),
+      ]);
+      setActivityPage(1);
+    }
   };
 
   const moveStage = async () => {
@@ -816,12 +855,14 @@ export default function AdminNewsletterContactDetailPage() {
         `${operation === "add" ? "Added" : "Subtracted"} ${result?.amount ?? Number(amountText)} points. Current score: ${result?.points ?? "updated"}.`
       );
       setPointReason("");
-      await Promise.all([
-        loadContact(),
-        loadActivity({ page: 1 }),
-        loadEngagement({ from: rangeFrom, to: rangeTo }),
-      ]);
-      setActivityPage(1);
+      await loadContact();
+      if (activityLoaded) {
+        await Promise.all([
+          loadActivity({ page: 1 }),
+          loadEngagement({ from: rangeFrom, to: rangeTo }),
+        ]);
+        setActivityPage(1);
+      }
     } catch (err) {
       setPointError(getErrorMessage(err, "Failed to adjust this contact's points."));
     } finally {
@@ -861,12 +902,14 @@ export default function AdminNewsletterContactDetailPage() {
         `${operation === "add" ? "Added" : "Subtracted"} ${result?.amount ?? Number(amountText)} points in ${result?.group_name || `Point Group #${selectedPointGroupId}`}. Score: ${result?.score ?? "updated"}.`
       );
       setGroupPointReason("");
-      await Promise.all([
-        loadPointGroupScores(),
-        loadActivity({ page: 1 }),
-        loadEngagement({ from: rangeFrom, to: rangeTo }),
-      ]);
-      setActivityPage(1);
+      await loadPointGroupScores();
+      if (activityLoaded) {
+        await Promise.all([
+          loadActivity({ page: 1 }),
+          loadEngagement({ from: rangeFrom, to: rangeTo }),
+        ]);
+        setActivityPage(1);
+      }
     } catch (err) {
       setGroupScoresError(
         getErrorMessage(err, "Failed to adjust this contact's Point Group score.")
@@ -878,13 +921,6 @@ export default function AdminNewsletterContactDetailPage() {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>Newsletter</Typography>
-        <Typography color="text.secondary">Manage campaigns, subscription lists, contacts, lifecycle stages, scoring, and performance from ECP.</Typography>
-      </Box>
-
-      <NewsletterTabs onChange={handleTabChange} />
-
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
           <IconButton onClick={() => navigate("/admin/newsletter/contacts")}><ArrowBackRoundedIcon /></IconButton>
@@ -903,8 +939,27 @@ export default function AdminNewsletterContactDetailPage() {
 
       {error && <Alert severity="error">{error}</Alert>}
 
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <Tabs
+            value={contactDetailTab}
+            onChange={(_, value) => setContactDetailTab(value)}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+          >
+            <Tab label="Overview" value="overview" />
+            <Tab label="Activity" value="activity" />
+            <Tab label="Scoring" value="scoring" />
+            <Tab label="Profile" value="profile" />
+            <Tab label="Communication" value="communication" />
+          </Tabs>
+        </Box>
+      </Paper>
+
       <Grid container spacing={2.5}>
-        <Grid item xs={12} lg={9}>
+        {contactDetailTab === "activity" && (
+        <Grid item xs={12}>
           <Stack spacing={2.5}>
             <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
               <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2} sx={{ p: 2.25, borderBottom: "1px solid #E7ECEF" }}>
@@ -972,13 +1027,16 @@ export default function AdminNewsletterContactDetailPage() {
             </Paper>
           </Stack>
         </Grid>
+        )}
 
-        <Grid item xs={12} lg={3}>
+        {contactDetailTab !== "activity" && (
+        <Grid item xs={12}>
           <Stack spacing={2.5}>
             {loading ? (
               <><Skeleton variant="rectangular" height={150} /><Skeleton variant="rectangular" height={260} /></>
             ) : contact ? (
               <>
+                {contactDetailTab === "scoring" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF", textAlign: "center" }}>
                   <Typography variant="h3" sx={{ fontWeight: 850, color: "#1B2A4A" }}>{Number(contact.points || 0)}</Typography>
                   <Typography color="text.secondary">points</Typography>
@@ -1034,7 +1092,9 @@ export default function AdminNewsletterContactDetailPage() {
                     </Stack>
                   </Stack>
                 </Paper>
+                )}
 
+                {contactDetailTab === "scoring" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Stack spacing={1.75}>
                     <Box>
@@ -1176,7 +1236,9 @@ export default function AdminNewsletterContactDetailPage() {
                     )}
                   </Stack>
                 </Paper>
+                )}
 
+                {contactDetailTab === "overview" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Stack spacing={1.75}>
                     <Box>
@@ -1269,7 +1331,9 @@ export default function AdminNewsletterContactDetailPage() {
                     )}
                   </Stack>
                 </Paper>
+                )}
 
+                {contactDetailTab === "profile" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 2 }}>Contact</Typography>
                   {editMessage && <Alert severity={editMessage.severity} sx={{ mb: 2 }}>{editMessage.text}</Alert>}
@@ -1301,7 +1365,9 @@ export default function AdminNewsletterContactDetailPage() {
                     </Button>
                   </Stack>
                 </Paper>
+                )}
 
+                {contactDetailTab === "communication" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Tags</Typography>
                   {tagError && <Alert severity="error" sx={{ mb: 1.5 }}>{tagError}</Alert>}
@@ -1321,7 +1387,9 @@ export default function AdminNewsletterContactDetailPage() {
                     <Button variant="outlined" onClick={addTag} disabled={tagLoading || !tagInput.trim()}>Add</Button>
                   </Stack>
                 </Paper>
+                )}
 
+                {contactDetailTab === "communication" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Notes</Typography>
                   {noteError && <Alert severity="error" sx={{ mb: 1.5 }}>{noteError}</Alert>}
@@ -1348,7 +1416,9 @@ export default function AdminNewsletterContactDetailPage() {
                     Add Note
                   </Button>
                 </Paper>
+                )}
 
+                {contactDetailTab === "communication" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Communication Restrictions</Typography>
                   {dncError && <Alert severity="error" sx={{ mb: 1.5 }}>{dncError}</Alert>}
@@ -1367,7 +1437,9 @@ export default function AdminNewsletterContactDetailPage() {
                     </Button>
                   </Stack>
                 </Paper>
+                )}
 
+                {contactDetailTab === "profile" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Custom Fields</Typography>
                   {customMessage ? (
@@ -1413,7 +1485,9 @@ export default function AdminNewsletterContactDetailPage() {
                     </Stack>
                   ) : null}
                 </Paper>
+                )}
 
+                {contactDetailTab === "overview" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
                     <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Companies</Typography>
@@ -1466,7 +1540,9 @@ export default function AdminNewsletterContactDetailPage() {
                     )) : <Typography variant="body2" color="text.secondary">No associated companies returned by Mautic.</Typography>}
                   </Stack>
                 </Paper>
+                )}
 
+                {contactDetailTab === "overview" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Segments</Typography>
                   {contact.mapped_in_ecp ? (
@@ -1490,10 +1566,12 @@ export default function AdminNewsletterContactDetailPage() {
                     <Typography variant="body2" color="text.secondary">ECP subscription state is unavailable for this Mautic-only contact.</Typography>
                   )}
                 </Paper>
+                )}
               </>
             ) : null}
           </Stack>
         </Grid>
+        )}
       </Grid>
 
       <AddCompanyDialog

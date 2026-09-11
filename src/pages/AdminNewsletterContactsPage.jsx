@@ -51,19 +51,6 @@ import {
   listNewsletterStages,
 } from "../services/newsletterService";
 
-const marketingTabs = [
-  { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
-  { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
-  { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
-  { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
-  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
-  { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
-  { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
-  { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
-  { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
-  { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
-];
-
 const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -89,31 +76,6 @@ const getErrorMessage = (err, fallback = "Something went wrong. Please try again
   if (firstValue) return `${firstKey}: ${firstValue}`;
   return fallback;
 };
-
-function NewsletterTabs({ onChange }) {
-  return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-      <Tabs
-        value="contacts"
-        onChange={(_, value) => onChange(value)}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{
-          minHeight: 52,
-          px: { xs: 1, md: 2 },
-          "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
-          "& .Mui-selected": { color: "#0f766e !important" },
-          "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
-        }}
-      >
-        {marketingTabs.map((tab) => (
-          <Tab key={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} value={tab.value} />
-        ))}
-      </Tabs>
-    </Paper>
-  );
-}
 
 export default function AdminNewsletterContactsPage() {
   const navigate = useNavigate();
@@ -200,20 +162,6 @@ export default function AdminNewsletterContactsPage() {
   const contacts = Array.isArray(data?.results) ? data.results : [];
   const count = Number(data?.count || 0);
   const numPages = Math.max(1, Number(data?.num_pages || 1));
-
-  const handleTabChange = (tab) => {
-    if (tab === "contacts") return;
-    if (tab === "stages") {
-      navigate("/admin/newsletter/stages");
-      return;
-    }
-    if (tab === "points") {
-      navigate("/admin/newsletter/points");
-      return;
-    }
-    if (tab === "companies") return navigate("/admin/newsletter/companies");
-    navigate("/admin/newsletter", { state: { newsletterTab: tab } });
-  };
 
   const handleSearch = () => {
     const nextSearch = searchInput.trim();
@@ -350,17 +298,6 @@ export default function AdminNewsletterContactsPage() {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
-          Newsletter
-        </Typography>
-        <Typography color="text.secondary">
-          Manage campaigns, subscription lists, contacts, lifecycle stages, and performance from ECP.
-        </Typography>
-      </Box>
-
-      <NewsletterTabs onChange={handleTabChange} />
-
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"

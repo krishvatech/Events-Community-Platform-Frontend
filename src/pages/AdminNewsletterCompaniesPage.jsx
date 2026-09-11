@@ -51,20 +51,6 @@ import {
   listNewsletterFields,
 } from "../services/newsletterService";
 
-const marketingTabs = [
-  { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
-  { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
-  { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
-  { value: "segments", label: "Segments", icon: <SegmentRoundedIcon fontSize="small" /> },
-  { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
-  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
-  { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
-  { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
-  { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
-  { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
-  { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
-];
-
 const COMPANY_NAME_ALIAS = "companyname";
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
@@ -82,31 +68,6 @@ const formatValue = (value) => {
   if (value === null || value === undefined || value === "") return "—";
   return String(value);
 };
-
-function NewsletterTabs({ onChange }) {
-  return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-      <Tabs
-        value="companies"
-        onChange={(_, value) => onChange(value)}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{
-          minHeight: 52,
-          px: { xs: 1, md: 2 },
-          "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
-          "& .Mui-selected": { color: "#0f766e !important" },
-          "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
-        }}
-      >
-        {marketingTabs.map((tab) => (
-          <Tab key={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} value={tab.value} />
-        ))}
-      </Tabs>
-    </Paper>
-  );
-}
 
 /** Create dialog driven entirely by the live Mautic company field definitions. */
 export function CompanyCreateDialog({ open, onClose, onCreated }) {
@@ -252,14 +213,6 @@ export default function AdminNewsletterCompaniesPage() {
     loadCompanies();
   }, [loadCompanies]);
 
-  const handleTabChange = (tab) => {
-    if (tab === "companies") return;
-    if (tab === "contacts") return navigate("/admin/newsletter/contacts");
-    if (tab === "stages") return navigate("/admin/newsletter/stages");
-    if (tab === "points") return navigate("/admin/newsletter/points");
-    navigate("/admin/newsletter", { state: { newsletterTab: tab } });
-  };
-
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -284,17 +237,6 @@ export default function AdminNewsletterCompaniesPage() {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
-          Newsletter
-        </Typography>
-        <Typography color="text.secondary">
-          Manage campaigns, subscription lists, contacts, companies, lifecycle stages, and performance from ECP.
-        </Typography>
-      </Box>
-
-      <NewsletterTabs onChange={handleTabChange} />
-
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"

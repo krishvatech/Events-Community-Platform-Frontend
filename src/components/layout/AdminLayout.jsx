@@ -1,7 +1,8 @@
 // src/components/layout/AdminLayout.jsx
 import * as React from "react";
 import { Box, Container } from "@mui/material";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { isMarketingHubPath } from "../../config/marketingNavigation";
 import { clearAuth } from "../../utils/authStorage";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api")
@@ -10,6 +11,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/ap
 
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   React.useEffect(() => {
     const IDLE_MIN = 720; // configurable idle timeout (minutes)
@@ -73,6 +75,10 @@ export default function AdminLayout() {
     };
   }, [navigate]);
 
+  if (isMarketingHubPath(location.pathname)) {
+    return <Outlet />;
+  }
+
   return (
     <Box sx={{ py: 3 }}>
       <Container maxWidth="xl">
@@ -84,4 +90,3 @@ export default function AdminLayout() {
     </Box>
   );
 }
-

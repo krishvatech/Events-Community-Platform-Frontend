@@ -9,6 +9,8 @@ import { isOwnerUser, isStaffUser } from "./utils/adminRole";
 import KYCNotification from "./components/KYCNotification";
 import Header from "./components/Header.jsx";
 import UnifiedSidebar from "./components/UnifiedSidebar.jsx"; // [NEW]
+import MarketingHubLayout from "./components/marketing/MarketingHubLayout.jsx";
+import { isMarketingHubPath } from "./config/marketingNavigation";
 
 import HomePage from "./pages/HomePage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
@@ -183,6 +185,7 @@ const AppShell = () => {
     normalizedPath.startsWith("/recognition/");
 
   const isCompanionPage = location.pathname.includes("/companion");
+  const isMarketingHub = isMarketingHubPath(location.pathname);
   const isSsoRedirectPage = normalizedPath === "/sso/imaa";
   const isSingleEventPage = (location.pathname.startsWith("/landing/") && location.pathname !== "/landing") ||
                             (!location.pathname.startsWith("/events") &&
@@ -211,7 +214,7 @@ const AppShell = () => {
     isCompanionPage ||
     isSingleEventPage;
 
-  const showSidebar = authed && !hideChrome;
+  const showSidebar = authed && !hideChrome && !isMarketingHub;
   const showHeader = !authed && !hideChrome;
 
   return (
@@ -300,19 +303,27 @@ const AppShell = () => {
             <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
             <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
             <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
-            <Route path="newsletter" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/new" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/audiences/*" element={<Navigate to="/admin/newsletter" replace />} />
-            <Route path="newsletter/contacts" element={<RequireStaffOrAdmin><AdminNewsletterContactsPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/contacts/:mauticContactId" element={<RequireStaffOrAdmin><AdminNewsletterContactDetailPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/companies" element={<RequireStaffOrAdmin><AdminNewsletterCompaniesPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/companies/:companyId" element={<RequireStaffOrAdmin><AdminNewsletterCompanyDetailPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/builder" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/builder/:campaignId" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/stages" element={<RequireStaffOrAdmin><AdminNewsletterStagesPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/points" element={<RequireStaffOrAdmin><AdminNewsletterPointsPage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/lists/:slug" element={<RequireStaffOrAdmin><AdminNewsletterListManagePage /></RequireStaffOrAdmin>} />
-            <Route path="newsletter/:campaignId" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter" element={<RequireStaffOrAdmin><MarketingHubLayout /></RequireStaffOrAdmin>}>
+              <Route index element={<AdminNewsletterPage />} />
+              <Route path="campaigns" element={<AdminNewsletterPage />} />
+              <Route path="templates" element={<AdminNewsletterPage />} />
+              <Route path="lists" element={<AdminNewsletterPage />} />
+              <Route path="segments" element={<AdminNewsletterPage />} />
+              <Route path="analytics" element={<AdminNewsletterPage />} />
+              <Route path="settings" element={<AdminNewsletterPage />} />
+              <Route path="new" element={<AdminNewsletterPage />} />
+              <Route path="audiences/*" element={<Navigate to="/admin/newsletter" replace />} />
+              <Route path="contacts" element={<AdminNewsletterContactsPage />} />
+              <Route path="contacts/:mauticContactId" element={<AdminNewsletterContactDetailPage />} />
+              <Route path="companies" element={<AdminNewsletterCompaniesPage />} />
+              <Route path="companies/:companyId" element={<AdminNewsletterCompanyDetailPage />} />
+              <Route path="builder" element={<AdminNewsletterPage />} />
+              <Route path="builder/:campaignId" element={<AdminNewsletterPage />} />
+              <Route path="stages" element={<AdminNewsletterStagesPage />} />
+              <Route path="points" element={<AdminNewsletterPointsPage />} />
+              <Route path="lists/:slug" element={<AdminNewsletterListManagePage />} />
+              <Route path=":campaignId" element={<AdminNewsletterPage />} />
+            </Route>
             <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />

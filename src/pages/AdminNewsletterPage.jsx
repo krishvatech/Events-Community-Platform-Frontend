@@ -83,6 +83,7 @@ import AdminNewsletterMauticCampaignBuilderPage from "./AdminNewsletterMauticCam
 import AdminNewsletterNativeSegmentsPanel from "./AdminNewsletterNativeSegmentsPanel.jsx";
 import AdminNewsletterTagsPanel from "./AdminNewsletterTagsPanel.jsx";
 import AdminNewsletterCustomFieldsPanel from "./AdminNewsletterCustomFieldsPanel.jsx";
+import { getMarketingSectionFromPath } from "../config/marketingNavigation";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -133,20 +134,6 @@ const blankForm = {
   plain_text: starterPlainText,
   audience_slugs: [],
 };
-
-const marketingTabs = [
-  { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
-  { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
-  { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
-  { value: "segments", label: "Segments", icon: <SegmentRoundedIcon fontSize="small" /> },
-  { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
-  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
-  { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
-  { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
-  { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
-  { value: "analytics", label: "Analytics", icon: <AnalyticsRoundedIcon fontSize="small" /> },
-  { value: "settings", label: "Settings", icon: <SettingsRoundedIcon fontSize="small" /> },
-];
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -254,37 +241,9 @@ function EmptyState({ title, description, action }) {
   );
 }
 
-function NewsletterShell({ active, onChange, children }) {
+function NewsletterShell({ children }) {
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
-          Newsletter
-        </Typography>
-        <Typography color="text.secondary">
-          Manage campaigns, subscription lists, contacts, lifecycle stages, scoring, templates, and performance from ECP.
-        </Typography>
-      </Box>
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-        <Tabs
-          value={active}
-          onChange={(_, value) => onChange(value)}
-          variant="scrollable"
-          scrollButtons="auto"
-          allowScrollButtonsMobile
-          sx={{
-            minHeight: 52,
-            px: { xs: 1, md: 2 },
-            "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
-            "& .Mui-selected": { color: "#0f766e !important" },
-            "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
-          }}
-        >
-          {marketingTabs.map((tab) => (
-            <Tab key={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} value={tab.value} />
-          ))}
-        </Tabs>
-      </Paper>
       {children}
     </Stack>
   );
@@ -763,14 +722,9 @@ export default function AdminNewsletterPage() {
   const isNew = normalizedPath.endsWith("/admin/newsletter/new");
   const isBuilderRoute = normalizedPath.includes("/admin/newsletter/builder");
   const isDetail = (isNew || Boolean(campaignId)) && !isBuilderRoute;
+  const activeTab = getMarketingSectionFromPath(location.pathname);
   const requestedTab = location.state?.newsletterTab;
-  const initialTab = isBuilderRoute
-    ? "campaigns"
-    : marketingTabs.some((tab) => tab.value === requestedTab)
-    ? requestedTab
-    : "dashboard";
 
-  const [activeTab, setActiveTab] = useState(initialTab);
   const [campaigns, setCampaigns] = useState([]);
   const [campaign, setCampaign] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -858,19 +812,24 @@ export default function AdminNewsletterPage() {
 
   useEffect(() => {
     if (!isDetail) {
-      if (isBuilderRoute) {
-        setActiveTab("campaigns");
-      } else if (location.state?.newsletterTab) {
-        const nextTab = marketingTabs.some(
-          (tab) => tab.value === location.state.newsletterTab
-        )
-          ? location.state.newsletterTab
-          : "dashboard";
-        setActiveTab(nextTab);
-        navigate(location.pathname, { replace: true, state: {} });
+      if (requestedTab) {
+        const paths = {
+          dashboard: "/admin/newsletter",
+          campaigns: "/admin/newsletter/campaigns",
+          lists: "/admin/newsletter/lists",
+          segments: "/admin/newsletter/segments",
+          templates: "/admin/newsletter/templates",
+          analytics: "/admin/newsletter/analytics",
+          settings: "/admin/newsletter/settings",
+          contacts: "/admin/newsletter/contacts",
+          companies: "/admin/newsletter/companies",
+          stages: "/admin/newsletter/stages",
+          points: "/admin/newsletter/points",
+        };
+        navigate(paths[requestedTab] || "/admin/newsletter", { replace: true, state: {} });
       }
     }
-  }, [isDetail, isBuilderRoute, location.pathname, location.state, navigate]);
+  }, [isDetail, requestedTab, navigate]);
 
   useEffect(() => {
     if (!isDetail && activeTab === "analytics" && selectedAnalyticsCampaignId) {
@@ -1010,16 +969,7 @@ export default function AdminNewsletterPage() {
 
   if (!isDetail) {
     return (
-      <NewsletterShell
-        active={activeTab}
-        onChange={(value) => {
-          if (value === "contacts") navigate("/admin/newsletter/contacts");
-          else if (value === "companies") navigate("/admin/newsletter/companies");
-          else if (value === "stages") navigate("/admin/newsletter/stages");
-          else if (value === "points") navigate("/admin/newsletter/points");
-          else setActiveTab(value);
-        }}
-      >
+      <NewsletterShell>
         {isBuilderRoute ? (
           <AdminNewsletterMauticCampaignBuilderPage />
         ) : (
@@ -1047,16 +997,7 @@ export default function AdminNewsletterPage() {
   }
 
   return (
-    <NewsletterShell
-      active="campaigns"
-      onChange={(value) => {
-        if (value === "contacts") navigate("/admin/newsletter/contacts");
-        else if (value === "companies") navigate("/admin/newsletter/companies");
-        else if (value === "stages") navigate("/admin/newsletter/stages");
-        else if (value === "points") navigate("/admin/newsletter/points");
-        else navigate("/admin/newsletter", { state: { newsletterTab: value } });
-      }}
-    >
+    <NewsletterShell>
       <Stack spacing={3}>
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
