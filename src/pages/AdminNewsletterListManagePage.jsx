@@ -33,6 +33,7 @@ import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
@@ -63,6 +64,7 @@ const marketingTabs = [
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
+  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
   { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
@@ -554,6 +556,7 @@ export default function AdminNewsletterListManagePage() {
       navigate("/admin/newsletter/points");
       return;
     }
+    if (value === "companies") return navigate("/admin/newsletter/companies");
     navigate("/admin/newsletter", { state: { newsletterTab: value } });
   };
 

@@ -43,6 +43,7 @@ import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
@@ -57,6 +58,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StopCircleRoundedIcon from "@mui/icons-material/StopCircleRounded";
 import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
+import SegmentRoundedIcon from "@mui/icons-material/SegmentRounded";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -78,6 +80,9 @@ import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
 import AdminNewsletterMauticCampaignBuilderPage from "./AdminNewsletterMauticCampaignBuilderPage.jsx";
+import AdminNewsletterNativeSegmentsPanel from "./AdminNewsletterNativeSegmentsPanel.jsx";
+import AdminNewsletterTagsPanel from "./AdminNewsletterTagsPanel.jsx";
+import AdminNewsletterCustomFieldsPanel from "./AdminNewsletterCustomFieldsPanel.jsx";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -133,7 +138,9 @@ const marketingTabs = [
   { value: "dashboard", label: "Dashboard", icon: <InsightsRoundedIcon fontSize="small" /> },
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
+  { value: "segments", label: "Segments", icon: <SegmentRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
+  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
   { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
@@ -594,6 +601,8 @@ function AnalyticsOverview({ campaigns, loading, selectedCampaignId, onSelectCam
 }
 
 function SettingsPage() {
+  const [section, setSection] = useState("connection");
+
   const rows = [
     ["Email Provider", "Mautic is used internally for campaign delivery."],
     ["Sender Configuration", "Sender defaults are configured when campaigns are created."],
@@ -607,16 +616,42 @@ function SettingsPage() {
         <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Settings</Typography>
         <Typography color="text.secondary">Newsletter configuration visible to marketing users.</Typography>
       </Box>
-      <Grid container spacing={2}>
-        {rows.map(([title, description]) => (
-          <Grid item xs={12} md={6} key={title}>
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF", minHeight: 132 }}>
-              <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>{title}</Typography>
-              <Typography color="text.secondary">{description}</Typography>
-            </Paper>
-          </Grid>
-        ))}
-      </Grid>
+
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+        <Tabs
+          value={section}
+          onChange={(_, value) => setSection(value)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{
+            px: 2,
+            "& .MuiTab-root": { textTransform: "none", fontWeight: 750 },
+            "& .Mui-selected": { color: "#0f766e !important" },
+            "& .MuiTabs-indicator": { backgroundColor: "#0f766e" },
+          }}
+        >
+          <Tab label="Mautic Connection" value="connection" />
+          <Tab label="Tags" value="tags" />
+          <Tab label="Custom Fields" value="fields" />
+        </Tabs>
+      </Paper>
+
+      {section === "connection" ? (
+        <Grid container spacing={2}>
+          {rows.map(([title, description]) => (
+            <Grid item xs={12} md={6} key={title}>
+              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF", minHeight: 132 }}>
+                <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>{title}</Typography>
+                <Typography color="text.secondary">{description}</Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      ) : null}
+
+      {section === "tags" ? <AdminNewsletterTagsPanel /> : null}
+      {section === "fields" ? <AdminNewsletterCustomFieldsPanel /> : null}
     </Stack>
   );
 }
@@ -979,6 +1014,7 @@ export default function AdminNewsletterPage() {
         active={activeTab}
         onChange={(value) => {
           if (value === "contacts") navigate("/admin/newsletter/contacts");
+          else if (value === "companies") navigate("/admin/newsletter/companies");
           else if (value === "stages") navigate("/admin/newsletter/stages");
           else if (value === "points") navigate("/admin/newsletter/points");
           else setActiveTab(value);
@@ -991,6 +1027,7 @@ export default function AdminNewsletterPage() {
             {activeTab === "dashboard" && <Dashboard campaigns={campaigns} loading={loading} error={error} onRefresh={loadCampaigns} />}
             {activeTab === "campaigns" && <AdminNewsletterMauticCampaignsPanel />}
             {activeTab === "lists" && <AdminNewsletterCategoriesTab />}
+            {activeTab === "segments" && <AdminNewsletterNativeSegmentsPanel />}
             {activeTab === "templates" && <AdminNewsletterTemplatesPanel />}
             {activeTab === "analytics" && (
               <AnalyticsOverview
@@ -1014,6 +1051,7 @@ export default function AdminNewsletterPage() {
       active="campaigns"
       onChange={(value) => {
         if (value === "contacts") navigate("/admin/newsletter/contacts");
+        else if (value === "companies") navigate("/admin/newsletter/companies");
         else if (value === "stages") navigate("/admin/newsletter/stages");
         else if (value === "points") navigate("/admin/newsletter/points");
         else navigate("/admin/newsletter", { state: { newsletterTab: value } });

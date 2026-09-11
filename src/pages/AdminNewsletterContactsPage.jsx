@@ -6,6 +6,10 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
@@ -25,6 +29,7 @@ import {
   Typography,
 } from "@mui/material";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
+import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
@@ -36,8 +41,12 @@ import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "react-router-dom";
 
+import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
+
 import {
   bulkUpdateNewsletterAdminContactStage,
+  createNewsletterAdminContact,
+  listNewsletterFields,
   listNewsletterAdminContacts,
   listNewsletterStages,
 } from "../services/newsletterService";
@@ -47,6 +56,7 @@ const marketingTabs = [
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
+  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
   { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
@@ -121,6 +131,23 @@ export default function AdminNewsletterContactsPage() {
   const [bulkStageId, setBulkStageId] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkMessage, setBulkMessage] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [customFieldDefs, setCustomFieldDefs] = useState([]);
+  const [customFieldValues, setCustomFieldValues] = useState({});
+  const [createForm, setCreateForm] = useState({
+    firstname: "",
+    lastname: "",
+    email: "",
+    phone: "",
+    mobile: "",
+    company: "",
+    city: "",
+    state: "",
+    zipcode: "",
+    country: "",
+  });
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState("");
   const pageSize = 25;
 
   const loadStages = useCallback(async () => {
@@ -184,6 +211,7 @@ export default function AdminNewsletterContactsPage() {
       navigate("/admin/newsletter/points");
       return;
     }
+    if (tab === "companies") return navigate("/admin/newsletter/companies");
     navigate("/admin/newsletter", { state: { newsletterTab: tab } });
   };
 
@@ -266,6 +294,60 @@ export default function AdminNewsletterContactsPage() {
     }
   };
 
+  // Contact custom fields are discovered from Mautic rather than hardcoded here.
+  useEffect(() => {
+    if (!createOpen) return undefined;
+    let active = true;
+    listNewsletterFields("contact", { published_only: true })
+      .then((data) => {
+        if (!active) return;
+        const results = Array.isArray(data?.results) ? data.results : [];
+        setCustomFieldDefs(results.filter((field) => field.group !== "core"));
+      })
+      .catch(() => {
+        if (active) setCustomFieldDefs([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [createOpen]);
+
+  const handleCreateContact = async () => {
+    setCreateLoading(true);
+    setCreateError("");
+    try {
+      const payload = Object.fromEntries(
+        Object.entries(createForm).filter(([, value]) => String(value || "").trim())
+      );
+      const customFields = Object.fromEntries(
+        Object.entries(customFieldValues).filter(
+          ([, value]) => value !== "" && value !== undefined && value !== null
+        )
+      );
+      if (Object.keys(customFields).length) payload.custom_fields = customFields;
+      const created = await createNewsletterAdminContact(payload);
+      setCreateOpen(false);
+      setCreateForm({
+        firstname: "",
+        lastname: "",
+        email: "",
+        phone: "",
+        mobile: "",
+        company: "",
+        city: "",
+        state: "",
+        zipcode: "",
+        country: "",
+      });
+      setCustomFieldValues({});
+      navigate(`/admin/newsletter/contacts/${created.mautic_contact_id}`);
+    } catch (err) {
+      setCreateError(getErrorMessage(err, "We could not create this Mautic contact."));
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   return (
     <Stack spacing={3}>
       <Box>
@@ -293,20 +375,25 @@ export default function AdminNewsletterContactsPage() {
             All contacts currently available in Mautic, enriched with ECP mapping and newsletter subscription data.
           </Typography>
         </Box>
-        <Button
-          startIcon={<RefreshRoundedIcon />}
-          onClick={() =>
-            loadContacts({
-              nextPage: page,
-              nextSearch: search,
-              nextStageFilter: stageFilter,
-            })
-          }
-          disabled={loading}
-          sx={{ textTransform: "none" }}
-        >
-          Refresh
-        </Button>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          <Button variant="contained" onClick={() => setCreateOpen(true)} sx={{ textTransform: "none" }}>
+            Create Contact
+          </Button>
+          <Button
+            startIcon={<RefreshRoundedIcon />}
+            onClick={() =>
+              loadContacts({
+                nextPage: page,
+                nextSearch: search,
+                nextStageFilter: stageFilter,
+              })
+            }
+            disabled={loading}
+            sx={{ textTransform: "none" }}
+          >
+            Refresh
+          </Button>
+        </Stack>
       </Stack>
 
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
@@ -666,6 +753,50 @@ export default function AdminNewsletterContactsPage() {
           </Stack>
         </Stack>
       </Paper>
+
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Create Mautic Contact</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            {createError && <Alert severity="error">{createError}</Alert>}
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField label="First name" value={createForm.firstname} onChange={(event) => setCreateForm((state) => ({ ...state, firstname: event.target.value }))} fullWidth />
+              <TextField label="Last name" value={createForm.lastname} onChange={(event) => setCreateForm((state) => ({ ...state, lastname: event.target.value }))} fullWidth />
+            </Stack>
+            <TextField label="Email" value={createForm.email} onChange={(event) => setCreateForm((state) => ({ ...state, email: event.target.value }))} fullWidth required />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField label="Phone" value={createForm.phone} onChange={(event) => setCreateForm((state) => ({ ...state, phone: event.target.value }))} fullWidth />
+              <TextField label="Mobile" value={createForm.mobile} onChange={(event) => setCreateForm((state) => ({ ...state, mobile: event.target.value }))} fullWidth />
+            </Stack>
+            <TextField label="Company" value={createForm.company} onChange={(event) => setCreateForm((state) => ({ ...state, company: event.target.value }))} fullWidth />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField label="City" value={createForm.city} onChange={(event) => setCreateForm((state) => ({ ...state, city: event.target.value }))} fullWidth />
+              <TextField label="State" value={createForm.state} onChange={(event) => setCreateForm((state) => ({ ...state, state: event.target.value }))} fullWidth />
+            </Stack>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField label="Zipcode" value={createForm.zipcode} onChange={(event) => setCreateForm((state) => ({ ...state, zipcode: event.target.value }))} fullWidth />
+              <TextField label="Country" value={createForm.country} onChange={(event) => setCreateForm((state) => ({ ...state, country: event.target.value }))} fullWidth />
+            </Stack>
+            {customFieldDefs.length ? (
+              <MauticDynamicFields
+                title="Custom Fields"
+                fields={customFieldDefs}
+                values={customFieldValues}
+                onChange={(alias, value) =>
+                  setCustomFieldValues((state) => ({ ...state, [alias]: value }))
+                }
+                disabled={createLoading}
+              />
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateOpen(false)} disabled={createLoading}>Cancel</Button>
+          <Button variant="contained" onClick={handleCreateContact} disabled={createLoading || !createForm.email.trim()}>
+            {createLoading ? <CircularProgress size={20} color="inherit" /> : "Create"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

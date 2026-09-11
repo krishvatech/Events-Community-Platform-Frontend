@@ -113,8 +113,17 @@ export const listNewsletterAudiences = () =>
 export const listNewsletterAdminContacts = (params = {}) =>
   unwrap(apiClient.get(adminContactsEndpoint, { params }));
 
+export const createNewsletterAdminContact = (payload) =>
+  unwrap(apiClient.post(adminContactsEndpoint, payload));
+
 export const getNewsletterAdminContact = (mauticContactId) =>
   unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/`));
+
+export const updateNewsletterAdminContact = (mauticContactId, payload) =>
+  unwrap(apiClient.patch(`${adminContactsEndpoint}${mauticContactId}/`, payload));
+
+export const listNewsletterAdminContactFieldMetadata = () =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}field-metadata/`));
 
 export const listNewsletterAdminContactActivity = (mauticContactId, params = {}) =>
   unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/activity/`, { params }));
@@ -131,6 +140,30 @@ export const moveNewsletterAdminContactStage = (mauticContactId, stageId) =>
 
 export const clearNewsletterAdminContactStage = (mauticContactId) =>
   unwrap(apiClient.delete(`${adminContactsEndpoint}${mauticContactId}/stage/`));
+
+export const listNewsletterAdminTags = (params = {}) =>
+  unwrap(apiClient.get("/newsletter/admin/tags/", { params }));
+
+export const addNewsletterAdminContactTag = (mauticContactId, tag) =>
+  unwrap(apiClient.post(`${adminContactsEndpoint}${mauticContactId}/tags/`, { tag }));
+
+export const removeNewsletterAdminContactTag = (mauticContactId, tag) =>
+  unwrap(apiClient.delete(`${adminContactsEndpoint}${mauticContactId}/tags/${encodeURIComponent(tag)}/`));
+
+export const listNewsletterAdminContactNotes = (mauticContactId, params = {}) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/notes/`, { params }));
+
+export const createNewsletterAdminContactNote = (mauticContactId, payload) =>
+  unwrap(apiClient.post(`${adminContactsEndpoint}${mauticContactId}/notes/`, payload));
+
+export const addNewsletterAdminContactDnc = (mauticContactId, payload) =>
+  unwrap(apiClient.post(`${adminContactsEndpoint}${mauticContactId}/dnc/`, payload));
+
+export const removeNewsletterAdminContactDnc = (mauticContactId, channel) =>
+  unwrap(apiClient.delete(`${adminContactsEndpoint}${mauticContactId}/dnc/${encodeURIComponent(channel)}/`));
+
+export const listNewsletterAdminContactCompanies = (mauticContactId) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/companies/`));
 
 export const listNewsletterStages = (params = {}) =>
   unwrap(apiClient.get(adminStagesEndpoint, { params }));
@@ -282,6 +315,33 @@ export const deleteNewsletterCategory = (slug) =>
 export const listMauticSegments = () =>
   unwrap(apiClient.get("/newsletter/admin/mautic/segments/"));
 
+export const listNativeMauticSegments = listMauticSegments;
+
+export const getNativeMauticSegment = (segmentId) =>
+  unwrap(apiClient.get(`/newsletter/admin/mautic/segments/${segmentId}/`));
+
+export const createNativeMauticSegment = (payload) =>
+  unwrap(apiClient.post("/newsletter/admin/mautic/segments/", payload));
+
+export const updateNativeMauticSegment = (segmentId, payload) =>
+  unwrap(apiClient.patch(`/newsletter/admin/mautic/segments/${segmentId}/`, payload));
+
+export const deleteNativeMauticSegment = (segmentId) =>
+  unwrap(apiClient.delete(`/newsletter/admin/mautic/segments/${segmentId}/`));
+
+export const listNativeMauticSegmentContacts = (segmentId, params = {}) =>
+  unwrap(apiClient.get(`/newsletter/admin/mautic/segments/${segmentId}/contacts/`, { params }));
+
+export const addNativeMauticSegmentContact = (segmentId, contactId) =>
+  unwrap(
+    apiClient.post(`/newsletter/admin/mautic/segments/${segmentId}/contacts/`, {
+      contact_id: String(contactId),
+    })
+  );
+
+export const removeNativeMauticSegmentContact = (segmentId, contactId) =>
+  unwrap(apiClient.delete(`/newsletter/admin/mautic/segments/${segmentId}/contacts/${contactId}/`));
+
 export const listNewsletterCategoryContacts = (slug, params = {}) =>
   unwrap(apiClient.get(`${adminCategoriesEndpoint}${slug}/contacts/`, { params }));
 
@@ -297,3 +357,79 @@ export const linkNewsletterCategoryMauticSegment = (slug, mauticSegmentId) =>
 
 export const syncNewsletterCategoryMautic = (slug) =>
   unwrap(apiClient.post(`${adminCategoriesEndpoint}${slug}/sync-mautic/`));
+
+/* ------------------------------------------------------------------ *
+ * Native Mautic companies
+ * ------------------------------------------------------------------ */
+
+const adminCompaniesEndpoint = "/newsletter/admin/companies/";
+
+export const listNewsletterCompanies = (params = {}) =>
+  unwrap(apiClient.get(adminCompaniesEndpoint, { params }));
+
+export const getNewsletterCompany = (companyId) =>
+  unwrap(apiClient.get(`${adminCompaniesEndpoint}${companyId}/`));
+
+export const createNewsletterCompany = (payload) =>
+  unwrap(apiClient.post(adminCompaniesEndpoint, payload));
+
+export const updateNewsletterCompany = (companyId, payload) =>
+  unwrap(apiClient.patch(`${adminCompaniesEndpoint}${companyId}/`, payload));
+
+export const deleteNewsletterCompany = (companyId) =>
+  unwrap(apiClient.delete(`${adminCompaniesEndpoint}${companyId}/`));
+
+export const listNewsletterCompanyContacts = (companyId, params = {}) =>
+  unwrap(apiClient.get(`${adminCompaniesEndpoint}${companyId}/contacts/`, { params }));
+
+export const addNewsletterCompanyContact = (companyId, contactId) =>
+  unwrap(
+    apiClient.post(`${adminCompaniesEndpoint}${companyId}/contacts/`, {
+      contact_id: String(contactId),
+    })
+  );
+
+export const removeNewsletterCompanyContact = (companyId, contactId) =>
+  unwrap(apiClient.delete(`${adminCompaniesEndpoint}${companyId}/contacts/${contactId}/`));
+
+/* ------------------------------------------------------------------ *
+ * Native Mautic tag administration
+ * ------------------------------------------------------------------ */
+
+const adminTagDirectoryEndpoint = "/newsletter/admin/tags/directory/";
+
+export const listNewsletterTagDirectory = (params = {}) =>
+  unwrap(apiClient.get(adminTagDirectoryEndpoint, { params }));
+
+export const createNewsletterTag = (payload) =>
+  unwrap(apiClient.post(adminTagDirectoryEndpoint, payload));
+
+export const updateNewsletterTag = (tagId, payload) =>
+  unwrap(apiClient.patch(`${adminTagDirectoryEndpoint}${tagId}/`, payload));
+
+export const deleteNewsletterTag = (tagId) =>
+  unwrap(apiClient.delete(`${adminTagDirectoryEndpoint}${tagId}/`));
+
+/* ------------------------------------------------------------------ *
+ * Native Mautic custom field definitions
+ * ------------------------------------------------------------------ */
+
+const adminFieldsEndpoint = "/newsletter/admin/fields/";
+
+export const listNewsletterFieldTypes = () =>
+  unwrap(apiClient.get(`${adminFieldsEndpoint}types/`));
+
+export const listNewsletterFieldChoices = (fieldType) =>
+  unwrap(apiClient.get(`${adminFieldsEndpoint}choices/${fieldType}/`));
+
+export const listNewsletterFields = (fieldObject, params = {}) =>
+  unwrap(apiClient.get(`${adminFieldsEndpoint}${fieldObject}/`, { params }));
+
+export const createNewsletterField = (fieldObject, payload) =>
+  unwrap(apiClient.post(`${adminFieldsEndpoint}${fieldObject}/`, payload));
+
+export const updateNewsletterField = (fieldObject, fieldId, payload) =>
+  unwrap(apiClient.patch(`${adminFieldsEndpoint}${fieldObject}/${fieldId}/`, payload));
+
+export const deleteNewsletterField = (fieldObject, fieldId) =>
+  unwrap(apiClient.delete(`${adminFieldsEndpoint}${fieldObject}/${fieldId}/`));

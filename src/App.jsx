@@ -33,6 +33,8 @@ import NewsletterPage from "./pages/NewsletterPage.jsx";
 import AdminNewsletterPage from "./pages/AdminNewsletterPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
 import AdminNewsletterContactDetailPage from "./pages/AdminNewsletterContactDetailPage.jsx";
+import AdminNewsletterCompaniesPage from "./pages/AdminNewsletterCompaniesPage.jsx";
+import AdminNewsletterCompanyDetailPage from "./pages/AdminNewsletterCompanyDetailPage.jsx";
 import AdminNewsletterStagesPage from "./pages/AdminNewsletterStagesPage.jsx";
 import AdminNewsletterPointsPage from "./pages/AdminNewsletterPointsPage.jsx";
 import AdminNewsletterListManagePage from "./pages/AdminNewsletterListManagePage.jsx";
@@ -303,6 +305,8 @@ const AppShell = () => {
             <Route path="newsletter/audiences/*" element={<Navigate to="/admin/newsletter" replace />} />
             <Route path="newsletter/contacts" element={<RequireStaffOrAdmin><AdminNewsletterContactsPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/contacts/:mauticContactId" element={<RequireStaffOrAdmin><AdminNewsletterContactDetailPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/companies" element={<RequireStaffOrAdmin><AdminNewsletterCompaniesPage /></RequireStaffOrAdmin>} />
+            <Route path="newsletter/companies/:companyId" element={<RequireStaffOrAdmin><AdminNewsletterCompanyDetailPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/builder" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/builder/:campaignId" element={<RequireStaffOrAdmin><AdminNewsletterPage /></RequireStaffOrAdmin>} />
             <Route path="newsletter/stages" element={<RequireStaffOrAdmin><AdminNewsletterStagesPage /></RequireStaffOrAdmin>} />

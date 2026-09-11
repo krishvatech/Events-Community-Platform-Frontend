@@ -5,6 +5,10 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   Grid,
   IconButton,
@@ -23,14 +27,18 @@ import {
   TableRow,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import LinkOffRoundedIcon from "@mui/icons-material/LinkOffRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
@@ -38,17 +46,32 @@ import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
+import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
+
 import {
   adjustNewsletterAdminContactPointGroup,
   adjustNewsletterAdminContactPoints,
+  addNewsletterAdminContactDnc,
+  addNewsletterAdminContactTag,
   clearNewsletterAdminContactStage,
+  createNewsletterAdminContactNote,
   getNewsletterAdminContact,
   getNewsletterAdminContactEngagement,
+  addNewsletterCompanyContact,
+  listNewsletterAdminContactCompanies,
+  listNewsletterCompanies,
+  listNewsletterFields,
+  removeNewsletterCompanyContact,
+  listNewsletterAdminContactFieldMetadata,
   listNewsletterAdminContactActivity,
+  listNewsletterAdminContactNotes,
   listNewsletterAdminContactPointGroups,
   listNewsletterPointGroups,
   listNewsletterStages,
   moveNewsletterAdminContactStage,
+  removeNewsletterAdminContactDnc,
+  removeNewsletterAdminContactTag,
+  updateNewsletterAdminContact,
 } from "../services/newsletterService";
 
 const marketingTabs = [
@@ -56,6 +79,7 @@ const marketingTabs = [
   { value: "campaigns", label: "Campaigns", icon: <EmailRoundedIcon fontSize="small" /> },
   { value: "lists", label: "Subscription Lists", icon: <ListAltRoundedIcon fontSize="small" /> },
   { value: "contacts", label: "Contacts", icon: <ContactsRoundedIcon fontSize="small" /> },
+  { value: "companies", label: "Companies", icon: <ApartmentRoundedIcon fontSize="small" /> },
   { value: "stages", label: "Stages", icon: <FlagRoundedIcon fontSize="small" /> },
   { value: "points", label: "Points", icon: <StarsRoundedIcon fontSize="small" /> },
   { value: "templates", label: "Templates", icon: <ViewModuleRoundedIcon fontSize="small" /> },
@@ -121,6 +145,116 @@ function NewsletterTabs({ onChange }) {
         ))}
       </Tabs>
     </Paper>
+  );
+}
+
+/** Picks an existing Mautic company to associate with this contact. */
+function AddCompanyDialog({ open, busy, onClose, onSelect }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      setResults([]);
+      setError("");
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    listNewsletterCompanies({ page_size: 10 })
+      .then((data) => {
+        if (active) setResults(Array.isArray(data?.results) ? data.results : []);
+      })
+      .catch((err) => {
+        if (active) setError(getErrorMessage(err, "Could not load companies from Mautic."));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open]);
+
+  const runSearch = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await listNewsletterCompanies({ search: query.trim(), page_size: 10 });
+      setResults(Array.isArray(data?.results) ? data.results : []);
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not search companies."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm">
+      <DialogTitle sx={{ fontWeight: 850 }}>Add Contact to a Company</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          {error ? <Alert severity="error">{error}</Alert> : null}
+          <Stack direction="row" spacing={1}>
+            <TextField
+              size="small"
+              fullWidth
+              autoFocus
+              placeholder="Search companies by name"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") runSearch();
+              }}
+            />
+            <Button variant="outlined" onClick={runSearch} disabled={loading} sx={{ textTransform: "none" }}>
+              Search
+            </Button>
+          </Stack>
+          {loading ? (
+            <Skeleton variant="rounded" height={120} />
+          ) : results.length ? (
+            <Stack spacing={1}>
+              {results.map((company) => (
+                <Paper key={company.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }} noWrap>
+                        {company.name || `Company #${company.id}`}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" noWrap>
+                        {[company.email, company.city, company.country].filter(Boolean).join(" · ")}
+                      </Typography>
+                    </Box>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={busy}
+                      onClick={() => onSelect(company)}
+                      sx={{ textTransform: "none", bgcolor: "#0f766e", "&:hover": { bgcolor: "#0d6259" } }}
+                    >
+                      Add
+                    </Button>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No companies found. Create one in Marketing → Companies.
+            </Typography>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none" }}>
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -270,6 +404,28 @@ export default function AdminNewsletterContactDetailPage() {
   const [activityPage, setActivityPage] = useState(1);
   const [rangeFrom, setRangeFrom] = useState(DEFAULT_RANGE.from);
   const [rangeTo, setRangeTo] = useState(DEFAULT_RANGE.to);
+  const [editContact, setEditContact] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
+  const [editMessage, setEditMessage] = useState(null);
+  const [fieldMetadata, setFieldMetadata] = useState([]);
+  const [contactFields, setContactFields] = useState([]);
+  const [customEdits, setCustomEdits] = useState({});
+  const [customSaving, setCustomSaving] = useState(false);
+  const [customMessage, setCustomMessage] = useState(null);
+  const [notes, setNotes] = useState([]);
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [noteText, setNoteText] = useState("");
+  const [noteError, setNoteError] = useState("");
+  const [tagInput, setTagInput] = useState("");
+  const [tagLoading, setTagLoading] = useState(false);
+  const [tagError, setTagError] = useState("");
+  const [dncLoading, setDncLoading] = useState(false);
+  const [dncError, setDncError] = useState("");
+  const [companies, setCompanies] = useState([]);
+  const [companiesLoading, setCompaniesLoading] = useState(true);
+  const [companiesError, setCompaniesError] = useState("");
+  const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
+  const [companyBusy, setCompanyBusy] = useState(false);
   const pageSize = 25;
 
   const loadContact = useCallback(async () => {
@@ -368,17 +524,101 @@ export default function AdminNewsletterContactDetailPage() {
     }
   }, [mauticContactId]);
 
+  const loadContactExtras = useCallback(async () => {
+    setNotesLoading(true);
+    setCompaniesLoading(true);
+    setNoteError("");
+    setCompaniesError("");
+    try {
+      const [fieldsData, notesData, companiesData, definitions] = await Promise.all([
+        listNewsletterAdminContactFieldMetadata(),
+        listNewsletterAdminContactNotes(mauticContactId, { page: 1, page_size: 25 }),
+        listNewsletterAdminContactCompanies(mauticContactId),
+        listNewsletterFields("contact", { published_only: true }),
+      ]);
+      setFieldMetadata(Array.isArray(fieldsData?.results) ? fieldsData.results : []);
+      setContactFields(Array.isArray(definitions?.results) ? definitions.results : []);
+      setCustomEdits({});
+      setNotes(Array.isArray(notesData?.results) ? notesData.results : []);
+      setCompanies(Array.isArray(companiesData?.results) ? companiesData.results : []);
+    } catch (err) {
+      setNoteError(getErrorMessage(err, "Failed to load contact notes or metadata."));
+      setCompaniesError(getErrorMessage(err, "Failed to load contact companies."));
+      setFieldMetadata([]);
+      setContactFields([]);
+      setNotes([]);
+      setCompanies([]);
+    } finally {
+      setNotesLoading(false);
+      setCompaniesLoading(false);
+    }
+  }, [mauticContactId]);
+
+  // Company membership lives only in Mautic; ECP stores no relationship record.
+  const handleRemoveCompany = useCallback(
+    async (company) => {
+      setCompanyBusy(true);
+      setCompaniesError("");
+      try {
+        await removeNewsletterCompanyContact(company.id, mauticContactId);
+        await loadContactExtras();
+      } catch (err) {
+        setCompaniesError(getErrorMessage(err, "Mautic rejected the company change."));
+      } finally {
+        setCompanyBusy(false);
+      }
+    },
+    [mauticContactId, loadContactExtras]
+  );
+
+  const handleAddCompany = useCallback(
+    async (company) => {
+      setCompanyBusy(true);
+      setCompaniesError("");
+      try {
+        await addNewsletterCompanyContact(company.id, mauticContactId);
+        setCompanyDialogOpen(false);
+        await loadContactExtras();
+      } catch (err) {
+        setCompaniesError(getErrorMessage(err, "Mautic rejected the company change."));
+      } finally {
+        setCompanyBusy(false);
+      }
+    },
+    [mauticContactId, loadContactExtras]
+  );
+
   useEffect(() => {
     loadContact();
     loadActivity({ page: 1 });
     loadEngagement(DEFAULT_RANGE);
     loadStages();
     loadPointGroupScores();
+    loadContactExtras();
   }, [mauticContactId]);
 
   useEffect(() => {
     setSelectedStageId(contact?.current_stage?.id ? String(contact.current_stage.id) : "");
-  }, [contact?.current_stage?.id]);
+    setEditContact({
+      firstname: contact?.contact_info?.first_name || "",
+      lastname: contact?.contact_info?.last_name || "",
+      email: contact?.contact_info?.email || contact?.email || "",
+      phone: contact?.contact_info?.phone || "",
+      mobile: contact?.contact_info?.mobile || "",
+      company: contact?.contact_info?.company || "",
+      city: contact?.contact_info?.city || "",
+      state: contact?.contact_info?.state || "",
+      zipcode: contact?.contact_info?.zipcode || "",
+      country: contact?.contact_info?.country || "",
+    });
+  }, [contact]);
+
+  // Core identity fields already have dedicated inputs in the edit form above, so the
+  // Custom Fields panel covers everything else Mautic publishes.
+  const customContactFields = useMemo(
+    () => contactFields.filter((field) => field.group !== "core"),
+    [contactFields]
+  );
 
   const subscribedSegments = useMemo(
     () => (contact?.subscription_lists || []).filter((item) => item.is_subscribed),
@@ -401,6 +641,7 @@ export default function AdminNewsletterContactDetailPage() {
     if (tab === "contacts") return navigate("/admin/newsletter/contacts");
     if (tab === "stages") return navigate("/admin/newsletter/stages");
     if (tab === "points") return navigate("/admin/newsletter/points");
+    if (tab === "companies") return navigate("/admin/newsletter/companies");
     navigate("/admin/newsletter", { state: { newsletterTab: tab } });
   };
 
@@ -410,6 +651,111 @@ export default function AdminNewsletterContactDetailPage() {
     loadEngagement({ from: rangeFrom, to: rangeTo });
     loadStages();
     loadPointGroupScores();
+    loadContactExtras();
+  };
+
+  const saveContact = async () => {
+    setEditLoading(true);
+    setEditMessage(null);
+    try {
+      const payload = Object.fromEntries(
+        Object.entries(editContact).filter(([, value]) => String(value || "").trim())
+      );
+      const updated = await updateNewsletterAdminContact(mauticContactId, payload);
+      setContact(updated);
+      setEditMessage({ severity: "success", text: "Contact updated in Mautic." });
+    } catch (err) {
+      setEditMessage({ severity: "error", text: getErrorMessage(err, "Failed to update contact.") });
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Sends only the custom fields the admin actually changed, so unrelated Mautic
+  // values are never rewritten by a save.
+  const saveCustomFields = async () => {
+    setCustomSaving(true);
+    setCustomMessage(null);
+    try {
+      const updated = await updateNewsletterAdminContact(mauticContactId, {
+        custom_fields: customEdits,
+      });
+      setContact(updated);
+      setCustomEdits({});
+      setCustomMessage({ severity: "success", text: "Custom fields updated in Mautic." });
+    } catch (err) {
+      setCustomMessage({
+        severity: "error",
+        text: getErrorMessage(err, "Failed to update custom fields."),
+      });
+    } finally {
+      setCustomSaving(false);
+    }
+  };
+
+  const addTag = async () => {
+    if (!tagInput.trim()) return;
+    setTagLoading(true);
+    setTagError("");
+    try {
+      setContact(await addNewsletterAdminContactTag(mauticContactId, tagInput.trim()));
+      setTagInput("");
+    } catch (err) {
+      setTagError(getErrorMessage(err, "Failed to add tag."));
+    } finally {
+      setTagLoading(false);
+    }
+  };
+
+  const removeTag = async (tag) => {
+    setTagLoading(true);
+    setTagError("");
+    try {
+      setContact(await removeNewsletterAdminContactTag(mauticContactId, tag));
+    } catch (err) {
+      setTagError(getErrorMessage(err, "Failed to remove tag."));
+    } finally {
+      setTagLoading(false);
+    }
+  };
+
+  const createNote = async () => {
+    if (!noteText.trim()) return;
+    setNotesLoading(true);
+    setNoteError("");
+    try {
+      await createNewsletterAdminContactNote(mauticContactId, { text: noteText.trim() });
+      setNoteText("");
+      await loadContactExtras();
+    } catch (err) {
+      setNoteError(getErrorMessage(err, "Failed to add note."));
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
+  const addDnc = async () => {
+    setDncLoading(true);
+    setDncError("");
+    try {
+      setContact(await addNewsletterAdminContactDnc(mauticContactId, { channel: "email", reason: 3 }));
+    } catch (err) {
+      setDncError(getErrorMessage(err, "Failed to add communication restriction."));
+    } finally {
+      setDncLoading(false);
+    }
+  };
+
+  const removeDnc = async (channel) => {
+    setDncLoading(true);
+    setDncError("");
+    try {
+      setContact(await removeNewsletterAdminContactDnc(mauticContactId, channel));
+    } catch (err) {
+      setDncError(getErrorMessage(err, "Failed to remove communication restriction."));
+    } finally {
+      setDncLoading(false);
+    }
   };
 
   const refreshAfterStageChange = async () => {
@@ -926,14 +1272,198 @@ export default function AdminNewsletterContactDetailPage() {
 
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 2 }}>Contact</Typography>
+                  {editMessage && <Alert severity={editMessage.severity} sx={{ mb: 2 }}>{editMessage.text}</Alert>}
                   <Stack spacing={1}>
-                    <Typography variant="body2"><strong>Email:</strong> {contact.email || "—"}</Typography>
-                    <Typography variant="body2"><strong>Phone:</strong> {contact.contact_info?.phone || "—"}</Typography>
-                    <Typography variant="body2"><strong>Mobile:</strong> {contact.contact_info?.mobile || "—"}</Typography>
-                    <Typography variant="body2"><strong>Address:</strong> {contact.contact_info?.address1 || "—"}</Typography>
-                    <Typography variant="body2"><strong>City:</strong> {contact.contact_info?.city || "—"}</Typography>
-                    <Typography variant="body2"><strong>State:</strong> {contact.contact_info?.state || "—"}</Typography>
-                    <Typography variant="body2"><strong>Country:</strong> {contact.contact_info?.country || "—"}</Typography>
+                    {[
+                      ["firstname", "First name"],
+                      ["lastname", "Last name"],
+                      ["email", "Email"],
+                      ["phone", "Phone"],
+                      ["mobile", "Mobile"],
+                      ["company", "Company"],
+                      ["city", "City"],
+                      ["state", "State"],
+                      ["zipcode", "Zipcode"],
+                      ["country", "Country"],
+                    ].map(([field, label]) => (
+                      <TextField
+                        key={field}
+                        label={label}
+                        size="small"
+                        value={editContact[field] || ""}
+                        onChange={(event) => setEditContact((state) => ({ ...state, [field]: event.target.value }))}
+                        disabled={editLoading}
+                        fullWidth
+                      />
+                    ))}
+                    <Button variant="contained" onClick={saveContact} disabled={editLoading} sx={{ textTransform: "none" }}>
+                      {editLoading ? <CircularProgress size={18} color="inherit" /> : "Save Contact"}
+                    </Button>
+                  </Stack>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Tags</Typography>
+                  {tagError && <Alert severity="error" sx={{ mb: 1.5 }}>{tagError}</Alert>}
+                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+                    {(contact.tags || []).length ? contact.tags.map((tag) => (
+                      <Chip
+                        key={tag.tag}
+                        label={tag.tag}
+                        onDelete={() => removeTag(tag.tag)}
+                        disabled={tagLoading}
+                        variant="outlined"
+                      />
+                    )) : <Typography variant="body2" color="text.secondary">No tags.</Typography>}
+                  </Stack>
+                  <Stack direction="row" spacing={1}>
+                    <TextField size="small" label="Add tag" value={tagInput} onChange={(event) => setTagInput(event.target.value)} fullWidth disabled={tagLoading} />
+                    <Button variant="outlined" onClick={addTag} disabled={tagLoading || !tagInput.trim()}>Add</Button>
+                  </Stack>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Notes</Typography>
+                  {noteError && <Alert severity="error" sx={{ mb: 1.5 }}>{noteError}</Alert>}
+                  <Stack spacing={1.25} sx={{ mb: 2 }}>
+                    {notesLoading ? <Skeleton height={80} /> : notes.length ? notes.map((note) => (
+                      <Box key={note.id} sx={{ borderBottom: "1px solid #EEF2F6", pb: 1 }}>
+                        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{note.text || "—"}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {[note.type, note.createdByUser, formatDateTime(note.dateAdded)].filter(Boolean).join(" · ")}
+                        </Typography>
+                      </Box>
+                    )) : <Typography variant="body2" color="text.secondary">No notes.</Typography>}
+                  </Stack>
+                  <TextField
+                    label="Add note"
+                    value={noteText}
+                    onChange={(event) => setNoteText(event.target.value)}
+                    multiline
+                    minRows={3}
+                    fullWidth
+                    disabled={notesLoading}
+                  />
+                  <Button variant="outlined" onClick={createNote} disabled={notesLoading || !noteText.trim()} sx={{ mt: 1, textTransform: "none" }}>
+                    Add Note
+                  </Button>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Communication Restrictions</Typography>
+                  {dncError && <Alert severity="error" sx={{ mb: 1.5 }}>{dncError}</Alert>}
+                  <Stack spacing={1.25}>
+                    {(contact.communication_restrictions || []).length ? contact.communication_restrictions.map((rule) => (
+                      <Stack key={rule.channel} direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 750 }}>{rule.channel}</Typography>
+                          <Typography variant="caption" color="text.secondary">{rule.comments || "Native Mautic DNC"}</Typography>
+                        </Box>
+                        <Button size="small" color="warning" onClick={() => removeDnc(rule.channel)} disabled={dncLoading}>Remove</Button>
+                      </Stack>
+                    )) : <Typography variant="body2" color="text.secondary">No native Mautic DNC restrictions.</Typography>}
+                    <Button variant="outlined" color="warning" onClick={addDnc} disabled={dncLoading} sx={{ textTransform: "none" }}>
+                      Add Email DNC
+                    </Button>
+                  </Stack>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Custom Fields</Typography>
+                  {customMessage ? (
+                    <Alert severity={customMessage.severity} sx={{ mb: 1.5 }}>{customMessage.text}</Alert>
+                  ) : null}
+                  <MauticDynamicFields
+                    fields={customContactFields}
+                    values={{ ...(contact.custom_fields || {}), ...customEdits }}
+                    onChange={(alias, value) =>
+                      setCustomEdits((current) => {
+                        const next = { ...current, [alias]: value };
+                        const stored = contact.custom_fields?.[alias] ?? "";
+                        if (String(stored) === String(value)) delete next[alias];
+                        return next;
+                      })
+                    }
+                    disabled={customSaving}
+                    emptyMessage="No custom contact fields are published in Mautic. Add one in Settings → Custom Fields."
+                  />
+                  {customContactFields.length ? (
+                    <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center" sx={{ mt: 2 }}>
+                      {Object.keys(customEdits).length ? (
+                        <Typography variant="body2" color="text.secondary">
+                          {`${Object.keys(customEdits).length} changed`}
+                        </Typography>
+                      ) : null}
+                      <Button
+                        onClick={() => setCustomEdits({})}
+                        disabled={!Object.keys(customEdits).length || customSaving}
+                        sx={{ textTransform: "none" }}
+                      >
+                        Discard
+                      </Button>
+                      <Button
+                        variant="contained"
+                        onClick={saveCustomFields}
+                        disabled={!Object.keys(customEdits).length || customSaving}
+                        startIcon={customSaving ? <CircularProgress size={16} color="inherit" /> : null}
+                        sx={{ textTransform: "none", bgcolor: "#0f766e", "&:hover": { bgcolor: "#0d6259" } }}
+                      >
+                        Save to Mautic
+                      </Button>
+                    </Stack>
+                  ) : null}
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Companies</Typography>
+                    <Button
+                      size="small"
+                      startIcon={<AddRoundedIcon />}
+                      onClick={() => setCompanyDialogOpen(true)}
+                      disabled={companyBusy}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Add
+                    </Button>
+                  </Stack>
+                  {companiesError && <Alert severity="error" sx={{ mb: 1.5 }}>{companiesError}</Alert>}
+                  <Stack spacing={1}>
+                    {companiesLoading ? <Skeleton height={64} /> : companies.length ? companies.map((company) => (
+                      <Stack
+                        key={company.id}
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        spacing={1}
+                        sx={{ borderBottom: "1px solid #EEF2F6", pb: 1 }}
+                      >
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 750, color: "#0f766e", cursor: "pointer" }}
+                            onClick={() => navigate(`/admin/newsletter/companies/${company.id}`)}
+                            noWrap
+                          >
+                            {company.name || `Company #${company.id}`}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {[company.email, company.city, company.country, company.is_primary ? "Primary" : ""].filter(Boolean).join(" · ")}
+                          </Typography>
+                        </Box>
+                        <Tooltip title="Remove from company">
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={companyBusy}
+                              onClick={() => handleRemoveCompany(company)}
+                            >
+                              <LinkOffRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    )) : <Typography variant="body2" color="text.secondary">No associated companies returned by Mautic.</Typography>}
                   </Stack>
                 </Paper>
 
@@ -965,6 +1495,13 @@ export default function AdminNewsletterContactDetailPage() {
           </Stack>
         </Grid>
       </Grid>
+
+      <AddCompanyDialog
+        open={companyDialogOpen}
+        busy={companyBusy}
+        onClose={() => setCompanyDialogOpen(false)}
+        onSelect={handleAddCompany}
+      />
     </Stack>
   );
 }
