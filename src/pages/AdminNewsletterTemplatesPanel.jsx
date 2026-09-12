@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -12,6 +12,7 @@ import {
   FormControlLabel,
   Grid,
   IconButton,
+  MenuItem,
   Paper,
   Skeleton,
   Snackbar,
@@ -22,8 +23,10 @@ import {
   Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import PreviewRoundedIcon from "@mui/icons-material/PreviewRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -31,8 +34,14 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import {
   createNewsletterTemplate,
   deleteNewsletterTemplate,
+  duplicateNewsletterTemplate,
   getNewsletterTemplate,
+  getNewsletterTemplateUsage,
+  listNewsletterTemplateCategories,
+  listNewsletterTemplateThemes,
+  listNewsletterTemplateTokens,
   listNewsletterTemplates,
+  previewNewsletterTemplate,
   updateNewsletterTemplate,
 } from "../services/newsletterService";
 
@@ -60,6 +69,8 @@ const blankTemplate = {
   plainText: starterPlainText,
   customHtml: starterHtml,
   isPublished: false,
+  category: "",
+  template: "",
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,7 +110,18 @@ const templateToForm = (template) => ({
   plainText: template?.plainText || "",
   customHtml: template?.customHtml || "",
   isPublished: Boolean(template?.isPublished),
+  category: template?.category?.id || "",
+  template: template?.template || "",
 });
+
+const tokenGroups = (tokens) =>
+  (Array.isArray(tokens) ? tokens : []).reduce((groups, token) => {
+    const group = token.group || "Tokens";
+    return {
+      ...groups,
+      [group]: [...(groups[group] || []), token],
+    };
+  }, {});
 
 function TemplateEditorDialog({
   open,
@@ -108,12 +130,15 @@ function TemplateEditorDialog({
   loading,
   saving,
   error,
+  metadata,
   onClose,
   onSave,
 }) {
   const [form, setForm] = useState(blankTemplate);
   const [formErrors, setFormErrors] = useState({});
   const [previewOpen, setPreviewOpen] = useState(false);
+  const htmlRef = useRef(null);
+  const textRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -151,8 +176,30 @@ function TemplateEditorDialog({
       plainText: form.plainText,
       customHtml: form.customHtml,
       isPublished: Boolean(form.isPublished),
+      category: form.category,
+      template: form.template,
     });
   };
+
+  const insertToken = (token, field = "customHtml") => {
+    if (!token) return;
+    const ref = field === "plainText" ? textRef : htmlRef;
+    const element = ref.current;
+    const value = form[field] || "";
+    const start = Number.isInteger(element?.selectionStart)
+      ? element.selectionStart
+      : value.length;
+    const end = Number.isInteger(element?.selectionEnd)
+      ? element.selectionEnd
+      : value.length;
+    setField(field, `${value.slice(0, start)}${token}${value.slice(end)}`);
+    window.requestAnimationFrame(() => {
+      element?.focus();
+      element?.setSelectionRange(start + token.length, start + token.length);
+    });
+  };
+
+  const groupedTokens = tokenGroups(metadata.tokens);
 
   return (
     <>
@@ -176,11 +223,6 @@ function TemplateEditorDialog({
           ) : (
             <Stack spacing={2}>
               {error && <Alert severity="error">{error}</Alert>}
-              <Alert severity="info" variant="outlined">
-                This reusable email is stored directly in Mautic. The HTML editor below is
-                source editing; the visual drag-and-drop builder is a separate phase.
-              </Alert>
-
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
                   <TextField
@@ -248,8 +290,40 @@ function TemplateEditorDialog({
                     fullWidth
                     disabled={saving}
                     helperText="Reusable HTML stored in the native Mautic email Template."
+                    inputRef={htmlRef}
                   />
                 </Grid>
+                {Object.keys(groupedTokens).length > 0 && (
+                  <Grid item xs={12}>
+                    <Paper variant="outlined" sx={{ p: 1.5, borderColor: "#E7ECEF" }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>
+                        Mautic Tokens
+                      </Typography>
+                      <Stack spacing={1}>
+                        {Object.entries(groupedTokens).map(([group, tokens]) => (
+                          <Box key={group}>
+                            <Typography variant="caption" color="text.secondary">
+                              {group}
+                            </Typography>
+                            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                              {tokens.slice(0, 16).map((token) => (
+                                <Button
+                                  key={token.token}
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => insertToken(token.token)}
+                                  sx={{ textTransform: "none", my: 0.25 }}
+                                >
+                                  {token.label}
+                                </Button>
+                              ))}
+                            </Stack>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Grid>
+                )}
                 <Grid item xs={12}>
                   <TextField
                     label="Plain Text Fallback"
@@ -259,7 +333,44 @@ function TemplateEditorDialog({
                     minRows={6}
                     fullWidth
                     disabled={saving}
+                    inputRef={textRef}
                   />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    select
+                    label="Email Category"
+                    value={form.category}
+                    onChange={(event) => setField("category", event.target.value)}
+                    fullWidth
+                    disabled={saving}
+                    helperText="Native Mautic email category."
+                  >
+                    <MenuItem value="">Uncategorized</MenuItem>
+                    {metadata.categories.map((category) => (
+                      <MenuItem key={category.id} value={category.id}>
+                        {category.title || category.alias || `Category #${category.id}`}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    select
+                    label="Theme"
+                    value={form.template}
+                    onChange={(event) => setField("template", event.target.value)}
+                    fullWidth
+                    disabled={saving}
+                    helperText="Native Mautic email theme metadata."
+                  >
+                    <MenuItem value="">No theme / custom HTML</MenuItem>
+                    {metadata.themes.map((theme) => (
+                      <MenuItem key={theme.key} value={theme.key}>
+                        {theme.name || theme.key}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 </Grid>
               </Grid>
 
@@ -452,7 +563,13 @@ export default function AdminNewsletterTemplatesPanel() {
     open: false,
     template: null,
     loading: false,
+    usage: null,
     error: "",
+  });
+  const [metadata, setMetadata] = useState({
+    tokens: [],
+    categories: [],
+    themes: [],
   });
   const [snack, setSnack] = useState({
     open: false,
@@ -499,6 +616,31 @@ export default function AdminNewsletterTemplatesPanel() {
     loadTemplates({ nextPage: page, nextSearch: search });
   }, [page, search]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMetadata() {
+      try {
+        const [tokenData, categoryData, themeData] = await Promise.all([
+          listNewsletterTemplateTokens(),
+          listNewsletterTemplateCategories(),
+          listNewsletterTemplateThemes(),
+        ]);
+        if (cancelled) return;
+        setMetadata({
+          tokens: Array.isArray(tokenData?.results) ? tokenData.results : [],
+          categories: Array.isArray(categoryData?.results) ? categoryData.results : [],
+          themes: Array.isArray(themeData?.results) ? themeData.results : [],
+        });
+      } catch (err) {
+        if (!cancelled) setMetadata({ tokens: [], categories: [], themes: [] });
+      }
+    }
+    loadMetadata();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const submitSearch = (event) => {
     event.preventDefault();
     const nextSearch = searchInput.trim();
@@ -530,7 +672,8 @@ export default function AdminNewsletterTemplatesPanel() {
       error: "",
     });
     try {
-      const template = await getNewsletterTemplate(templateId);
+      const response = await previewNewsletterTemplate(templateId);
+      const template = response?.template || response;
       setEditor({
         open: true,
         mode: "edit",
@@ -545,6 +688,53 @@ export default function AdminNewsletterTemplatesPanel() {
         loading: false,
         error: getErrorMessage(err, "We could not load this Template."),
       }));
+    }
+  };
+
+  const duplicateTemplate = async (template) => {
+    if (!template?.id) return;
+    try {
+      await duplicateNewsletterTemplate(template.id);
+      setSnack({
+        open: true,
+        severity: "success",
+        message: "Template duplicated as a draft.",
+      });
+      await loadTemplates({ nextPage: page, nextSearch: search });
+    } catch (err) {
+      setSnack({
+        open: true,
+        severity: "error",
+        message: getErrorMessage(err, "We could not duplicate this Template."),
+      });
+    }
+  };
+
+  const openDelete = async (template) => {
+    setDeleteState({
+      open: true,
+      template,
+      loading: true,
+      usage: null,
+      error: "",
+    });
+    try {
+      const usage = await getNewsletterTemplateUsage(template.id);
+      setDeleteState({
+        open: true,
+        template,
+        loading: false,
+        usage,
+        error: "",
+      });
+    } catch (err) {
+      setDeleteState({
+        open: true,
+        template,
+        loading: false,
+        usage: null,
+        error: getErrorMessage(err, "Template usage could not be checked."),
+      });
     }
   };
 
@@ -616,6 +806,7 @@ export default function AdminNewsletterTemplatesPanel() {
         open: false,
         template: null,
         loading: false,
+        usage: null,
         error: "",
       });
       setSnack({
@@ -839,6 +1030,15 @@ export default function AdminNewsletterTemplatesPanel() {
 
                   <Box sx={{ mt: "auto" }}>
                     <Typography variant="caption" color="text.secondary" display="block">
+                      Type: {template.emailType || "template"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Category: {template.category?.title || "Uncategorized"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Theme: {template.template || "Custom HTML"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
                       Sender: {template.fromName || "-"}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" display="block">
@@ -857,17 +1057,22 @@ export default function AdminNewsletterTemplatesPanel() {
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
+                    <Tooltip title="Duplicate">
+                      <IconButton onClick={() => duplicateTemplate(template)}>
+                        <ContentCopyRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Test send requires a verified Mautic test-send bridge">
+                      <span>
+                        <IconButton disabled>
+                          <EmailRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                     <Tooltip title="Delete">
                       <IconButton
                         color="error"
-                        onClick={() =>
-                          setDeleteState({
-                            open: true,
-                            template,
-                            loading: false,
-                            error: "",
-                          })
-                        }
+                        onClick={() => openDelete(template)}
                       >
                         <DeleteRoundedIcon fontSize="small" />
                       </IconButton>
@@ -918,6 +1123,7 @@ export default function AdminNewsletterTemplatesPanel() {
         loading={editor.loading}
         saving={editor.saving}
         error={editor.error}
+        metadata={metadata}
         onClose={() =>
           setEditor({
             open: false,
@@ -953,6 +1159,7 @@ export default function AdminNewsletterTemplatesPanel() {
             open: false,
             template: null,
             loading: false,
+            usage: null,
             error: "",
           })
         }
@@ -963,6 +1170,14 @@ export default function AdminNewsletterTemplatesPanel() {
         <DialogContent dividers>
           <Stack spacing={2}>
             {deleteState.error && <Alert severity="error">{deleteState.error}</Alert>}
+            {deleteState.loading ? (
+              <Skeleton height={54} />
+            ) : deleteState.usage?.available === false ? (
+              <Alert severity="warning" variant="outlined">
+                Mautic REST does not expose template dependency usage here. Delete
+                will be attempted through Mautic, and provider validation remains the guard.
+              </Alert>
+            ) : null}
             <Typography>
               Delete <strong>{deleteState.template?.name || "this Template"}</strong> from
               native Mautic?
@@ -980,6 +1195,7 @@ export default function AdminNewsletterTemplatesPanel() {
                 open: false,
                 template: null,
                 loading: false,
+                usage: null,
                 error: "",
               })
             }

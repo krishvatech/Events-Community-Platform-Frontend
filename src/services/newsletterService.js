@@ -118,14 +118,35 @@ export const listNewsletterTemplates = (params = {}) =>
 export const getNewsletterTemplate = (templateId) =>
   unwrap(apiClient.get(`${adminTemplatesEndpoint}${templateId}/`));
 
+export const previewNewsletterTemplate = (templateId) =>
+  unwrap(apiClient.get(`${adminTemplatesEndpoint}${templateId}/preview/`));
+
 export const createNewsletterTemplate = (payload) =>
   unwrap(apiClient.post(adminTemplatesEndpoint, payload));
 
 export const updateNewsletterTemplate = (templateId, payload) =>
   unwrap(apiClient.patch(`${adminTemplatesEndpoint}${templateId}/`, payload));
 
+export const duplicateNewsletterTemplate = (templateId, payload = {}) =>
+  unwrap(apiClient.post(`${adminTemplatesEndpoint}${templateId}/duplicate/`, payload));
+
 export const deleteNewsletterTemplate = (templateId) =>
   unwrap(apiClient.delete(`${adminTemplatesEndpoint}${templateId}/`));
+
+export const testSendNewsletterTemplate = (templateId, email) =>
+  unwrap(apiClient.post(`${adminTemplatesEndpoint}${templateId}/test-send/`, { email }));
+
+export const listNewsletterTemplateTokens = () =>
+  unwrap(apiClient.get(`${adminTemplatesEndpoint}tokens/`));
+
+export const listNewsletterTemplateCategories = () =>
+  unwrap(apiClient.get(`${adminTemplatesEndpoint}categories/`));
+
+export const listNewsletterTemplateThemes = () =>
+  unwrap(apiClient.get(`${adminTemplatesEndpoint}themes/`));
+
+export const getNewsletterTemplateUsage = (templateId) =>
+  unwrap(apiClient.get(`${adminTemplatesEndpoint}${templateId}/usage/`));
 
 export const listNewsletterCategories = () =>
   unwrap(apiClient.get("/newsletter/admin/categories/"));
