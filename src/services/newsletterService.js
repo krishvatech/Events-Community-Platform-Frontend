@@ -18,6 +18,7 @@ const adminPointTriggersEndpoint = `${adminPointsEndpoint}triggers/`;
 const adminPointGroupsEndpoint = `${adminPointsEndpoint}groups/`;
 const adminTemplatesEndpoint = "/newsletter/admin/templates/";
 const adminMauticCampaignsEndpoint = "/newsletter/admin/mautic-campaigns/";
+const adminAnalyticsEndpoint = "/newsletter/admin/analytics/";
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -72,6 +73,24 @@ export const updateNewsletterMauticCampaign = (campaignId, payload) =>
 
 export const deleteNewsletterMauticCampaign = (campaignId) =>
   unwrap(apiClient.delete(`${adminMauticCampaignsEndpoint}${campaignId}/`));
+
+export const getNewsletterMauticDiagnostics = () =>
+  unwrap(apiClient.get("/newsletter/admin/settings/mautic-diagnostics/"));
+
+export const getNewsletterAnalyticsOverview = (params = {}) =>
+  unwrap(apiClient.get(`${adminAnalyticsEndpoint}overview/`, { params }));
+
+export const listNewsletterAnalyticsCampaigns = (params = {}) =>
+  unwrap(apiClient.get(`${adminAnalyticsEndpoint}campaigns/`, { params }));
+
+export const listNewsletterAnalyticsEmails = (params = {}) =>
+  unwrap(apiClient.get(`${adminAnalyticsEndpoint}emails/`, { params }));
+
+export const getNewsletterAnalyticsContacts = (params = {}) =>
+  unwrap(apiClient.get(`${adminAnalyticsEndpoint}contacts/`, { params }));
+
+export const listNewsletterAnalyticsSegments = (params = {}) =>
+  unwrap(apiClient.get(`${adminAnalyticsEndpoint}segments/`, { params }));
 
 export const getMauticCampaignCapabilities = () =>
   unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}capabilities/`));

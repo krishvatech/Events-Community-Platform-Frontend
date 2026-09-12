@@ -75,6 +75,7 @@ import {
   sendNewsletterCampaign,
   sendNewsletterTestEmail,
   updateNewsletterCampaign,
+  getNewsletterMauticDiagnostics,
 } from "../services/newsletterService";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
@@ -561,13 +562,75 @@ function AnalyticsOverview({ campaigns, loading, selectedCampaignId, onSelectCam
 
 function SettingsPage() {
   const [section, setSection] = useState("connection");
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(true);
+  const [diagnosticsError, setDiagnosticsError] = useState("");
 
-  const rows = [
-    ["Email Provider", "Mautic is used internally for campaign delivery."],
-    ["Sender Configuration", "Sender defaults are configured when campaigns are created."],
-    ["Unsubscribe Settings", "Subscriber preferences are managed through ECP newsletter preferences."],
-    ["Mautic Status", "Connection status coming soon"],
-  ];
+  const loadDiagnostics = async () => {
+    setDiagnosticsLoading(true);
+    setDiagnosticsError("");
+    try {
+      setDiagnostics(await getNewsletterMauticDiagnostics());
+    } catch (err) {
+      setDiagnostics(null);
+      setDiagnosticsError(getErrorMessage(err, "Could not load Mautic diagnostics."));
+    } finally {
+      setDiagnosticsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (section === "connection") loadDiagnostics();
+  }, [section]);
+
+  const StatusChip = ({ value }) => {
+    const normalized = String(value || "Not available");
+    const healthy = ["Healthy", "Available", "Configured", "Enabled", "Ready", "Received"].includes(normalized);
+    const warning = ["Degraded", "Not Verifiable", "Never Received", "Disabled"].includes(normalized);
+    return (
+      <Chip
+        size="small"
+        label={normalized}
+        color={healthy ? "success" : warning ? "warning" : "error"}
+        variant={healthy ? "filled" : "outlined"}
+        sx={{ fontWeight: 800 }}
+      />
+    );
+  };
+
+  const InfoCard = ({ title, children, status }) => (
+    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF", minHeight: 132 }}>
+      <Stack spacing={1.25}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+          <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{title}</Typography>
+          {status ? <StatusChip value={status} /> : null}
+        </Stack>
+        {children}
+      </Stack>
+    </Paper>
+  );
+
+  const Field = ({ label, value }) => (
+    <Stack direction="row" justifyContent="space-between" spacing={2}>
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: 700, textAlign: "right", color: "#1B2A4A" }}>
+        {value === null || value === undefined || value === "" ? "Not available" : String(value)}
+      </Typography>
+    </Stack>
+  );
+
+  const formatDiagnosticDate = (value) => {
+    if (!value) return "Never";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   return (
     <Stack spacing={3}>
@@ -597,16 +660,107 @@ function SettingsPage() {
       </Paper>
 
       {section === "connection" ? (
-        <Grid container spacing={2}>
-          {rows.map(([title, description]) => (
-            <Grid item xs={12} md={6} key={title}>
-              <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF", minHeight: 132 }}>
-                <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>{title}</Typography>
-                <Typography color="text.secondary">{description}</Typography>
-              </Paper>
+        <Stack spacing={2.5}>
+          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.5}>
+            <Typography color="text.secondary">
+              Read-only operational status for Mautic, bridge plugins, webhooks, and newsletter sync.
+            </Typography>
+            <Button
+              startIcon={<RefreshRoundedIcon />}
+              onClick={loadDiagnostics}
+              disabled={diagnosticsLoading}
+              sx={{ textTransform: "none", alignSelf: { xs: "flex-start", sm: "center" } }}
+            >
+              Refresh Status
+            </Button>
+          </Stack>
+
+          {diagnosticsError ? <Alert severity="error">{diagnosticsError}</Alert> : null}
+
+          {diagnosticsLoading ? (
+            <Grid container spacing={2}>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Grid item xs={12} md={6} key={index}>
+                  <Skeleton variant="rounded" height={150} />
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
+          ) : diagnostics ? (
+            <>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <InfoCard title="Mautic Instance" status={diagnostics.connection?.status}>
+                    <Field label="Configured" value={diagnostics.connection?.configured ? "Yes" : "No"} />
+                    <Field label="Reachable" value={diagnostics.connection?.reachable ? "Yes" : "No"} />
+                    <Field label="Authenticated" value={diagnostics.connection?.authenticated ? "Yes" : "No"} />
+                    <Field label="Host" value={diagnostics.connection?.host} />
+                    <Field label="Version" value={diagnostics.connection?.version} />
+                    <Field label="Last Checked" value={formatDiagnosticDate(diagnostics.checked_at)} />
+                  </InfoCard>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InfoCard title="Mautic REST API" status={diagnostics.api?.status}>
+                    <Typography color="text.secondary" variant="body2">{diagnostics.api?.detail}</Typography>
+                  </InfoCard>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InfoCard title="ECP Marketing Bridge" status={diagnostics.bridges?.marketing?.status}>
+                    <Field label="Plugin" value={diagnostics.bridges?.marketing?.plugin} />
+                    <Field label="Version" value={diagnostics.bridges?.marketing?.version} />
+                    <Typography variant="body2" color="text.secondary">
+                      {(diagnostics.bridges?.marketing?.capabilities || []).join(", ") || diagnostics.bridges?.marketing?.detail || "No capabilities reported."}
+                    </Typography>
+                  </InfoCard>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InfoCard title="Campaign Builder Bridge" status={diagnostics.bridges?.campaign_builder?.status}>
+                    <Field label="Plugin" value={diagnostics.bridges?.campaign_builder?.plugin} />
+                    <Field label="Actions" value={diagnostics.bridges?.campaign_builder?.capabilities?.actions} />
+                    <Field label="Conditions" value={diagnostics.bridges?.campaign_builder?.capabilities?.conditions} />
+                    <Field label="Decisions" value={diagnostics.bridges?.campaign_builder?.capabilities?.decisions} />
+                  </InfoCard>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InfoCard title="Webhooks" status={diagnostics.webhook?.receiver}>
+                    <Field label="Receiver" value={diagnostics.webhook?.receiver} />
+                    <Field label="Endpoint" value={diagnostics.webhook?.endpoint_path} />
+                    <Field label="Last Received" value={formatDiagnosticDate(diagnostics.webhook?.last_received_at)} />
+                    <Field label="Registration" value={diagnostics.webhook?.registration} />
+                    <Typography variant="body2" color="text.secondary">
+                      {(diagnostics.webhook?.supported_event_types || []).join(", ")}
+                    </Typography>
+                  </InfoCard>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InfoCard title="Synchronization" status={diagnostics.sync?.status}>
+                    <Field label="Pending" value={diagnostics.sync?.pending} />
+                    <Field label="Processing" value={diagnostics.sync?.processing} />
+                    <Field label="Retrying" value={diagnostics.sync?.retrying} />
+                    <Field label="Failed" value={diagnostics.sync?.failed} />
+                    <Field label="Last successful" value={formatDiagnosticDate(diagnostics.sync?.latest_success_at)} />
+                  </InfoCard>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InfoCard title="Background Processing" status={diagnostics.background_processing?.configuration}>
+                    <Field label="Configuration" value={diagnostics.background_processing?.configuration} />
+                    <Field label="Worker heartbeat" value={diagnostics.background_processing?.live_worker_status} />
+                    <Field label="Sync recovery scheduled" value={diagnostics.background_processing?.newsletter_sync_scheduled ? "Yes" : "No"} />
+                  </InfoCard>
+                </Grid>
+              </Grid>
+
+              {diagnostics.diagnostics?.warnings?.length ? (
+                <Stack spacing={1}>
+                  {diagnostics.diagnostics.warnings.map((warning) => (
+                    <Alert key={warning} severity="warning" variant="outlined">{warning}</Alert>
+                  ))}
+                </Stack>
+              ) : (
+                <Alert severity="success" variant="outlined">No diagnostics warnings.</Alert>
+              )}
+            </>
+          ) : null}
+        </Stack>
       ) : null}
 
       {section === "tags" ? <AdminNewsletterTagsPanel /> : null}

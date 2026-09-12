@@ -33,6 +33,7 @@ import ProfilePage from "./pages/ProfilePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import NewsletterPage from "./pages/NewsletterPage.jsx";
 import AdminNewsletterPage from "./pages/AdminNewsletterPage.jsx";
+import AdminNewsletterAnalyticsPage from "./pages/AdminNewsletterAnalyticsPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
 import AdminNewsletterContactDetailPage from "./pages/AdminNewsletterContactDetailPage.jsx";
 import AdminNewsletterCompaniesPage from "./pages/AdminNewsletterCompaniesPage.jsx";
@@ -309,7 +310,7 @@ const AppShell = () => {
               <Route path="templates" element={<AdminNewsletterPage />} />
               <Route path="lists" element={<AdminNewsletterPage />} />
               <Route path="segments" element={<AdminNewsletterPage />} />
-              <Route path="analytics" element={<AdminNewsletterPage />} />
+              <Route path="analytics" element={<AdminNewsletterAnalyticsPage />} />
               <Route path="settings" element={<AdminNewsletterPage />} />
               <Route path="new" element={<AdminNewsletterPage />} />
               <Route path="audiences/*" element={<Navigate to="/admin/newsletter" replace />} />
