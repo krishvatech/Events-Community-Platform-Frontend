@@ -32,6 +32,7 @@ import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
 import ProfilePage from "./pages/ProfilePage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import NewsletterPage from "./pages/NewsletterPage.jsx";
+import AdminNewsletterDashboardPage from "./pages/AdminNewsletterDashboardPage.jsx";
 import AdminNewsletterPage from "./pages/AdminNewsletterPage.jsx";
 import AdminNewsletterAnalyticsPage from "./pages/AdminNewsletterAnalyticsPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
@@ -305,7 +306,7 @@ const AppShell = () => {
             <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
             <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
             <Route path="newsletter" element={<RequireStaffOrAdmin><MarketingHubLayout /></RequireStaffOrAdmin>}>
-              <Route index element={<AdminNewsletterPage />} />
+              <Route index element={<AdminNewsletterDashboardPage />} />
               <Route path="campaigns" element={<AdminNewsletterPage />} />
               <Route path="templates" element={<AdminNewsletterPage />} />
               <Route path="lists" element={<AdminNewsletterPage />} />
