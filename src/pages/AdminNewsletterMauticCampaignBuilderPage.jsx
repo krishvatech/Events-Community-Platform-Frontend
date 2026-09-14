@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -41,7 +41,32 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import WorkflowCanvas from "./WorkflowCanvas";
 import {
+  asArray,
+  buildCapabilityIndex,
+  getEventKey,
+  getEventLabel,
+  hydrateWorkflowEvent,
+  hydrateWorkflowEvents,
+  isPlainObject,
+  isProviderMetadataHydrated,
+  isProviderMetadataUnavailable,
+} from "./mauticCampaignEventHydration";
+import {
+  buildEventsPayload,
+  buildFlatExecutionEvents,
+  executionEventId,
+  isEcpCanvasNode,
+} from "./mauticCampaignSavePayload";
+import { isRemoteChoiceField } from "./mauticCampaignChoices";
+import {
+  findWorkflowEvent,
+  removeWorkflowEventFromState,
+  requiresProviderDeletion,
+} from "./mauticCampaignEventRemoval";
+import MauticRemoteChoiceField from "./MauticRemoteChoiceField";
+import {
   createNativeMauticCampaign,
+  deleteNativeMauticCampaignEvent,
   deleteNewsletterMauticCampaign,
   duplicateNativeMauticCampaign,
   getMauticCampaignCapabilities,
@@ -61,16 +86,6 @@ const getErrorMessage = (err, fallback = "Something went wrong. Please try again
   if (firstValue) return `${firstKey}: ${firstValue}`;
   return fallback;
 };
-
-const asArray = (value) => {
-  if (Array.isArray(value)) return value;
-  if (value && typeof value === "object") return Object.values(value);
-  return [];
-};
-
-const getEventKey = (event) => event?.key || event?.type || event?.eventType || "unknown";
-
-const getEventLabel = (event) => event?.label || getEventKey(event);
 
 const eventTypeLabel = (eventType) => {
   const normalized = String(eventType || "").toLowerCase();
@@ -93,9 +108,6 @@ const sourceLabel = (source, fallback) =>
 
 const workflowEventId = () =>
   `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-const isPlainObject = (value) =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 const propertyPath = (parts) => parts.join(".");
 
@@ -145,6 +157,62 @@ const optionChoices = (value) => {
   return [];
 };
 
+const flattenSchemaChoices = (choices) =>
+  asArray(choices).flatMap((choice) => {
+    if (Array.isArray(choice?.choices)) return flattenSchemaChoices(choice.choices);
+    return [choice];
+  });
+
+const fieldKindFromSchema = (field) => {
+  const prefixes = asArray(field?.blockPrefixes).map((prefix) => String(prefix).toLowerCase());
+  const type = String(field?.type || "").toLowerCase();
+  if (field?.choices?.length || prefixes.includes("choice") || type.includes("choicetype")) {
+    return "select";
+  }
+  if (prefixes.includes("checkbox") || prefixes.includes("switch") || type.includes("checkboxtype")) {
+    return "boolean";
+  }
+  if (prefixes.includes("textarea") || type.includes("textareatype")) return "textarea";
+  if (prefixes.includes("integer") || prefixes.includes("number") || type.includes("integertype") || type.includes("numbertype")) {
+    return "number";
+  }
+  return "text";
+};
+
+const schemaFieldLabel = (field) => {
+  if (typeof field?.label === "string" && field.label.trim()) return field.label;
+  return field?.name || "Field";
+};
+
+const buildSchemaPropertyFields = (fields, prefix = []) =>
+  asArray(fields).flatMap((field) => {
+    if (!isPlainObject(field) || !field.name) return [];
+    if (field.renderable === false) return [];
+    const path = propertyPath([...prefix, field.name]);
+    const children = asArray(field.children);
+    const choices = flattenSchemaChoices(field.choices);
+    const remote = isRemoteChoiceField(field);
+    const kind = remote ? "select" : fieldKindFromSchema(field);
+
+    if (children.length && !choices.length && !remote && kind !== "boolean") {
+      return buildSchemaPropertyFields(children, [...prefix, field.name]);
+    }
+
+    return [{
+      path,
+      label: schemaFieldLabel(field),
+      kind,
+      choices,
+      required: Boolean(field.required),
+      multiple: Boolean(field.multiple),
+      help: field.help || field.attr?.tooltip || field.attr?.help || "",
+      // Present only when the provider list is served by reference.
+      remote,
+      choiceSource: remote ? field.choiceSource : null,
+      choiceCount: field.choiceCount,
+    }];
+  });
+
 const buildPropertyFields = (value, prefix = []) => {
   if (!isPlainObject(value)) return [];
 
@@ -166,6 +234,12 @@ const buildPropertyFields = (value, prefix = []) => {
   });
 };
 
+const getEventPropertyFields = (event) => {
+  const schemaFields = buildSchemaPropertyFields(event?.metadata?.formSchema?.fields);
+  if (schemaFields.length) return schemaFields;
+  return buildPropertyFields(event?.metadata?.formTypeOptions);
+};
+
 const configuredPropertiesCount = (properties) => {
   if (!isPlainObject(properties)) return 0;
   return Object.values(properties).reduce((count, value) => {
@@ -185,8 +259,8 @@ const getRequiredFields = (formTypeOptions) => {
 };
 
 const isEventConfigurationComplete = (event) => {
-  if (!isPlainObject(event.metadata?.formTypeOptions)) return true;
-  const requiredFields = getRequiredFields(event.metadata.formTypeOptions);
+  const fields = getEventPropertyFields(event);
+  const requiredFields = fields.filter(field => field.required === true);
   if (!requiredFields.length) return true;
 
   return requiredFields.every(field => {
@@ -195,12 +269,32 @@ const isEventConfigurationComplete = (event) => {
   });
 };
 
-const getConfigurationStatus = (event) => {
-  if (!isPlainObject(event.metadata?.formTypeOptions)) {
+const getConfigurationStatus = (event, { capabilitiesLoading = false } = {}) => {
+  // A saved event only becomes configurable once it has been rejoined with the
+  // current provider capability, so never claim it has no fields before then.
+  if (isProviderMetadataUnavailable(event)) {
+    return {
+      complete: true,
+      unavailable: true,
+      color: "warning",
+      message: "Provider event metadata unavailable",
+    };
+  }
+  if (capabilitiesLoading && !isProviderMetadataHydrated(event)) {
+    return {
+      complete: true,
+      pending: true,
+      color: "default",
+      message: "Loading provider metadata…",
+    };
+  }
+
+  const fields = getEventPropertyFields(event);
+  if (!fields.length && !isPlainObject(event.metadata?.formTypeOptions)) {
     return { complete: true, message: "No configuration fields" };
   }
 
-  const requiredFields = getRequiredFields(event.metadata.formTypeOptions);
+  const requiredFields = fields.filter(field => field.required === true);
   if (!requiredFields.length) {
     const configuredCount = configuredPropertiesCount(event.properties);
     return {
@@ -223,6 +317,12 @@ const getConfigurationStatus = (event) => {
 
   return { complete: true, message: "Configured" };
 };
+
+const statusChipColor = (status) =>
+  status?.color || (status?.complete ? "success" : "error");
+
+const statusChipVariant = (status) =>
+  status?.complete && !status?.color ? "filled" : "outlined";
 
 const hasValidPosition = (node) =>
   Boolean(node?.position) &&
@@ -320,7 +420,12 @@ const buildCanvasGraph = (canvasNodes, canvasEdges) => {
 const mapCanvasToExecution = (canvasNodes, canvasEdges, form) => {
   const nodes = canvasNodes || [];
   if (!nodes.length) {
-    return { events: form.events || [], errors: [], nodeMap: new Map(), reachable: new Set() };
+    return {
+      events: buildFlatExecutionEvents(form.events || []),
+      errors: [],
+      nodeMap: new Map(),
+      reachable: new Set(),
+    };
   }
 
   const errors = [];
@@ -374,7 +479,9 @@ const mapCanvasToExecution = (canvasNodes, canvasEdges, form) => {
         );
       } else {
         sequence += 1;
-        const executionId = `new_${sequence}`;
+        // Persisted events keep their provider ID so Mautic updates them in
+        // place instead of creating a duplicate alongside the original.
+        const executionId = executionEventId(event, sequence);
         const executionEvent = {
           id: executionId,
           name: getEventLabel(event.metadata),
@@ -439,30 +546,6 @@ const mapCanvasToExecution = (canvasNodes, canvasEdges, form) => {
   return { events: executionEvents, errors, nodeMap, reachable };
 };
 
-// The provider stores the graph on each event via `parent`; `children` is
-// rebuilt server-side and must not be sent.
-const toEventPayload = (workflowEvent) => {
-  const payload = {
-    key: workflowEvent.key,
-    eventType: workflowEvent.eventType,
-    properties: isPlainObject(workflowEvent.properties) ? workflowEvent.properties : {},
-  };
-
-  if (String(workflowEvent.id || "").startsWith("new_")) {
-    payload.id = workflowEvent.id;
-    payload.name = workflowEvent.name;
-    payload.order = workflowEvent.order;
-    payload.parent = workflowEvent.parent ?? null;
-    if (workflowEvent.triggerMode) payload.triggerMode = workflowEvent.triggerMode;
-    if (workflowEvent.triggerInterval) {
-      payload.triggerInterval = workflowEvent.triggerInterval;
-      payload.triggerIntervalUnit = workflowEvent.triggerIntervalUnit;
-    }
-  }
-
-  return payload;
-};
-
 // The provider reads `connections`, not `edges`; our own keys ride along so the
 // canvas round-trips exactly on reload.
 const toCanvasSettingsPayload = (canvasSettings) => ({
@@ -521,12 +604,45 @@ function CapabilityGroup({ title, description, events, loading }) {
   );
 }
 
-function EventConfigurationPanel({ event, onChangeProperty }) {
+// Shown when the provider no longer describes an event type: the persisted
+// configuration stays exactly as Mautic saved it, so surface it read-only.
+function PersistedPropertiesSummary({ properties }) {
+  const rows = useMemo(
+    () =>
+      Object.entries(isPlainObject(properties) ? properties : {}).map(([key, value]) => ({
+        key,
+        value: isPlainObject(value) || Array.isArray(value) ? JSON.stringify(value) : String(value),
+      })),
+    [properties]
+  );
+
+  if (!rows.length) return null;
+
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary">
+        Saved configuration (preserved)
+      </Typography>
+      <Stack spacing={0.25} sx={{ mt: 0.5 }}>
+        {rows.map((row) => (
+          <Typography key={row.key} component="code" variant="body2">
+            {row.key}: {row.value}
+          </Typography>
+        ))}
+      </Stack>
+    </Box>
+  );
+}
+
+function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading = false }) {
   const fields = useMemo(
-    () => buildPropertyFields(event?.metadata?.formTypeOptions),
+    () => getEventPropertyFields(event),
     [event]
   );
-  const status = useMemo(() => (event ? getConfigurationStatus(event) : null), [event]);
+  const status = useMemo(
+    () => (event ? getConfigurationStatus(event, { capabilitiesLoading }) : null),
+    [event, capabilitiesLoading]
+  );
 
   if (!event) {
     return (
@@ -537,7 +653,10 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
   }
 
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: status?.complete ? "#E7ECEF" : "#FCA5A5", p: 2 }}>
+    <Paper
+      variant="outlined"
+      sx={{ borderRadius: 2, borderColor: status?.complete ? "#E7ECEF" : "#FCA5A5", p: 2 }}
+    >
       <Stack spacing={2}>
         <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">
           <Box sx={{ flex: 1 }}>
@@ -550,8 +669,8 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
           </Box>
           <Chip
             label={status?.message || "Unknown"}
-            color={status?.complete ? "success" : "error"}
-            variant={status?.complete ? "filled" : "outlined"}
+            color={statusChipColor(status)}
+            variant={statusChipVariant(status)}
           />
         </Stack>
 
@@ -577,7 +696,12 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
               Form
             </Typography>
             <Typography component="code" variant="body2">
-              {event.metadata?.formType || "No formType provided"}
+              {event.metadata?.formType ||
+                (status?.unavailable
+                  ? "Provider event metadata unavailable"
+                  : status?.pending
+                  ? "Loading provider metadata…"
+                  : "No formType provided")}
             </Typography>
           </Box>
         </Stack>
@@ -587,8 +711,8 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
             {fields.map((field) => {
               const value = getNestedValue(event.properties, field.path);
               const fieldMeta = getNestedValue(event.metadata?.formTypeOptions, field.path);
-              const isRequired = fieldMeta?.required === true || fieldMeta?.required === "true";
-              const isEmpty = value === undefined || value === null || value === "";
+              const isRequired = field.required === true || fieldMeta?.required === true || fieldMeta?.required === "true";
+              const isEmpty = value === undefined || value === null || value === "" || (Array.isArray(value) && !value.length);
               const fieldLabel = isRequired ? `${field.label} *` : field.label;
               const fieldError = isRequired && isEmpty;
 
@@ -609,6 +733,19 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
                 );
               }
 
+              if (field.remote) {
+                return (
+                  <MauticRemoteChoiceField
+                    key={field.path}
+                    field={field}
+                    value={value}
+                    onChange={(nextValue) =>
+                      onChangeProperty(event.id, field.path, nextValue)
+                    }
+                  />
+                );
+              }
+
               if (field.kind === "select") {
                 return (
                   <FormControl key={field.path} fullWidth error={fieldError}>
@@ -617,17 +754,29 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
                     </InputLabel>
                     <Select
                       labelId={`${event.id}-${field.path}-label`}
-                      value={value ?? ""}
+                      multiple={Boolean(field.multiple)}
+                      value={field.multiple ? (Array.isArray(value) ? value : []) : (value ?? "")}
                       label={fieldLabel}
                       onChange={(changeEvent) =>
                         onChangeProperty(event.id, field.path, changeEvent.target.value)
                       }
+                      input={<OutlinedInput label={fieldLabel} />}
+                      renderValue={field.multiple ? (selected) =>
+                        asArray(selected)
+                          .map((selectedValue) => {
+                            const choice = field.choices.find((item) => String(optionValue(item)) === String(selectedValue));
+                            return optionLabel(choice || selectedValue);
+                          })
+                          .join(", ") : undefined}
                     >
                       {field.choices.map((choice, index) => (
                         <MenuItem
                           key={`${field.path}-${optionValue(choice)}-${index}`}
                           value={optionValue(choice)}
                         >
+                          {field.multiple && (
+                            <Checkbox checked={asArray(value).map(String).includes(String(optionValue(choice)))} />
+                          )}
                           {optionLabel(choice)}
                         </MenuItem>
                       ))}
@@ -641,16 +790,32 @@ function EventConfigurationPanel({ event, onChangeProperty }) {
                   key={field.path}
                   label={fieldLabel}
                   value={value ?? ""}
+                  type={field.kind === "number" ? "number" : "text"}
+                  multiline={field.kind === "textarea"}
+                  minRows={field.kind === "textarea" ? 3 : undefined}
                   onChange={(changeEvent) =>
                     onChangeProperty(event.id, field.path, changeEvent.target.value)
                   }
                   fullWidth
                   error={fieldError}
-                  helperText={fieldError ? "This field is required" : fieldMeta?.description || ""}
+                  helperText={fieldError ? "This field is required" : field.help || fieldMeta?.description || ""}
                 />
               );
             })}
           </Stack>
+        ) : status?.unavailable ? (
+          <Stack spacing={1}>
+            <Alert severity="warning" variant="outlined">
+              Provider event metadata unavailable. This event type is not offered by
+              the current Mautic runtime, so its saved configuration is shown read-only
+              and left untouched.
+            </Alert>
+            <PersistedPropertiesSummary properties={event.properties} />
+          </Stack>
+        ) : status?.pending ? (
+          <Alert severity="info" variant="outlined" icon={<CircularProgress size={16} />}>
+            Loading provider configuration from Mautic…
+          </Alert>
         ) : (
           <Alert severity="info" variant="outlined">
             Additional configuration is provided by Mautic form metadata.
@@ -671,6 +836,7 @@ function CanvasNodeConfigPanel({
   onDeleteNode,
   onClose,
   disabled,
+  capabilitiesLoading = false,
 }) {
   if (!node) {
     return (
@@ -680,7 +846,9 @@ function CanvasNodeConfigPanel({
     );
   }
 
-  const status = linkedEvent ? getConfigurationStatus(linkedEvent) : null;
+  const status = linkedEvent
+    ? getConfigurationStatus(linkedEvent, { capabilitiesLoading })
+    : null;
   const canLinkEvent = EVENT_NODE_TYPES.has(node.nodeType);
   const isDelay = node.nodeType === "delay";
 
@@ -726,8 +894,8 @@ function CanvasNodeConfigPanel({
                   <Chip
                     size="small"
                     label={status ? status.message : "No event linked"}
-                    color={status?.complete ? "success" : "error"}
-                    variant={status?.complete ? "filled" : "outlined"}
+                    color={status ? statusChipColor(status) : "error"}
+                    variant={status ? statusChipVariant(status) : "outlined"}
                   />
                 </Box>
               </Box>
@@ -828,7 +996,11 @@ function CanvasNodeConfigPanel({
       </Paper>
 
       {canLinkEvent && (
-        <EventConfigurationPanel event={linkedEvent} onChangeProperty={onChangeProperty} />
+        <EventConfigurationPanel
+          event={linkedEvent}
+          onChangeProperty={onChangeProperty}
+          capabilitiesLoading={capabilitiesLoading}
+        />
       )}
 
       <Alert severity="info" variant="outlined">
@@ -867,12 +1039,22 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   });
   const [selectedWorkflowEventId, setSelectedWorkflowEventId] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [removeEventTarget, setRemoveEventTarget] = useState(null);
+  const [removingEvent, setRemovingEvent] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [canvasNodes, setCanvasNodes] = useState([]);
   const [selectedCanvasNodeId, setSelectedCanvasNodeId] = useState("");
   const [builderTab, setBuilderTab] = useState("edit");
 
+  const capabilityIndex = useMemo(
+    () => buildCapabilityIndex(capabilities),
+    [capabilities]
+  );
+  // Read by loadCampaign without making the campaign fetch depend on
+  // capabilities: the rehydration effect covers the other load order.
+  const capabilityIndexRef = useRef(capabilityIndex);
+  capabilityIndexRef.current = capabilityIndex;
   const actions = useMemo(() => asArray(capabilities?.actions), [capabilities]);
   const conditions = useMemo(() => asArray(capabilities?.conditions), [capabilities]);
   const decisions = useMemo(() => asArray(capabilities?.decisions), [capabilities]);
@@ -910,6 +1092,11 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     [form.events, selectedCanvasNode]
   );
 
+  const eventConfigurationStatus = useCallback(
+    (event) => getConfigurationStatus(event, { capabilitiesLoading: loading }),
+    [loading]
+  );
+
   const loadCapabilities = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -936,8 +1123,11 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
 
     const campaign = await getNativeMauticCampaignBuilder(campaignId);
 
+    // The saved canvas holds two graphs: this builder's nodes and the
+    // provider-native event graph Mautic needs (keyed by event ID, no nodeType).
+    // Only the builder's own nodes belong on the canvas.
     const rawCanvasNodes = (campaign?.canvasSettings?.nodes || [])
-      .filter((node) => node && node.id)
+      .filter((node) => node && node.id && isEcpCanvasNode(node))
       .map((node) => ({
         ...node,
         nodeType: node.nodeType || node.type,
@@ -948,6 +1138,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               y: Number(node.positionY),
             },
       }));
+    const canvasNodeIds = new Set(rawCanvasNodes.map((node) => node.id));
     const savedEdges = [
       ...(campaign?.canvasSettings?.connections || []),
       ...(campaign?.canvasSettings?.edges || []),
@@ -961,6 +1152,8 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         (edge, index, all) =>
           edge.source &&
           edge.target &&
+          canvasNodeIds.has(edge.source) &&
+          canvasNodeIds.has(edge.target) &&
           all.findIndex((o) => o.source === edge.source && o.target === edge.target) === index
       );
     const validatedCanvasNodes = applyWorkflowLayout(rawCanvasNodes, savedEdges);
@@ -974,13 +1167,18 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       isPublished: Boolean(campaign?.isPublished),
       lists: (campaign?.sources?.segments || []).map((item) => item.id).filter(Boolean),
       forms: (campaign?.sources?.forms || []).map((item) => item.id).filter(Boolean),
-      events: (campaign?.events || []).map((event) => ({
-        id: String(event.id || workflowEventId()),
-        key: event.key,
-        eventType: event.eventType,
-        metadata: event.metadata,
-        properties: isPlainObject(event.properties) ? event.properties : {},
-      })),
+      // Only provider-owned state is persisted; labels and form schema come from
+      // the live capability definition, joined here by provider event key.
+      events: hydrateWorkflowEvents(
+        (campaign?.events || []).map((event) => ({
+          id: String(event.id || workflowEventId()),
+          key: event.key,
+          eventType: event.eventType,
+          metadata: event.metadata,
+          properties: isPlainObject(event.properties) ? event.properties : {},
+        })),
+        capabilityIndexRef.current
+      ),
       canvasSettings: {
         nodes: validatedCanvasNodes,
         edges: validatedCanvasEdges,
@@ -992,6 +1190,16 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   useEffect(() => {
     loadCampaign();
   }, [loadCampaign]);
+
+  // Campaign detail and capabilities load independently, so rejoin saved events
+  // with the current provider metadata whenever either side arrives. Hydration
+  // returns the same array when nothing changes, which stops this from looping.
+  useEffect(() => {
+    setForm((current) => {
+      const events = hydrateWorkflowEvents(current.events, capabilityIndex);
+      return events === current.events ? current : { ...current, events };
+    });
+  }, [capabilityIndex, form.events]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1030,7 +1238,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setSaving(true);
     setFormError("");
     try {
-      let executionEvents = form.events;
+      let executionEvents = buildFlatExecutionEvents(form.events);
       if (canvasNodes.length > 0) {
         const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
         if (mapping.errors.length > 0) {
@@ -1049,7 +1257,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           segments: form.lists,
           forms: form.forms,
         },
-        events: executionEvents.map(toEventPayload),
+        events: buildEventsPayload(executionEvents),
         canvasSettings: toCanvasSettingsPayload(form.canvasSettings),
       };
 
@@ -1093,30 +1301,96 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     if (!selected) return;
     const id = workflowEventId();
 
+    const added = hydrateWorkflowEvent(
+      {
+        id,
+        key: getEventKey(selected),
+        eventType: selected.eventType || eventPicker.eventType,
+        metadata: selected,
+        properties: {},
+      },
+      capabilityIndex
+    );
+
     setForm((current) => ({
       ...current,
-      events: [
-        ...current.events,
-        {
-          id,
-          key: getEventKey(selected),
-          eventType: selected.eventType || eventPicker.eventType,
-          metadata: selected,
-          properties: {},
-        },
-      ],
+      events: [...current.events, added],
     }));
     setSelectedWorkflowEventId(id);
     setEventPicker((current) => ({ ...current, eventKey: "" }));
   };
 
+  // Local reconciliation only: the event, the canvas node standing for it and any
+  // connection touching that node.
   const removeWorkflowEvent = (eventId) => {
-    setForm((current) => ({
-      ...current,
-      events: current.events.filter((event) => event.id !== eventId),
-    }));
-    if (selectedWorkflowEventId === eventId) {
-      setSelectedWorkflowEventId("");
+    let removedNodeIds = [];
+    setForm((current) => {
+      const next = removeWorkflowEventFromState(
+        {
+          events: current.events,
+          canvasSettings: current.canvasSettings,
+          canvasNodes,
+          selectedWorkflowEventId,
+          selectedCanvasNodeId,
+        },
+        eventId
+      );
+      removedNodeIds = next.removedNodeIds;
+      setCanvasNodes(next.canvasNodes);
+      setSelectedWorkflowEventId(next.selectedWorkflowEventId);
+      setSelectedCanvasNodeId(next.selectedCanvasNodeId);
+      return { ...current, events: next.events, canvasSettings: next.canvasSettings };
+    });
+    return removedNodeIds;
+  };
+
+  // A persisted event exists in Mautic, so it has to be removed there; an unsaved
+  // one has never left this page.
+  const requestRemoveWorkflowEvent = (eventId) => {
+    const event = findWorkflowEvent(form.events, eventId);
+    if (!event) return;
+
+    if (!requiresProviderDeletion(event) || !isEditMode) {
+      removeWorkflowEvent(eventId);
+      return;
+    }
+
+    setRemoveEventTarget({ id: String(eventId), label: getEventLabel(event.metadata) });
+  };
+
+  const confirmRemoveWorkflowEvent = async () => {
+    const target = removeEventTarget;
+    if (!target) return;
+
+    setRemovingEvent(true);
+    setFormError("");
+    try {
+      const result = await deleteNativeMauticCampaignEvent(campaignId, target.id);
+      removeWorkflowEvent(target.id);
+      setRemoveEventTarget(null);
+      const detached = (result?.detachedChildren || []).length;
+      setSnack({
+        open: true,
+        severity: "success",
+        message: detached
+          ? `"${target.label}" removed. ${detached} following step${detached > 1 ? "s" : ""} no longer follow it.`
+          : `"${target.label}" removed from this campaign.`,
+      });
+      // Reconcile with whatever the provider now holds.
+      await loadCampaign();
+    } catch (err) {
+      // The event stays exactly where it was; nothing is removed optimistically.
+      setRemoveEventTarget(null);
+      setFormError(
+        getErrorMessage(err, "We could not remove this workflow event from Mautic.")
+      );
+      setSnack({
+        open: true,
+        severity: "error",
+        message: getErrorMessage(err, "We could not remove this workflow event."),
+      });
+    } finally {
+      setRemovingEvent(false);
     }
   };
 
@@ -1193,6 +1467,17 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
 
   const handleCanvasDeleteNode = (nodeId) => {
     const node = canvasNodes.find((n) => n.id === nodeId);
+    const linkedEvent = node?.eventId
+      ? findWorkflowEvent(form.events, node.eventId)
+      : null;
+
+    // Deleting the node of an event Mautic already holds means removing that
+    // event from the campaign, which only the provider can do.
+    if (linkedEvent && requiresProviderDeletion(linkedEvent) && isEditMode) {
+      requestRemoveWorkflowEvent(node.eventId);
+      return;
+    }
+
     if (node?.eventId) {
       removeWorkflowEvent(node.eventId);
     }
@@ -1316,7 +1601,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setSaving(true);
     setFormError("");
     try {
-      let executionEvents = form.events;
+      let executionEvents = buildFlatExecutionEvents(form.events);
       if (canvasNodes.length > 0) {
         const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
         if (mapping.errors.length > 0) {
@@ -1335,7 +1620,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           segments: form.lists,
           forms: form.forms,
         },
-        events: executionEvents.map(toEventPayload),
+        events: buildEventsPayload(executionEvents),
         canvasSettings: toCanvasSettingsPayload(form.canvasSettings),
       };
 
@@ -1360,7 +1645,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setSaving(true);
     setFormError("");
     try {
-      let executionEvents = form.events;
+      let executionEvents = buildFlatExecutionEvents(form.events);
       if (canvasNodes.length > 0) {
         const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
         if (mapping.errors.length > 0) {
@@ -1379,7 +1664,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           segments: form.lists,
           forms: form.forms,
         },
-        events: executionEvents.map(toEventPayload),
+        events: buildEventsPayload(executionEvents),
         canvasSettings: toCanvasSettingsPayload(form.canvasSettings),
       };
 
@@ -1815,6 +2100,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               <EventConfigurationPanel
                 event={selectedWorkflowEvent}
                 onChangeProperty={updateWorkflowEventProperty}
+                capabilitiesLoading={loading}
               />
 
               <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
@@ -1831,7 +2117,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   {form.events.length > 0 ? (
                     <Stack spacing={1}>
                       {form.events.map((event, index) => {
-                        const status = getConfigurationStatus(event);
+                        const status = eventConfigurationStatus(event);
                         return (
                           <Stack key={event.id} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
                             <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
@@ -1840,20 +2126,31 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                               </Typography>
                               <Chip
                                 label={status.message}
-                                color={status.complete ? "success" : "error"}
-                                variant={status.complete ? "filled" : "outlined"}
+                                color={statusChipColor(status)}
+                                variant={statusChipVariant(status)}
                                 size="small"
                               />
                             </Stack>
-                            <Button
-                              type="button"
-                              variant="outlined"
-                              onClick={() => setSelectedWorkflowEventId(event.id)}
-                              disabled={saving}
-                              size="small"
-                            >
-                              Configure
-                            </Button>
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                type="button"
+                                variant="outlined"
+                                onClick={() => setSelectedWorkflowEventId(event.id)}
+                                disabled={saving}
+                                size="small"
+                              >
+                                Configure
+                              </Button>
+                              <Button
+                                type="button"
+                                color="error"
+                                onClick={() => requestRemoveWorkflowEvent(event.id)}
+                                disabled={saving || removingEvent}
+                                size="small"
+                              >
+                                Remove
+                              </Button>
+                            </Stack>
                           </Stack>
                         );
                       })}
@@ -1895,7 +2192,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     canvasSettings={form.canvasSettings}
                     onDeleteNode={handleCanvasDeleteNode}
                     onAddNode={handleCanvasAddNode}
-                    getConfigurationStatus={getConfigurationStatus}
+                    getConfigurationStatus={eventConfigurationStatus}
                     getEventLabel={getEventLabel}
                     selectedNodeId={selectedCanvasNodeId}
                   />
@@ -1912,6 +2209,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     onDeleteNode={handleCanvasDeleteNode}
                     onClose={() => setSelectedCanvasNodeId("")}
                     disabled={saving}
+                    capabilitiesLoading={loading}
                   />
                 </Box>
               </Stack>
@@ -1980,6 +2278,37 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           />
         </Box>
       </Stack>
+
+      <Dialog
+        open={Boolean(removeEventTarget)}
+        onClose={() => !removingEvent && setRemoveEventTarget(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Remove this workflow event from the campaign?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            "{removeEventTarget?.label}" will be removed from this campaign. Any
+            steps that followed it will no longer follow it.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemoveEventTarget(null)} disabled={removingEvent}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmRemoveWorkflowEvent}
+            disabled={removingEvent}
+            startIcon={
+              removingEvent ? <CircularProgress size={18} color="inherit" /> : <DeleteRoundedIcon />
+            }
+          >
+            {removingEvent ? "Removing..." : "Remove Event"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={deleteConfirmOpen} onClose={() => !isDeleting && setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Delete Native Mautic Campaign?</DialogTitle>

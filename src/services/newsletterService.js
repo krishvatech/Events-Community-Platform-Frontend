@@ -99,6 +99,40 @@ export const listNewsletterAnalyticsSegments = (params = {}) =>
 export const getMauticCampaignCapabilities = () =>
   unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}capabilities/`));
 
+// Choices for provider fields whose lists are too large to travel inside the
+// capabilities response (reference catalogs, and entity selectors as they grow).
+// Repeated `values=a&values=b` — axios' default `values[]=` bracket form is not
+// what the endpoint reads.
+const serializeChoiceParams = (params) => {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => query.append(key, item));
+      return;
+    }
+    query.append(key, value);
+  });
+  return query.toString();
+};
+
+export const getMauticCampaignChoices = (params = {}) =>
+  unwrap(
+    apiClient.get(`${adminMauticCampaignsEndpoint}choices/`, {
+      params,
+      paramsSerializer: { serialize: serializeChoiceParams },
+    })
+  );
+
+// Removes one workflow event from the provider campaign. Only events Mautic has
+// already assigned an ID to exist provider-side; unsaved ones are local only.
+export const deleteNativeMauticCampaignEvent = (campaignId, eventId) =>
+  unwrap(
+    apiClient.delete(
+      `${adminMauticCampaignsEndpoint}${campaignId}/events/${eventId}/`
+    )
+  );
+
 export const getNativeMauticCampaign = (campaignId) =>
   unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}${campaignId}/`));
 
