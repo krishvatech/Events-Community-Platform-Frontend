@@ -395,6 +395,22 @@ export const listMauticSegments = () =>
 
 export const listNativeMauticSegments = listMauticSegments;
 
+// Values for a segment filter field whose options come from a Mautic reference
+// catalog. Repeated `values=a&values=b`, as the endpoint reads them.
+export const getNativeMauticSegmentFilterChoices = (params = {}) =>
+  unwrap(
+    apiClient.get("/newsletter/admin/mautic/segments/filter-choices/", {
+      params,
+      paramsSerializer: { serialize: serializeChoiceParams },
+    })
+  );
+
+// Which fields, operators and value controls Mautic offers for segment filters.
+export const getNativeMauticSegmentFilterMetadata = (params = {}) =>
+  unwrap(
+    apiClient.get("/newsletter/admin/mautic/segments/filter-metadata/", { params })
+  );
+
 export const getNativeMauticSegment = (segmentId) =>
   unwrap(apiClient.get(`/newsletter/admin/mautic/segments/${segmentId}/`));
 

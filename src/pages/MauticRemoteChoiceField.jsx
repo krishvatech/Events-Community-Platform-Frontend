@@ -55,14 +55,28 @@ const getErrorMessage = (err, fallback) =>
   err?.response?.data?.detail || err?.message || fallback;
 
 /**
- * Generic selector for any provider choice field the capabilities response
- * describes by reference instead of inlining. No field or event is named here.
+ * Generic selector for any provider choice field described by reference instead
+ * of inlined. No field, event or segment is named here.
  *
- * The provider rebuilds the event's whole form per request, so this asks for one
- * small page at a time, searches provider-side, and only fetches more when the
- * user asks for it.
+ * It asks for one small page at a time, searches provider-side, and only fetches
+ * more when the user asks for it. What differs per caller — how a request is
+ * addressed, who serves it, and which cache it belongs to — is injected, and
+ * defaults to the campaign builder's, which is where this component started.
  */
-export default function MauticRemoteChoiceField({ field, value, onChange, disabled }) {
+export default function MauticRemoteChoiceField({
+  field,
+  value,
+  onChange,
+  disabled,
+  buildParams = choiceRequestParams,
+  loadChoices = getMauticCampaignChoices,
+  // Caches and resolved labels are module-wide, and two callers can name the
+  // same provider catalog while asking different endpoints for it. The default
+  // is empty so the campaign builder's keys are unchanged.
+  cacheNamespace = "",
+  // The campaign builder's own default; the segment rows are compact.
+  size = "medium",
+}) {
   const [options, setOptions] = useState([]);
   // Bumped when the label store learns something, to re-render with it.
   const [resolvedRevision, setResolvedRevision] = useState(0);
@@ -93,14 +107,21 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
     [value, field.multiple]
   );
   const source = field.choiceSource;
-  const sourceKey = useMemo(() => choiceSourceKey(source), [source]);
+  const sourceKey = useMemo(
+    () => `${cacheNamespace}${choiceSourceKey(source)}`,
+    [source, cacheNamespace]
+  );
+  const pageKey = useCallback(
+    (page) => `${cacheNamespace}${choiceCacheKey(source, page)}`,
+    [source, cacheNamespace]
+  );
 
   const fetchPage = useCallback(async (params, cacheKey) => {
     if (cacheKey && choicePageCache.has(cacheKey)) return choicePageCache.get(cacheKey);
     if (cacheKey && inFlightPages.has(cacheKey)) return inFlightPages.get(cacheKey);
 
     const request = (async () => {
-      const payload = await getMauticCampaignChoices(params);
+      const payload = await loadChoices(params);
       const choices = normalizeChoiceResults(payload);
       const page = {
         choices,
@@ -119,7 +140,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
     } finally {
       inFlightPages.delete(cacheKey);
     }
-  }, []);
+  }, [loadChoices]);
 
   const selectedKey = selectionKey(selectedValues);
 
@@ -131,14 +152,14 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
     const needed = labelStore.needed(sourceKey, selectedValues);
     if (!needed.length) return undefined;
 
-    const params = choiceRequestParams(source, { values: needed });
+    const params = buildParams(source, { values: needed });
     if (!params) return undefined; // source not usable yet; retry when it is
 
     labelStore.markPending(sourceKey, needed);
 
     (async () => {
       try {
-        const page = await fetchPage(params, choiceCacheKey(source, { values: needed }));
+        const page = await fetchPage(params, pageKey({ values: needed }));
         labelStore.resolve(sourceKey, page.choices);
         // Anything the provider did not return simply does not exist any more.
         labelStore.markFailed(sourceKey, needed);
@@ -152,7 +173,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
     })();
 
     return undefined;
-  }, [selectedKey, sourceKey, source, fetchPage, selectedValues]);
+  }, [selectedKey, sourceKey, source, fetchPage, selectedValues, buildParams, pageKey]);
 
   const selectedChoices = useMemo(
     () => labelStore.known(sourceKey, selectedValues),
@@ -163,7 +184,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
 
   const loadFirstPage = useCallback(
     async (nextSearch) => {
-      const params = choiceRequestParams(source, {
+      const params = buildParams(source, {
         search: nextSearch,
         start: 0,
         limit: DEFAULT_CHOICE_PAGE_SIZE,
@@ -177,7 +198,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
       try {
         const page = await fetchPage(
           params,
-          choiceCacheKey(source, { search: nextSearch, start: 0 })
+          pageKey({ search: nextSearch, start: 0 })
         );
         if (version !== requestVersion.current) return; // a newer query won
         setSearch(nextSearch);
@@ -193,12 +214,12 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
         if (version === requestVersion.current) setLoading(false);
       }
     },
-    [source, fetchPage]
+    [source, fetchPage, buildParams, pageKey]
   );
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loading || loadingMore) return;
-    const params = choiceRequestParams(source, {
+    const params = buildParams(source, {
       search,
       start: nextStart,
       limit: DEFAULT_CHOICE_PAGE_SIZE,
@@ -210,7 +231,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
     try {
       const page = await fetchPage(
         params,
-        choiceCacheKey(source, { search, start: nextStart })
+        pageKey({ search, start: nextStart })
       );
       if (version !== requestVersion.current) return;
       setOptions((current) => appendChoicePage(current, page.choices));
@@ -223,7 +244,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
     } finally {
       setLoadingMore(false);
     }
-  }, [hasMore, loading, loadingMore, source, search, nextStart, fetchPage]);
+  }, [hasMore, loading, loadingMore, source, search, nextStart, fetchPage, buildParams, pageKey]);
 
   // Debounced so a typed word is one provider query, not one per keystroke.
   useEffect(() => {
@@ -264,6 +285,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
   return (
     <FormControl
       fullWidth
+      size={size}
       error={field.required && !selectedValues.length}
       disabled={disabled}
     >
@@ -274,6 +296,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
         value={field.multiple ? selectedValues : selectedValues[0] ?? ""}
         label={fieldLabel}
         input={<OutlinedInput label={fieldLabel} />}
+        size={size}
         onOpen={handleOpen}
         onClose={() => setOpened(false)}
         onChange={(changeEvent) => onChange(changeEvent.target.value)}
@@ -289,7 +312,7 @@ export default function MauticRemoteChoiceField({ field, value, onChange, disabl
           <TextField
             size="small"
             fullWidth
-            placeholder={`Search ${String(field.label).toLowerCase()}…`}
+            placeholder={`Search ${String(field.searchLabel || field.label).toLowerCase()}…`}
             value={searchInput}
             onChange={(changeEvent) => setSearchInput(changeEvent.target.value)}
             onClick={(e) => e.stopPropagation()}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -35,11 +35,19 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
+import MauticSegmentFilterEditor from "./MauticSegmentFilterEditor";
+import {
+  buildFilterMetadataIndex,
+  hydrateFilterRows,
+  toFilterPayload,
+  validateSegmentFilters,
+} from "./mauticSegmentFilters";
 import {
   addNativeMauticSegmentContact,
   createNativeMauticSegment,
   deleteNativeMauticSegment,
   getNativeMauticSegment,
+  getNativeMauticSegmentFilterMetadata,
   listNewsletterAdminContacts,
   listNativeMauticSegmentContacts,
   listNativeMauticSegments,
@@ -297,7 +305,7 @@ function SegmentDetailDialog({
                   Filters
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                  Filter editing is not exposed until Mautic filter metadata can be modeled safely.
+                  Membership is decided by these filters. Edit them with the Edit button.
                 </Typography>
                 {filters.length ? (
                   <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: "#E7ECEF", bgcolor: "#F8FAFC", overflow: "auto" }}>
@@ -327,6 +335,7 @@ const blankSegmentForm = {
   alias: "",
   description: "",
   isPublished: false,
+  filters: [],
 };
 
 const segmentToForm = (segment) => ({
@@ -334,11 +343,30 @@ const segmentToForm = (segment) => ({
   alias: segment?.alias || "",
   description: segment?.description || "",
   isPublished: Boolean(segment?.isPublished),
+  // Saved filters are read back exactly as Mautic evaluates them.
+  filters: hydrateFilterRows(segment?.filters),
 });
 
-function SegmentFormDialog({ open, mode, value, loading, error, onClose, onSubmit }) {
+function SegmentFormDialog({
+  open,
+  mode,
+  value,
+  loading,
+  error,
+  filterMetadata,
+  onClose,
+  onSubmit,
+}) {
   const [form, setForm] = useState(blankSegmentForm);
   const isEdit = mode === "edit";
+  const metadataIndex = useMemo(
+    () => buildFilterMetadataIndex(filterMetadata?.data),
+    [filterMetadata?.data]
+  );
+  const filterValidation = useMemo(
+    () => validateSegmentFilters(form.filters, metadataIndex),
+    [form.filters, metadataIndex]
+  );
 
   useEffect(() => {
     if (open) setForm(value || blankSegmentForm);
@@ -349,7 +377,15 @@ function SegmentFormDialog({ open, mode, value, loading, error, onClose, onSubmi
   };
 
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="sm" fullWidth>
+    <Dialog
+      open={open}
+      onClose={loading ? undefined : onClose}
+      maxWidth="lg"
+      fullWidth
+      // A filter row is five controls wide, so this dialog needs room the other
+      // segment dialogs do not.
+      PaperProps={{ sx: { width: "min(1100px, calc(100vw - 48px))" } }}
+    >
       <DialogTitle>{isEdit ? "Edit Segment" : "Create Segment"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
@@ -359,29 +395,33 @@ function SegmentFormDialog({ open, mode, value, loading, error, onClose, onSubmi
               : "Creates a native Mautic marketing segment. This does not create a Subscription List or newsletter consent option."}
           </Alert>
           {error && <Alert severity="error">{error}</Alert>}
-          <TextField
-            autoFocus
-            label="Name"
-            value={form.name}
-            onChange={(event) => updateField("name", event.target.value)}
-            required
-            fullWidth
-          />
-          <TextField
-            label="Alias"
-            value={form.alias}
-            onChange={(event) => updateField("alias", event.target.value)}
-            helperText="Leave blank to let Mautic assign an alias when supported."
-            fullWidth
-          />
-          <TextField
-            label="Description"
-            value={form.description}
-            onChange={(event) => updateField("description", event.target.value)}
-            multiline
-            minRows={3}
-            fullWidth
-          />
+          {/* The segment's own details stay a readable column even though the
+              dialog is wide enough for the filter builder. */}
+          <Stack spacing={2} sx={{ maxWidth: 640 }}>
+            <TextField
+              autoFocus
+              label="Name"
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              required
+              fullWidth
+            />
+            <TextField
+              label="Alias"
+              value={form.alias}
+              onChange={(event) => updateField("alias", event.target.value)}
+              helperText="Leave blank to let Mautic assign an alias when supported."
+              fullWidth
+            />
+            <TextField
+              label="Description"
+              value={form.description}
+              onChange={(event) => updateField("description", event.target.value)}
+              multiline
+              minRows={3}
+              fullWidth
+            />
+          </Stack>
           <FormControlLabel
             control={
               <Switch
@@ -391,11 +431,14 @@ function SegmentFormDialog({ open, mode, value, loading, error, onClose, onSubmi
             }
             label="Published"
           />
-          {isEdit && (
-            <Alert severity="warning" variant="outlined">
-              Dynamic filters are not edited in this phase, and existing filter definitions will not be sent or reset.
-            </Alert>
-          )}
+          <MauticSegmentFilterEditor
+            rows={form.filters}
+            metadataIndex={metadataIndex}
+            loading={filterMetadata?.loading}
+            error={filterMetadata?.error}
+            disabled={loading}
+            onChange={(rows) => updateField("filters", rows)}
+          />
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -403,7 +446,7 @@ function SegmentFormDialog({ open, mode, value, loading, error, onClose, onSubmi
         <Button
           variant="contained"
           onClick={() => onSubmit(form)}
-          disabled={loading || !form.name.trim()}
+          disabled={loading || !form.name.trim() || !filterValidation.valid}
         >
           {loading ? <CircularProgress size={20} color="inherit" /> : isEdit ? "Save" : "Create"}
         </Button>
@@ -548,6 +591,13 @@ export default function AdminNewsletterNativeSegmentsPanel() {
     error: "",
     search: "",
   });
+  // Which fields, conditions and values Mautic offers for filters. Fetched once
+  // per panel session and shared by create and edit.
+  const [filterMetadata, setFilterMetadata] = useState({
+    loading: false,
+    error: "",
+    data: null,
+  });
   const [formState, setFormState] = useState({
     open: false,
     mode: "create",
@@ -685,6 +735,28 @@ export default function AdminNewsletterNativeSegmentsPanel() {
     });
   };
 
+  const loadFilterMetadata = useCallback(async () => {
+    if (filterMetadata.data || filterMetadata.loading) return;
+    setFilterMetadata((state) => ({ ...state, loading: true, error: "" }));
+    try {
+      const data = await getNativeMauticSegmentFilterMetadata();
+      setFilterMetadata({ loading: false, error: "", data });
+    } catch (err) {
+      setFilterMetadata({
+        loading: false,
+        data: null,
+        error: getErrorMessage(
+          err,
+          "We could not load segment filter options from Mautic."
+        ),
+      });
+    }
+  }, [filterMetadata.data, filterMetadata.loading]);
+
+  useEffect(() => {
+    if (formState.open) loadFilterMetadata();
+  }, [formState.open, loadFilterMetadata]);
+
   const submitForm = async (form) => {
     const payload = {
       name: form.name.trim(),
@@ -694,6 +766,9 @@ export default function AdminNewsletterNativeSegmentsPanel() {
     if (form.alias.trim() || formState.mode === "edit") {
       payload.alias = form.alias.trim();
     }
+    // Always sent, so clearing every row turns a dynamic segment back into a
+    // static one rather than silently leaving the old filters in place.
+    payload.filters = toFilterPayload(form.filters);
 
     setFormState((state) => ({ ...state, loading: true, error: "" }));
     try {
@@ -983,6 +1058,7 @@ export default function AdminNewsletterNativeSegmentsPanel() {
         onClose={() => setDetailState({ open: false, loading: false, segment: null, error: "", tab: "details" })}
       />
       <SegmentFormDialog
+        filterMetadata={filterMetadata}
         open={formState.open}
         mode={formState.mode}
         value={formState.mode === "edit" ? segmentToForm(formState.segment) : blankSegmentForm}

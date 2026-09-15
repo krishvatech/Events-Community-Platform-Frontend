@@ -59,6 +59,20 @@ import {
 } from "./mauticCampaignSavePayload";
 import { isRemoteChoiceField } from "./mauticCampaignChoices";
 import {
+  getEventPropertyFields,
+  getNestedValue,
+  optionLabel,
+  optionValue,
+  setNestedValue,
+} from "./mauticCampaignFields";
+import {
+  CAMPAIGN_PUBLISH,
+  CAMPAIGN_SAVE,
+  validateCampaignAction,
+  validateWorkflowEvent,
+  workflowEventStatus,
+} from "./mauticCampaignValidation";
+import {
   findWorkflowEvent,
   removeWorkflowEventFromState,
   requiresProviderDeletion,
@@ -109,165 +123,7 @@ const sourceLabel = (source, fallback) =>
 const workflowEventId = () =>
   `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-const propertyPath = (parts) => parts.join(".");
-
-const getNestedValue = (value, path) =>
-  path.split(".").reduce((current, part) => {
-    if (!isPlainObject(current)) return undefined;
-    return current[part];
-  }, value);
-
-const setNestedValue = (value, path, nextValue) => {
-  const parts = path.split(".");
-  const root = isPlainObject(value) ? { ...value } : {};
-  let current = root;
-
-  parts.forEach((part, index) => {
-    if (index === parts.length - 1) {
-      current[part] = nextValue;
-      return;
-    }
-
-    current[part] = isPlainObject(current[part]) ? { ...current[part] } : {};
-    current = current[part];
-  });
-
-  return root;
-};
-
-const optionLabel = (option) => {
-  if (isPlainObject(option)) {
-    return option.label || option.name || option.title || option.value || option.id || "Option";
-  }
-  return String(option);
-};
-
-const optionValue = (option) => {
-  if (isPlainObject(option)) {
-    return option.value ?? option.id ?? option.key ?? option.label ?? option.name ?? "";
-  }
-  return option;
-};
-
-const optionChoices = (value) => {
-  if (Array.isArray(value)) return value;
-  if (isPlainObject(value?.choices)) return Object.entries(value.choices).map(([key, label]) => ({ value: key, label }));
-  if (Array.isArray(value?.choices)) return value.choices;
-  if (Array.isArray(value?.options)) return value.options;
-  return [];
-};
-
-const flattenSchemaChoices = (choices) =>
-  asArray(choices).flatMap((choice) => {
-    if (Array.isArray(choice?.choices)) return flattenSchemaChoices(choice.choices);
-    return [choice];
-  });
-
-const fieldKindFromSchema = (field) => {
-  const prefixes = asArray(field?.blockPrefixes).map((prefix) => String(prefix).toLowerCase());
-  const type = String(field?.type || "").toLowerCase();
-  if (field?.choices?.length || prefixes.includes("choice") || type.includes("choicetype")) {
-    return "select";
-  }
-  if (prefixes.includes("checkbox") || prefixes.includes("switch") || type.includes("checkboxtype")) {
-    return "boolean";
-  }
-  if (prefixes.includes("textarea") || type.includes("textareatype")) return "textarea";
-  if (prefixes.includes("integer") || prefixes.includes("number") || type.includes("integertype") || type.includes("numbertype")) {
-    return "number";
-  }
-  return "text";
-};
-
-const schemaFieldLabel = (field) => {
-  if (typeof field?.label === "string" && field.label.trim()) return field.label;
-  return field?.name || "Field";
-};
-
-const buildSchemaPropertyFields = (fields, prefix = []) =>
-  asArray(fields).flatMap((field) => {
-    if (!isPlainObject(field) || !field.name) return [];
-    if (field.renderable === false) return [];
-    const path = propertyPath([...prefix, field.name]);
-    const children = asArray(field.children);
-    const choices = flattenSchemaChoices(field.choices);
-    const remote = isRemoteChoiceField(field);
-    const kind = remote ? "select" : fieldKindFromSchema(field);
-
-    if (children.length && !choices.length && !remote && kind !== "boolean") {
-      return buildSchemaPropertyFields(children, [...prefix, field.name]);
-    }
-
-    return [{
-      path,
-      label: schemaFieldLabel(field),
-      kind,
-      choices,
-      required: Boolean(field.required),
-      multiple: Boolean(field.multiple),
-      help: field.help || field.attr?.tooltip || field.attr?.help || "",
-      // Present only when the provider list is served by reference.
-      remote,
-      choiceSource: remote ? field.choiceSource : null,
-      choiceCount: field.choiceCount,
-    }];
-  });
-
-const buildPropertyFields = (value, prefix = []) => {
-  if (!isPlainObject(value)) return [];
-
-  return Object.entries(value).flatMap(([key, child]) => {
-    const pathParts = [...prefix, key];
-    if (Array.isArray(child) || Array.isArray(child?.choices) || Array.isArray(child?.options) || isPlainObject(child?.choices)) {
-      return [{ path: propertyPath(pathParts), label: key, kind: "select", choices: optionChoices(child) }];
-    }
-    if (typeof child === "boolean") {
-      return [{ path: propertyPath(pathParts), label: key, kind: "boolean" }];
-    }
-    if (typeof child === "string" || typeof child === "number") {
-      return [{ path: propertyPath(pathParts), label: key, kind: "text" }];
-    }
-    if (isPlainObject(child)) {
-      return buildPropertyFields(child, pathParts);
-    }
-    return [];
-  });
-};
-
-const getEventPropertyFields = (event) => {
-  const schemaFields = buildSchemaPropertyFields(event?.metadata?.formSchema?.fields);
-  if (schemaFields.length) return schemaFields;
-  return buildPropertyFields(event?.metadata?.formTypeOptions);
-};
-
-const configuredPropertiesCount = (properties) => {
-  if (!isPlainObject(properties)) return 0;
-  return Object.values(properties).reduce((count, value) => {
-    if (isPlainObject(value)) return count + configuredPropertiesCount(value);
-    if (Array.isArray(value)) return count + (value.length ? 1 : 0);
-    if (value === "" || value === undefined || value === null) return count;
-    return count + 1;
-  }, 0);
-};
-
-const getRequiredFields = (formTypeOptions) => {
-  const fields = buildPropertyFields(formTypeOptions);
-  return fields.filter(field => {
-    const fieldMeta = getNestedValue(formTypeOptions, field.path);
-    return fieldMeta?.required === true || fieldMeta?.required === "true";
-  });
-};
-
-const isEventConfigurationComplete = (event) => {
-  const fields = getEventPropertyFields(event);
-  const requiredFields = fields.filter(field => field.required === true);
-  if (!requiredFields.length) return true;
-
-  return requiredFields.every(field => {
-    const value = getNestedValue(event.properties, field.path);
-    return value !== undefined && value !== null && value !== "";
-  });
-};
+const isEventConfigurationComplete = (event) => validateWorkflowEvent(event).length === 0;
 
 const getConfigurationStatus = (event, { capabilitiesLoading = false } = {}) => {
   // A saved event only becomes configurable once it has been rejoined with the
@@ -289,33 +145,8 @@ const getConfigurationStatus = (event, { capabilitiesLoading = false } = {}) => 
     };
   }
 
-  const fields = getEventPropertyFields(event);
-  if (!fields.length && !isPlainObject(event.metadata?.formTypeOptions)) {
-    return { complete: true, message: "No configuration fields" };
-  }
-
-  const requiredFields = fields.filter(field => field.required === true);
-  if (!requiredFields.length) {
-    const configuredCount = configuredPropertiesCount(event.properties);
-    return {
-      complete: configuredCount > 0,
-      message: configuredCount > 0 ? "Configured" : "No configuration needed",
-    };
-  }
-
-  const missingFields = requiredFields.filter(field => {
-    const value = getNestedValue(event.properties, field.path);
-    return value === undefined || value === null || value === "";
-  });
-
-  if (missingFields.length) {
-    return {
-      complete: false,
-      message: `${missingFields.length} required field${missingFields.length > 1 ? "s" : ""} missing`,
-    };
-  }
-
-  return { complete: true, message: "Configured" };
+  // One source of truth: the badge reports what the save-time validator sees.
+  return workflowEventStatus(event);
 };
 
 const statusChipColor = (status) =>
@@ -1209,23 +1040,9 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   const createCampaign = async (event) => {
     event.preventDefault();
     const name = form.name.trim();
-    if (!name) {
-      setFormError("Campaign name is required.");
-      return;
-    }
-    if (!form.lists.length && !form.forms.length) {
-      setFormError("Select at least one Segment or Form source.");
-      return;
-    }
-    if (!form.events.length) {
-      setFormError("Add at least one workflow event.");
-      return;
-    }
-
-    const incompleteEvents = form.events.filter(evt => !isEventConfigurationComplete(evt));
-    if (incompleteEvents.length) {
-      const eventNames = incompleteEvents.map(evt => getEventLabel(evt.metadata)).join(", ");
-      setFormError(`Event configuration incomplete: ${eventNames}. Please configure all required fields.`);
+    const validation = campaignValidation(CAMPAIGN_SAVE);
+    if (!validation.valid) {
+      reportValidationErrors(validation.errors);
       return;
     }
 
@@ -1559,6 +1376,26 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     applyToCanvasNode(nodeId, { delay });
   };
 
+  // Everything the provider schema says must hold before a save is attempted.
+  const campaignValidation = (action) =>
+    validateCampaignAction(action, {
+      name: form.name,
+      lists: form.lists,
+      forms: form.forms,
+      events: form.events,
+      canvasNodes,
+      canvasEdges: form.canvasSettings?.edges || [],
+    });
+
+  const reportValidationErrors = (errors) => {
+    setFormError(errors.join(" "));
+    setSnack({
+      open: true,
+      severity: "error",
+      message: errors[0] || "This campaign cannot be saved yet.",
+    });
+  };
+
   // Surface workflow problems in the UI rather than letting the provider reject
   // the save with an opaque 400.
   const reportWorkflowErrors = (errors, prefix) => {
@@ -1598,6 +1435,13 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
 
   const publishCampaign = async () => {
     if (!isEditMode || !campaignId) return;
+
+    const validation = campaignValidation(CAMPAIGN_PUBLISH);
+    if (!validation.valid) {
+      reportValidationErrors(validation.errors);
+      return;
+    }
+
     setSaving(true);
     setFormError("");
     try {
@@ -1640,35 +1484,16 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     }
   };
 
+  // Switching a campaign off is a safety action. A published campaign is exactly
+  // where provider configuration goes stale, so this never validates or resubmits
+  // the workflow — it changes the published state and nothing else.
   const unpublishCampaign = async () => {
     if (!isEditMode || !campaignId) return;
+
     setSaving(true);
     setFormError("");
     try {
-      let executionEvents = buildFlatExecutionEvents(form.events);
-      if (canvasNodes.length > 0) {
-        const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
-        if (mapping.errors.length > 0) {
-          reportWorkflowErrors(mapping.errors, "Cannot unpublish");
-          setSaving(false);
-          return;
-        }
-        executionEvents = mapping.events;
-      }
-
-      const payload = {
-        name: form.name,
-        description: form.description,
-        isPublished: false,
-        sources: {
-          segments: form.lists,
-          forms: form.forms,
-        },
-        events: buildEventsPayload(executionEvents),
-        canvasSettings: toCanvasSettingsPayload(form.canvasSettings),
-      };
-
-      await updateNativeMauticCampaign(campaignId, payload);
+      await updateNativeMauticCampaign(campaignId, { isPublished: false });
       setForm((current) => ({ ...current, isPublished: false }));
       setSnack({
         open: true,
