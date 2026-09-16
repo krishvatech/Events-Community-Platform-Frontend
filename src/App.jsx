@@ -334,6 +334,10 @@ const AppShell = () => {
           <Route path="/account/courses/:courseId" element={<RequireAuth><CoursePlayerPage /></RequireAuth>} />
           <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
           <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+          {/* Signed-in federated (e.g. Google) users setting a password for the
+              first time. Reuses the ForgotPassword screen/OTP flow; the public
+              /forgot-password route is left untouched. */}
+          <Route path="/account/set-password" element={<RequireAuth><ForgotPassword authedMode /></RequireAuth>} />
           <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
           <Route path="/account/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
           <Route path="/newsletter" element={<RequireAuth><NewsletterPage /></RequireAuth>} />
