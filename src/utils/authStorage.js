@@ -34,11 +34,16 @@ export function saveLoginPayload(data, { email, firstName } = {}) {
 
   // Persist auth identifiers for flows like forgot-password after logout.
   const payloadUser = data?.user || {};
+  // Order matters: this value is used as the Cognito username for SDK calls
+  // (e.g. change password), so prefer identifiers that come from the signed
+  // Cognito token. `payloadUser.username` is the Django username on the
+  // Google/OAuth path — a real value, but not a Cognito one — so it is only a
+  // last resort.
   const candidateUsername =
     payloadUser?.["cognito:username"] ||
-    payloadUser?.username ||
     claims?.["cognito:username"] ||
     claims?.username ||
+    payloadUser?.username ||
     "";
   const candidateEmail =
     (email || payloadUser?.email || claims?.email || "").toString().trim().toLowerCase();

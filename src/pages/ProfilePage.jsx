@@ -48,6 +48,7 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import RichProfile from "./community/RichProfile";
+import SecurityCard from "../components/profile/SecurityCard";
 import LinkedInProfileImportDialog from "../components/LinkedInProfileImportDialog";
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -1941,6 +1942,10 @@ export default function ProfilePage() {
           first_name: data?.first_name || "",
           last_name: data?.last_name || "",
           email: data?.email || "",
+          // Identity provider ("cognito" | "google" | ...) drives the Security
+          // card: native users change their password in place, federated users
+          // must set one through the reset flow.
+          provider: data?.provider || "",
           full_name: prof.full_name || "",
           timezone: prof.timezone || "",
           bio: prof.bio || "",
@@ -4113,6 +4118,10 @@ export default function ProfilePage() {
                           </Box>
                         )}
                       </SectionCard>
+
+                      <Box sx={{ mt: 2 }}>
+                        <SecurityCard provider={form.provider} email={form.email} />
+                      </Box>
 
                     </Grid>
 

@@ -19,7 +19,12 @@ import {
     CssBaseline,
 } from '@mui/material';
 
-const ForgotPassword = () => {
+// `authedMode` is used by the /account/set-password route, where an already
+// signed-in federated (e.g. Google) user sets a password for the first time.
+// It only changes wording and where we land on success — the OTP request and
+// confirm calls are identical, so the public /forgot-password flow is
+// unchanged by default.
+const ForgotPassword = ({ authedMode = false }) => {
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -125,8 +130,15 @@ const ForgotPassword = () => {
                 confirm_new_password: confirmPassword,
             });
 
-            toast.success('Password reset successfully! Redirecting...');
-            setTimeout(() => navigate('/signin'), 1500);
+            // Authed users keep their session (they are adding a password, not
+            // recovering an account) and go back to Profile → Security.
+            if (authedMode) {
+                toast.success('Password set successfully! Redirecting...');
+                setTimeout(() => navigate('/account/profile'), 1500);
+            } else {
+                toast.success('Password reset successfully! Redirecting...');
+                setTimeout(() => navigate('/signin'), 1500);
+            }
         } catch (err) {
             toast.error(err?.message || 'Failed to reset password.');
         } finally {
@@ -142,36 +154,40 @@ const ForgotPassword = () => {
                 component="main"
                 sx={{
                     width: 1,
-                    minHeight: '100svh',
+                    minHeight: authedMode ? 'auto' : '100svh',
                     display: 'flex',
                     flexDirection: { xs: 'column', md: 'row' },
                     bgcolor: (t) => t.palette.background.default,
                 }}
             >
-                {/* LEFT: Hero (same as SignInPage) */}
-                <Box
-                    sx={{
-                        display: { xs: 'none', md: 'flex' },
-                        flexBasis: '50%',
-                        flexShrink: 0,
-                        alignItems: 'stretch',
-                        justifyContent: 'stretch',
-                    }}
-                >
-                    <HeroSection />
-                </Box>
+                {/* LEFT: Hero (same as SignInPage). Hidden for signed-in users,
+                    who reach this screen inside the app shell — the marketing
+                    hero there would read as having been logged out. */}
+                {!authedMode && (
+                    <Box
+                        sx={{
+                            display: { xs: 'none', md: 'flex' },
+                            flexBasis: '50%',
+                            flexShrink: 0,
+                            alignItems: 'stretch',
+                            justifyContent: 'stretch',
+                        }}
+                    >
+                        <HeroSection />
+                    </Box>
+                )}
 
                 {/* RIGHT: Form */}
                 <Box
                     sx={{
                         flexGrow: 1,
-                        width: { xs: '100%', md: '50%' },
+                        width: { xs: '100%', md: authedMode ? '100%' : '50%' },
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         p: { xs: 3, md: 6 },
-                        bgcolor: '#f9fafb',
+                        bgcolor: authedMode ? 'transparent' : '#f9fafb',
                     }}
                 >
                     <Box sx={{ width: '100%', maxWidth: 480 }}>
@@ -181,10 +197,12 @@ const ForgotPassword = () => {
                                 variant="h5"
                                 sx={{ fontWeight: 400, letterSpacing: '-0.2px' }}
                             >
-                                Forgot your password?
+                                {authedMode ? 'Set your password' : 'Forgot your password?'}
                             </Typography>
                             <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
-                                Enter your email and we&apos;ll send you a verification code (OTP).
+                                {authedMode
+                                    ? 'Confirm your email and we’ll send you a verification code (OTP) to set your password.'
+                                    : 'Enter your email and we’ll send you a verification code (OTP).'}
                             </Typography>
                             {step === 'confirm' && deliveryHint ? (
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -321,11 +339,11 @@ const ForgotPassword = () => {
                                     }}
                                 >
                                     <Typography variant="body2" color="text.secondary">
-                                        Remember your password?
+                                        {authedMode ? 'Changed your mind?' : 'Remember your password?'}
                                     </Typography>
                                     <Button
                                         type="button"
-                                        onClick={() => navigate('/signin')}
+                                        onClick={() => navigate(authedMode ? '/account/profile' : '/signin')}
                                         sx={{
                                             p: 0,
                                             minWidth: 'auto',
@@ -335,16 +353,19 @@ const ForgotPassword = () => {
                                             fontWeight: 600,
                                         }}
                                     >
-                                        Back to Sign in
+                                        {authedMode ? 'Back to Profile' : 'Back to Sign in'}
                                     </Button>
                                 </Box>
                             </Box>
                         </Paper>
 
-                        {/* Features (same as SignInPage) */}
-                        <Box sx={{ mt: 3 }}>
-                            <FeaturesSection />
-                        </Box>
+                        {/* Features (same as SignInPage) — marketing content,
+                            not shown to already signed-in users. */}
+                        {!authedMode && (
+                            <Box sx={{ mt: 3 }}>
+                                <FeaturesSection />
+                            </Box>
+                        )}
                     </Box>
                 </Box>
             </Box>
