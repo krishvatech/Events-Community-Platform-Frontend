@@ -1,6 +1,7 @@
 // src/components/UnifiedSidebar.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
+import useMarketingAccess from "../hooks/useMarketingAccess";
 import {
     Box,
     Drawer,
@@ -192,6 +193,10 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const isSuperUser = userIsOwner;
     const isStaffOnly = !isSuperUser && userIsStaff;
     const isNormalUser = !isSuperUser && !isStaffOnly;
+
+    // Marketing Hub visibility comes from the backend (active ECP superuser WITH
+    // an active Mautic mapping), never from is_superuser/is_staff alone.
+    const { hasMarketingAccess } = useMarketingAccess();
 
     // --- State for badges and Saleor status ---
     const [notifCount, setNotifCount] = useState(0);
@@ -570,12 +575,20 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const [user, setUser] = useState(null);
 
     // Calculate total filtered items
+    // One place decides which admin entries are actually visible, so the search
+    // count and the rendered list can never disagree.
+    const visibleAdminItems = adminItems.filter(
+        (item) =>
+            (item.label !== "Saleor Manager" || saleorEnabled) &&
+            (item.label !== "Marketing Hub" || hasMarketingAccess)
+    );
+
     const allItems = [
         ...discoverItems,
         ...(isSuperUser ? trainingsItems : []),  // Trainings & Courses: SuperUser only
         ...resourcesItems,  // Show for ALL users
         ...manageItems,
-        ...(adminItems.length > 0 ? adminItems : [])
+        ...visibleAdminItems
     ];
 
     const filteredCount = searchQuery.trim()
@@ -773,7 +786,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 {isSuperUser && renderList(trainingsItems, "TRAININGS & COURSES")}
                 {renderList(resourcesItems, "RESOURCES")}
                 {renderList(manageItems, isNormalUser ? "PERSONAL" : "MY CONTENT")}
-                {adminItems.length > 0 && renderList(adminItems.filter(item => item.label !== "Saleor Manager" || saleorEnabled), "PLATFORM")}
+                {visibleAdminItems.length > 0 && renderList(visibleAdminItems, "PLATFORM")}
 
                 {/* More Indicator - sticky positioning */}
                 <Box sx={{

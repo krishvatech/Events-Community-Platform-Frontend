@@ -366,6 +366,27 @@ export const addUserToSaleorStaff = (userId) =>
 export const removeUserFromSaleorStaff = (userId) =>
   apiClient.post(`${ADMIN_USERS_BASE}/${userId}/remove-from-saleor-staff/`).then((r) => r.data);
 
+// Marketing Access (Mautic) Management.
+// The frontend only ever names an ECP user: provisioning and Mautic identity
+// resolution are the backend's job, and no Mautic credential ever reaches here.
+const MARKETING_ACCESS_BASE = "/newsletter/admin/marketing-access";
+
+export const getMarketingAccessUsers = () =>
+  apiClient.get(`${MARKETING_ACCESS_BASE}/`).then((r) => r.data);
+
+export const addUserToMarketing = (ecpUserId) =>
+  apiClient.post(`${MARKETING_ACCESS_BASE}/${ecpUserId}/add/`).then((r) => r.data);
+
+export const removeUserFromMarketing = (ecpUserId, reason = "") =>
+  apiClient
+    .post(`${MARKETING_ACCESS_BASE}/${ecpUserId}/remove/`, reason ? { reason } : {})
+    .then((r) => r.data);
+
+// Authoritative Marketing status for the signed-in user; the sidebar and the
+// Marketing Hub route guard both gate on this, never on is_superuser alone.
+export const getCurrentMarketingStatus = () =>
+  apiClient.get(`/newsletter/marketing-access/me/`).then((r) => r.data);
+
 const adminUserBase = (userId) => `${ADMIN_USERS_BASE}/${userId}`;
 
 const adminSub = (userId, resource) => {

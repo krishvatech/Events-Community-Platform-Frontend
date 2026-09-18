@@ -23,8 +23,9 @@ import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
-import { apiClient, listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deactivateAdminUser, restoreAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff } from "../utils/api";
+import { apiClient, listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deactivateAdminUser, restoreAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff, getMarketingAccessUsers, addUserToMarketing, removeUserFromMarketing } from "../utils/api";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { resetMarketingStatusCache } from "../hooks/useMarketingAccess";
 
 
 // Simple Dialog for Creating/Editing Users/staff (Invitation only)
@@ -622,6 +623,371 @@ function SaleorStaffTab({ currentUserId }) {
     );
 }
 
+// Marketing Access (Mautic) Management Tab.
+// Only ECP superusers are eligible, and only the backend decides who actually
+// has access: this tab renders the state the backend reports and never derives
+// it from is_superuser alone. No Mautic credential is ever shown or requested.
+function MarketingAccessTab({ currentUserId }) {
+    const [rows, setRows] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState(null);
+    const [actionLoading, setActionLoading] = React.useState(null); // ECP user ID being updated
+    const [snack, setSnack] = React.useState({ open: false, message: "", severity: "success" });
+    const [addDialog, setAddDialog] = React.useState({ open: false, user: null });
+    const [removeDialog, setRemoveDialog] = React.useState({ open: false, user: null });
+
+    const fetchMarketingAccess = React.useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await getMarketingAccessUsers();
+            setRows(data.results || []);
+        } catch (err) {
+            const msg =
+                err.response?.data?.detail || err.message || "Failed to load Marketing access list";
+            setError(msg);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        fetchMarketingAccess();
+    }, [fetchMarketingAccess]);
+
+    const displayName = (user) =>
+        user.first_name && user.last_name
+            ? `${user.first_name} ${user.last_name}`
+            : user.username;
+
+    const handleAdd = async (user) => {
+        setActionLoading(user.ecp_user_id);
+        try {
+            const result = await addUserToMarketing(user.ecp_user_id);
+            resetMarketingStatusCache();
+            setSnack({
+                open: true,
+                severity: "success",
+                message:
+                    result.outcome === "reactivated"
+                        ? `✅ Marketing access re-enabled for ${user.email} (same Mautic user #${result.mautic_user_id})`
+                        : `✅ ${user.email} now has Marketing access as Mautic user #${result.mautic_user_id}`,
+            });
+            setAddDialog({ open: false, user: null });
+            await fetchMarketingAccess();
+        } catch (err) {
+            // Backend errors are already safe, actionable text: no provider
+            // internals or traces are surfaced here.
+            const msg =
+                err.response?.data?.detail || err.message || "Failed to grant Marketing access";
+            setSnack({ open: true, severity: "error", message: `❌ ${msg}` });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleRemove = async (user) => {
+        setActionLoading(user.ecp_user_id);
+        try {
+            await removeUserFromMarketing(user.ecp_user_id);
+            resetMarketingStatusCache();
+            setSnack({
+                open: true,
+                severity: "success",
+                message: `✅ Marketing access removed for ${user.email}`,
+            });
+            setRemoveDialog({ open: false, user: null });
+            await fetchMarketingAccess();
+        } catch (err) {
+            const msg =
+                err.response?.data?.detail || err.message || "Failed to remove Marketing access";
+            setSnack({ open: true, severity: "error", message: `❌ ${msg}` });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const statusChip = (user) => {
+        if (!user.eligible) {
+            return (
+                <Chip
+                    label="⊘ Not eligible"
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontWeight: 600 }}
+                />
+            );
+        }
+        if (user.marketing_state === "active") {
+            return <Chip label="✅ Active" size="small" color="success" sx={{ fontWeight: 600 }} />;
+        }
+        if (user.marketing_state === "inactive") {
+            return <Chip label="⏸ Removed" size="small" color="warning" sx={{ fontWeight: 600 }} />;
+        }
+        if (user.marketing_state === "provisioning_error") {
+            return <Chip label="⚠ Error" size="small" color="error" sx={{ fontWeight: 600 }} />;
+        }
+        return <Chip label="⊘ Not added" size="small" variant="outlined" sx={{ fontWeight: 600 }} />;
+    };
+
+    const actionCell = (user) => {
+        if (!user.eligible) {
+            // Staff and deactivated accounts get no Add path at all.
+            return (
+                <Tooltip title="Only active ECP superusers can be given Marketing access">
+                    <span>
+                        <Typography variant="caption" color="textSecondary">
+                            Superusers only
+                        </Typography>
+                    </span>
+                </Tooltip>
+            );
+        }
+        if (user.ecp_user_id === currentUserId) {
+            return (
+                <Tooltip title="You cannot manage your own Marketing access">
+                    <span>
+                        <Button size="small" disabled sx={{ textTransform: "none" }}>
+                            {user.has_marketing_access ? "Remove Marketing Access" : "+ Add to Marketing"}
+                        </Button>
+                    </span>
+                </Tooltip>
+            );
+        }
+        if (user.has_marketing_access) {
+            return (
+                <Button
+                    size="small"
+                    color="error"
+                    onClick={() => setRemoveDialog({ open: true, user })}
+                    disabled={actionLoading === user.ecp_user_id}
+                    sx={{ textTransform: "none" }}
+                >
+                    {actionLoading === user.ecp_user_id ? "Removing..." : "Remove Marketing Access"}
+                </Button>
+            );
+        }
+        const reEnable = user.marketing_state === "inactive" || user.marketing_state === "provisioning_error";
+        return (
+            <Button
+                size="small"
+                color="success"
+                variant="contained"
+                onClick={() => setAddDialog({ open: true, user })}
+                disabled={actionLoading === user.ecp_user_id}
+                sx={{ textTransform: "none" }}
+            >
+                {actionLoading === user.ecp_user_id
+                    ? reEnable
+                        ? "Re-enabling..."
+                        : "Adding..."
+                    : reEnable
+                        ? "Re-enable Marketing"
+                        : "+ Add to Marketing"}
+            </Button>
+        );
+    };
+
+    const activeCount = rows.filter((row) => row.has_marketing_access).length;
+    const dialogUserIsReturning =
+        addDialog.user?.marketing_state === "inactive" ||
+        addDialog.user?.marketing_state === "provisioning_error";
+
+    return (
+        <Box>
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                </Alert>
+            )}
+
+            <Alert severity="info" sx={{ mb: 2 }}>
+                Marketing access lets an ECP superuser work in the Marketing Hub as their own
+                Mautic identity. They keep using their normal ECP login — no Mautic login or
+                password is involved.
+            </Alert>
+
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                        Marketing Access
+                    </Typography>
+                    <Chip
+                        label={`${activeCount} Active`}
+                        size="small"
+                        variant="outlined"
+                        sx={{ borderColor: "#0ea5a4", color: "#0ea5a4", fontWeight: 600 }}
+                    />
+                </Box>
+                <Button
+                    size="small"
+                    onClick={fetchMarketingAccess}
+                    disabled={loading}
+                    sx={{ textTransform: "none" }}
+                >
+                    {loading ? "Refreshing..." : "🔄 Refresh"}
+                </Button>
+            </Box>
+
+            <TableContainer component={Paper} variant="outlined">
+                <Table>
+                    <TableHead>
+                        <TableRow sx={{ backgroundColor: "#f3f4f6" }}>
+                            <TableCell>Superuser</TableCell>
+                            <TableCell>Email</TableCell>
+                            <TableCell align="center">Marketing Status</TableCell>
+                            <TableCell>Mautic Identity</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {loading ? (
+                            Array.from({ length: 5 }).map((_, idx) => (
+                                <TableRow key={idx}>
+                                    <TableCell colSpan={5}>
+                                        <Skeleton height={40} />
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : rows.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} align="center">
+                                    <Typography variant="body2" color="textSecondary" sx={{ py: 3 }}>
+                                        No superusers found
+                                    </Typography>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            rows.map((user) => (
+                                <TableRow key={user.ecp_user_id} hover>
+                                    <TableCell>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Avatar sx={{ width: 32, height: 32, bgcolor: "#0ea5a4" }}>
+                                                {user.username?.[0]?.toUpperCase()}
+                                            </Avatar>
+                                            <Box>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                                    {displayName(user)}
+                                                </Typography>
+                                                {!user.eligible && (
+                                                    <Typography variant="caption" color="textSecondary">
+                                                        {user.is_staff ? "Staff" : "Not a superuser"}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        </Stack>
+                                    </TableCell>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell align="center">{statusChip(user)}</TableCell>
+                                    <TableCell>
+                                        {user.mautic_user_id ? (
+                                            <Box>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                    {user.mautic_username || `Mautic user #${user.mautic_user_id}`}
+                                                </Typography>
+                                                <Typography variant="caption" color="textSecondary">
+                                                    #{user.mautic_user_id}
+                                                    {user.mautic_role_name ? ` · ${user.mautic_role_name}` : ""}
+                                                </Typography>
+                                            </Box>
+                                        ) : (
+                                            <Typography variant="caption" color="textSecondary">
+                                                —
+                                            </Typography>
+                                        )}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                            {actionCell(user)}
+                                        </Stack>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+
+            {/* Add / Re-enable Dialog */}
+            <Dialog open={addDialog.open} onClose={() => setAddDialog({ open: false, user: null })}>
+                <DialogTitle>
+                    {dialogUserIsReturning ? "Re-enable Marketing access?" : "Add to Marketing?"}
+                </DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        {dialogUserIsReturning ? (
+                            <>
+                                Re-enable Marketing access for <strong>{addDialog.user?.email}</strong>?
+                                Their existing Mautic identity
+                                {addDialog.user?.mautic_user_id ? ` (#${addDialog.user.mautic_user_id})` : ""} is
+                                reused — no new Mautic user is created.
+                            </>
+                        ) : (
+                            <>
+                                Give <strong>{addDialog.user?.email}</strong> Marketing Hub access? A Mautic
+                                identity is created for them automatically, and their Marketing actions will
+                                be attributed to it.
+                            </>
+                        )}
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setAddDialog({ open: false, user: null })}>Cancel</Button>
+                    <Button
+                        color="success"
+                        variant="contained"
+                        onClick={() => handleAdd(addDialog.user)}
+                        disabled={actionLoading === addDialog.user?.ecp_user_id}
+                    >
+                        {actionLoading === addDialog.user?.ecp_user_id
+                            ? "Working..."
+                            : dialogUserIsReturning
+                                ? "Re-enable"
+                                : "Add to Marketing"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Remove Dialog */}
+            <Dialog open={removeDialog.open} onClose={() => setRemoveDialog({ open: false, user: null })}>
+                <DialogTitle>Remove Marketing access?</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Remove Marketing Hub access for <strong>{removeDialog.user?.email}</strong>?
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                        Their Mautic user and everything it created stay in Mautic, and the history is
+                        kept. Access can be re-enabled later with the same Mautic identity. This does not
+                        change their ECP superuser status.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRemoveDialog({ open: false, user: null })}>Cancel</Button>
+                    <Button
+                        color="error"
+                        variant="contained"
+                        onClick={() => handleRemove(removeDialog.user)}
+                        disabled={actionLoading === removeDialog.user?.ecp_user_id}
+                    >
+                        {actionLoading === removeDialog.user?.ecp_user_id ? "Removing..." : "Remove"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar
+                open={snack.open}
+                autoHideDuration={5000}
+                onClose={() => setSnack({ ...snack, open: false })}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            >
+                <Alert severity={snack.severity} onClose={() => setSnack({ ...snack, open: false })}>
+                    {snack.message}
+                </Alert>
+            </Snackbar>
+        </Box>
+    );
+}
+
 export default function AdminStaffPage() {
 
     const location = useLocation();
@@ -696,8 +1062,12 @@ export default function AdminStaffPage() {
     const [selectedPrimaryId, setSelectedPrimaryId] = React.useState(null);
 
     const fetchData = React.useCallback(async () => {
-        // Skip fetchData if on duplicates or saleor-staff tab
-        if (userTypeFilter === "duplicates" || userTypeFilter === "saleor-staff") return;
+        // Skip fetchData on tabs that load their own data
+        if (
+            userTypeFilter === "duplicates" ||
+            userTypeFilter === "saleor-staff" ||
+            userTypeFilter === "marketing-access"
+        ) return;
 
         setLoading(true);
         try {
@@ -1089,7 +1459,7 @@ export default function AdminStaffPage() {
                         </Box>
 
                         {/* Actions */}
-                        {userTypeFilter !== "saleor-staff" && (
+                        {userTypeFilter !== "saleor-staff" && userTypeFilter !== "marketing-access" && (
                             <Box
                                 sx={{
                                     width: { xs: "100%", sm: "auto" },
@@ -1125,7 +1495,7 @@ export default function AdminStaffPage() {
                         )}
                     </Box>
 
-                    {userTypeFilter !== "saleor-staff" && (
+                    {userTypeFilter !== "saleor-staff" && userTypeFilter !== "marketing-access" && (
                         <TextField
                             size="small"
                             placeholder="Search users..."
@@ -1153,11 +1523,14 @@ export default function AdminStaffPage() {
                         <Tab label="Normal User" value="normal" />
                         {owner && <Tab label="Deactivated" value="deleted" />}
                         {owner && <Tab label="Saleor Staff" value="saleor-staff" />}
+                        {owner && <Tab label="Marketing Access" value="marketing-access" />}
                         {owner && <Tab label="Duplicate Accounts" value="duplicates" />}
                     </Tabs>
 
                     {userTypeFilter === "saleor-staff" ? (
                         <SaleorStaffTab currentUserId={currentUser?.id} />
+                    ) : userTypeFilter === "marketing-access" ? (
+                        <MarketingAccessTab currentUserId={currentUser?.id} />
                     ) : userTypeFilter !== "duplicates" ? (
                         <Box>
                             {/* Bulk Delete Action Bar */}

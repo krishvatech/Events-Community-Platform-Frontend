@@ -69,7 +69,7 @@ import AdminCarts from "./pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
 import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
 import { useParams, useNavigate } from "react-router-dom";
-import { RequireSuperAdmin, RequireStaffOrAdmin, RequireStaffOrAdminForResources } from "./components/RoleBasedRoute.jsx";
+import { RequireSuperAdmin, RequireStaffOrAdmin, RequireStaffOrAdminForResources, RequireMarketingAccess } from "./components/RoleBasedRoute.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
 import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
@@ -305,7 +305,7 @@ const AppShell = () => {
             <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
             <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
             <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
-            <Route path="newsletter" element={<RequireStaffOrAdmin><MarketingHubLayout /></RequireStaffOrAdmin>}>
+            <Route path="newsletter" element={<RequireMarketingAccess><MarketingHubLayout /></RequireMarketingAccess>}>
               <Route index element={<AdminNewsletterDashboardPage />} />
               <Route path="campaigns" element={<AdminNewsletterPage />} />
               <Route path="templates" element={<AdminNewsletterPage />} />
