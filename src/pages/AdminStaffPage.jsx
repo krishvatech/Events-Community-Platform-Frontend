@@ -627,7 +627,7 @@ function SaleorStaffTab({ currentUserId }) {
 // Only ECP superusers are eligible, and only the backend decides who actually
 // has access: this tab renders the state the backend reports and never derives
 // it from is_superuser alone. No Mautic credential is ever shown or requested.
-function MarketingAccessTab({ currentUserId }) {
+function MarketingAccessTab({ currentUserId, navigate }) {
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -898,6 +898,14 @@ function MarketingAccessTab({ currentUserId }) {
                                     </TableCell>
                                     <TableCell align="right">
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                onClick={() => navigate(`/admin/marketing/activity?ecp_user_id=${user.ecp_user_id}`)}
+                                                sx={{ textTransform: "none" }}
+                                            >
+                                                View Activity
+                                            </Button>
                                             {actionCell(user)}
                                         </Stack>
                                     </TableCell>
@@ -1530,7 +1538,7 @@ export default function AdminStaffPage() {
                     {userTypeFilter === "saleor-staff" ? (
                         <SaleorStaffTab currentUserId={currentUser?.id} />
                     ) : userTypeFilter === "marketing-access" ? (
-                        <MarketingAccessTab currentUserId={currentUser?.id} />
+                        <MarketingAccessTab currentUserId={currentUser?.id} navigate={navigate} />
                     ) : userTypeFilter !== "duplicates" ? (
                         <Box>
                             {/* Bulk Delete Action Bar */}

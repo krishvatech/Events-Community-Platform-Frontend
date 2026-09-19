@@ -42,6 +42,7 @@ import AdminNewsletterCompanyDetailPage from "./pages/AdminNewsletterCompanyDeta
 import AdminNewsletterStagesPage from "./pages/AdminNewsletterStagesPage.jsx";
 import AdminNewsletterPointsPage from "./pages/AdminNewsletterPointsPage.jsx";
 import AdminNewsletterListManagePage from "./pages/AdminNewsletterListManagePage.jsx";
+import AdminMarketingAuditPage from "./pages/AdminMarketingAuditPage.jsx";
 import ResourceDetailsPage from "./pages/ResourceDetailsPage.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
@@ -305,6 +306,9 @@ const AppShell = () => {
             <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
             <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
             <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
+            <Route path="marketing/activity" element={<RequireSuperAdmin><MarketingHubLayout /></RequireSuperAdmin>}>
+              <Route index element={<AdminMarketingAuditPage />} />
+            </Route>
             <Route path="newsletter" element={<RequireMarketingAccess><MarketingHubLayout /></RequireMarketingAccess>}>
               <Route index element={<AdminNewsletterDashboardPage />} />
               <Route path="campaigns" element={<AdminNewsletterPage />} />

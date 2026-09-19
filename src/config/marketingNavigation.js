@@ -5,12 +5,14 @@ import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
+import ManageSearchRoundedIcon from "@mui/icons-material/ManageSearchRounded";
 import SegmentRoundedIcon from "@mui/icons-material/SegmentRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 
 export const MARKETING_HOME_PATH = "/admin/newsletter";
+export const MARKETING_AUDIT_PATH = "/admin/marketing/activity";
 export const CONNECT_HOME_PATH = "/community?view=home";
 
 export const marketingNavigationGroups = [
@@ -111,8 +113,15 @@ export const marketingNavigationGroups = [
     ],
   },
   {
-    label: "Configuration",
+    label: "Administration",
     items: [
+      {
+        id: "activity",
+        label: "Audit & Activity",
+        path: MARKETING_AUDIT_PATH,
+        icon: ManageSearchRoundedIcon,
+        match: [MARKETING_AUDIT_PATH],
+      },
       {
         id: "settings",
         label: "Settings",
@@ -127,11 +136,15 @@ export const marketingNavigationGroups = [
 export const marketingNavigationItems = marketingNavigationGroups.flatMap((group) => group.items);
 
 export function isMarketingHubPath(pathname = "") {
-  return pathname === MARKETING_HOME_PATH || pathname.startsWith(`${MARKETING_HOME_PATH}/`);
+  return pathname === MARKETING_HOME_PATH ||
+    pathname.startsWith(`${MARKETING_HOME_PATH}/`) ||
+    pathname === MARKETING_AUDIT_PATH ||
+    pathname.startsWith(`${MARKETING_AUDIT_PATH}/`);
 }
 
 export function getMarketingSectionFromPath(pathname = "") {
   const normalized = pathname.replace(/\/+$/, "") || MARKETING_HOME_PATH;
+  if (normalized === MARKETING_AUDIT_PATH) return "activity";
   if (normalized === MARKETING_HOME_PATH) return "dashboard";
   if (normalized.startsWith(`${MARKETING_HOME_PATH}/builder`) || normalized.startsWith(`${MARKETING_HOME_PATH}/new`)) return "campaigns";
 

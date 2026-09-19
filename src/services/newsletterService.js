@@ -20,6 +20,7 @@ const adminTemplatesEndpoint = "/newsletter/admin/templates/";
 const adminMauticCampaignsEndpoint = "/newsletter/admin/mautic-campaigns/";
 const adminAnalyticsEndpoint = "/newsletter/admin/analytics/";
 const adminDashboardEndpoint = "/newsletter/admin/dashboard/";
+const adminMarketingAuditEndpoint = "/newsletter/admin/marketing-audit/";
 
 export const listNewsletterCampaigns = (params = {}) =>
   unwrap(apiClient.get(adminCampaignsEndpoint, { params }));
@@ -80,6 +81,9 @@ export const getNewsletterMauticDiagnostics = () =>
 
 export const getNewsletterDashboard = (params = {}) =>
   unwrap(apiClient.get(adminDashboardEndpoint, { params }));
+
+export const getMarketingAudit = (params = {}) =>
+  unwrap(apiClient.get(adminMarketingAuditEndpoint, { params }));
 
 export const getNewsletterAnalyticsOverview = (params = {}) =>
   unwrap(apiClient.get(`${adminAnalyticsEndpoint}overview/`, { params }));
