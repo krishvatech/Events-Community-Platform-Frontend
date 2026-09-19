@@ -1,0 +1,29 @@
+# AWS Amplify Hosting custom response headers.
+# Amplify reads this file from the repository root at build time and applies the
+# headers to every response served by the Amplify CDN (including SPA rewrites).
+# Docs: https://docs.aws.amazon.com/amplify/latest/userguide/custom-headers.html
+#
+# Content-Security-Policy is shipped as Report-Only first. The app loads media from
+# the backend S3 bucket, Cloudflare RealtimeKit (dynamic hosts, blob workers, WASM)
+# and Cloudflare injects an inline bot-detection script in front of Amplify, so an
+# enforced CSP must be tuned from real violation reports before it is switched on.
+# Only the non-fetch directives (framing, <base>, plugins) are enforced now.
+customHeaders:
+  - pattern: '**'
+    headers:
+      - key: 'Strict-Transport-Security'
+        value: 'max-age=31536000; includeSubDomains'
+      - key: 'X-Content-Type-Options'
+        value: 'nosniff'
+      - key: 'X-Frame-Options'
+        value: 'SAMEORIGIN'
+      - key: 'Referrer-Policy'
+        value: 'strict-origin-when-cross-origin'
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      - key: 'Permissions-Policy'
+        value: 'camera=(self), microphone=(self), display-capture=(self), geolocation=(self), usb=(), serial=(), hid=(), midi=(), accelerometer=(), gyroscope=(), magnetometer=()'
+      - key: 'Content-Security-Policy'
+        value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.bunny.net; font-src 'self' data: https://fonts.gstatic.com https://fonts.bunny.net https://rtk-assets.realtime.cloudflare.com https://assets.dyte.io; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://api.colligatus.com wss://api.colligatus.com https://*.amazoncognito.com https://cognito-idp.eu-central-1.amazonaws.com https://*.amazonaws.com https://imaa-institute.org https://*.ingest.us.sentry.io https://*.realtime.cloudflare.com wss://*.realtime.cloudflare.com https://*.dyte.io wss://*.dyte.io https://*.dyte.in wss://*.dyte.in https://cdn.jsdelivr.net https://unpkg.com https://autocomplete.clearbit.com https://api.ror.org https://geocoding-api.open-meteo.com; frame-src 'self' https://player.vimeo.com https://www.youtube.com https://www.youtube-nocookie.com https://calendly.com https://*.amazonaws.com https://*.realtime.cloudflare.com https://*.dyte.io; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
