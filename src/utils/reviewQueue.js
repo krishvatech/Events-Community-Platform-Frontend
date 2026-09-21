@@ -227,10 +227,11 @@ export const markOriginPaid = async (eventId, originId, paymentReference = '') =
 /**
  * Phase 10: Accept track application with tier selection
  */
-export const acceptTrackApplication = async (eventId, applicationId, trackAppId, tierId, notes = '') => {
+export const acceptTrackApplication = async (eventId, applicationId, trackAppId, tierId, notes = '', sendEmail = true) => {
   try {
     const payload = {
       accepted_tier_id: tierId,
+      send_email: sendEmail,
     };
     if (notes) {
       payload.notes = notes;

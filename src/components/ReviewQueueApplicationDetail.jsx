@@ -72,6 +72,7 @@ const ReviewQueueApplicationDetail = ({
     setConfirming(false);
     setNotes('');
     setSelectedTier('');
+    setSendEmail(true);
     setError(null);
     setSuccess(null);
   }, [open, application?.id]);
@@ -121,6 +122,7 @@ const ReviewQueueApplicationDetail = ({
     setError(null);
     setSuccess(null);
     setNotes('');
+    setSendEmail(true);
     setConfirming(false);
 
     // Preselect tier for accept action
@@ -193,7 +195,8 @@ const ReviewQueueApplicationDetail = ({
           application.application_id,
           application.id,
           selectedTier,
-          notes
+          notes,
+          sendEmail
         );
       } else if (selectedAction === 'decline') {
         result = await declineTrackApplication(
@@ -584,7 +587,7 @@ const ReviewQueueApplicationDetail = ({
                   )}
 
                   {/* Email Notification Option */}
-                  {(selectedAction === 'decline' || selectedAction === 'waitlist') && (
+                  {['accept', 'decline', 'waitlist'].includes(selectedAction) && (
                     <FormControlLabel
                       control={
                         <Checkbox
@@ -595,7 +598,9 @@ const ReviewQueueApplicationDetail = ({
                       }
                       label={
                         canSendEmail
-                          ? `Send ${selectedAction} email to applicant`
+                          ? selectedAction === 'accept'
+                            ? 'Send acceptance email to applicant'
+                            : `Send ${selectedAction} email to applicant`
                           : 'Cannot send email (applicant opted out)'
                       }
                     />
