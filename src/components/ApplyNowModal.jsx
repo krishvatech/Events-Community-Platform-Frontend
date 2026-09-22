@@ -23,6 +23,10 @@ import {
   getApplicationIntroText,
   getTrackDescription,
 } from "../utils/trackFormatting";
+import {
+  buildApplicationCacheEntry,
+  writeApplicationCache,
+} from "../utils/applicationCache";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.replace(/\/+$/, "");
@@ -109,12 +113,11 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
     setSubmittedApplication(data);
 
     // Guests have no account/profile to look the application up later, so keep
-    // only the event + email needed by the existing public status check.
+    // the event + the applicant's own details here. The public status endpoint
+    // returns a status only, so these cached values (which the guest just typed
+    // into this form) are what lets an approved guest call guest-join later.
     if (isGuestApplication && data?.email && event?.id) {
-      localStorage.setItem(
-        "application_cache",
-        JSON.stringify({ event_id: event.id, email: data.email })
-      );
+      writeApplicationCache(buildApplicationCacheEntry(event.id, data));
     }
 
     if (onSuccess) {
