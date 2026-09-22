@@ -22,6 +22,7 @@ import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const TEAL = "#0ea5a4";
 const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
@@ -366,7 +367,7 @@ export default function ResourceDetailsPage() {
       setError(null);
 
       try {
-        const token = localStorage.getItem("access_token");
+        const token = getStoredAccessToken();
 
         const resourceResponse = await fetch(`${API_URL}/content/resources/${id}/`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -423,7 +424,7 @@ export default function ResourceDetailsPage() {
     if (!resource || resource.type !== "file") return;
 
     const downloadUrl = `${API_URL}/content/resources/${resource.id}/download/`;
-    const token = localStorage.getItem("access_token");
+    const token = getStoredAccessToken();
 
     fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } })
       .then((response) => {

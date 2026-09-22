@@ -61,6 +61,7 @@ import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRound
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchEventSummaryCached } from "../../utils/entityCache.js";
 import { connectToConversation } from "../../utils/websocketMessaging.js";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 
 const BORDER = "#e2e8f0";
@@ -624,7 +625,7 @@ function getCookie(name) {
 function authHeader() {
   const access =
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("accessToken");
   const headers = {};
   if (access) headers.Authorization = `Bearer ${access}`;

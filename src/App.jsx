@@ -91,6 +91,9 @@ import AttendeeFormPage from "./pages/AttendeeFormPage.jsx";
 import TrainingProgramsPage from "./pages/TrainingProgramsPage.jsx";
 import RecognitionDirectoryPage from "./pages/RecognitionDirectoryPage.jsx";
 import { CircularProgress } from "@mui/material";
+import { getAccessToken as getStoredAccessToken } from "./utils/tokenStore";
+import { isSecureAuthSessionEnabled } from "./utils/secureAuthSession";
+import { bootstrapMemberAuthSession } from "./utils/memberAuthSession";
 
 
 function RedirectGroupToAdmin() {
@@ -143,7 +146,7 @@ function EventIdRedirect() {
 }
 
 // Auth helper
-const getAccessToken = () => localStorage.getItem("access_token");
+const getAccessToken = () => getStoredAccessToken();
 const isAuthed = () => {
   // Treat guest sessions as NOT authenticated for dashboard/sidebar sections.
   // Guests are only allowed on /live/* via RequireAuth special handling.
@@ -158,6 +161,47 @@ const AppShell = () => {
 
   const [authed, setAuthed] = useState(isAuthed());
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [authReady, setAuthReady] = useState(!isSecureAuthSessionEnabled());
+
+  // Secure-session mode keeps the member access token in memory only. After a
+  // full page reload, restore it once from the HttpOnly session cookie before
+  // route guards/header/sidebar decide whether the user is authenticated.
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isSecureAuthSessionEnabled()) {
+      setAuthReady(true);
+      return () => { cancelled = true; };
+    }
+
+    const initialPath = window.location.pathname.replace(/\/$/, "") || "/";
+    const callbackCreatesSession =
+      initialPath === "/cognito/callback" ||
+      initialPath === "/oauth/callback" ||
+      initialPath === "/auth/magic-link";
+
+    if (callbackCreatesSession) {
+      setAuthReady(true);
+      return () => { cancelled = true; };
+    }
+
+    bootstrapMemberAuthSession()
+      .catch(() => null)
+      .finally(() => {
+        if (cancelled) return;
+        setAuthed(isAuthed());
+        setAuthReady(true);
+        try {
+          window.dispatchEvent(new Event("auth:changed"));
+        } catch {
+          // no-op
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Sync auth state
   useEffect(() => {
@@ -219,6 +263,14 @@ const AppShell = () => {
 
   const showSidebar = authed && !hideChrome && !isMarketingHub;
   const showHeader = !authed && !hideChrome;
+
+  if (!authReady) {
+    return (
+      <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <CircularProgress size={30} />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>

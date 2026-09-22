@@ -56,6 +56,7 @@ const asList = (data) => (Array.isArray(data) ? data : (data?.results ?? []));
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -655,9 +656,9 @@ export default function MyEventsPage() {
   const first = (fullName || "Member").split(" ")[0];
 
   const token =
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     "";
 
   const [tab, setTab] = useState(0);

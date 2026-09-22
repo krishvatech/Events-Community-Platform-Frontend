@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { wordpressAuthService } from '../services/wordpressAuth';
+import { establishMemberAuthSession } from '../utils/memberAuthSession';
 
 export function useWordPressAuth() {
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,13 @@ export function useWordPressAuth() {
     try {
       const result = await wordpressAuthService.loginWithWordPress(email, password);
 
+      await establishMemberAuthSession({
+        accessToken: result.id_token || result.access_token,
+        idToken: result.id_token || result.access_token,
+        refreshToken: result.refresh_token,
+        cognitoAccessToken: result.access_token,
+      });
+
       // Store user data
       wordpressAuthService.storeUser({
         id: result.user_id,
@@ -58,8 +66,8 @@ export function useWordPressAuth() {
   /**
    * Logout
    */
-  const logout = useCallback(() => {
-    wordpressAuthService.logout();
+  const logout = useCallback(async () => {
+    await wordpressAuthService.logout();
     setUser(null);
     setIsAuthenticated(false);
     setError(null);

@@ -70,6 +70,7 @@ import { isFutureDate, isFutureMonth, isFutureYear } from "../../utils/dateValid
 // Countries Library
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 // -----------------------------------------------------------------------------
 // API helpers
@@ -78,9 +79,9 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/ap
 
 function getToken() {
   return (
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     ""
   );
 }

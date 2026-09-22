@@ -1,4 +1,11 @@
-// access_token is stored in localStorage; profile data uses sessionStorage.
+import {
+  clearCognitoAuthTokens,
+  setAccessToken,
+  setRefreshToken,
+} from "./tokenStore";
+import { isSecureAuthSessionEnabled } from "./secureAuthSession";
+
+// Profile/identity metadata may persist; secure-session mode keeps credentials in memory only.
 function decodeJwtPayload(token) {
   try {
     const part = String(token || "").split(".")[1] || "";
@@ -27,8 +34,10 @@ export function saveLoginPayload(data, { email, firstName } = {}) {
   const idToken = data?.id_token || "";
   const accessToken = data?.access || "";
   const claims = decodeJwtPayload(idToken || accessToken || access || "");
-  if (access) localStorage.setItem("access_token", access);
-  if (data?.refresh) localStorage.setItem("refresh_token", data.refresh);
+  if (access) setAccessToken(access);
+  // In secure-session mode the refresh token must be handed to Django by the
+  // login flow and must never be retained in browser storage/memory afterwards.
+  if (data?.refresh && !isSecureAuthSessionEnabled()) setRefreshToken(data.refresh);
   localStorage.setItem("user_name", name || "");
   if (data?.user) sessionStorage.setItem("user", JSON.stringify(data.user));
 
@@ -60,9 +69,8 @@ export function clearLogin() {
 
 export function clearAuth() {
   try {
-    // localStorage variants you use
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    // Clear all member Cognito credentials (persistent legacy copies + memory).
+    clearCognitoAuthTokens();
     localStorage.removeItem("user_name");
     localStorage.removeItem("user");
     localStorage.removeItem("loginPayload");

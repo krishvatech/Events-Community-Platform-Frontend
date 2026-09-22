@@ -45,6 +45,7 @@ import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import CloseIcon from "@mui/icons-material/Close";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 dayjs.extend(relativeTime);
 
@@ -56,7 +57,7 @@ function toApi(path) {
 }
 
 function getToken() {
-    return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
+    return localStorage.getItem("access") || getStoredAccessToken() || "";
 }
 
 function authH() {

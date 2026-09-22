@@ -53,6 +53,7 @@ import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import RichProfile from "./community/RichProfile";
 import { isOwnerUser, getCurrentUserCandidate } from "../utils/adminRole";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // -------------------- Constants for Dropdowns --------------------
 const CEFR_OPTIONS = [
@@ -130,8 +131,8 @@ const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
 const tokenHeader = () => {
   const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};
@@ -1327,8 +1328,8 @@ export default function AdminUserProfileEditPage() {
     setSyncing(true);
     try {
       const token =
-        localStorage.getItem("access_token") ||
-        localStorage.getItem("access_token") ||
+        getStoredAccessToken() ||
+        getStoredAccessToken() ||
         localStorage.getItem("access") ||
         localStorage.getItem("jwt");
 

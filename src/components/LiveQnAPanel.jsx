@@ -51,6 +51,7 @@ import SensorsOffIcon from "@mui/icons-material/SensorsOff";
 import Divider from "@mui/material/Divider";
 import Chip from "@mui/material/Chip";
 import LinearProgress from "@mui/material/LinearProgress";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // --- same API pattern as other pages ---
 const API_ROOT = (
@@ -63,7 +64,7 @@ const QNA_PAGE_SIZE = 10;
 function getToken() {
   return (
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     ""
   );
 }

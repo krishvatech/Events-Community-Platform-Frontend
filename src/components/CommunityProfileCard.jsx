@@ -24,8 +24,9 @@ import {
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
-import { clearAuth } from "../utils/authStorage";
+import { logoutBrowserSession } from "../utils/logoutSession";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import { getAccessToken as readAccessToken } from "../utils/tokenStore";
 
 const BORDER = "#e2e8f0";
 const SLATE_700 = "#334155";
@@ -92,7 +93,7 @@ function joinApi(url) {
 }
 
 function authHeaders() {
-  const token = localStorage.getItem("access_token");
+  const token = readAccessToken();
   return token
     ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
     : { "Content-Type": "application/json" };
@@ -160,53 +161,12 @@ export default function CommunityProfileCard({
 }) {
   const navigate = useNavigate();
 
-  const getAccessToken = () =>
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token");
-
-  const getRefreshToken = () =>
-    localStorage.getItem("refresh_token");
+  const getAccessToken = () => readAccessToken();
 
   const signOut = async () => {
-    const access = getAccessToken();
-    const refresh = getRefreshToken();
-
-    const AUTH_PROVIDER = import.meta.env.VITE_AUTH_PROVIDER;
-
-    const isJwtLike = (t) => typeof t === "string" && t.split(".").length === 3;
-
-    try {
-      // ✅ Only call backend logout when using SimpleJWT refresh token
-      if (AUTH_PROVIDER !== "cognito" && access && refresh && isJwtLike(refresh)) {
-        await axios.post(
-          `${apiBase}/auth/logout/`,
-          { refresh },
-          { headers: { Authorization: `Bearer ${access}` } }
-        );
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    // ✅ Also kill Wagtail (Django) session
-    try {
-      if (access) {
-        await fetch(`${apiBase}/auth/wagtail/logout/`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${access}` },
-          credentials: "include",
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    clearAuth();
+    await logoutBrowserSession();
     localStorage.setItem("cart_count", "0");
     window.dispatchEvent(new Event("cart:update"));
-
     navigate("/", { replace: true });
   };
 

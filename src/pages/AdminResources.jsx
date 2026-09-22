@@ -26,6 +26,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 import axios from "axios";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
   .toString()
@@ -89,7 +90,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
 
     setEventLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getStoredAccessToken();
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const limit = 10;
@@ -254,7 +255,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
 
     setUploading(true);
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getStoredAccessToken();
 
       // 1) Validate event is selected
       if (!form.event_id) {
@@ -620,7 +621,7 @@ export default function MyResourcesAdmin() {
 
   const fetchCurrentUser = async () => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getStoredAccessToken();
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const response = await axios.get(`${API}/users/me/`, config);
       setCurrentUser(response.data);
@@ -637,7 +638,7 @@ export default function MyResourcesAdmin() {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getStoredAccessToken();
       const offset = (resourcePage - 1) * RESOURCE_ITEMS_PER_PAGE;
 
       const params = new URLSearchParams({
@@ -705,7 +706,7 @@ export default function MyResourcesAdmin() {
 
   const fetchEvents = async () => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getStoredAccessToken();
       const config = { headers: { Authorization: `Bearer ${token}` } };
       let response;
       try {
@@ -790,7 +791,7 @@ export default function MyResourcesAdmin() {
 
     setDeletingResource(true);
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getStoredAccessToken();
       const config = {
         headers: { Authorization: `Bearer ${token}` },
         data: { reason: deleteReason.trim() },

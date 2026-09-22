@@ -3,7 +3,8 @@ import * as React from "react";
 import { Box, Container } from "@mui/material";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { isMarketingHubPath } from "../../config/marketingNavigation";
-import { clearAuth } from "../../utils/authStorage";
+import { logoutBrowserSession } from "../../utils/logoutSession";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api")
   .trim()
@@ -22,7 +23,7 @@ export default function AdminLayout() {
 
     const logIdleLogoutToServer = () => {
       try {
-        const token = localStorage.getItem("access_token");
+        const token = getStoredAccessToken();
         const payload = {
           reason: "idle_timeout",
           idle_minutes: IDLE_MIN,
@@ -45,7 +46,7 @@ export default function AdminLayout() {
       }
     };
 
-    const logoutNow = (trigger = "idle_timeout") => {
+    const logoutNow = async (trigger = "idle_timeout") => {
       const now = Date.now();
       const idleSec = Math.max(0, Math.floor((now - lastActivityAt) / 1000));
       console.warn(
@@ -53,7 +54,7 @@ export default function AdminLayout() {
       );
 
       logIdleLogoutToServer();
-      clearAuth();
+      await logoutBrowserSession();
       navigate("/signin", { replace: true });
     };
 

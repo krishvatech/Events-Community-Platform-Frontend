@@ -18,6 +18,7 @@ import imaaLogo from "../assets/oxford/IMAA_Logo.svg";
 import bancorLogo from "../assets/Bancor Gray Different file format/Bancor Gray Transparent BG.png";
 import polskyLogo from "../assets/oxford/Polsky_logo_stacked_Color_RGB.png";
 import "../styles/OxfordSymposium2026.css";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // Strategic partner artwork lives in assets/oxford/partners/. It is resolved through
 // import.meta.glob rather than a static import so that a partner listed below whose
@@ -2664,7 +2665,7 @@ export default function OxfordSymposium2026({ theme = "blue" }) {
   const [error, setError] = useState(null);
 
   // Apply workflow state
-  const token = localStorage.getItem("access_token") || localStorage.getItem("access");
+  const token = getStoredAccessToken() || localStorage.getItem("access");
   const isGuest = localStorage.getItem("is_guest") === "true";
   const isAdminViewer = Boolean(token) && !isGuest && isOwnerUser();
   const [myApplication, setMyApplication] = useState(null);

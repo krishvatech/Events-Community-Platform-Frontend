@@ -51,6 +51,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { isOwnerUser } from "../utils/adminRole";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
     .toString()
@@ -61,7 +62,7 @@ const S3_BUCKET_URL =
 
 const getTokenHeader = () => {
     const t =
-        localStorage.getItem("access_token") ||
+        getStoredAccessToken() ||
         localStorage.getItem("access") ||
         localStorage.getItem("jwt");
     return t ? { Authorization: `Bearer ${t}` } : {};

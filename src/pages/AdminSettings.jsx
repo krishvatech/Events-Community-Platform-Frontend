@@ -78,6 +78,7 @@ import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // --- API helpers ---
 const API_ROOT = (
@@ -85,8 +86,8 @@ const API_ROOT = (
 ).replace(/\/$/, "");
 
 const getToken = () =>
-  localStorage.getItem("access_token") ||
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
+  getStoredAccessToken() ||
   localStorage.getItem("access") ||
   "";
 

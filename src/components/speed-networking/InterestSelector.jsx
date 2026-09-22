@@ -15,11 +15,12 @@ import {
     Checkbox,
     Divider
 } from '@mui/material';
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 function authHeader() {
-    const token = localStorage.getItem("access") || localStorage.getItem("access_token");
+    const token = localStorage.getItem("access") || getStoredAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

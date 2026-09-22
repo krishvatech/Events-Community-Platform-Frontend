@@ -15,12 +15,13 @@ import {
     IconButton,
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 // Helper to get token (adjust path as needed or pass as prop if preferred, but direct import is easier given existing patterns)
 const getToken = () => {
     return (
         localStorage.getItem("access") ||
-        localStorage.getItem("access_token") ||
+        getStoredAccessToken() ||
         ""
     );
 };

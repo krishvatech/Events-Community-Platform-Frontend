@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import { ChevronDown, Check, X, Clock, MapPin, MessageCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const COLORS = {
   primary: '#E8532F',
@@ -38,7 +39,7 @@ const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
 const getToken = () =>
-  localStorage.getItem('access_token') || localStorage.getItem('access') || '';
+  getStoredAccessToken() || localStorage.getItem('access') || '';
 
 const MEETING_STATUSES = {
   pending: { color: '#FF9500', label: 'Pending', icon: '⏳' },

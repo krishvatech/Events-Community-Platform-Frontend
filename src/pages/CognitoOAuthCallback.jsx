@@ -3,6 +3,14 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
+import {
+  removeAccessToken,
+  removeIdToken,
+  removeRefreshToken,
+} from "../utils/tokenStore";
+import { establishMemberAuthSession } from "../utils/memberAuthSession";
+import { isSecureAuthSessionEnabled } from "../utils/secureAuthSession";
+import { logoutBrowserSession } from "../utils/logoutSession";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/+$/, "");
 const COGNITO_DOMAIN = (import.meta.env.VITE_COGNITO_DOMAIN || "").replace(/\/+$/, "");
@@ -54,17 +62,10 @@ const CognitoOAuthCallback = () => {
     if (didRunRef.current) return;
     didRunRef.current = true;
 
-    // DEBUG: Log the full URL and all params
-    console.log("📍 Current URL:", window.location.href);
-    console.log("📍 Current pathname:", window.location.pathname);
-    console.log("📍 Current search:", window.location.search);
-
     const code = params.get("code");
     const state = params.get("state");
     const error = params.get("error");
     const errorDescription = params.get("error_description");
-
-    console.log("🔍 URL Parameters:", { code, state, error, errorDescription });
 
     // Check if user came from WordPress login (has higher priority)
     const wpRedirect = sessionStorage.getItem("post_wordpress_cognito_redirect") || localStorage.getItem("post_wordpress_cognito_redirect");
@@ -104,12 +105,12 @@ const CognitoOAuthCallback = () => {
     }
 
     // Clear stale auth before exchanging OAuth code.
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("id_token");
+    removeAccessToken();
+    removeRefreshToken();
+    removeIdToken();
     localStorage.removeItem("user");
 
-    console.log("✅ Authorization code received:", code);
+    console.log("✅ Authorization code received");
 
     // Use state if present, otherwise generate a temporary one
     let finalState = state;
@@ -117,13 +118,6 @@ const CognitoOAuthCallback = () => {
       console.warn("⚠️ State parameter missing, generating temporary one");
       finalState = "temp_" + Math.random().toString(36).substr(2, 9);
     }
-
-    // DEBUG: Log all sessionStorage
-    console.log("📦 All sessionStorage keys at callback:", Object.keys(sessionStorage));
-    console.log("📦 SessionStorage items:", Array.from({ length: sessionStorage.length }, (_, i) => {
-      const key = sessionStorage.key(i);
-      return { key, value: sessionStorage.getItem(key)?.substring?.(0, 30) + "..." };
-    }));
 
     const verifierKey = `pkce_verifier_${finalState}`;
     let verifier = sessionStorage.getItem(verifierKey) || localStorage.getItem(verifierKey);
@@ -181,7 +175,7 @@ const CognitoOAuthCallback = () => {
         console.log("📡 Token exchange response:", t?.access_token ? "✅ Got access token" : "❌ No access token", t?.error);
 
         if (!resp.ok || !t?.access_token) {
-          console.error("❌ Token exchange failed:", resp.status, t);
+          console.error("❌ Token exchange failed:", resp.status, t?.error || "unknown_error");
           toast.error("❌ Cognito token exchange failed: " + (t?.error_description || t?.error || "Unknown error"));
           navigate("/signin", { replace: true });
           return;
@@ -193,18 +187,18 @@ const CognitoOAuthCallback = () => {
         const access = t.access_token;
         const refresh = t.refresh_token || "";
         const idToken = t.id_token || "";
-        const backendJwt = idToken || access;
-        // 2) Store tokens (same keys your app already uses)
-        // ✅ Your app should use idToken for backend APIs
-        localStorage.setItem("access_token", idToken || access);
 
-        // keep the real access token separately (used for /userInfo etc.)
-        localStorage.setItem("cognito_access_token", access);
+        // 2) Establish the browser member session. Secure mode hands the
+        // refresh token to Django and leaves only a short-lived ID token in
+        // memory; legacy mode preserves the previous storage behaviour.
+        const backendJwt = await establishMemberAuthSession({
+          accessToken: idToken || access,
+          idToken,
+          refreshToken: refresh,
+          cognitoAccessToken: access,
+        });
 
-        if (refresh) localStorage.setItem("refresh_token", refresh);
-        if (idToken) localStorage.setItem("id_token", idToken);
-
-        console.log("✅ Tokens stored successfully");
+        console.log("✅ Member session established successfully");
 
         await updateTimezone(backendJwt).catch(e => {
           console.warn("Timezone update failed:", e);
@@ -265,7 +259,7 @@ const CognitoOAuthCallback = () => {
 
         localStorage.setItem("user", JSON.stringify(backendUser || claims || {}));
         saveLoginPayload(
-          { access_token: backendJwt, refresh, user: backendUser || claims },
+          { access_token: backendJwt, id_token: backendJwt, refresh: "", user: backendUser || claims },
           { email, firstName }
         );
 
@@ -281,6 +275,9 @@ const CognitoOAuthCallback = () => {
         navigate(intended || path, { replace: true });
       } catch (e) {
         console.error("❌ Cognito callback error:", e);
+        if (isSecureAuthSessionEnabled()) {
+          await logoutBrowserSession().catch(() => {});
+        }
         toast.error("❌ Could not finish Cognito social login.");
         navigate("/signin", { replace: true });
       }

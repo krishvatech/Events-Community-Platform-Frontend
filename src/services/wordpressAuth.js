@@ -3,6 +3,17 @@
  * Handles login, token management, and profile sync
  */
 
+import {
+  clearCognitoAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setCognitoAccessToken,
+  setIdToken,
+  setRefreshToken,
+} from '../utils/tokenStore';
+import { logoutBrowserSession } from '../utils/logoutSession';
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
 export const wordpressAuthService = {
@@ -43,22 +54,21 @@ export const wordpressAuthService = {
       }
 
       const syncData = await syncResponse.json();
-      console.log('WordPress user synced:', syncData);
-
+      // Never log the sync payload: it can contain Cognito credentials.
       // Store Cognito tokens if provided
       if (syncData.access_token) {
-        localStorage.setItem('access_token', syncData.access_token);
+        setAccessToken(syncData.access_token);
       }
       if (syncData.id_token) {
-        localStorage.setItem('id_token', syncData.id_token);
+        setIdToken(syncData.id_token);
       }
       if (syncData.refresh_token) {
-        localStorage.setItem('refresh_token', syncData.refresh_token);
+        setRefreshToken(syncData.refresh_token);
       }
 
       // Also store cognito_access_token if available
       if (syncData.access_token) {
-        localStorage.setItem('cognito_access_token', syncData.access_token);
+        setCognitoAccessToken(syncData.access_token);
       }
 
       return {
@@ -75,22 +85,22 @@ export const wordpressAuthService = {
    * Store authentication tokens
    */
   storeTokens(accessToken, refreshToken) {
-    if (accessToken) localStorage.setItem('access_token', accessToken);
-    if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+    if (accessToken) setAccessToken(accessToken);
+    if (refreshToken) setRefreshToken(refreshToken);
   },
 
   /**
    * Retrieve access token
    */
   getAccessToken() {
-    return localStorage.getItem('access_token');
+    return getAccessToken();
   },
 
   /**
    * Retrieve refresh token
    */
   getRefreshToken() {
-    return localStorage.getItem('refresh_token');
+    return getRefreshToken();
   },
 
   /**
@@ -112,8 +122,7 @@ export const wordpressAuthService = {
    * Clear all auth data
    */
   clearAuth() {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    clearCognitoAuthTokens();
     localStorage.removeItem('user');
   },
 
@@ -127,8 +136,9 @@ export const wordpressAuthService = {
   /**
    * Logout
    */
-  logout() {
-    this.clearAuth();
+  async logout() {
+    await logoutBrowserSession();
+    localStorage.removeItem('user');
   },
 
   /**

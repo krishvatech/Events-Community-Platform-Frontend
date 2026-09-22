@@ -30,6 +30,7 @@ import {
 import MyMeetingsView from '../components/MyMeetingsView';
 import ScheduleTab from '../components/ScheduleTab';
 import { toast } from 'react-toastify';
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -1639,7 +1640,7 @@ function EventCompanionDirectoryPage() {
   const { slug } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const token = localStorage.getItem('access_token');
+  const token = getStoredAccessToken();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
 const getToken = () =>
-  localStorage.getItem('access_token') || localStorage.getItem('access') || '';
+  getStoredAccessToken() || localStorage.getItem('access') || '';
 
 function EventCompanionGuard({ children }) {
   const { slug } = useParams();

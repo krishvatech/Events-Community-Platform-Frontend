@@ -20,6 +20,7 @@ import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import LockRounded from "@mui/icons-material/LockRounded";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const isAbortLikeError = (err) => {
   const name = String(err?.name || "").toLowerCase();
@@ -58,9 +59,9 @@ const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 const API_ORIGIN = BASE.replace(/\/api$/, "") || BASE;
 
 const getToken = () =>
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   localStorage.getItem("access") ||
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   "";
 
 const toAbs = (u) => {
@@ -501,7 +502,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 }
 
 function EditGroupDialog({ open, group, onClose, onUpdated }) {
-  const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("access_token") || "";
+  const token = getStoredAccessToken() || localStorage.getItem("access") || getStoredAccessToken() || "";
   const [name, setName] = React.useState("");
   const [shortDescription, setShortDescription] = React.useState("");
   const [description, setDescription] = React.useState("");

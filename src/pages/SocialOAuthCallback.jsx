@@ -4,6 +4,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
+import { getAccessToken } from "../utils/tokenStore";
+import { establishMemberAuthSession } from "../utils/memberAuthSession";
+import { isSecureAuthSessionEnabled } from "../utils/secureAuthSession";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/+$/, "");
 
@@ -119,6 +122,17 @@ const SocialOAuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // This route belongs to the legacy direct Google/LinkedIn backend flow,
+    // which returns SimpleJWT tokens. Secure-session mode deliberately accepts
+    // Cognito credentials only, so fail cleanly instead of attempting to mix
+    // authentication systems. SocialLogin routes secure-mode users through
+    // Cognito Hosted UI and /cognito/callback instead.
+    if (isSecureAuthSessionEnabled()) {
+      toast.error("This social sign-in session has expired. Please sign in again.");
+      navigate("/signin", { replace: true });
+      return;
+    }
+
     const access = searchParams.get("access");
     const refresh = searchParams.get("refresh");
 
@@ -130,23 +144,28 @@ const SocialOAuthCallback = () => {
 
     (async () => {
       try {
-        // Store tokens like SignInPage does
-        localStorage.setItem("access_token", access);
-        if (refresh) localStorage.setItem("refresh_token", refresh);
+        // Establish the member session using the same secure hand-off as the
+        // primary Cognito callback. With the feature flag off, this preserves
+        // the previous token-storage behaviour.
+        const memberAccessToken = await establishMemberAuthSession({
+          accessToken: access,
+          idToken: access,
+          refreshToken: refresh,
+        });
 
-        await updateTimezone(access);
+        await updateTimezone(memberAccessToken);
 
         // Try to resolve user object
-        const userObj = await resolveCurrentUser(access, null);
+        const userObj = await resolveCurrentUser(memberAccessToken, null);
         localStorage.setItem("user", JSON.stringify(userObj || {}));
 
         // Save login payload (sessionStorage helpers)
-        const payload = { access, refresh, user: userObj };
+        const payload = { access: memberAccessToken, access_token: memberAccessToken, refresh: "", user: userObj };
         saveLoginPayload(payload, { email: userObj?.email });
 
-        const accessTokenForGroups = localStorage.getItem("access_token") || "";
+        const accessTokenForGroups = getAccessToken() || "";
         const cognitoGroups = getCognitoGroupsFromTokens(accessTokenForGroups);
-        const backendUser = await resolveBackendUser(access);
+        const backendUser = await resolveBackendUser(memberAccessToken);
 
         const { path } = getRoleAndRedirectPath({
           cognitoGroups,

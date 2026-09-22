@@ -1,3 +1,4 @@
+import { getAccessToken as getStoredAccessToken } from "./tokenStore";
 /**
  * WebSocket utility for real-time messaging with Redis Channel Layer.
  * Provides WebSocket connection with fallback to REST polling.
@@ -14,7 +15,7 @@ function getWsRoot() {
 function getAuthToken() {
   return (
     localStorage.getItem('access') ||
-    localStorage.getItem('access_token') ||
+    getStoredAccessToken() ||
     localStorage.getItem('accessToken')
   );
 }

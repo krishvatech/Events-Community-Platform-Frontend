@@ -20,8 +20,9 @@ import {
   Groups as GroupsIcon,
   AccessTime as AccessTimeIcon,
 } from "@mui/icons-material";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
-const getAccessToken = () => localStorage.getItem("access_token");
+const getAccessToken = () => getStoredAccessToken();
 const isAuthed = () => !!getAccessToken();
 
 const NAVY = "#1B2A4A";

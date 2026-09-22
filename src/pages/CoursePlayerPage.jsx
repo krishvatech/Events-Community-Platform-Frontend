@@ -38,6 +38,7 @@ import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import DoneRoundedIcon from "@mui/icons-material/DoneRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -55,7 +56,7 @@ function decodeEntities(str) {
 }
 
 function authHeaders() {
-  const token = localStorage.getItem("access_token");
+  const token = getStoredAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

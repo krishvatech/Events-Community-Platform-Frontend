@@ -1,0 +1,12 @@
+# Example only. Deliberately contains NO production route binding.
+# Copy/review values before using Wrangler; do not deploy blindly.
+
+name = "ecp-secure-auth-proxy"
+main = "index.js"
+compatibility_date = "2026-09-22"
+workers_dev = false
+
+[vars]
+AUTH_BACKEND_ORIGIN = "https://api.colligatus.com"
+AUTH_ALLOWED_ORIGIN = "https://connect.imaa-institute.org"
+AUTH_COOKIE_NAME = "__Host-ecp_secure_session"

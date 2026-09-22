@@ -24,6 +24,7 @@ import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
 import VerifiedIcon from "@mui/icons-material/Verified";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const BORDER = "#e2e8f0";
 
@@ -32,8 +33,8 @@ const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
 const tokenHeader = () => {
   const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};

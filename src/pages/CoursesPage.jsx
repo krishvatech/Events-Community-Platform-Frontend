@@ -34,13 +34,14 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const PAGE_SIZE = 9;
 
 function authHeaders() {
-  const token = localStorage.getItem("access_token");
+  const token = getStoredAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

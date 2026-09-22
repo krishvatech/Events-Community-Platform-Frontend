@@ -3,6 +3,8 @@ import { FaGoogle, FaLinkedinIn } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { Box, Divider, Typography, Button } from '@mui/material';
 import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
+import { removeAccessToken, removeIdToken, removeRefreshToken } from "../utils/tokenStore";
+import { isSecureAuthSessionEnabled } from "../utils/secureAuthSession";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
 const SocialLogin = () => {
@@ -18,9 +20,9 @@ const SocialLogin = () => {
 
       // If Cognito config is present, use Cognito Hosted UI Google
       if (AUTH_PROVIDER === "cognito" && COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("id_token");
+        removeAccessToken();
+        removeRefreshToken();
+        removeIdToken();
         localStorage.removeItem("user");
 
         console.log("✅ Using Cognito OAuth flow");
@@ -28,12 +30,12 @@ const SocialLogin = () => {
         const verifier = randomString(48);
         const challenge = await pkceChallengeFromVerifier(verifier);
 
-        console.log("🔐 Google OAuth Flow:", { state, verifier, challenge, redirectUri: COGNITO_REDIRECT_URI });
+        console.log("🔐 Google OAuth PKCE flow prepared");
 
         // Store in sessionStorage
         sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
         localStorage.setItem(`pkce_verifier_${state}`, verifier);
-        console.log("✅ Stored verifier in sessionStorage:", { key: `pkce_verifier_${state}`, value: verifier?.substring(0, 20) + "..." });
+        console.log("✅ PKCE verifier stored for OAuth callback");
 
         // ✅ store where user should land after login
         const intended =
@@ -44,9 +46,6 @@ const SocialLogin = () => {
         sessionStorage.setItem(`post_login_redirect_${state}`, intended);
         localStorage.setItem(`post_login_redirect_${state}`, intended);
         console.log("✅ Stored redirect in sessionStorage:", { key: `post_login_redirect_${state}`, value: intended });
-
-        // DEBUG: Log all sessionStorage keys
-        console.log("📦 All sessionStorage keys:", Object.keys(sessionStorage).filter(k => k.includes('pkce') || k.includes('redirect')));
 
         const params = new URLSearchParams({
           response_type: "code",
@@ -60,9 +59,16 @@ const SocialLogin = () => {
         });
 
         const authUrl = `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
-        console.log("📍 Redirecting to Cognito:", authUrl);
+        console.log("📍 Redirecting to Cognito Hosted UI");
         window.location.href = authUrl;
         return;
+      }
+
+      // Secure-session mode only accepts Cognito member credentials. Never
+      // silently fall back to the legacy backend OAuth/SimpleJWT flow, because
+      // that callback cannot establish the HttpOnly Cognito refresh session.
+      if (isSecureAuthSessionEnabled()) {
+        throw new Error("Secure social login requires Cognito Hosted UI configuration.");
       }
 
       // fallback (your existing backend social login)
@@ -88,9 +94,9 @@ const SocialLogin = () => {
 
       // Use Cognito Hosted UI LinkedIn (OIDC provider)
       if (AUTH_PROVIDER === "cognito" && COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("id_token");
+        removeAccessToken();
+        removeRefreshToken();
+        removeIdToken();
         localStorage.removeItem("user");
 
         const state = randomString(16);
@@ -122,6 +128,12 @@ const SocialLogin = () => {
 
         window.location.href = `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
         return;
+      }
+
+      // Secure-session mode only accepts Cognito member credentials. Never
+      // silently fall back to the legacy backend OAuth/SimpleJWT flow.
+      if (isSecureAuthSessionEnabled()) {
+        throw new Error("Secure social login requires Cognito Hosted UI configuration.");
       }
 
       // fallback (your existing backend LinkedIn social login)

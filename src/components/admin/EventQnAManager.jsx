@@ -27,13 +27,14 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 
 const getToken = () =>
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   localStorage.getItem("access") ||
   "";
 

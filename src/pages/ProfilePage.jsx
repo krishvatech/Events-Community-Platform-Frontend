@@ -54,6 +54,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // -------------------- Constants for Dropdowns --------------------
 const CEFR_OPTIONS = [
@@ -131,8 +132,8 @@ const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
 const tokenHeader = () => {
   const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};
@@ -1389,8 +1390,8 @@ export default function ProfilePage() {
     setSyncing(true);
     try {
       const token =
-        localStorage.getItem("access_token") ||
-        localStorage.getItem("access_token") ||
+        getStoredAccessToken() ||
+        getStoredAccessToken() ||
         localStorage.getItem("access") ||
         localStorage.getItem("jwt");
 

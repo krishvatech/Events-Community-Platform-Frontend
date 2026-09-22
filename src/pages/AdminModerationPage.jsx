@@ -25,13 +25,14 @@ import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlin
 
 import { isAdminUser } from "../utils/adminRole";
 import AdminProfileModerationPage from "./AdminProfileModerationPage";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 function getToken() {
   return (
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     ""
   );
 }

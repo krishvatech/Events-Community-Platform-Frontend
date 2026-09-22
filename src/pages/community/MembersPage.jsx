@@ -58,6 +58,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet.heat";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 
 
@@ -96,8 +97,8 @@ function useDebouncedValue(value, delay = 350) {
 
 const tokenHeader = () => {
   const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};

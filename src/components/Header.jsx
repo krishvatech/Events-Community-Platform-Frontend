@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { clearAuth } from "../utils/authStorage";
+import { logoutBrowserSession } from "../utils/logoutSession";
 import {
   AppBar,
   Toolbar,
@@ -25,10 +25,9 @@ import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { authConfig } from "../utils/api";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
+import { getAccessToken } from "../utils/tokenStore";
 const apiBase =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-
-const getAccessToken = () => localStorage.getItem("access_token");
 
 const getCookie = (name) =>
   document.cookie
@@ -237,44 +236,8 @@ const Header = () => {
     return () => window.removeEventListener("pageshow", onShow);
   }, [location.pathname, navigate]);
 
-  const getRefreshToken = () =>
-    localStorage.getItem("refresh_token");
-
   const signOut = async () => {
-    const access = getAccessToken();
-    const refresh = getRefreshToken();
-
-    const AUTH_PROVIDER = import.meta.env.VITE_AUTH_PROVIDER;
-
-    const isJwtLike = (t) => typeof t === "string" && t.split(".").length === 3;
-
-    try {
-      // ✅ Only call backend logout when using SimpleJWT refresh token
-      if (AUTH_PROVIDER !== "cognito" && access && refresh && isJwtLike(refresh)) {
-        await axios.post(
-          `${apiBase}/auth/logout/`,
-          { refresh },
-          { headers: { Authorization: `Bearer ${access}` } }
-        );
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    // ✅ Also kill Wagtail (Django) session
-    try {
-      if (access) {
-        await fetch(`${apiBase}/auth/wagtail/logout/`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${access}` },
-          credentials: "include",
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    clearAuth();
+    await logoutBrowserSession();
     localStorage.setItem("cart_count", "0");
     window.dispatchEvent(new Event("cart:update"));
 

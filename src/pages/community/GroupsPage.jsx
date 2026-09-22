@@ -41,6 +41,7 @@ import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import LockRounded from "@mui/icons-material/LockRounded";
 import { isAdminUser } from "../../utils/adminRole";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const BORDER = "#e2e8f0";
 const JOIN_BTN_SX = {
@@ -97,7 +98,7 @@ const bust = (url, key) => {
 function authHeader() {
   const token =
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("auth_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

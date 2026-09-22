@@ -1,6 +1,17 @@
 import axios from "axios";
 import { cognitoRefreshSession } from "./cognitoAuth";
+import {
+  isSecureAuthSessionEnabled,
+  refreshSecureAuthSession,
+} from "./secureAuthSession";
 import { getUserName, clearAuth } from "./authStorage";
+import {
+  getAccessToken as readAccessToken,
+  getRefreshToken as readRefreshToken,
+  removeAccessToken,
+  setAccessToken,
+  setRefreshToken,
+} from "./tokenStore";
 
 // Refresh queue controls
 let isRefreshing = false;
@@ -117,8 +128,7 @@ export async function getLinkedInAuthUrl() {
 /**
  * Token + CSRF helpers
  */
-export const getRefreshToken = () =>
-  localStorage.getItem("refresh_token");
+export const getRefreshToken = () => readRefreshToken();
 
 const normalizeToken = (token) => {
   if (!token) return null;
@@ -128,7 +138,66 @@ const normalizeToken = (token) => {
 };
 
 export const getToken = () =>
-  normalizeToken(localStorage.getItem("access_token"));
+  normalizeToken(readAccessToken());
+
+// One refresh promise is shared by axios and the global fetch interceptor.
+// With the secure-session flag OFF this executes the existing Cognito refresh
+// flow. With the flag ON it uses only the first-party HttpOnly session cookie.
+let memberRefreshPromise = null;
+
+export const refreshMemberAccessToken = async () => {
+  if (memberRefreshPromise) return memberRefreshPromise;
+
+  memberRefreshPromise = (async () => {
+    if (isSecureAuthSessionEnabled()) {
+      const { accessToken } = await refreshSecureAuthSession();
+      setAccessToken(accessToken);
+      return accessToken;
+    }
+
+    const refreshToken = getRefreshToken();
+    let username = getUserName();
+
+    // Preserve the existing Cognito username fallbacks while secure auth is off.
+    if (!username) {
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "{}");
+        username = u.username || u.email || "";
+      } catch { }
+    }
+
+    if (!username) {
+      const token = getToken();
+      if (token) {
+        try {
+          const parts = token.split(".");
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            username =
+              payload.username || payload["cognito:username"] || payload.sub;
+          }
+        } catch { }
+      }
+    }
+
+    if (!refreshToken || !username) {
+      throw new Error("No refresh token or username available");
+    }
+
+    const { idToken, refreshToken: newRefresh } = await cognitoRefreshSession({
+      username,
+      refreshToken,
+    });
+
+    setAccessToken(idToken);
+    if (newRefresh) setRefreshToken(newRefresh);
+    return idToken;
+  })().finally(() => {
+    memberRefreshPromise = null;
+  });
+
+  return memberRefreshPromise;
+};
 
 export const getCSRF = () =>
   document.cookie.split("; ").find((s) => s.startsWith("csrftoken="))?.split("=")[1];
@@ -197,7 +266,7 @@ apiClient.interceptors.response.use(
     const isGuest = localStorage.getItem("is_guest") === "true";
     if (isGuest) {
       console.warn("[Auth] Guest token expired (401). Clearing guest session.");
-      localStorage.removeItem("access_token");
+      removeAccessToken();
       localStorage.removeItem("is_guest");
       localStorage.removeItem("guest_email");
       localStorage.removeItem("guest_name");
@@ -220,51 +289,8 @@ apiClient.interceptors.response.use(
         isRefreshing = true;
         original._retry = true;
 
-        const refreshToken = getRefreshToken();
-        let username = getUserName();
-
         console.log(`[Auth] 401 Unauthorized detected. Attempting token refresh...`);
-
-        // Fallback 1: Try getting username from localStorage 'user' object
-        if (!username) {
-          try {
-            const u = JSON.parse(localStorage.getItem("user") || "{}");
-            username = u.username || u.email || "";
-          } catch { }
-        }
-
-        // Fallback 2: Decode the expired token to find a username/sub
-        if (!username) {
-          const t = getToken();
-          if (t) {
-            try {
-              const parts = t.split('.');
-              if (parts.length === 3) {
-                const payload = JSON.parse(atob(parts[1]));
-                username = payload.username || payload['cognito:username'] || payload.sub;
-              }
-            } catch { }
-          }
-        }
-
-        if (!refreshToken || !username) {
-          console.error("[Auth] Missing refresh token or username. Cannot refresh. Logging out.");
-          throw new Error("No refresh token or username available");
-        }
-
-        console.log(`[Auth] Refreshing session for user: ${username}`);
-
-        // Call our new helper
-        const { idToken, refreshToken: newRefresh } = await cognitoRefreshSession({
-          username,
-          refreshToken,
-        });
-
-        // Save new tokens
-        localStorage.setItem("access_token", idToken);
-        if (newRefresh) {
-          localStorage.setItem("refresh_token", newRefresh);
-        }
+        const idToken = await refreshMemberAccessToken();
 
         // Process queue
         processQueue(null, idToken);
@@ -568,7 +594,7 @@ export const manualApproveKYC = (userId, formData) =>
 export async function createWagtailSession() {
   const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
   const token =
-    localStorage.getItem("access_token") ||
+    readAccessToken() ||
     localStorage.getItem("access") ||
     "";
 
@@ -593,7 +619,7 @@ export async function createWagtailSession() {
 
 export async function getSaleorDashboardUrl() {
   const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
-  const token = localStorage.getItem("access_token") || localStorage.getItem("access") || "";
+  const token = readAccessToken() || localStorage.getItem("access") || "";
   const r = await fetch(`${API_BASE}/auth/saleor/dashboard/`, {
     method: "GET",
     headers: {

@@ -21,17 +21,18 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BlockIcon from '@mui/icons-material/Block';
 import { useNavigate } from 'react-router-dom';
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 const WS_ROOT = API_ROOT.replace(/^http/, "ws").replace(/\/api\/?$/, "");
 
 function authHeader() {
-    const token = localStorage.getItem("access") || localStorage.getItem("access_token");
+    const token = localStorage.getItem("access") || getStoredAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 function getToken() {
-    return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
+    return localStorage.getItem("access") || getStoredAccessToken() || "";
 }
 
 function mergeMatches(incoming, previous = []) {

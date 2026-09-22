@@ -23,6 +23,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { LeadGenModal } from '../components/LeadGenModal.jsx';
 import ApplyNowModal from '../components/ApplyNowModal.jsx';
 import EventCompanionDirectoryPage from './EventCompanionDirectoryPage';
+import { getAccessToken, removeAccessToken } from '../utils/tokenStore';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -31,7 +32,7 @@ const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
 const getToken = () =>
-  localStorage.getItem('access_token') || localStorage.getItem('access') || '';
+  getAccessToken() || localStorage.getItem('access') || '';
 
 function EventCompanionAccessPage() {
   const { slug } = useParams();
@@ -95,7 +96,7 @@ function EventCompanionAccessPage() {
       });
 
       if (!userRes.ok) {
-        localStorage.removeItem('access_token');
+        removeAccessToken();
         localStorage.removeItem('access');
         setIsAuthenticated(false);
         setLoading(false);

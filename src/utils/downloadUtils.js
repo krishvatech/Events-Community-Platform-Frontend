@@ -1,3 +1,4 @@
+import { getAccessToken as getStoredAccessToken } from "./tokenStore";
 /**
  * Download utility functions for exporting promotional profiles
  */
@@ -101,7 +102,7 @@ export const downloadFromAPI = async (url, filename, options = {}) => {
       ...options,
       headers: {
         ...options.headers,
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        'Authorization': `Bearer ${getStoredAccessToken()}`,
       }
     };
 

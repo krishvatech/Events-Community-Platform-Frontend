@@ -2,6 +2,7 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Avatar, Box, Button, Container } from "@mui/material";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 /** Decode a JWT without verifying (used as a fallback to guess first name) */
 function decodeJwtNoVerify(token) {
@@ -47,9 +48,9 @@ export default function AccountHero({ title, subtitle, actions }) {
     } else {
       // Fallback to JWT claims
       const token =
-        localStorage.getItem("access_token") ||
+        getStoredAccessToken() ||
         localStorage.getItem("access") ||
-        localStorage.getItem("access_token") ||
+        getStoredAccessToken() ||
         localStorage.getItem("jwt") ||
         "";
       const claims = token ? decodeJwtNoVerify(token) : null;

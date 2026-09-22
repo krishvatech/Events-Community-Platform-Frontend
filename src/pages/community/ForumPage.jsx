@@ -27,6 +27,7 @@ import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineR
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(
   /\/$/,
@@ -51,7 +52,7 @@ const ITEMS_PER_PAGE = 6;
 function authHeader() {
   const token =
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("auth_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

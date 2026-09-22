@@ -8,6 +8,15 @@ import "react-toastify/dist/ReactToastify.css";
 import AuthModal from "../components/AuthModal.jsx";
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
+import {
+  getAccessToken,
+  removeAccessToken,
+  removeIdToken,
+  removeRefreshToken,
+} from "../utils/tokenStore";
+import { establishMemberAuthSession } from "../utils/memberAuthSession";
+import { isSecureAuthSessionEnabled } from "../utils/secureAuthSession";
+import { logoutBrowserSession } from "../utils/logoutSession";
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/+$/, "");
 
@@ -110,16 +119,15 @@ export default function SignInPage() {
 
   const handleLoginSuccess = async (data) => {
     try {
-      // Store tokens
-      const accessTokenValue = data?.access_token || data?.access || "";
-      if (accessTokenValue) {
-        localStorage.setItem("access_token", accessTokenValue);
-      }
-      if (data?.refresh) {
-        localStorage.setItem("refresh_token", data.refresh);
-      }
-
-      const accessTokenForBackend = accessTokenValue || "";
+      // Establish the member session. With secure auth enabled this hands the
+      // Cognito refresh token to Django and keeps only the returned short-lived
+      // ID token in memory. With the flag off, legacy storage is preserved.
+      const accessTokenForBackend = await establishMemberAuthSession({
+        accessToken: data?.access_token || data?.access || "",
+        idToken: data?.id_token || data?.access_token || "",
+        refreshToken: data?.refresh || "",
+        cognitoAccessToken: data?.access || "",
+      });
 
       // Update timezone
       await updateTimezone(accessTokenForBackend);
@@ -164,10 +172,14 @@ export default function SignInPage() {
             toast.error("Authentication failed. Please try again or contact support.");
           }
 
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
-          localStorage.removeItem("id_token");
-          localStorage.removeItem("user");
+          if (isSecureAuthSessionEnabled()) {
+            await logoutBrowserSession();
+          } else {
+            removeAccessToken();
+            removeRefreshToken();
+            removeIdToken();
+            localStorage.removeItem("user");
+          }
           return;
         }
       }
@@ -179,12 +191,15 @@ export default function SignInPage() {
       }
 
       localStorage.setItem("user", JSON.stringify(userObj || {}));
-      saveLoginPayload(data, { email: data?.email || "" });
+      saveLoginPayload(
+        { ...data, access_token: accessTokenForBackend, id_token: accessTokenForBackend, refresh: "" },
+        { email: data?.email || "" },
+      );
       // Notify app now that user data is fully stored — GuestOnly will read the correct role
       window.dispatchEvent(new Event("auth:changed"));
 
       // Get role and redirect path
-      const accessTokenForGroups = data?.access || localStorage.getItem("access_token") || "";
+      const accessTokenForGroups = data?.access || getAccessToken() || "";
       const cognitoGroups = getCognitoGroupsFromTokens(accessTokenForGroups);
       const params = new URLSearchParams(location.search);
       const intended = params.get("next") || location.state?.from?.pathname || "/account/profile";
@@ -214,7 +229,10 @@ export default function SignInPage() {
 
     } catch (err) {
       console.error("Login success handler error:", err);
-      toast.error("Authentication completed but redirect failed. Please refresh.");
+      if (isSecureAuthSessionEnabled()) {
+        await logoutBrowserSession().catch(() => {});
+      }
+      toast.error("Authentication completed but redirect failed. Please sign in again.");
     }
   };
 

@@ -48,6 +48,7 @@ import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast, isReplayReadyForSignup } from "../utils/eventUtils";
 import { toast } from "react-toastify";
 import { Helmet } from "react-helmet-async";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -564,9 +565,9 @@ export default function EventDetailsPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const token =
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     "";
   const isGuest = localStorage.getItem("is_guest") === "true";
   const location = useLocation();
@@ -1483,7 +1484,7 @@ export default function EventDetailsPage() {
   useEffect(() => {
     if (!event?.id || !['live', 'ended'].includes(event?.status)) return;
 
-    const token = localStorage.getItem("access_token") || localStorage.getItem("access") || "";
+    const token = getStoredAccessToken() || localStorage.getItem("access") || "";
     const WS_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api")
       .replace(/^http/, "ws")
       .replace(/\/api\/?$/, "");

@@ -41,6 +41,7 @@ import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 
 // Number of members shown per page in the Members tab list.
@@ -92,9 +93,9 @@ const bust = (url, key) => {
     return `${u}${sep}v=${encodeURIComponent(k)}`;
 };
 const getToken = () =>
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     "";
 
 const ROLE_BADGE_CONFIG = {

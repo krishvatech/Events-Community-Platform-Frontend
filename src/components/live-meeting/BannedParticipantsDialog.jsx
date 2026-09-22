@@ -26,9 +26,10 @@ import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LockIcon from "@mui/icons-material/Lock";
 import UndoIcon from "@mui/icons-material/Undo";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 function getToken() {
-    return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
+    return localStorage.getItem("access") || getStoredAccessToken() || "";
 }
 
 function authHeader() {

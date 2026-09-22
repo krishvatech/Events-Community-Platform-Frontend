@@ -4,6 +4,7 @@ import timezone from "dayjs/plugin/timezone";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import { normalizeTimezoneName } from "./timezoneUtils";
+import { getAccessToken as getStoredAccessToken } from "./tokenStore";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -18,9 +19,9 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/ap
 export const API_ORIGIN = API_BASE.replace(/\/api$/, "");
 
 export const getToken = () =>
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     "";
 
 export const toAbs = (u) => {

@@ -35,6 +35,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import localizedFormat from "dayjs/plugin/localizedFormat";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -811,9 +812,9 @@ function toApiUrl(pathOrUrl) {
 function authHeaders() {
   const token =
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token");
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
+    getStoredAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

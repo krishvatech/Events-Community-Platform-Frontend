@@ -1,3 +1,4 @@
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 /**
  * Virtual Speaker API Service
  * Handles all API calls related to virtual speaker profiles
@@ -9,7 +10,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/ap
  * Get auth token from localStorage
  */
 const getAuthToken = () => {
-  return localStorage.getItem('access_token');
+  return getStoredAccessToken();
 };
 
 /**

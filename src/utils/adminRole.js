@@ -1,3 +1,4 @@
+import { getAccessToken as getStoredAccessToken } from "./tokenStore";
 // src/utils/adminRole.js
 
 // Small helper: treat booleans / numbers / strings as truthy
@@ -43,7 +44,7 @@ export const getBackendUserFromStorage = () => {
 };
 
 const getCognitoGroupsFromAccessToken = () => {
-  const token = window.localStorage.getItem("access_token") || "";
+  const token = getStoredAccessToken() || "";
   const claims = decodeJwtPayload(token);
   const raw = claims?.["cognito:groups"] || [];
 
@@ -84,7 +85,7 @@ const getUserCandidates = () => {
   }
 
   // JWT tokens (these usually contain is_superuser / is_staff)
-  const jwtToken = window.localStorage.getItem("access_token");
+  const jwtToken = getStoredAccessToken();
 
   const claims = decodeJwtPayload(jwtToken);
   if (claims) candidates.push(claims);

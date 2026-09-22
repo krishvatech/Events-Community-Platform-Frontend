@@ -7,11 +7,12 @@ import LoungeGrid from './LoungeGrid';
 import MainRoomPeek from './MainRoomPeek';
 import LateJoinerNotification from './LateJoinerNotification';
 import LateJoinerWaitingMessage from './LateJoinerWaitingMessage';
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const API_RAW = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 const WS_ROOT = API_RAW.replace(/^http/, "ws").replace(/\/api\/?$/, "");
 function getToken() {
-    return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
+    return localStorage.getItem("access") || getStoredAccessToken() || "";
 }
 
 const LoungeOverlay = ({

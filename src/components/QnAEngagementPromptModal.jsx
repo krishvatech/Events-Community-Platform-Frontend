@@ -36,6 +36,7 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import CloseIcon from "@mui/icons-material/Close";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
 import SendIcon from "@mui/icons-material/Send";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // ── API helpers (same pattern as LiveMeetingPage / LiveQnAPanel) ──────────────
 const API_ROOT = (
@@ -45,7 +46,7 @@ const API_ROOT = (
 function authHeader() {
     const tok =
         localStorage.getItem("access") ||
-        localStorage.getItem("access_token") ||
+        getStoredAccessToken() ||
         "";
     return tok ? { Authorization: `Bearer ${tok}` } : {};
 }

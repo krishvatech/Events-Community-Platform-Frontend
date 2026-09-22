@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 import { toast } from "react-toastify";
 import { API_BASE, authConfig } from "../utils/api";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // Helper to compute event status
 function computeEventStatus(ev) {
@@ -39,7 +40,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
     const [loading, setLoading] = useState(false);
 
     const authHeaders = () => authConfig().headers;
-    const token = localStorage.getItem("access_token") || localStorage.getItem("access");
+    const token = getStoredAccessToken() || localStorage.getItem("access");
 
     // Check if event has started or ended
     const eventStatus = computeEventStatus(ev);

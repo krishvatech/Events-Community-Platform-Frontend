@@ -1,10 +1,46 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CircularProgress, Box, Typography, Alert, Container } from "@mui/material";
+import { setAccessToken } from "../utils/tokenStore";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.replace(/\/+$/, "");
 const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path}`}`;
+
+const safeSameOriginPath = (value) => {
+  if (!value) return "";
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.origin !== window.location.origin) return "";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "";
+  }
+};
+
+const persistGuestSession = ({ token, guestId, user, event, guestData = null }) => {
+  if (!token || !guestId) return;
+
+  const guestName =
+    guestData?.name ||
+    [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
+    "Guest";
+  const guestEmail = guestData?.email || user?.email || "";
+  const attendee = guestData || {
+    token,
+    guest_id: guestId,
+    event_id: event?.id || null,
+    email: guestEmail,
+    name: guestName,
+  };
+
+  localStorage.setItem("guest_token", token);
+  localStorage.setItem("guest_id", String(guestId));
+  localStorage.setItem("is_guest", "true");
+  if (guestEmail) localStorage.setItem("guest_email", guestEmail);
+  if (guestName) localStorage.setItem("guest_name", guestName);
+  localStorage.setItem("guest_attendee", JSON.stringify(attendee));
+};
 
 /**
  * MagicLinkPage
@@ -30,7 +66,6 @@ export default function MagicLinkPage() {
 
       try {
         console.log("[MagicLink] 1. Starting magic link validation...");
-        console.log("[MagicLink] Token:", token.substring(0, 20) + "...");
         console.log("[MagicLink] Next URL:", nextUrl);
 
         // Call backend to validate token and get access token
@@ -44,8 +79,6 @@ export default function MagicLinkPage() {
         }
 
         const data = await response.json();
-        console.log("[MagicLink] 3. Magic link response data:", data);
-
         const { access_token, user, event, guest_token, guest_id } = data;
         console.log("[MagicLink] Access token:", access_token ? "✅ Received" : "❌ Missing");
         console.log("[MagicLink] User:", user);
@@ -53,18 +86,21 @@ export default function MagicLinkPage() {
         console.log("[MagicLink] Guest token:", guest_token ? "✅ Received" : "❌ Not provided");
         console.log("[MagicLink] Guest ID:", guest_id || "N/A");
 
-        // Store access token in localStorage
-        localStorage.setItem("access_token", access_token);
+        // tokenStore preserves legacy persistence, but keeps this token memory-only in secure mode.
+        setAccessToken(access_token);
         localStorage.setItem("user", JSON.stringify(user));
-        console.log("[MagicLink] 4. Stored access_token and user in localStorage");
+        console.log("[MagicLink] 4. Stored login context");
 
         // If guest_token is provided from approved application, use it directly
         if (guest_token && guest_id) {
           console.log("[MagicLink] 5. Guest token provided from application approval");
-          localStorage.setItem("guest_token", guest_token);
-          localStorage.setItem("guest_id", guest_id.toString());
-          console.log("[MagicLink] 6. Stored guest_token and guest_id from approval email");
-          console.log("[MagicLink] guest_token:", guest_token.substring(0, 20) + "...");
+          persistGuestSession({
+            token: guest_token,
+            guestId: guest_id,
+            user,
+            event,
+          });
+          console.log("[MagicLink] 6. Stored approved guest session");
           console.log("[MagicLink] guest_id:", guest_id);
         } else if (event?.id) {
           // Fallback: If no guest token in response but event exists, call guest-join
@@ -97,13 +133,17 @@ export default function MagicLinkPage() {
               const guestData = JSON.parse(guestResponseText);
               console.log("[MagicLink] 7. Guest data received:", guestData);
 
-              // Store guest token and attendee info
-              localStorage.setItem("guest_token", guestData.token);
-              localStorage.setItem("guest_id", guestData.guest_id.toString());
-              localStorage.setItem("guest_attendee", JSON.stringify(guestData));
+              // Store guest token and attendee info using the same guest-session
+              // markers as the normal GuestJoin flow.
+              persistGuestSession({
+                token: guestData.token,
+                guestId: guestData.guest_id,
+                user,
+                event,
+                guestData,
+              });
 
-              console.log("[MagicLink] 8. Stored guest_token and guest_id in localStorage");
-              console.log("[MagicLink] guest_token:", guestData.token.substring(0, 20) + "...");
+              console.log("[MagicLink] 8. Stored guest session");
               console.log("[MagicLink] guest_id:", guestData.guest_id);
             } else {
               console.warn("[MagicLink] Guest join failed with status:", guestResponse.status);
@@ -121,10 +161,13 @@ export default function MagicLinkPage() {
         console.log("[MagicLink] nextUrl:", nextUrl);
         console.log("[MagicLink] event?.slug:", event?.slug);
 
-        // Redirect to event or home
-        if (nextUrl) {
-          console.log("[MagicLink] Redirecting to nextUrl:", nextUrl);
-          window.location.href = nextUrl;
+        // Redirect to event or home. Keep same-origin redirects inside the SPA
+        // so secure-mode memory tokens are not discarded unnecessarily. The
+        // generated approval links already use relative /live/... paths.
+        const safeNextUrl = safeSameOriginPath(nextUrl);
+        if (safeNextUrl) {
+          console.log("[MagicLink] Redirecting to nextUrl:", safeNextUrl);
+          navigate(safeNextUrl, { replace: true });
         } else if (event?.slug) {
           console.log("[MagicLink] Redirecting to event:", `/events/${event.slug}/`);
           navigate(`/events/${event.slug}/`);

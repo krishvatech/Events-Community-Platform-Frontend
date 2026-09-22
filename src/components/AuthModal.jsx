@@ -25,6 +25,8 @@ import { API_BASE } from "../utils/api";
 import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
 import { wordpressAuthService } from "../services/wordpressAuth";
 import { assertAccountCanLogin } from "../services/accountStatus";
+import { removeAccessToken, removeIdToken, removeRefreshToken } from "../utils/tokenStore";
+import { establishMemberAuthSession } from "../utils/memberAuthSession";
 
 const GOOGLE_ICON = (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -201,7 +203,13 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           };
           onLoginSuccess(data);
         } else {
-          saveLoginPayload({ id_token: result.idToken, refresh: result.refreshToken });
+          const memberToken = await establishMemberAuthSession({
+            accessToken: result.idToken,
+            idToken: result.idToken,
+            refreshToken: result.refreshToken,
+            cognitoAccessToken: result.accessToken,
+          });
+          saveLoginPayload({ id_token: memberToken, access_token: memberToken, refresh: "", user: result.payload });
           window.dispatchEvent(new Event("auth:changed"));
           handleClose();
           navigate("/community?view=home", { replace: true });
@@ -242,7 +250,16 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
               email: trimmedEmail
             });
           } else {
-            saveLoginPayload(normalizedPayload, { email: trimmedEmail });
+            const memberToken = await establishMemberAuthSession({
+              accessToken: normalizedPayload.access_token,
+              idToken: normalizedPayload.id_token,
+              refreshToken: normalizedPayload.refresh,
+              cognitoAccessToken: normalizedPayload.access,
+            });
+            saveLoginPayload(
+              { ...normalizedPayload, access_token: memberToken, id_token: memberToken, refresh: "" },
+              { email: trimmedEmail },
+            );
             window.dispatchEvent(new Event("auth:changed"));
             handleClose();
             navigate("/community?view=home", { replace: true });
@@ -392,8 +409,14 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
             password: signupData.password,
           });
 
-          // Save auth payload & dispatch event
-          saveLoginPayload({ id_token: session.idToken, refresh: session.refreshToken });
+          // Establish the member session before exposing the signed-in UI.
+          const memberToken = await establishMemberAuthSession({
+            accessToken: session.idToken,
+            idToken: session.idToken,
+            refreshToken: session.refreshToken,
+            cognitoAccessToken: session.accessToken,
+          });
+          saveLoginPayload({ id_token: memberToken, access_token: memberToken, refresh: "" });
           window.dispatchEvent(new Event("auth:changed"));
 
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -458,9 +481,9 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
     const redirect = import.meta.env.VITE_COGNITO_REDIRECT_URI || `${window.location.origin}/cognito/callback`;
     if (base && clientId) {
       // Prevent stale-session refresh loops while OAuth callback is in progress.
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("id_token");
+      removeAccessToken();
+      removeRefreshToken();
+      removeIdToken();
       localStorage.removeItem("user");
 
       const state = randomString(16);

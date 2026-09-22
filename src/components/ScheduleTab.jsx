@@ -21,12 +21,13 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import { toast } from 'react-toastify';
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
 const getToken = () =>
-  localStorage.getItem('access_token') || localStorage.getItem('access') || '';
+  getStoredAccessToken() || localStorage.getItem('access') || '';
 
 const COLORS = {
   teal: '#0A9396',

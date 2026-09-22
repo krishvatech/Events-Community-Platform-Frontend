@@ -10,6 +10,7 @@
 
 import React from "react";
 import { getCurrentMarketingStatus } from "../utils/api";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const DENIED = {
   eligible: false,
@@ -22,7 +23,7 @@ let cachedPromise = null;
 
 const hasSession = () =>
   Boolean(
-    window.localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
       window.localStorage.getItem("user") ||
       window.sessionStorage.getItem("user")
   );

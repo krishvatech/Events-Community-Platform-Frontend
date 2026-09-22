@@ -58,6 +58,7 @@ import {
 } from "@mui/icons-material";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 // -----------------------------------------------------------------------------
 // 1. API Helpers & Constants
@@ -75,9 +76,9 @@ const API_ORIGIN = (() => {
 
 function getToken() {
   return (
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
     ""
   );
 }

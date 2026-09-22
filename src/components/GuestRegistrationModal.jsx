@@ -21,6 +21,8 @@ import {
   cognitoConfirmSignUp,
   cognitoSignIn,
 } from "../utils/cognitoAuth";
+import { getAccessToken } from "../utils/tokenStore";
+import { establishMemberAuthSession } from "../utils/memberAuthSession";
 
 /**
  * GuestRegistrationModal
@@ -90,7 +92,7 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
     onCloseProp();
   };
 
-  const switchToRegisteredSessionAndRejoin = (session) => {
+  const switchToRegisteredSessionAndRejoin = async (session) => {
     const idToken = session?.idToken || "";
     const refreshToken = session?.refreshToken || "";
 
@@ -98,9 +100,13 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
       throw new Error("Could not establish authenticated session.");
     }
 
-    // Replace guest session with Cognito-backed session
-    localStorage.setItem("access_token", idToken);
-    if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+    // Replace guest session with a Cognito-backed member session.
+    await establishMemberAuthSession({
+      accessToken: idToken,
+      idToken,
+      refreshToken,
+      cognitoAccessToken: session?.accessToken || "",
+    });
     localStorage.setItem("user_name", `${form.first_name.trim()} ${form.last_name.trim()}`.trim());
 
     localStorage.removeItem("is_guest");
@@ -215,7 +221,7 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
           throw new Error(bootstrapData?.detail || "We could not save your account profile.");
         }
 
-        const guestToken = localStorage.getItem("access_token");
+        const guestToken = getAccessToken();
         if (guestToken) {
           const linkResponse = await fetch(`${API_BASE}/auth/guest-register/link/`, {
             method: "POST",
@@ -259,7 +265,7 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
           if (profile.full_name) localStorage.setItem("user_name", profile.full_name);
         }
 
-        switchToRegisteredSessionAndRejoin(session);
+        await switchToRegisteredSessionAndRejoin(session);
       } catch (err) {
         const msg =
           err?.code === "CodeMismatchException"

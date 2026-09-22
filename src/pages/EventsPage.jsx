@@ -66,6 +66,7 @@ import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
 import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast } from "../utils/eventUtils";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -265,8 +266,8 @@ function getEventLocation(event) {
 
 function authHeaders() {
   const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access");
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
@@ -782,8 +783,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
   const showYourTime = (ev.event_format === 'virtual' || ev.event_format === 'hybrid') && organizerTimezone && timesDiffer;
   const token =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access");
   const isGuest = localStorage.getItem("is_guest") === "true";
   // Authenticated regular user (not guest) - guests can still rejoin
@@ -1158,9 +1159,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     if (isBefore && ev.show_participants_before_event === false) canView = false;
                     else if (isAfter && ev.show_participants_after_event === false) canView = false;
                   }
-                  const token = localStorage.getItem("access_token") ||
+                  const token = getStoredAccessToken() ||
                     localStorage.getItem("access") ||
-                    localStorage.getItem("access_token");
+                    getStoredAccessToken();
                   const isGuest = localStorage.getItem("is_guest") === "true";
                   const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
@@ -1635,8 +1636,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
   const showYourTime = (ev.event_format === 'virtual' || ev.event_format === 'hybrid') && organizerTimezone && timesDiffer;
   const token =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access");
   const isGuest = localStorage.getItem("is_guest") === "true";
   // Authenticated regular user (not guest) - guests can still rejoin
@@ -1893,9 +1894,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                     if (isBefore && ev.show_participants_before_event === false) canView = false;
                     else if (isAfter && ev.show_participants_after_event === false) canView = false;
                   }
-                  const token = localStorage.getItem("access_token") ||
+                  const token = getStoredAccessToken() ||
                     localStorage.getItem("access") ||
-                    localStorage.getItem("access_token");
+                    getStoredAccessToken();
                   const isGuest = localStorage.getItem("is_guest") === "true";
                   const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
@@ -2298,9 +2299,9 @@ export default function EventsPage() {
   }, []);
 
   const handleShowParticipants = React.useCallback(async (eventId, eventTitle) => {
-    const token = localStorage.getItem("access_token") ||
+    const token = getStoredAccessToken() ||
       localStorage.getItem("access") ||
-      localStorage.getItem("access_token");
+      getStoredAccessToken();
     const isGuest = localStorage.getItem("is_guest") === "true";
 
     if (!token) {
@@ -2355,9 +2356,9 @@ export default function EventsPage() {
       return;
     }
 
-    const token = localStorage.getItem("access_token") ||
+    const token = getStoredAccessToken() ||
       localStorage.getItem("access") ||
-      localStorage.getItem("access_token");
+      getStoredAccessToken();
 
     if (!token) {
       return;
@@ -2696,8 +2697,8 @@ export default function EventsPage() {
   // /api/event-registrations/mine/?limit=1000 returns [{ id, event: { id, ... }, ... }, ...]
   useEffect(() => {
     const token =
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("access_token") ||
+      getStoredAccessToken() ||
+      getStoredAccessToken() ||
       localStorage.getItem("access");
 
     // if not logged-in, mark as loaded and clear any old state
@@ -2747,8 +2748,8 @@ export default function EventsPage() {
   // Batch fetch application statuses for apply-type events
   useEffect(() => {
     const token =
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("access_token") ||
+      getStoredAccessToken() ||
+      getStoredAccessToken() ||
       localStorage.getItem("access");
 
     if (!token) {
@@ -2811,8 +2812,8 @@ export default function EventsPage() {
   // This ensures button text updates when user returns from live meeting after admission
   useEffect(() => {
     const token =
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("access_token") ||
+      getStoredAccessToken() ||
+      getStoredAccessToken() ||
       localStorage.getItem("access");
 
     if (!token) return; // Not logged in
@@ -2943,8 +2944,8 @@ export default function EventsPage() {
 
         const headers = { "Content-Type": "application/json" };
         const token =
-          localStorage.getItem("access_token") ||
-          localStorage.getItem("access_token") ||
+          getStoredAccessToken() ||
+          getStoredAccessToken() ||
           localStorage.getItem("access"); // last for backwards compat
         if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -3032,8 +3033,8 @@ export default function EventsPage() {
         setPinnedLoading(true);
         const headers = { "Content-Type": "application/json" };
         const token =
-          localStorage.getItem("access_token") ||
-          localStorage.getItem("access_token") ||
+          getStoredAccessToken() ||
+          getStoredAccessToken() ||
           localStorage.getItem("access");
         if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -3102,8 +3103,8 @@ export default function EventsPage() {
         setReplayLoading(true);
         const headers = { "Content-Type": "application/json" };
         const token =
-          localStorage.getItem("access_token") ||
-          localStorage.getItem("access_token") ||
+          getStoredAccessToken() ||
+          getStoredAccessToken() ||
           localStorage.getItem("access");
         if (token) headers.Authorization = `Bearer ${token}`;
 

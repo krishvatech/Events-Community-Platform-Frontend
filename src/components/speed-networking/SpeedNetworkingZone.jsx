@@ -6,6 +6,7 @@ import SpeedNetworkingLobby from './SpeedNetworkingLobby';
 import SpeedNetworkingControls from './SpeedNetworkingControls';
 import SpeedNetworkingHostPanel from './SpeedNetworkingHostPanel';
 import InterestSelector from './InterestSelector';
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -36,7 +37,7 @@ function withClientJitter(baseMs, jitterMs = SPEED_NETWORKING_POLL_JITTER_MS) {
 }
 
 function authHeader() {
-    const token = localStorage.getItem("access") || localStorage.getItem("access_token");
+    const token = localStorage.getItem("access") || getStoredAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

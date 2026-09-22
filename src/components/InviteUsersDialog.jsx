@@ -26,6 +26,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import PersonIcon from "@mui/icons-material/Person";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import { toast } from "react-toastify";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // Define API constants (reusing existing patterns)
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -76,7 +77,7 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
     const performSearch = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem("access_token");
+            const token = getStoredAccessToken();
             const endpoint = tab === 0 ? "users" : "groups";
             // Adjust endpoint based on backend structure. Assuming standard ModelViewSet with SearchFilter.
             const url = `${API_ROOT}/${endpoint}/?search=${encodeURIComponent(searchQuery)}`;
@@ -162,7 +163,7 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
 
         setLoading(true);
         try {
-            const token = localStorage.getItem("access_token");
+            const token = getStoredAccessToken();
             const payload = {
                 user_ids: Array.from(selectedUsers),
                 group_ids: Array.from(selectedGroups),

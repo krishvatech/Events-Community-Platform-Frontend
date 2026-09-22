@@ -11,6 +11,7 @@ import {
     CircularProgress,
 } from "@mui/material";
 import { toast } from "react-toastify";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // Define API constants (reusing existing patterns)
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -56,7 +57,7 @@ export default function InviteEmailsDialog({ open, onClose, mode = "event", targ
         setErrorText("");
         setLoading(true);
         try {
-            const token = localStorage.getItem("access_token");
+            const token = getStoredAccessToken();
             const endpoint = mode === "event" ? `events/${targetIdOrSlug}/invite-emails/` : `groups/${targetIdOrSlug}/invite-emails/`;
 
             const payload = {

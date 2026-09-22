@@ -21,11 +21,12 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 function authHeader() {
-    const token = localStorage.getItem("access") || localStorage.getItem("access_token");
+    const token = localStorage.getItem("access") || getStoredAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

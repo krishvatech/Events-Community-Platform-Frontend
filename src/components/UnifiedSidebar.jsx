@@ -57,7 +57,8 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { isOwnerUser, isStaffUser, canEditProfilesUser } from "../utils/adminRole";
 import { apiClient, createWagtailSession, getSaleorDashboardUrl } from "../utils/api";
-import { clearAuth } from "../utils/authStorage";
+import { logoutBrowserSession } from "../utils/logoutSession";
+import { getAccessToken } from "../utils/tokenStore";
 
 const ORANGE = "#E8532F";
 const TEXT = "#2C3E5A";
@@ -435,32 +436,13 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
 
     const handleLogoutConfirm = async () => {
         setOpenLogoutDialog(false);
-        // Copied from Header.jsx
-        const access = localStorage.getItem("access_token");
-        const refresh = localStorage.getItem("refresh_token");
-        const isJwtLike = (t) => typeof t === "string" && t.split(".").length === 3;
-
-        try {
-            if (import.meta.env.VITE_AUTH_PROVIDER !== "cognito" && access && refresh && isJwtLike(refresh)) {
-                await apiClient.post("/auth/logout/", { refresh });
-            }
-        } catch { }
-        try {
-            if (access) {
-                await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/wagtail/logout/`, {
-                    method: "POST", headers: { Authorization: `Bearer ${access}` }, credentials: "include"
-                });
-            }
-        } catch { }
-
-        clearAuth();
+        await logoutBrowserSession();
         localStorage.setItem("cart_count", "0");
         window.dispatchEvent(new Event("cart:update"));
         window.dispatchEvent(new Event("auth:changed"));
         // App.jsx will catch auth change and unmount sidebar
         navigate("/", { replace: true });
     };
-
 
     const filterMenuItems = (items) => {
         if (!searchQuery.trim()) return items;

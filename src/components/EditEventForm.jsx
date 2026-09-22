@@ -69,6 +69,7 @@ import {
     validateNonMultidayEvent,
     validateMultidayEvent,
 } from "../utils/dateTimeValidator";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -103,8 +104,8 @@ const appendPlatformSlugsToFormData = (formData, slugs) => {
 
 const tokenHeader = () => {
     const t =
-        localStorage.getItem("access_token") ||
-        localStorage.getItem("access_token") ||
+        getStoredAccessToken() ||
+        getStoredAccessToken() ||
         localStorage.getItem("access") ||
         localStorage.getItem("jwt");
     return t ? { Authorization: `Bearer ${t}` } : {};

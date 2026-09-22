@@ -1,3 +1,4 @@
+import { getAccessToken as getStoredAccessToken } from "./tokenStore";
 /**
  * presenterAudioUtils.js
  * Utility functions for presenter audio management
@@ -81,7 +82,7 @@ export async function withDisplayMediaInterception(displayMediaFn) {
  */
 export function getMyUserIdFromJwt() {
   try {
-    const token = localStorage.getItem("access_token") || localStorage.getItem("access");
+    const token = getStoredAccessToken() || localStorage.getItem("access");
     if (!token) return null;
 
     const payload = token.split(".")[1];

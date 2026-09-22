@@ -1,6 +1,7 @@
 // src/components/RequireAuth.jsx
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const decodeJwtPayload = (token) => {
   try {
@@ -12,7 +13,7 @@ const decodeJwtPayload = (token) => {
 };
 
 const RequireAuth = ({ children }) => {
-  const accessToken = localStorage.getItem("access_token");
+  const accessToken = getStoredAccessToken();
   const guestToken = localStorage.getItem("guest_token");
   const token = accessToken || guestToken;
 

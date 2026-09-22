@@ -21,6 +21,7 @@ import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
 const API_URL = API.endsWith("/api") ? API : `${API}/api`;
@@ -111,7 +112,7 @@ export default function MyResourcesPage() {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        const token = localStorage.getItem("access_token");
+        const token = getStoredAccessToken();
         const response = await fetch(`${API_URL}/users/me/`, {
           headers: { "Authorization": `Bearer ${token}` },
         });
@@ -130,7 +131,7 @@ export default function MyResourcesPage() {
 
     const fetchRegisteredEvents = async () => {
       try {
-        const token = localStorage.getItem("access_token");
+        const token = getStoredAccessToken();
         const response = await fetch(`${API_URL}/event-registrations/mine/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -188,7 +189,7 @@ export default function MyResourcesPage() {
 
       setResourcesLoading(true);
       try {
-        const token = localStorage.getItem("access_token");
+        const token = getStoredAccessToken();
         const offset = (page - 1) * itemsPerPage;
 
         // Build query parameters
@@ -275,7 +276,7 @@ export default function MyResourcesPage() {
     e.stopPropagation();
     if (resource.type !== 'file') return alert('Only files can be downloaded');
     const downloadUrl = `${API_URL}/content/resources/${resource.id}/download/`;
-    const token = localStorage.getItem('access_token');
+    const token = getStoredAccessToken();
     fetch(downloadUrl, { headers: { 'Authorization': `Bearer ${token}` } })
       .then(response => { if (!response.ok) throw new Error('Download failed'); return response.blob(); })
       .then(blob => {

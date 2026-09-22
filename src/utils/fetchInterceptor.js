@@ -1,6 +1,5 @@
-import { cognitoRefreshSession } from "./cognitoAuth";
-import { getRefreshToken, getToken } from "./api";
-import { getUserName, clearAuth } from "./authStorage";
+import { getToken, refreshMemberAccessToken } from "./api";
+import { clearAuth } from "./authStorage";
 
 // Store original fetch
 const originalFetch = window.fetch;
@@ -176,64 +175,8 @@ window.fetch = async (...args) => {
         console.log(`[Global Fetch] ${statusCode} detected. Attempting token refresh...`);
 
         try {
-            const refreshToken = getRefreshToken();
-            let username = getUserName();
-
-            // Fallback 1: Try getting username from localStorage 'user' object
-            if (!username) {
-                try {
-                    const u = JSON.parse(localStorage.getItem("user") || "{}");
-                    username = u.username || u.email || "";
-                } catch { }
-            }
-
-            // Fallback 2: Decode the expired token to find a username/sub
-            if (!username) {
-                // Try to get token from header if available, else localStorage
-                // Note: Headers might be headers object or Headers instance
-                let currentToken = getToken();
-                if (!currentToken && requestConfig?.headers) {
-                    if (requestConfig.headers instanceof Headers) {
-                        const auth = requestConfig.headers.get("Authorization");
-                        if (auth) currentToken = auth.replace("Bearer ", "");
-                    } else if (requestConfig.headers["Authorization"]) {
-                        currentToken = requestConfig.headers["Authorization"].replace("Bearer ", "");
-                    }
-                }
-
-                if (currentToken) {
-                    try {
-                        const parts = currentToken.split('.');
-                        if (parts.length === 3) {
-                            const payload = JSON.parse(atob(parts[1]));
-                            username = payload.username || payload['cognito:username'] || payload.sub;
-                        }
-                    } catch { }
-                }
-            }
-
-            if (!refreshToken || !username) {
-                console.error("[Global Fetch] Missing refresh token or username. Cannot refresh. Logging out.");
-                processQueue(new Error("Cannot refresh: missing credentials"), null);
-                isRefreshing = false;
-                clearAuth();
-                return response;
-            }
-
-            console.log(`[Global Fetch] Refreshing session for user: ${username}`);
-
-            const { idToken, refreshToken: newRefresh } = await cognitoRefreshSession({
-                username,
-                refreshToken,
-            });
-
+            const idToken = await refreshMemberAccessToken();
             console.log("[Global Fetch] Token refresh successful!");
-
-            // Update LocalStorage
-            localStorage.setItem("access_token", idToken);
-            if (newRefresh) {
-                localStorage.setItem("refresh_token", newRefresh);
-            }
 
             // Process Queue
             processQueue(null, idToken);

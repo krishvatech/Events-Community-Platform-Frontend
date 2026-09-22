@@ -2,10 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
+import { getAccessToken, removeAccessToken, removeIdToken, removeRefreshToken } from "../utils/tokenStore";
 
 const DEFAULT_NEXT_PATH = "/community/mygroups";
 
-const getStoredAccessToken = () => localStorage.getItem("access_token");
+const getStoredAccessToken = () => getAccessToken();
 
 const isAlreadyAuthenticated = () => {
   if (localStorage.getItem("is_guest") === "true") return false;
@@ -68,9 +69,9 @@ export default function ImaaSsoRedirect() {
       }
 
       // Same OAuth/PKCE flow as the existing Continue with IMAA button.
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("id_token");
+      removeAccessToken();
+      removeRefreshToken();
+      removeIdToken();
       localStorage.removeItem("user");
       sessionStorage.removeItem("post_wordpress_cognito_redirect");
       localStorage.removeItem("post_wordpress_cognito_redirect");

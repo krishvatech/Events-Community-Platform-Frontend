@@ -21,15 +21,16 @@ import {
   Snackbar,
 } from "@mui/material";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = API_BASE.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 
 const getToken = () =>
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   localStorage.getItem("access") ||
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   "";
 
 const addContentToExistingHtml = (existingHtml, { _meeting_info, _closing }) => {

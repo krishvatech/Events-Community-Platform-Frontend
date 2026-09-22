@@ -168,15 +168,14 @@ import LoungeSettingsDialog from "../components/live-meeting/LoungeSettingsDialo
 import RoomLocationBadge from "../components/RoomLocationBadge.jsx";
 import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
 import WaitingRoomQnaPanel from "../components/WaitingRoomQnaPanel.jsx";
-import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
-import { getRefreshToken } from "../utils/api.js";
+import { refreshMemberAccessToken } from "../utils/api.js";
 import {
   fetchCurrentUserPreferencesCached,
   fetchEventSummaryCached,
   fetchUserDetailCached,
   fetchUserKycStatusCached,
 } from "../utils/entityCache.js";
-import { getUserName } from "../utils/authStorage.js";
+import { getAccessToken, removeAccessToken } from "../utils/tokenStore.js";
 import {
   acceptLiveMeetingConnectionRequest,
   cacheLiveMeetingConnectionStatus,
@@ -298,7 +297,7 @@ const URL_REGEX = /(https?:\/\/[^\s<>"')\]]+)/gi;
 function getToken() {
   // Prioritize guest_token if available (for approved applications joining as guests)
   const guestToken = localStorage.getItem("guest_token");
-  const accessToken = localStorage.getItem("access_token") || localStorage.getItem("access");
+  const accessToken = getAccessToken() || localStorage.getItem("access");
 
   if (guestToken) {
     console.log("[getToken] Returning guest_token");
@@ -2896,39 +2895,14 @@ export default function NewLiveMeeting() {
 
     const refreshTokenProactively = async () => {
       try {
-        const refreshToken = getRefreshToken();
-        let username = getUserName();
-
-        // Fallback: Try getting username from localStorage 'user' object
-        if (!username) {
-          try {
-            const u = JSON.parse(localStorage.getItem("user") || "{}");
-            username = u.username || u.email || "";
-          } catch { }
-        }
-
-        if (!refreshToken || !username) {
-          console.log("[LiveMeeting] Cannot refresh token: missing refresh token or username");
-          return;
-        }
-
-        console.log("[LiveMeeting] Proactively refreshing Cognito token...");
-
-        const { idToken, refreshToken: newRefresh } = await cognitoRefreshSession({
-          username,
-          refreshToken,
-        });
-
-        // Update localStorage with new tokens
-        localStorage.setItem("access_token", idToken);
-        if (newRefresh) {
-          localStorage.setItem("refresh_token", newRefresh);
-        }
-
+        // Uses the same centralized refresh path as Axios/fetch. In secure mode
+        // this relies only on the HttpOnly session cookie; in legacy mode it
+        // preserves the existing Cognito refresh-token flow.
+        await refreshMemberAccessToken();
         console.log("[LiveMeeting] Token refresh successful! Next refresh in 15 minutes.");
       } catch (error) {
         console.error("[LiveMeeting] Token refresh failed:", error);
-        // If refresh fails, user will be redirected on next API call
+        // If refresh fails, the normal API interceptor will handle sign-out.
       }
     };
 
@@ -3516,14 +3490,14 @@ export default function NewLiveMeeting() {
     console.log("[Init] Event from state:", eventFromState);
 
     // Check localStorage
-    const accessToken = localStorage.getItem("access_token");
+    const accessToken = getAccessToken();
     const guestToken = localStorage.getItem("guest_token");
     const guestId = localStorage.getItem("guest_id");
     const user = localStorage.getItem("user");
 
     console.log("[Init] === LocalStorage ===");
-    console.log("[Init] access_token:", accessToken ? "✅ " + accessToken.substring(0, 30) + "..." : "❌ Missing");
-    console.log("[Init] guest_token:", guestToken ? "✅ " + guestToken.substring(0, 30) + "..." : "❌ Missing");
+    console.log("[Init] access_token:", accessToken ? "✅ Present" : "❌ Missing");
+    console.log("[Init] guest_token:", guestToken ? "✅ Present" : "❌ Missing");
     console.log("[Init] guest_id:", guestId);
     console.log("[Init] user:", user ? JSON.parse(user) : "❌ Missing");
     console.log("[Init] === State Variables ===");
@@ -3531,7 +3505,7 @@ export default function NewLiveMeeting() {
     console.log("[Init] role:", role);
     console.log("[Init] joinMainRequested:", joinMainRequested);
     console.log("[Init] loadingJoin:", loadingJoin);
-    console.log("[Init] authToken:", authToken ? "✅ " + authToken.substring(0, 30) + "..." : "❌ Missing");
+    console.log("[Init] authToken:", authToken ? "✅ Present" : "❌ Missing");
     console.log("==========================================");
   }, []);
 
@@ -7794,7 +7768,7 @@ export default function NewLiveMeeting() {
         console.log("[RTKJoin] EventID:", eventId);
         console.log("[RTKJoin] Role:", role);
         console.log("[RTKJoin] Auth header:", authHeaders);
-        console.log("[RTKJoin] Token type:", authHeaders.Authorization ? authHeaders.Authorization.split(' ')[1]?.substring(0, 30) + "..." : "None");
+        console.log("[RTKJoin] Authorization header:", authHeaders.Authorization ? "Present" : "None");
 
         const { res, data } = await fetchRtkJoinWithQueueRetry({
           eventId,
@@ -9312,7 +9286,8 @@ export default function NewLiveMeeting() {
           if (payload.type === "kicked") {
             // Clear guest session if this is a guest user
             if (localStorage.getItem("is_guest") === "true") {
-              ["guest_token", "guest_id", "is_guest", "guest_email", "guest_name", "guest_attendee", "access_token"].forEach(k => localStorage.removeItem(k));
+              ["guest_token", "guest_id", "is_guest", "guest_email", "guest_name", "guest_attendee"].forEach(k => localStorage.removeItem(k));
+              removeAccessToken();
               window.dispatchEvent(new Event("auth:changed"));
             }
             // alert("You have been kicked from the meeting by the host."); // Removed intrusive alert
@@ -9321,7 +9296,8 @@ export default function NewLiveMeeting() {
           } else if (payload.type === "banned") {
             // Clear guest session if this is a guest user
             if (localStorage.getItem("is_guest") === "true") {
-              ["guest_token", "guest_id", "is_guest", "guest_email", "guest_name", "guest_attendee", "access_token"].forEach(k => localStorage.removeItem(k));
+              ["guest_token", "guest_id", "is_guest", "guest_email", "guest_name", "guest_attendee"].forEach(k => localStorage.removeItem(k));
+              removeAccessToken();
               window.dispatchEvent(new Event("auth:changed"));
             }
             setIsBanned(true);
@@ -12236,7 +12212,7 @@ export default function NewLiveMeeting() {
         const isGuest = localStorage.getItem("is_guest") === "true";
         if (isGuest) {
           console.log("[LiveMeeting] Clearing guest session for event:", eventId);
-          localStorage.removeItem("access_token");
+          removeAccessToken();
           localStorage.removeItem("is_guest");
           localStorage.removeItem("guest_email");
           localStorage.removeItem("guest_name");
@@ -17772,7 +17748,7 @@ export default function NewLiveMeeting() {
 
   // Load user Q&A anonymous default preference
   useEffect(() => {
-    const accessToken = localStorage.getItem("access_token");
+    const accessToken = getAccessToken();
     if (!accessToken) return;  // Only for authenticated users, not guests
     if (deferNonCriticalLiveApi) return;
     (async () => {

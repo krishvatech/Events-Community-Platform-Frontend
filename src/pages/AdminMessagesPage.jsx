@@ -44,6 +44,7 @@ import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 // ---- API helpers ----
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(
@@ -54,9 +55,9 @@ const BORDER = "#e2e8f0";
 
 const getToken = () =>
   localStorage.getItem("access") ||
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   localStorage.getItem("jwt") ||
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   "";
 const authHeader = () => {
   const t = getToken();

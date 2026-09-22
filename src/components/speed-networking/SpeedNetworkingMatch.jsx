@@ -24,6 +24,7 @@ import {
     saveBackgroundSelection,
     validateBackgroundUpload
 } from '../../utils/rtkBackground.js';
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 // Style to ensure RTK UI controls don't overflow
 const rtkStyles = `
@@ -77,7 +78,7 @@ function stripHiddenControls(items = []) {
 function getToken() {
     return localStorage.getItem("guest_token")
         || localStorage.getItem("access")
-        || localStorage.getItem("access_token")
+        || getStoredAccessToken()
         || "";
 }
 

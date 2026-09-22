@@ -118,9 +118,9 @@ const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 const API_ORIGIN = API_ROOT.replace(/\/api$/, "");
 
 const getToken = () =>
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   localStorage.getItem("access") ||
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   "";
 
 const toAbs = (u) => {
@@ -140,6 +140,7 @@ const isVerifiedStatus = (raw) => {
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 

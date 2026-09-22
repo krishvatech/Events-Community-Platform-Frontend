@@ -20,12 +20,13 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import IconButton from '@mui/material/IconButton';
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
 const getToken = () =>
-  localStorage.getItem('access_token') || localStorage.getItem('access') || '';
+  getStoredAccessToken() || localStorage.getItem('access') || '';
 
 function NetworkingMeetingRequestModal({ open, onClose, attendee, eventId, networkingSettings, currentUser }) {
   const theme = useTheme();

@@ -45,6 +45,7 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS & API HELPERS
@@ -139,9 +140,9 @@ function toApiUrl(pathOrUrl) {
 function authHeaders() {
   const token =
     localStorage.getItem("access") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token");
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
+    getStoredAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

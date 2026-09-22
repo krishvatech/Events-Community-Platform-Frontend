@@ -66,6 +66,7 @@ import ReportProfileDialog from "../../components/ReportProfileDialog.jsx";
 import { Menu, MenuItem } from "@mui/material";
 import { isAdminUser } from "../../utils/adminRole";
 import { startKYC } from "../../utils/api";
+import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 
 
@@ -73,8 +74,8 @@ const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const tokenHeader = () => {
   const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};

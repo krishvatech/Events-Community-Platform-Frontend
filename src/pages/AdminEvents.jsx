@@ -77,6 +77,7 @@ import { formatSessionTimeRange } from "../utils/timezoneUtils";
 import { normalizeTimezoneName } from "../utils/timezoneUtils";
 import EditEventForm from "../components/EditEventForm";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 
 dayjs.extend(utc);
@@ -197,15 +198,15 @@ const toAbs = (u) => {
 };
 
 const getToken = () =>
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   localStorage.getItem("access") ||
-  localStorage.getItem("access_token") ||
+  getStoredAccessToken() ||
   "";
 
 const tokenHeader = () => {
   const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
+    getStoredAccessToken() ||
+    getStoredAccessToken() ||
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};

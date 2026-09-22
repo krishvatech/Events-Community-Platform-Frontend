@@ -32,6 +32,7 @@ import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 
@@ -41,7 +42,7 @@ function toApiUrl(path) {
 }
 
 function getToken() {
-  return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
+  return localStorage.getItem("access") || getStoredAccessToken() || "";
 }
 
 function authHeader() {
