@@ -48,6 +48,7 @@ import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast, isReplayReadyForSignup } from "../utils/eventUtils";
 import { toast } from "react-toastify";
 import { Helmet } from "react-helmet-async";
+import { guestJoinIdentity, readApplicationCache } from "../utils/applicationCache";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -954,19 +955,13 @@ export default function EventDetailsPage() {
           headers.Authorization = `Bearer ${token}`;
         }
 
-        // For unauthenticated users, check localStorage for cached email
+        // For unauthenticated users, check localStorage for cached email.
+        // The cache is only used when it belongs to this event.
         let url = `${API_BASE}/events/${event.id}/apply/`;
         if (!token) {
-          const cached = localStorage.getItem("application_cache");
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              if (parsed.email) {
-                url += `?email=${encodeURIComponent(parsed.email)}`;
-              }
-            } catch (err) {
-              console.error("Failed to parse application_cache:", err);
-            }
+          const cached = readApplicationCache({ eventId: event.id });
+          if (cached?.email) {
+            url += `?email=${encodeURIComponent(cached.email)}`;
           }
         }
 
@@ -991,6 +986,22 @@ export default function EventDetailsPage() {
     // Only generate if no guest token exists
     if (guestToken) return;
 
+    // The public status endpoint returns a status only, so an anonymous
+    // applicant's own details come from the local application cache. An
+    // authenticated applicant still receives their full application, which
+    // takes precedence.
+    const identity = guestJoinIdentity(
+      myApplication,
+      readApplicationCache({ eventId: event.id })
+    );
+    if (!identity) {
+      // Nothing to identify this guest with (cache cleared, another browser, or
+      // an entry written before this data was cached). guest-join would reject
+      // the call, so skip it; the approval email's magic link still works.
+      console.info("[EventDetails] No applicant identity available for guest join; skipping.");
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -999,13 +1010,7 @@ export default function EventDetailsPage() {
         const guestRes = await fetch(`${API_BASE}/events/${event.id}/guest-join/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            first_name: myApplication.first_name || "",
-            last_name: myApplication.last_name || "",
-            email: myApplication.email,
-            job_title: myApplication.job_title || "",
-            company_name: myApplication.company_name || "",
-          }),
+          body: JSON.stringify(identity),
         });
 
         if (cancelled) return;
