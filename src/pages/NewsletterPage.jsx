@@ -24,6 +24,28 @@ import {
 const normalizePreferences = (data) =>
   Array.isArray(data?.preferences) ? data.preferences : [];
 
+const normalizeSuppression = (data) => data?.email_suppression || null;
+
+// Mautic blocks email per contact, not per list, so one block silences every
+// newsletter. Only a member's own earlier opt-out can be lifted by opting in
+// again; a bounce or a block set by staff has to be resolved by support.
+const suppressionMessages = {
+  bounced:
+    "Email delivery to your address is paused because messages bounced. Please contact support to restore delivery.",
+  manual:
+    "Email delivery to your address has been paused by our team. Please contact support to restore delivery.",
+  unknown:
+    "Email delivery to your address is currently paused. Please contact support to restore delivery.",
+};
+
+const suppressionMessage = (suppression) => {
+  if (!suppression?.suppressed) return "";
+  if (suppression.reversible) {
+    return "You unsubscribed from all emails. Turn a newsletter back on to start receiving email again.";
+  }
+  return suppressionMessages[suppression.reason] || suppressionMessages.unknown;
+};
+
 const filterEmptyMessages = {
   all: "No newsletter subscriptions are currently available.",
   subscribed: "No subscribed newsletters.",
@@ -32,6 +54,7 @@ const filterEmptyMessages = {
 
 export default function NewsletterPage() {
   const [preferences, setPreferences] = useState([]);
+  const [suppression, setSuppression] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -50,6 +73,7 @@ export default function NewsletterPage() {
       setError("");
       const data = await getNewsletterPreferences();
       setPreferences(normalizePreferences(data));
+      setSuppression(normalizeSuppression(data));
     } catch (err) {
       console.error("Failed to load newsletter preferences:", err);
       setError("We could not load your newsletter preferences. Please try again.");
@@ -83,10 +107,18 @@ export default function NewsletterPage() {
         },
       ]);
       setPreferences(normalizePreferences(data));
+      const nextSuppression = normalizeSuppression(data);
+      setSuppression(nextSuppression);
+
+      // Saying "updated" while Mautic still withholds every email would tell
+      // the member something untrue, so say what actually happens instead.
+      const blocked = desiredValue && nextSuppression?.suppressed;
       setSnack({
         open: true,
-        severity: "success",
-        message: "Newsletter preference updated.",
+        severity: blocked ? "warning" : "success",
+        message: blocked
+          ? suppressionMessage(nextSuppression)
+          : "Newsletter preference updated.",
       });
     } catch (err) {
       console.error("Failed to update newsletter preference:", err);
@@ -159,6 +191,14 @@ export default function NewsletterPage() {
               <Tab label="Unsubscribed" value="unsubscribed" />
             </Tabs>
           </Box>
+
+          {!loading && !error && suppression?.suppressed && (
+            <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 } }}>
+              <Alert severity={suppression.reversible ? "info" : "warning"}>
+                {suppressionMessage(suppression)}
+              </Alert>
+            </Box>
+          )}
 
           <Box sx={{ p: { xs: 2, md: 3 } }}>
             {loading ? (
