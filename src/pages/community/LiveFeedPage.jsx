@@ -36,12 +36,14 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import localizedFormat from "dayjs/plugin/localizedFormat";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import ImaaCommunityScope from "../../components/community/ImaaCommunityScope";
+import { IMAA } from "../../components/community/imaaCommunityTheme";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(localizedFormat);
 
-const BORDER = "#e2e8f0";
+const BORDER = IMAA.border;
 // LinkedIn-style reactions 
 const POST_REACTIONS = [
   { id: "like", emoji: "👍", label: "Like" },
@@ -411,18 +413,19 @@ function SuggestedConnections({ list = [] }) {
     <Paper
       variant="outlined"
       sx={{
-        p: 1.5,
+        p: { xs: 1.5, sm: 2 },
         mb: 2,
         borderColor: BORDER,
         borderRadius: 3,
         bgcolor: "background.paper",
+        boxShadow: IMAA.shadowSm,
         // ✅ match PostCard width & centering
         maxWidth: { xs: "100%", md: "100%" },
         mx: { xs: 0, md: "auto" },
       }}
     >
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: IMAA.navy, fontSize: 15 }}>
           Suggested connections
         </Typography>
         <Button size="small" variant="text" onClick={handleOpenModal}>See all</Button>
@@ -448,14 +451,15 @@ function SuggestedConnections({ list = [] }) {
             if (!u || !u.id) return null;
             const isConnected = connected.has(u.id);
             return (
-              <Box key={u.id} sx={{ minWidth: 140, scrollSnapAlign: "start" }}>
+              <Box key={u.id} sx={{ minWidth: 150, scrollSnapAlign: "start" }}>
                 <Paper
                   variant="outlined"
                   sx={{
-                    p: 1,
-                    borderRadius: 2,
+                    p: 1.5,
+                    borderRadius: 3,
                     textAlign: "center",
                     borderColor: BORDER,
+                    bgcolor: IMAA.bg,
                   }}
                   onMouseEnter={() => {
                     if (u.mutuals > 0) loadMutuals(u.id);
@@ -463,17 +467,17 @@ function SuggestedConnections({ list = [] }) {
                   }}
                 >
                   <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer", mb: 0.75 }}>
-                    <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto" }} imgProps={{ loading: "lazy", decoding: "async" }}>
+                    <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto", border: "2px solid #fff", boxShadow: IMAA.shadowSm, bgcolor: IMAA.navy, fontWeight: 700 }} imgProps={{ loading: "lazy", decoding: "async" }}>
                       {(userName(u) || "U").slice(0, 1)}
                     </Avatar>
                   </Box>
                   <Box onClick={() => navigate(`/community/rich-profile/${u.id}`)} sx={{ cursor: "pointer" }}>
                     <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center" sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" noWrap sx={{ fontWeight: 600, minWidth: 0 }}>
+                      <Typography variant="body2" noWrap sx={{ fontWeight: 700, minWidth: 0, color: IMAA.navy }}>
                         {userName(u)}
                       </Typography>
                       {userIsVerified(u) && (
-                        <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />
+                        <VerifiedIcon sx={{ fontSize: 16, color: IMAA.teal, flexShrink: 0 }} />
                       )}
                     </Stack>
                   </Box>
@@ -592,7 +596,7 @@ function SuggestedConnections({ list = [] }) {
                             {userName(u)}
                           </Typography>
                           {userIsVerified(u) && (
-                            <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />
+                            <VerifiedIcon sx={{ fontSize: 16, color: IMAA.teal, flexShrink: 0 }} />
                           )}
                         </Stack>
                         {u.mutuals > 0 && (
@@ -663,20 +667,21 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
     <Paper
       variant="outlined"
       sx={{
-        p: 1.5,
+        p: { xs: 1.5, sm: 2 },
         mb: 2,
         borderColor: BORDER,
         borderRadius: 3,
         bgcolor: "background.paper",
+        boxShadow: IMAA.shadowSm,
         maxWidth: { xs: "100%", md: "100%" },
         mx: { xs: 0, md: "auto" },
       }}
     >
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, gap: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: IMAA.navy, fontSize: 15 }}>
           Groups you may like
         </Typography>
-        <Chip size="small" label="Based on your contacts" variant="outlined" />
+        <Chip size="small" label="Based on your contacts" variant="outlined" className="ecp-type-badge ecp-type-badge--group" />
       </Stack>
 
       <Grid container spacing={1}>
@@ -1317,21 +1322,21 @@ function ClampedText({
 // ---- EVENT BLOCK ----
 function EventBlock({ post, onOpen }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, borderLeft: `3px solid ${IMAA.coral}`, bgcolor: IMAA.bg }}>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ gap: 1 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: IMAA.navy, fontSize: 15 }} noWrap>
             {post.event?.title}
           </Typography>
         </Box>
 
         <Tooltip title="View event">
-          <IconButton size="small" onClick={onOpen} sx={{ flexShrink: 0, mt: -0.25 }}>
+          <IconButton size="small" className="ecp-icon-btn" onClick={onOpen} sx={{ flexShrink: 0, mt: -0.25 }}>
             <OpenInNewRoundedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </Stack>
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
         {post.event?.when ? formatWhen(post.event.when, post.userTimezone) : ""}{post.event?.where ? ` · ${post.event.where}` : ""}
       </Typography>
 
@@ -1389,9 +1394,9 @@ function ResourceBlock({ post, onOpenEvent }) {
   const iframeSrc = ytEmbed || vmEmbed;
 
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "#e2e8f0", bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, borderLeft: `3px solid ${IMAA.teal}`, bgcolor: IMAA.bg }}>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ gap: 1 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1, minWidth: 0 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1, minWidth: 0, color: IMAA.navy, fontSize: 15 }}>
           {r.title}
         </Typography>
 
@@ -1399,6 +1404,7 @@ function ResourceBlock({ post, onOpenEvent }) {
           <Tooltip title={hasVideo ? "Watch video" : r.link_url ? "Open link" : "View file"}>
             <IconButton
               size="small"
+              className="ecp-icon-btn"
               component="a"
               href={primaryHref}
               target="_blank"
@@ -1444,7 +1450,7 @@ function ResourceBlock({ post, onOpenEvent }) {
               src={r.video_url}
               controls
               preload="metadata"
-              sx={{ width: "100%", maxHeight: 420, borderRadius: 1, border: "1px solid #e2e8f0", mt: 0.5 }}
+              sx={{ width: "100%", maxHeight: 420, borderRadius: 1, border: `1px solid ${BORDER}`, mt: 0.5 }}
             />
           )}
         </Box>
@@ -1457,7 +1463,7 @@ function ResourceBlock({ post, onOpenEvent }) {
             mt: 1,
             borderRadius: 1,
             overflow: "hidden",
-            border: "1px solid #e2e8f0",
+            border: `1px solid ${BORDER}`,
             bgcolor: "background.paper",
           }}
         >
@@ -1481,7 +1487,7 @@ function ResourceBlock({ post, onOpenEvent }) {
             mt: 1,
             borderRadius: 1,
             overflow: "hidden",
-            border: "1px solid #e2e8f0",
+            border: `1px solid ${BORDER}`,
             bgcolor: "background.paper",
           }}
         >
@@ -1501,7 +1507,7 @@ function ResourceBlock({ post, onOpenEvent }) {
             mt: 1,
             p: 1.25,
             borderRadius: 1,
-            borderColor: "#e2e8f0",
+            borderColor: BORDER,
             bgcolor: "background.paper",
           }}
         >
@@ -1510,8 +1516,8 @@ function ResourceBlock({ post, onOpenEvent }) {
               sx={{
                 width: 44,
                 height: 44,
-                borderRadius: 1.5,
-                bgcolor: "grey.100",
+                borderRadius: 2,
+                bgcolor: IMAA.tealLight,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -1635,7 +1641,7 @@ function CommentItem({
     <Box
       sx={{
         pl: depth ? 2 : 0,
-        borderLeft: depth ? "2px solid #e2e8f0" : "none",
+        borderLeft: depth ? `2px solid ${BORDER}` : "none",
         ml: depth ? 1.5 : 0,
         mt: depth ? 1 : 0
       }}
@@ -1648,20 +1654,20 @@ function CommentItem({
         >
           {(c.author?.name || "U").slice(0, 1)}
         </Avatar>
-        <Typography variant="subtitle2" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+        <Typography variant="subtitle2" sx={{ display: "flex", alignItems: "center", gap: 0.5, fontWeight: 700, color: IMAA.navy }}>
           {c.author?.name || c.author?.username || "User"}
           {c.author?.kyc_status === "approved" && (
-            <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />
+            <VerifiedIcon sx={{ fontSize: 14, color: IMAA.teal }} />
           )}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{ color: IMAA.hint }}>
           {formatWhen(c.created_at, c.userTimezone)}
         </Typography>
         {c.is_under_review && (
-          <Chip size="small" label="Under Review" variant="outlined" />
+          <Chip size="small" label="Under Review" variant="outlined" className="ecp-type-badge ecp-type-badge--review" />
         )}
         {c.is_removed && (
-          <Chip size="small" color="warning" label="Removed" variant="outlined" />
+          <Chip size="small" color="warning" label="Removed" variant="outlined" className="ecp-type-badge ecp-type-badge--removed" />
         )}
         {canReport && (
           <>
@@ -1689,8 +1695,17 @@ function CommentItem({
 
       <Typography
         sx={{
-          mt: 0.5,
+          mt: 0.75,
+          ml: 4.5,
+          px: 1.5,
+          py: 1,
+          borderRadius: 2,
+          bgcolor: IMAA.bg,
+          color: IMAA.body,
+          fontSize: 14,
+          lineHeight: 1.55,
           whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
           filter: c.is_blurred ? "blur(4px)" : "none",
           opacity: c.is_removed ? 0.5 : 1,
         }}
@@ -1698,13 +1713,13 @@ function CommentItem({
         {c.text}
       </Typography>
 
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, ml: 4 }}>
         <Button
           size="small"
           startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
           onClick={() => canInteract && onToggleLike?.(c.id)}
           disabled={!canInteract}
-          sx={{ color: c.user_has_liked ? "teal" : "inherit" }}
+          sx={{ color: c.user_has_liked ? IMAA.coral : IMAA.muted }}
         >
           {c.like_count ?? 0}
         </Button>
@@ -1713,6 +1728,7 @@ function CommentItem({
           startIcon={<ReplyRoundedIcon fontSize="small" />}
           onClick={() => canInteract && onReply?.(c)}
           disabled={!canInteract}
+          sx={{ color: IMAA.muted }}
         >
           Reply
         </Button>
@@ -2099,10 +2115,10 @@ function CommentsDialog({
 
 
     return (
-      <Box sx={{ mt: 1.25 }}>
+      <Box sx={{ mt: 1.25, pt: 1.5, borderTop: `1px solid ${BORDER}` }}>
         {replyTo && (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
               Replying to {replyTo.author?.name || `#${replyTo.author_id}`}
             </Typography>
             <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
@@ -2115,10 +2131,11 @@ function CommentsDialog({
           </Typography>
         )}
         {/* Always show comment input */}
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} alignItems="center">
           <TextField
             size="small"
             fullWidth
+            className="ecp-search-field"
             placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -2696,11 +2713,14 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
     <Paper
       key={post.id}
       elevation={0}
+      className="ecp-post-card"
       sx={{
-        p: 2,
+        p: { xs: 1.75, sm: 2.25 },
+        pb: { xs: 1, sm: 1.25 },
         mb: 2,
         border: `1px solid ${BORDER}`,
         borderRadius: 3,
+        boxShadow: IMAA.shadowSm,
         width: "100%",
         // 🔹 Make each post card itself fixed-width on desktop
         maxWidth: { xs: "100%", md: "100%" },
@@ -2718,47 +2738,49 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
           )}
           alt={headingTitle}
           variant={post.type === "event" && post.event?.preview_image ? "rounded" : "circular"}
+          sx={{ width: 44, height: 44, bgcolor: IMAA.navy, fontWeight: 700, border: `1px solid ${BORDER}` }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
 
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 700, color: IMAA.navy, fontSize: 15, lineHeight: 1.3, minWidth: 0 }}>
               {headingTitle}
             </Typography>
             {headingTitle === post.author?.name && post.author?.kyc_status === "approved" && (
-              <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+              <VerifiedIcon sx={{ fontSize: 16, color: IMAA.teal, flexShrink: 0 }} />
             )}
           </Stack>
 
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <Typography variant="caption" color="text.secondary" noWrap>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0, mt: 0.25 }}>
+            <Typography variant="caption" noWrap sx={{ color: IMAA.muted, fontWeight: 600, minWidth: 0 }}>
               {post.type === "resource" ? (post.resource?.title || "Resource") : (post.author?.name)}
             </Typography>
 
 
 
-            <Typography variant="caption" color="text.secondary" noWrap>
+            <Typography variant="caption" noWrap sx={{ color: IMAA.hint, flexShrink: 0 }}>
               · {formatWhen(post.created_at, userTimezone)}
             </Typography>
           </Stack>
         </Box>
-        {post.type === "event" && <Chip size="small" color="primary" label="Event" variant="outlined" />}
-        {post.type === "poll" && <Chip size="small" label="Poll" variant="outlined" />}
-        {post.type === "link" && <Chip size="small" label="Link" variant="outlined" />}
-        {post.type === "image" && <Chip size="small" label="Image" variant="outlined" />}
-        {post.type === "text" && <Chip size="small" label="Post" variant="outlined" />}
+        {post.type === "event" && <Chip size="small" color="primary" label="Event" variant="outlined" className="ecp-type-badge ecp-type-badge--event" />}
+        {post.type === "poll" && <Chip size="small" label="Poll" variant="outlined" className="ecp-type-badge" />}
+        {post.type === "link" && <Chip size="small" label="Link" variant="outlined" className="ecp-type-badge" />}
+        {post.type === "image" && <Chip size="small" label="Image" variant="outlined" className="ecp-type-badge" />}
+        {post.type === "text" && <Chip size="small" label="Post" variant="outlined" className="ecp-type-badge" />}
         {post.type === "resource" && (
           <Chip
             size="small"
             label={post.resource?.video_url ? "Video" : "Resource"}
             variant="outlined"
+            className="ecp-type-badge ecp-type-badge--resource"
           />
         )}
-        {isUnderReview && <Chip size="small" label="Under Review" variant="outlined" />}
-        {isRemoved && <Chip size="small" color="warning" label="Removed" variant="outlined" />}
+        {isUnderReview && <Chip size="small" label="Under Review" variant="outlined" className="ecp-type-badge ecp-type-badge--review" />}
+        {isRemoved && <Chip size="small" color="warning" label="Removed" variant="outlined" className="ecp-type-badge ecp-type-badge--removed" />}
         {canReport && (
           <>
-            <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+            <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)} sx={{ color: IMAA.muted }}>
               <MoreVertRoundedIcon fontSize="small" />
             </IconButton>
             <Menu
@@ -2783,7 +2805,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
       </Stack>
 
       {/* Body */}
-      <Box sx={{ mt: 1.25, position: "relative" }}>
+      <Box sx={{ mt: 1.5, position: "relative", color: IMAA.body }}>
         {!canEngage && isUnderReview && (
           <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
             Engagement is disabled while this content is under review.
@@ -2836,15 +2858,15 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
               )}
 
               {post.type === "link" && (
-                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, borderLeft: `3px solid ${IMAA.navy}`, bgcolor: IMAA.bg }}>
                   {post.text && (
                     <Box sx={{ mb: 1 }}>
                       <ClampedText text={post.text} maxLines={5} />
                     </Box>
                   )}
 
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    <Link href={post.url} target="_blank" rel="noreferrer">
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, wordBreak: "break-word" }}>
+                    <Link href={post.url} target="_blank" rel="noreferrer" sx={{ color: IMAA.teal }}>
                       {post.url_title || post.url}
                     </Link>
                   </Typography>
@@ -2887,12 +2909,12 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
       {/* Actions */}
       {/* Meta strip: likers avatars + sentence | shares on right */}
       {(local.metrics?.likes || 0) > 0 || (local.metrics?.shares || 0) > 0 ? (
-        <Box sx={{ px: 0.5, pt: 0.5 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" spacing={1} alignItems="center">
+        <Box sx={{ px: 0.25, pt: 1.25 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ gap: 1 }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
               <AvatarGroup
                 max={3}
-                sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 14 } }}
+                sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 14, bgcolor: IMAA.bg, borderColor: "#fff" } }}
               >
                 {(reactionIds.length ? reactionIds : ["like"])
                   .slice(0, 3)
@@ -2908,25 +2930,27 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
               </AvatarGroup>
               <Typography
                 variant="body2"
-                sx={{ cursor: "pointer" }}
+                noWrap
+                sx={{ cursor: "pointer", color: IMAA.muted, fontSize: 13, "&:hover": { color: IMAA.navy, textDecoration: "underline" } }}
                 onClick={() => window.__openLikes?.(engageTargetOf(post))?.()}
               >
                 {likeLabel}
               </Typography>
             </Stack>
 
-            <Button size="small" onClick={() => window.__openShares?.(engageTargetOf(post))?.()}>
-              {(local.metrics?.shares || 0).toLocaleString()} SHARES
+            <Button size="small" className="ecp-post-meta-link" onClick={() => window.__openShares?.(engageTargetOf(post))?.()}>
+              {(local.metrics?.shares || 0).toLocaleString()} shares
             </Button>
           </Stack>
         </Box>
       ) : null}
-      <Divider sx={{ my: 1 }} />
+      <Divider sx={{ mt: 1.25, mb: 0.5, borderColor: BORDER }} />
 
       {/* Action row: Like / Comment / Share */}
-      <Stack direction="row" justifyContent="space-around" alignItems="center" sx={{ px: 0.5, pb: 0.5 }}>
+      <Stack direction="row" justifyContent="space-around" alignItems="center" className="ecp-post-actions">
         <Button
           size="small"
+          className={`ecp-post-action${hasReaction ? " is-active" : ""}`}
           onClick={canEngage ? handleOpenPicker : undefined}
           disabled={!canEngage}
           sx={{
@@ -2946,6 +2970,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
         {commentsEnabled && (
           <Button
             size="small"
+            className={`ecp-post-action${commentsOpen ? " is-active" : ""}`}
             startIcon={<ChatBubbleOutlineIcon />}
             disabled={!canEngage}
             onClick={() => {
@@ -2957,18 +2982,19 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
               });
             }}
           >
-            COMMENT
+            Comment
           </Button>
         )}
 
 
         <Button
           size="small"
+          className="ecp-post-action"
           startIcon={<IosShareIcon />}
           disabled={!canEngage}
           onClick={() => canEngage && setShareOpen(true)}
         >
-          SHARE
+          Share
         </Button>
       </Stack>
 
@@ -3054,7 +3080,7 @@ function PostSkeleton() {
         p: 2,
         mb: 2,
         borderRadius: 3,
-        borderColor: "#e2e8f0",
+        borderColor: BORDER,
         width: "100%", // ✅ Forces full width
         maxWidth: "100%", // ✅ Ensures it doesn't shrink on larger screens
         mx: "auto",
@@ -4055,38 +4081,42 @@ export default function LiveFeedPage({
 
 
   return (
+    <ImaaCommunityScope page="live">
     <Grid
       container
       rowSpacing={2}
       columnSpacing={{ xs: 2, md: 4 }}   // 🔹 more gap between feed and right rail on md+
     >
       {/* Center: scope + search + feed */}
-      <Grid item xs={12} md={9}>
+      <Grid size={12}>
         <Box
           sx={{
             width: "100%",
             // 🔹 Mobile & tablet: full width
-            // 🔹 md+ (≥ 900px): clamp the feed to a fixed width and center it
-            maxWidth: { xs: "100%", md: "100%" },
+            // 🔹 md+ (≥ 900px): clamp the feed to a readable column and center it
+            maxWidth: { xs: "100%", md: 820 },
             mx: { xs: 0, md: "auto" },
           }}
         >
           {/* Scope toggle */}
           <Stack
             direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            sx={{ mb: 2 }}
-            alignItems="center"
+            spacing={1.25}
+            className="ecp-feed-toolbar"
+            sx={{ mb: 2, p: { xs: 1.25, sm: 1.5 } }}
+            alignItems={{ xs: "stretch", sm: "center" }}
           >
             <Stack direction="row" spacing={1}>
               <Chip
                 label="All"
+                className="ecp-filter-chip"
                 color={scope === "all" ? "primary" : "default"}
                 variant={scope === "all" ? "filled" : "outlined"}
                 onClick={() => setScope("all")}
               />
               <Chip
                 label="My Groups"
+                className="ecp-filter-chip"
                 color={scope === "mine" ? "primary" : "default"}
                 variant={scope === "mine" ? "filled" : "outlined"}
                 onClick={() => setScope("mine")}
@@ -4097,6 +4127,7 @@ export default function LiveFeedPage({
               <TextField
                 fullWidth
                 size="small"
+                className="ecp-search-field"
                 placeholder="Search posts, events, resources…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)} // debounced by dq
@@ -4124,6 +4155,7 @@ export default function LiveFeedPage({
               <Chip
                 label="Most recent"
                 size="small"
+                className="ecp-filter-chip"
                 color={sortMode === "recent" ? "primary" : "default"}
                 variant={sortMode === "recent" ? "filled" : "outlined"}
                 onClick={() => setSortMode("recent")}
@@ -4131,6 +4163,7 @@ export default function LiveFeedPage({
               <Chip
                 label="Most popular"
                 size="small"
+                className="ecp-filter-chip"
                 color={sortMode === "popular" ? "primary" : "default"}
                 variant={sortMode === "popular" ? "filled" : "outlined"}
                 onClick={() => setSortMode("popular")}
@@ -4163,8 +4196,9 @@ export default function LiveFeedPage({
               <PostSkeleton />
             </>)
           ) : displayPosts.length === 0 ? (
-            <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-              <Typography variant="body2" color="text.secondary">No posts match your filters.</Typography>
+            <Paper elevation={0} className="ecp-empty-state">
+              <SearchIcon />
+              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>No posts match your filters.</Typography>
             </Paper>
           ) : (
             <>
@@ -4175,7 +4209,7 @@ export default function LiveFeedPage({
                     sx={{
                       scrollMarginTop: 96,
                       ...(focusPostId === p.id
-                        ? { outline: `2px solid ${BORDER}`, borderRadius: 3 }
+                        ? { outline: `2px solid ${IMAA.teal}`, outlineOffset: 2, borderRadius: 3 }
                         : null),
                     }}
                   >
@@ -4280,7 +4314,7 @@ export default function LiveFeedPage({
                         <Stack direction="row" spacing={0.5} alignItems="center">
                           <Typography variant="body1">{u.name}</Typography>
                           {u.kyc_status === "approved" && (
-                            <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+                            <VerifiedIcon sx={{ fontSize: 16, color: IMAA.teal }} />
                           )}
                         </Stack>
                       }
@@ -4352,13 +4386,14 @@ export default function LiveFeedPage({
           <IconButton
             onClick={handleScrollTop}
             size="large"
+            className="ecp-scroll-top"
             sx={{
-              bgcolor: "primary.main",
+              bgcolor: IMAA.navy,
               color: "#fff",
-              boxShadow: 4,
+              boxShadow: IMAA.shadowMd,
               borderRadius: "999px",
               "&:hover": {
-                bgcolor: "primary.dark",
+                bgcolor: IMAA.teal,
               },
             }}
           >
@@ -4367,5 +4402,6 @@ export default function LiveFeedPage({
         </Box>
       )}
     </Grid>
+    </ImaaCommunityScope>
   );
 }

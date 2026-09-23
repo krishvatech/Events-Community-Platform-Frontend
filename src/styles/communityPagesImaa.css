@@ -1,0 +1,374 @@
+/*
+  IMAA Community pages (Live Feed, Members, My Contacts, Messages, My Posts,
+  Notifications). Presentation only, scoped to .ecp-community-page which is
+  added by src/components/community/ImaaCommunityScope.jsx.
+  Rules are prefixed with the scope class so they win over the shared
+  .imaa-ecp-ui foundation rules without touching other modules.
+*/
+
+.ecp-community-page {
+  --ecp-navy: #1B2A4A;
+  --ecp-navy-2: #2C3E5A;
+  --ecp-coral: #E8532F;
+  --ecp-coral-hover: #CC4422;
+  --ecp-coral-light: #FEF2EE;
+  --ecp-teal: #0A9396;
+  --ecp-teal-hover: #077B7E;
+  --ecp-teal-light: #E8F7F7;
+  --ecp-bg: #F6F8FB;
+  --ecp-border: #E3E8EF;
+  --ecp-border-strong: #C9D2DE;
+  --ecp-body: #4F5B6B;
+  --ecp-muted: #667085;
+  --ecp-hint: #98A2B3;
+  --ecp-danger: #B42318;
+  --ecp-shadow-sm: 0 1px 2px rgba(27, 42, 74, 0.06);
+  --ecp-shadow-md: 0 6px 18px rgba(27, 42, 74, 0.10);
+
+  width: 100%;
+  color: var(--ecp-navy);
+}
+
+/* ---------- Buttons: correct the broad foundation button rules ---------- */
+
+.ecp-community-page .MuiButton-sizeSmall {
+  min-height: 32px;
+  padding-left: 12px;
+  padding-right: 12px;
+  font-size: 13px;
+}
+
+.ecp-community-page .MuiButton-text {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.ecp-community-page .MuiButton-contained.Mui-disabled {
+  border-color: var(--ecp-border);
+  background-color: var(--ecp-border);
+  color: var(--ecp-hint);
+}
+
+.ecp-community-page .MuiButton-containedError {
+  border-color: var(--ecp-danger);
+  background-color: var(--ecp-danger);
+}
+
+.ecp-community-page .MuiButton-containedError:hover {
+  border-color: #912018;
+  background-color: #912018;
+}
+
+.ecp-community-page .MuiButton-outlinedError {
+  border-color: rgba(180, 35, 24, 0.32);
+  color: var(--ecp-danger);
+}
+
+.ecp-community-page .MuiButton-outlinedError:hover {
+  border-color: var(--ecp-danger);
+  background-color: #FEF3F2;
+  color: var(--ecp-danger);
+}
+
+.ecp-community-page .MuiButton-outlined.Mui-disabled {
+  border-color: var(--ecp-border);
+  background: var(--ecp-bg);
+  color: var(--ecp-hint);
+}
+
+/* Secondary teal action (e.g. Message on a connected member card). */
+.ecp-community-page .ecp-btn-soft-teal.MuiButton-outlined {
+  border-color: rgba(10, 147, 150, 0.35);
+  background: var(--ecp-teal-light);
+  color: var(--ecp-teal-hover);
+}
+
+.ecp-community-page .ecp-btn-soft-teal.MuiButton-outlined:hover {
+  border-color: var(--ecp-teal);
+  background: #D5EEEE;
+  color: var(--ecp-teal-hover);
+}
+
+/* Small bordered icon buttons (edit / delete / info / mark read). */
+.ecp-community-page .ecp-icon-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ecp-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ecp-muted);
+}
+
+.ecp-community-page .ecp-icon-btn:hover {
+  border-color: var(--ecp-border-strong);
+  background: var(--ecp-bg);
+  color: var(--ecp-navy);
+}
+
+.ecp-community-page .ecp-icon-btn--danger:hover {
+  border-color: rgba(180, 35, 24, 0.32);
+  background: #FEF3F2;
+  color: var(--ecp-danger);
+}
+
+/* ---------- Page headers ---------- */
+
+.ecp-community-page .ecp-page-eyebrow {
+  margin: 0 0 4px;
+  color: var(--ecp-teal);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.ecp-community-page .ecp-page-title {
+  color: var(--ecp-navy);
+  font-family: var(--imaa-font-serif);
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.ecp-community-page .ecp-page-subtitle {
+  margin-top: 4px;
+  color: var(--ecp-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ecp-community-page .ecp-section-label {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--ecp-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+/* ---------- Toolbars, filters and search ---------- */
+
+.ecp-community-page .ecp-feed-toolbar,
+.ecp-community-page .ecp-filter-panel {
+  border: 1px solid var(--ecp-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--ecp-shadow-sm);
+}
+
+.ecp-community-page .ecp-search-field .MuiOutlinedInput-root {
+  background: var(--ecp-bg);
+}
+
+.ecp-community-page .ecp-search-field .MuiOutlinedInput-root.Mui-focused {
+  background: #fff;
+}
+
+.ecp-community-page .ecp-search-field .MuiInputAdornment-root {
+  color: var(--ecp-hint);
+}
+
+.ecp-community-page .ecp-filter-chip.MuiChip-root {
+  height: 32px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ecp-community-page .ecp-filter-chip.MuiChip-outlined {
+  border-color: var(--ecp-border);
+  background: #fff;
+  color: var(--ecp-body);
+}
+
+.ecp-community-page .ecp-filter-chip.MuiChip-outlined:hover {
+  border-color: var(--ecp-border-strong);
+  background: var(--ecp-bg);
+}
+
+.ecp-community-page .ecp-filter-chip.MuiChip-filled {
+  border: 1px solid var(--ecp-navy);
+  background: var(--ecp-navy);
+  color: #fff;
+}
+
+.ecp-community-page .ecp-filter-chip.MuiChip-filled:hover {
+  background: var(--ecp-navy-2);
+}
+
+/* ---------- Cards ---------- */
+
+.ecp-community-page .ecp-post-card {
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.ecp-community-page .ecp-post-card:hover {
+  border-color: var(--ecp-border-strong);
+  box-shadow: var(--ecp-shadow-md);
+}
+
+.ecp-community-page .ecp-empty-state {
+  padding: 40px 24px;
+  border: 1px dashed var(--ecp-border-strong);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ecp-muted);
+  text-align: center;
+}
+
+.ecp-community-page .ecp-empty-state .MuiSvgIcon-root {
+  margin-bottom: 8px;
+  color: var(--ecp-hint);
+  font-size: 36px;
+}
+
+/* ---------- Badges (Event / Group / Post / status) ---------- */
+
+.ecp-type-badge.MuiChip-root {
+  height: 22px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #EEF2F6;
+  color: var(--ecp-navy, #1B2A4A);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ecp-type-badge.MuiChip-root .MuiChip-label {
+  padding-left: 9px;
+  padding-right: 9px;
+}
+
+.ecp-type-badge--event.MuiChip-root {
+  border-color: rgba(232, 83, 47, 0.22);
+  background: #FEF2EE;
+  color: #C2410C;
+}
+
+.ecp-type-badge--group.MuiChip-root,
+.ecp-type-badge--resource.MuiChip-root {
+  border-color: rgba(10, 147, 150, 0.22);
+  background: #E8F7F7;
+  color: #077B7E;
+}
+
+.ecp-type-badge--review.MuiChip-root {
+  border-color: rgba(181, 71, 8, 0.22);
+  background: #FFFAEB;
+  color: #B54708;
+}
+
+.ecp-type-badge--removed.MuiChip-root {
+  border-color: rgba(180, 35, 24, 0.2);
+  background: #FEF3F2;
+  color: #B42318;
+}
+
+/* ---------- Post actions (Like / Comment / Share) ---------- */
+
+.ecp-community-page .ecp-post-actions {
+  gap: 4px;
+}
+
+.ecp-community-page .ecp-post-actions .ecp-post-action.MuiButton-root {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 38px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 8px;
+  color: var(--ecp-muted);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ecp-community-page .ecp-post-actions .ecp-post-action.MuiButton-root:hover {
+  background: var(--ecp-bg);
+  color: var(--ecp-navy);
+}
+
+.ecp-community-page .ecp-post-actions .ecp-post-action.is-active {
+  color: var(--ecp-teal);
+  font-weight: 700;
+}
+
+.ecp-community-page .ecp-post-actions .ecp-post-action.Mui-disabled {
+  color: var(--ecp-hint);
+}
+
+.ecp-community-page .ecp-post-meta-link.MuiButton-root {
+  min-height: 28px;
+  padding-left: 6px;
+  padding-right: 6px;
+  color: var(--ecp-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.ecp-community-page .ecp-post-meta-link.MuiButton-root:hover {
+  background: transparent;
+  color: var(--ecp-navy);
+  text-decoration: underline;
+}
+
+/* ---------- Scroll to top ---------- */
+
+.ecp-community-page .ecp-scroll-top.MuiIconButton-root {
+  background: var(--ecp-navy);
+  color: #fff;
+  box-shadow: var(--ecp-shadow-md);
+}
+
+.ecp-community-page .ecp-scroll-top.MuiIconButton-root:hover {
+  background: var(--ecp-teal);
+}
+
+/* ---------- Messages ---------- */
+
+.ecp-community-page .ecp-chat-thread {
+  background: var(--ecp-bg);
+}
+
+.ecp-community-page .ecp-chat-composer .MuiOutlinedInput-root {
+  border-radius: 999px;
+  background: var(--ecp-bg);
+}
+
+.ecp-community-page .ecp-chat-composer .MuiOutlinedInput-root.Mui-focused {
+  background: #fff;
+}
+
+.ecp-community-page .ecp-chat-send.MuiButton-root {
+  min-height: 40px;
+  border-radius: 999px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+  .ecp-community-page .ecp-page-title {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .ecp-community-page .ecp-post-actions .ecp-post-action.MuiButton-root {
+    font-size: 12.5px;
+  }
+
+  .ecp-community-page .ecp-post-actions .ecp-post-action .MuiButton-startIcon {
+    margin-right: 4px;
+  }
+
+  .ecp-community-page .ecp-empty-state {
+    padding: 32px 16px;
+  }
+}

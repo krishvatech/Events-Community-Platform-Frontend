@@ -1,6 +1,7 @@
 /* Import IMAA brand tokens — must precede all other statements */
 @import './styles/brand.css';
 @import './styles/eventsCommunityFoundation.css';
+@import './styles/communityPagesImaa.css';
 
 @tailwind base;
 @tailwind components;

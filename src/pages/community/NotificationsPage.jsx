@@ -25,8 +25,10 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import ImaaCommunityScope from "../../components/community/ImaaCommunityScope";
+import { IMAA } from "../../components/community/imaaCommunityTheme";
 
-const BORDER = "#e2e8f0";
+const BORDER = IMAA.border;
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -364,11 +366,12 @@ function NotificationSkeleton() {
     <Paper
       elevation={0}
       sx={{
-        p: 1.25,
+        p: { xs: 1.5, sm: 1.75 },
         mb: 1,
         width: "100%",
         border: `1px solid ${BORDER}`,
-        borderRadius: 2,
+        borderRadius: 3,
+        boxShadow: IMAA.shadowSm,
       }}
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
@@ -507,7 +510,7 @@ function NotificationRow({
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography
             variant="body2"
-            sx={{ fontWeight: 700, cursor: "pointer", "&:hover": { color: "primary.main" } }}
+            sx={{ fontWeight: 700, color: IMAA.navy, cursor: "pointer", "&:hover": { color: IMAA.teal } }}
             onClick={(e) => {
               e.stopPropagation();
               onAvatarClick?.(item);
@@ -530,7 +533,7 @@ function NotificationRow({
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography
             variant="body2"
-            sx={{ fontWeight: 700, cursor: "pointer", "&:hover": { color: "primary.main" } }}
+            sx={{ fontWeight: 700, color: IMAA.navy, cursor: "pointer", "&:hover": { color: IMAA.teal } }}
             onClick={(e) => {
               e.stopPropagation();
               onAvatarClick?.(item);
@@ -553,7 +556,7 @@ function NotificationRow({
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography
             variant="body2"
-            sx={{ fontWeight: 700, cursor: "pointer", "&:hover": { color: "primary.main" } }}
+            sx={{ fontWeight: 700, color: IMAA.navy, cursor: "pointer", "&:hover": { color: IMAA.teal } }}
             onClick={(e) => {
               e.stopPropagation();
               onAvatarClick?.(item);
@@ -575,7 +578,7 @@ function NotificationRow({
       return (
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography variant="body2">
-            Forum has been <span style={{ fontWeight: 700, color: '#10b8a6' }}>enabled</span> for
+            Forum has been <span style={{ fontWeight: 700, color: IMAA.teal }}>enabled</span> for
           </Typography>
           {item.data?.group_name && (
             <Chip size="small" label={item.data.group_name} variant="outlined" />
@@ -666,7 +669,7 @@ function NotificationRow({
             </Typography>
             <Typography
               variant="body2"
-              sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+              sx={{ fontWeight: 700, color: IMAA.navy, cursor: 'pointer', '&:hover': { color: IMAA.teal } }}
               onClick={(e) => {
                 e.stopPropagation();
                 onAvatarClick?.(item);
@@ -686,7 +689,7 @@ function NotificationRow({
             </Typography>
             <Typography
               variant="body2"
-              sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+              sx={{ fontWeight: 700, color: IMAA.navy, cursor: 'pointer', '&:hover': { color: IMAA.teal } }}
               onClick={(e) => {
                 e.stopPropagation();
                 onAvatarClick?.(item);
@@ -709,7 +712,7 @@ function NotificationRow({
             </Typography>
             <Typography
               variant="body2"
-              sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+              sx={{ fontWeight: 700, color: IMAA.navy, cursor: 'pointer', '&:hover': { color: IMAA.teal } }}
               onClick={(e) => {
                 e.stopPropagation();
                 onAvatarClick?.(item);
@@ -728,7 +731,7 @@ function NotificationRow({
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography
             variant="body2"
-            sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+            sx={{ fontWeight: 700, color: IMAA.navy, cursor: 'pointer', '&:hover': { color: IMAA.teal } }}
             onClick={(e) => {
               e.stopPropagation();
               onAvatarClick?.(item);
@@ -750,16 +753,16 @@ function NotificationRow({
         return (
           <Stack direction="column" spacing={0.5}>
             <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
-              <ReceiptLongRoundedIcon sx={{ fontSize: 17, color: "#0f766e" }} />
-              <Typography variant="body2" sx={{ fontWeight: 800, color: "#0f172a" }}>
+              <ReceiptLongRoundedIcon sx={{ fontSize: 17, color: IMAA.teal }} />
+              <Typography variant="body2" sx={{ fontWeight: 700, color: IMAA.navy }}>
                 {item.title || `Payment confirmed${orderLabel ? ` for order #${orderLabel}` : ""}`}
               </Typography>
             </Stack>
-            <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
+            <Typography variant="caption" sx={{ color: IMAA.muted, display: "block" }}>
               {item.description || `Your manual payment has been confirmed${invoiceNumber ? `. Invoice ${invoiceNumber} is ready to download.` : "."}`}
             </Typography>
             <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
-              {invoiceNumber && <Chip size="small" label={invoiceNumber} sx={{ height: 22, bgcolor: "#ecfeff", color: "#0f766e", fontWeight: 700 }} />}
+              {invoiceNumber && <Chip size="small" label={invoiceNumber} sx={{ height: 22, bgcolor: IMAA.tealLight, color: IMAA.tealHover, fontWeight: 700 }} />}
               {amount && <Chip size="small" label={amount} sx={{ height: 22, bgcolor: "#f0fdf4", color: "#166534", fontWeight: 700 }} />}
             </Stack>
           </Stack>
@@ -789,7 +792,7 @@ function NotificationRow({
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography
             variant="body2"
-            sx={sourceIsPerson ? { fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } } : { fontWeight: 700 }}
+            sx={sourceIsPerson ? { fontWeight: 700, color: IMAA.navy, cursor: 'pointer', '&:hover': { color: IMAA.teal } } : { fontWeight: 700, color: IMAA.navy }}
             onClick={(e) => {
               if (!sourceIsPerson) return;
               e.stopPropagation();
@@ -816,7 +819,7 @@ function NotificationRow({
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
         <Typography
           variant="body2"
-          sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+          sx={{ fontWeight: 700, color: IMAA.navy, cursor: 'pointer', '&:hover': { color: IMAA.teal } }}
           onClick={(e) => {
             e.stopPropagation();
             onAvatarClick?.(item);
@@ -845,7 +848,8 @@ function NotificationRow({
             onOpen?.(item);
           }}
           startIcon={<ReceiptLongRoundedIcon />}
-          sx={{ textTransform: "none", borderRadius: 2, mt: 1, borderColor: "#99f6e4", color: "#0f766e", fontWeight: 700 }}
+          className="ecp-btn-soft-teal"
+          sx={{ textTransform: "none", borderRadius: 2, mt: 1, fontWeight: 700 }}
         >
           View order
         </Button>
@@ -993,14 +997,16 @@ function NotificationRow({
         }
       }}
       sx={{
-        p: 1.25,
-        mb: 1,
+        p: { xs: 1.5, sm: 1.75 },
+        mb: 0,
         width: "100%",
         flexGrow: 1,
         boxSizing: "border-box",
-        border: `1px solid ${BORDER}`,
-        borderRadius: 2,
-        bgcolor: unread ? "#f6fffe" : "background.paper",
+        border: `1px solid ${unread ? "rgba(10,147,150,0.28)" : BORDER}`,
+        borderRadius: 3,
+        bgcolor: unread ? "#F5FBFB" : "background.paper",
+        boxShadow: unread ? `inset 3px 0 0 ${IMAA.teal}, ${IMAA.shadowSm}` : IMAA.shadowSm,
+        transition: "background-color .15s, border-color .15s",
         cursor: (
           isPaymentNotification(item) ||
           item.kind === "forum_enabled" ||
@@ -1027,27 +1033,28 @@ function NotificationRow({
           item.context?.groupSlug ||
           item.data?.group_slug
         ) ? {
-          bgcolor: unread ? "#e6f7f5" : "#f9fafb",
+          bgcolor: unread ? IMAA.tealLight : IMAA.bg,
+          borderColor: unread ? "rgba(10,147,150,0.4)" : IMAA.borderStrong,
         } : {},
       }}
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
           {isPaymentNotification(item) ? (
-            <Avatar sx={{ bgcolor: "#ecfeff", color: "#0f766e" }}>
+            <Avatar sx={{ bgcolor: IMAA.tealLight, color: IMAA.teal }}>
               <ReceiptLongRoundedIcon />
             </Avatar>
           ) : isKycNotification(item) ? (
-            <Avatar sx={{ bgcolor: "transparent" }}>
-              <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 32 }} />
+            <Avatar sx={{ bgcolor: IMAA.tealLight }}>
+              <VerifiedIcon sx={{ color: IMAA.teal, fontSize: 24 }} />
             </Avatar>
           ) : item.kind === 'name_change' ? (
-            <Avatar sx={{ bgcolor: '#394d79', color: 'white' }}>
+            <Avatar sx={{ bgcolor: IMAA.navy, color: 'white' }}>
               <BadgeRoundedIcon fontSize="small" />
             </Avatar>
 
           ) : item.kind === 'system' ? (
-            <Avatar sx={{ bgcolor: '#f3f4f6', color: '#1f2937' }}>
+            <Avatar sx={{ bgcolor: '#EEF2F6', color: IMAA.navy }}>
               <InfoRoundedIcon />
             </Avatar>
           ) : (
@@ -1055,7 +1062,7 @@ function NotificationRow({
               src={item.actor?.avatar}
               alt={item.actor?.name}
               onClick={() => onAvatarClick?.(item)} // Use parent handler
-              sx={{ cursor: (item?.context?.profile_user_id || item?.actor?.id) ? "pointer" : "default" }}
+              sx={{ bgcolor: IMAA.navy, fontWeight: 700, cursor: (item?.context?.profile_user_id || item?.actor?.id) ? "pointer" : "default" }}
             >
               {(item.actor?.name || "S").slice(0, 1).toUpperCase()}
             </Avatar>
@@ -1087,9 +1094,9 @@ function NotificationRow({
               const isPayment = isPaymentNotification(item);
               const isNameChange = item.kind === "name_change" || String(item?.data?.type || "").toLowerCase() === "name_change" || item.source === "identity";
               const label = isPayment ? "Payments" : isKyc ? "KYC" : isNameChange ? "Name Change" : kindChip(item.kind);
-              return <Chip size="small" label={label} sx={isPayment ? { bgcolor: "#ecfeff", color: "#0f766e", fontWeight: 700 } : undefined} />;
+              return <Chip size="small" label={label} className={`ecp-type-badge${isPayment ? " ecp-type-badge--resource" : ""}`} />;
             })()}
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: IMAA.hint, fontWeight: 500 }}>
               {formatWhen(item.created_at)}
             </Typography>
           </Stack>
@@ -1101,6 +1108,7 @@ function NotificationRow({
           <Stack direction="row" spacing={0.5}>
             <IconButton
               size="small"
+              className="ecp-icon-btn"
               title={unread ? "Mark as read" : "Mark as unread"}
               onClick={(e) => {
                 e.stopPropagation();
@@ -1127,7 +1135,7 @@ function NotificationRow({
               item.context?.groupSlug ||
               item.data?.group_slug
             ) && (
-                <IconButton size="small" title="Open" onClick={(e) => {
+                <IconButton size="small" className="ecp-icon-btn" title="Open" onClick={(e) => {
                   e.stopPropagation();
                   onOpen?.(item);
                 }}>
@@ -1583,15 +1591,16 @@ export default function NotificationsPage({
   };
 
   return (
+    <ImaaCommunityScope page="notifications">
     <Grid container spacing={2}>
-      <Grid item xs={12} sm={12} md={9} sx={{ width: '100%' }}>
+      <Grid size={12} sx={{ width: '100%', maxWidth: 920, mx: "auto" }}>
         {/* Header */}
-        <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 2 }}>
+        <Paper elevation={0} sx={{ p: { xs: 1.75, sm: 2.25 }, border: `1px solid ${BORDER}`, borderRadius: 3, boxShadow: IMAA.shadowSm, mb: 2.5 }}>
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, alignItems: "center", gap: 1 }}>
             <Stack direction="row" spacing={1.25} alignItems="center">
-              <Badge badgeContent={unreadCount} color="primary"><NotificationsNoneOutlinedIcon /></Badge>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Notifications</Typography>
-              <Chip size="small" label={`${unreadCount} unread`} />
+              <Badge badgeContent={unreadCount} color="primary"><NotificationsNoneOutlinedIcon sx={{ color: IMAA.navy }} /></Badge>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: IMAA.navy, fontFamily: "var(--imaa-font-serif)", fontSize: 22, lineHeight: 1.2 }}>Notifications</Typography>
+              <Chip size="small" label={`${unreadCount} unread`} sx={{ bgcolor: unreadCount > 0 ? IMAA.coralLight : "#EEF2F6", color: unreadCount > 0 ? IMAA.coral : IMAA.muted, fontWeight: 700 }} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent={{ xs: "flex-start", sm: "flex-end" }}>
               <FormControlLabel control={<Switch checked={showOnlyUnread} onChange={(e) => setShowOnlyUnread(e.target.checked)} size="small" />} label="Unread only" sx={{ m: 0 }} />
@@ -1600,7 +1609,7 @@ export default function NotificationsPage({
                   size="small"
                   value={kind}
                   onChange={(e) => setKind(e.target.value)}
-                  sx={{ minWidth: 160 }}
+                  sx={{ minWidth: 180, bgcolor: IMAA.bg, fontSize: 14 }}
                 >
                   <MenuItem value="All">All</MenuItem>
                   <MenuItem value="Requests">Contact Requests (Inbox)</MenuItem>
@@ -1625,15 +1634,15 @@ export default function NotificationsPage({
         {loading && items.length === 0 ? (
           <><NotificationSkeleton /><NotificationSkeleton /><NotificationSkeleton /></>
         ) : filtered.length === 0 ? (
-          <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: 'center' }}><Typography variant="body2" color="text.secondary">No notifications found.</Typography></Paper>
+          <Paper elevation={0} className="ecp-empty-state"><NotificationsNoneOutlinedIcon /><Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>No notifications found.</Typography></Paper>
         ) : (
           <>
             {["Today", "Yesterday", "Earlier"].map((section) => groupedLimited[section]?.length ? (
               <Box key={section} sx={{ mb: 2 }}>
-                <Typography variant="overline" sx={{ color: "text.secondary" }}>{section}</Typography>
-                <List sx={{ mt: 1 }}>
+                <Typography variant="overline" className="ecp-section-label">{section}</Typography>
+                <List disablePadding>
                   {groupedLimited[section].map((it) => (
-                    <ListItem key={it.id} disableGutters sx={{ px: 0 }}>
+                    <ListItem key={it.id} disableGutters sx={{ px: 0, py: 0.625 }}>
                       <NotificationRow
                         item={it}
                         onOpen={handleOpen}
@@ -1658,10 +1667,11 @@ export default function NotificationsPage({
       </Grid>
       {showScrollTop && (
         <Box sx={{ position: "fixed", bottom: { xs: 72, md: 32 }, right: { xs: 16, md: 32 }, zIndex: 1300 }}>
-          <IconButton onClick={handleScrollTop} size="large" sx={{ bgcolor: "primary.main", color: "#fff", boxShadow: 4, borderRadius: "999px", "&:hover": { bgcolor: "primary.dark" } }}><KeyboardArrowUpRoundedIcon /></IconButton>
+          <IconButton onClick={handleScrollTop} size="large" className="ecp-scroll-top" sx={{ bgcolor: IMAA.navy, color: "#fff", boxShadow: IMAA.shadowMd, borderRadius: "999px", "&:hover": { bgcolor: IMAA.teal } }}><KeyboardArrowUpRoundedIcon /></IconButton>
         </Box>
       )}
     </Grid>
+    </ImaaCommunityScope>
   );
 }
 

@@ -60,9 +60,11 @@ import {
 import L from "leaflet";
 import "leaflet.heat";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import ImaaCommunityScope from "../../components/community/ImaaCommunityScope";
+import { IMAA } from "../../components/community/imaaCommunityTheme";
 
 /* --------------------- constants & helpers --------------------- */
-const BORDER = "#e2e8f0";
+const BORDER = IMAA.border;
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
@@ -206,8 +208,8 @@ const MAP_THEMES = {
             "#c5e1a5", "#aed581", "#ffecb3", "#b2dfdb", "#ffe0b2",
         ],
         landStroke: "#8fa8c3",
-        memberDot: "#e53935",
-        friendDot: "#1e88e5",
+        memberDot: "#E8532F",
+        friendDot: "#0A9396",
         ocean: "#b3d9ff",
     }
 };
@@ -267,7 +269,7 @@ function flagEmojiFromISO2(code) {
 }
 
 function memberAccentColor(name) {
-    const colors = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#3B5998"];
+    const colors = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#2C3E5A"];
     let h = 0;
     for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
     return colors[h % colors.length];
@@ -363,7 +365,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
                                     <Box sx={{ fontSize: 12, cursor: "pointer" }} onClick={() => onOpenProfile?.(m.user)}>
                                         <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
                                             {m.userName}
-                                            {isVerified && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                                            {isVerified && <VerifiedIcon sx={{ fontSize: 14, color: IMAA.teal }} />}
                                         </div>
                                         <div style={{ opacity: 0.85 }}>{m.isFriend ? "My Contact" : "Member"}</div>
                                     </Box>
@@ -413,23 +415,23 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
     return (
         <Box
             sx={{
-                borderRadius: "14px",
+                borderRadius: "12px",
                 border: `1px solid ${BORDER}`,
                 background: "#fff",
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
                 transition: "box-shadow .18s, border-color .18s",
-                boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+                boxShadow: IMAA.shadowSm,
                 width: "100%",
                 "&:hover": {
-                    boxShadow: "0 8px 28px rgba(0,0,0,.09)",
-                    borderColor: accent + "55",
+                    boxShadow: IMAA.shadowMd,
+                    borderColor: IMAA.borderStrong,
                 },
             }}
         >
             {/* Top accent stripe */}
-            <Box sx={{ height: 4, bgcolor: accent, flexShrink: 0 }} />
+            <Box sx={{ height: 3, bgcolor: accent, flexShrink: 0 }} />
 
             {/* Card body — click opens profile */}
             <Box
@@ -470,25 +472,25 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                         {!isMe && (
                             <Box sx={{
-                                fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
+                                fontSize: 10, fontWeight: 800, px: "8px", py: "3px", borderRadius: "999px",
                                 bgcolor: degreeColors[degree] + "15", color: degreeColors[degree],
-                                letterSpacing: 0.3, lineHeight: 1,
+                                letterSpacing: 0.4, lineHeight: 1.2,
                             }}>
                                 {degreeLabels[degree]}
                             </Box>
                         )}
                         {status === "friends" ? (
                             <Box sx={{
-                                fontSize: 10, fontWeight: 700, px: "10px", py: "3px", borderRadius: "20px",
-                                bgcolor: "#0A939614", color: "#0A9396",
+                                fontSize: 10.5, fontWeight: 700, px: "10px", py: "3px", borderRadius: "999px",
+                                bgcolor: IMAA.tealLight, color: IMAA.tealHover,
                             }}>
                                 ✓ Connected
                             </Box>
                         ) : industry ? (
                             <Box sx={{
-                                fontSize: 10, fontWeight: 600, px: "10px", py: "3px", borderRadius: "20px",
-                                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
-                                maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                fontSize: 10.5, fontWeight: 600, px: "10px", py: "3px", borderRadius: "999px",
+                                bgcolor: "#EEF2F6", color: IMAA.body,
+                                maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }}>
                                 {industry}
                             </Box>
@@ -498,11 +500,11 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
                 {/* Name + title + company */}
                 <Box>
-                    <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+                    <Typography sx={{ fontSize: 15, fontWeight: 700, color: IMAA.navy, lineHeight: 1.25, mb: "3px" }}>
                         {name}
                     </Typography>
                     {(title || company) && (
-                        <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+                        <Typography sx={{ fontSize: 12.5, color: IMAA.muted, lineHeight: 1.4 }}>
                             {title}
                             {title && company
                                 ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {company}</Box>
@@ -515,7 +517,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
                 {/* Location + online indicator */}
                 {country && (
-                    <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                    <Typography sx={{ fontSize: 12, color: IMAA.muted, display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
                         {flag && <span>{flag}</span>}
                         {country}
                         {isOnline && (
@@ -532,8 +534,8 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
                         {skillsArr.slice(0, 3).map((skill, i) => (
                             <Box key={i} sx={{
-                                fontSize: 10, fontWeight: 600, px: "9px", py: "3px", borderRadius: "14px",
-                                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
+                                fontSize: 11, fontWeight: 600, px: "9px", py: "3px", borderRadius: "999px",
+                                bgcolor: IMAA.bg, color: IMAA.body, border: `1px solid ${BORDER}`,
                             }}>
                                 {skill}
                             </Box>
@@ -545,15 +547,16 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
             {/* Action footer */}
             {!isMe && (
                 <Box
-                    sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+                    sx={{ borderTop: `1px solid ${BORDER}`, bgcolor: "#FAFBFC", px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {status === "friends" ? (
                         <Button
                             size="small"
                             variant="outlined"
+                            className="ecp-btn-soft-teal"
                             onClick={() => onOpenProfile?.(u)}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: 12.5, fontWeight: 700, flex: 1 }}
                         >
                             Message
                         </Button>
@@ -563,7 +566,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             variant="outlined"
                             color="inherit"
                             onClick={() => {}}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: 12.5, fontWeight: 700, flex: 1 }}
                             disabled
                         >
                             Request Sent
@@ -574,7 +577,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             variant="contained"
                             onClick={() => onAddFriend(u.id)}
                             startIcon={<PersonAddAlt1RoundedIcon fontSize="small" />}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: 12.5, fontWeight: 700, flex: 1 }}
                         >
                             Add Contact
                         </Button>
@@ -586,7 +589,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             variant="outlined"
                             color="error"
                             onClick={() => onRemoveFriend(u.id)}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: 12.5, fontWeight: 600 }}
                         >
                             Remove
                         </Button>
@@ -619,23 +622,23 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
     return (
         <Box
             sx={{
-                borderRadius: "14px",
+                borderRadius: "12px",
                 border: `1px solid ${BORDER}`,
                 background: "#fff",
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
                 transition: "box-shadow .18s, border-color .18s",
-                boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+                boxShadow: IMAA.shadowSm,
                 width: "100%",
                 "&:hover": {
-                    boxShadow: "0 8px 28px rgba(0,0,0,.09)",
-                    borderColor: accent + "55",
+                    boxShadow: IMAA.shadowMd,
+                    borderColor: IMAA.borderStrong,
                 },
             }}
         >
             {/* Top accent stripe */}
-            <Box sx={{ height: 4, bgcolor: type === "received" ? "#E8532F" : "#1B2A4A", flexShrink: 0 }} />
+            <Box sx={{ height: 3, bgcolor: type === "received" ? IMAA.coral : IMAA.navy, flexShrink: 0 }} />
 
             {/* Card body — click opens profile */}
             <Box
@@ -674,10 +677,10 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
 
                     {/* Status badge */}
                     <Box sx={{
-                        fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
-                        bgcolor: type === "received" ? "#E8532F15" : "#1B2A4A08",
-                        color: type === "received" ? "#E8532F" : "#1B2A4A99",
-                        letterSpacing: 0.3, lineHeight: 1,
+                        fontSize: 10, fontWeight: 800, px: "8px", py: "3px", borderRadius: "999px",
+                        bgcolor: type === "received" ? IMAA.coralLight : "#EEF2F6",
+                        color: type === "received" ? IMAA.coral : IMAA.body,
+                        letterSpacing: 0.4, lineHeight: 1.2, textTransform: "uppercase",
                     }}>
                         {type === "received" ? "Pending" : "Waiting"}
                     </Box>
@@ -685,11 +688,11 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
 
                 {/* Name + title + company */}
                 <Box>
-                    <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+                    <Typography sx={{ fontSize: 15, fontWeight: 700, color: IMAA.navy, lineHeight: 1.25, mb: "3px" }}>
                         {name}
                     </Typography>
                     {(title || company) && (
-                        <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+                        <Typography sx={{ fontSize: 12.5, color: IMAA.muted, lineHeight: 1.4 }}>
                             {title}
                             {title && company
                                 ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {company}</Box>
@@ -702,7 +705,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
 
                 {/* Location + industry */}
                 {(country || industry) && (
-                    <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                    <Typography sx={{ fontSize: 12, color: IMAA.muted, display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
                         {industry && <span>{industry}</span>}
                         {industry && country && <span>•</span>}
                         {flag && <span>{flag}</span>}
@@ -719,7 +722,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
 
             {/* Action footer */}
             <Box
-                sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+                sx={{ borderTop: `1px solid ${BORDER}`, bgcolor: "#FAFBFC", px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {type === "sent" ? (
@@ -728,7 +731,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             size="small"
                             variant="outlined"
                             color="inherit"
-                            sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontSize: 12.5, fontWeight: 700 }}
                             disabled
                             startIcon={<HourglassBottomRoundedIcon />}
                         >
@@ -739,7 +742,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             variant="outlined"
                             color="error"
                             onClick={() => onCancel(req.id)}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: 12.5, fontWeight: 600 }}
                             startIcon={<HighlightOffIcon />}
                         >
                             Cancel
@@ -751,7 +754,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             size="small"
                             variant="contained"
                             onClick={() => onAccept(req.id)}
-                            sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontSize: 12.5, fontWeight: 700 }}
                             startIcon={<CheckCircleOutlineIcon />}
                         >
                             Accept
@@ -761,7 +764,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             variant="outlined"
                             color="error"
                             onClick={() => onDecline(req.id)}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontSize: 12.5, fontWeight: 600 }}
                             startIcon={<HighlightOffIcon />}
                         >
                             Decline
@@ -774,8 +777,8 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
 };
 
 const MemberCardSkeleton = () => (
-    <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <Box sx={{ height: 4, bgcolor: "#e2e8f0" }} />
+    <Box sx={{ borderRadius: "12px", border: `1px solid ${BORDER}`, bgcolor: "#fff", boxShadow: IMAA.shadowSm, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ height: 3, bgcolor: IMAA.border }} />
         <Stack sx={{ p: "16px 18px 12px", gap: "8px" }} spacing={0}>
             <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                 <Skeleton variant="rounded" width={50} height={50} sx={{ borderRadius: "13px" }} />
@@ -801,8 +804,8 @@ const MemberCardSkeleton = () => (
 );
 
 const RequestCardSkeleton = () => (
-    <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <Box sx={{ height: 4, bgcolor: "#e2e8f0" }} />
+    <Box sx={{ borderRadius: "12px", border: `1px solid ${BORDER}`, bgcolor: "#fff", boxShadow: IMAA.shadowSm, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ height: 3, bgcolor: IMAA.border }} />
         <Stack sx={{ p: "16px 18px 12px", gap: "8px" }} spacing={0}>
             <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                 <Skeleton variant="rounded" width={50} height={50} sx={{ borderRadius: "13px" }} />
@@ -1388,12 +1391,12 @@ export default function MyContacts() {
     };
 
     return (
-        <>
+        <ImaaCommunityScope page="contacts">
             <Box
                 sx={{
                     display: "flex",
                     flexDirection: { xs: "column", md: "row" },
-                    gap: 2,
+                    gap: { xs: 2, md: 2.5 },
                     alignItems: "stretch",
                 }}
             >
@@ -1415,14 +1418,14 @@ export default function MyContacts() {
                             height: "100%",
                         }}
                     >
-                        <Paper sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+                        <Paper elevation={0} className="ecp-filter-panel" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
                             <Stack spacing={1.25}>
                                 {/* Title row */}
                                 <Stack
                                     direction="row"
                                     alignItems="center"
                                     justifyContent="space-between"
-                                    sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
+                                    sx={{ borderBottom: 1, borderColor: 'divider', mb: 1, gap: 1 }}
                                 >
                                     <Tabs value={tabIndex} onChange={(e, v) => setTabIndex(v)} variant="scrollable" scrollButtons="auto">
                                         <Tab label={`My Contacts ${tabIndex === 0 ? `(Page ${page})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
@@ -1438,6 +1441,7 @@ export default function MyContacts() {
                                             <IconButton
                                                 size="small"
                                                 onClick={() => setMapOverlayOpen(true)}
+                                                className="ecp-icon-btn"
                                                 sx={{ flexShrink: 0 }}
                                             >
                                                 <MapRoundedIcon fontSize="small" />
@@ -1451,6 +1455,7 @@ export default function MyContacts() {
                                         <TextField
                                             fullWidth
                                             size="small"
+                                            className="ecp-search-field"
                                             placeholder="Search contacts..."
                                             value={q}
                                             onChange={(e) => { setQ(e.target.value); setPage(1); }}
@@ -1614,7 +1619,7 @@ export default function MyContacts() {
                             </Stack>
                         )}
 
-                        {!loading && error && <Typography color="error">⚠️ {error}</Typography>}
+                        {!loading && error && <Typography color="error" sx={{ p: 2, mb: 1.5, borderRadius: 3, border: "1px solid rgba(180,35,24,0.2)", bgcolor: "#FEF3F2", fontWeight: 600, fontSize: 14 }}>⚠️ {error}</Typography>}
 
                         {!loading && !loadingRequests && !error && (
                             <Stack spacing={1.5}>
@@ -1633,7 +1638,7 @@ export default function MyContacts() {
                                             />
                                         ))}
                                         {displayedUsers.length === 0 && (
-                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                                            <Typography variant="body2" color="text.secondary" align="center" className="ecp-empty-state" sx={{ fontWeight: 600 }}>
                                                 {page === 1 ? "No contacts found." : "No more contacts."}
                                             </Typography>
                                         )}
@@ -1657,7 +1662,7 @@ export default function MyContacts() {
                                 {tabIndex === 1 && (
                                     <>
                                         {sentRequests.length > 0 && (
-                                            <Typography variant="body2" color="text.secondary" sx={{ pb: 1, pl: 1, fontWeight: 500 }}>
+                                            <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 1, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: IMAA.bg, fontWeight: 500, fontSize: 13 }}>
                                                 "Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted."
                                             </Typography>
                                         )}
@@ -1665,7 +1670,7 @@ export default function MyContacts() {
                                             <RequestCard key={req.id} req={req} type="sent" onOpenProfile={handleOpenProfile} onCancel={cancelRequest} />
                                         ))}
                                         {sentRequests.length === 0 && (
-                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                                            <Typography variant="body2" color="text.secondary" align="center" className="ecp-empty-state" sx={{ fontWeight: 600 }}>
                                                 {page === 1 ? "No sent requests pending." : "No more requests."}
                                             </Typography>
                                         )}
@@ -1689,7 +1694,7 @@ export default function MyContacts() {
                                 {tabIndex === 2 && (
                                     <>
                                         {receivedRequests.length > 0 && (
-                                            <Typography variant="body2" color="text.secondary" sx={{ pb: 1, pl: 1, fontWeight: 500 }}>
+                                            <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, py: 1, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: IMAA.bg, fontWeight: 500, fontSize: 13 }}>
                                                 Pending requests (sent or received) will be automatically withdrawn after 30 days if not accepted.
                                             </Typography>
                                         )}
@@ -1697,7 +1702,7 @@ export default function MyContacts() {
                                             <RequestCard key={req.id} req={req} type="received" onOpenProfile={handleOpenProfile} onAccept={acceptRequest} onDecline={declineRequest} />
                                         ))}
                                         {receivedRequests.length === 0 && (
-                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                                            <Typography variant="body2" color="text.secondary" align="center" className="ecp-empty-state" sx={{ fontWeight: 600 }}>
                                                 {page === 1 ? "No pending requests received." : "No more requests."}
                                             </Typography>
                                         )}
@@ -1725,13 +1730,13 @@ export default function MyContacts() {
                                                 <CircularProgress size={32} />
                                             </Box>
                                         ) : visitors.length === 0 ? (
-                                            <Box sx={{ textAlign: "center", py: 4 }}>
-                                                <Typography variant="body2" color="text.secondary">
+                                            <Box className="ecp-empty-state">
+                                                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
                                                     No profile visitors yet.
                                                 </Typography>
                                             </Box>
                                         ) : (
-                                            <List disablePadding>
+                                            <List disablePadding sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, boxShadow: IMAA.shadowSm, overflow: "hidden" }}>
                                                 {visitors.map((visitor, index) => (
                                                     <ListItem
                                                         key={`${visitor.id}-${visitor.viewed_at}-${index}`}
@@ -1739,12 +1744,12 @@ export default function MyContacts() {
                                                         onClick={() => !visitor.is_anonymous && navigate(`/community/rich-profile/${visitor.id}`)}
                                                         sx={{
                                                             py: 1.5,
-                                                            px: 0,
-                                                            borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                                                            px: 2,
+                                                            borderBottom: `1px solid ${BORDER}`,
                                                             "&:last-child": { borderBottom: "none" },
                                                             cursor: !visitor.is_anonymous ? "pointer" : "default",
                                                             "&:hover": !visitor.is_anonymous ? {
-                                                                backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                                                backgroundColor: IMAA.bg,
                                                             } : {},
                                                             transition: "background-color 0.2s",
                                                         }}
@@ -1752,7 +1757,7 @@ export default function MyContacts() {
                                                         <ListItemAvatar>
                                                             <Avatar
                                                                 src={visitor.avatar_url || ""}
-                                                                sx={{ width: 40, height: 40, bgcolor: "primary.main" }}
+                                                                sx={{ width: 40, height: 40, bgcolor: IMAA.navy, fontWeight: 700 }}
                                                             >
                                                                 {visitor.avatar_url ? null : (visitor.full_name || visitor.username || "?").slice(0, 1).toUpperCase()}
                                                             </Avatar>
@@ -1760,12 +1765,12 @@ export default function MyContacts() {
                                                         <ListItemText
                                                             primary={
                                                                 <Stack direction="row" alignItems="center" gap={0.5}>
-                                                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                                    <Typography variant="body2" sx={{ fontWeight: 700, color: IMAA.navy }}>
                                                                         {visitor.is_anonymous ? "Someone" : `${visitor.first_name || ""} ${visitor.last_name || ""}`.trim() || visitor.full_name || visitor.username}
                                                                     </Typography>
                                                                     {!visitor.is_anonymous && isVerifiedStatus(visitor.kyc_status || visitor.profile?.kyc_status) && (
                                                                         <Tooltip title="Verified Member">
-                                                                            <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 16 }} />
+                                                                            <VerifiedIcon sx={{ color: IMAA.teal, fontSize: 16 }} />
                                                                         </Tooltip>
                                                                     )}
                                                                 </Stack>
@@ -1820,10 +1825,12 @@ export default function MyContacts() {
                         }}
                     >
                         <Paper
+                            elevation={0}
                             sx={{
-                                p: 1.5,
+                                p: 2,
                                 border: `1px solid ${BORDER}`,
                                 borderRadius: 3,
+                                boxShadow: IMAA.shadowSm,
                                 position: { md: "sticky" },
                                 top: 88,
                                 height: { xs: 520, md: "calc(100vh - 140px)" },
@@ -1839,7 +1846,7 @@ export default function MyContacts() {
                                 justifyContent="space-between"
                                 spacing={1}
                             >
-                                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: IMAA.navy, fontSize: 17 }}>
                                     Where My Contacts are from
                                 </Typography>
                                 <Stack direction="row" alignItems="center" spacing={2}>
@@ -1925,7 +1932,7 @@ export default function MyContacts() {
                             >
                                 <ArrowBackIosNewRoundedIcon fontSize="small" />
                             </IconButton>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: IMAA.navy }}>
                                 Contacts map
                             </Typography>
                         </Stack>
@@ -1937,7 +1944,7 @@ export default function MyContacts() {
                             justifyContent="space-between"
                             spacing={1}
                         >
-                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: IMAA.navy, fontSize: 17 }}>
                                 Where My Contacts are from
                             </Typography>
                             <Stack direction="row" alignItems="center" spacing={2}>
@@ -1993,10 +2000,10 @@ export default function MyContacts() {
                 maxWidth="xs"
                 PaperProps={{
                     sx: {
-                        borderRadius: 4,
+                        borderRadius: 3,
                         overflow: "hidden",
-                        background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
-                        boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
+                        background: "#ffffff",
+                        boxShadow: "0 12px 32px rgba(27, 42, 74, 0.18)",
                     },
                 }}
             >
@@ -2005,8 +2012,8 @@ export default function MyContacts() {
                         px: 3,
                         pt: 2.5,
                         pb: 1.5,
-                        background: "linear-gradient(135deg, rgba(8,145,178,0.14), rgba(14,116,144,0.05))",
-                        borderBottom: "1px solid rgba(148,163,184,0.18)",
+                        background: IMAA.bg,
+                        borderBottom: `1px solid ${BORDER}`,
                     }}
                 >
                     <Chip
@@ -2014,25 +2021,25 @@ export default function MyContacts() {
                         label="Contact Management"
                         sx={{
                             mb: 1.5,
-                            bgcolor: "rgba(8,145,178,0.12)",
-                            color: "#0f766e",
+                            bgcolor: IMAA.tealLight,
+                            color: IMAA.tealHover,
                             fontWeight: 700,
                         }}
                     />
-                    <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+                    <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 700, color: IMAA.navy }}>
                         Remove contact?
                     </DialogTitle>
                 </Box>
                 <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
                     <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Avatar sx={{ bgcolor: "#0f766e", width: 44, height: 44, fontWeight: 800 }}>
+                        <Avatar sx={{ bgcolor: IMAA.navy, width: 44, height: 44, fontWeight: 700 }}>
                             {(removeDialog.name || "?").slice(0, 1).toUpperCase()}
                         </Avatar>
                         <Box>
-                            <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                            <Typography sx={{ fontWeight: 700, color: IMAA.navy }}>
                                 {removeDialog.name || "This member"}
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "#475569" }}>
+                            <Typography variant="body2" sx={{ color: IMAA.muted }}>
                                 This removes them from your contacts list. You can send a new request later.
                             </Typography>
                         </Box>
@@ -2043,7 +2050,7 @@ export default function MyContacts() {
                         onClick={closeRemoveFriendDialog}
                         disabled={removeDialog.submitting}
                         variant="outlined"
-                        sx={{ borderRadius: 999, px: 2.25, textTransform: "none", fontWeight: 700 }}
+                        sx={{ borderRadius: 2, px: 2.25, textTransform: "none", fontWeight: 700 }}
                     >
                         Keep contact
                     </Button>
@@ -2052,7 +2059,7 @@ export default function MyContacts() {
                         disabled={removeDialog.submitting}
                         variant="contained"
                         color="error"
-                        sx={{ borderRadius: 999, px: 2.5, textTransform: "none", fontWeight: 700, boxShadow: "none" }}
+                        sx={{ borderRadius: 2, px: 2.5, textTransform: "none", fontWeight: 700, boxShadow: "none" }}
                     >
                         {removeDialog.submitting ? "Removing..." : "Remove"}
                     </Button>
@@ -2073,6 +2080,6 @@ export default function MyContacts() {
                     {toast.msg}
                 </Alert>
             </Snackbar>
-        </>
+        </ImaaCommunityScope>
     );
 }

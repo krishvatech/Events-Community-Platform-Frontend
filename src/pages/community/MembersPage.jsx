@@ -59,11 +59,13 @@ import {
 import L from "leaflet";
 import "leaflet.heat";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import ImaaCommunityScope from "../../components/community/ImaaCommunityScope";
+import { IMAA } from "../../components/community/imaaCommunityTheme";
 
 
 
 /* --------------------- constants & helpers --------------------- */
-const BORDER = "#e2e8f0";
+const BORDER = IMAA.border;
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
@@ -508,8 +510,8 @@ const MAP_THEMES = {
       "#ffe0b2",
     ],
     landStroke: "#8fa8c3",          // soft bluish border
-    memberDot: "#e53935",           // strong red
-    friendDot: "#1e88e5",           // Google blue
+    memberDot: "#E8532F",           // IMAA coral
+    friendDot: "#0A9396",           // IMAA teal
     ocean: "#b3d9ff",               // bright blue water
   },
 
@@ -548,7 +550,7 @@ const countryColor = (name) => {
 
 /* ── accent colour derived from member name (consistent palette) ── */
 function memberAccentColor(name) {
-  const colors = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#3B5998"];
+  const colors = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#2C3E5A"];
   let h = 0;
   for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
   return colors[h % colors.length];
@@ -646,23 +648,23 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
   return (
     <Box
       sx={{
-        borderRadius: "14px",
+        borderRadius: "12px",
         border: `1px solid ${BORDER}`,
         background: "#fff",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         transition: "box-shadow .18s, border-color .18s",
-        boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+        boxShadow: IMAA.shadowSm,
         width: "100%",
         "&:hover": {
-          boxShadow: "0 8px 28px rgba(0,0,0,.09)",
-          borderColor: accent + "55",
+          boxShadow: IMAA.shadowMd,
+          borderColor: IMAA.borderStrong,
         },
       }}
     >
       {/* Top accent stripe */}
-      <Box sx={{ height: 4, bgcolor: accent, flexShrink: 0 }} />
+      <Box sx={{ height: 3, bgcolor: accent, flexShrink: 0 }} />
 
       {/* Card body — click opens profile */}
       <Box
@@ -703,25 +705,25 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
             {!isSelf && (
               <Box sx={{
-                fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
+                fontSize: 10, fontWeight: 800, px: "8px", py: "3px", borderRadius: "999px",
                 bgcolor: degreeColors[degree] + "15", color: degreeColors[degree],
-                letterSpacing: 0.3, lineHeight: 1,
+                letterSpacing: 0.4, lineHeight: 1.2,
               }}>
                 {degreeLabels[degree]}
               </Box>
             )}
             {status === "friends" ? (
               <Box sx={{
-                fontSize: 10, fontWeight: 700, px: "10px", py: "3px", borderRadius: "20px",
-                bgcolor: "#0A939614", color: "#0A9396",
+                fontSize: 10.5, fontWeight: 700, px: "10px", py: "3px", borderRadius: "999px",
+                bgcolor: IMAA.tealLight, color: IMAA.tealHover,
               }}>
                 ✓ Connected
               </Box>
             ) : industry ? (
               <Box sx={{
-                fontSize: 10, fontWeight: 600, px: "10px", py: "3px", borderRadius: "20px",
-                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
-                maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                fontSize: 10.5, fontWeight: 600, px: "10px", py: "3px", borderRadius: "999px",
+                bgcolor: "#EEF2F6", color: IMAA.body,
+                maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>
                 {industry}
               </Box>
@@ -731,11 +733,11 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
         {/* Name + title + company */}
         <Box>
-          <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+          <Typography sx={{ fontSize: 15, fontWeight: 700, color: IMAA.navy, lineHeight: 1.25, mb: "3px" }}>
             {name}
           </Typography>
           {(rawTitle || rawCompany) && (
-            <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+            <Typography sx={{ fontSize: 12.5, color: IMAA.muted, lineHeight: 1.4 }}>
               {rawTitle}
               {rawTitle && rawCompany
                 ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {rawCompany}</Box>
@@ -748,7 +750,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
         {/* Location + online indicator */}
         {country && (
-          <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+          <Typography sx={{ fontSize: 12, color: IMAA.muted, display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
             {flag && <span>{flag}</span>}
             {country}
             {isOnline && (
@@ -765,8 +767,8 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
             {skillsArr.slice(0, 3).map((skill, i) => (
               <Box key={i} sx={{
-                fontSize: 10, fontWeight: 600, px: "9px", py: "3px", borderRadius: "14px",
-                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
+                fontSize: 11, fontWeight: 600, px: "9px", py: "3px", borderRadius: "999px",
+                bgcolor: IMAA.bg, color: IMAA.body, border: `1px solid ${BORDER}`,
               }}>
                 {skill}
               </Box>
@@ -776,7 +778,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
         {/* Email line (visibility-aware) */}
         {showEmailLine && (
-          <Typography sx={{ fontSize: 10.5, color: "#aaa" }} noWrap>
+          <Typography sx={{ fontSize: 11.5, color: IMAA.hint }} noWrap>
             {emailDisplay}
           </Typography>
         )}
@@ -785,7 +787,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
       {/* Action footer */}
       {!isSelf && (
         <Box
-          sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+          sx={{ borderTop: `1px solid ${BORDER}`, bgcolor: "#FAFBFC", px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
           onClick={(e) => e.stopPropagation()}
         >
           {status === "friends" ? (
@@ -793,11 +795,11 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
               <Button
                 size="small"
                 variant="outlined"
+                className="ecp-btn-soft-teal"
                 onClick={() => onOpenProfile?.(u)}
                 sx={{
-                  textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px",
-                  px: 1.5, py: "5px", borderColor: "#0A939630", color: "#0A9396",
-                  bgcolor: "#0A939608", "&:hover": { bgcolor: "#0A939615", borderColor: "#0A939660" },
+                  textTransform: "none", fontSize: 12.5, fontWeight: 700, borderRadius: "8px",
+                  px: 1.5, py: "5px",
                   flex: 1,
                 }}
               >
@@ -809,7 +811,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                 color="error"
                 onClick={() => onRemoveFriend?.(u)}
                 sx={{
-                  textTransform: "none", fontSize: 11, fontWeight: 600, borderRadius: "8px",
+                  textTransform: "none", fontSize: 12.5, fontWeight: 600, borderRadius: "8px",
                   px: 1.5, py: "5px",
                 }}
               >
@@ -821,7 +823,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
               size="small"
               variant="outlined"
               disabled
-              sx={{ textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px", px: 1.5, py: "5px", flex: 1 }}
+              sx={{ textTransform: "none", fontSize: 12.5, fontWeight: 700, borderRadius: "8px", px: 1.5, py: "5px", flex: 1 }}
             >
               ✓ Request Sent
             </Button>
@@ -834,10 +836,9 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                   disabled={blockByVerified}
                   onClick={() => onAddFriend?.(u)}
                   sx={{
-                    textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px",
-                    px: 1.5, py: "5px", bgcolor: accent, boxShadow: "none",
-                    "&:hover": { bgcolor: accent, filter: "brightness(0.9)", boxShadow: "none" },
-                    "&:disabled": { bgcolor: "#ccc", color: "#fff" },
+                    textTransform: "none", fontSize: 12.5, fontWeight: 700, borderRadius: "8px",
+                    px: 1.5, py: "5px", bgcolor: IMAA.coral, boxShadow: "none",
+                    "&:hover": { bgcolor: IMAA.coralHover, boxShadow: "none" },
                     flex: 1,
                   }}
                 >
@@ -851,9 +852,8 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
             variant="outlined"
             onClick={() => onOpenProfile?.(u)}
             sx={{
-              textTransform: "none", fontSize: 11, fontWeight: 600, borderRadius: "8px",
-              px: 1.5, py: "5px", borderColor: "#1B2A4A12", color: "#1B2A4A88",
-              "&:hover": { borderColor: accent + "40", color: accent },
+              textTransform: "none", fontSize: 12.5, fontWeight: 600, borderRadius: "8px",
+              px: 1.5, py: "5px",
             }}
           >
             Profile
@@ -1169,7 +1169,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, loading = false, minH
                       <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
                         {m.userName}
                         {isVerified && (
-                          <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />
+                          <VerifiedIcon sx={{ fontSize: 14, color: IMAA.teal }} />
                         )}
                       </div>
                       <div style={{ opacity: 0.85 }}>
@@ -1900,12 +1900,12 @@ export default function MembersPage() {
   /* -------------------------------- UI -------------------------------- */
   /* -------------------------------- UI -------------------------------- */
   return (
-    <>
+    <ImaaCommunityScope page="members">
       <Box
         sx={{
           display: "flex",
           flexDirection: { xs: "column", md: "row" },
-          gap: 2,
+          gap: { xs: 2, md: 2.5 },
           alignItems: "stretch",
         }}
       >
@@ -1931,21 +1931,21 @@ export default function MembersPage() {
             <Box sx={{ mb: 2 }}>
               {/* Page title */}
               <Box sx={{ mb: 1.5 }}>
-                <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#0A9396", textTransform: "uppercase", letterSpacing: "0.12em", mb: "4px" }}>
+                <Typography className="ecp-page-eyebrow">
                   MEMBER DIRECTORY
                 </Typography>
 	                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
 	                  <Box>
-	                    <Typography variant="h5" sx={{ fontWeight: 800, color: "#1B2A4A", lineHeight: 1.2, mb: "4px" }}>
+	                    <Typography variant="h5" className="ecp-page-title">
 	                      Explore Members
 	                    </Typography>
-	                    <Typography sx={{ fontSize: 12.5, color: "#aaa" }}>
+	                    <Typography className="ecp-page-subtitle">
 	                      Connect with M&A professionals across the globe.
 	                    </Typography>
 	                  </Box>
                   {isCompact && (
                     <Tooltip title="View map">
-                      <IconButton size="small" onClick={() => setMapOverlayOpen(true)} sx={{ flexShrink: 0, mt: "4px" }}>
+                      <IconButton size="small" className="ecp-icon-btn" onClick={() => setMapOverlayOpen(true)} sx={{ flexShrink: 0, mt: "4px" }}>
                         <MapRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -1955,10 +1955,10 @@ export default function MembersPage() {
 	                  sx={{
 	                    mt: 1.5,
 	                    p: 1.5,
-	                    borderRadius: 2,
-	                    border: "1px solid #bfe8e8",
-	                    borderLeft: "4px solid #0A9396",
-	                    bgcolor: "#f2fbfb",
+	                    borderRadius: 3,
+	                    border: "1px solid rgba(10,147,150,0.22)",
+	                    borderLeft: `3px solid ${IMAA.teal}`,
+	                    bgcolor: IMAA.tealLight,
 	                  }}
 	                >
 	                  <Stack direction="row" spacing={1.25} alignItems="flex-start">
@@ -1991,11 +1991,11 @@ export default function MembersPage() {
 	                            color: "#fff",
 	                          }}
 	                        />
-	                        <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#1B2A4A", lineHeight: 1.2 }}>
+	                        <Typography sx={{ fontSize: 15, fontWeight: 700, color: IMAA.navy, lineHeight: 1.25 }}>
 	                          Member migration in progress
 	                        </Typography>
 	                      </Stack>
-	                      <Typography sx={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
+	                      <Typography sx={{ fontSize: 13, color: IMAA.body, lineHeight: 1.6 }}>
 	                        Over the coming weeks, more than 40,000+ M&A professionals will be onboarded as we complete the
 	                        transition from our previous platform. The directory will grow significantly as members verify their
 	                        accounts. Thank you for being among the first to explore IMAA Connect.
@@ -2006,7 +2006,7 @@ export default function MembersPage() {
 	              </Box>
 
 	              {/* Tab pills */}
-	              <Box sx={{ display: "flex", gap: "4px", mb: 1.5, pb: 1.5, borderBottom: "1px solid #EEECEA" }}>
+	              <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px", mb: 1.5, pb: 1.5, borderBottom: `1px solid ${BORDER}` }}>
                 {[
                   { label: "All Members", count: allMembersTotal || (tabValue === 0 ? rosterTotal : 0) },
                   { label: "My Contacts", count: displayedContactsTotal },
@@ -2016,11 +2016,12 @@ export default function MembersPage() {
                     onClick={() => { setTabValue(i); setPage(1); }}
                     sx={{
                       px: 2, py: "6px", borderRadius: "100px", cursor: "pointer",
-                      fontSize: 13, fontWeight: tabValue === i ? 700 : 500,
-                      color: tabValue === i ? "#1B2A4A" : "#888",
+                      fontSize: 13, fontWeight: tabValue === i ? 700 : 600,
+                      color: tabValue === i ? IMAA.navy : IMAA.muted,
                       bgcolor: tabValue === i ? "#fff" : "transparent",
-                      border: tabValue === i ? "1.5px solid #EEECEA" : "1.5px solid transparent",
-                      boxShadow: tabValue === i ? "0 1px 4px rgba(0,0,0,.06)" : "none",
+                      border: tabValue === i ? `1px solid ${IMAA.borderStrong}` : "1px solid transparent",
+                      boxShadow: tabValue === i ? IMAA.shadowSm : "none",
+                      "&:hover": { color: IMAA.navy, bgcolor: tabValue === i ? "#fff" : IMAA.bg },
                       display: "flex", alignItems: "center", gap: "6px",
                       transition: "all .15s",
                     }}
@@ -2029,8 +2030,8 @@ export default function MembersPage() {
                     {tab.count > 0 && (
                       <Box component="span" sx={{
                         fontSize: 11, fontWeight: 700,
-                        bgcolor: tabValue === i ? "#0A9396" : "#e5e7eb",
-                        color: tabValue === i ? "#fff" : "#666",
+                        bgcolor: tabValue === i ? IMAA.teal : "#EEF2F6",
+                        color: tabValue === i ? "#fff" : IMAA.muted,
                         px: "7px", py: "1px", borderRadius: "100px",
                       }}>
                         {tab.count}
@@ -2040,12 +2041,13 @@ export default function MembersPage() {
                 ))}
               </Box>
 
-              <Stack spacing={1.25}>
+              <Stack spacing={1.25} className="ecp-filter-panel" sx={{ p: { xs: 1.5, sm: 2 } }}>
                 {/* Search bar */}
                 <TextField
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   size="small"
+                  className="ecp-search-field"
                   placeholder="Search by name, company, region..."
                   fullWidth
                   InputProps={{
@@ -2054,7 +2056,7 @@ export default function MembersPage() {
                         <SearchIcon fontSize="small" />
                       </InputAdornment>
                     ),
-                    sx: { borderRadius: "10px", fontSize: 13 },
+                    sx: { borderRadius: "8px", fontSize: 14 },
                   }}
                 />
 
@@ -2219,7 +2221,7 @@ export default function MembersPage() {
                     "& .MuiTab-root": {
                       textTransform: "none",
                       fontWeight: 600,
-                      minHeight: 40,
+                      minHeight: 44,
                       px: 2,
                     },
                   }}
@@ -2250,9 +2252,9 @@ export default function MembersPage() {
                   {Array.from({ length: ROWS_PER_PAGE }).map((_, idx) => (
                     <Box
                       key={idx}
-                      sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, bgcolor: "#fff", overflow: "hidden" }}
+                      sx={{ borderRadius: "12px", border: `1px solid ${BORDER}`, bgcolor: "#fff", overflow: "hidden", boxShadow: IMAA.shadowSm }}
                     >
-                      <Skeleton variant="rectangular" width="100%" height={4} sx={{ bgcolor: "#e8f7f7" }} />
+                      <Skeleton variant="rectangular" width="100%" height={3} sx={{ bgcolor: IMAA.tealLight }} />
                       <Box sx={{ p: "16px 18px 12px", display: "flex", flexDirection: "column", gap: "8px" }}>
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                           <Skeleton variant="rectangular" width={50} height={50} sx={{ borderRadius: "13px" }} />
@@ -2269,7 +2271,7 @@ export default function MembersPage() {
                           <Skeleton width={70} height={22} sx={{ borderRadius: "14px" }} />
                         </Box>
                       </Box>
-                      <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", gap: "8px" }}>
+                      <Box sx={{ borderTop: `1px solid ${BORDER}`, bgcolor: "#FAFBFC", px: "18px", py: "10px", display: "flex", gap: "8px" }}>
                         <Skeleton width={80} height={30} sx={{ borderRadius: "8px" }} />
                         <Skeleton width={70} height={30} sx={{ borderRadius: "8px" }} />
                       </Box>
@@ -2294,13 +2296,16 @@ export default function MembersPage() {
             {/* ❌ Error state */}
             {!loading && error && (
               <Paper
+                elevation={0}
                 sx={{
+                  mt: 2,
                   p: 2,
-                  border: `1px solid ${BORDER}`,
+                  border: "1px solid rgba(180,35,24,0.2)",
+                  bgcolor: "#FEF3F2",
                   borderRadius: 3,
                 }}
               >
-                <Typography color="error">⚠️ {error}</Typography>
+                <Typography color="error" sx={{ fontWeight: 600, fontSize: 14 }}>⚠️ {error}</Typography>
               </Paper>
             )}
 
@@ -2309,7 +2314,7 @@ export default function MembersPage() {
               <>
                 <Stack
                   spacing={1.5}
-                  sx={{ flex: 1, width: "100%" }}
+                  sx={{ flex: 1, width: "100%", mt: 2 }}
                 >
                   {current.map((u) => (
                     <MemberCard
@@ -2329,8 +2334,9 @@ export default function MembersPage() {
                   ))}
 
                   {filtered.length === 0 && (
-                    <Box sx={{ textAlign: "center", py: 5 }}>
-                      <Typography sx={{ fontSize: 14, color: "#aaa" }}>
+                    <Box className="ecp-empty-state">
+                      <SearchIcon />
+                      <Typography sx={{ fontSize: 14, fontWeight: 600, color: IMAA.muted }}>
                         {tabValue === 1 && Object.keys(friendStatusByUser).length === 0
                           ? "No contacts yet. Start connecting with members!"
                           : "No members match your search."}
@@ -2346,7 +2352,7 @@ export default function MembersPage() {
                   spacing={1}
                   sx={{ mt: 2 }}
                 >
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
                     Showing{" "}
                     {rosterTotal === 0
                       ? "0"
@@ -2379,10 +2385,12 @@ export default function MembersPage() {
             }}
           >
             <Paper
+              elevation={0}
               sx={{
-                p: 1.5,
+                p: 2,
                 border: `1px solid ${BORDER}`,
                 borderRadius: 3,
+                boxShadow: IMAA.shadowSm,
                 position: { md: "sticky" },
                 top: 88,
                 height: { xs: 520, md: "calc(100vh - 140px)" },
@@ -2398,7 +2406,7 @@ export default function MembersPage() {
                 justifyContent="space-between"
                 spacing={1}
               >
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: IMAA.navy, fontSize: 17 }}>
                   Where {tabValue === 1 ? "My Contacts" : "members"} are from
                 </Typography>
                 <Stack direction="row" alignItems="center" spacing={2}>
@@ -2497,7 +2505,7 @@ export default function MembersPage() {
               >
                 <ArrowBackIosNewRoundedIcon fontSize="small" />
               </IconButton>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: IMAA.navy }}>
                 Members map
               </Typography>
             </Stack>
@@ -2509,7 +2517,7 @@ export default function MembersPage() {
               justifyContent="space-between"
               spacing={1}
             >
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: IMAA.navy, fontSize: 17 }}>
                 Where {tabValue === 1 ? "My Contacts" : "members"} are from
               </Typography>
               <Stack direction="row" alignItems="center" spacing={2}>
@@ -2578,10 +2586,10 @@ export default function MembersPage() {
         maxWidth="xs"
         PaperProps={{
           sx: {
-            borderRadius: 4,
+            borderRadius: 3,
             overflow: "hidden",
-            background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
-            boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
+            background: "#ffffff",
+            boxShadow: "0 12px 32px rgba(27, 42, 74, 0.18)",
           },
         }}
       >
@@ -2590,8 +2598,8 @@ export default function MembersPage() {
             px: 3,
             pt: 2.5,
             pb: 1.5,
-            background: "linear-gradient(135deg, rgba(8,145,178,0.14), rgba(14,116,144,0.05))",
-            borderBottom: "1px solid rgba(148,163,184,0.18)",
+            background: IMAA.bg,
+            borderBottom: `1px solid ${BORDER}`,
           }}
         >
           <Chip
@@ -2599,25 +2607,25 @@ export default function MembersPage() {
             label="Contact Management"
             sx={{
               mb: 1.5,
-              bgcolor: "rgba(8,145,178,0.12)",
-              color: "#0f766e",
+              bgcolor: IMAA.tealLight,
+              color: IMAA.tealHover,
               fontWeight: 700,
             }}
           />
-          <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+          <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 700, color: IMAA.navy }}>
             Remove contact?
           </DialogTitle>
         </Box>
         <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <Avatar sx={{ bgcolor: "#0f766e", width: 44, height: 44, fontWeight: 800 }}>
+            <Avatar sx={{ bgcolor: IMAA.navy, width: 44, height: 44, fontWeight: 700 }}>
               {(removeDialog.name || "?").slice(0, 1).toUpperCase()}
             </Avatar>
             <Box>
-              <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+              <Typography sx={{ fontWeight: 700, color: IMAA.navy }}>
                 {removeDialog.name || "This member"}
               </Typography>
-              <Typography variant="body2" sx={{ color: "#475569" }}>
+              <Typography variant="body2" sx={{ color: IMAA.muted }}>
                 This removes them from your contacts list. You can send a new request later.
               </Typography>
             </Box>
@@ -2628,7 +2636,7 @@ export default function MembersPage() {
             onClick={closeRemoveFriendDialog}
             disabled={removeDialog.submitting}
             variant="outlined"
-            sx={{ borderRadius: 999, px: 2.25, textTransform: "none", fontWeight: 700 }}
+            sx={{ borderRadius: 2, px: 2.25, textTransform: "none", fontWeight: 700 }}
           >
             Keep contact
           </Button>
@@ -2637,7 +2645,7 @@ export default function MembersPage() {
             disabled={removeDialog.submitting}
             variant="contained"
             color="error"
-            sx={{ borderRadius: 999, px: 2.5, textTransform: "none", fontWeight: 700, boxShadow: "none" }}
+            sx={{ borderRadius: 2, px: 2.5, textTransform: "none", fontWeight: 700, boxShadow: "none" }}
           >
             {removeDialog.submitting ? "Removing..." : "Remove"}
           </Button>
@@ -2658,6 +2666,6 @@ export default function MembersPage() {
           {toast.msg}
         </Alert>
       </Snackbar>
-    </>
+    </ImaaCommunityScope>
   );
 }
