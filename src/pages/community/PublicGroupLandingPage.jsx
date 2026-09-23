@@ -19,6 +19,13 @@ import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import { API_BASE, getToken } from "../../utils/api";
 
 const API_ORIGIN = API_BASE.replace(/\/api\/?$/, "");
+const NAVY = "#1B2A4A";
+const CORAL = "#E8532F";
+const TEAL = "#0A9396";
+const BG = "#F6F8FB";
+const BORDER = "#E3E8EF";
+const MUTED = "#64748B";
+const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
 
 const toAbsoluteUrl = (url) => {
   if (!url) return "";
@@ -72,8 +79,8 @@ export default function PublicGroupLandingPage() {
 
   if (loading) {
     return (
-      <Box sx={{ minHeight: "65vh", display: "grid", placeItems: "center" }}>
-        <CircularProgress />
+      <Box sx={{ minHeight: "65vh", display: "grid", placeItems: "center", bgcolor: BG }}>
+        <CircularProgress sx={{ color: CORAL }} />
       </Box>
     );
   }
@@ -81,11 +88,11 @@ export default function PublicGroupLandingPage() {
   if (!group) {
     return (
       <Container maxWidth="sm" sx={{ py: 10 }}>
-        <Paper variant="outlined" sx={{ p: 4, borderRadius: 3 }}>
+        <Paper variant="outlined" sx={{ p: 4, borderRadius: "10px", borderColor: BORDER, boxShadow: CARD_SHADOW }}>
           <Alert severity="info" sx={{ mb: 3 }}>
             {error || "This group is not publicly available."}
           </Alert>
-          <Button variant="contained" onClick={() => navigate("/")} sx={{ textTransform: "none" }}>
+          <Button variant="contained" onClick={() => navigate("/")} sx={{ textTransform: "none", bgcolor: CORAL, "&:hover": { bgcolor: "#cf4525" } }}>
             Back to home
           </Button>
         </Paper>
@@ -103,16 +110,16 @@ export default function PublicGroupLandingPage() {
   const encodedNext = encodeURIComponent(groupPath);
 
   return (
-    <Box sx={{ bgcolor: "#f8fafc", minHeight: "100vh", pb: 8 }}>
+    <Box sx={{ bgcolor: BG, minHeight: "100vh", pb: 8 }}>
       <Box
         sx={{
           minHeight: { xs: 240, md: 360 },
           position: "relative",
           overflow: "hidden",
-          bgcolor: "#0f2942",
+          bgcolor: NAVY,
           backgroundImage: coverUrl
-            ? `linear-gradient(180deg, rgba(15,41,66,.16), rgba(15,41,66,.74)), url(${coverUrl})`
-            : "linear-gradient(135deg, #0f2942 0%, #155e75 55%, #0f766e 100%)",
+            ? `linear-gradient(180deg, rgba(27,42,74,.16), rgba(27,42,74,.74)), url(${coverUrl})`
+            : `linear-gradient(135deg, ${NAVY} 0%, ${TEAL} 100%)`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -122,7 +129,7 @@ export default function PublicGroupLandingPage() {
             position: "absolute",
             inset: 0,
             background: coverUrl
-              ? "linear-gradient(90deg, rgba(15,41,66,.76) 0%, rgba(15,41,66,.28) 62%, transparent 100%)"
+              ? "linear-gradient(90deg, rgba(27,42,74,.76) 0%, rgba(27,42,74,.28) 62%, transparent 100%)"
               : "none",
           }}
         />
@@ -132,9 +139,9 @@ export default function PublicGroupLandingPage() {
         <Paper
           elevation={0}
           sx={{
-            borderRadius: 4,
-            border: "1px solid #dbe4ea",
-            boxShadow: "0 20px 50px rgba(15, 41, 66, 0.12)",
+            borderRadius: "10px",
+            border: `1px solid ${BORDER}`,
+            boxShadow: CARD_SHADOW,
             overflow: "hidden",
           }}
         >
@@ -152,9 +159,9 @@ export default function PublicGroupLandingPage() {
                   sx={{
                     width: { xs: 76, md: 96 },
                     height: { xs: 76, md: 96 },
-                    bgcolor: "#0f2942",
+                    bgcolor: NAVY,
                     border: "4px solid white",
-                    boxShadow: "0 8px 24px rgba(15, 41, 66, .16)",
+                    boxShadow: "0 8px 24px rgba(16,24,40,.14)",
                     fontSize: 32,
                     fontWeight: 800,
                   }}
@@ -164,19 +171,19 @@ export default function PublicGroupLandingPage() {
 
                 <Box>
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                    <Chip size="small" label="Public group" sx={{ bgcolor: "#e6fffb", color: "#0f766e", fontWeight: 700 }} />
+                    <Chip size="small" label="Public group" sx={{ bgcolor: "rgba(10,147,150,0.10)", color: TEAL, fontWeight: 800 }} />
                     <Chip
                       size="small"
                       icon={<GroupsRoundedIcon />}
                       label={memberLabel}
                       variant="outlined"
-                      sx={{ fontWeight: 600 }}
+                      sx={{ fontWeight: 700, borderColor: BORDER, color: NAVY }}
                     />
                   </Stack>
                   <Typography
                     component="h1"
                     sx={{
-                      color: "#102a43",
+                      color: NAVY,
                       fontSize: { xs: 30, md: 44 },
                       lineHeight: 1.1,
                       fontWeight: 800,
@@ -189,7 +196,7 @@ export default function PublicGroupLandingPage() {
                     <Typography
                       sx={{
                         mt: 1,
-                        color: "#334e68",
+                        color: MUTED,
                         fontWeight: 600,
                         fontSize: { xs: 16, md: 19 },
                         maxWidth: 620,
@@ -211,8 +218,8 @@ export default function PublicGroupLandingPage() {
                     borderRadius: 2,
                     px: 3,
                     py: 1.2,
-                    bgcolor: "#0db7a5",
-                    "&:hover": { bgcolor: "#0b9f91" },
+                    bgcolor: CORAL,
+                    "&:hover": { bgcolor: "#cf4525" },
                   }}
                 >
                   Open Group
@@ -228,8 +235,8 @@ export default function PublicGroupLandingPage() {
                       borderRadius: 2,
                       px: 3,
                       py: 1.2,
-                      bgcolor: "#0db7a5",
-                      "&:hover": { bgcolor: "#0b9f91" },
+                      bgcolor: CORAL,
+                      "&:hover": { bgcolor: "#cf4525" },
                     }}
                   >
                     Register
@@ -238,7 +245,7 @@ export default function PublicGroupLandingPage() {
                     variant="outlined"
                     startIcon={<LoginRoundedIcon />}
                     onClick={() => navigate(`/signin?next=${encodedNext}`)}
-                    sx={{ textTransform: "none", borderRadius: 2, px: 3, py: 1.2 }}
+                    sx={{ textTransform: "none", borderRadius: "8px", px: 3, py: 1.2, borderColor: "#D9E0E8", color: NAVY, bgcolor: "#fff", "&:hover": { borderColor: TEAL, color: TEAL, bgcolor: "#fff" } }}
                   >
                     Sign In
                   </Button>
@@ -246,13 +253,13 @@ export default function PublicGroupLandingPage() {
               )}
             </Stack>
 
-            <Box sx={{ mt: { xs: 4, md: 5 }, pt: { xs: 3, md: 4 }, borderTop: "1px solid #e2e8f0" }}>
-              <Typography variant="h5" sx={{ color: "#102a43", fontWeight: 800, mb: 1.5 }}>
+            <Box sx={{ mt: { xs: 4, md: 5 }, pt: { xs: 3, md: 4 }, borderTop: `1px solid ${BORDER}` }}>
+              <Typography variant="h5" sx={{ color: NAVY, fontWeight: 900, mb: 1.5 }}>
                 About this group
               </Typography>
               <Typography
                 sx={{
-                  color: "#486581",
+                  color: MUTED,
                   lineHeight: 1.8,
                   fontSize: { xs: 16, md: 17 },
                   maxWidth: 900,
@@ -265,8 +272,8 @@ export default function PublicGroupLandingPage() {
           </Box>
 
           {!signedIn && (
-            <Box sx={{ bgcolor: "#eef8f7", borderTop: "1px solid #d9efec", px: { xs: 3, md: 5 }, py: 3 }}>
-              <Typography sx={{ color: "#334e68", fontWeight: 600 }}>
+            <Box sx={{ bgcolor: "rgba(10,147,150,0.08)", borderTop: `1px solid ${BORDER}`, px: { xs: 3, md: 5 }, py: 3 }}>
+              <Typography sx={{ color: NAVY, fontWeight: 700 }}>
                 Join the Events & Community Platform to access group members, posts, relations and chat.
               </Typography>
             </Box>
@@ -276,3 +283,4 @@ export default function PublicGroupLandingPage() {
     </Box>
   );
 }
+

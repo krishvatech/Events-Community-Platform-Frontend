@@ -18,6 +18,14 @@ const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 
+// ---- IMAA Institute design tokens (presentation only) ----
+const NAVY = "#1B2A4A";
+const TEAL = "#0A9396";
+const TEAL_DARK = "#087F82";
+const BG = "#F6F8FB";
+const BORDER = "#E3E8EF";
+const MUTED = "#64748B";
+
 export default function InviteEmailsDialog({ open, onClose, mode = "event", targetIdOrSlug }) {
     const [emailsText, setEmailsText] = useState("");
     const [errorText, setErrorText] = useState("");
@@ -99,11 +107,21 @@ export default function InviteEmailsDialog({ open, onClose, mode = "event", targ
     };
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-            <DialogTitle>Invite by Email</DialogTitle>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            fullWidth
+            maxWidth="sm"
+            PaperProps={{ sx: { borderRadius: 3, border: `1px solid ${BORDER}` } }}
+        >
+            <DialogTitle
+                sx={{ fontWeight: 800, fontSize: 19, color: NAVY, borderBottom: `1px solid ${BORDER}`, py: 2 }}
+            >
+                Invite by Email
+            </DialogTitle>
             <DialogContent>
                 <Box sx={{ mb: 2, mt: 1 }}>
-                    <Typography variant="body2" color="text.secondary" paragraph>
+                    <Typography variant="body2" sx={{ color: MUTED, mb: 2 }}>
                         Enter email addresses separated by commas, spaces, or newlines.
                         We'll send them a secure link to join directly.
                     </Typography>
@@ -121,19 +139,47 @@ export default function InviteEmailsDialog({ open, onClose, mode = "event", targ
                         disabled={loading}
                         error={!!errorText}
                         helperText={errorText}
+                        sx={{
+                            "& .MuiOutlinedInput-root": {
+                                borderRadius: 2,
+                                bgcolor: "#fff",
+                                "& fieldset": { borderColor: BORDER },
+                                "&:hover fieldset": { borderColor: "#CBD5E1" },
+                                "&.Mui-focused fieldset": { borderColor: TEAL, borderWidth: 2 },
+                            },
+                        }}
                     />
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: MUTED }}>
                         Limit: 20 emails per request, 100 per day.
                     </Typography>
                 </Box>
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3 }}>
-                <Button onClick={onClose} disabled={loading}>Cancel</Button>
+            <DialogActions
+                sx={{ px: 3, py: 2.25, borderTop: `1px solid ${BORDER}`, bgcolor: BG, gap: 1 }}
+            >
+                <Button
+                    onClick={onClose}
+                    disabled={loading}
+                    sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2, color: MUTED,
+                          "&:hover": { bgcolor: "rgba(27,42,74,0.05)", color: NAVY } }}
+                >
+                    Cancel
+                </Button>
                 <Button
                     onClick={handleSendInvites}
                     variant="contained"
                     disabled={loading || !emailsText.trim()}
-                    sx={{ minWidth: 120 }}
+                    sx={{
+                        minWidth: 120,
+                        textTransform: "none",
+                        fontWeight: 600,
+                        borderRadius: 2,
+                        bgcolor: TEAL,
+                        color: "#fff",
+                        boxShadow: "none",
+                        "&:hover": { bgcolor: TEAL_DARK, boxShadow: "none" },
+                        "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#fff" },
+                    }}
                 >
                     {loading ? <CircularProgress size={24} color="inherit" /> : "Send Invites"}
                 </Button>

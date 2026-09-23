@@ -39,11 +39,20 @@ import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import LockRounded from "@mui/icons-material/LockRounded";
+import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
+import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 import { isAdminUser } from "../../utils/adminRole";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
-const BORDER = "#e2e8f0";
+const NAVY = "#1B2A4A";
+const CORAL = "#E8532F";
+const TEAL = "#0A9396";
+const BG = "#F6F8FB";
+const BORDER = "#E3E8EF";
+const MUTED = "#64748B";
+const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
 const JOIN_BTN_SX = {
   textTransform: "none",
   whiteSpace: "nowrap",
@@ -206,7 +215,9 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
           minHeight: 56,
           opacity: disabled ? 0.6 : 1,
           pointerEvents: disabled ? "none" : "auto",
-          '&:hover': { borderColor: disabled ? "inherit" : "#10b8a6" }
+          borderColor: BORDER,
+          borderRadius: "10px",
+          '&:hover': { borderColor: disabled ? BORDER : TEAL }
         }}
       >
         <Box>
@@ -239,9 +250,9 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
                 }}
                 className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
                 sx={{
-                  backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
+                  backgroundColor: value === opt.value ? "rgba(10,147,150,0.10)" : "transparent",
                   fontWeight: value === opt.value ? 600 : 400,
-                  color: value === opt.value ? "#10b8a6" : "inherit"
+                  color: value === opt.value ? TEAL : NAVY
                 }}
               >
                 {opt.label}
@@ -603,7 +614,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
           disabled={submitting}
           variant="contained"
           className="rounded-xl"
-          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          sx={{ textTransform: "none", backgroundColor: CORAL, "&:hover": { backgroundColor: "#cf4525" } }}
         >
           Save
         </Button>
@@ -613,7 +624,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 }
 
 /* ---------- Single group card — v3 design ---------- */
-const GROUP_ACCENT_COLORS = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#3B5998"];
+const GROUP_ACCENT_COLORS = [TEAL, CORAL, NAVY];
 function hashColor(name) {
   let h = 0;
   for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
@@ -658,14 +669,15 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       sx={{
-        borderRadius: "14px",
-        border: `1px solid ${hov ? accent + "55" : BORDER}`,
+        borderRadius: "10px",
+        border: `1px solid ${hov ? "rgba(232,83,47,0.45)" : BORDER}`,
         background: "#fff",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        transition: "box-shadow .2s, border-color .2s",
-        boxShadow: hov ? "0 6px 24px rgba(0,0,0,.09)" : "0 1px 4px rgba(0,0,0,.05)",
+        transition: "box-shadow .2s, border-color .2s, transform .2s",
+        boxShadow: hov ? "0 10px 24px rgba(16,24,40,0.10)" : CARD_SHADOW,
+        transform: hov ? "translateY(-2px)" : "translateY(0)",
         cursor: "pointer",
         position: "relative",
         height: "100%",
@@ -688,7 +700,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
-          <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(27,42,74,.08), rgba(10,147,150,.14))" }} />
         )}
 
         {/* Logo overlay */}
@@ -697,7 +709,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
             position: "absolute", bottom: -20, left: 14,
             width: 44, height: 44, borderRadius: "50%",
             overflow: "hidden", border: "3px solid white", bgcolor: "white",
-            zIndex: 2, boxShadow: "0 2px 8px rgba(0,0,0,.15)"
+            zIndex: 2, boxShadow: "0 2px 8px rgba(16,24,40,0.14)"
           }}>
             <img src={bust(g.logo, g._cache || g.updated_at)} alt="logo"
               style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -710,33 +722,33 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
         {/* Category breadcrumb + status badges row */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px", mb: "2px" }}>
           {category ? (
-            <Typography sx={{ fontSize: 10, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <Typography sx={{ fontSize: 10, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {category}{subcategory ? ` · ${subcategory}` : ""}
             </Typography>
           ) : (
-            <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <Typography sx={{ fontSize: 10, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {isPrivate ? "PRIVATE" : "GROUP"}
             </Typography>
           )}
           <Box sx={{ display: "flex", gap: "4px", alignItems: "center" }}>
             {joined && (
-              <Box sx={{ fontSize: 10, fontWeight: 700, color: "#0A9396", bgcolor: "#E8F7F7", px: "7px", py: "2px", borderRadius: "100px" }}>
+              <Box sx={{ fontSize: 10, fontWeight: 800, color: TEAL, bgcolor: "rgba(10,147,150,0.10)", px: "7px", py: "2px", borderRadius: "100px" }}>
                 ✓ Joined
               </Box>
             )}
             {pending && (
-              <Box sx={{ fontSize: 10, fontWeight: 700, color: "#b45309", bgcolor: "#fffbeb", px: "7px", py: "2px", borderRadius: "100px" }}>
+              <Box sx={{ fontSize: 10, fontWeight: 800, color: CORAL, bgcolor: "rgba(232,83,47,0.10)", px: "7px", py: "2px", borderRadius: "100px" }}>
                 Pending
               </Box>
             )}
             {isApproval && !joined && !pending && (
               <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
-                <LockRounded sx={{ fontSize: 11, color: "#f97316" }} />
-                <Typography sx={{ fontSize: 10, color: "#f97316" }}>Approval required</Typography>
+                <LockRounded sx={{ fontSize: 11, color: CORAL }} />
+                <Typography sx={{ fontSize: 10, color: CORAL, fontWeight: 700 }}>Approval required</Typography>
               </Box>
             )}
             {role && (
-              <Box sx={{ fontSize: 10, fontWeight: 700, color: "#4338ca", bgcolor: "#eef2ff", px: "7px", py: "2px", borderRadius: "100px" }}>
+              <Box sx={{ fontSize: 10, fontWeight: 800, color: NAVY, bgcolor: "rgba(27,42,74,0.08)", px: "7px", py: "2px", borderRadius: "100px" }}>
                 {role}
               </Box>
             )}
@@ -745,14 +757,14 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
 
         {/* Title */}
         <Box onClick={() => onOpen?.(g)}>
-          <Typography sx={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.08em", mb: "2px" }}>
+          <Typography sx={{ fontSize: 11, fontWeight: 800, color: TEAL, textTransform: "uppercase", letterSpacing: "0.08em", mb: "2px" }}>
             GROUP
           </Typography>
-          <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#1B2A4A", lineHeight: 1.25, mb: "4px" }}>
+          <Typography sx={{ fontSize: 16, fontWeight: 800, color: NAVY, lineHeight: 1.25, mb: "4px" }}>
             {g.name}
           </Typography>
           {g.owner_name || g.created_by_name ? (
-            <Typography sx={{ fontSize: 11, color: "#888" }}>
+            <Typography sx={{ fontSize: 11, color: MUTED }}>
               by {g.owner_name || g.created_by_name}
             </Typography>
           ) : null}
@@ -760,7 +772,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
 
         {/* Short description / headline */}
         {headline && (
-          <Typography sx={{ fontSize: 12.5, color: "#334155", fontWeight: 600, lineHeight: 1.5,
+          <Typography sx={{ fontSize: 12.5, color: NAVY, fontWeight: 700, lineHeight: 1.5,
             display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {headline}
           </Typography>
@@ -768,35 +780,35 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
 
         {/* Description */}
         {desc && (
-          <Typography sx={{ fontSize: 12, color: "#666", lineHeight: 1.55,
+          <Typography sx={{ fontSize: 12, color: MUTED, lineHeight: 1.55,
             display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {desc}
           </Typography>
         )}
 
         {/* Stats */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: "12px", mt: "4px" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: "12px", mt: "6px", flexWrap: "wrap", color: MUTED }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <Typography sx={{ fontSize: 11, color: "#888" }}>{members}</Typography>
+            <PeopleAltRoundedIcon sx={{ fontSize: 15, color: TEAL }} />
+            <Typography sx={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>{members} members</Typography>
           </Box>
           {posts > 0 && (
             <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <Typography sx={{ fontSize: 11, color: "#888" }}>{posts}</Typography>
+              <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 14, color: TEAL }} />
+              <Typography sx={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>{posts} posts</Typography>
             </Box>
           )}
           {activity != null && (
             <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-              <Typography sx={{ fontSize: 11, color: "#888" }}>{activity}/wk</Typography>
+              <TrendingUpRoundedIcon sx={{ fontSize: 14, color: TEAL }} />
+              <Typography sx={{ fontSize: 11, color: MUTED, fontWeight: 700 }}>{activity}/wk</Typography>
             </Box>
           )}
         </Box>
 
         {/* Tags */}
         {g.parent_group && (
-          <Typography sx={{ fontSize: 11, color: "#888" }}>
+          <Typography sx={{ fontSize: 11, color: MUTED }}>
             Subgroup of <b>{g.parent_group.name}</b>
           </Typography>
         )}
@@ -806,7 +818,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
       <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
         {canEdit && (
           <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit?.(g); }}
-            sx={{ color: "#aaa", "&:hover": { color: accent } }} title="Edit Group">
+            sx={{ color: MUTED, border: `1px solid ${BORDER}`, borderRadius: "8px", "&:hover": { color: TEAL, borderColor: TEAL, bgcolor: "rgba(10,147,150,0.08)" } }} title="Edit Group">
             <EditNoteRoundedIcon fontSize="small" />
           </IconButton>
         )}
@@ -814,12 +826,17 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
           <Box
             onClick={() => !pending && !joined && onJoin?.(g)}
             sx={{
-              fontSize: 12, fontWeight: 700,
-              color: joined ? "#888" : accent,
+              fontSize: 12, fontWeight: 800,
+              color: joined ? MUTED : "#fff",
+              bgcolor: joined ? "transparent" : CORAL,
+              border: joined ? `1px solid ${BORDER}` : `1px solid ${CORAL}`,
+              borderRadius: "8px",
+              px: 1.5,
+              py: 0.75,
               cursor: (pending || joined) ? "default" : "pointer",
               display: "flex", alignItems: "center", gap: "4px",
               opacity: pending ? 0.6 : 1,
-              "&:hover": { textDecoration: (pending || joined) ? "none" : "underline" }
+              "&:hover": { bgcolor: (pending || joined) ? "transparent" : "#cf4525" }
             }}
           >
             {ctaText} {!joined && !pending && "→"}
@@ -828,10 +845,15 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
         {(hideJoin || joined) && (
           <Box
             onClick={() => onOpen?.(g)}
-            sx={{ fontSize: 12, fontWeight: 700, color: accent, cursor: "pointer",
+            sx={{ fontSize: 12, fontWeight: 800, color: NAVY, cursor: "pointer",
+              bgcolor: "#fff",
+              border: "1px solid #D9E0E8",
+              borderRadius: "8px",
+              px: 1.5,
+              py: 0.75,
               display: "flex", alignItems: "center", gap: "4px",
               ml: "auto",
-              "&:hover": { textDecoration: "underline" } }}
+              "&:hover": { borderColor: TEAL, color: TEAL } }}
           >
             {joined ? "Open Group →" : "View Details →"}
           </Box>
@@ -843,7 +865,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
 
 function GroupGridCardSkeleton() {
   return (
-    <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ borderRadius: "10px", border: `1px solid ${BORDER}`, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: CARD_SHADOW }}>
       <Skeleton variant="rectangular" width="100%" height={4} sx={{ bgcolor: "#e8f7f7" }} />
       <Box sx={{ p: "16px 18px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <Box sx={{ display: "flex", justifyContent: "space-between" }}>
@@ -873,13 +895,13 @@ function TopicHeader({ title, groupCount, myGroupCount }) {
   const canCreate = isAdminUser();
   return (
     <Box sx={{ textAlign: "center", mb: 3, pt: 1 }}>
-      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0A9396", textTransform: "uppercase", letterSpacing: "0.12em", mb: "6px" }}>
+      <Typography sx={{ fontSize: 11, fontWeight: 800, color: TEAL, textTransform: "uppercase", letterSpacing: "0.12em", mb: "6px" }}>
         COMMUNITY
       </Typography>
-      <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: "8px", lineHeight: 1.2 }}>
+      <Typography variant="h4" sx={{ fontWeight: 900, color: NAVY, mb: "8px", lineHeight: 1.2 }}>
         Explore Groups
       </Typography>
-      <Typography sx={{ fontSize: 14, color: "#888", mb: canCreate ? 2 : 0 }}>
+      <Typography sx={{ fontSize: 14, color: MUTED, mb: canCreate ? 2 : 0 }}>
         Join groups organized by region, industry, practice area, and topic.
       </Typography>
       {canCreate && (
@@ -889,7 +911,7 @@ function TopicHeader({ title, groupCount, myGroupCount }) {
             onClick={() => navigate("/admin/groups", { state: { openCreateGroup: true, redirectAfterCreate: "/community/mygroups" } })}
             sx={{
               textTransform: "none", fontWeight: 700, fontSize: 13,
-              bgcolor: "#0A9396", "&:hover": { bgcolor: "#077B7E" },
+              bgcolor: CORAL, "&:hover": { bgcolor: "#cf4525" },
               borderRadius: "10px", px: 3,
             }}
           >
@@ -935,7 +957,7 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
             mb: 2,
             borderRadius: 2,
             overflow: "hidden",
-            bgcolor: "#f8fafc",
+            bgcolor: BG,
             border: `1px solid ${BORDER}`,
             backgroundImage:
               group.cover_image || group.cover
@@ -984,7 +1006,7 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
           </Typography>
         </Stack>
         {group.short_description && (
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#334155", mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: NAVY, mb: 1 }}>
             {group.short_description}
           </Typography>
         )}
@@ -998,7 +1020,7 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
           variant="contained"
           onClick={() => onJoin?.(group)}
           disabled={pending || joined || isInviteOnly}
-          sx={{ textTransform: "none", fontWeight: 700 }}
+          sx={{ textTransform: "none", fontWeight: 700, bgcolor: CORAL, "&:hover": { bgcolor: "#cf4525" } }}
         >
           {ctaText}
         </Button>
@@ -1303,7 +1325,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   };
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 2, md: 3 }, bgcolor: "#FAF9F7", minHeight: "100vh" }}>
+    <Box sx={{ width: "100%", py: { xs: 2, md: 3 }, bgcolor: BG, minHeight: "100vh" }}>
       <Box
         sx={{
           display: "flex",
@@ -1330,7 +1352,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
               gap: 2,
               mb: 2,
               pb: 2,
-              borderBottom: "1px solid #EEECEA",
+              borderBottom: `1px solid ${BORDER}`,
             }}
           >
             <Box sx={{ display: "flex", gap: "4px" }}>
@@ -1344,10 +1366,10 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   sx={{
                     px: 2, py: "6px", borderRadius: "100px", cursor: "pointer",
                     fontSize: 13, fontWeight: tabIndex === i ? 700 : 500,
-                    color: tabIndex === i ? "#1B2A4A" : "#888",
+                    color: tabIndex === i ? NAVY : MUTED,
                     bgcolor: tabIndex === i ? "#fff" : "transparent",
-                    border: tabIndex === i ? "1.5px solid #EEECEA" : "1.5px solid transparent",
-                    boxShadow: tabIndex === i ? "0 1px 4px rgba(0,0,0,.06)" : "none",
+                    border: tabIndex === i ? `1.5px solid ${BORDER}` : "1.5px solid transparent",
+                    boxShadow: tabIndex === i ? CARD_SHADOW : "none",
                     display: "flex", alignItems: "center", gap: "6px",
                     transition: "all .15s",
                   }}
@@ -1356,8 +1378,8 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   {tab.count > 0 && (
                     <Box component="span" sx={{
                       fontSize: 11, fontWeight: 700,
-                      bgcolor: tabIndex === i ? "#0A9396" : "#e5e7eb",
-                      color: tabIndex === i ? "#fff" : "#666",
+                      bgcolor: tabIndex === i ? TEAL : "#EDF2F7",
+                      color: tabIndex === i ? "#fff" : MUTED,
                       px: "7px", py: "1px", borderRadius: "100px",
                     }}>
                       {tab.count}
@@ -1374,18 +1396,18 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon fontSize="small" sx={{ color: "#aaa" }} />
+                    <SearchIcon fontSize="small" sx={{ color: MUTED }} />
                   </InputAdornment>
                 ),
                 sx: { borderRadius: "10px", fontSize: 13, bgcolor: "#fff" }
               }}
-              sx={{ width: 240 }}
+              sx={{ width: { xs: "100%", sm: 260 }, "& .MuiOutlinedInput-notchedOutline": { borderColor: BORDER }, "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: TEAL } }}
             />
           </Box>
 
           {/* Showing count */}
           {!loading && (
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
               {tabIndex === 0 ? "ALL GROUPS" : "MY GROUPS"} {filtered.length}
             </Typography>
           )}
@@ -1464,8 +1486,8 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
               })}
             </Box>
           ) : (
-            <Box sx={{ textAlign: "center", py: 8, color: "#aaa" }}>
-              <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+            <Box sx={{ textAlign: "center", py: 8, px: 2, color: MUTED, bgcolor: "#fff", border: `1px dashed ${BORDER}`, borderRadius: "10px", boxShadow: CARD_SHADOW }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: NAVY }}>
                 {tabIndex === 0 ? "No groups found." : "You haven't joined any groups yet."}
               </Typography>
             </Box>
@@ -1478,10 +1500,10 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                 count={totalPages}
                 page={currentPage}
                 onChange={handlePageChange}
-                color="primary"
                 size="large"
                 showFirstButton
                 showLastButton
+                sx={{ "& .Mui-selected": { bgcolor: `${CORAL} !important`, color: "#fff" } }}
               />
             </Box>
           )}

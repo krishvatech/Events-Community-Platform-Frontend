@@ -28,8 +28,12 @@ import { logoutBrowserSession } from "../utils/logoutSession";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { getAccessToken as readAccessToken } from "../utils/tokenStore";
 
-const BORDER = "#e2e8f0";
-const SLATE_700 = "#334155";
+const NAVY = "#1B2A4A";
+const CORAL = "#E8532F";
+const TEAL = "#0A9396";
+const BORDER = "#E3E8EF";
+const MUTED = "#64748B";
+const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
 
 function initials(name = "") {
   const parts = name.trim().split(/\s+/);
@@ -391,20 +395,21 @@ export default function CommunityProfileCard({
           sx={{
             p: 2.5,
             border: `1px solid ${BORDER}`,
-            borderRadius: 3,
+            borderRadius: "10px",
             textAlign: "center",
+            boxShadow: CARD_SHADOW,
           }}
         >
           <Stack spacing={1.25} alignItems="center">
             <Avatar
               src={userDisplay.avatarUrl}
               alt={userDisplay.name}
-              sx={{ width: 72, height: 72, bgcolor: "#1abc9c", fontWeight: 700 }}
+              sx={{ width: 72, height: 72, bgcolor: TEAL, fontWeight: 800, border: "3px solid #fff", boxShadow: "0 4px 14px rgba(16,24,40,0.14)" }}
             >
               {userDisplay.avatarUrl ? null : initials(userDisplay.name)}
             </Avatar>
 
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: SLATE_700 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: NAVY }}>
               {userDisplay.name}
             </Typography>
 
@@ -414,9 +419,9 @@ export default function CommunityProfileCard({
                 label={userDisplay.status}
                 variant="filled"
                 sx={{
-                  bgcolor: "#E6F9EE",
-                  color: "#198754",
-                  fontWeight: 600,
+                  bgcolor: "rgba(10,147,150,0.10)",
+                  color: TEAL,
+                  fontWeight: 800,
                   height: 22,
                   "& .MuiChip-label": { px: 1.25, pt: "1px" },
                 }}
@@ -425,12 +430,12 @@ export default function CommunityProfileCard({
 
             <Stack direction="row" spacing={1}>
               <Tooltip title="Logout">
-                <IconButton size="small" onClick={signOut}>
+                <IconButton size="small" onClick={signOut} sx={{ color: MUTED, border: `1px solid ${BORDER}`, borderRadius: "8px", "&:hover": { color: CORAL, borderColor: CORAL, bgcolor: "rgba(232,83,47,0.08)" } }}>
                   <LogoutRoundedIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="More">
-                <IconButton size="small" onClick={onMore}>
+                <IconButton size="small" onClick={onMore} sx={{ color: MUTED, border: `1px solid ${BORDER}`, borderRadius: "8px", "&:hover": { color: TEAL, borderColor: TEAL, bgcolor: "rgba(10,147,150,0.08)" } }}>
                   <MoreHorizRoundedIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
@@ -439,7 +444,7 @@ export default function CommunityProfileCard({
         </Paper>
 
         {/* Your Groups */}
-        <Paper elevation={0} sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+        <Paper elevation={0} sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: "10px", boxShadow: CARD_SHADOW }}>
           <SectionHeader title="Your Groups" onViewAll={handleOpenGroups} viewAllText="View all" />
 
           <Stack spacing={1.25} mt={1}>
@@ -462,7 +467,7 @@ export default function CommunityProfileCard({
                     height: 28,
                     borderRadius: 1.5,
                     bgcolor: c.cover_image ? undefined : (c.color || "#F1F5F9"),
-                    color: "#111827",
+                    color: NAVY,
                     fontSize: 12,
                     fontWeight: 700,
                   }}
@@ -473,7 +478,7 @@ export default function CommunityProfileCard({
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography
                     variant="body2"
-                    sx={{ fontWeight: 600, color: SLATE_700, lineHeight: 1.2 }}
+                    sx={{ fontWeight: 700, color: NAVY, lineHeight: 1.2 }}
                     noWrap
                     title={c.name}
                   >
@@ -488,7 +493,7 @@ export default function CommunityProfileCard({
                         p: 0,
                         minWidth: 0,
                         justifyContent: "flex-start",
-                        color: "#2E7D32",
+                        color: TEAL,
                         textTransform: "none",
                         fontSize: 12,
                       }}
@@ -508,7 +513,7 @@ export default function CommunityProfileCard({
         </Paper>
 
         {/* Your friends */}
-        <Paper elevation={0} sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+        <Paper elevation={0} sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: "10px", boxShadow: CARD_SHADOW }}>
           <SectionHeader title="Your Contacts" onViewAll={handleOpenFriends} viewAllText="View all" />
 
           <Stack spacing={1.25} mt={1}>
@@ -522,12 +527,12 @@ export default function CommunityProfileCard({
                 to={buildRichProfileUrl(f)}
                 sx={{ textDecoration: "none", cursor: "pointer" }}
               >
-                <Avatar src={f.avatarUrl} alt={f.name} sx={{ width: 28, height: 28 }}>
+                <Avatar src={f.avatarUrl} alt={f.name} sx={{ width: 28, height: 28, bgcolor: TEAL, fontWeight: 800 }}>
                   {f.avatarUrl ? null : (f.name?.[0] || "").toUpperCase()}
                 </Avatar>
                 <Typography
                   variant="body2"
-                  sx={{ fontWeight: 600, color: SLATE_700 }}
+                  sx={{ fontWeight: 700, color: NAVY }}
                   noWrap
                   title={f.name}
                 >
@@ -546,7 +551,7 @@ export default function CommunityProfileCard({
 
       {/* Dialog: Your Groups */}
       <Dialog open={openGroups} onClose={() => setOpenGroups(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 800 }}>Your Groups</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: NAVY }}>Your Groups</DialogTitle>
         <DialogContent dividers>
           <List disablePadding>
             {(groups || []).map((c, idx) => (
@@ -565,7 +570,7 @@ export default function CommunityProfileCard({
                         height: 36,
                         borderRadius: 1.5,
                         bgcolor: c.color || "#F1F5F9",
-                        color: "#111827",
+                        color: NAVY,
                         fontSize: 13,
                         fontWeight: 800,
                       }}
@@ -574,7 +579,7 @@ export default function CommunityProfileCard({
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
-                    primary={<Typography sx={{ fontWeight: 700 }}>{c.name}</Typography>}
+                    primary={<Typography sx={{ fontWeight: 700, color: NAVY }}>{c.name}</Typography>}
                     secondary={c.subscribed ? "Subscribed" : ""}
                   />
                   {c.subscribed && (
@@ -582,7 +587,7 @@ export default function CommunityProfileCard({
                       size="small"
                       variant="outlined"
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCommunityUnsubscribe(c); }}
-                      sx={{ textTransform: "none" }}
+                      sx={{ textTransform: "none", borderColor: "#D9E0E8", color: NAVY, "&:hover": { borderColor: TEAL, color: TEAL } }}
                     >
                       Unsubscribe
                     </Button>
@@ -599,13 +604,13 @@ export default function CommunityProfileCard({
           </List>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenGroups(false)}>Close</Button>
+          <Button onClick={() => setOpenGroups(false)} sx={{ color: NAVY, textTransform: "none", fontWeight: 700 }}>Close</Button>
         </DialogActions>
       </Dialog>
 
       {/* Dialog: Your friends */}
       <Dialog open={openFriends} onClose={() => setOpenFriends(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 800 }}>Your friends</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: NAVY }}>Your friends</DialogTitle>
         <DialogContent dividers>
           <List disablePadding>
             {(friends || []).map((f, idx) => (
@@ -622,14 +627,14 @@ export default function CommunityProfileCard({
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
-                    primary={<Typography sx={{ fontWeight: 700 }}>{f.name}</Typography>}
+                    primary={<Typography sx={{ fontWeight: 700, color: NAVY }}>{f.name}</Typography>}
                     secondary={f.job_title || f.headline || ""}
                   />
                   <Button
                     size="small"
                     variant="outlined"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMessage(f); }}
-                    sx={{ textTransform: "none" }}
+                    sx={{ textTransform: "none", borderColor: "#D9E0E8", color: NAVY, "&:hover": { borderColor: TEAL, color: TEAL } }}
                   >
                     Message
                   </Button>
@@ -645,7 +650,7 @@ export default function CommunityProfileCard({
           </List>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenFriends(false)}>Close</Button>
+          <Button onClick={() => setOpenFriends(false)} sx={{ color: NAVY, textTransform: "none", fontWeight: 700 }}>Close</Button>
         </DialogActions>
       </Dialog>
     </>
@@ -655,14 +660,14 @@ export default function CommunityProfileCard({
 function SectionHeader({ title, onViewAll, viewAllText = "View all" }) {
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between">
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+      <Typography variant="caption" sx={{ fontWeight: 800, color: NAVY, textTransform: "uppercase", letterSpacing: "0.06em" }}>
         {title}
       </Typography>
       <Button
         size="small"
         variant="text"
         onClick={onViewAll}
-        sx={{ textTransform: "none", fontSize: 12, p: 0, minWidth: 0 }}
+        sx={{ textTransform: "none", fontSize: 12, p: 0, minWidth: 0, color: CORAL, fontWeight: 800 }}
       >
         {viewAllText}
       </Button>

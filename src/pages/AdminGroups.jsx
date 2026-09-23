@@ -22,6 +22,144 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import LockRounded from "@mui/icons-material/LockRounded";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
+// ---- IMAA Institute design tokens (presentation only) ----
+const NAVY = "#1B2A4A";
+const CORAL = "#E8532F";
+const TEAL = "#0A9396";
+const TEAL_DARK = "#087F82";
+const BG = "#F6F8FB";
+const BORDER = "#E3E8EF";
+const MUTED = "#64748B";
+const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
+const CARD_SHADOW_HOVER = "0 10px 24px rgba(27,42,74,0.10)";
+
+// Shared surface / control styles so every admin group screen matches.
+const CARD_SX = {
+  border: `1px solid ${BORDER}`,
+  borderRadius: 3,
+  bgcolor: "#fff",
+  boxShadow: CARD_SHADOW,
+};
+
+const PRIMARY_BTN_SX = {
+  textTransform: "none",
+  fontWeight: 600,
+  borderRadius: 2,
+  px: 2.25,
+  bgcolor: TEAL,
+  color: "#fff",
+  boxShadow: "none",
+  "&:hover": { bgcolor: TEAL_DARK, boxShadow: "none" },
+  "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#fff" },
+};
+
+const ACCENT_BTN_SX = {
+  ...PRIMARY_BTN_SX,
+  bgcolor: CORAL,
+  "&:hover": { bgcolor: "#CF4525", boxShadow: "none" },
+};
+
+const OUTLINE_BTN_SX = {
+  textTransform: "none",
+  fontWeight: 600,
+  borderRadius: 2,
+  px: 2.25,
+  color: NAVY,
+  borderColor: BORDER,
+  bgcolor: "#fff",
+  "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.06)" },
+};
+
+const SUBTLE_BTN_SX = {
+  textTransform: "none",
+  fontWeight: 600,
+  borderRadius: 2,
+  color: MUTED,
+  "&:hover": { bgcolor: "rgba(27,42,74,0.05)", color: NAVY },
+};
+
+const FIELD_SX = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: 2,
+    bgcolor: "#fff",
+    "& fieldset": { borderColor: BORDER },
+    "&:hover fieldset": { borderColor: "#CBD5E1" },
+    "&.Mui-focused fieldset": { borderColor: TEAL, borderWidth: 2 },
+  },
+  "& .MuiInputLabel-root.Mui-focused": { color: TEAL },
+};
+
+const DIALOG_TITLE_SX = {
+  fontWeight: 800,
+  fontSize: 19,
+  color: NAVY,
+  borderBottom: `1px solid ${BORDER}`,
+  py: 2,
+};
+
+const UPLOAD_BOX_SX = {
+  position: "relative",
+  borderRadius: 2,
+  border: `1px dashed #CBD5E1`,
+  bgcolor: BG,
+  color: "#AEBACB",
+  transition: "border-color .2s ease, background-color .2s ease",
+  "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.04)" },
+};
+
+// Badge presets: visibility, join policy, membership and role chips.
+const chipSx = (fg, bg, bd) => ({
+  height: 24,
+  fontSize: 12,
+  fontWeight: 600,
+  borderRadius: 1.5,
+  color: fg,
+  bgcolor: bg,
+  border: `1px solid ${bd}`,
+  "& .MuiChip-icon": { color: `${fg} !important`, fontSize: 15, ml: 0.75 },
+  "& .MuiChip-label": { px: 1 },
+});
+
+const BADGE_PUBLIC = chipSx(TEAL_DARK, "rgba(10,147,150,0.10)", "rgba(10,147,150,0.22)");
+const BADGE_PRIVATE = chipSx(NAVY, "rgba(27,42,74,0.07)", "rgba(27,42,74,0.16)");
+const BADGE_NEUTRAL = chipSx(MUTED, "#F1F5F9", BORDER);
+const BADGE_ROLE = chipSx(CORAL, "rgba(232,83,47,0.10)", "rgba(232,83,47,0.22)");
+const BADGE_PENDING = chipSx("#B45309", "rgba(245,158,11,0.12)", "rgba(245,158,11,0.26)");
+const BADGE_MEMBER = chipSx(TEAL_DARK, "rgba(10,147,150,0.10)", "rgba(10,147,150,0.22)");
+
+const TABLE_SX = {
+  border: `1px solid ${BORDER}`,
+  borderRadius: 2,
+  "& .MuiTableHead-root .MuiTableCell-root": {
+    bgcolor: BG,
+    color: NAVY,
+    fontWeight: 700,
+    fontSize: 12.5,
+    letterSpacing: 0.2,
+    borderBottom: `1px solid ${BORDER}`,
+    whiteSpace: "nowrap",
+  },
+  "& .MuiTableCell-root": { borderBottom: `1px solid ${BORDER}`, fontSize: 13.5, color: "#334155" },
+  "& .MuiTableBody-root .MuiTableRow-root:hover": { bgcolor: "rgba(10,147,150,0.04)" },
+  "& .MuiTableBody-root .MuiTableRow-root:last-of-type .MuiTableCell-root": { borderBottom: "none" },
+};
+
+const SWITCH_SX = {
+  "& .MuiSwitch-switchBase.Mui-checked": { color: TEAL },
+  "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: TEAL },
+};
+
+// Neutral placeholder used when a group has no cover image.
+const IMAGE_PLACEHOLDER_SX = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: `linear-gradient(135deg, ${BG} 0%, #ECF1F7 100%)`,
+  color: "#AEBACB",
+};
+
 const isAbortLikeError = (err) => {
   const name = String(err?.name || "").toLowerCase();
   const message = String(err?.message || err || "").toLowerCase();
@@ -144,22 +282,26 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
       <Box
         ref={anchorRef}
         onClick={() => !disabled && setOpen(!open)}
-        className="border border-slate-300 rounded-md p-3 bg-white cursor-pointer hover:bg-slate-50 transition"
+        className="cursor-pointer transition"
         sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           minHeight: 56,
-          '&:hover': { borderColor: "#10b8a6" }
+          px: 1.75,
+          borderRadius: 2,
+          border: `1px solid ${BORDER}`,
+          bgcolor: "#fff",
+          '&:hover': { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.04)" }
         }}
       >
         <Box>
-          <Typography variant="caption" className="text-slate-500">{label}</Typography>
+          <Typography variant="caption" sx={{ color: MUTED }}>{label}</Typography>
           <Typography variant="body2" className="font-medium">
             {options.find(opt => opt.value === value)?.label || "Select..."}
           </Typography>
         </Box>
-        <Box className="text-slate-400">▼</Box>
+        <Box sx={{ color: "#94A3B8" }}>▼</Box>
       </Box>
 
       <Popper
@@ -170,7 +312,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
       >
         <Paper
           elevation={3}
-          className="rounded-md border border-slate-200 overflow-hidden"
+          sx={{ borderRadius: 2, border: `1px solid ${BORDER}`, overflow: "hidden", mt: 0.5 }}
           style={{ width: anchorRef.current?.offsetWidth || 300 }}
         >
           <Box className="max-h-60 overflow-y-auto">
@@ -181,11 +323,17 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
                   onChange(opt.value);
                   setOpen(false);
                 }}
-                className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
+                className="cursor-pointer transition"
                 sx={{
-                  backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
+                  px: 2,
+                  py: 1.25,
+                  fontSize: 14,
+                  borderBottom: `1px solid ${BORDER}`,
+                  "&:last-of-type": { borderBottom: "none" },
+                  backgroundColor: value === opt.value ? "rgba(10,147,150,0.10)" : "transparent",
                   fontWeight: value === opt.value ? 600 : 400,
-                  color: value === opt.value ? "#10b8a6" : "inherit"
+                  color: value === opt.value ? TEAL_DARK : NAVY,
+                  "&:hover": { backgroundColor: value === opt.value ? "rgba(10,147,150,0.14)" : BG },
                 }}
               >
                 {opt.label}
@@ -196,7 +344,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
       </Popper>
 
       {helperText && (
-        <Typography variant="caption" className="text-slate-500 block mt-1">
+        <Typography variant="caption" sx={{ color: MUTED, display: "block", mt: 0.5 }}>
           {helperText}
         </Typography>
       )}
@@ -309,10 +457,16 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
-        <DialogTitle className="font-extrabold">Create Group</DialogTitle>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ sx: { borderRadius: 3, border: `1px solid ${BORDER}` } }}
+      >
+        <DialogTitle sx={DIALOG_TITLE_SX}>Create Group</DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body2" className="text-slate-500 mb-4">
+          <Typography variant="body2" sx={{ color: MUTED, mb: 2 }}>
             *Required fields are marked with an asterisk
           </Typography>
 
@@ -323,7 +477,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
             fullWidth
             error={!!errors.name}
             helperText={errors.name}
-            className="mb-3"
+            sx={{ ...FIELD_SX, mb: 2 }}
           />
 
           <TextField
@@ -331,7 +485,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
             value={shortDescription}
             onChange={(e) => setShortDescription(e.target.value)}
             fullWidth
-            className="mb-3"
+            sx={{ ...FIELD_SX, mb: 2 }}
             placeholder="e.g. Connecting AI professionals worldwide"
             inputProps={{ maxLength: GROUP_SHORT_DESCRIPTION_MAX_LENGTH }}
             helperText={`${shortDescription.length}/${GROUP_SHORT_DESCRIPTION_MAX_LENGTH} characters`}
@@ -345,7 +499,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
                 maxRows={12}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                fullWidth className="mb-3"
+                fullWidth sx={{ ...FIELD_SX, mb: 2 }}
                 error={!!errors.description}
                 helperText={errors.description || describeWordCount(description)}
               />
@@ -354,7 +508,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
                 label="Visibility"
                 select
                 fullWidth
-                className="mb-3"
+                sx={{ ...FIELD_SX, mb: 2 }}
                 value={visibility}
                 onChange={(e) => setVisibility(e.target.value)}
                 SelectProps={{
@@ -395,22 +549,22 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
             <div className="col-span-12 md:col-span-5 flex flex-col gap-4">
               {/* Logo Upload */}
               <div>
-                <Typography variant="subtitle1" className="font-semibold">Logo / Icon</Typography>
-                <Typography variant="caption" className="text-slate-500 block mb-2">
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: NAVY }}>Logo / Icon</Typography>
+                <Typography variant="caption" sx={{ color: MUTED, display: "block", mb: 1 }}>
                   Recommended 200×200px (Square)
                 </Typography>
 
                 <Box className="flex items-center gap-4">
                   <Box
-                    className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center overflow-hidden"
-                    sx={{ width: 100, height: 100, position: "relative" }}
+                    className="flex items-center justify-center overflow-hidden"
+                    sx={{ ...UPLOAD_BOX_SX, width: 100, height: 100 }}
                   >
                     {logoPreview ? (
                       <img src={logoPreview} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : (
                       <Stack alignItems="center" spacing={0.5}>
                         <ImageRoundedIcon fontSize="small" />
-                        <Typography variant="caption" className="text-slate-600 text-[10px]">Icon</Typography>
+                        <Typography variant="caption" sx={{ color: MUTED, fontSize: 10 }}>Icon</Typography>
                       </Stack>
                     )}
                     <input
@@ -423,7 +577,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
                   </Box>
 
                   <label htmlFor="group-logo-file">
-                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                    <Button component="span" size="small" variant="outlined" sx={OUTLINE_BTN_SX} startIcon={<InsertPhotoRoundedIcon />}>
                       Upload Icon
                     </Button>
                   </label>
@@ -432,21 +586,21 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 
               {/* Cover Image Upload */}
               <div>
-                <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
-                <Typography variant="caption" className="text-slate-500 block mb-2">
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: NAVY }}>Cover Image</Typography>
+                <Typography variant="caption" sx={{ color: MUTED, display: "block", mb: 1 }}>
                   Recommended 650×365px • Max 50 MB
                 </Typography>
 
                 <Box
-                  className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                  sx={{ height: 160, position: "relative", overflow: "hidden" }}
+                  className="flex items-center justify-center"
+                  sx={{ ...UPLOAD_BOX_SX, height: 160, overflow: "hidden" }}
                 >
                   {localPreview ? (
                     <img src={localPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
                     <Stack alignItems="center" spacing={1}>
                       <ImageRoundedIcon />
-                      <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
+                      <Typography variant="body2" sx={{ color: MUTED }}>Image Preview</Typography>
                     </Stack>
                   )}
                   <input
@@ -460,7 +614,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 
                 <Stack direction="row" spacing={1} className="mt-2">
                   <label htmlFor="group-image-file">
-                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                    <Button component="span" size="small" variant="outlined" sx={OUTLINE_BTN_SX} startIcon={<InsertPhotoRoundedIcon />}>
                       Upload Cover
                     </Button>
                   </label>
@@ -469,14 +623,14 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
             </div>
           </div>
         </DialogContent>
-        <DialogActions className="px-6 py-4">
-          <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>
+        <DialogActions sx={{ px: 3, py: 2.25, borderTop: `1px solid ${BORDER}`, bgcolor: BG, gap: 1 }}>
+          <Button onClick={onClose} className="rounded-xl" sx={SUBTLE_BTN_SX}>Cancel</Button>
           <Button
             onClick={submit}
             disabled={submitting}
             variant="contained"
             className="rounded-xl"
-            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+            sx={PRIMARY_BTN_SX}
           >
             Create
           </Button>
@@ -669,8 +823,14 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
   if (!group) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
-      <DialogTitle className="font-extrabold">Edit Group</DialogTitle>
+    <Dialog
+        open={open}
+        onClose={onClose}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ sx: { borderRadius: 3, border: `1px solid ${BORDER}` } }}
+      >
+      <DialogTitle sx={DIALOG_TITLE_SX}>Edit Group</DialogTitle>
       <DialogContent dividers>
         {errors.__all__ && (
           <Alert severity="error" className="mb-3">{errors.__all__}</Alert>
@@ -683,7 +843,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
           fullWidth
           error={!!errors.name}
           helperText={errors.name}
-          className="mb-3"
+          sx={{ ...FIELD_SX, mb: 2 }}
         />
 
         <TextField
@@ -691,7 +851,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
           value={shortDescription}
           onChange={(e) => setShortDescription(e.target.value)}
           fullWidth
-          className="mb-3"
+          sx={{ ...FIELD_SX, mb: 2 }}
           placeholder="e.g. Connecting AI professionals worldwide"
           inputProps={{ maxLength: GROUP_SHORT_DESCRIPTION_MAX_LENGTH }}
           helperText={`${shortDescription.length}/${GROUP_SHORT_DESCRIPTION_MAX_LENGTH} characters`}
@@ -705,7 +865,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
               maxRows={12}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              fullWidth className="mb-3"
+              fullWidth sx={{ ...FIELD_SX, mb: 2 }}
               error={!!errors.description}
               helperText={errors.description || describeWordCount(description)}
             />
@@ -714,7 +874,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
               label="Visibility"
               select
               fullWidth
-              className="mb-3"
+              sx={{ ...FIELD_SX, mb: 2 }}
               value={visibility}
               onChange={(e) => setVisibility(e.target.value)}
               SelectProps={{
@@ -753,22 +913,22 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
             {/* Logo Upload */}
             <div>
-              <Typography variant="subtitle1" className="font-semibold">Logo / Icon</Typography>
-              <Typography variant="caption" className="text-slate-500 block mb-2">
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: NAVY }}>Logo / Icon</Typography>
+              <Typography variant="caption" sx={{ color: MUTED, display: "block", mb: 1 }}>
                 Recommended 200×200px (Square)
               </Typography>
 
               <Box className="flex items-center gap-4">
                 <Box
-                  className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center overflow-hidden"
-                  sx={{ width: 100, height: 100, position: "relative" }}
+                  className="flex items-center justify-center overflow-hidden"
+                  sx={{ ...UPLOAD_BOX_SX, width: 100, height: 100 }}
                 >
                   {logoPreview ? (
                     <img src={logoPreview} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
                     <Stack alignItems="center" spacing={0.5}>
                       <ImageRoundedIcon fontSize="small" />
-                      <Typography variant="caption" className="text-slate-600 text-[10px]">Icon</Typography>
+                      <Typography variant="caption" sx={{ color: MUTED, fontSize: 10 }}>Icon</Typography>
                     </Stack>
                   )}
                   <input
@@ -782,7 +942,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
                 <div className="flex flex-col gap-1">
                   <label htmlFor="group-edit-logo-file">
-                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                    <Button component="span" size="small" variant="outlined" sx={OUTLINE_BTN_SX} startIcon={<InsertPhotoRoundedIcon />}>
                       Upload Icon
                     </Button>
                   </label>
@@ -800,21 +960,21 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
             {/* Cover Image Upload */}
             <div>
-              <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
-              <Typography variant="caption" className="text-slate-500 block mb-2">
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: NAVY }}>Cover Image</Typography>
+              <Typography variant="caption" sx={{ color: MUTED, display: "block", mb: 1 }}>
                 Recommended 650×365px • Max 50 MB
               </Typography>
 
               <Box
-                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                sx={{ height: 160, position: "relative", overflow: "hidden" }}
+                className="flex items-center justify-center"
+                sx={{ ...UPLOAD_BOX_SX, height: 160, overflow: "hidden" }}
               >
                 {localPreview ? (
                   <img src={localPreview} alt="cover" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
                   <Stack alignItems="center" spacing={1}>
                     <ImageRoundedIcon />
-                    <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
+                    <Typography variant="body2" sx={{ color: MUTED }}>Image Preview</Typography>
                   </Stack>
                 )}
                 <input
@@ -828,7 +988,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
               <Stack direction="row" spacing={1} className="mt-2">
                 <label htmlFor="group-edit-image-file">
-                  <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                  <Button component="span" size="small" variant="outlined" sx={OUTLINE_BTN_SX} startIcon={<InsertPhotoRoundedIcon />}>
                     Upload Cover
                   </Button>
                 </label>
@@ -845,14 +1005,14 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
           </div>
         </div>
       </DialogContent>
-      <DialogActions className="px-6 py-4">
-        <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>
+      <DialogActions sx={{ px: 3, py: 2.25, borderTop: `1px solid ${BORDER}`, bgcolor: BG, gap: 1 }}>
+        <Button onClick={onClose} className="rounded-xl" sx={SUBTLE_BTN_SX}>Cancel</Button>
         <Button
           onClick={submit}
           disabled={submitting}
           variant="contained"
           className="rounded-xl"
-          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          sx={PRIMARY_BTN_SX}
         >
           Save
         </Button>
@@ -865,7 +1025,7 @@ function GroupCardSkeleton() {
   return (
     <Paper
       elevation={0}
-      className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+      className="h-full flex flex-col overflow-hidden" sx={CARD_SX}
     >
       {/* Image */}
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
@@ -908,7 +1068,15 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
   const memberStatus = membershipLabel(g);
 
   return (
-    <Paper elevation={0} className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden">
+    <Paper
+      elevation={0}
+      className="h-full flex flex-col overflow-hidden"
+      sx={{
+        ...CARD_SX,
+        transition: "box-shadow .2s ease, border-color .2s ease, transform .2s ease",
+        "&:hover": { boxShadow: CARD_SHADOW_HOVER, borderColor: "#CBD5E1", transform: "translateY(-2px)" },
+      }}
+    >
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
         {g.cover_image ? (
           <img
@@ -919,7 +1087,9 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
-          <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
+          <Box sx={IMAGE_PLACEHOLDER_SX}>
+            <ImageRoundedIcon sx={{ fontSize: 34, opacity: 0.85 }} />
+          </Box>
         )}
 
         {/* Logo overlay */}
@@ -933,10 +1103,10 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
               height: 48,
               borderRadius: "50%",
               overflow: "hidden",
-              border: "3px solid white",
-              backgroundColor: "white",
+              border: "3px solid #fff",
+              backgroundColor: "#fff",
               zIndex: 2,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+              boxShadow: CARD_SHADOW_HOVER
             }}
           >
             <img
@@ -948,7 +1118,7 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
         )}
       </Box>
 
-      <Box className="p-4 flex flex-col gap-2 flex-1 pt-7">
+      <Box className="flex flex-col flex-1" sx={{ p: 2.25, pt: 3.5, gap: 1 }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <Chip
@@ -957,68 +1127,77 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
               icon={
                 g.visibility === "public" && (g.join_policy === "approval" || g.join_policy === "public_approval")
                   ? <Tooltip title="Approval needed for membership - Request to join">
-                    <LockRounded sx={{ fontSize: 16, color: "#f97316 !important" }} />
+                    <LockRounded sx={{ fontSize: 16, color: `${CORAL} !important` }} />
                   </Tooltip>
                   : undefined
               }
-              className={
-                g.visibility === "private"
-                  ? "bg-slate-200 text-slate-700"
-                  : "bg-teal-50 text-teal-700"
-              }
+              sx={g.visibility === "private" ? BADGE_PRIVATE : BADGE_PUBLIC}
             />
             {g.join_policy && (
               <Chip
                 size="small"
                 label={labelJoinPolicy(g.join_policy)}
-                className="bg-slate-100 text-slate-700"
+                sx={BADGE_NEUTRAL}
               />
             )}
             {memberStatus && (
               <Chip
                 size="small"
                 label={memberStatus}
-                className={
-                  memberStatus === "Pending"
-                    ? "bg-amber-50 text-amber-700"
-                    : "bg-emerald-50 text-emerald-700"
-                }
+                sx={memberStatus === "Pending" ? BADGE_PENDING : BADGE_MEMBER}
               />
             )}
             {role && (
               <Chip
                 size="small"
                 label={role}
-                className="bg-indigo-50 text-indigo-700"
+                sx={BADGE_ROLE}
               />
             )}
           </div>
           {typeof g.member_count === "number" && (
-            <span className="text-xs text-slate-500">{g.member_count} members</span>
+            <Typography
+              component="span"
+              sx={{ fontSize: 12, fontWeight: 600, color: MUTED, whiteSpace: "nowrap" }}
+            >
+              {g.member_count} members
+            </Typography>
           )}
         </div>
 
-        <Typography variant="h6" className="font-extrabold !leading-snug text-slate-900">
+        <Typography
+          variant="h6"
+          sx={{ fontWeight: 800, fontSize: 18, lineHeight: 1.3, color: NAVY, mt: 0.25 }}
+        >
           {g.name}
         </Typography>
         {g.short_description && (
-          <p className="text-sm font-semibold text-slate-700 line-clamp-2">{g.short_description}</p>
+          <Typography
+            className="line-clamp-2"
+            sx={{ fontSize: 13.5, fontWeight: 600, color: "#475569", lineHeight: 1.5 }}
+          >
+            {g.short_description}
+          </Typography>
         )}
         {g.description && (
-          <p className="text-sm text-slate-500 line-clamp-2">{g.description}</p>
+          <Typography
+            className="line-clamp-2"
+            sx={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55 }}
+          >
+            {g.description}
+          </Typography>
         )}
 
-        <Box className="mt-auto flex items-center gap-1.5 pt-1">
+        <Box
+          className="mt-auto flex items-center"
+          sx={{ gap: 1, pt: 1.75, mt: 2, borderTop: `1px solid ${BORDER}` }}
+        >
           {g.membership_status === "active" || g._am_member || g._joined ? (
             <Button
               onClick={() => onOpen?.(g)}
               variant="contained"
               className="rounded-xl"
-              sx={{
-                textTransform: "none",
-                backgroundColor: "#10b8a6",
-                "&:hover": { backgroundColor: "#0ea5a4" },
-              }}
+              sx={PRIMARY_BTN_SX}
             >
               Open
             </Button>
@@ -1027,7 +1206,7 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
               disabled
               variant="outlined"
               className="rounded-xl"
-              sx={{ textTransform: "none" }}
+              sx={OUTLINE_BTN_SX}
             >
               Pending
             </Button>
@@ -1036,11 +1215,7 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
               onClick={() => onOpen?.(g)}
               variant="contained"
               className="rounded-xl"
-              sx={{
-                textTransform: "none",
-                backgroundColor: "#0ea5a4",
-                "&:hover": { backgroundColor: "#0d9488" }
-              }}
+              sx={ACCENT_BTN_SX}
             >
               Join
             </Button>
@@ -1053,7 +1228,7 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
               startIcon={<EditNoteRoundedIcon />}
               variant="outlined"
               className="rounded-xl"
-              sx={{ textTransform: "none" }}
+              sx={OUTLINE_BTN_SX}
             >
               Edit
             </Button>
@@ -1470,14 +1645,14 @@ function WordPressGroupSyncPanel({ token }) {
   };
 
   return (
-    <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-6 overflow-hidden">
+    <Paper elevation={0} className="mb-6 overflow-hidden" sx={CARD_SX}>
       <Box className="p-4 flex flex-col gap-3">
         <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }}>
           <Box className="flex-1">
-            <Typography variant="h6" className="font-extrabold text-slate-900">
+            <Typography variant="h6" sx={{ fontWeight: 800, color: NAVY }}>
               WordPress IMAA Group Sync
             </Typography>
-            <Typography variant="body2" className="text-slate-500">
+            <Typography variant="body2" sx={{ color: MUTED }}>
               Import WordPress groups, enable only selected groups, create linked Connect groups, and sync members when needed.
             </Typography>
           </Box>
@@ -1486,7 +1661,7 @@ function WordPressGroupSyncPanel({ token }) {
             placeholder="Search WP groups…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            sx={{ width: { xs: "100%", md: 280 } }}
+            sx={{ ...FIELD_SX, width: { xs: "100%", md: 280 } }}
           />
           <Button
             onClick={refreshFromWordPress}
@@ -1494,7 +1669,7 @@ function WordPressGroupSyncPanel({ token }) {
             startIcon={<CloudSyncRoundedIcon />}
             variant="outlined"
             className="rounded-xl"
-            sx={{ textTransform: "none" }}
+            sx={OUTLINE_BTN_SX}
           >
             {refreshing ? "Refreshing…" : "Refresh from WP"}
           </Button>
@@ -1503,7 +1678,7 @@ function WordPressGroupSyncPanel({ token }) {
             disabled={refreshing || syncingEnabled || syncingMembers || syncingContent}
             variant="contained"
             className="rounded-xl"
-            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+            sx={PRIMARY_BTN_SX}
           >
             {syncingEnabled ? "Syncing…" : "Sync Enabled"}
           </Button>
@@ -1512,7 +1687,7 @@ function WordPressGroupSyncPanel({ token }) {
             disabled={refreshing || syncingEnabled || syncingMembers || syncingContent}
             variant="outlined"
             className="rounded-xl"
-            sx={{ textTransform: "none" }}
+            sx={OUTLINE_BTN_SX}
           >
             {syncingMembers ? "Syncing Members…" : "Sync Members"}
           </Button>
@@ -1521,7 +1696,7 @@ function WordPressGroupSyncPanel({ token }) {
             disabled={refreshing || syncingEnabled || syncingMembers || syncingContent}
             variant="outlined"
             className="rounded-xl"
-            sx={{ textTransform: "none" }}
+            sx={OUTLINE_BTN_SX}
           >
             {syncingContent ? "Importing Content…" : "Import Full Content"}
           </Button>
@@ -1595,7 +1770,7 @@ function WordPressGroupSyncPanel({ token }) {
               onClick={resetFilters}
               variant="text"
               className="rounded-xl"
-              sx={{ textTransform: "none" }}
+              sx={SUBTLE_BTN_SX}
             >
               Clear filters
             </Button>
@@ -1616,9 +1791,9 @@ function WordPressGroupSyncPanel({ token }) {
             ["No local password", stats?.wordpress_users_with_unusable_password],
             ["WP posts imported", stats?.wordpress_group_posts_imported],
           ].map(([label, value]) => (
-            <Box key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <Typography variant="caption" className="text-slate-500 block">{label}</Typography>
-              <Typography variant="body1" className="font-extrabold text-slate-900">
+            <Box key={label} sx={{ borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: BG, px: 1.75, py: 1.25 }}>
+              <Typography variant="caption" sx={{ color: MUTED, display: "block" }}>{label}</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 800, color: NAVY }}>
                 {statsLoading ? "…" : Number(value || 0).toLocaleString()}
               </Typography>
             </Box>
@@ -1635,12 +1810,12 @@ function WordPressGroupSyncPanel({ token }) {
           <Box className="py-2"><LinearProgress /></Box>
         ) : items.length === 0 ? (
           <Box className="py-6 text-center">
-            <Typography variant="body2" className="text-slate-500">
+            <Typography variant="body2" sx={{ color: MUTED }}>
               No WordPress groups imported yet. Click “Refresh from WP” after WP API credentials are configured.
             </Typography>
           </Box>
         ) : (
-          <TableContainer>
+          <TableContainer sx={TABLE_SX}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -1661,27 +1836,27 @@ function WordPressGroupSyncPanel({ token }) {
                 {items.map((row) => (
                   <TableRow key={row.wp_group_id} hover>
                     <TableCell>
-                      <Typography variant="body2" className="font-semibold text-slate-800">
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: NAVY }}>
                         {row.name}
                       </Typography>
-                      <Typography variant="caption" className="text-slate-500 block">
+                      <Typography variant="caption" sx={{ color: MUTED, display: "block" }}>
                         {row.slug || "—"}
                       </Typography>
                     </TableCell>
                     <TableCell>{row.wp_group_id}</TableCell>
                     <TableCell>
-                      <Chip size="small" label={row.status || "unknown"} className="bg-slate-100 text-slate-700" />
+                      <Chip size="small" label={row.status || "unknown"} sx={BADGE_NEUTRAL} />
                     </TableCell>
                     <TableCell>
                       {row.linked_group_id ? (
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip size="small" color="success" label="Linked" />
-                          <Typography variant="caption" className="text-slate-500">
+                          <Chip size="small" label="Linked" sx={BADGE_MEMBER} />
+                          <Typography variant="caption" sx={{ color: MUTED }}>
                             {row.linked_group_name || `#${row.linked_group_id}`}
                           </Typography>
                         </Stack>
                       ) : (
-                        <Chip size="small" label="Not created" className="bg-slate-100 text-slate-500" />
+                        <Chip size="small" label="Not created" sx={BADGE_NEUTRAL} />
                       )}
                     </TableCell>
                     <TableCell align="right">{row.member_count ?? 0}</TableCell>
@@ -1689,6 +1864,7 @@ function WordPressGroupSyncPanel({ token }) {
                     <TableCell align="right">{row.synced_post_count ?? 0}</TableCell>
                     <TableCell align="center">
                       <Switch
+                        sx={SWITCH_SX}
                         checked={!!row.sync_enabled}
                         onChange={(e) => toggleSync(row, e.target.checked)}
                         inputProps={{ "aria-label": `Toggle sync for ${row.name}` }}
@@ -1700,7 +1876,7 @@ function WordPressGroupSyncPanel({ token }) {
                         variant="outlined"
                         disabled={!row.sync_enabled || !row.linked_group_id || syncingMemberId === row.wp_group_id || syncingMembers || syncingContent}
                         onClick={() => syncOneMembers(row)}
-                        sx={{ textTransform: "none" }}
+                        sx={OUTLINE_BTN_SX}
                       >
                         {syncingMemberId === row.wp_group_id ? "Syncing…" : "Sync"}
                       </Button>
@@ -1711,7 +1887,7 @@ function WordPressGroupSyncPanel({ token }) {
                         variant="outlined"
                         disabled={!row.sync_enabled || !row.linked_group_id || syncingToWordPressId === row.wp_group_id || syncingMemberId === row.wp_group_id || syncingMembers || syncingContent}
                         onClick={() => syncOneToWordPress(row)}
-                        sx={{ textTransform: "none" }}
+                        sx={OUTLINE_BTN_SX}
                       >
                         {syncingToWordPressId === row.wp_group_id ? "Syncing…" : "Sync to WP"}
                       </Button>
@@ -1722,7 +1898,7 @@ function WordPressGroupSyncPanel({ token }) {
                         variant="outlined"
                         disabled={!row.sync_enabled || !row.linked_group_id || syncingContentId === row.wp_group_id || syncingToWordPressId === row.wp_group_id || syncingContent || syncingMembers}
                         onClick={() => syncOneContent(row)}
-                        sx={{ textTransform: "none" }}
+                        sx={OUTLINE_BTN_SX}
                       >
                         {syncingContentId === row.wp_group_id ? "Importing…" : "Full Import"}
                       </Button>
@@ -1740,7 +1916,7 @@ function WordPressGroupSyncPanel({ token }) {
           alignItems={{ xs: "stretch", sm: "center" }}
           justifyContent="space-between"
         >
-          <Typography variant="caption" className="text-slate-500">
+          <Typography variant="caption" sx={{ color: MUTED }}>
             Showing {showingFrom}-{showingTo} of {count} imported WordPress groups. Enable sync creates the Connect group; Sync Members pulls members from WordPress; Sync to WP pushes missing Connect members back to WordPress and creates missing WP users with password setup emails; Import Full Content brings posts, comments, and group-connected forum topics/replies into Connect without deleting existing data.
           </Typography>
           <Pagination
@@ -1928,14 +2104,14 @@ function WordPressPublicForumSyncPanel({ token }) {
   };
 
   return (
-    <Paper elevation={0} className="rounded-2xl border border-slate-200 bg-white p-4">
+    <Paper elevation={0} sx={{ ...CARD_SX, p: 2.25 }}>
       <Box className="space-y-4">
         <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }}>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" className="font-extrabold text-slate-900">
+            <Typography variant="h6" sx={{ fontWeight: 800, color: NAVY }}>
               Public WordPress Forum Import
             </Typography>
-            <Typography variant="body2" className="text-slate-500">
+            <Typography variant="body2" sx={{ color: MUTED }}>
               Create public Connect groups for separate bbPress forums, then import topics and replies. No member sync runs here.
             </Typography>
           </Box>
@@ -1944,7 +2120,7 @@ function WordPressPublicForumSyncPanel({ token }) {
             onClick={refreshForums}
             disabled={refreshing || loading}
             startIcon={<CloudSyncRoundedIcon />}
-            sx={{ textTransform: "none" }}
+            sx={OUTLINE_BTN_SX}
           >
             {refreshing ? "Refreshing…" : "Refresh Forums"}
           </Button>
@@ -1960,8 +2136,8 @@ function WordPressPublicForumSyncPanel({ token }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search public forums…"
-            InputProps={{ startAdornment: <SearchRoundedIcon fontSize="small" className="mr-2 text-slate-400" /> }}
-            sx={{ minWidth: { xs: "100%", md: 260 } }}
+            InputProps={{ startAdornment: <SearchRoundedIcon fontSize="small" sx={{ mr: 1, color: "#94A3B8" }} /> }}
+            sx={{ ...FIELD_SX, minWidth: { xs: "100%", md: 260 } }}
           />
           <TextField
             size="small"
@@ -2005,12 +2181,12 @@ function WordPressPublicForumSyncPanel({ token }) {
           <Box className="py-2"><LinearProgress /></Box>
         ) : items.length === 0 ? (
           <Box className="py-6 text-center">
-            <Typography variant="body2" className="text-slate-500">
+            <Typography variant="body2" sx={{ color: MUTED }}>
               No public forums loaded yet. Click “Refresh Forums” after the Forum Content API plugin is installed.
             </Typography>
           </Box>
         ) : (
-          <TableContainer>
+          <TableContainer sx={TABLE_SX}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -2027,10 +2203,10 @@ function WordPressPublicForumSyncPanel({ token }) {
                 {items.map((row) => (
                   <TableRow key={row.wp_forum_id} hover>
                     <TableCell>
-                      <Typography variant="body2" className="font-semibold text-slate-800">
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: NAVY }}>
                         {row.title}
                       </Typography>
-                      <Typography variant="caption" className="text-slate-500 block">
+                      <Typography variant="caption" sx={{ color: MUTED, display: "block" }}>
                         {row.slug || "—"}
                       </Typography>
                     </TableCell>
@@ -2040,13 +2216,13 @@ function WordPressPublicForumSyncPanel({ token }) {
                     <TableCell>
                       {row.linked_group_id ? (
                         <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip size="small" color="success" label="Linked" />
-                          <Typography variant="caption" className="text-slate-500">
+                          <Chip size="small" label="Linked" sx={BADGE_MEMBER} />
+                          <Typography variant="caption" sx={{ color: MUTED }}>
                             {row.linked_group_name || `#${row.linked_group_id}`}
                           </Typography>
                         </Stack>
                       ) : (
-                        <Chip size="small" label="Not created" className="bg-slate-100 text-slate-500" />
+                        <Chip size="small" label="Not created" sx={BADGE_NEUTRAL} />
                       )}
                     </TableCell>
                     <TableCell align="center">
@@ -2056,7 +2232,7 @@ function WordPressPublicForumSyncPanel({ token }) {
                         variant="outlined"
                         disabled={!!actionId}
                         onClick={(event) => { event.stopPropagation(); createForumGroup(row); }}
-                        sx={{ textTransform: "none" }}
+                        sx={OUTLINE_BTN_SX}
                       >
                         {actionId === `group-${row.wp_forum_id}` ? "Creating…" : row.linked_group_id ? "Update" : "Create"}
                       </Button>
@@ -2068,7 +2244,7 @@ function WordPressPublicForumSyncPanel({ token }) {
                         variant="contained"
                         disabled={!row.linked_group_id || !!actionId}
                         onClick={(event) => { event.stopPropagation(); importForumContent(row); }}
-                        sx={{ textTransform: "none" }}
+                        sx={PRIMARY_BTN_SX}
                       >
                         {actionId === `import-${row.wp_forum_id}` ? "Importing…" : "Import"}
                       </Button>
@@ -2086,7 +2262,7 @@ function WordPressPublicForumSyncPanel({ token }) {
           alignItems={{ xs: "stretch", sm: "center" }}
           justifyContent="space-between"
         >
-          <Typography variant="caption" className="text-slate-500">
+          <Typography variant="caption" sx={{ color: MUTED }}>
             Showing {showingFrom}-{showingTo} of {count} public WordPress forums. Create Group must be done before Import.
           </Typography>
           <Pagination
@@ -2302,14 +2478,32 @@ export default function AdminGroups() {
       className="py-6 sm:py-8"
     >
       {/* Header */}
-      < Box className="flex items-center gap-3 mb-4" >
-        <Avatar sx={{ bgcolor: "#0ea5a4" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
-        <div className="flex-1">
-          <Typography variant="h5" className="font-extrabold">
+      < Box
+        sx={{
+          ...CARD_SX,
+          p: { xs: 2, sm: 2.5 },
+          mb: 2.5,
+          display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "flex-start", sm: "center" },
+          gap: { xs: 1.75, sm: 2 },
+          borderLeft: `4px solid ${CORAL}`,
+        }}
+      >
+        <Avatar sx={{ bgcolor: NAVY, fontWeight: 700, width: 46, height: 46 }}>
+          {(user?.first_name || "A")[0].toUpperCase()}
+        </Avatar>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            variant="h5"
+            sx={{ fontWeight: 800, color: NAVY, lineHeight: 1.2, fontSize: { xs: 21, sm: 25 } }}
+          >
             Community Groups
           </Typography>
-          <Typography className="text-slate-500">Create and manage your groups.</Typography>
-        </div>
+          <Typography sx={{ color: MUTED, fontSize: 14, mt: 0.25 }}>
+            Create and manage your groups.
+          </Typography>
+        </Box>
 
         {
           isOwnerUser() && (
@@ -2317,8 +2511,7 @@ export default function AdminGroups() {
               onClick={() => setCreateOpen(true)}
               startIcon={<AddRoundedIcon />}
               variant="contained"
-              className="rounded-xl"
-              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+              sx={{ ...ACCENT_BTN_SX, width: { xs: "100%", sm: "auto" }, py: 1, flexShrink: 0 }}
             >
               Create Group
             </Button>
@@ -2327,7 +2520,7 @@ export default function AdminGroups() {
       </Box >
 
       {owner && (
-        <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-5 overflow-hidden">
+        <Paper elevation={0} className="mb-5 overflow-hidden" sx={CARD_SX}>
           <Tabs
             value={activeTab}
             onChange={changeTab}
@@ -2336,9 +2529,16 @@ export default function AdminGroups() {
             sx={{
               px: 2,
               minHeight: 48,
-              "& .MuiTab-root": { textTransform: "none", fontWeight: 700, minHeight: 48 },
-              "& .Mui-selected": { color: "#0ea5a4 !important" },
-              "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+              "& .MuiTab-root": {
+                textTransform: "none",
+                fontWeight: 700,
+                minHeight: 48,
+                fontSize: 14.5,
+                color: MUTED,
+                "&:hover": { color: NAVY },
+              },
+              "& .Mui-selected": { color: `${NAVY} !important` },
+              "& .MuiTabs-indicator": { backgroundColor: CORAL, height: 3, borderRadius: 3 },
             }}
           >
             <Tab value="connect-groups" label="Groups" />
@@ -2362,8 +2562,18 @@ export default function AdminGroups() {
           placeholder="Search your groups…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          InputProps={{ startAdornment: <SearchRoundedIcon className="mr-2 text-slate-400" /> }}
-          sx={{ width: { xs: "100%", sm: 360 } }}
+          InputProps={{
+            startAdornment: <SearchRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#94A3B8" }} />,
+          }}
+          sx={{
+            ...FIELD_SX,
+            width: { xs: "100%", sm: 380 },
+            "& .MuiOutlinedInput-root": {
+              ...FIELD_SX["& .MuiOutlinedInput-root"],
+              height: 44,
+              boxShadow: CARD_SHADOW,
+            },
+          }}
         />
         <Box sx={{ flex: 1 }} />
       </Stack >
@@ -2372,7 +2582,7 @@ export default function AdminGroups() {
       {
         loading ? (
           <Box sx={{ flexGrow: 1 }}>
-            <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3">
+            <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-4 md:gap-5">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="col-span-4">
                   <GroupCardSkeleton />
@@ -2381,17 +2591,28 @@ export default function AdminGroups() {
             </div>
           </Box>
         ) : filtered.length === 0 ? (
-          <Paper elevation={0} className="rounded-2xl border border-slate-200">
-            <Box className="p-8 text-center">
-              <Typography variant="h6" className="font-semibold text-slate-700">
+          <Paper elevation={0} sx={CARD_SX}>
+            <Box sx={{ p: { xs: 4, sm: 6 }, textAlign: "center" }}>
+              <Box
+                sx={{
+                  width: 56, height: 56, mx: "auto", mb: 1.75, borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  bgcolor: BG, color: "#AEBACB", border: `1px solid ${BORDER}`,
+                }}
+              >
+                <SearchRoundedIcon />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: NAVY, fontSize: 17 }}>
                 No groups found
               </Typography>
-              <p className="text-slate-500 mt-1">Try a different search or create a new group.</p>
+              <Typography sx={{ color: MUTED, mt: 0.5, fontSize: 14 }}>
+                Try a different search or create a new group.
+              </Typography>
               {isOwnerUser() && (
                 <Button
                   onClick={() => setCreateOpen(true)}
-                  className="mt-4 rounded-xl"
-                  sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                  startIcon={<AddRoundedIcon />}
+                  sx={{ ...ACCENT_BTN_SX, mt: 2.5 }}
                   variant="contained"
                 >
                   Create Group
@@ -2402,7 +2623,7 @@ export default function AdminGroups() {
 
         ) : (
           <Box sx={{ flexGrow: 1 }}>
-            <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3">
+            <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-4 md:gap-5">
               {pageItems.map((g) => (
                 <div key={g.id || g.slug} className="col-span-4">
                   <GroupCard
@@ -2422,13 +2643,32 @@ export default function AdminGroups() {
               ))}
 
             </div>
-            <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+            <Stack direction="row" justifyContent="center" sx={{ mt: 3.5 }}>
               <Pagination
                 count={totalPages}
                 page={page}
                 onChange={(_, v) => setPage(v)}
                 shape="rounded"
                 size="medium"
+                sx={{
+                  "& .MuiPaginationItem-root": {
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    color: NAVY,
+                    border: `1px solid ${BORDER}`,
+                    bgcolor: "#fff",
+                    minWidth: 36,
+                    height: 36,
+                    "&:hover": { bgcolor: "rgba(10,147,150,0.08)", borderColor: TEAL },
+                  },
+                  "& .MuiPaginationItem-root.Mui-selected": {
+                    bgcolor: NAVY,
+                    color: "#fff",
+                    borderColor: NAVY,
+                    "&:hover": { bgcolor: "#16233D" },
+                  },
+                  "& .MuiPaginationItem-ellipsis": { border: "none", bgcolor: "transparent" },
+                }}
               />
             </Stack>
           </Box>

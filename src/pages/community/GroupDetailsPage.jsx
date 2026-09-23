@@ -51,7 +51,13 @@ import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 // 1. CONSTANTS & API HELPERS
 // -----------------------------------------------------------------------------
 
-const BORDER = "#e2e8f0";
+const NAVY = "#1B2A4A";
+const CORAL = "#E8532F";
+const TEAL = "#0A9396";
+const BG = "#F6F8FB";
+const BORDER = "#E3E8EF";
+const MUTED = "#64748B";
+const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
 const POST_REACTIONS = [
   { id: "like", emoji: "\u{1F44D}", label: "Like" },
   { id: "intriguing", emoji: "\u{1F914}", label: "Intriguing" },
@@ -71,10 +77,10 @@ const REPORT_REASONS = [
 ];
 
 const ROLE_BADGE_CONFIG = {
-  owner: { label: "Owner", className: "bg-slate-200 text-slate-700" },
-  admin: { label: "Admin", className: "bg-teal-50 text-teal-700" },
-  moderator: { label: "Moderator", className: "bg-sky-50 text-sky-700" },
-  member: { label: "Member", className: "bg-slate-100 text-slate-700" },
+  owner: { label: "Owner", tone: "navy" },
+  admin: { label: "Admin", tone: "teal" },
+  moderator: { label: "Moderator", tone: "coral" },
+  member: { label: "Member", tone: "neutral" },
 };
 
 const RoleBadge = ({ role }) => {
@@ -84,13 +90,13 @@ const RoleBadge = ({ role }) => {
       size="small"
       label={cfg.label}
       sx={{
-        bgcolor: cfg.className.includes("bg-slate-200") ? "#e2e8f0" :
-          cfg.className.includes("bg-teal-50") ? "#f0fdfa" :
-            cfg.className.includes("bg-sky-50") ? "#f0f9ff" : "#f1f5f9",
-        color: cfg.className.includes("text-slate-700") ? "#334155" :
-          cfg.className.includes("text-teal-700") ? "#0f766e" :
-            cfg.className.includes("text-sky-700") ? "#0369a1" : "#334155",
-        fontWeight: 500
+        bgcolor: cfg.tone === "teal" ? "rgba(10,147,150,0.10)" :
+          cfg.tone === "coral" ? "rgba(232,83,47,0.10)" :
+            cfg.tone === "navy" ? "rgba(27,42,74,0.10)" : BG,
+        color: cfg.tone === "teal" ? TEAL :
+          cfg.tone === "coral" ? CORAL :
+            cfg.tone === "navy" ? NAVY : MUTED,
+        fontWeight: 800
       }}
     />
   );
@@ -483,7 +489,7 @@ function PollBlock({ post, onVote }) {
                 p: 1, borderRadius: 2, borderColor: BORDER,
                 bgcolor: chosen ? "action.selected" : "background.paper",
                 cursor: canVote && !chosen ? "pointer" : "default",
-                "&:hover": canVote && !chosen ? { borderColor: "primary.main" } : undefined,
+                "&:hover": canVote && !chosen ? { borderColor: TEAL } : undefined,
               }}
             >
               <Stack spacing={0.5}>
@@ -507,14 +513,14 @@ function PollBlock({ post, onVote }) {
 
 function EventBlock({ post, onOpen }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "10px", borderColor: BORDER, bgcolor: "#fff", boxShadow: CARD_SHADOW }}>
       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{post.event?.title}</Typography>
       <Typography variant="caption" color="text.secondary">
         {post.event?.when ? new Date(post.event.when).toLocaleString() : ""} Â· {post.event?.where}
       </Typography>
       {post.text && <ExpandableText text={post.text} maxLines={5} wrapperSx={{ mt: 1 }} />}
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-        <Button size="small" variant="contained" onClick={onOpen} startIcon={<ThumbUpAltOutlinedIcon />}>
+        <Button size="small" variant="contained" onClick={onOpen} startIcon={<ThumbUpAltOutlinedIcon />} sx={{ textTransform: "none", bgcolor: CORAL, "&:hover": { bgcolor: "#cf4525" } }}>
           View Event
         </Button>
       </Stack>
@@ -532,7 +538,7 @@ function ResourceBlock({ post }) {
   const iframeSrc = ytId ? `https://www.youtube.com/embed/${ytId}` : vmId ? `https://player.vimeo.com/video/${vmId}` : null;
 
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "10px", borderColor: BORDER, bgcolor: "#fff", boxShadow: CARD_SHADOW }}>
       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{r.title}</Typography>
       {post.text && <ExpandableText text={post.text} maxLines={5} wrapperSx={{ mt: 1 }} />}
 
@@ -548,7 +554,7 @@ function ResourceBlock({ post }) {
 
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
         {primaryHref && (
-          <Button size="small" variant="contained" component="a" href={primaryHref} target="_blank">
+          <Button size="small" variant="contained" component="a" href={primaryHref} target="_blank" sx={{ textTransform: "none", bgcolor: CORAL, "&:hover": { bgcolor: "#cf4525" } }}>
             {hasVideo ? "Watch Video" : r.link_url ? "Open Link" : "View File"}
           </Button>
         )}
@@ -732,7 +738,7 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
   const CommentItem = ({ c, depth = 0 }) => {
     const isMe = me && c.author?.id && String(c.author.id) === String(me.id);
     return (
-      <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: 1 }}>
+      <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #E3E8EF" : "none", ml: depth ? 1.5 : 0, mt: 1 }}>
         <Stack direction="row" spacing={1}>
           <Avatar src={c.author.avatar} sx={{ width: 24, height: 24 }}>{(c.author.name || "U")[0]}</Avatar>
           <Box sx={{ flex: 1 }}>
@@ -762,7 +768,7 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
                 size="small"
                 startIcon={<ReplyRoundedIcon fontSize="small" />}
                 onClick={() => setReplyTo(c)}
-                sx={{ color: "primary.main", minWidth: 0 }}
+                sx={{ color: TEAL, minWidth: 0 }}
               >
                 REPLY
               </Button>
@@ -1433,7 +1439,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
             {local.type === "event" && <EventBlock post={local} onOpen={() => onOpenEvent?.(local.event?.id || local.id)} />}
 
             {local.type === "link" && (
-              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#fafafa" }}>
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#fff" }}>
                 <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 0.5 }} />
                 <Link href={local.url} target="_blank" fontWeight={600}>
                   {local.url_title || local.url}
@@ -1506,7 +1512,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
       <Stack direction="row" justifyContent="space-around">
         <Button
           startIcon={<span style={{ fontSize: 18 }}>{likeBtnEmoji}</span>}
-          sx={{ color: hasReaction ? "primary.main" : "text.secondary", fontWeight: hasReaction ? 600 : 400 }}
+          sx={{ color: hasReaction ? TEAL : "text.secondary", fontWeight: hasReaction ? 600 : 400 }}
           onClick={(e) => canEngage && setAnchorEl(e.currentTarget)}
           disabled={!canEngage}
         >
@@ -2527,7 +2533,7 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
                   <Box sx={{ flex: 1 }}>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
                       <Typography fontWeight={500}>{u.name || u.email || u.id}</Typography>
-                      {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: "#10b8a6" }} />}
+                      {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: TEAL }} />}
                     </Stack>
                     {u.email && <Typography variant="caption" color="text.secondary">{u.email}</Typography>}
                   </Box>
@@ -2547,7 +2553,7 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
           onClick={submit}
           disabled={selected.size === 0 || submitting}
           variant="contained"
-          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
         >
           {submitting ? "Adding..." : `Add ${selected.size > 0 ? `(${selected.size})` : ""}`}
         </Button>
@@ -2693,7 +2699,7 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
                   <Box sx={{ flex: 1 }}>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
                       <Typography fontWeight={500}>{u.name || u.email || u.id}</Typography>
-                      {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: "#10b8a6" }} />}
+                      {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: TEAL }} />}
                     </Stack>
                     {u.email && <Typography variant="caption" color="text.secondary">{u.email}</Typography>}
                   </Box>
@@ -2712,7 +2718,7 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
         <Button
           onClick={submit} disabled={selected.size === 0 || submitting}
           variant="contained"
-          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
         >
           {submitting ? "Sending..." : "Send request"}
         </Button>
@@ -3082,8 +3088,8 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
               startIcon={<FileDownloadRoundedIcon />}
               sx={{
                 textTransform: "none",
-                borderColor: "#10b8a6",
-                color: "#10b8a6",
+                borderColor: TEAL,
+                color: TEAL,
                 borderRadius: 3,
               }}
             >
@@ -3094,8 +3100,8 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
               variant="contained"
               onClick={() => setAddMembersOpen(true)}
               sx={{
-                backgroundColor: "#10b8a6",
-                "&:hover": { backgroundColor: "#0ea5a4" },
+                backgroundColor: TEAL,
+                "&:hover": { backgroundColor: "#087f82" },
                 textTransform: "none",
                 borderRadius: 3,
               }}
@@ -4226,7 +4232,7 @@ function SettingsTab({ group, onUpdate }) {
 
 function PostSkeleton() {
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, borderColor: "#e2e8f0" }}>
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, borderColor: BORDER }}>
       {/* Header Skeleton */}
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
         <Skeleton variant="circular" width={40} height={40} />
@@ -4699,7 +4705,7 @@ export default function GroupDetailsPage() {
   });
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
+    <Box sx={{ width: "100%", py: { xs: 2, md: 3 }, bgcolor: BG, minHeight: "100vh" }}>
       <Box
         sx={{
           display: "flex",
@@ -4719,11 +4725,12 @@ export default function GroupDetailsPage() {
               onClick={() => navigate(backTo)}
               sx={{
                 textTransform: "none",
-                color: "text.primary",
-                fontWeight: 600,
+                color: NAVY,
+                fontWeight: 800,
                 minWidth: "auto",
-                px: 1,
-                "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                px: 1.25,
+                borderRadius: "8px",
+                "&:hover": { bgcolor: "rgba(10,147,150,0.08)", color: TEAL }
               }}
             >
               {backLabel}
@@ -4731,17 +4738,19 @@ export default function GroupDetailsPage() {
           </Box>
           <Card
             variant="outlined"
-            sx={{ borderRadius: 3, borderColor: BORDER, mb: 3 }}
+            sx={{ borderRadius: "10px", borderColor: BORDER, mb: 3, bgcolor: "#fff", boxShadow: CARD_SHADOW }}
           >
             <CardContent
               sx={{
                 p: 3,
                 display: "flex",
-                alignItems: "center",
+                alignItems: { xs: "flex-start", md: "center" },
                 justifyContent: "space-between",
+                gap: 2,
+                flexDirection: { xs: "column", md: "row" },
               }}
             >
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }}>
                 {groupLoading && !group ? (
                   <Skeleton variant="circular" width={80} height={80} />
                 ) : (
@@ -4751,24 +4760,28 @@ export default function GroupDetailsPage() {
                       width: 80,
                       height: 80,
                       fontSize: 32,
-                      bgcolor: "primary.light",
+                      bgcolor: TEAL,
+                      color: "#fff",
+                      fontWeight: 900,
+                      border: "4px solid #fff",
+                      boxShadow: "0 4px 14px rgba(16,24,40,0.14)",
                     }}
                   >
                     {(group?.name || "G")[0]}
                   </Avatar>
                 )}
                 <Box>
-                  <Typography variant="h5" fontWeight={700} component="div">
+                  <Typography variant="h5" fontWeight={900} component="div" sx={{ color: NAVY, lineHeight: 1.2 }}>
                     {groupLoading && !group ? (
                       <Skeleton width={240} height={36} />
                     ) : (group?.name || "Group unavailable")}
                   </Typography>
                   {!groupLoading && group?.short_description && (
-                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600} component="div">
+                    <Typography variant="subtitle2" fontWeight={700} component="div" sx={{ color: MUTED, mt: 0.5 }}>
                       {group.short_description}
                     </Typography>
                   )}
-                  <Typography variant="body2" color="text.secondary" component="div">
+                  <Typography variant="body2" component="div" sx={{ color: MUTED, mt: 0.75, fontWeight: 600 }}>
                     {groupLoading && !group ? (
                       <Skeleton width={90} />
                     ) : (
@@ -4783,7 +4796,7 @@ export default function GroupDetailsPage() {
                             <Link
                               component={RouterLink}
                               to={`/community/groups/${pg.id}`}
-                              sx={{ fontWeight: 600, color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                              sx={{ fontWeight: 700, color: TEAL, textDecoration: "none", "&:hover": { color: CORAL } }}
                             >
                               {pg.name}
                             </Link>
@@ -4796,7 +4809,7 @@ export default function GroupDetailsPage() {
                         <Link
                           component={RouterLink}
                           to={`/community/groups/${group.parent_group.id}`}
-                          sx={{ fontWeight: 600, color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                          sx={{ fontWeight: 700, color: TEAL, textDecoration: "none", "&:hover": { color: CORAL } }}
                         >
                           {group.parent_group.name}
                         </Link>
@@ -4805,13 +4818,14 @@ export default function GroupDetailsPage() {
                   </Typography>
                 </Box>
               </Stack>
-              <Stack direction="row" spacing={1}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" } }}>
                 {canAccessGroupContent && (
                   <Button
                     variant="outlined"
                     startIcon={<ChatBubbleOutlineRoundedIcon />}
                     onClick={() => navigate(`/community?view=messages`)} // Example route
                     disabled={groupLoading || !group}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px", color: NAVY, borderColor: "#D9E0E8", bgcolor: "#fff", "&:hover": { borderColor: TEAL, color: TEAL, bgcolor: "#fff" } }}
                   >
                     Message
                   </Button>
@@ -4840,21 +4854,21 @@ export default function GroupDetailsPage() {
                     return (
                       <Button
                         variant="outlined"
-                        color="error"
                         onClick={handleLeaveClick}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px", borderColor: "rgba(232,83,47,0.35)", color: CORAL, "&:hover": { borderColor: CORAL, bgcolor: "rgba(232,83,47,0.08)" } }}
                       >
                         Leave
                       </Button>
                     );
                   } else if (isPending) {
                     return (
-                      <Button variant="outlined" disabled>
+                      <Button variant="outlined" disabled sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px" }}>
                         Pending
                       </Button>
                     );
                   } else if (joinPolicy === "invite") {
                     return (
-                      <Button variant="outlined" disabled>
+                      <Button variant="outlined" disabled sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px" }}>
                         Invitation Required
                       </Button>
                     );
@@ -4863,7 +4877,7 @@ export default function GroupDetailsPage() {
                       <Button
                         variant="contained"
                         onClick={handleJoin}
-                        sx={{ bgcolor: "#0ea5a4", "&:hover": { bgcolor: "#0d9488" } }}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px", bgcolor: CORAL, "&:hover": { bgcolor: "#cf4525" } }}
                       >
                         {isApproval ? "Request to Join" : "Join Group"}
                       </Button>
@@ -4877,10 +4891,21 @@ export default function GroupDetailsPage() {
           {/* Tabs + tab content */}
           <Card
             variant="outlined"
-            sx={{ borderRadius: 3, borderColor: BORDER }}
+            sx={{ borderRadius: "10px", borderColor: BORDER, bgcolor: "#fff", boxShadow: CARD_SHADOW }}
           >
-            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>
+            <Box sx={{ borderBottom: `1px solid ${BORDER}` }}>
+              <Tabs
+                value={tab}
+                onChange={(_, v) => setTab(v)}
+                variant="scrollable"
+                allowScrollButtonsMobile
+                sx={{
+                  px: 2,
+                  "& .MuiTabs-indicator": { bgcolor: CORAL, height: 3, borderRadius: "3px 3px 0 0" },
+                  "& .MuiTab-root": { color: MUTED, fontWeight: 800, textTransform: "none", minHeight: 54 },
+                  "& .Mui-selected": { color: `${NAVY} !important` },
+                }}
+              >
                 {tabDefs.map((t) => (
                   <Tab key={t.label} icon={t.icon} iconPosition="start" label={t.label} />
                 ))}
@@ -5006,3 +5031,5 @@ export default function GroupDetailsPage() {
     </Box >
   );
 }
+
+

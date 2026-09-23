@@ -23,8 +23,10 @@ const N = "#1B2A4A";
 const T = "#0A9396";
 // const P = "#7B2D8E"; // COMMENTED OUT - used only in commented Community section
 // const G = "#D4920B"; // COMMENTED OUT - used only in commented Community section
-const BG = "#FAF9F7";
-const BORDER = "#EEECEA";
+const BG = "#F6F8FB";
+const BORDER = "#E3E8EF";
+const MUTED = "#64748B";
+const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
 const FONT = "'DM Sans', 'Helvetica Neue', sans-serif";
 
 const FALLBACK_IMGS = [
@@ -186,7 +188,7 @@ function DashTopbar({ notifCount, messageCount, isAdmin }) {
         ) : (
           <button
             onClick={() => navigate("/events")}
-            style={{ height: 34, padding: "0 16px", background: N, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}
+            style={{ height: 34, padding: "0 16px", background: "#fff", color: N, border: "1px solid #D9E0E8", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}
           >
             Explore Events
           </button>
@@ -238,10 +240,10 @@ function ProfileBanner({ completion, onDismiss, profile }) {
   return (
     <div style={{
       margin: "0 40px 14px",
-      background: `linear-gradient(135deg, ${O}08 0%, ${O}14 100%)`,
-      border: `1px solid ${O}28`, borderRadius: 12,
+      background: "#fff",
+      border: `1px solid ${BORDER}`, borderRadius: 10,
       padding: "14px 20px", display: "flex", alignItems: "center", gap: 16,
-      fontFamily: FONT, position: "relative",
+      fontFamily: FONT, position: "relative", boxShadow: CARD_SHADOW,
     }}>
       <svg width="52" height="52" style={{ flexShrink: 0 }}>
         <circle cx="26" cy="26" r={r} fill="none" stroke={`${O}20`} strokeWidth="3" />
@@ -254,12 +256,12 @@ function ProfileBanner({ completion, onDismiss, profile }) {
       </svg>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: N, marginBottom: 2, fontFamily: FONT }}>Complete your profile</div>
-        <div style={{ fontSize: 12, color: "#777", lineHeight: 1.5, fontFamily: FONT }}>
+        <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, fontFamily: FONT }}>
           {helperText}
         </div>
       </div>
       <a href="/account/profile"
-        style={{ fontSize: 12, fontWeight: 700, color: O, textDecoration: "none", whiteSpace: "nowrap", background: `${O}14`, padding: "6px 14px", borderRadius: 7, fontFamily: FONT }}>
+        style={{ fontSize: 12, fontWeight: 700, color: "#fff", textDecoration: "none", whiteSpace: "nowrap", background: O, padding: "6px 14px", borderRadius: 8, fontFamily: FONT }}>
         Update Profile →
       </a>
       <button onClick={onDismiss} aria-label="Dismiss"
@@ -275,10 +277,10 @@ function VerifyBanner({ onDismiss }) {
   return (
     <div style={{
       margin: "0 40px 20px",
-      background: `linear-gradient(135deg, ${T}08 0%, ${T}14 100%)`,
-      border: `1px solid ${T}28`, borderRadius: 12,
+      background: "#fff",
+      border: `1px solid ${BORDER}`, borderRadius: 10,
       padding: "14px 20px", display: "flex", alignItems: "center", gap: 16,
-      fontFamily: FONT, position: "relative",
+      fontFamily: FONT, position: "relative", boxShadow: CARD_SHADOW,
     }}>
       <div style={{
         width: 48, height: 48, borderRadius: 10, background: `${T}15`,
@@ -288,12 +290,12 @@ function VerifyBanner({ onDismiss }) {
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: N, marginBottom: 2, fontFamily: FONT }}>Verify your identity</div>
-        <div style={{ fontSize: 12, color: "#777", lineHeight: 1.5, fontFamily: FONT }}>
+        <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, fontFamily: FONT }}>
           Unlock full platform features and boost credibility with verified status.
         </div>
       </div>
       <a href="/account/profile#verify"
-        style={{ fontSize: 12, fontWeight: 700, color: T, textDecoration: "none", whiteSpace: "nowrap", background: `${T}14`, padding: "6px 14px", borderRadius: 7, fontFamily: FONT }}>
+        style={{ fontSize: 12, fontWeight: 700, color: N, textDecoration: "none", whiteSpace: "nowrap", background: "#fff", border: "1px solid #D9E0E8", padding: "6px 14px", borderRadius: 8, fontFamily: FONT }}>
         Get Verified →
       </a>
       <button onClick={onDismiss} aria-label="Dismiss"
@@ -317,10 +319,10 @@ function PendingFormsBanner({ forms }) {
 
         return (
           <div key={form.id} style={{
-            background: `linear-gradient(135deg, ${O}08 0%, ${O}14 100%)`,
-            border: `1px solid ${O}28`, borderRadius: 12,
+            background: "#fff",
+            border: `1px solid ${BORDER}`, borderRadius: 10,
             padding: "14px 20px", display: "flex", alignItems: "center", gap: 16,
-            fontFamily: FONT, position: "relative",
+            fontFamily: FONT, position: "relative", boxShadow: CARD_SHADOW,
           }}>
             <div style={{
               width: 48, height: 48, borderRadius: 10, background: `${O}15`,
@@ -330,13 +332,13 @@ function PendingFormsBanner({ forms }) {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: N, marginBottom: 2, fontFamily: FONT }}>Pending Form: {formTitle}</div>
-              <div style={{ fontSize: 12, color: "#777", lineHeight: 1.5, fontFamily: FONT }}>
+              <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, fontFamily: FONT }}>
                 {eventTitle} — Due {form.deadline ? new Date(form.deadline).toLocaleDateString() : 'soon'}
               </div>
             </div>
             <button
               onClick={() => navigate(`/forms/${form.id}`)}
-              style={{ fontSize: 12, fontWeight: 700, color: O, textDecoration: "none", whiteSpace: "nowrap", background: `${O}14`, padding: "6px 14px", borderRadius: 7, fontFamily: FONT, border: "none", cursor: "pointer" }}>
+              style={{ fontSize: 12, fontWeight: 700, color: "#fff", textDecoration: "none", whiteSpace: "nowrap", background: O, padding: "6px 14px", borderRadius: 8, fontFamily: FONT, border: "none", cursor: "pointer" }}>
               Complete →
             </button>
           </div>
@@ -360,9 +362,9 @@ function FeaturedHero({ event }) {
   return (
     <a href={href} style={{ textDecoration: "none", display: "block", marginBottom: 24 }}>
       <div style={{
-        borderRadius: 16, overflow: "hidden", border: `1px solid ${BORDER}`,
+        borderRadius: 10, overflow: "hidden", border: `1px solid ${BORDER}`,
         display: "grid", gridTemplateColumns: "1fr 1fr",
-        boxShadow: "0 2px 14px rgba(0,0,0,.07)", position: "relative",
+        boxShadow: CARD_SHADOW, position: "relative",
       }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: accent, zIndex: 3 }} />
         <div style={{ padding: "32px 32px 32px", background: "#fff", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -376,11 +378,11 @@ function FeaturedHero({ event }) {
           <h2 style={{ fontSize: 20, fontWeight: 800, color: N, margin: "0 0 10px", lineHeight: 1.3, fontFamily: FONT }}>
             {event?.title}
           </h2>
-          <p style={{ fontSize: 13, color: "#666", lineHeight: 1.65, margin: "0 0 16px", fontFamily: FONT }}>
+          <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.65, margin: "0 0 16px", fontFamily: FONT }}>
             {event?.description || event?.desc || event?.short_description || "Join fellow M&A professionals at this premier industry event."}
           </p>
           {(dateStr || eventLocation) && (
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 20, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: FONT }}>
+            <div style={{ fontSize: 12, color: MUTED, marginBottom: 20, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: FONT }}>
               <EventNoteIcon sx={{ fontSize: 14, color: "#C0BAB4" }} />
               {dateStr}{eventLocation && <> · {eventLocation}</>}
             </div>
@@ -421,9 +423,9 @@ function DashEventCard({ event, index }) {
   return (
     <a href={href} style={{ textDecoration: "none" }}>
       <div
-        style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${BORDER}`, background: "#fff", cursor: "pointer", position: "relative", transition: "box-shadow .2s", display: "flex", flexDirection: "column", height: 280 }}
-        onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,.09)"; e.currentTarget.style.borderColor = accent + "50"; }}
-        onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = BORDER; }}
+        style={{ borderRadius: 10, overflow: "hidden", border: `1px solid ${BORDER}`, background: "#fff", cursor: "pointer", position: "relative", transition: "box-shadow .2s, border-color .2s, transform .2s", display: "flex", flexDirection: "column", height: 280, boxShadow: CARD_SHADOW }}
+        onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 10px 24px rgba(16,24,40,0.10)"; e.currentTarget.style.borderColor = accent + "50"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+        onMouseLeave={e => { e.currentTarget.style.boxShadow = CARD_SHADOW; e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.transform = "translateY(0)"; }}
       >
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, zIndex: 2 }} />
         <div style={{ height: 152, overflow: "hidden", flexShrink: 0 }}>
@@ -444,7 +446,7 @@ function DashEventCard({ event, index }) {
           {(dateStr || getEventType(event)) && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
               {dateStr && <span style={{ fontSize: 11, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: 0.5 }}>{dateStr}</span>}
-              {getEventType(event) && <span style={{ fontSize: 10, color: "#AAA", background: "#F5F4F2", padding: "2px 6px", borderRadius: 4 }}>{getEventType(event)}</span>}
+              {getEventType(event) && <span style={{ fontSize: 10, color: N, background: BG, padding: "2px 6px", borderRadius: 4 }}>{getEventType(event)}</span>}
             </div>
           )}
           <h3 style={{ fontSize: 13, fontWeight: 700, color: N, margin: "0 0 4px", lineHeight: 1.4, fontFamily: FONT, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
