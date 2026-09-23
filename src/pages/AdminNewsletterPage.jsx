@@ -74,9 +74,15 @@ import {
   scheduleNewsletterCampaign,
   sendNewsletterCampaign,
   sendNewsletterTestEmail,
+  syncNewsletterCampaign,
   updateNewsletterCampaign,
   getNewsletterMauticDiagnostics,
 } from "../services/newsletterService";
+import {
+  SAVE_STAGE_SYNC,
+  SAVE_STATUS_SYNCED,
+  saveBroadcastDraft,
+} from "./newsletterBroadcastSave.js";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
@@ -1021,18 +1027,40 @@ export default function AdminNewsletterPage() {
       audience_slugs: form.audience_slugs,
     };
     try {
-      const data = isNew ? await createNewsletterCampaign(payload) : await updateNewsletterCampaign(campaignId, payload);
-      const nextForm = campaignToForm(data);
-      setCampaign(data);
-      setForm(nextForm);
-      setSavedForm(nextForm);
-      setSnack({ open: true, severity: "success", message: "Draft saved." });
-      if (isNew) navigate(`/admin/newsletter/${data.uuid}`, { replace: true });
-      return data;
-    } catch (err) {
-      setError(getErrorMessage(err, "We could not save this draft."));
-      return null;
+      return await saveBroadcastDraft({
+        isNew,
+        campaignId,
+        payload,
+        createCampaign: createNewsletterCampaign,
+        updateCampaign: updateNewsletterCampaign,
+        syncCampaign: syncNewsletterCampaign,
+        applySaved: (record) => {
+          const nextForm = campaignToForm(record);
+          setCampaign(record);
+          setForm(nextForm);
+          setSavedForm(nextForm);
+        },
+        onError: ({ stage, error }) => {
+          setError(
+            stage === SAVE_STAGE_SYNC
+              ? `Draft saved in ECP, but Mautic sync failed: ${getErrorMessage(error, "Mautic sync failed.")}`
+              : getErrorMessage(error, "We could not save this draft.")
+          );
+        },
+        onNotify: ({ status }) => {
+          const synced = status === SAVE_STATUS_SYNCED;
+          setSnack({
+            open: true,
+            severity: synced ? "success" : "warning",
+            message: synced
+              ? "Draft saved and synced to Mautic."
+              : "Draft saved, but Mautic sync failed.",
+          });
+        },
+        onNavigate: (uuid) => navigate(`/admin/newsletter/${uuid}`, { replace: true }),
+      });
     } finally {
+      // Stays disabled for the whole local save + sync sequence.
       setSaving(false);
     }
   };
