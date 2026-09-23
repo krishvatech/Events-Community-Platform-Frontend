@@ -15,6 +15,7 @@ import {
   setIdToken,
   setRefreshToken,
 } from "./tokenStore";
+import { purgePersistedCognitoSdkTokens } from "./cognitoSdkStorage";
 
 const normalizeToken = (value) => {
   if (value === null || value === undefined) return "";
@@ -81,8 +82,10 @@ export async function establishMemberAuthSession({
   });
 
   // The refresh credential has now been handed to Django. Remove any stale
-  // member-token keys left by older releases before exposing the signed-in UI.
+  // member-token keys left by older releases and any duplicate credentials
+  // written by amazon-cognito-identity-js before exposing the signed-in UI.
   purgePersistedMemberTokens();
+  purgePersistedCognitoSdkTokens();
   clearCognitoAuthTokens();
   setAccessToken(result.accessToken);
 
@@ -106,6 +109,10 @@ export async function bootstrapMemberAuthSession() {
   if (!isSecureAuthSessionEnabled()) {
     return getAccessToken();
   }
+
+  // Secure mode must never leave SDK-managed Cognito credentials persisted,
+  // including leftovers written by releases from before this hardening.
+  purgePersistedCognitoSdkTokens();
 
   // Guest auth intentionally remains a separate flow and uses guest_token.
   if (typeof localStorage !== "undefined" && localStorage.getItem("is_guest") === "true") {
@@ -153,4 +160,5 @@ export async function bootstrapMemberAuthSession() {
 export function clearMemberAuthSessionLocalState() {
   clearCognitoAuthTokens();
   purgePersistedMemberTokens();
+  if (isSecureAuthSessionEnabled()) purgePersistedCognitoSdkTokens();
 }

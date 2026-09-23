@@ -4,6 +4,7 @@ import {
   setRefreshToken,
 } from "./tokenStore";
 import { isSecureAuthSessionEnabled } from "./secureAuthSession";
+import { purgePersistedCognitoSdkTokens } from "./cognitoSdkStorage";
 
 // Profile/identity metadata may persist; secure-session mode keeps credentials in memory only.
 function decodeJwtPayload(token) {
@@ -71,6 +72,7 @@ export function clearAuth() {
   try {
     // Clear all member Cognito credentials (persistent legacy copies + memory).
     clearCognitoAuthTokens();
+    if (isSecureAuthSessionEnabled()) purgePersistedCognitoSdkTokens();
     localStorage.removeItem("user_name");
     localStorage.removeItem("user");
     localStorage.removeItem("loginPayload");

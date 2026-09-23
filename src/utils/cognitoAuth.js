@@ -4,12 +4,18 @@ import {
   AuthenticationDetails,
   CognitoRefreshToken,
 } from "amazon-cognito-identity-js";
+import { isSecureAuthSessionEnabled } from "./secureAuthSession";
+import { getCognitoSdkStorage } from "./cognitoSdkStorage";
 
 const region = import.meta.env.VITE_COGNITO_REGION;
 const userPoolId = import.meta.env.VITE_COGNITO_USER_POOL_ID;
 const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
 
-const pool = new CognitoUserPool({ UserPoolId: userPoolId, ClientId: clientId });
+const poolData = { UserPoolId: userPoolId, ClientId: clientId };
+const cognitoSdkStorage = getCognitoSdkStorage(isSecureAuthSessionEnabled());
+if (cognitoSdkStorage) poolData.Storage = cognitoSdkStorage;
+
+const pool = new CognitoUserPool(poolData);
 
 export function cognitoSignUp({ username, email, firstName, lastName, password }) {
   return new Promise((resolve, reject) => {
