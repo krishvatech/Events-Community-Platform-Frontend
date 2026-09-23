@@ -709,7 +709,7 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
                     borderRadius: 1.5,
                     overflow: "hidden",
                     mb: 1,
-                    bgcolor: "grey.100",
+                    bgcolor: IMAA.bg,
                     mx: "auto",
                   }}
                 >
@@ -1232,7 +1232,7 @@ function PollBlock({ post, onVote }) {
                 borderColor: BORDER,
                 bgcolor: chosen ? "action.selected" : "background.paper",
                 cursor: canVote && !chosen ? "pointer" : "default",
-                "&:hover": canVote && !chosen ? { borderColor: "primary.main" } : undefined,
+                "&:hover": canVote && !chosen ? { borderColor: IMAA.teal } : undefined,
               }}
             >
               <Stack spacing={0.5}>
@@ -1441,7 +1441,7 @@ function ResourceBlock({ post, onOpenEvent }) {
               src={iframeSrc}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              sx={{ width: "100%", height: 360, border: 0, borderRadius: 1 }}
+              sx={{ width: "100%", height: 360, border: 0, borderRadius: 2 }}
               title={r.title}
             />
           ) : (
@@ -1450,7 +1450,7 @@ function ResourceBlock({ post, onOpenEvent }) {
               src={r.video_url}
               controls
               preload="metadata"
-              sx={{ width: "100%", maxHeight: 420, borderRadius: 1, border: `1px solid ${BORDER}`, mt: 0.5 }}
+              sx={{ width: "100%", maxHeight: 420, borderRadius: 2, border: `1px solid ${BORDER}`, mt: 0.5 }}
             />
           )}
         </Box>
@@ -1461,7 +1461,7 @@ function ResourceBlock({ post, onOpenEvent }) {
         <Box
           sx={{
             mt: 1,
-            borderRadius: 1,
+            borderRadius: 2,
             overflow: "hidden",
             border: `1px solid ${BORDER}`,
             bgcolor: "background.paper",
@@ -1485,7 +1485,7 @@ function ResourceBlock({ post, onOpenEvent }) {
         <Box
           sx={{
             mt: 1,
-            borderRadius: 1,
+            borderRadius: 2,
             overflow: "hidden",
             border: `1px solid ${BORDER}`,
             bgcolor: "background.paper",
@@ -1506,7 +1506,7 @@ function ResourceBlock({ post, onOpenEvent }) {
           sx={{
             mt: 1,
             p: 1.25,
-            borderRadius: 1,
+            borderRadius: 2,
             borderColor: BORDER,
             bgcolor: "background.paper",
           }}
@@ -2955,7 +2955,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
           disabled={!canEngage}
           sx={{
             textTransform: "none",
-            color: hasReaction ? "primary.main" : "text.secondary",
+            color: hasReaction ? IMAA.teal : "text.secondary",
             fontWeight: hasReaction ? 600 : 400,
           }}
           startIcon={

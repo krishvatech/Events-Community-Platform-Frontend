@@ -71,6 +71,8 @@ import { isFutureDate, isFutureMonth, isFutureYear } from "../../utils/dateValid
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import ImaaCommunityScope from "../../components/community/ImaaCommunityScope";
+import { IMAA } from "../../components/community/imaaCommunityTheme";
 
 // -----------------------------------------------------------------------------
 // API helpers
@@ -1095,6 +1097,7 @@ export default function HomePage() {
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User";
 
   return (
+    <ImaaCommunityScope page="profile">
     <Box sx={{ px: { xs: 1, sm: 2, md: 0 }, py: 2 }}>
       <Box sx={{ width: "100%", mx: "auto" }}>
 
@@ -1102,16 +1105,18 @@ export default function HomePage() {
         {loading ? (
           <Card
             variant="outlined"
-            sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}
+            className="ecp-profile-header"
+            sx={{ width: "100%", borderRadius: 3, p: 0, mb: 2.5 }}
           >
+            <Box className="ecp-profile-banner" />
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
-              alignItems={{ xs: "flex-start", sm: "center" }}
-              sx={{ width: "100%" }}
+              alignItems={{ xs: "flex-start", sm: "flex-end" }}
+              sx={{ width: "100%", px: { xs: 2, sm: 3 }, pb: 2.5, mt: "-40px" }}
             >
-              <Box sx={{ mr: { sm: 2 }, width: 72, height: 72 }}>
-                <Skeleton variant="circular" width={72} height={72} />
+              <Box sx={{ mr: { sm: 2 }, width: 88, height: 88 }}>
+                <Skeleton variant="circular" width={88} height={88} sx={{ border: "4px solid #fff", bgcolor: IMAA.border }} />
               </Box>
               <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
                 <Skeleton variant="text" width="40%" height={28} />
@@ -1131,44 +1136,45 @@ export default function HomePage() {
             </Stack>
           </Card>
         ) : (
-          <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
-              <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
-                <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72 }}>
+          <Card variant="outlined" className="ecp-profile-header" sx={{ width: "100%", borderRadius: 3, p: 0, mb: 2.5 }}>
+            <Box className="ecp-profile-banner" />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "flex-end" }} sx={{ width: "100%", px: { xs: 2, sm: 3 }, pb: 2.5, mt: "-40px" }}>
+              <Box sx={{ position: "relative", mr: { sm: 2 }, width: 88, height: 88, flexShrink: 0 }}>
+                <Avatar src={profile.avatar || ""} className="ecp-profile-avatar" sx={{ width: 88, height: 88, fontSize: 32 }}>
                   {(fullName[0] || "").toUpperCase()}
                 </Avatar>
                 <Tooltip title="Change photo">
                   <IconButton
                     size="small"
                     onClick={() => { setAvatarPreview(profile.avatar || ""); setAvatarDialogOpen(true); }}
-                    sx={{ position: "absolute", right: -6, bottom: -6, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: 1 }}
+                    sx={{ position: "absolute", right: -2, bottom: -2, bgcolor: "#fff", color: IMAA.navy, border: "1px solid", borderColor: IMAA.border, boxShadow: IMAA.shadowSm, "&:hover": { bgcolor: IMAA.bg, color: IMAA.teal } }}
                   >
                     <PhotoCameraRoundedIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
               </Box>
 
-              <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
+              <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" }, minWidth: 0, pb: { sm: 0.5 } }}>
                 <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
+                  <Typography variant="h6" className="ecp-profile-name">{fullName}</Typography>
                   {profile.kyc_status === 'approved' && (
                     <Tooltip title="Identity Verified">
-                      <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
+                      <VerifiedRoundedIcon color="primary" sx={{ fontSize: 22 }} />
                     </Tooltip>
                   )}
                 </Stack>
                 {profile.experience && profile.experience.length > 0 ? (
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, fontSize: 14.5 }}>
                     {profile.experience[0].position} – {profile.experience[0].org}
                   </Typography>
                 ) : (
-                  profile.job_title && <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
+                  profile.job_title && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, fontSize: 14.5 }}>{profile.job_title}</Typography>
                 )}
               </Box>
 
-              <Box sx={{ ml: "auto", display: "flex", alignItems: "center" }}>
+              <Box sx={{ ml: "auto", display: "flex", alignItems: "center", pb: { sm: 0.5 } }}>
                 <Tooltip title="Identity Details">
-                  <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
+                  <IconButton size="small" className="ecp-icon-btn" onClick={() => setBasicInfoOpen(true)}>
                     <EditRoundedIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -1180,10 +1186,10 @@ export default function HomePage() {
                 sx={{ display: { xs: "none", sm: "block" }, mx: 2 }}
               />
 
-              <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
-                <Typography variant="subtitle2">
-                  <Box component="span" sx={{ fontWeight: 600 }}>0</Box> Posts&nbsp;|&nbsp;
-                  <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Contacts
+              <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" }, px: 2, py: 1, borderRadius: 2, border: `1px solid ${IMAA.border}`, bgcolor: IMAA.bg }}>
+                <Typography variant="subtitle2" sx={{ color: IMAA.muted, fontWeight: 600 }}>
+                  <Box component="span" sx={{ fontWeight: 800, color: IMAA.navy, fontSize: 16 }}>0</Box> Posts&nbsp;|&nbsp;
+                  <Box component="span" sx={{ fontWeight: 800, color: IMAA.navy, fontSize: 16 }}>{friendCount}</Box> Contacts
                 </Typography>
               </Box>
             </Stack>
@@ -1202,8 +1208,6 @@ export default function HomePage() {
             >
               {/* LEFT skeleton column */}
               <Grid
-                item
-                xs={12}
                 sx={{
                   display: "flex",
                   flexDirection: "column",
@@ -1233,8 +1237,6 @@ export default function HomePage() {
 
               {/* RIGHT skeleton column */}
               <Grid
-                item
-                xs={12}
                 sx={{
                   display: "flex",
                   flexDirection: "column",
@@ -1427,6 +1429,7 @@ export default function HomePage() {
         </Alert>
       </Snackbar>
     </Box>
+    </ImaaCommunityScope>
   );
 }
 
@@ -1577,8 +1580,8 @@ function SkillsChips({ skills }) {
 
 function SectionCard({ title, action, children, sx }) {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3, width: "100%", ...sx }}>
-      <CardHeader title={<Typography variant="h6" sx={{ fontWeight: 600 }}>{title}</Typography>} action={action} sx={{ pb: 0.5 }} />
+    <Card variant="outlined" className="ecp-profile-section" sx={{ borderRadius: 3, width: "100%", ...sx }}>
+      <CardHeader title={<Typography variant="h6" sx={{ fontWeight: 700 }}>{title}</Typography>} action={action} sx={{ pb: 0.5 }} />
       <CardContent sx={{ pt: 1.5 }}>{children}</CardContent>
     </Card>
   );
@@ -1588,13 +1591,14 @@ function SectionSkeleton({ minHeight = 140, lines = 3 }) {
   return (
     <Card
       variant="outlined"
+      className="ecp-profile-section"
       sx={{
         borderRadius: 3,
         width: "100%",
         minHeight,
         display: "flex",
         flexDirection: "column",
-        p: 2,
+        p: 2.5,
       }}
     >
       <Skeleton variant="text" width="40%" height={28} sx={{ mb: 1 }} />
@@ -2187,18 +2191,18 @@ function VerificationCard({ status, onVerify }) {
       title="Verification"
       sx={{
         mb: 2,
-        borderColor: isVerified ? "primary.light" : isPending ? "#14b8a6" : "divider",
-        bgcolor: isVerified ? "primary.50" : isPending ? "#f0fdfa" : "background.paper"
+        borderColor: isVerified ? "rgba(10,147,150,0.35)" : isPending ? "rgba(181,71,8,0.25)" : IMAA.border,
+        bgcolor: isVerified ? IMAA.tealLight : isPending ? "#FFFAEB" : "#FFFFFF"
       }}
     >
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", textAlign: "center", pb: 1 }}>
         {isVerified ? (
           <>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "primary.main" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: IMAA.teal }}>
               <VerifiedRoundedIcon sx={{ fontSize: 40 }} />
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: IMAA.navy }}>
                 Verified Profile
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -2208,14 +2212,14 @@ function VerificationCard({ status, onVerify }) {
           </>
         ) : isPending ? (
           <>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#14b8a6" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#B54708" }}>
               <Box
                 sx={{
                   width: 40,
                   height: 40,
                   borderRadius: "50%",
                   border: "3px solid",
-                  borderColor: "#14b8a6",
+                  borderColor: "#F79009",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -2226,7 +2230,7 @@ function VerificationCard({ status, onVerify }) {
               </Box>
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: IMAA.navy }}>
                 Verification {status === "review" ? "Under Review" : "Pending"}
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -2236,10 +2240,10 @@ function VerificationCard({ status, onVerify }) {
           </>
         ) : (
           <>
-            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+            <Typography variant="body1" sx={{ fontWeight: 600, color: IMAA.navy }}>
               Verify your profile and identity to unleash all benefits of the community platform.
             </Typography>
-            <Button variant="contained" color="primary" onClick={onVerify} sx={{ px: 4, borderRadius: 20 }}>
+            <Button variant="contained" color="primary" onClick={onVerify} sx={{ px: 4, borderRadius: 2 }}>
               GET VERIFIED
             </Button>
           </>
@@ -3344,7 +3348,7 @@ function AboutTab({
     <Box>
       <Grid container spacing={2} sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, alignItems: "flex-start" }}>
         {/* LEFT: About / Skills / Experience / Education */}
-        <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
+        <Grid sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
 
           <VerificationCard status={profile.kyc_status} onVerify={onStartKYC} />
 
@@ -3366,7 +3370,7 @@ function AboutTab({
                 wordBreak: "break-word",
               }}
             >
-              {profile.bio || <Box sx={{ color: "text.secondary" }}>List your major duties...</Box>}
+              {profile.bio || <Box component="span" sx={{ color: IMAA.hint }}>List your major duties...</Box>}
             </Typography>
             {Boolean((profile.bio || "").trim()) && (aboutExpanded || aboutHasOverflow) && (
               <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.5 }}>
@@ -3489,11 +3493,10 @@ function AboutTab({
             ) : (
               <Box sx={{ textAlign: "center", py: 4 }}>
                 <Avatar
+                  className="ecp-profile-empty-icon"
                   sx={{
-                    width: 64,
-                    height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    width: 56,
+                    height: 56,
                     mx: "auto",
                   }}
                 >
@@ -3558,7 +3561,7 @@ function AboutTab({
               </List>
             ) : (
               <Box sx={{ textAlign: "center", py: 4 }}>
-                <Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", mx: "auto" }}>
+                <Avatar className="ecp-profile-empty-icon" sx={{ width: 56, height: 56, mx: "auto" }}>
                   <HistoryEduRoundedIcon />
                 </Avatar>
 
@@ -3651,11 +3654,10 @@ function AboutTab({
             ) : (
               <Box sx={{ textAlign: "center", py: 4 }}>
                 <Avatar
+                  className="ecp-profile-empty-icon"
                   sx={{
-                    width: 64,
-                    height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    width: 56,
+                    height: 56,
                     mx: "auto",
                   }}
                 >
@@ -3744,11 +3746,10 @@ function AboutTab({
             ) : (
               <Box sx={{ textAlign: "center", py: 4 }}>
                 <Avatar
+                  className="ecp-profile-empty-icon"
                   sx={{
-                    width: 64,
-                    height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    width: 56,
+                    height: 56,
                     mx: "auto",
                   }}
                 >
@@ -3776,7 +3777,7 @@ function AboutTab({
         </Grid>
 
         {/* RIGHT: Contact + New Sections */}
-        <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
+        <Grid sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
           <SectionCard title="E-Mail" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("emails")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <Stack spacing={1} sx={{ mt: 1 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -4038,11 +4039,10 @@ function AboutTab({
             ) : (
               <Box sx={{ textAlign: "center", py: 4 }}>
                 <Avatar
+                  className="ecp-profile-empty-icon"
                   sx={{
-                    width: 64,
-                    height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    width: 56,
+                    height: 56,
                     mx: "auto",
                   }}
                 >
@@ -4134,11 +4134,10 @@ function AboutTab({
             ) : (
               <Box sx={{ textAlign: "center", py: 4 }}>
                 <Avatar
+                  className="ecp-profile-empty-icon"
                   sx={{
-                    width: 64,
-                    height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    width: 56,
+                    height: 56,
                     mx: "auto",
                   }}
                 >
@@ -4266,7 +4265,7 @@ function AboutTab({
                     <Stack spacing={1.5} sx={{ mt: 1 }}>
                       {/* Main Email Row */}
                       <Grid container spacing={1} alignItems="center">
-                        <Grid item xs={12} sm={5}>
+                        <Grid size={{ xs: 12, sm: 5 }}>
                           <TextField
                             label="Main Email"
                             fullWidth
@@ -4274,7 +4273,7 @@ function AboutTab({
                             value={profile.email || ""}
                           />
                         </Grid>
-                        <Grid item xs={6} sm={4}>
+                        <Grid size={{ xs: 6, sm: 4 }}>
                           <TextField
                             select
                             label="Type"
@@ -4302,7 +4301,7 @@ function AboutTab({
                             ))}
                           </TextField>
                         </Grid>
-                        <Grid item xs={6} sm={3}>
+                        <Grid size={{ xs: 6, sm: 3 }}>
                           <TextField
                             select
                             label="Visibility"
@@ -4327,7 +4326,7 @@ function AboutTab({
 
                       {contactForm.emails.map((item, idx) => (
                         <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
-                          <Grid item xs={12} sm={5}>
+                          <Grid size={{ xs: 12, sm: 5 }}>
                             <TextField
                               label="Email Address"
                               fullWidth
@@ -4346,7 +4345,7 @@ function AboutTab({
                               }}
                             />
                           </Grid>
-                          <Grid item xs={6} sm={3}>
+                          <Grid size={{ xs: 6, sm: 3 }}>
                             <TextField
                               select
                               label="Type"
@@ -4364,7 +4363,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={6} sm={3}>
+                          <Grid size={{ xs: 6, sm: 3 }}>
                             <TextField
                               select
                               label="Visibility"
@@ -4382,7 +4381,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={1} sm={1}>
+                          <Grid size={{ xs: 1, sm: 1 }}>
                             <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
@@ -4413,7 +4412,7 @@ function AboutTab({
                     <Stack spacing={1.5} sx={{ mt: 1 }}>
                       {contactForm.phones.map((item, idx) => (
                         <Grid container spacing={1} alignItems="flex-start" key={`phone-row-${idx}`}>
-                          <Grid item xs={12} sm={3}>
+                          <Grid size={{ xs: 12, sm: 3 }}>
                             <PhoneInputWithCountry
                               label="Number"
                               value={item.number}
@@ -4430,7 +4429,7 @@ function AboutTab({
                               }}
                             />
                           </Grid>
-                          <Grid item xs={6} sm={3}>
+                          <Grid size={{ xs: 6, sm: 3 }}>
                             <TextField
                               select
                               label="Type"
@@ -4448,7 +4447,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={6} sm={3}>
+                          <Grid size={{ xs: 6, sm: 3 }}>
                             <TextField
                               select
                               label="Visibility"
@@ -4466,7 +4465,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={8} sm={2}>
+                          <Grid size={{ xs: 8, sm: 2 }}>
                             <FormControlLabel
                               control={
                                 <Radio
@@ -4482,7 +4481,7 @@ function AboutTab({
                               label="Primary"
                             />
                           </Grid>
-                          <Grid item xs={4} sm={1}>
+                          <Grid size={{ xs: 4, sm: 1 }}>
                             <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
@@ -4578,7 +4577,7 @@ function AboutTab({
                     <Stack spacing={1.5} sx={{ mt: 1 }}>
                       {contactForm.websites.map((item, idx) => (
                         <Grid container spacing={1} alignItems="center" key={`site-row-${idx}`}>
-                          <Grid item xs={12} sm={4}>
+                          <Grid size={{ xs: 12, sm: 4 }}>
                             <TextField
                               label="Label"
                               fullWidth
@@ -4591,7 +4590,7 @@ function AboutTab({
                               }
                             />
                           </Grid>
-                          <Grid item xs={12} sm={5}>
+                          <Grid size={{ xs: 12, sm: 5 }}>
                             <TextField
                               label="URL"
                               fullWidth
@@ -4610,7 +4609,7 @@ function AboutTab({
                               }}
                             />
                           </Grid>
-                          <Grid item xs={7} sm={2}>
+                          <Grid size={{ xs: 7, sm: 2 }}>
                             <TextField
                               select
                               label="Visibility"
@@ -4628,7 +4627,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={5} sm={1}>
+                          <Grid size={{ xs: 5, sm: 1 }}>
                             <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
@@ -4657,7 +4656,7 @@ function AboutTab({
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Scheduler</Typography>
                     <Grid container spacing={1} sx={{ mt: 1 }} alignItems="center">
-                      <Grid item xs={12} sm={4}>
+                      <Grid size={{ xs: 12, sm: 4 }}>
                         <TextField
                           label="Label"
                           fullWidth
@@ -4670,7 +4669,7 @@ function AboutTab({
                           }
                         />
                       </Grid>
-                      <Grid item xs={12} sm={5}>
+                      <Grid size={{ xs: 12, sm: 5 }}>
                         <TextField
                           label="URL"
                           fullWidth
@@ -4686,7 +4685,7 @@ function AboutTab({
                           }}
                         />
                       </Grid>
-                      <Grid item xs={12} sm={3}>
+                      <Grid size={{ xs: 12, sm: 3 }}>
                         <TextField
                           select
                           label="Visibility"
@@ -4821,7 +4820,7 @@ function AboutTab({
               ))}
             </TextField>
 
-            <Box sx={{ border: '1px dashed', borderColor: 'divider', p: 2, borderRadius: 1 }}>
+            <Box sx={{ border: '1px dashed', borderColor: IMAA.borderStrong, bgcolor: IMAA.bg, p: 2, borderRadius: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 <VerifiedRoundedIcon fontSize="inherit" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
                 Certificates & Proof

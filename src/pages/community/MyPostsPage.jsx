@@ -299,7 +299,7 @@ function PostComposer({ communityId, onCreate }) {
             <Grid container spacing={1}>
               {images.map((src, i) => (
                 <Grid key={i} size={4}>
-                  <img src={src} alt="p" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 4 }} />
+                  <img src={src} alt="p" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${IMAA.border}` }} />
                 </Grid>
               ))}
             </Grid>
@@ -767,7 +767,7 @@ function PostCard({
             onClick={handleOpenPicker}
             sx={{
               textTransform: "none",
-              color: hasReaction ? "primary.main" : "text.secondary",
+              color: hasReaction ? IMAA.teal : "text.secondary",
               fontWeight: hasReaction ? 600 : 400,
             }}
             startIcon={

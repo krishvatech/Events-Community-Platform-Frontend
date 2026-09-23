@@ -67,6 +67,8 @@ import { Menu, MenuItem } from "@mui/material";
 import { isAdminUser } from "../../utils/adminRole";
 import { startKYC } from "../../utils/api";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import ImaaCommunityScope from "../../components/community/ImaaCommunityScope";
+import { IMAA } from "../../components/community/imaaCommunityTheme";
 
 
 
@@ -338,9 +340,9 @@ const pickAvatarUrl = (u) => {
 
 // UI helpers
 const Section = ({ title, children, action }) => (
-  <Card variant="outlined" sx={{ borderRadius: 2 }}>
+  <Card variant="outlined" className="ecp-profile-section" sx={{ borderRadius: 3 }}>
     <CardHeader
-      title={<Typography variant="h6" sx={{ fontWeight: 600 }}>{title}</Typography>}
+      title={<Typography variant="h6" sx={{ fontWeight: 700 }}>{title}</Typography>}
       action={action}
       sx={{ pb: 0.5 }}
     />
@@ -669,16 +671,17 @@ function RichPostCard({
 
 
   return (
-    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+    <Card variant="outlined" className="ecp-post-card" sx={{ borderRadius: 3, borderColor: IMAA.border, boxShadow: IMAA.shadowSm }}>
 
       <CardHeader
         avatar={
-          <Avatar sx={{ width: 40, height: 40 }} src={avatarUrl}>
+          <Avatar sx={{ width: 44, height: 44, bgcolor: IMAA.navy, fontWeight: 700 }} src={avatarUrl}>
             {(fullName || "?").slice(0, 1).toUpperCase()}
           </Avatar>
         }
-        title={<Typography fontWeight={600}>{fullName || "User"}</Typography>}
+        title={<Typography fontWeight={700} sx={{ color: IMAA.navy, fontSize: 15 }}>{fullName || "User"}</Typography>}
         subheader={timeAgo(post.created_at)}
+        subheaderTypographyProps={{ sx: { color: IMAA.hint, fontSize: 12.5 } }}
       />
       <CardContent sx={{ pt: 0 }}>
         {post.is_removed || post.moderation_status === "removed" ? (
@@ -688,7 +691,7 @@ function RichPostCard({
         ) : (
           <>
             {post.content && (
-              <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>
+              <Typography sx={{ whiteSpace: "pre-wrap", color: IMAA.body, fontSize: 14.5, lineHeight: 1.6, wordBreak: "break-word" }}>{post.content}</Typography>
             )}
             {post.link && (
               <Button
@@ -704,7 +707,7 @@ function RichPostCard({
             {Array.isArray(post.images) && post.images.length > 0 && (
               <Stack spacing={1} direction="row" sx={{ mt: 1 }} flexWrap="wrap">
                 {post.images.map((src, idx) => (
-                  <Box key={idx} sx={{ width: "100%", maxWidth: 200, borderRadius: 1, overflow: "hidden" }}>
+                  <Box key={idx} sx={{ width: "100%", maxWidth: 200, borderRadius: 2, overflow: "hidden", border: `1px solid ${IMAA.border}` }}>
                     <img
                       src={src}
                       alt={`post-img-${idx}`}
@@ -785,7 +788,7 @@ function RichPostCard({
                             sx={{ mb: 0.5 }}
                           >
                             <Stack direction="row" spacing={1} alignItems="center">
-                              <Typography variant="body2">{label}</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: IMAA.navy }}>{label}</Typography>
                               {userVoted && (
                                 <Chip
                                   size="small"
@@ -805,10 +808,10 @@ function RichPostCard({
                             variant="determinate"
                             value={pct}
                             sx={{
-                              height: 10,
-                              borderRadius: 5,
+                              height: 8,
+                              borderRadius: 999,
                               "& .MuiLinearProgress-bar": {
-                                borderRadius: 5,
+                                borderRadius: 999,
                               },
                             }}
                           />
@@ -868,6 +871,8 @@ function RichPostCard({
                     width: 24,
                     height: 24,
                     fontSize: 14,
+                    bgcolor: IMAA.bg,
+                    borderColor: "#fff",
                   },
                 }}
               >
@@ -885,27 +890,28 @@ function RichPostCard({
                   })}
               </AvatarGroup>
 
-              <Typography variant="body2">
+              <Typography variant="body2" sx={{ color: IMAA.muted, fontSize: 13 }}>
                 {metaLikeLabel}
               </Typography>
             </Stack>
 
             {/* Right: share count, like HomePage "My posts" section */}
-            <Button size="small" disabled={!shareCount} onClick={() => {
+            <Button size="small" className="ecp-post-meta-link" disabled={!shareCount} onClick={() => {
               if (shareCount) setShareListOpen(true);
             }}>
-              {shareCount.toLocaleString()} SHARES
+              {shareCount.toLocaleString()} shares
             </Button>
           </Stack>
         </Box>
       )}
 
-      <Divider sx={{ my: 1 }} />
+      <Divider sx={{ mt: 1, mb: 0.5, borderColor: IMAA.border }} />
 
       {/* Action row: Like / Comment / Share */}
       <Stack
         direction="row"
         alignItems="center"
+        className="ecp-post-actions"
         justifyContent={{ xs: "space-between", sm: "space-around" }}
         spacing={{ xs: 0.5, sm: 1.5 }}
         sx={{
@@ -917,6 +923,7 @@ function RichPostCard({
         {/* LIKE / REACTIONS */}
         <Button
           size="small"
+          className={`ecp-post-action${hasReaction ? " is-active" : ""}`}
           onClick={handleLikeClick}
           sx={{
             flex: { xs: 1, sm: "0 0 auto" },
@@ -924,7 +931,7 @@ function RichPostCard({
             px: { xs: 0.25, sm: 1 },
             fontSize: { xs: 11, sm: 12 },
             textTransform: "none",
-            color: hasReaction ? "primary.main" : "text.secondary",
+            color: hasReaction ? IMAA.teal : "text.secondary",
             fontWeight: hasReaction ? 600 : 400,
             "& .MuiButton-startIcon": {
               mr: { xs: 0.25, sm: 0.5 },
@@ -942,6 +949,7 @@ function RichPostCard({
         {/* COMMENT */}
         <Button
           size="small"
+          className="ecp-post-action"
           startIcon={<ChatBubbleOutlineIcon />}
           onClick={() => setCommentsOpen(true)}
           sx={{
@@ -954,12 +962,13 @@ function RichPostCard({
             },
           }}
         >
-          COMMENT
+          Comment
         </Button>
 
         {/* SHARE */}
         <Button
           size="small"
+          className="ecp-post-action"
           startIcon={<IosShareIcon />}
           onClick={() => setShareOpen(true)}
           sx={{
@@ -972,7 +981,7 @@ function RichPostCard({
             },
           }}
         >
-          SHARE
+          Share
         </Button>
       </Stack>
 
@@ -1058,10 +1067,10 @@ function RichPostCard({
 
 function RichPostSkeleton() {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: IMAA.border, boxShadow: IMAA.shadowSm }}>
       <CardHeader
         avatar={
-          <Skeleton variant="circular" width={40} height={40} />
+          <Skeleton variant="circular" width={44} height={44} />
         }
         title={<Skeleton width="40%" />}
         subheader={<Skeleton width="25%" />}
@@ -1555,12 +1564,12 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
     return (
       <Box sx={{ pl: depth ? 5 : 0, mt: depth ? 0.75 : 1 }}>
         <Stack direction="row" spacing={1} alignItems="flex-start">
-          <Avatar sx={{ width: 32, height: 32 }} src={c.authorAvatar}>
+          <Avatar sx={{ width: 32, height: 32, bgcolor: IMAA.navy }} src={c.authorAvatar}>
             {(c.authorName || "U").slice(0, 1)}
           </Avatar>
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Typography variant="subtitle2">
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: IMAA.navy }}>
                 {c.authorName}
               </Typography>
               {c.isVerified && (
@@ -1592,7 +1601,7 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
                   )
                 }
                 sx={{
-                  color: liked ? "teal" : "text.secondary",
+                  color: liked ? IMAA.coral : "text.secondary",
                   minWidth: "auto",
                   px: 1,
                 }}
@@ -1731,7 +1740,7 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
             <Box
               mt={2}
               p={1.5}
-              sx={{ bgcolor: "grey.100", borderRadius: 1 }}
+              sx={{ bgcolor: IMAA.bg, border: `1px solid ${IMAA.border}`, borderRadius: 2 }}
             >
               <Typography
                 variant="body2"
@@ -3530,7 +3539,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   /* ========================= */
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <ImaaCommunityScope page="rich-profile">
+    <div className="min-h-screen" style={{ background: IMAA.bg }}>
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <div className="flex flex-col gap-4 md:gap-6">
           <main className="w-full">
@@ -3548,11 +3558,11 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                     }}
                     sx={{
                       textTransform: "none",
-                      color: "text.primary",
+                      color: IMAA.navy,
                       fontWeight: 600,
                       minWidth: "auto",
                       px: 1,
-                      "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                      "&:hover": { bgcolor: "#fff", color: IMAA.teal }
                     }}
                   >
                     {viewAsPublic ? "Exit Public View" : "Back to Explore Members"}
@@ -3560,23 +3570,23 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                 </Box>
 
                 {/* Header Card */}
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                  <Box className="flex items-center gap-3">
-                    <Avatar sx={{ width: 56, height: 56 }} src={pickAvatarUrl(userItem)}>
+                <Paper variant="outlined" className="ecp-profile-header" sx={{ p: 0, borderRadius: 3 }}>
+                  <Box className="ecp-profile-banner" />
+                  <Box className="flex items-end gap-3 flex-wrap" sx={{ px: { xs: 2, sm: 3 }, pb: 2.5, mt: "-36px" }}>
+                    <Avatar className="ecp-profile-avatar" sx={{ width: 80, height: 80, fontSize: 30 }} src={pickAvatarUrl(userItem)}>
                       {(fullName || "?").slice(0, 1).toUpperCase()}
                     </Avatar>
-                    <Box sx={{ minWidth: 0 }}>
+                    <Box sx={{ minWidth: 0, pb: 0.5 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                         <Typography
                           variant="h6"
-                          sx={{ fontWeight: 700 }}
-                          className="truncate"
+                          className="truncate ecp-profile-name"
                         >
                           {fullName}
                         </Typography>
                         {userItem?.profile?.kyc_status === "approved" && (
                           <Tooltip title="Verified Member">
-                            <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 20 }} />
+                            <VerifiedIcon sx={{ color: IMAA.teal, fontSize: 22 }} />
                           </Tooltip>
                         )}
                       </Box>
@@ -3584,6 +3594,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                         variant="body2"
                         color="text.secondary"
                         className="truncate"
+                        sx={{ mt: 0.25, fontSize: 14.5 }}
                       >
                         {(currentExp?.position || titleFromRoster || "—")} ·{" "}
                         {(currentExp?.community_name || companyFromRoster || "—")}
@@ -3592,9 +3603,10 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
                     {/* Right-side actions */}
                     {!isMe && !viewAsPublic && (
-                      <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end", ml: "auto", gap: 1 }}>
+                      <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", ml: "auto", gap: 1, pb: 0.5 }}>
                         <IconButton
                           size="small"
+                          className="ecp-icon-btn"
                           onClick={(e) => setMenuAnchor(e.currentTarget)}
                         >
                           <MoreVertIcon />
@@ -3624,7 +3636,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               <Chip
                                 label={`${mutualCount} mutual`}
                                 size="small"
-                                sx={{ alignSelf: "center" }}
+                                sx={{ alignSelf: "center", bgcolor: IMAA.tealLight, color: IMAA.tealHover, fontWeight: 700 }}
                               />
                             )}
                             {connectionsAreVisible && (
@@ -3675,7 +3687,6 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               <Button
                                 variant="contained"
                                 size="small"
-                                color="success"
                                 onClick={() => respondToRequest("accept")}
                                 disabled={friendSubmitting}
                                 sx={{ textTransform: "none", borderRadius: 2 }}
@@ -3722,7 +3733,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                   count and a friend button. About mirrors the prior sections
                   (About, Current role, Experience, Education) for viewing.
                 */}
-                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                <Card variant="outlined" className="ecp-profile-tabs" sx={{ borderRadius: 3 }}>
                   <Tabs
                     value={tab}
                     onChange={(e, v) => setTab(v)}
@@ -3738,8 +3749,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                   {tab === 0 && (
                     <CardContent>
                       {(!isMe && !viewAsPublic && (friendStatus || "").toLowerCase() !== "friends") ? (
-                        <Box sx={{ textAlign: "center", py: 6 }}>
-                          <Typography variant="h6" sx={{ mb: 0.5 }}>This account is private</Typography>
+                        <Box className="ecp-empty-state" sx={{ py: 6 }}>
+                          <Typography variant="h6" sx={{ mb: 0.5, fontWeight: 700, color: IMAA.navy }}>This account is private</Typography>
                           <Typography variant="body2" color="text.secondary">
                             Add this member as a Contact to see their posts.
                           </Typography>
@@ -3775,7 +3786,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           <RichPostSkeleton />
                         </Stack>)
                       ) : posts.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" className="ecp-empty-state" sx={{ fontWeight: 600 }}>
                           No posts yet.
                         </Typography>
                       ) : (
@@ -3820,8 +3831,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                         <Section title="About">
                           {/* EMAILS - display ALL public emails */}
                           {visibleEmails.length > 0 && (
-                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                            <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                              <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                                 Email{visibleEmails.length > 1 ? "s" : ""}:
                               </Typography>
                               <Stack spacing={0.5}>
@@ -3831,7 +3842,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                       variant="body2"
                                       component="a"
                                       href={`mailto:${emailObj.email}`}
-                                      sx={{ color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                                      sx={{ color: IMAA.navy, fontWeight: 500, wordBreak: "break-all", textDecoration: "none", "&:hover": { color: IMAA.teal, textDecoration: "underline" } }}
                                     >
                                       {emailObj.email}
                                     </Typography>
@@ -3856,13 +3867,13 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                             </Box>
                           )}
                           {visibleEmails.length === 0 && emailVisibilityInfo.anyEmail && (
-                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                            <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                              <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                                 Email:
                               </Typography>
                               {emailBlockedByVerified ? (
-                                <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "#f8fafc", borderColor: "#e2e8f0", flex: 1 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: IMAA.bg, borderColor: IMAA.border, borderLeft: `3px solid ${IMAA.coral}`, borderRadius: 2, flex: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 700, color: IMAA.navy }}>
                                     This member only shares their email with Verified Professionals.
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary">
@@ -3905,8 +3916,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           )}
 
                           {/* PHONES */}
-                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                          <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                            <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                               Phone{visiblePhones.length > 1 ? "s" : ""}:
                             </Typography>
                             {visiblePhones.length > 0 ? (
@@ -3918,7 +3929,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                       variant="body2"
                                       component="a"
                                       href={`tel:${phoneObj.number.startsWith('+') ? phoneObj.number : '+' + phoneObj.number}`}
-                                      sx={{ color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                                      sx={{ color: IMAA.navy, fontWeight: 500, textDecoration: "none", "&:hover": { color: IMAA.teal, textDecoration: "underline" } }}
                                     >
                                       {phoneObj.number.startsWith('+') ? phoneObj.number : '+' + phoneObj.number}
                                     </Typography>
@@ -3950,15 +3961,15 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           </Box>
 
                           {/* WEBSITES */}
-                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                          <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                            <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                               Website{portfolioLinks.length > 1 ? "s" : ""}:
                             </Typography>
                             {portfolioLinks.length > 0 ? (
                               <Stack spacing={0.5}>
                                 {portfolioLinks.map((p, idx) => (
                                   <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                    <LanguageIcon sx={{ fontSize: 16, color: "primary.main" }} />
+                                    <LanguageIcon sx={{ fontSize: 16, color: IMAA.teal }} />
                                     <Button
                                       size="small"
                                       component="a"
@@ -3970,7 +3981,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                         p: 0,
                                         minWidth: 0,
                                         fontSize: 'inherit',
-                                        color: 'primary.main',
+                                        color: IMAA.teal,
                                         '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' }
                                       }}
                                     >
@@ -3996,16 +4007,16 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               )
                             )}
                           </Box>
-                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                          <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                            <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                               Company:
                             </Typography>
                             <Typography variant="body2">
                               {currentExp?.community_name || companyFromRoster || "—"}
                             </Typography>
                           </Box>
-                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                          <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                            <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                               Job Title:
                             </Typography>
                             <Typography variant="body2">
@@ -4013,8 +4024,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                             </Typography>
                           </Box>
                           {visibleLocation && (
-                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                            <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                              <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                                 Location:
                               </Typography>
                               <Typography variant="body2">
@@ -4025,8 +4036,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
                           {/* Social Profiles */}
                           {socialItems.length > 0 && (
-                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                            <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                              <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                                 Social:
                               </Typography>
                               <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -4039,7 +4050,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     title={social.label}
-                                    sx={{ color: "primary.main" }}
+                                    className="ecp-icon-btn"
+                                    sx={{ color: IMAA.navy }}
                                   >
                                     {social.icon}
                                   </IconButton>
@@ -4049,8 +4061,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           )}
 
                           {/* Scheduler */}
-                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                          <Box sx={{ display: "flex", gap: 1.5, py: 1, borderBottom: `1px solid ${IMAA.border}`, "&:last-child": { borderBottom: "none" }, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+                            <Typography variant="subtitle2" color="text.secondary" className="ecp-profile-label" sx={{ width: 120 }}>
                               Book an appointment:
                             </Typography>
                             {visibleScheduler ? (
@@ -4087,7 +4099,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
                         {/* Current role section */}
                         <Section title="Current role">
-                          <Typography variant="body2" sx={{ mb: 0.5 }}>
+                          <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 700, color: IMAA.navy, fontSize: 15 }}>
                             {currentExp?.position || titleFromRoster || "—"}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
@@ -4113,7 +4125,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           ) : experiences.length ? (
                             <List dense disablePadding>
                               {experiences.map((x) => (
-                                <ListItem key={x.id} disableGutters sx={{ py: 0.5 }}>
+                                <ListItem key={x.id} disableGutters sx={{ py: 1 }}>
                                   <ListItemText
                                     primary={
                                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -4150,7 +4162,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           ) : educations.length ? (
                             <List dense disablePadding>
                               {educations.map((e) => (
-                                <ListItem key={e.id} disableGutters sx={{ py: 0.5 }}>
+                                <ListItem key={e.id} disableGutters sx={{ py: 1 }}>
                                   <ListItemText
                                     primary={
                                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -4201,7 +4213,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           ) : trainings.length ? (
                             <List dense disablePadding>
                               {trainings.map((t) => (
-                                <ListItem key={t.id} disableGutters sx={{ py: 0.5 }}>
+                                <ListItem key={t.id} disableGutters sx={{ py: 1 }}>
                                   <ListItemText
                                     primary={
                                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -4264,7 +4276,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           ) : certifications.length ? (
                             <List dense disablePadding>
                               {certifications.map((c) => (
-                                <ListItem key={c.id} disableGutters sx={{ py: 0.5 }}>
+                                <ListItem key={c.id} disableGutters sx={{ py: 1 }}>
                                   <ListItemText
                                     primary={
                                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -4328,7 +4340,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           ) : memberships.length ? (
                             <List dense disablePadding>
                               {memberships.map((m) => (
-                                <ListItem key={m.id} disableGutters sx={{ py: 0.5 }}>
+                                <ListItem key={m.id} disableGutters sx={{ py: 1 }}>
                                   <ListItemText
                                     primary={
                                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -4393,13 +4405,13 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           <CircularProgress size={32} />
                         </Box>
                       ) : visitors.length === 0 ? (
-                        <Box sx={{ textAlign: "center", py: 4 }}>
-                          <Typography variant="body2" color="text.secondary">
+                        <Box className="ecp-empty-state">
+                          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
                             No profile visitors yet.
                           </Typography>
                         </Box>
                       ) : (
-                        <List disablePadding>
+                        <List disablePadding sx={{ bgcolor: "#fff", border: `1px solid ${IMAA.border}`, borderRadius: 3, boxShadow: IMAA.shadowSm, overflow: "hidden" }}>
                           {visitors.map((visitor) => (
                             <ListItem
                               key={visitor.id || Math.random()}
@@ -4407,12 +4419,12 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               onClick={() => !visitor.is_anonymous && navigate(`/community/rich-profile/${visitor.id}`)}
                               sx={{
                                 py: 1.5,
-                                px: 0,
-                                borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                                px: 2,
+                                borderBottom: `1px solid ${IMAA.border}`,
                                 "&:last-child": { borderBottom: "none" },
                                 cursor: !visitor.is_anonymous ? "pointer" : "default",
                                 "&:hover": !visitor.is_anonymous ? {
-                                  backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                  backgroundColor: IMAA.bg,
                                 } : {},
                                 transition: "background-color 0.2s",
                               }}
@@ -4420,7 +4432,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               <ListItemAvatar>
                                 <Avatar
                                   src={visitor.avatar_url || ""}
-                                  sx={{ width: 40, height: 40, bgcolor: "primary.main" }}
+                                  sx={{ width: 40, height: 40, bgcolor: IMAA.navy, fontWeight: 700 }}
                                 >
                                   {visitor.avatar_url ? null : (visitor.full_name || visitor.username || "?").slice(0, 1).toUpperCase()}
                                 </Avatar>
@@ -4428,12 +4440,12 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               <ListItemText
                                 primary={
                                   <Stack direction="row" alignItems="center" gap={0.5}>
-                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: IMAA.navy }}>
                                       {visitor.is_anonymous ? "Someone" : `${visitor.first_name || ""} ${visitor.last_name || ""}`.trim() || visitor.full_name || visitor.username}
                                     </Typography>
                                     {!visitor.is_anonymous && isVerifiedStatus(visitor.kyc_status || visitor.profile?.kyc_status) && (
                                       <Tooltip title="Verified Member">
-                                        <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 16 }} />
+                                        <VerifiedIcon sx={{ color: IMAA.teal, fontSize: 16 }} />
                                       </Tooltip>
                                     )}
                                   </Stack>
@@ -4580,7 +4592,6 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                         <Button
                                           size="small"
                                           variant="contained"
-                                          color="success"
                                           disabled={connSubmitting[String(f.id)]}
                                           onClick={() => respondToConnRequest(f.id, "accept")}
                                           sx={{ textTransform: "none", borderRadius: 2, minWidth: 'auto', px: 1 }}
@@ -4619,7 +4630,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           }
                         >
                           <ListItemAvatar>
-                            <Avatar sx={{ width: 36, height: 36 }} src={pickAvatarUrl(f)}>
+                            <Avatar sx={{ width: 36, height: 36, bgcolor: IMAA.navy }} src={pickAvatarUrl(f)}>
                               {(name || "?").slice(0, 1).toUpperCase()}
                             </Avatar>
                           </ListItemAvatar>
@@ -4631,7 +4642,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                 </Typography>
                                 {isVerifiedStatus(f?.kyc_status || f?.profile?.kyc_status) && (
                                   <Tooltip title="Verified Member">
-                                    <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 16 }} />
+                                    <VerifiedIcon sx={{ color: IMAA.teal, fontSize: 16 }} />
                                   </Tooltip>
                                 )}
                               </Box>
@@ -4661,10 +4672,10 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         maxWidth="xs"
         PaperProps={{
           sx: {
-            borderRadius: 4,
+            borderRadius: 3,
             overflow: "hidden",
-            background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
-            boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
+            background: "#ffffff",
+            boxShadow: "0 12px 32px rgba(27, 42, 74, 0.18)",
           },
         }}
       >
@@ -4673,8 +4684,8 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
             px: 3,
             pt: 2.5,
             pb: 1.5,
-            background: "linear-gradient(135deg, rgba(8,145,178,0.14), rgba(14,116,144,0.05))",
-            borderBottom: "1px solid rgba(148,163,184,0.18)",
+            background: IMAA.bg,
+            borderBottom: `1px solid ${IMAA.border}`,
           }}
         >
           <Chip
@@ -4682,25 +4693,25 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
             label="Contact Management"
             sx={{
               mb: 1.5,
-              bgcolor: "rgba(8,145,178,0.12)",
-              color: "#0f766e",
+              bgcolor: IMAA.tealLight,
+              color: IMAA.tealHover,
               fontWeight: 700,
             }}
           />
-          <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+          <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 700, color: IMAA.navy }}>
             Remove contact?
           </DialogTitle>
         </Box>
         <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <Avatar src={profileAvatarUrl || ""} sx={{ bgcolor: "#0f766e", width: 44, height: 44, fontWeight: 800 }}>
+            <Avatar src={profileAvatarUrl || ""} sx={{ bgcolor: IMAA.navy, width: 44, height: 44, fontWeight: 700 }}>
               {!profileAvatarUrl ? (fullName || "?").slice(0, 1).toUpperCase() : null}
             </Avatar>
             <Box>
-              <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+              <Typography sx={{ fontWeight: 700, color: IMAA.navy }}>
                 {fullName || "This member"}
               </Typography>
-              <Typography variant="body2" sx={{ color: "#475569" }}>
+              <Typography variant="body2" sx={{ color: IMAA.muted }}>
                 This removes them from your contacts list. You can send a new request later.
               </Typography>
             </Box>
@@ -4711,7 +4722,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
             onClick={closeRemoveFriendDialog}
             disabled={removeDialog.submitting}
             variant="outlined"
-            sx={{ borderRadius: 999, px: 2.25, textTransform: "none", fontWeight: 700 }}
+            sx={{ borderRadius: 2, px: 2.25, textTransform: "none", fontWeight: 700 }}
           >
             Keep contact
           </Button>
@@ -4720,7 +4731,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
             disabled={removeDialog.submitting}
             variant="contained"
             color="error"
-            sx={{ borderRadius: 999, px: 2.5, textTransform: "none", fontWeight: 700, boxShadow: "none" }}
+            sx={{ borderRadius: 2, px: 2.5, textTransform: "none", fontWeight: 700, boxShadow: "none" }}
           >
             {removeDialog.submitting ? "Removing..." : "Remove Contact"}
           </Button>
@@ -4753,5 +4764,6 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         </Alert>
       </Snackbar>
     </div >
+    </ImaaCommunityScope>
   );
 }

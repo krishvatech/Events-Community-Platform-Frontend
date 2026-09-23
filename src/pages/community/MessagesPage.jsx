@@ -462,7 +462,7 @@ function SharePreview({ attachment, mine }) {
                       width: `${opt.pct}%`,
                       maxWidth: "100%",
                       borderRadius: 9999,
-                      bgcolor: "primary.main",
+                      bgcolor: IMAA.teal,
                     }}
                   />
                 </Box>
@@ -1304,10 +1304,10 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                       bgcolor: mine ? "rgba(255,255,255,0.7)" : IMAA.bg,
                       cursor: "pointer",
                       mb: 0.5,
-                      border: "1px solid rgba(0,0,0,0.08)"
+                      border: `1px solid ${BORDER}`
                     }}
                   >
-                    <Box sx={{ height: 120, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+                    <Box sx={{ height: 120, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: `1px solid ${BORDER}` }}>
                       <PictureAsPdfRoundedIcon sx={{ fontSize: 50, color: IMAA.border }} />
                     </Box>
                     <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5 }}>
@@ -3988,7 +3988,7 @@ export default function MessagesPage() {
                               }}
                             />
                           ) : (
-                            <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "white", borderRadius: 4 }}>
+                            <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "white", borderRadius: 3, border: `1px solid ${BORDER}` }}>
                               <DescriptionOutlinedIcon sx={{ fontSize: 60, color: IMAA.teal }} />
                               <Typography variant="h6">{draftAttachments[activePreviewIndex].name}</Typography>
                               <Typography variant="body2" color="text.secondary">
@@ -4218,7 +4218,7 @@ export default function MessagesPage() {
                                   cursor: "pointer",
                                   borderRadius: 1,
                                   p: 0.5,
-                                  "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
+                                  "&:hover": { bgcolor: IMAA.bg },
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();

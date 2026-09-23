@@ -351,6 +351,134 @@
   padding-right: 18px;
 }
 
+/* ---------- Profile (Community Profile + Rich Profile) ---------- */
+
+.ecp-community-page .ecp-profile-header {
+  overflow: hidden;
+  border-color: var(--ecp-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--ecp-shadow-sm);
+}
+
+.ecp-community-page .ecp-profile-banner {
+  height: 88px;
+  background:
+    linear-gradient(120deg, var(--ecp-navy) 0%, var(--ecp-navy-2) 58%, var(--ecp-teal) 100%);
+}
+
+.ecp-community-page .ecp-profile-avatar.MuiAvatar-root {
+  border: 4px solid #fff;
+  background: var(--ecp-navy);
+  box-shadow: var(--ecp-shadow-md);
+  font-weight: 700;
+}
+
+.ecp-community-page .ecp-profile-name {
+  color: var(--ecp-navy);
+  font-family: var(--imaa-font-serif);
+  font-size: clamp(20px, 2.2vw, 26px);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ecp-community-page .ecp-profile-section.MuiCard-root {
+  border-color: var(--ecp-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--ecp-shadow-sm);
+}
+
+.ecp-community-page .ecp-profile-section .MuiCardHeader-root {
+  padding: 16px 20px 4px;
+}
+
+.ecp-community-page .ecp-profile-section .MuiCardHeader-title .MuiTypography-root {
+  color: var(--ecp-navy);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.ecp-community-page .ecp-profile-section .MuiCardContent-root,
+.ecp-community-page .ecp-profile-section .MuiCardContent-root:last-child {
+  padding: 12px 20px 20px;
+}
+
+.ecp-community-page .ecp-profile-section .MuiCardHeader-action {
+  margin: 0;
+  align-self: center;
+}
+
+.ecp-community-page .ecp-profile-section .MuiCardHeader-action .MuiIconButton-root,
+.ecp-community-page .ecp-profile-section .MuiListItemSecondaryAction-root .MuiIconButton-root {
+  width: 32px;
+  height: 32px;
+  margin-left: 4px;
+  border: 1px solid var(--ecp-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ecp-muted);
+}
+
+.ecp-community-page .ecp-profile-section .MuiCardHeader-action .MuiIconButton-root:hover,
+.ecp-community-page .ecp-profile-section .MuiListItemSecondaryAction-root .MuiIconButton-root:hover {
+  border-color: var(--ecp-border-strong);
+  background: var(--ecp-bg);
+  color: var(--ecp-navy);
+}
+
+.ecp-community-page .ecp-profile-section .MuiListItem-root {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.ecp-community-page .ecp-profile-section .MuiListItem-root:has(> .MuiListItemSecondaryAction-root) {
+  padding-right: 116px;
+}
+
+.ecp-community-page .ecp-profile-section .MuiListItem-root + .MuiListItem-root {
+  border-top: 1px solid var(--ecp-border);
+}
+
+.ecp-community-page .ecp-profile-section .MuiChip-filledDefault {
+  background: #EEF2F6;
+  color: var(--ecp-navy);
+  font-weight: 600;
+}
+
+.ecp-community-page .ecp-profile-section .MuiChip-outlinedDefault {
+  border-color: var(--ecp-border);
+  color: var(--ecp-body);
+}
+
+.ecp-community-page .ecp-profile-label {
+  flex-shrink: 0;
+  color: var(--ecp-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ecp-community-page .ecp-profile-tabs.MuiCard-root {
+  overflow: hidden;
+  border-color: var(--ecp-border);
+  border-radius: 12px;
+  box-shadow: var(--ecp-shadow-sm);
+}
+
+.ecp-community-page .ecp-profile-tabs .MuiTabs-root {
+  background: #fff;
+}
+
+.ecp-community-page .ecp-profile-tabs > .MuiCardContent-root {
+  background: var(--ecp-bg);
+}
+
+.ecp-community-page .ecp-profile-empty-icon.MuiAvatar-root {
+  margin: 0 auto;
+  background: var(--ecp-teal-light);
+  color: var(--ecp-teal);
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 900px) {
@@ -360,6 +488,19 @@
 }
 
 @media (max-width: 600px) {
+  .ecp-community-page .ecp-profile-banner {
+    height: 64px;
+  }
+
+  .ecp-community-page .ecp-profile-section .MuiCardHeader-root {
+    padding: 14px 16px 2px;
+  }
+
+  .ecp-community-page .ecp-profile-section .MuiCardContent-root,
+  .ecp-community-page .ecp-profile-section .MuiCardContent-root:last-child {
+    padding: 10px 16px 16px;
+  }
+
   .ecp-community-page .ecp-post-actions .ecp-post-action.MuiButton-root {
     font-size: 12.5px;
   }

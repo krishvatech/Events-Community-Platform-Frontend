@@ -776,8 +776,8 @@ function NotificationRow({
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2">You have successfully registered for</Typography>
             <Stack direction="row" spacing={0.5} alignItems="center">
-              <EventRoundedIcon sx={{ fontSize: 16, color: "primary.main" }} />
-              <Typography variant="body2" sx={{ fontWeight: 600, color: "primary.main" }}>
+              <EventRoundedIcon sx={{ fontSize: 16, color: IMAA.teal }} />
+              <Typography variant="body2" sx={{ fontWeight: 600, color: IMAA.teal }}>
                 {eventTitle}
               </Typography>
             </Stack>
@@ -805,8 +805,8 @@ function NotificationRow({
             invited you to event:
           </Typography>
           <Stack direction="row" spacing={0.5} alignItems="center">
-            <EventRoundedIcon sx={{ fontSize: 16, color: "primary.main" }} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: "primary.main" }}>
+            <EventRoundedIcon sx={{ fontSize: 16, color: IMAA.teal }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: IMAA.teal }}>
               {eventTitle}
             </Typography>
           </Stack>
@@ -1169,9 +1169,9 @@ function NotificationRow({
               return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
             }
             if (s === "pending" || s === "review" || s === "under_review" || s === "requested" || s === "waiting" || s === "sent") {
-              return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"} sx={{ ...common.sx, bgcolor: "#eef2f6", borderColor: "#eef2f6", color: "#374151", "& .MuiChip-icon": { color: "#374151", mr: 0.5 } }} />;
+              return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"} sx={{ ...common.sx, bgcolor: "#EEF2F6", borderColor: "#EEF2F6", color: IMAA.body, "& .MuiChip-icon": { color: IMAA.muted, mr: 0.5 } }} />;
             }
-            return <Chip {...common} icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />} label={item.state} sx={{ ...common.sx, bgcolor: "#f3f4f6", borderColor: "#f3f4f6", color: "#111827", "& .MuiChip-icon": { color: "#6b7280", mr: 0.5 } }} />;
+            return <Chip {...common} icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />} label={item.state} sx={{ ...common.sx, bgcolor: "#EEF2F6", borderColor: "#EEF2F6", color: IMAA.navy, "& .MuiChip-icon": { color: IMAA.muted, mr: 0.5 } }} />;
           })()}
         </Stack>
       </Stack>
