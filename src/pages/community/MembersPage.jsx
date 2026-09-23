@@ -225,6 +225,10 @@ const isAbort = (e) =>
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 18;
 const ZOOM_STEP = 1.35;
+const MEMBER_MAP_TILE_URL =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
+const MEMBER_MAP_ATTRIBUTION =
+  "Tiles &copy; Esri &mdash; Esri, TomTom, Garmin, FAO, NOAA, USGS, OpenStreetMap contributors";
 const LINKEDIN_COMPANY_SIZES = [
   "1-10",
   "11-50",
@@ -1090,8 +1094,9 @@ function MembersLeafletMap({ markers, countryAgg, showMap, loading = false, minH
           {/* Auto-adjust view when search/filter changes */}
           <AutoZoom markers={markers} />
           <TileLayer
-            attribution='&copy; OpenStreetMap contributors &copy; CARTO'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            attribution={MEMBER_MAP_ATTRIBUTION}
+            maxNativeZoom={16}
+            url={MEMBER_MAP_TILE_URL}
           />
 
           {/* 🔥 Snapchat-style heatmap zone */}
@@ -1239,7 +1244,7 @@ export default function MembersPage() {
   const [tabValue, setTabValue] = useState(0);
 
   // map controls
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);
   const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 });
 
   const hasSideMap = true;
@@ -1556,6 +1561,12 @@ export default function MembersPage() {
     (async () => {
       const startedAt = perfNow();
       try {
+        if (!showMap) {
+          setMapLoading(false);
+          setMapUsers([]);
+          return;
+        }
+
         const params = new URLSearchParams();
         setMapLoading(true);
         setMapUsers([]);
@@ -1642,7 +1653,7 @@ export default function MembersPage() {
     })();
 
     return () => { alive = false; ctrl.abort(); };
-  }, [debouncedQuery, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes, tabValue]);
+  }, [showMap, debouncedQuery, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes, tabValue]);
 
 
   const filtered = useMemo(() => {

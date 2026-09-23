@@ -40,8 +40,10 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import InviteGroupUsersDialog from "../components/InviteGroupUsersDialog";
 
 
 // Number of members shown per page in the Members tab list.
@@ -3573,6 +3575,7 @@ export default function GroupManagePage() {
     const [memberPage, setMemberPage] = React.useState(1);
     const [addOpen, setAddOpen] = React.useState(false);
     const [inviteEmailsOpen, setInviteEmailsOpen] = React.useState(false);
+    const [inviteUsersOpen, setInviteUsersOpen] = React.useState(false);
     const [requestAddOpen, setRequestAddOpen] = React.useState(false);
     const [memMenuAnchor, setMemMenuAnchor] = React.useState(null);
     const [activeMember, setActiveMember] = React.useState(null);
@@ -5421,6 +5424,15 @@ export default function GroupManagePage() {
                                                         <Button
                                                             variant="contained"
                                                             className="rounded-xl ml-2 text-white"
+                                                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" }, ml: 1 }}
+                                                            startIcon={<PersonAddAlt1RoundedIcon />}
+                                                            onClick={() => setInviteUsersOpen(true)}
+                                                        >
+                                                            Invite
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            className="rounded-xl ml-2 text-white"
                                                             sx={{ textTransform: "none", backgroundColor: "#0ea5e9", "&:hover": { backgroundColor: "#0284c7" }, ml: 1 }}
                                                             startIcon={<EmailRoundedIcon />}
                                                             onClick={() => setInviteEmailsOpen(true)}
@@ -6822,6 +6834,14 @@ export default function GroupManagePage() {
                                 await fetchMembers();
                                 setGroup((prev) => prev ? { ...prev, member_count: (prev.member_count || 0) + n } : prev);
                             }}
+                        />
+
+                        <InviteGroupUsersDialog
+                            open={inviteUsersOpen}
+                            onClose={() => setInviteUsersOpen(false)}
+                            groupIdOrSlug={idOrSlug}
+                            groupId={group?.id}
+                            groupName={group?.name || ""}
                         />
 
                         <InviteEmailsDialog

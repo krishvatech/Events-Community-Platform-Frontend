@@ -1081,6 +1081,60 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
     </ListItem>
   );
 }
+// Matches http(s):// and bare www. links. Trailing punctuation is trimmed below so
+// a link at the end of a sentence doesn't swallow the full stop.
+const URL_RE = /((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
+const TRAILING_PUNCT_RE = /[.,;:!?)\]}'"]+$/;
+
+// Renders plain message text with any URLs turned into real links.
+function LinkifiedText({ text }) {
+  const raw = String(text ?? "");
+  if (!raw) return null;
+
+  const parts = raw.split(URL_RE);
+
+  return parts.map((part, i) => {
+    // Odd indexes are the captured URLs
+    if (i % 2 === 0 || !part) return part;
+
+    const trailing = (part.match(TRAILING_PUNCT_RE) || [""])[0];
+    const url = trailing ? part.slice(0, -trailing.length) : part;
+    if (!url) return part;
+
+    const href = url.startsWith("www.") ? `https://${url}` : url;
+
+    let sameOrigin = false;
+    try {
+      sameOrigin = new URL(href).origin === window.location.origin;
+    } catch {
+      sameOrigin = false;
+    }
+
+    return (
+      <React.Fragment key={`lnk-${i}`}>
+        <Box
+          component="a"
+          href={href}
+          target={sameOrigin ? "_self" : "_blank"}
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          sx={{
+            color: "inherit",
+            textDecoration: "underline",
+            textUnderlineOffset: "2px",
+            fontWeight: 600,
+            wordBreak: "break-all",
+            "&:hover": { opacity: 0.8 },
+          }}
+        >
+          {url}
+        </Box>
+        {trailing}
+      </React.Fragment>
+    );
+  });
+}
+
 function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, conversationId }) {
   const mine = Boolean(m.mine);
 
@@ -1354,7 +1408,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
               mt: standardAttachments.length > 0 ? 0.5 : 0
             }}
           >
-            {m.body}
+            <LinkifiedText text={m.body} />
           </Typography>
         )}
 

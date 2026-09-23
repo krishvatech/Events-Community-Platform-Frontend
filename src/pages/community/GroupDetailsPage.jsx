@@ -44,8 +44,12 @@ import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import InviteEmailsDialog from "../../components/InviteEmailsDialog";
+import InviteGroupUsersDialog from "../../components/InviteGroupUsersDialog";
 
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS & API HELPERS
@@ -2729,6 +2733,8 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
 
   // Add members dialog state
   const [addMembersOpen, setAddMembersOpen] = React.useState(false);
+  const [inviteUsersOpen, setInviteUsersOpen] = React.useState(false);
+  const [inviteEmailsOpen, setInviteEmailsOpen] = React.useState(false);
   const [requestMembersOpen, setRequestMembersOpen] = React.useState(false);
 
   // Role management menu state
@@ -3064,7 +3070,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
       {canManageMembers && (
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>Members</Typography>
-          <Stack direction="row" spacing={2}>
+          <Stack direction="row" spacing={2} useFlexGap sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
             {group?.join_policy !== "open" && group?.join_policy !== "invite" && (
               <Button
                 variant="outlined"
@@ -3101,6 +3107,34 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
               }}
             >
               Add members
+            </Button>
+
+            <Button
+              variant="contained"
+              onClick={() => setInviteUsersOpen(true)}
+              startIcon={<PersonAddAlt1RoundedIcon />}
+              sx={{
+                backgroundColor: "#10b8a6",
+                "&:hover": { backgroundColor: "#0ea5a4" },
+                textTransform: "none",
+                borderRadius: 3,
+              }}
+            >
+              Invite
+            </Button>
+
+            <Button
+              variant="contained"
+              onClick={() => setInviteEmailsOpen(true)}
+              startIcon={<EmailRoundedIcon />}
+              sx={{
+                backgroundColor: "#0ea5e9",
+                "&:hover": { backgroundColor: "#0284c7" },
+                textTransform: "none",
+                borderRadius: 3,
+              }}
+            >
+              Invite by Email
             </Button>
           </Stack>
         </Stack>
@@ -3489,6 +3523,24 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
             fetchMembers();
             onMembersAdded?.(count);
           }}
+        />
+      )}
+      {inviteUsersOpen && (
+        // Invites create no membership — the list only changes once someone accepts.
+        <InviteGroupUsersDialog
+          open={inviteUsersOpen}
+          onClose={() => setInviteUsersOpen(false)}
+          groupIdOrSlug={groupId}
+          groupId={group?.id}
+          groupName={group?.name || ""}
+        />
+      )}
+      {inviteEmailsOpen && (
+        <InviteEmailsDialog
+          open={inviteEmailsOpen}
+          onClose={() => setInviteEmailsOpen(false)}
+          mode="group"
+          targetIdOrSlug={groupId}
         />
       )}
       {requestMembersOpen && (
