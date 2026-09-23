@@ -25,8 +25,23 @@ import {
   SearchRounded as SearchIcon
 } from '@mui/icons-material';
 import { apiClient } from '../../utils/api';
+import {
+  BG,
+  BORDER,
+  BTN_SHAPE_SX,
+  CORAL,
+  DIALOG_ACTIONS_SX,
+  DIALOG_TITLE_SX,
+  MUTED,
+  OUTLINE_BTN_SX,
+  PRIMARY_BTN_SX,
+  SUBTLE_BTN_SX,
+  TABLE_SX,
+  TEAL,
+} from "../../theme/imaaTokens";
 
 const ROLES = ['speaker', 'sponsor', 'sponsor_staff', 'startup', 'investor'];
+
 const STATUSES = ['not_started', 'in_progress', 'completed', 'lapsed'];
 const MODULES = ['speaker', 'sponsor', 'sponsor_staff', 'startup', 'investor'];
 
@@ -324,11 +339,11 @@ export default function PromotionalProfilesManager({ eventId }) {
   const getConsentColor = (consent) => {
     switch (consent) {
       case 'yes':
-        return '#4caf50';
+        return TEAL;
       case 'no':
-        return '#f44336';
+        return CORAL;
       default:
-        return '#999';
+        return MUTED;
     }
   };
 
@@ -349,7 +364,7 @@ export default function PromotionalProfilesManager({ eventId }) {
         Promotional Profiles Manager
       </Typography>
 
-      <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
+      <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} sx={{ mb: 3, borderBottom: 1, borderColor: BORDER }}>
         <Tab label="Profiles" />
         <Tab label="Progress Summary" />
         <Tab label="Missing Assets" />
@@ -440,7 +455,7 @@ export default function PromotionalProfilesManager({ eventId }) {
           {/* Bulk Actions */}
           <Paper sx={{ p: 2, mb: 3 }}>
             <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>
-              <Button
+              <Button sx={OUTLINE_BTN_SX}
                 size="small"
                 variant="outlined"
                 startIcon={<SendIcon />}
@@ -449,7 +464,7 @@ export default function PromotionalProfilesManager({ eventId }) {
               >
                 Send Reminders ({selected.size})
               </Button>
-              <Button
+              <Button sx={OUTLINE_BTN_SX}
                 size="small"
                 variant="outlined"
                 startIcon={<CheckIcon />}
@@ -466,7 +481,7 @@ export default function PromotionalProfilesManager({ eventId }) {
                 Export Completed Profiles:
               </Typography>
               <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-                <Button
+                <Button sx={PRIMARY_BTN_SX}
                   variant="contained"
                   size="small"
                   startIcon={<DownloadIcon />}
@@ -478,7 +493,7 @@ export default function PromotionalProfilesManager({ eventId }) {
                 >
                   All Profiles (ZIP)
                 </Button>
-                <Button
+                <Button sx={OUTLINE_BTN_SX}
                   variant="outlined"
                   size="small"
                   startIcon={<DownloadIcon />}
@@ -488,7 +503,7 @@ export default function PromotionalProfilesManager({ eventId }) {
                 >
                   {exportingRole === 'speaker' ? 'Exporting...' : 'Speakers'}
                 </Button>
-                <Button
+                <Button sx={OUTLINE_BTN_SX}
                   variant="outlined"
                   size="small"
                   startIcon={<DownloadIcon />}
@@ -498,7 +513,7 @@ export default function PromotionalProfilesManager({ eventId }) {
                 >
                   {exportingRole === 'sponsor' ? 'Exporting...' : 'Sponsors'}
                 </Button>
-                <Button
+                <Button sx={OUTLINE_BTN_SX}
                   variant="outlined"
                   size="small"
                   startIcon={<DownloadIcon />}
@@ -508,7 +523,7 @@ export default function PromotionalProfilesManager({ eventId }) {
                 >
                   {exportingRole === 'startup' ? 'Exporting...' : 'Startups'}
                 </Button>
-                <Button
+                <Button sx={OUTLINE_BTN_SX}
                   variant="outlined"
                   size="small"
                   startIcon={<DownloadIcon />}
@@ -518,7 +533,7 @@ export default function PromotionalProfilesManager({ eventId }) {
                 >
                   {exportingRole === 'investor' ? 'Exporting...' : 'Investors'}
                 </Button>
-                <Button
+                <Button sx={BTN_SHAPE_SX}
                   variant="contained"
                   color="secondary"
                   size="small"
@@ -533,10 +548,10 @@ export default function PromotionalProfilesManager({ eventId }) {
           </Paper>
 
           {/* Table */}
-          <TableContainer component={Paper}>
+          <TableContainer sx={TABLE_SX} component={Paper}>
             <Table>
               <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableRow sx={{ backgroundColor: BG }}>
                   <TableCell>
                     <Checkbox
                       checked={selectAll}
@@ -625,7 +640,7 @@ export default function PromotionalProfilesManager({ eventId }) {
                       />
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                      <Button
+                      <Button sx={OUTLINE_BTN_SX}
                         fullWidth
                         size="small"
                         variant="outlined"
@@ -634,7 +649,7 @@ export default function PromotionalProfilesManager({ eventId }) {
                       >
                         {exportingRole === role ? 'Exporting...' : 'Export ZIP'}
                       </Button>
-                      <Button
+                      <Button sx={OUTLINE_BTN_SX}
                         fullWidth
                         size="small"
                         variant="outlined"
@@ -694,7 +709,7 @@ export default function PromotionalProfilesManager({ eventId }) {
 
       {/* Dialogs */}
       <Dialog open={reminderDialog} onClose={() => setReminderDialog(false)}>
-        <DialogTitle>Send Reminders</DialogTitle>
+        <DialogTitle sx={DIALOG_TITLE_SX}>Send Reminders</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
             {(() => {
@@ -730,9 +745,9 @@ export default function PromotionalProfilesManager({ eventId }) {
             })()}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setReminderDialog(false)}>Cancel</Button>
-          <Button
+        <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <Button sx={SUBTLE_BTN_SX} onClick={() => setReminderDialog(false)}>Cancel</Button>
+          <Button sx={PRIMARY_BTN_SX}
             onClick={handleSendReminders}
             variant="contained"
             color="primary"
@@ -744,7 +759,7 @@ export default function PromotionalProfilesManager({ eventId }) {
       </Dialog>
 
       <Dialog open={completeDialog} onClose={() => setCompleteDialog(false)}>
-        <DialogTitle>Mark as Complete</DialogTitle>
+        <DialogTitle sx={DIALOG_TITLE_SX}>Mark as Complete</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <FormControl fullWidth>
@@ -777,9 +792,9 @@ export default function PromotionalProfilesManager({ eventId }) {
             </Typography>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCompleteDialog(false)}>Cancel</Button>
-          <Button
+        <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <Button sx={SUBTLE_BTN_SX} onClick={() => setCompleteDialog(false)}>Cancel</Button>
+          <Button sx={PRIMARY_BTN_SX}
             onClick={handleMarkComplete}
             variant="contained"
             color="primary"
@@ -791,7 +806,7 @@ export default function PromotionalProfilesManager({ eventId }) {
       </Dialog>
 
       <Dialog open={exportDialog} onClose={() => setExportDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Export Promotional Profiles for Production</DialogTitle>
+        <DialogTitle sx={DIALOG_TITLE_SX}>Export Promotional Profiles for Production</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="body2" color="textSecondary">
@@ -800,21 +815,21 @@ export default function PromotionalProfilesManager({ eventId }) {
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Format:</Typography>
               <Stack direction="row" spacing={1}>
-                <Button
+                <Button sx={SUBTLE_BTN_SX}
                   variant={exportFormat === 'zip' ? 'contained' : 'outlined'}
                   onClick={() => setExportFormat('zip')}
                   size="small"
                 >
                   ZIP
                 </Button>
-                <Button
+                <Button sx={SUBTLE_BTN_SX}
                   variant={exportFormat === 'csv' ? 'contained' : 'outlined'}
                   onClick={() => setExportFormat('csv')}
                   size="small"
                 >
                   CSV
                 </Button>
-                <Button
+                <Button sx={SUBTLE_BTN_SX}
                   variant={exportFormat === 'json' ? 'contained' : 'outlined'}
                   onClick={() => setExportFormat('json')}
                   size="small"
@@ -830,9 +845,9 @@ export default function PromotionalProfilesManager({ eventId }) {
             )}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setExportDialog(false)}>Cancel</Button>
-          <Button
+        <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <Button sx={SUBTLE_BTN_SX} onClick={() => setExportDialog(false)}>Cancel</Button>
+          <Button sx={PRIMARY_BTN_SX}
             onClick={handleExportProduction}
             variant="contained"
             color="primary"

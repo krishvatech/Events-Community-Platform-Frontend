@@ -3,10 +3,17 @@ import { Button, Dialog, DialogActions, DialogContent, DialogContentText, Dialog
 import { toast } from "react-toastify";
 import { API_BASE, authConfig } from "../utils/api";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import {
+  BTN_SHAPE_SX,
+  DANGER_BTN_SX,
+  OUTLINE_BTN_SX,
+  PRIMARY_BTN_SX,
+} from "../theme/imaaTokens";
 
 // Helper to compute event status
 function computeEventStatus(ev) {
     const now = Date.now();
+
     const s = ev.start_time ? new Date(ev.start_time).getTime() : 0;
     const e = ev.end_time ? new Date(ev.end_time).getTime() : 0;
 
@@ -130,7 +137,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
             {ev.is_free ? (
                 <div className="flex gap-2">
                     {!hideChip && (
-                        <Button
+                        <Button sx={OUTLINE_BTN_SX}
                             variant="outlined"
                             size="large"
                             disabled
@@ -139,7 +146,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                             Registered
                         </Button>
                     )}
-                    <Button
+                    <Button sx={DANGER_BTN_SX}
                         variant="text"
                         size="large"
                         color="error"
@@ -153,7 +160,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
             ) : (
                 <div className="flex gap-2">
                     {isCancelRequested ? (
-                        <Button
+                        <Button sx={PRIMARY_BTN_SX}
                             variant="contained"
                             size="large"
                             disabled
@@ -164,7 +171,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                     ) : (
                         <>
                             {!hideChip && (
-                                <Button
+                                <Button sx={OUTLINE_BTN_SX}
                                     variant="outlined"
                                     size="large"
                                     disabled
@@ -173,7 +180,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                                     Registered
                                 </Button>
                             )}
-                            <Button
+                            <Button sx={BTN_SHAPE_SX}
                                 variant="text"
                                 size="medium"
                                 color="warning"
@@ -209,10 +216,10 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={handleClose} disabled={loading} color="inherit" className="rounded-full">
+                    <Button sx={BTN_SHAPE_SX} onClick={handleClose} disabled={loading} color="inherit" className="rounded-full">
                         Keep It
                     </Button>
-                    <Button
+                    <Button sx={PRIMARY_BTN_SX}
                         onClick={handleConfirm}
                         disabled={loading}
                         variant="contained"

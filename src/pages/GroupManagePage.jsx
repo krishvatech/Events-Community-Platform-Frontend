@@ -1041,8 +1041,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
                                 <Box className="flex items-center gap-4">
                                     <Box
-                                        className="flex items-center justify-center overflow-hidden" sx={UPLOAD_BOX_SX}
-                                        sx={{ width: 100, height: 100, position: "relative" }}
+                                        className="flex items-center justify-center overflow-hidden" sx={{ ...UPLOAD_BOX_SX, width: 100, height: 100, position: "relative" }}
                                     >
                                         {logoPreview ? (
                                             <img
@@ -1108,8 +1107,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                 </Typography>
 
                                 <Box
-                                    className="flex items-center justify-center" sx={UPLOAD_BOX_SX}
-                                    sx={{ height: 200, position: "relative", overflow: "hidden" }}
+                                    className="flex items-center justify-center" sx={{ ...UPLOAD_BOX_SX, height: 200, position: "relative", overflow: "hidden" }}
                                 >
                                     {localPreview ? (
                                         <img
@@ -1447,10 +1445,10 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
             </DialogContent>
 
             <DialogActions sx={{ ...DIALOG_ACTIONS_SX, position: 'sticky', bottom: 0 }}>
-                <Typography sx={{ flex: 1 }} sx={{ color: MUTED }}>
+                <Typography sx={{ flex: 1, color: MUTED }}>
                     {selected.size} selected
                 </Typography>
-                <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
+                <Button onClick={onClose} sx={SUBTLE_BTN_SX}>Cancel</Button>
                 <Button
                     onClick={submit}
                     disabled={selected.size === 0 || submitting}
@@ -1641,10 +1639,10 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
             </DialogContent>
 
             <DialogActions sx={{ ...DIALOG_ACTIONS_SX, position: 'sticky', bottom: 0 }}>
-                <Typography sx={{ flex: 1 }} sx={{ color: MUTED }}>
+                <Typography sx={{ flex: 1, color: MUTED }}>
                     {selected.size} selected
                 </Typography>
-                <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
+                <Button onClick={onClose} sx={SUBTLE_BTN_SX}>Cancel</Button>
                 <Button
                     onClick={submit} disabled={selected.size === 0 || submitting}
                     variant="contained"
@@ -1914,8 +1912,7 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
                         </Typography>
 
                         <Box
-                            className="flex items-center justify-center" sx={UPLOAD_BOX_SX}
-                            sx={{ height: 200, position: "relative", overflow: "hidden" }}
+                            className="flex items-center justify-center" sx={{ ...UPLOAD_BOX_SX, height: 200, position: "relative", overflow: "hidden" }}
                         >
                             {localPreview ? (
                                 <img src={localPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -3415,13 +3412,11 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
             {/* Left: target list (group + members) */}
             <Paper
                 elevation={0}
-                sx={CARD_SX}
-                sx={{
-                    width: { xs: "100%", md: 280 },
+                sx={{ ...CARD_SX, width: { xs: "100%", md: 280 },
                     maxHeight: 480,
                     overflowY: "auto",
-                    display: { xs: mobileView === "list" ? "block" : "none", md: "block" },
-                }}
+                    display: { xs: mobileView === "list" ? "block" : "none", md: "block" } }}
+
             >
                 <Box sx={{ p: 2, borderBottom: "1px solid #E3E8EF" }}>
                     <Typography variant="subtitle1" className="font-semibold">
@@ -6534,7 +6529,7 @@ export default function GroupManagePage() {
                                             ) : postsError ? (
                                                 <Alert severity="error">{postsError}</Alert>
                                             ) : posts.length === 0 ? (
-                                                <Typography sx={{ color: MUTED }} sx={{ fontStyle: (postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0)) ? 'italic' : 'normal' }}>
+                                                <Typography sx={{ color: MUTED, fontStyle: (postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0)) ? 'italic' : 'normal' }}>
                                                     {(postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0))
                                                         ? "This content was removed by moderators."
                                                         : "No posts yet."}

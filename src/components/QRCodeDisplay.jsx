@@ -3,9 +3,13 @@ import { useState } from 'react';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { toast } from 'react-toastify';
+import {
+  FIELD_SX,
+} from "../theme/imaaTokens";
 
 function QRCodeDisplay({ url, eventSlug, size = 300 }) {
   const [loading, setLoading] = useState(false);
+
   const [qrGenerating, setQrGenerating] = useState(false);
 
   // Use QR server API to generate QR code
@@ -42,7 +46,7 @@ function QRCodeDisplay({ url, eventSlug, size = 300 }) {
       {/* Direct URL */}
       <Box>
         <Stack direction="row" gap={1} sx={{ mb: 1 }}>
-          <TextField
+          <TextField sx={FIELD_SX}
             fullWidth
             size="small"
             value={url}

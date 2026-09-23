@@ -28,8 +28,22 @@ import {
   Typography,
 } from "@mui/material";
 import { apiClient } from "../../utils/api";
+import {
+  BORDER,
+  BTN_SHAPE_SX,
+  DIALOG_ACTIONS_SX,
+  DIALOG_TITLE_SX,
+  FIELD_SX,
+  MUTED,
+  OUTLINE_BTN_SX,
+  PAGINATION_SX,
+  PRIMARY_BTN_SX,
+  SUBTLE_BTN_SX,
+  SWITCH_SX,
+} from "../../theme/imaaTokens";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
+
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 
@@ -312,33 +326,33 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
   };
 
   return (
-    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
+    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid", borderColor: BORDER }}>
       <Stack spacing={2}>
         <Typography variant="h6">Pre-Approval Manager</Typography>
 
         <Typography variant="subtitle2">Configuration</Typography>
         <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
           <FormControlLabel
-            control={<Switch checked={!!config.preapproval_code_enabled} onChange={(e) => setConfig((p) => ({ ...p, preapproval_code_enabled: e.target.checked }))} />}
+            control={<Switch sx={SWITCH_SX} checked={!!config.preapproval_code_enabled} onChange={(e) => setConfig((p) => ({ ...p, preapproval_code_enabled: e.target.checked }))} />}
             label="Enable pre-approved codes"
           />
           <FormControlLabel
-            control={<Switch checked={!!config.preapproval_allowlist_enabled} onChange={(e) => setConfig((p) => ({ ...p, preapproval_allowlist_enabled: e.target.checked }))} />}
+            control={<Switch sx={SWITCH_SX} checked={!!config.preapproval_allowlist_enabled} onChange={(e) => setConfig((p) => ({ ...p, preapproval_allowlist_enabled: e.target.checked }))} />}
             label="Enable email allowlist"
           />
           <FormControlLabel
-            control={<Switch checked={!!config.attendee_marker_enabled} onChange={(e) => setConfig((p) => ({ ...p, attendee_marker_enabled: e.target.checked }))} />}
+            control={<Switch sx={SWITCH_SX} checked={!!config.attendee_marker_enabled} onChange={(e) => setConfig((p) => ({ ...p, attendee_marker_enabled: e.target.checked }))} />}
             label="Show attendee marker checkbox"
           />
         </Stack>
-        <TextField
+        <TextField sx={FIELD_SX}
           size="small"
           label="Attendee marker label"
           value={config.attendee_marker_label}
           onChange={(e) => setConfig((p) => ({ ...p, attendee_marker_label: e.target.value }))}
         />
         <Box>
-          <Button variant="contained" onClick={saveConfig} disabled={savingConfig}>
+          <Button sx={PRIMARY_BTN_SX} variant="contained" onClick={saveConfig} disabled={savingConfig}>
             {savingConfig ? "Saving..." : "Save Configuration"}
           </Button>
         </Box>
@@ -348,8 +362,8 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
         <Typography variant="subtitle2">Codes</Typography>
         {/* FIX 3: Add track and submission mode dropdowns */}
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-          <TextField size="small" label="Custom-Code (optional)" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
-          <TextField size="small" label="Notes" value={newCodeNotes} onChange={(e) => setNewCodeNotes(e.target.value)} />
+          <TextField sx={FIELD_SX} size="small" label="Custom-Code (optional)" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
+          <TextField sx={FIELD_SX} size="small" label="Notes" value={newCodeNotes} onChange={(e) => setNewCodeNotes(e.target.value)} />
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Track (optional)</InputLabel>
             <Select value={newCodeTrackId} label="Track (optional)" onChange={(e) => setNewCodeTrackId(e.target.value)}>
@@ -368,11 +382,11 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
               ))}
             </Select>
           </FormControl>
-          <Button variant="outlined" onClick={createSingleCode}>Create Code</Button>
+          <Button sx={OUTLINE_BTN_SX} variant="outlined" onClick={createSingleCode}>Create Code</Button>
         </Stack>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-          <TextField size="small" label="Prefix" value={batchPrefix} onChange={(e) => setBatchPrefix(e.target.value)} />
-          <TextField size="small" type="number" label="Count" value={batchCount} onChange={(e) => setBatchCount(e.target.value)} />
+          <TextField sx={FIELD_SX} size="small" label="Prefix" value={batchPrefix} onChange={(e) => setBatchPrefix(e.target.value)} />
+          <TextField sx={FIELD_SX} size="small" type="number" label="Count" value={batchCount} onChange={(e) => setBatchCount(e.target.value)} />
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Track (optional)</InputLabel>
             <Select value={batchTrackId} label="Track (optional)" onChange={(e) => setBatchTrackId(e.target.value)}>
@@ -391,14 +405,14 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
               ))}
             </Select>
           </FormControl>
-          <Button variant="outlined" onClick={createBatchCodes}>Generate Batch</Button>
+          <Button sx={OUTLINE_BTN_SX} variant="outlined" onClick={createBatchCodes}>Generate Batch</Button>
           <Select size="small" value={codeStatus} onChange={(e) => setCodeStatus(e.target.value)}>
             <MenuItem value="active">Active</MenuItem>
             <MenuItem value="used">Used</MenuItem>
             <MenuItem value="revoked">Revoked</MenuItem>
           </Select>
         </Stack>
-        <TextField
+        <TextField sx={FIELD_SX}
           size="small"
           label="Search codes"
           placeholder="Search by code, used email, or notes"
@@ -427,15 +441,15 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
                   <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : "-"}</TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1}>
-                      {row.status === "active" && <Button size="small" onClick={() => revokeCode(row)}>Revoke</Button>}
-                      {row.status === "active" && <Button size="small" onClick={() => markCodeUsed(row.id)}>Mark Used</Button>}
+                      {row.status === "active" && <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => revokeCode(row)}>Revoke</Button>}
+                      {row.status === "active" && <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => markCodeUsed(row.id)}>Mark Used</Button>}
                     </Stack>
                   </TableCell>
                 </TableRow>
               ))}
               {paginatedCodes.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} sx={{ color: "text.secondary" }}>
+                  <TableCell colSpan={6} sx={{ color: MUTED }}>
                     No codes found.
                   </TableCell>
                 </TableRow>
@@ -447,7 +461,7 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
           <Typography variant="body2" color="text.secondary">
             Showing {paginatedCodes.length} of {filteredCodes.length} codes
           </Typography>
-          <Pagination
+          <Pagination sx={PAGINATION_SX}
             page={codePage}
             count={totalCodePages}
             onChange={(_e, page) => setCodePage(page)}
@@ -460,9 +474,9 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
         <Typography variant="subtitle2">Allowlist</Typography>
         {/* FIX 2: Add track and submission mode to allowlist */}
         <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-          <TextField size="small" label="First Name" value={allowFirst} onChange={(e) => setAllowFirst(e.target.value)} />
-          <TextField size="small" label="Last Name" value={allowLast} onChange={(e) => setAllowLast(e.target.value)} />
-          <TextField size="small" label="Email" value={allowEmail} onChange={(e) => setAllowEmail(e.target.value)} />
+          <TextField sx={FIELD_SX} size="small" label="First Name" value={allowFirst} onChange={(e) => setAllowFirst(e.target.value)} />
+          <TextField sx={FIELD_SX} size="small" label="Last Name" value={allowLast} onChange={(e) => setAllowLast(e.target.value)} />
+          <TextField sx={FIELD_SX} size="small" label="Email" value={allowEmail} onChange={(e) => setAllowEmail(e.target.value)} />
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Track (optional)</InputLabel>
             <Select value={allowTrackId} label="Track (optional)" onChange={(e) => setAllowTrackId(e.target.value)}>
@@ -481,8 +495,8 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
               ))}
             </Select>
           </FormControl>
-          <Button variant="outlined" onClick={addAllowlist}>Add Entry</Button>
-          <Button variant="outlined" component="label">
+          <Button sx={OUTLINE_BTN_SX} variant="outlined" onClick={addAllowlist}>Add Entry</Button>
+          <Button sx={OUTLINE_BTN_SX} variant="outlined" component="label">
             Import CSV
             <input hidden type="file" accept=".csv" onChange={(e) => e.target.files?.[0] && importCsv(e.target.files[0])} />
           </Button>
@@ -507,7 +521,7 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
                   <TableCell>{row.email}</TableCell>
                   <TableCell>{row.is_active ? "Yes" : "No"}</TableCell>
                   <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : "-"}</TableCell>
-                  <TableCell>{row.is_active && <Button size="small" onClick={() => removeAllowlist(row)}>Remove</Button>}</TableCell>
+                  <TableCell>{row.is_active && <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => removeAllowlist(row)}>Remove</Button>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -521,7 +535,7 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
+        <DialogTitle sx={DIALOG_TITLE_SX}>
           {removeDialog.type === "code"
             ? "Remove Pre-Approval Code"
             : "Remove Email from Allowlist"}
@@ -533,11 +547,11 @@ export default function EventPreApprovalManager({ event, token, onEventUpdated }
               : `"${removeDialog.item?.email || "This email"}" will no longer receive pre-approved access, but the allowlist record will remain stored in the database with its scope and audit history.`}
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRemoveDialog({ open: false, type: "", item: null })}>
+        <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <Button sx={SUBTLE_BTN_SX} onClick={() => setRemoveDialog({ open: false, type: "", item: null })}>
             Cancel
           </Button>
-          <Button color="error" variant="contained" onClick={confirmSoftRemove}>
+          <Button sx={BTN_SHAPE_SX} color="error" variant="contained" onClick={confirmSoftRemove}>
             {removeDialog.type === "code" ? "Remove Code" : "Remove Email"}
           </Button>
         </DialogActions>

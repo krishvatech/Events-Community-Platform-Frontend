@@ -25,9 +25,14 @@ import {
   getStatusColor,
 } from '../utils/reviewQueue';
 import { apiClient } from '../utils/api';
+import {
+  OUTLINE_BTN_SX,
+  PRIMARY_BTN_SX,
+} from "../theme/imaaTokens";
 
 const EventManageApplications = ({ eventId }) => {
   const [event, setEvent] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
@@ -254,7 +259,7 @@ const EventManageApplications = ({ eventId }) => {
               />
 
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
+                <Button sx={OUTLINE_BTN_SX}
                   variant="outlined"
                   startIcon={<DownloadIcon />}
                   onClick={handleExport}
@@ -263,7 +268,7 @@ const EventManageApplications = ({ eventId }) => {
                   Export
                 </Button>
 
-                <Button
+                <Button sx={PRIMARY_BTN_SX}
                   variant="contained"
                   onClick={() => setBulkActionOpen(true)}
                   disabled={selectedIds.length === 0}

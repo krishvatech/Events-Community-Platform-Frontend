@@ -23,6 +23,12 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
+import {
+  BG,
+  PAGINATION_SX,
+  TABLE_SX,
+} from "../theme/imaaTokens";
+
 
 const isVerifiedStatus = (raw) => {
   const v = String(raw || "").toLowerCase();
@@ -288,10 +294,10 @@ export default function ParticipantsAttendanceTable({
             <Typography variant="body2">No participants found in this category.</Typography>
           </Box>
         ) : (
-          <TableContainer>
+          <TableContainer sx={TABLE_SX}>
             <Table stickyHeader>
               <TableHead>
-                <TableRow sx={{ backgroundColor: "#f8fafc" }}>
+                <TableRow sx={{ backgroundColor: BG }}>
                   <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600 }}>
@@ -381,7 +387,7 @@ export default function ParticipantsAttendanceTable({
       {/* Pagination */}
       {totalPages > 1 && !loading && registrations.length > 0 && (
         <Box className="p-3 border-t border-slate-200 flex justify-center">
-          <Pagination
+          <Pagination sx={PAGINATION_SX}
             count={totalPages}
             page={page}
             onChange={(_, v) => setPage(v)}

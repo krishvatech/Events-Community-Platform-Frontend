@@ -41,6 +41,19 @@ import {
   saveEventEmailTemplate,
   sendTestEventEmailTemplate,
 } from "../../services/eventEmailTemplateService";
+import {
+  BG,
+  BORDER,
+  BTN_SHAPE_SX,
+  DIALOG_ACTIONS_SX,
+  DIALOG_TITLE_SX,
+  FIELD_SX,
+  OUTLINE_BTN_SX,
+  PRIMARY_BTN_SX,
+  SUBTLE_BTN_SX,
+  SWITCH_SX,
+} from "../../theme/imaaTokens";
+
 
 const TEMPLATE_LABEL_OVERRIDES = {
   user_registration_acknowledgement: "Successful Registration Email",
@@ -410,7 +423,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
             alignItems: "center",
           }}
         >
-          <TextField
+          <TextField sx={FIELD_SX}
             size="small"
             placeholder="Search templates"
             value={query}
@@ -494,16 +507,16 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                 </Typography>
               </Box>
               <Stack direction="row" gap={1} flexWrap="wrap">
-                <Button variant="outlined" startIcon={<VisibilityRoundedIcon />} onClick={handlePreview} disabled={saving}>
+                <Button sx={OUTLINE_BTN_SX} variant="outlined" startIcon={<VisibilityRoundedIcon />} onClick={handlePreview} disabled={saving}>
                   Preview
                 </Button>
-                <Button variant="outlined" startIcon={<SendRoundedIcon />} onClick={() => setTestOpen(true)} disabled={saving}>
+                <Button sx={OUTLINE_BTN_SX} variant="outlined" startIcon={<SendRoundedIcon />} onClick={() => setTestOpen(true)} disabled={saving}>
                   Send Test Email
                 </Button>
-                <Button color="warning" variant="outlined" startIcon={<RestartAltRoundedIcon />} onClick={() => setResetOpen(true)} disabled={saving}>
+                <Button sx={BTN_SHAPE_SX} color="warning" variant="outlined" startIcon={<RestartAltRoundedIcon />} onClick={() => setResetOpen(true)} disabled={saving}>
                   Reset to Global
                 </Button>
-                <Button variant="contained" startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />} onClick={handleSave} disabled={saving}>
+                <Button sx={BTN_SHAPE_SX} variant="contained" startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />} onClick={handleSave} disabled={saving}>
                   Save
                 </Button>
               </Stack>
@@ -516,7 +529,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                 gap: 2,
               }}
             >
-              <TextField
+              <TextField sx={FIELD_SX}
                 label="Subject"
                 value={draft.subject}
                 onChange={(event) => setDraft((prev) => ({ ...prev, subject: event.target.value }))}
@@ -526,7 +539,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                   Active
                 </Typography>
-                <Switch
+                <Switch sx={SWITCH_SX}
                   checked={draft.is_active}
                   onChange={(event) => setDraft((prev) => ({ ...prev, is_active: event.target.checked }))}
                 />
@@ -565,7 +578,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
             <Box
               sx={{
                 border: "1px solid",
-                borderColor: "divider",
+                borderColor: BORDER,
                 borderRadius: 1,
                 overflow: "hidden",
                 bgcolor: "#ffffff",
@@ -577,8 +590,8 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                   px: 1.75,
                   py: 1.25,
                   borderBottom: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: "#f8fafc",
+                  borderColor: BORDER,
+                  bgcolor: BG,
                 }}
               >
                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
@@ -604,7 +617,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
             <Box
               sx={{
                 border: "1px solid",
-                borderColor: "divider",
+                borderColor: BORDER,
                 borderRadius: 1,
                 overflow: "hidden",
                 bgcolor: "#ffffff",
@@ -620,8 +633,8 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                   px: 1.75,
                   py: 1.25,
                   borderBottom: "1px solid",
-                  borderColor: "divider",
-                  bgcolor: "#f8fafc",
+                  borderColor: BORDER,
+                  bgcolor: BG,
                 }}
               >
                 <Box sx={{ minWidth: 0 }}>
@@ -664,7 +677,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                 gap: 2,
               }}
             >
-              <TextField
+              <TextField sx={FIELD_SX}
                 label="Plain-text fallback"
                 value={draft.text_body}
                 onChange={(event) => setDraft((prev) => ({ ...prev, text_body: event.target.value }))}
@@ -674,7 +687,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                 helperText="Used by email clients that cannot display the visual HTML template."
               />
 
-              <TextField
+              <TextField sx={FIELD_SX}
                 label="Internal notes"
                 value={draft.notes}
                 onChange={(event) => setDraft((prev) => ({ ...prev, notes: event.target.value }))}
@@ -688,7 +701,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
       </Paper>
 
       <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Email Preview</DialogTitle>
+        <DialogTitle sx={DIALOG_TITLE_SX}>Email Preview</DialogTitle>
         <DialogContent dividers>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
             {preview?.rendered_subject}
@@ -701,21 +714,21 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
               width: "100%",
               minHeight: 560,
               border: "1px solid",
-              borderColor: "divider",
+              borderColor: BORDER,
               borderRadius: 1,
               bgcolor: "white",
             }}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPreviewOpen(false)}>Close</Button>
+        <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <Button sx={SUBTLE_BTN_SX} onClick={() => setPreviewOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={testOpen} onClose={() => setTestOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Send Test Email</DialogTitle>
+        <DialogTitle sx={DIALOG_TITLE_SX}>Send Test Email</DialogTitle>
         <DialogContent>
-          <TextField
+          <TextField sx={FIELD_SX}
             autoFocus
             margin="dense"
             label="Test email"
@@ -725,24 +738,24 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
             fullWidth
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTestOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSendTest} disabled={!testEmail || saving}>
+        <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <Button sx={SUBTLE_BTN_SX} onClick={() => setTestOpen(false)}>Cancel</Button>
+          <Button sx={PRIMARY_BTN_SX} variant="contained" onClick={handleSendTest} disabled={!testEmail || saving}>
             Send
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={resetOpen} onClose={() => setResetOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Reset to Global</DialogTitle>
+        <DialogTitle sx={DIALOG_TITLE_SX}>Reset to Global</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Remove the custom event override for {displayLabel(selected)}? This event will use the platform global template again.
           </DialogContentText>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setResetOpen(false)}>Cancel</Button>
-          <Button color="warning" variant="contained" onClick={handleReset} disabled={saving}>
+        <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <Button sx={SUBTLE_BTN_SX} onClick={() => setResetOpen(false)}>Cancel</Button>
+          <Button sx={BTN_SHAPE_SX} color="warning" variant="contained" onClick={handleReset} disabled={saving}>
             Reset to Global
           </Button>
         </DialogActions>
