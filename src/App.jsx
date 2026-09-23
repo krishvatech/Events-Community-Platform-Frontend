@@ -312,6 +312,7 @@ const AppShell = () => {
             <Route path="newsletter" element={<RequireMarketingAccess><MarketingHubLayout /></RequireMarketingAccess>}>
               <Route index element={<AdminNewsletterDashboardPage />} />
               <Route path="campaigns" element={<AdminNewsletterPage />} />
+              <Route path="broadcasts" element={<AdminNewsletterPage />} />
               <Route path="templates" element={<AdminNewsletterPage />} />
               <Route path="lists" element={<AdminNewsletterPage />} />
               <Route path="segments" element={<AdminNewsletterPage />} />

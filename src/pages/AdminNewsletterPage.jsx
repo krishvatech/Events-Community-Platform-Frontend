@@ -352,7 +352,7 @@ function ScheduleDialog({ open, loading, error, initialValue, onClose, onSchedul
 
   return (
     <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>{initialValue ? "Reschedule Campaign" : "Schedule Campaign"}</DialogTitle>
+      <DialogTitle>{initialValue ? "Reschedule Broadcast" : "Schedule Broadcast"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {error && <Alert severity="error">{error}</Alert>}
@@ -420,11 +420,11 @@ function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, 
     <Stack spacing={3}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Campaigns</Typography>
-          <Typography color="text.secondary">Create, schedule, and review newsletter campaigns.</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Email Broadcasts</Typography>
+          <Typography color="text.secondary">Create, schedule, and review newsletter emails sent to subscription lists.</Typography>
         </Box>
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={onCreate} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
-          Create Campaign
+          Create Broadcast
         </Button>
       </Stack>
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
@@ -447,13 +447,13 @@ function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, 
         ) : error ? (
           <Box sx={{ p: 3 }}><Alert severity="error" action={<Button color="inherit" size="small" onClick={onRefresh}>Retry</Button>}>{error}</Alert></Box>
         ) : filteredCampaigns.length === 0 ? (
-          <Box sx={{ p: 3 }}><Alert severity="info" variant="outlined">No newsletter campaigns found.</Alert></Box>
+          <Box sx={{ p: 3 }}><Alert severity="info" variant="outlined">No email broadcasts found.</Alert></Box>
         ) : (
           <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
-                  <TableCell>Campaign Name</TableCell>
+                  <TableCell>Broadcast Name</TableCell>
                   <TableCell>Audience</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Created Date</TableCell>
@@ -468,7 +468,7 @@ function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, 
                 {filteredCampaigns.map((row) => (
                   <TableRow hover key={row.uuid} sx={{ cursor: "pointer" }} onClick={() => onOpen(row.uuid)}>
                     <TableCell>
-                      <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{row.name || "Untitled campaign"}</Typography>
+                      <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{row.name || "Untitled broadcast"}</Typography>
                       <Typography variant="body2" color="text.secondary">{row.subject || "-"}</Typography>
                     </TableCell>
                     <TableCell>{getCampaignAudienceLabels(row).join(", ") || "-"}</TableCell>
@@ -479,12 +479,12 @@ function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, 
                     <TableCell>No data available</TableCell>
                     <TableCell>No data available</TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Duplicate campaign">
+                      <Tooltip title="Duplicate broadcast">
                         <IconButton onClick={(event) => { event.stopPropagation(); onDuplicate(row.uuid); }}>
                           <ContentCopyRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Open campaign">
+                      <Tooltip title="Open broadcast">
                         <IconButton onClick={(event) => { event.stopPropagation(); onOpen(row.uuid); }}>
                           <EditRoundedIcon fontSize="small" />
                         </IconButton>
@@ -782,7 +782,7 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
     <Stack spacing={3}>
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
         <Stepper activeStep={activeStep} alternativeLabel sx={{ display: { xs: "none", md: "flex" } }}>
-          {["Campaign Information", "Subscription Lists", "Email Content", "Review & Actions"].map((label) => (
+          {["Broadcast Information", "Subscription Lists", "Email Content", "Review & Actions"].map((label) => (
             <Step key={label}><StepLabel>{label}</StepLabel></Step>
           ))}
         </Stepper>
@@ -796,10 +796,10 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
 
       {activeStep === 0 && (
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 2 }}>Campaign Information</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 2 }}>Broadcast Information</Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <TextField label="Campaign Name" value={value.name} onChange={(event) => setField("name", event.target.value)} error={Boolean(errors.name)} helperText={errors.name} fullWidth required InputProps={{ readOnly }} />
+              <TextField label="Broadcast Name" value={value.name} onChange={(event) => setField("name", event.target.value)} error={Boolean(errors.name)} helperText={errors.name} fullWidth required InputProps={{ readOnly }} />
             </Grid>
             <Grid item xs={12} md={6}>
               <TextField label="Subject" value={value.subject} onChange={(event) => setField("subject", event.target.value)} error={Boolean(errors.subject)} helperText={errors.subject} fullWidth required InputProps={{ readOnly }} />
@@ -820,7 +820,7 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
       {activeStep === 1 && (
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: errors.audience_slugs ? "error.main" : "#E7ECEF" }}>
           <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>Subscription Lists</Typography>
-          <Typography color="text.secondary" sx={{ mb: 2 }}>Choose the newsletter lists this campaign should be sent to.</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Choose the newsletter lists this broadcast should be sent to.</Typography>
           <FormControl component="fieldset" fullWidth disabled={readOnly} error={Boolean(errors.audience_slugs)}>
             <FormGroup>
               <Grid container spacing={1}>
@@ -857,7 +857,7 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
           <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 2 }}>Review & Actions</Typography>
           <Grid container spacing={2}>
-            <Grid item xs={12} md={6}><MetricCard label="Campaign Name" value={value.name || "No data available"} /></Grid>
+            <Grid item xs={12} md={6}><MetricCard label="Broadcast Name" value={value.name || "No data available"} /></Grid>
             <Grid item xs={12} md={6}><MetricCard label="Subscription Lists" value={(value.audience_slugs || []).join(", ") || "No data available"} /></Grid>
             <Grid item xs={12} md={6}><MetricCard label="Subject" value={value.subject || "No data available"} /></Grid>
             <Grid item xs={12} md={6}><MetricCard label="Sender" value={value.from_name || "No data available"} /></Grid>
@@ -909,7 +909,7 @@ export default function AdminNewsletterPage() {
         setSelectedAnalyticsCampaignId(rows[0].uuid);
       }
     } catch (err) {
-      setError(getErrorMessage(err, "We could not load newsletter campaigns."));
+      setError(getErrorMessage(err, "We could not load email broadcasts."));
     } finally {
       setLoading(false);
     }
@@ -942,7 +942,7 @@ export default function AdminNewsletterPage() {
       }
     } catch (err) {
       setCampaign(null);
-      setError(getErrorMessage(err, "We could not load this campaign."));
+      setError(getErrorMessage(err, "We could not load this broadcast."));
     } finally {
       setLoading(false);
     }
@@ -970,6 +970,7 @@ export default function AdminNewsletterPage() {
         const paths = {
           dashboard: "/admin/newsletter",
           campaigns: "/admin/newsletter/campaigns",
+          broadcasts: "/admin/newsletter/broadcasts",
           lists: "/admin/newsletter/lists",
           segments: "/admin/newsletter/segments",
           templates: "/admin/newsletter/templates",
@@ -993,7 +994,7 @@ export default function AdminNewsletterPage() {
 
   const validate = () => {
     const errors = {};
-    if (!form.name.trim()) errors.name = "Campaign name is required.";
+    if (!form.name.trim()) errors.name = "Broadcast name is required.";
     if (!form.subject.trim()) errors.subject = "Subject is required.";
     if (!form.from_name.trim()) errors.from_name = "Sender name is required.";
     if (!form.from_email.trim()) errors.from_email = "Sender email is required.";
@@ -1050,10 +1051,10 @@ export default function AdminNewsletterPage() {
     setError("");
     try {
       const data = await duplicateNewsletterCampaign(uuid);
-      setSnack({ open: true, severity: "success", message: "Campaign duplicated as a new draft." });
+      setSnack({ open: true, severity: "success", message: "Broadcast duplicated as a new draft." });
       navigate(`/admin/newsletter/${data.uuid}`);
     } catch (err) {
-      setError(getErrorMessage(err, "We could not duplicate this campaign."));
+      setError(getErrorMessage(err, "We could not duplicate this broadcast."));
     }
   };
 
@@ -1091,9 +1092,9 @@ export default function AdminNewsletterPage() {
       setForm(nextForm);
       setSavedForm(nextForm);
       setScheduleState({ open: false, loading: false, error: "" });
-      setSnack({ open: true, severity: "success", message: "Campaign scheduled." });
+      setSnack({ open: true, severity: "success", message: "Broadcast scheduled." });
     } catch (err) {
-      setScheduleState((state) => ({ ...state, loading: false, error: getErrorMessage(err, "We could not schedule this campaign.") }));
+      setScheduleState((state) => ({ ...state, loading: false, error: getErrorMessage(err, "We could not schedule this broadcast.") }));
     }
   };
 
@@ -1107,7 +1108,7 @@ export default function AdminNewsletterPage() {
       setSnack({ open: true, severity: "success", message: "Newsletter send accepted." });
       refreshCampaign();
     } catch (err) {
-      setError(getErrorMessage(err, "We could not send this campaign."));
+      setError(getErrorMessage(err, "We could not send this broadcast."));
       setConfirmState({ type: "", loading: false });
     }
   };
@@ -1130,6 +1131,19 @@ export default function AdminNewsletterPage() {
           <>
             {activeTab === "dashboard" && <Dashboard campaigns={campaigns} loading={loading} error={error} onRefresh={loadCampaigns} />}
             {activeTab === "campaigns" && <AdminNewsletterMauticCampaignsPanel />}
+            {activeTab === "broadcasts" && (
+              <CampaignList
+                campaigns={campaigns}
+                loading={loading}
+                error={error}
+                filter={filter}
+                onFilter={setFilter}
+                onRefresh={loadCampaigns}
+                onOpen={(uuid) => navigate(`/admin/newsletter/${uuid}`)}
+                onDuplicate={duplicateCampaign}
+                onCreate={() => navigate("/admin/newsletter/new")}
+              />
+            )}
             {activeTab === "lists" && <AdminNewsletterCategoriesTab />}
             {activeTab === "segments" && <AdminNewsletterNativeSegmentsPanel />}
             {activeTab === "templates" && <AdminNewsletterTemplatesPanel />}
@@ -1155,13 +1169,13 @@ export default function AdminNewsletterPage() {
       <Stack spacing={3}>
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
-          <IconButton onClick={() => navigate("/admin/newsletter")}><ArrowBackRoundedIcon /></IconButton>
+          <IconButton onClick={() => navigate("/admin/newsletter/broadcasts")}><ArrowBackRoundedIcon /></IconButton>
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>{isNew ? "Create Campaign" : campaign?.name || "Newsletter Campaign"}</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>{isNew ? "Create Broadcast" : campaign?.name || "Email Broadcast"}</Typography>
               {!isNew && <StatusChip status={campaign?.status} />}
             </Stack>
-            <Typography color="text.secondary">Build the campaign in four steps, then test, schedule, or send.</Typography>
+            <Typography color="text.secondary">Build the email broadcast in four steps, then test, schedule, or send.</Typography>
           </Box>
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -1193,20 +1207,20 @@ export default function AdminNewsletterPage() {
           onStepChange={setActiveStep}
         />
       ) : (
-        <EmptyState title="Campaign could not be loaded." action={<Button variant="contained" onClick={loadDetail}>Retry</Button>} />
+        <EmptyState title="Broadcast could not be loaded." action={<Button variant="contained" onClick={loadDetail}>Retry</Button>} />
       )}
 
       {detailLoaded && activeStep === 3 && (
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
           <Stack spacing={2}>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>Campaign Actions</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>Broadcast Actions</Typography>
               <Typography color="text.secondary">
                 {isNew
                   ? "Save the draft before testing, scheduling, or sending."
                   : editable
-                    ? "Test, schedule, or send this draft campaign."
-                    : "This campaign status is read-only for sending actions."}
+                    ? "Test, schedule, or send this draft broadcast."
+                    : "This broadcast status is read-only for sending actions."}
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -1250,34 +1264,34 @@ export default function AdminNewsletterPage() {
       <TestEmailDialog open={testState.open} loading={testState.loading} error={testState.error} onClose={() => setTestState({ open: false, loading: false, error: "" })} onSend={sendTest} />
       <ScheduleDialog open={scheduleState.open} loading={scheduleState.loading} error={scheduleState.error} initialValue={status === "scheduled" ? campaign?.scheduled_at : ""} onClose={() => setScheduleState({ open: false, loading: false, error: "" })} onSchedule={scheduleCampaign} />
 
-      <ConfirmDialog open={confirmState.type === "send"} title="Send Campaign Now?" confirmLabel="Send Now" confirmColor="success" loading={confirmState.loading} onClose={() => setConfirmState({ type: "", loading: false })} onConfirm={sendNow}>
-        <Typography>This campaign will be sent immediately to the selected subscription lists.</Typography>
+      <ConfirmDialog open={confirmState.type === "send"} title="Send Broadcast Now?" confirmLabel="Send Now" confirmColor="success" loading={confirmState.loading} onClose={() => setConfirmState({ type: "", loading: false })} onConfirm={sendNow}>
+        <Typography>This broadcast will be sent immediately to the selected subscription lists.</Typography>
       </ConfirmDialog>
-      <ConfirmDialog open={confirmState.type === "cancel"} title="Cancel Scheduled Campaign?" confirmLabel="Cancel Campaign" confirmColor="warning" loading={confirmState.loading} onClose={() => setConfirmState({ type: "", loading: false })} onConfirm={async () => {
+      <ConfirmDialog open={confirmState.type === "cancel"} title="Cancel Scheduled Broadcast?" confirmLabel="Cancel Broadcast" confirmColor="warning" loading={confirmState.loading} onClose={() => setConfirmState({ type: "", loading: false })} onConfirm={async () => {
         setConfirmState((state) => ({ ...state, loading: true }));
         try {
           const data = await cancelNewsletterCampaign(campaignId);
           setCampaign(data);
           setConfirmState({ type: "", loading: false });
-          setSnack({ open: true, severity: "success", message: "Scheduled campaign cancelled." });
+          setSnack({ open: true, severity: "success", message: "Scheduled broadcast cancelled." });
         } catch (err) {
-          setError(getErrorMessage(err, "We could not cancel this campaign."));
+          setError(getErrorMessage(err, "We could not cancel this broadcast."));
           setConfirmState({ type: "", loading: false });
         }
       }}>
         <Typography>The scheduled delivery will be cancelled.</Typography>
       </ConfirmDialog>
-      <ConfirmDialog open={confirmState.type === "delete"} title="Delete Draft Campaign?" confirmLabel="Delete" confirmColor="error" loading={confirmState.loading} onClose={() => setConfirmState({ type: "", loading: false })} onConfirm={async () => {
+      <ConfirmDialog open={confirmState.type === "delete"} title="Delete Draft Broadcast?" confirmLabel="Delete" confirmColor="error" loading={confirmState.loading} onClose={() => setConfirmState({ type: "", loading: false })} onConfirm={async () => {
         setConfirmState((state) => ({ ...state, loading: true }));
         try {
           await deleteNewsletterCampaign(campaignId);
-          navigate("/admin/newsletter", { replace: true });
+          navigate("/admin/newsletter/broadcasts", { replace: true });
         } catch (err) {
           setError(getErrorMessage(err, "We could not delete this draft."));
           setConfirmState({ type: "", loading: false });
         }
       }}>
-        <Typography>This only removes draft campaigns. Sent or scheduled campaign history is left untouched.</Typography>
+        <Typography>This only removes draft broadcasts. Sent or scheduled broadcast history is left untouched.</Typography>
       </ConfirmDialog>
 
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack((state) => ({ ...state, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
