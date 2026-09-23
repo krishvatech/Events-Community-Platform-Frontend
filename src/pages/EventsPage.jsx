@@ -987,12 +987,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     <MUICard
       elevation={0}
       onClick={handleCardClick}
-      className="group h-full w-full flex flex-col rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
+      className="ecp-event-card group h-full w-full flex flex-col rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
                 transition-all duration-300 hover:shadow-xl hover:-translate-y-2.5
                 hover:ring-1 hover:ring-teal-200 overflow-hidden cursor-pointer"
     >
       {/* MEDIA */}
-      <Box className="relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px] overflow-hidden">
+      <Box className="ecp-event-card__media relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px] overflow-hidden">
         {(ev.cover_image || ev.image) ? (
           <img
             src={toAbs(ev.cover_image || ev.image)}
@@ -1005,17 +1005,17 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         )}
 
         {ev.topics?.[0] && (
-          <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold shadow-sm">
+          <span className="ecp-event-badge absolute top-3 left-3 inline-flex items-center rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold shadow-sm">
             {ev.topics[0]}
           </span>
         )}
         {ev.topics?.[1] && (
-          <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-slate-200 text-slate-900 px-3 py-1 text-xs font-semibold shadow-sm">
+          <span className="ecp-event-badge ecp-event-badge--muted absolute top-3 right-3 inline-flex items-center rounded-full bg-slate-200 text-slate-900 px-3 py-1 text-xs font-semibold shadow-sm">
             {ev.topics[1]}
           </span>
         )}
       </Box>
-      <CardContent className="p-4 sm:p-5 md:p-6 flex-1 flex flex-col min-h-[260px] sm:min-h-[280px] md:min-h-[300px]">
+      <CardContent className="ecp-event-card__content p-4 sm:p-5 md:p-6 flex-1 flex flex-col min-h-[260px] sm:min-h-[280px] md:min-h-[300px]">
         <div className="flex items-start gap-2 mb-1">
           <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 leading-snug two-line flex-1">
             {ev.title}
@@ -1282,7 +1282,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       {!isSecondaryDataReady ? (
         <CardFooterSkeleton />
       ) : (
-      <div className="flex items-center justify-between border-t p-6">
+      <div className="ecp-event-card__footer flex items-center justify-between border-t p-6">
         <div className="text-base font-semibold text-neutral-900">
           {isPaymentPending ? (
             <PaymentPendingSummary reg={reg} />
@@ -3443,24 +3443,24 @@ export default function EventsPage() {
   });
 
   return (
-    <>
+    <div className="imaa-ecp-ui ecp-events-page">
       {/* Hero (background image) */}
-      <section className="relative">
+      <section className="ecp-events-hero relative">
         <div
-          className="relative text-white text-center"
+          className="ecp-events-hero__image relative text-white text-center"
           style={{
             backgroundImage: `url("${heroBg}")`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0d2046]/80 to-[#0d2046]/95" />
+          <div className="ecp-events-hero__overlay absolute inset-0 bg-gradient-to-b from-[#0d2046]/80 to-[#0d2046]/95" />
           <Container maxWidth={false} disableGutters>
-            <div className="relative mx-auto max-w-7xl px-6 py-16 md:py-20">
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
+            <div className="ecp-events-hero__inner relative mx-auto max-w-7xl px-6 py-16 md:py-20">
+              <h1 className="ecp-events-hero__title text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
                 {heroTitle}
               </h1>
-              <p className="mx-auto max-w-3xl text-lg md:text-xl text-white/80">
+              <p className="ecp-events-hero__subtitle mx-auto max-w-3xl text-lg md:text-xl text-white/80">
                 {heroSubtitle}
               </p>
               <div className="mt-8 flex flex-wrap justify-center items-center gap-4">
@@ -3535,8 +3535,8 @@ export default function EventsPage() {
       </section>
 
       {/* Top filters / controls bar */}
-      <Container maxWidth={false} disableGutters className="mt-6 px-4 sm:px-6">
-        <div className="w-full rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 overflow-visible">
+      <Container maxWidth={false} disableGutters className="ecp-events-filter-container mt-6 px-4 sm:px-6">
+        <div className="ecp-events-toolbar w-full rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 overflow-visible">
           {/* Responsive grid: 1 col on xs, 2 cols on sm, 12-col layout on lg+ */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
 
@@ -3552,7 +3552,7 @@ export default function EventsPage() {
                 <input
                   type="text"
                   placeholder="Search events by keyword..."
-                  className="w-full h-11 pl-12 pr-4 rounded-xl border border-slate-200 bg-white outline-none"
+                  className="ecp-events-search-input w-full h-11 pl-12 pr-4 rounded-xl border border-slate-200 bg-white outline-none"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                 />
@@ -3633,7 +3633,7 @@ export default function EventsPage() {
               <button
                 onClick={() => setShowAdvanced((v) => !v)}
                 type="button"
-                className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm"
+                className="ecp-events-filter-button w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-slate-600">
                   <path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -3648,7 +3648,7 @@ export default function EventsPage() {
               className="hidden sm:block sm:col-span-2 lg:col-span-1 min-w-0"
               aria-hidden={false} // hidden only on xs due to Tailwind
             >
-              <div className="flex w-full h-11 rounded-xl overflow-hidden border border-slate-200 bg-white">
+              <div className="ecp-events-view-toggle flex w-full h-11 rounded-xl overflow-hidden border border-slate-200 bg-white">
                 <button
                   aria-label="Grid view"
                   onClick={() => setView('grid')}
@@ -3683,7 +3683,7 @@ export default function EventsPage() {
       </Container>
 
       {/* Results */}
-      <Container id="events" maxWidth={false} disableGutters className="mt-8 mb-16 px-4 sm:px-6">
+      <Container id="events" maxWidth={false} disableGutters className="ecp-events-results mt-8 mb-16 px-4 sm:px-6">
         <Grid container spacing={4} sx={{ alignItems: "flex-start" }}>
           {/* LEFT: Advanced Filters — desktop only */}
           {isDesktop && showAdvanced && (
@@ -3699,7 +3699,7 @@ export default function EventsPage() {
               }}
             >
               <div className="sticky top-24 h-fit">
-                <div className="rounded-2xl bg-[#0d2046] text-white p-6">
+                <div className="ecp-events-advanced-panel rounded-2xl bg-[#0d2046] text-white p-6">
                   <div className="flex items-center gap-2 mb-6">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                       <path
@@ -3978,7 +3978,7 @@ export default function EventsPage() {
             sx={{ flex: 1, minWidth: 0 }}
           >
             {/* Tab Navigation */}
-            <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
+            <Paper elevation={0} className="ecp-events-tabs rounded-2xl border border-slate-200 mb-4">
               <Tabs
                 value={selectedTab === "upcoming" ? 0 : 1}
                 onChange={(_, value) => {
@@ -3999,7 +3999,7 @@ export default function EventsPage() {
               </Tabs>
             </Paper>
 
-            <div className="w-full">
+            <div className="ecp-events-results-header w-full">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-3xl font-bold">
                   {selectedTab === "replays" ? "Available Replays" : "Upcoming Events"}
@@ -4781,6 +4781,6 @@ export default function EventsPage() {
         pauseOnHover
         theme="colored"
       />
-    </>
+    </div>
   );
 }

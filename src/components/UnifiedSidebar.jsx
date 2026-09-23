@@ -68,7 +68,7 @@ const SIDEBAR_TEXT = "rgba(255,255,255,0.82)";
 const SIDEBAR_MUTED = "rgba(255,255,255,0.46)";
 const SIDEBAR_BORDER = "rgba(255,255,255,0.12)";
 const SIDEBAR_HOVER = "rgba(255,255,255,0.08)";
-const SIDEBAR_ACTIVE = "rgba(232,83,47,0.18)";
+const SIDEBAR_ACTIVE = "rgba(255,255,255,0.08)";
 
 // --- Helpers for badges ---
 const BADGE_CACHE_TTL_MS = 60_000;
@@ -537,9 +537,9 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                 color: selected ? "#ffffff" : SIDEBAR_TEXT,
                                 bgcolor: selected ? SIDEBAR_ACTIVE : "transparent",
                                 transition: "background-color 0.16s ease, color 0.16s ease",
-                                "&:hover": { bgcolor: selected ? SIDEBAR_ACTIVE : SIDEBAR_HOVER, color: "#ffffff" },
+                                "&:hover": { bgcolor: selected ? "rgba(255,255,255,0.1)" : SIDEBAR_HOVER, color: "#ffffff" },
                                 "&.Mui-selected": { bgcolor: SIDEBAR_ACTIVE },
-                                "&.Mui-selected:hover": { bgcolor: SIDEBAR_ACTIVE },
+                                "&.Mui-selected:hover": { bgcolor: "rgba(255,255,255,0.1)" },
                                 "&::before": {
                                     content: '""',
                                     position: "absolute",
@@ -552,7 +552,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                 }
                             }}
                         >
-                            <ListItemIcon sx={{ minWidth: 36, color: selected ? "#ffffff" : "rgba(255,255,255,0.58)" }}>
+                            <ListItemIcon sx={{ minWidth: 36, color: selected ? CORAL : "rgba(255,255,255,0.62)" }}>
                                 {item.badge ? (
                                   <Badge color="error" badgeContent={item.badge === "notifications" ? notifCount : messageCount} invisible={!(item.badge === "notifications" ? notifCount : messageCount)}>
                                         <item.icon fontSize="small" />
