@@ -1,0 +1,408 @@
+/*
+  Events & Community UI foundation.
+  Scoped to .imaa-ecp-ui so these patterns can be adopted incrementally without
+  changing unrelated ECP modules or global MUI behavior.
+*/
+
+.imaa-ecp-ui {
+  min-height: 100%;
+  color: var(--imaa-text);
+  background: var(--imaa-bg);
+  font-family: var(--imaa-font-sans);
+}
+
+.imaa-ecp-ui *,
+.imaa-ecp-ui *::before,
+.imaa-ecp-ui *::after {
+  box-sizing: border-box;
+}
+
+.imaa-ecp-ui a {
+  color: var(--imaa-teal);
+  text-decoration: none;
+}
+
+.imaa-ecp-ui a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.imaa-ecp-shell {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--imaa-bg);
+}
+
+.imaa-ecp-container {
+  width: 100%;
+  max-width: var(--imaa-content-max);
+  margin: 0 auto;
+  padding: var(--imaa-space-xl) var(--imaa-space-lg);
+}
+
+.imaa-ecp-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--imaa-space-md);
+  margin-bottom: var(--imaa-space-lg);
+}
+
+.imaa-ecp-eyebrow,
+.imaa-ecp-section-label {
+  margin: 0 0 var(--imaa-space-sm);
+  color: var(--imaa-teal);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.imaa-ecp-title {
+  margin: 0;
+  color: var(--imaa-navy);
+  font-family: var(--imaa-font-serif);
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 700;
+  line-height: 1.16;
+}
+
+.imaa-ecp-subtitle {
+  max-width: 720px;
+  margin: var(--imaa-space-sm) 0 0;
+  color: var(--imaa-text-body);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.imaa-ecp-section-title {
+  margin: 0 0 var(--imaa-space-md);
+  color: var(--imaa-navy);
+  font-family: var(--imaa-font-serif);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.imaa-ecp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.imaa-ecp-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.imaa-ecp-card,
+.imaa-ecp-content-card,
+.imaa-ecp-metric-card,
+.imaa-ecp-side-panel,
+.imaa-ecp-empty-state,
+.imaa-ecp-loading-state {
+  border: 1px solid var(--imaa-border);
+  border-radius: var(--imaa-radius-lg);
+  background: var(--imaa-surface);
+  box-shadow: var(--imaa-shadow-sm);
+}
+
+.imaa-ecp-card,
+.imaa-ecp-content-card,
+.imaa-ecp-side-panel {
+  padding: var(--imaa-space-lg);
+}
+
+.imaa-ecp-card {
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.imaa-ecp-card:hover {
+  border-color: var(--imaa-border-strong);
+  box-shadow: var(--imaa-shadow-md);
+  transform: translateY(-2px);
+}
+
+.imaa-ecp-metric-card {
+  min-height: 92px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--imaa-space-md);
+}
+
+.imaa-ecp-metric-card span {
+  color: var(--imaa-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.imaa-ecp-metric-card strong {
+  color: var(--imaa-navy);
+  font-family: var(--imaa-font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.imaa-ecp-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--imaa-space-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--imaa-space-lg);
+  padding: var(--imaa-space-md) 20px;
+  border: 1px solid var(--imaa-border);
+  border-radius: var(--imaa-radius-lg);
+  background: var(--imaa-surface);
+  box-shadow: var(--imaa-shadow-sm);
+}
+
+.imaa-ecp-search,
+.imaa-ecp-field,
+.imaa-ecp-select {
+  min-height: 44px;
+  border: 1px solid var(--imaa-border);
+  border-radius: var(--imaa-radius-md);
+  background: var(--imaa-surface);
+  color: var(--imaa-text);
+  font: 500 14px/1.4 var(--imaa-font-sans);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.imaa-ecp-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: min(100%, 280px);
+  padding: 0 13px;
+}
+
+.imaa-ecp-search input,
+.imaa-ecp-field input,
+.imaa-ecp-field textarea,
+.imaa-ecp-field select {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.imaa-ecp-search:focus-within,
+.imaa-ecp-field:focus-within,
+.imaa-ecp-select:focus,
+.imaa-ecp-control:focus-visible,
+.imaa-ecp-tab:focus-visible {
+  border-color: var(--imaa-teal);
+  box-shadow: 0 0 0 3px rgba(10, 147, 150, 0.14);
+  outline: none;
+}
+
+.imaa-ecp-button,
+.imaa-ecp-control {
+  min-height: 40px;
+  border: 1px solid var(--imaa-border);
+  border-radius: var(--imaa-radius-pill);
+  background: var(--imaa-surface);
+  color: var(--imaa-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  font: 800 13px/1 var(--imaa-font-sans);
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.imaa-ecp-button:hover,
+.imaa-ecp-control:hover {
+  border-color: var(--imaa-teal);
+  color: var(--imaa-teal);
+  text-decoration: none;
+}
+
+.imaa-ecp-button--primary {
+  border-color: var(--imaa-navy);
+  background: var(--imaa-navy);
+  color: #fff;
+}
+
+.imaa-ecp-button--primary:hover {
+  border-color: var(--imaa-teal);
+  background: var(--imaa-teal);
+  color: #fff;
+}
+
+.imaa-ecp-button--accent {
+  border-color: var(--imaa-coral);
+  background: var(--imaa-coral);
+  color: #fff;
+}
+
+.imaa-ecp-button--accent:hover {
+  border-color: #cc4422;
+  background: #cc4422;
+  color: #fff;
+}
+
+.imaa-ecp-badge,
+.imaa-ecp-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--imaa-radius-pill);
+  padding: 5px 10px;
+  background: var(--imaa-bg-cool);
+  color: var(--imaa-text);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.imaa-ecp-badge--teal,
+.imaa-ecp-status-badge--success {
+  background: var(--imaa-teal-light);
+  color: #08745e;
+}
+
+.imaa-ecp-badge--coral,
+.imaa-ecp-status-badge--warning {
+  background: var(--imaa-orange-light);
+  color: #994e1a;
+}
+
+.imaa-ecp-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--imaa-border);
+}
+
+.imaa-ecp-tab {
+  margin-bottom: -1px;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--imaa-text-body);
+  font: 800 14px/1 var(--imaa-font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.imaa-ecp-tab[aria-selected="true"],
+.imaa-ecp-tab[aria-current="page"],
+.imaa-ecp-tab.is-active {
+  color: var(--imaa-navy);
+  border-bottom-color: var(--imaa-coral);
+}
+
+.imaa-ecp-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--imaa-border);
+  border-radius: var(--imaa-radius-lg);
+  background: var(--imaa-surface);
+}
+
+.imaa-ecp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.imaa-ecp-table th,
+.imaa-ecp-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--imaa-border);
+  text-align: left;
+}
+
+.imaa-ecp-table th {
+  background: var(--imaa-surface-muted);
+  color: var(--imaa-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.imaa-ecp-empty-state,
+.imaa-ecp-loading-state {
+  padding: 40px;
+  text-align: center;
+  color: var(--imaa-text-body);
+}
+
+.imaa-ecp-empty-state h2,
+.imaa-ecp-loading-state h2 {
+  margin: 0 0 var(--imaa-space-sm);
+  color: var(--imaa-navy);
+  font-family: var(--imaa-font-serif);
+  font-size: 24px;
+}
+
+.imaa-ecp-skeleton {
+  display: block;
+  border-radius: var(--imaa-radius-md);
+  background: linear-gradient(90deg, var(--imaa-bg-cool) 25%, var(--imaa-border) 50%, var(--imaa-bg-cool) 75%);
+  background-size: 200% 100%;
+  animation: imaa-ecp-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes imaa-ecp-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imaa-ecp-card,
+  .imaa-ecp-button,
+  .imaa-ecp-control,
+  .imaa-ecp-skeleton {
+    animation: none;
+    transition: none;
+  }
+
+  .imaa-ecp-card:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .imaa-ecp-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .imaa-ecp-container {
+    padding: var(--imaa-space-lg) var(--imaa-space-md);
+  }
+
+  .imaa-ecp-page-header,
+  .imaa-ecp-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .imaa-ecp-grid,
+  .imaa-ecp-grid--two {
+    grid-template-columns: 1fr;
+  }
+
+  .imaa-ecp-empty-state,
+  .imaa-ecp-loading-state {
+    padding: var(--imaa-space-xl) var(--imaa-space-md);
+  }
+}

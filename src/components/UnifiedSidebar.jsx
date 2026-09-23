@@ -60,11 +60,15 @@ import { apiClient, createWagtailSession, getSaleorDashboardUrl } from "../utils
 import { logoutBrowserSession } from "../utils/logoutSession";
 import { getAccessToken } from "../utils/tokenStore";
 
-const ORANGE = "#E8532F";
-const TEXT = "#2C3E5A";
-const HOVER_BG = "rgba(232,83,47,0.07)";
-const CARD_BG = "#ffffff";
-const CARD_BORDER = "#F0EEEB";
+const NAVY = "#1B2A4A";
+const NAVY_2 = "#203554";
+const CORAL = "#E8532F";
+const TEAL = "#0A9396";
+const SIDEBAR_TEXT = "rgba(255,255,255,0.82)";
+const SIDEBAR_MUTED = "rgba(255,255,255,0.46)";
+const SIDEBAR_BORDER = "rgba(255,255,255,0.12)";
+const SIDEBAR_HOVER = "rgba(255,255,255,0.08)";
+const SIDEBAR_ACTIVE = "rgba(232,83,47,0.18)";
 
 // --- Helpers for badges ---
 const BADGE_CACHE_TTL_MS = 60_000;
@@ -457,7 +461,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         return (
         <Box sx={{ mb: 2 }}>
             {title && (
-                <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: "block", color: "#C0BAB4", fontWeight: 800, fontSize: 10, letterSpacing: "0.1em" }}>
+                <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.75, display: "block", color: SIDEBAR_MUTED, fontWeight: 800, fontSize: 10, letterSpacing: "0.14em", lineHeight: 1.2 }}>
                     {title}
                 </Typography>
             )}
@@ -524,27 +528,48 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                 }
                             }}
                             sx={{
-                                borderRadius: 2,
+                                position: "relative",
+                                borderRadius: "8px",
                                 px: 1.5,
                                 mx: 1,
                                 mb: 0.5,
-                                color: selected ? ORANGE : TEXT,
-                                bgcolor: selected ? HOVER_BG : "transparent",
-                                "&:hover": { bgcolor: HOVER_BG },
-                                "&.Mui-selected": { bgcolor: HOVER_BG },
-                                "&.Mui-selected:hover": { bgcolor: HOVER_BG },
+                                minHeight: 42,
+                                color: selected ? "#ffffff" : SIDEBAR_TEXT,
+                                bgcolor: selected ? SIDEBAR_ACTIVE : "transparent",
+                                transition: "background-color 0.16s ease, color 0.16s ease",
+                                "&:hover": { bgcolor: selected ? SIDEBAR_ACTIVE : SIDEBAR_HOVER, color: "#ffffff" },
+                                "&.Mui-selected": { bgcolor: SIDEBAR_ACTIVE },
+                                "&.Mui-selected:hover": { bgcolor: SIDEBAR_ACTIVE },
+                                "&::before": {
+                                    content: '""',
+                                    position: "absolute",
+                                    left: 0,
+                                    top: 8,
+                                    bottom: 8,
+                                    width: 3,
+                                    borderRadius: "0 999px 999px 0",
+                                    bgcolor: selected ? CORAL : "transparent"
+                                }
                             }}
                         >
-                            <ListItemIcon sx={{ minWidth: 36, color: selected ? ORANGE : "#6b7280" }}>
+                            <ListItemIcon sx={{ minWidth: 36, color: selected ? "#ffffff" : "rgba(255,255,255,0.58)" }}>
                                 {item.badge ? (
-                                    <Badge color="error" badgeContent={item.badge === "notifications" ? notifCount : messageCount} invisible={!(item.badge === "notifications" ? notifCount : messageCount)}>
+                                  <Badge color="error" badgeContent={item.badge === "notifications" ? notifCount : messageCount} invisible={!(item.badge === "notifications" ? notifCount : messageCount)}>
                                         <item.icon fontSize="small" />
                                     </Badge>
                                 ) : (
                                     <item.icon fontSize="small" />
                                 )}
                             </ListItemIcon>
-                            <ListItemText primary={item.label} primaryTypographyProps={{ variant: "body2", fontWeight: selected ? 600 : 500 }} />
+                            <ListItemText
+                                primary={item.label}
+                                primaryTypographyProps={{
+                                    variant: "body2",
+                                    fontWeight: selected ? 800 : 600,
+                                    fontSize: 13,
+                                    noWrap: true
+                                }}
+                            />
                         </ListItemButton>
                     );
                 })}
@@ -672,19 +697,19 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const showCart = cartCount > 0 && !isSuperUser; // Owners typically don't shop
 
     const SidebarContent = (
-        <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "#ffffff", borderRight: `1px solid ${CARD_BORDER}` }}>
+        <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: NAVY, color: SIDEBAR_TEXT, borderRight: `1px solid ${SIDEBAR_BORDER}`, boxShadow: "4px 0 18px rgba(27,42,74,0.16)" }}>
             {/* Brand area */}
-            <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", gap: 1.5, borderBottom: `1px solid ${CARD_BORDER}` }}>
-                <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#1B2A4A", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", gap: 1.5, borderBottom: `1px solid ${SIDEBAR_BORDER}` }}>
+                <Box sx={{ width: 38, height: 38, borderRadius: "8px", bgcolor: "rgba(255,255,255,0.08)", border: `1px solid ${SIDEBAR_BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="#0A9396" strokeWidth="1.5" />
-                        <ellipse cx="12" cy="12" rx="4" ry="10" stroke="#E8532F" strokeWidth="1.5" />
-                        <line x1="2" y1="12" x2="22" y2="12" stroke="#0A9396" strokeWidth="1.5" />
+                        <circle cx="12" cy="12" r="10" stroke={TEAL} strokeWidth="1.5" />
+                        <ellipse cx="12" cy="12" rx="4" ry="10" stroke={CORAL} strokeWidth="1.5" />
+                        <line x1="2" y1="12" x2="22" y2="12" stroke={TEAL} strokeWidth="1.5" />
                     </svg>
                 </Box>
                 <Box>
-                    <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#1B2A4A", lineHeight: 1.2, letterSpacing: "-0.01em" }}>IMAA</Typography>
-                    <Typography sx={{ fontWeight: 700, fontSize: 10, color: "#0A9396", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>CONNECT</Typography>
+                    <Typography sx={{ fontWeight: 800, fontSize: 15, color: "#ffffff", lineHeight: 1.15 }}>IMAA</Typography>
+                    <Typography sx={{ fontWeight: 800, fontSize: 10, color: "rgba(255,255,255,0.52)", letterSpacing: "0.14em", textTransform: "uppercase", lineHeight: 1.25 }}>CONNECT</Typography>
                 </Box>
             </Box>
 
@@ -700,34 +725,41 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     bg: "transparent"
                 },
                 "&::-webkit-scrollbar-thumb": {
-                    bgcolor: "rgba(0, 0, 0, 0.2)",
+                    bgcolor: "rgba(255,255,255,0.22)",
                     borderRadius: "3px",
                     "&:hover": {
-                        bgcolor: "rgba(0, 0, 0, 0.3)"
+                        bgcolor: "rgba(255,255,255,0.34)"
                     }
                 },
                 scrollbarWidth: "thin",
-                scrollbarColor: "rgba(0, 0, 0, 0.2) transparent"
+                scrollbarColor: "rgba(255,255,255,0.22) transparent"
             }} ref={menuScrollRef}>
                 {/* Sticky Search Bar */}
                 <Box sx={{
                     position: "sticky",
                     top: 0,
                     zIndex: 10,
-                    bgcolor: "#ffffff",
+                    bgcolor: NAVY,
                     p: 1.5,
                     mb: 1,
-                    borderBottom: `1px solid ${CARD_BORDER}`
+                    borderBottom: `1px solid ${SIDEBAR_BORDER}`
                 }}>
                     <Box sx={{
                         display: "flex",
                         alignItems: "center",
                         gap: 0.5,
-                        bgcolor: "rgba(0, 0, 0, 0.04)",
-                        borderRadius: 1.5,
+                        bgcolor: "rgba(255,255,255,0.08)",
+                        border: `1px solid ${SIDEBAR_BORDER}`,
+                        borderRadius: "8px",
                         px: 1.5,
                         py: 0.75,
-                        justifyContent: "space-between"
+                        justifyContent: "space-between",
+                        color: SIDEBAR_MUTED,
+                        "&:focus-within": {
+                            borderColor: "rgba(10,147,150,0.9)",
+                            boxShadow: "0 0 0 3px rgba(10,147,150,0.16)",
+                            color: "#ffffff"
+                        }
                     }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flex: 1, minWidth: 0 }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -750,12 +782,12 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                     outline: "none",
                                     fontSize: "14px",
                                     fontFamily: "inherit",
-                                    color: TEXT,
+                                    color: "#ffffff",
                                     minWidth: 0
                                 }}
                             />
                         </Box>
-                        <Box sx={{ fontSize: "12px", color: "#666", fontWeight: 600, whiteSpace: "nowrap", ml: 1 }}>
+                        <Box sx={{ fontSize: "12px", color: SIDEBAR_MUTED, fontWeight: 700, whiteSpace: "nowrap", ml: 1 }}>
                             {searchQuery && filteredCount > 0
                                 ? `${currentSearchIndex + 1} / ${filteredCount}`
                                 : `${allItems.length}`
@@ -778,8 +810,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     justifyContent: "center",
                     py: 1.5,
                     px: 1.5,
-                    bgcolor: "#ffffff",
-                    borderTop: `1px solid ${CARD_BORDER}`,
+                    bgcolor: NAVY,
+                    borderTop: `1px solid ${SIDEBAR_BORDER}`,
                     opacity: showMoreIndicator ? 1 : 0,
                     pointerEvents: showMoreIndicator ? "auto" : "none",
                     transition: "opacity 0.2s",
@@ -800,13 +832,13 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                             textTransform: "none",
                             fontSize: "13px",
                             fontWeight: 500,
-                            color: ORANGE,
-                            bgcolor: HOVER_BG,
+                            color: "#ffffff",
+                            bgcolor: SIDEBAR_ACTIVE,
                             padding: "8px 16px",
-                            border: `1px solid ${ORANGE}20`,
+                            border: `1px solid rgba(232,83,47,0.36)`,
                             "&:hover": {
-                                bgcolor: "rgba(232,83,47,0.12)",
-                                borderColor: `${ORANGE}40`
+                                bgcolor: "rgba(232,83,47,0.26)",
+                                borderColor: "rgba(232,83,47,0.52)"
                             },
                             transition: "all 0.2s"
                         }}
@@ -816,7 +848,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 </Box>
             </Box>
 
-            <Box sx={{ px: 1, pt: 0.5, pb: 0.5 }}>
+            <Box sx={{ px: 1, pt: 0.75, pb: 0.75, borderTop: `1px solid ${SIDEBAR_BORDER}` }}>
                 {/* TODO: Re-enable Settings when ready */}
                 {/* <ListItemButton
                     onClick={() => navigate("/account/settings")}
@@ -832,17 +864,17 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     href="https://imaa-institute.org"
                     target="_blank"
                     rel="noopener noreferrer"
-                    sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.5, py: 0.75, color: "#C0BAB4", fontSize: 11.5, textDecoration: "none", fontWeight: 500,
-                        "&:hover": { color: ORANGE } }}
+                    sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.5, py: 0.75, color: SIDEBAR_MUTED, fontSize: 11.5, textDecoration: "none", fontWeight: 700,
+                        "&:hover": { color: "#ffffff" } }}
                 >
                     <OpenInNewIcon sx={{ fontSize: 13 }} />
                     Back to imaa-institute.org
                 </Box>
             </Box>
 
-            <Divider />
+            <Divider sx={{ borderColor: SIDEBAR_BORDER }} />
 
-            <Box sx={{ p: 2, pb: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+            <Box sx={{ p: 2, pb: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, bgcolor: NAVY_2 }}>
                 {/* Profile Section */}
                 <Box
                     onClick={() => navigate('/account/profile')}
@@ -853,10 +885,10 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                         overflow: "hidden",
                         cursor: "pointer",
                         flex: 1,
-                        p: 0.5,
-                        borderRadius: 2,
+                        p: 0.75,
+                        borderRadius: "8px",
                         transition: "background-color 0.2s",
-                        "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" }
+                        "&:hover": { bgcolor: SIDEBAR_HOVER }
                     }}
                 >
                     {user && (
@@ -881,22 +913,22 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                     })()
                                 }
                                 alt={user.first_name || "User"}
-                                sx={{ width: 40, height: 40 }}
+                                sx={{ width: 40, height: 40, bgcolor: TEAL, color: "#ffffff", fontWeight: 800, boxShadow: "0 0 0 1px rgba(255,255,255,0.18)" }}
                             >
                                 {(user.first_name || user.username || "U")[0]?.toUpperCase()}
                             </Avatar>
                             <Box sx={{ minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                    <Typography variant="subtitle2" fontWeight={700} noWrap>
+                                    <Typography variant="subtitle2" fontWeight={800} noWrap sx={{ color: "#ffffff", fontSize: 13 }}>
                                         {user.first_name} {user.last_name}
                                     </Typography>
                                     {user.profile?.kyc_status === "approved" && (
                                         <Tooltip title="Verified">
-                                            <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+                                            <VerifiedIcon sx={{ fontSize: 16, color: TEAL }} />
                                         </Tooltip>
                                     )}
                                 </Box>
-                                <Typography variant="caption" color="text.secondary" noWrap display="block">
+                                <Typography variant="caption" noWrap display="block" sx={{ color: SIDEBAR_MUTED, fontWeight: 600 }}>
                                     {(function () {
                                         // 1. Try latest experience
                                         if (user.experiences && user.experiences.length > 0) {
@@ -926,9 +958,10 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                             <IconButton
                                 onClick={() => navigate(isStaffOnly ? "/admin/carts" : "/account/cart")}
                                 sx={{
-                                    color: "text.secondary",
-                                    bgcolor: "rgba(0, 0, 0, 0.04)",
-                                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.1)" }
+                                    color: "#ffffff",
+                                    bgcolor: "rgba(255,255,255,0.08)",
+                                    border: `1px solid ${SIDEBAR_BORDER}`,
+                                    "&:hover": { bgcolor: SIDEBAR_HOVER }
                                 }}
                             >
                                 <Badge
@@ -956,8 +989,10 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                             onClick={handleLogoutClick}
                             color="error"
                             sx={{
-                                bgcolor: "rgba(211, 47, 47, 0.04)",
-                                "&:hover": { bgcolor: "rgba(211, 47, 47, 0.12)" }
+                                color: "#ffffff",
+                                bgcolor: "rgba(232,83,47,0.16)",
+                                border: "1px solid rgba(232,83,47,0.32)",
+                                "&:hover": { bgcolor: "rgba(232,83,47,0.26)" }
                             }}
                         >
                             <LogoutRoundedIcon fontSize="small" />
