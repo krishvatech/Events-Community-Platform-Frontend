@@ -83,6 +83,7 @@ import {
   SAVE_STATUS_SYNCED,
   saveBroadcastDraft,
 } from "./newsletterBroadcastSave.js";
+import { isBroadcastDetailLoaded } from "./newsletterBroadcastState.js";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
@@ -1141,7 +1142,7 @@ export default function AdminNewsletterPage() {
     }
   };
 
-  const detailLoaded = isNew || (!loading && !error && Boolean(campaign));
+  const detailLoaded = isBroadcastDetailLoaded({ isNew, loading, campaign });
   const status = campaign ? String(campaign.status || "").toLowerCase() : "";
   const editable = detailLoaded && (isNew || status === "draft");
   const isDirty = editable && !isNew && JSON.stringify(form) !== JSON.stringify(savedForm);
