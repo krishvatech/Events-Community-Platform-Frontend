@@ -54,6 +54,10 @@ import NewspaperRoundedIcon from "@mui/icons-material/NewspaperRounded";
 import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
 import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import AutoStoriesRoundedIcon from "@mui/icons-material/AutoStoriesRounded"; // Explore Blogs
+import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded"; // My Blogs
+import { getBlogSidebarItems } from "../config/blogNavigation";
+import { canManageBlogs } from "../utils/blogAccess";
 
 import { isOwnerUser, isStaffUser, canEditProfilesUser } from "../utils/adminRole";
 import { apiClient, createWagtailSession, getSaleorDashboardUrl } from "../utils/api";
@@ -211,6 +215,12 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const searchInputRef = useRef(null);
 
     // --- Navigation Config ---
+    // Explore Blogs is for every member. My Blogs follows the backend Blog rule
+    // (Django is_superuser only), not the wider isOwnerUser/platform_admin check.
+    const blogItems = getBlogSidebarItems({ canManageBlogs: canManageBlogs() });
+    const exploreBlogItems = blogItems.explore.map((item) => ({ label: item.label, to: item.to, icon: AutoStoriesRoundedIcon }));
+    const myBlogItems = blogItems.manage.map((item) => ({ label: item.label, to: item.to, icon: EditNoteRoundedIcon }));
+
     const discoverItems = [
         { label: "Dashboard", to: "/community?view=home", icon: HomeRoundedIcon },
         { label: "Upcoming Events", to: "/events", icon: EventNoteRoundedIcon },
@@ -218,6 +228,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         { label: "Discussion Forum", to: "/community?view=forum", icon: ForumRoundedIcon },
         { label: "Explore Groups", to: "/community?view=groups", icon: GroupsRoundedIcon },
         { label: "Explore Members", to: "/community?view=members", icon: Diversity3RoundedIcon },
+        ...exploreBlogItems,
     ];
 
     const trainingsItems = [
@@ -244,6 +255,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Posts", to: "/admin/posts", icon: ArticleRoundedIcon },
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
             { label: "My Series", to: "/admin/series", icon: ArticleRoundedIcon },
+            ...myBlogItems,
             { label: "Virtual Speakers", to: "/admin/virtual-speakers", icon: MicRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
@@ -272,6 +284,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
+            ...myBlogItems,
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
         adminItems = [
@@ -290,6 +303,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Groups", to: "/community/mygroups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
+            ...myBlogItems,
             { label: "My Orders", to: "/account/cart", icon: ShoppingCartRoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];

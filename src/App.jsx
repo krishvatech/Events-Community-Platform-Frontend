@@ -11,6 +11,8 @@ import Header from "./components/Header.jsx";
 import UnifiedSidebar from "./components/UnifiedSidebar.jsx"; // [NEW]
 import MarketingHubLayout from "./components/marketing/MarketingHubLayout.jsx";
 import { isMarketingHubPath } from "./config/marketingNavigation";
+import { isBlogReaderPath } from "./config/blogNavigation";
+import { blogAdminRoutes, blogReaderRoutes } from "./routes/blogRoutes.jsx";
 
 import HomePage from "./pages/HomePage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
@@ -241,6 +243,7 @@ const AppShell = () => {
                             !location.pathname.startsWith("/community") &&
                             !location.pathname.startsWith("/landing") &&
                             !location.pathname.startsWith("/newsletter") &&
+                            !isBlogReaderPath(location.pathname) &&
                             location.pathname !== "/" &&
                             location.pathname !== "/about" &&
                             location.pathname !== "/cms" &&
@@ -384,6 +387,7 @@ const AppShell = () => {
               <Route path=":campaignId" element={<AdminNewsletterPage />} />
             </Route>
             <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
+            {blogAdminRoutes}
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/groups/public/:slug" element={<PublicGroupLandingPage />} />
@@ -423,6 +427,9 @@ const AppShell = () => {
           <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
           <Route path="/account/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
           <Route path="/newsletter" element={<RequireAuth><NewsletterPage /></RequireAuth>} />
+
+          {/* Blogs: Explore Blogs + reader (signed-in members) */}
+          {blogReaderRoutes}
 
           {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
           <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />
