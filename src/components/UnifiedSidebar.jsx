@@ -56,7 +56,7 @@ import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { isOwnerUser, isStaffUser, canEditProfilesUser } from "../utils/adminRole";
-import { apiClient, createWagtailSession, getSaleorDashboardUrl } from "../utils/api";
+import { apiClient, createWagtailSession, createOpenApiDocsSession, getSaleorDashboardUrl } from "../utils/api";
 import { logoutBrowserSession } from "../utils/logoutSession";
 import { getAccessToken } from "../utils/tokenStore";
 
@@ -260,6 +260,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Email Templates", to: "/admin/email-templates", icon: MarkEmailReadRoundedIcon },
             { label: "Marketing Hub", to: "/admin/newsletter", icon: NewspaperRoundedIcon },
             { label: "CMS", action: "cms", icon: ArticleRoundedIcon },
+            { label: "API Docs", action: "api-docs", icon: MenuBookRoundedIcon },
             { label: "Admin Guide", to: "/admin/guide", icon: MenuBookRoundedIcon },
         ];
     } else if (isStaffOnly) {
@@ -427,6 +428,24 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 const url = await createWagtailSession();
                 window.open(url, "_blank");
             } catch { alert("Error accessing CMS"); }
+        } else if (action === "api-docs") {
+            // Open the tab immediately so browser popup blockers do not block
+            // it while we exchange the existing ECP token for a Django session.
+            const docsWindow = window.open("about:blank", "_blank");
+            if (docsWindow) docsWindow.opener = null;
+
+            try {
+                const url = await createOpenApiDocsSession();
+                if (docsWindow) {
+                    docsWindow.location.replace(url);
+                } else {
+                    // Fallback for browsers that block a new tab.
+                    window.location.href = url;
+                }
+            } catch {
+                if (docsWindow && !docsWindow.closed) docsWindow.close();
+                alert("Error accessing API Docs");
+            }
         }
     };
 
