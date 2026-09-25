@@ -1,14 +1,17 @@
 import React, { useState } from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Typography,
+  Alert,
   Box,
+  Button,
+  Checkbox,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
+  FormControlLabel,
+  Typography,
 } from "@mui/material";
 import { API_BASE, getToken } from "../utils/api";
 
@@ -25,6 +28,9 @@ export default function LinkedInProfileImportDialog({
 }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [identityCheck, setIdentityCheck] = useState(null);
+  const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
+  const [addLinkedinEmail, setAddLinkedinEmail] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -33,6 +39,8 @@ export default function LinkedInProfileImportDialog({
 
     setLoading(true);
     setError("");
+    setOwnershipConfirmed(false);
+    setAddLinkedinEmail(false);
 
     try {
       const form = new FormData();
@@ -54,6 +62,7 @@ export default function LinkedInProfileImportDialog({
       }
 
       setPreview(data.data);
+      setIdentityCheck(data.identity_check || null);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -78,6 +87,8 @@ export default function LinkedInProfileImportDialog({
           },
           body: JSON.stringify({
             profile_data: preview,
+            ownership_confirmed: ownershipConfirmed,
+            add_linkedin_email: addLinkedinEmail,
           }),
         }
       );
@@ -89,7 +100,7 @@ export default function LinkedInProfileImportDialog({
       }
 
       onImported?.();
-      onClose();
+      handleClose();
     } catch (e) {
       setError(e.message);
     } finally {
@@ -97,12 +108,33 @@ export default function LinkedInProfileImportDialog({
     }
   };
 
+  const handleFileChange = (event) => {
+    setFile(event.target.files?.[0] || null);
+    setPreview(null);
+    setIdentityCheck(null);
+    setOwnershipConfirmed(false);
+    setAddLinkedinEmail(false);
+    setError("");
+  };
+
   const handleClose = () => {
     setFile(null);
     setPreview(null);
+    setIdentityCheck(null);
+    setOwnershipConfirmed(false);
+    setAddLinkedinEmail(false);
     setError("");
     onClose();
   };
+
+  const identityStatus = identityCheck?.status || "matched";
+  const needsOwnershipConfirmation = identityStatus === "review";
+  const identityBlocked = identityStatus === "blocked";
+  const canImport =
+    !!preview &&
+    !loading &&
+    !identityBlocked &&
+    (!needsOwnershipConfirmation || ownershipConfirmed);
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md">
@@ -139,7 +171,7 @@ export default function LinkedInProfileImportDialog({
                 hidden
                 type="file"
                 accept="application/pdf"
-                onChange={(e) => setFile(e.target.files[0])}
+                onChange={handleFileChange}
               />
             </Button>
 
@@ -180,6 +212,72 @@ export default function LinkedInProfileImportDialog({
             <Typography>
               Education: {(preview.educations || []).length}
             </Typography>
+
+            {needsOwnershipConfirmation && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  The LinkedIn email is different from your account email.
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Account email: <strong>{identityCheck.account_email || "Not available"}</strong>
+                </Typography>
+                <Typography variant="body2">
+                  LinkedIn email: <strong>{identityCheck.linkedin_email || "Not available"}</strong>
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  The profile name matches your account closely. Confirm ownership to continue.
+                </Typography>
+
+                <FormControlLabel
+                  sx={{ mt: 1, display: "flex", alignItems: "flex-start" }}
+                  control={
+                    <Checkbox
+                      checked={ownershipConfirmed}
+                      onChange={(event) => setOwnershipConfirmed(event.target.checked)}
+                    />
+                  }
+                  label="I confirm this LinkedIn profile belongs to me."
+                />
+
+                <FormControlLabel
+                  sx={{ display: "flex", alignItems: "flex-start" }}
+                  control={
+                    <Checkbox
+                      checked={addLinkedinEmail}
+                      onChange={(event) => setAddLinkedinEmail(event.target.checked)}
+                      disabled={!ownershipConfirmed}
+                    />
+                  }
+                  label="Add the LinkedIn email to my profile as an additional email."
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", ml: 4 }}>
+                  This adds it to your profile email list only. It does not change your login email.
+                </Typography>
+              </Alert>
+            )}
+
+            {identityBlocked && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  This LinkedIn profile appears to belong to another person.
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Account email: <strong>{identityCheck.account_email || "Not available"}</strong>
+                </Typography>
+                <Typography variant="body2">
+                  LinkedIn email: <strong>{identityCheck.linkedin_email || "Not available"}</strong>
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Account name: <strong>{identityCheck.account_name || "Not available"}</strong>
+                </Typography>
+                <Typography variant="body2">
+                  LinkedIn name: <strong>{identityCheck.linkedin_name || "Not available"}</strong>
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Please upload your own LinkedIn profile PDF.
+                </Typography>
+              </Alert>
+            )}
           </Box>
         )}
 
@@ -208,16 +306,20 @@ export default function LinkedInProfileImportDialog({
           </Button>
         )}
 
-        {preview && (
+        {preview && !identityBlocked && (
           <Button
             variant="contained"
             onClick={confirmImport}
-            disabled={loading}
+            disabled={!canImport}
             startIcon={
               loading ? <CircularProgress size={16} color="inherit" /> : null
             }
           >
-            {loading ? "Importing…" : "Import"}
+            {loading
+              ? "Importing…"
+              : needsOwnershipConfirmation
+                ? "Import Anyway"
+                : "Import"}
           </Button>
         )}
       </DialogActions>
