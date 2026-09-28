@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "#navigation";
 import { toast } from "react-toastify";
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";

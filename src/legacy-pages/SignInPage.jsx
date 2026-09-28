@@ -1,7 +1,7 @@
 ﻿// src/pages/SignInPage.jsx
 // Renders the landing-page background with the login modal open.
 import React, { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "#navigation";
 import { Box } from "@mui/material";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";

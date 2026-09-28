@@ -1,6 +1,6 @@
 // src/components/RoleBasedRoute.jsx
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate } from "#navigation";
 import { isOwnerUser, isAdminUser } from "../utils/adminRole";
 import useMarketingAccess from "../hooks/useMarketingAccess";
 

@@ -1,17 +1,11 @@
 // src/App.jsx
 
-import React, { useState, useEffect } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { Toolbar, Box, IconButton, useMediaQuery, useTheme } from "@mui/material";
-import MenuRoundedIcon from "@mui/icons-material/MenuRounded"; // Mobile toggle
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import { isOwnerUser, isStaffUser } from "./utils/adminRole";
-import KYCNotification from "./components/KYCNotification";
-import Header from "./components/Header.jsx";
-import UnifiedSidebar from "./components/UnifiedSidebar.jsx"; // [NEW]
+import AppChrome from "./components/layout/AppChrome.jsx";
 import MarketingHubLayout from "./components/marketing/MarketingHubLayout.jsx";
-import { isMarketingHubPath } from "./config/marketingNavigation";
-import { isBlogReaderPath } from "./config/blogNavigation";
 import { blogAdminRoutes, blogReaderRoutes } from "./routes/blogRoutes.jsx";
 
 import HomePage from "./legacy-pages/HomePage.jsx";
@@ -29,7 +23,6 @@ import EventCompanionDirectoryPage from "./legacy-pages/EventCompanionDirectoryP
 import EventCompanionAccessPage from "./legacy-pages/EventCompanionAccessPage.jsx";
 import EventCompanionGuard from "./components/EventCompanionGuard.jsx";
 import LiveMeetingPage from "./legacy-pages/LiveMeetingPage.jsx";
-import Footer from "./components/Footer.jsx";
 import MyRecordingsPage from "./legacy-pages/MyRecordingsPage.jsx"
 import ProfilePage from "./legacy-pages/ProfilePage.jsx";
 import SettingsPage from "./legacy-pages/SettingsPage.jsx";
@@ -93,9 +86,6 @@ import AttendeeFormPage from "./legacy-pages/AttendeeFormPage.jsx";
 import TrainingProgramsPage from "./legacy-pages/TrainingProgramsPage.jsx";
 import RecognitionDirectoryPage from "./legacy-pages/RecognitionDirectoryPage.jsx";
 import { CircularProgress } from "@mui/material";
-import { getAccessToken as getStoredAccessToken } from "./utils/tokenStore";
-import { isSecureAuthSessionEnabled } from "./utils/secureAuthSession";
-import { bootstrapMemberAuthSession } from "./utils/memberAuthSession";
 
 
 function RedirectGroupToAdmin() {
@@ -147,311 +137,145 @@ function EventIdRedirect() {
   return null;
 }
 
-// Auth helper
-const getAccessToken = () => getStoredAccessToken();
-const isAuthed = () => {
-  // Treat guest sessions as NOT authenticated for dashboard/sidebar sections.
-  // Guests are only allowed on /live/* via RequireAuth special handling.
-  if (localStorage.getItem("is_guest") === "true") return false;
-  return !!getAccessToken();
-};
-
-const AppShell = () => {
-  const location = useLocation();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-
-  const [authed, setAuthed] = useState(isAuthed());
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [authReady, setAuthReady] = useState(!isSecureAuthSessionEnabled());
-
-  // Secure-session mode keeps the member access token in memory only. After a
-  // full page reload, restore it once from the HttpOnly session cookie before
-  // route guards/header/sidebar decide whether the user is authenticated.
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!isSecureAuthSessionEnabled()) {
-      setAuthReady(true);
-      return () => { cancelled = true; };
-    }
-
-    const initialPath = window.location.pathname.replace(/\/$/, "") || "/";
-    const callbackCreatesSession =
-      initialPath === "/cognito/callback" ||
-      initialPath === "/oauth/callback" ||
-      initialPath === "/auth/magic-link";
-
-    if (callbackCreatesSession) {
-      setAuthReady(true);
-      return () => { cancelled = true; };
-    }
-
-    bootstrapMemberAuthSession()
-      .catch(() => null)
-      .finally(() => {
-        if (cancelled) return;
-        setAuthed(isAuthed());
-        setAuthReady(true);
-        try {
-          window.dispatchEvent(new Event("auth:changed"));
-        } catch {
-          // no-op
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Sync auth state
-  useEffect(() => {
-    const syncAuth = () => setAuthed(isAuthed());
-    window.addEventListener("storage", syncAuth);
-    window.addEventListener("auth:changed", syncAuth);
-    return () => {
-      window.removeEventListener("storage", syncAuth);
-      window.removeEventListener("auth:changed", syncAuth);
-    };
-  }, []);
-
-  // Sync auth on location change (sometimes needed)
-  useEffect(() => {
-    setAuthed(isAuthed());
-    setMobileOpen(false); // Close mobile drawer on nav
-  }, [location.pathname]);
-
-
-  // Hide header & footer on auth pages, live meeting routes, and public branded event pages
-  // Also hide chrome on event marketing pages (single slug route or /landing/:slug)
-  // And hide on IMAA standalone public pages
-  const normalizedPath = location.pathname.replace(/\/$/, "");
-  const isImaaStandalonePublicPage =
-    normalizedPath === "/m-and-a-trainings" ||
-    normalizedPath.startsWith("/m-and-a-trainings/") ||
-    normalizedPath === "/recognition" ||
-    normalizedPath.startsWith("/recognition/");
-
-  const isCompanionPage = location.pathname.includes("/companion");
-  const isMarketingHub = isMarketingHubPath(location.pathname);
-  const isSsoRedirectPage = normalizedPath === "/sso/imaa";
-  const isSingleEventPage = (location.pathname.startsWith("/landing/") && location.pathname !== "/landing") ||
-                            (!location.pathname.startsWith("/events") &&
-                            !location.pathname.startsWith("/account") &&
-                            !location.pathname.startsWith("/admin") &&
-                            !location.pathname.startsWith("/community") &&
-                            !location.pathname.startsWith("/landing") &&
-                            !location.pathname.startsWith("/newsletter") &&
-                            !isBlogReaderPath(location.pathname) &&
-                            location.pathname !== "/" &&
-                            location.pathname !== "/about" &&
-                            location.pathname !== "/cms" &&
-                            location.pathname.match(/^\/[a-zA-Z0-9\-]+\/?$/));
-  const hideChrome =
-    isSsoRedirectPage ||
-    isImaaStandalonePublicPage ||
-    location.pathname === "/signin" ||
-    location.pathname === "/signup" ||
-    location.pathname === "/forgot-password" ||
-    location.pathname === "/reset-password" ||
-    location.pathname === "/auth/magic-link" ||
-    location.pathname === "/cognito/callback" ||
-    location.pathname === "/live" ||
-    location.pathname.startsWith("/live/") ||
-    location.pathname.startsWith("/public/") ||
-    location.pathname.startsWith("/staging/") ||
-    isCompanionPage ||
-    isSingleEventPage;
-
-  const showSidebar = authed && !hideChrome && !isMarketingHub;
-  const showHeader = !authed && !hideChrome;
-
-  if (!authReady) {
-    return (
-      <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <CircularProgress size={30} />
-      </Box>
-    );
-  }
-
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-
-      {/* 1. Unauthorized User -> Header */}
-      {showHeader && (
-        <>
-          <Header />
-          <Toolbar />
-        </>
-      )}
-
-      {/* 2. Authorized User -> Sidebar */}
-      {showSidebar && (
-        <>
-          <UnifiedSidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
-
-          {/* Mobile Handburger for Authed User */}
-          {isMobile && (
-            <Box sx={{ position: "fixed", top: 12, left: 12, zIndex: 1200 }}>
-              <IconButton
-                onClick={() => setMobileOpen(true)}
-                sx={{ bgcolor: "white", boxShadow: 1, "&:hover": { bgcolor: "#f9fafb" } }}
-              >
-                <MenuRoundedIcon />
-              </IconButton>
-            </Box>
-          )}
-        </>
-      )}
-
-      {!isCompanionPage && !isImaaStandalonePublicPage && !isSsoRedirectPage && <KYCNotification />}
-
-      {/* Main Content Wrapper */}
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          width: showSidebar && !isMobile ? "calc(100% - 280px)" : "100%",
-          ml: showSidebar && !isMobile ? "280px" : 0,
-          pt: isMobile && showSidebar ? 6 : 0, // spacing for mobile hamburger?
-        }}
-      >
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/cms" element={<RequireAuth><CmsBridge /></RequireAuth>} />
+// Route table of the Vite app. Also rendered by the Next.js legacy fallback
+// (src/app/(app)/[[...legacy]]/page.jsx) for routes not yet migrated.
+export const LegacyRoutes = () => (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/cms" element={<RequireAuth><CmsBridge /></RequireAuth>} />
 	          <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
 	          <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
 	          <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
 	          <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
 	          <Route path="/auth/magic-link" element={<MagicLinkPage />} />
-          <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
-          <Route path="/oauth/callback" element={<SocialOAuthCallback />} />
-          <Route path="/cognito/callback" element={<CognitoOAuthCallback />} />
-          <Route path="/sso/imaa" element={<ImaaSsoRedirect />} />
+      <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
+      <Route path="/oauth/callback" element={<SocialOAuthCallback />} />
+      <Route path="/cognito/callback" element={<CognitoOAuthCallback />} />
+      <Route path="/sso/imaa" element={<ImaaSsoRedirect />} />
 
-          {/* Admin routes - Layout is handled globally now, so AdminLayout just renders Outlet? */}
-          <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
-            <Route index element={<RequireStaffOrAdminForResources><AdminResources /></RequireStaffOrAdminForResources>} />
+      {/* Admin routes - Layout is handled globally now, so AdminLayout just renders Outlet? */}
+      <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
+        <Route index element={<RequireStaffOrAdminForResources><AdminResources /></RequireStaffOrAdminForResources>} />
 
-            {/* main admin pages */}
-            <Route path="events" element={<AdminEvents />} />
-            <Route path="series" element={<SeriesList />} />
-            <Route path="series/:seriesId" element={<SeriesManagePage />} />
-            <Route path="resources" element={<RequireStaffOrAdminForResources><AdminResources /></RequireStaffOrAdminForResources>} />
-            <Route path="posts" element={<AdminPostsPage />} />
-            {/* Platform-level pages: group admins/moderators are scoped to their
-                own group and must not reach these. */}
-            <Route path="groups" element={<RequireStaffOrAdmin><AdminGroups /></RequireStaffOrAdmin>} />
-            <Route path="messages" element={<AdminMessagesPage />} />
-            <Route path="notifications" element={<AdminNotificationsPage />} />
-            <Route path="settings" element={<AdminSettings />} />
-            <Route path="moderation" element={<RequireStaffOrAdmin><AdminModerationPage /></RequireStaffOrAdmin>} />
-            <Route path="moderation/profiles" element={<RequireStaffOrAdmin><AdminProfileModerationPage /></RequireStaffOrAdmin>} />
-            <Route path="name-requests" element={<AdminNameRequestsPage />} />
-            <Route path="/admin/events/:slug" element={<EventManagePage />} />
-            {/* recordings with slug-based routing */}
-            <Route path="recordings" element={<AdminRecordingsPage />} />
-            <Route path="recordings/:slug" element={<AdminRecordingDetailsPage />} />
-            <Route path="groups/:idOrSlug" element={<RequireStaffOrAdmin><GroupManagePage /></RequireStaffOrAdmin>} />
-            <Route path="carts" element={<AdminCarts />} />
-            <Route path="users" element={<AdminStaffPage />} />
-            <Route path="users/:userId/edit-profile" element={<AdminUserProfileEditPage />} />
-            <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
-            <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
-            <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
-            <Route path="marketing/activity" element={<RequireSuperAdmin><MarketingHubLayout /></RequireSuperAdmin>}>
-              <Route index element={<AdminMarketingAuditPage />} />
-            </Route>
-            <Route path="newsletter" element={<RequireMarketingAccess><MarketingHubLayout /></RequireMarketingAccess>}>
-              <Route index element={<AdminNewsletterDashboardPage />} />
-              <Route path="campaigns" element={<AdminNewsletterPage />} />
-              <Route path="broadcasts" element={<AdminNewsletterPage />} />
-              <Route path="templates" element={<AdminNewsletterPage />} />
-              <Route path="lists" element={<AdminNewsletterPage />} />
-              <Route path="segments" element={<AdminNewsletterPage />} />
-              <Route path="analytics" element={<AdminNewsletterAnalyticsPage />} />
-              <Route path="settings" element={<AdminNewsletterPage />} />
-              <Route path="new" element={<AdminNewsletterPage />} />
-              <Route path="audiences/*" element={<Navigate to="/admin/newsletter" replace />} />
-              <Route path="contacts" element={<AdminNewsletterContactsPage />} />
-              <Route path="contacts/:mauticContactId" element={<AdminNewsletterContactDetailPage />} />
-              <Route path="companies" element={<AdminNewsletterCompaniesPage />} />
-              <Route path="companies/:companyId" element={<AdminNewsletterCompanyDetailPage />} />
-              <Route path="builder" element={<AdminNewsletterPage />} />
-              <Route path="builder/:campaignId" element={<AdminNewsletterPage />} />
-              <Route path="stages" element={<AdminNewsletterStagesPage />} />
-              <Route path="points" element={<AdminNewsletterPointsPage />} />
-              <Route path="lists/:slug" element={<AdminNewsletterListManagePage />} />
-              <Route path=":campaignId" element={<AdminNewsletterPage />} />
-            </Route>
-            <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
-            {blogAdminRoutes}
-          </Route>
-          <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
-          <Route path="/groups/public/:slug" element={<PublicGroupLandingPage />} />
-          <Route path="/events" element={<EventsPage />} />
-          <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
-          {/* Design preview (IPDT-749) - same page, green theme */}
-          <Route path="/staging/:slug" element={<EventLandingPage_Marketing theme="green" />} />
-          <Route path="/landing/:slug" element={<SingleEventMarketingPage />} />
-          <Route path="/series/:slug" element={<PublicSeriesLanding />} />
-          <Route path="/events/:slug/companion" element={<EventCompanionAccessPage />} />
-          <Route path="/events/:slug" element={<EventDetailsPage />} />
-          <Route path="/events/:id" element={<EventIdRedirect />} />
-          <Route path="/account/cart" element={<MyCartPage />} />
-          <Route path="/community" element={<RequireAuth><CommunityHubPage /></RequireAuth>} />
-          <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
-          <Route path="/community/mygroups" element={<RequireAuth><MyGroupsPage /></RequireAuth>} />
-          <Route path="/community/mygroups/:groupId" element={<RequireAuth><GroupDetailsPage /></RequireAuth>} />
+        {/* main admin pages */}
+        <Route path="events" element={<AdminEvents />} />
+        <Route path="series" element={<SeriesList />} />
+        <Route path="series/:seriesId" element={<SeriesManagePage />} />
+        <Route path="resources" element={<RequireStaffOrAdminForResources><AdminResources /></RequireStaffOrAdminForResources>} />
+        <Route path="posts" element={<AdminPostsPage />} />
+        {/* Platform-level pages: group admins/moderators are scoped to their
+            own group and must not reach these. */}
+        <Route path="groups" element={<RequireStaffOrAdmin><AdminGroups /></RequireStaffOrAdmin>} />
+        <Route path="messages" element={<AdminMessagesPage />} />
+        <Route path="notifications" element={<AdminNotificationsPage />} />
+        <Route path="settings" element={<AdminSettings />} />
+        <Route path="moderation" element={<RequireStaffOrAdmin><AdminModerationPage /></RequireStaffOrAdmin>} />
+        <Route path="moderation/profiles" element={<RequireStaffOrAdmin><AdminProfileModerationPage /></RequireStaffOrAdmin>} />
+        <Route path="name-requests" element={<AdminNameRequestsPage />} />
+        <Route path="/admin/events/:slug" element={<EventManagePage />} />
+        {/* recordings with slug-based routing */}
+        <Route path="recordings" element={<AdminRecordingsPage />} />
+        <Route path="recordings/:slug" element={<AdminRecordingDetailsPage />} />
+        <Route path="groups/:idOrSlug" element={<RequireStaffOrAdmin><GroupManagePage /></RequireStaffOrAdmin>} />
+        <Route path="carts" element={<AdminCarts />} />
+        <Route path="users" element={<AdminStaffPage />} />
+        <Route path="users/:userId/edit-profile" element={<AdminUserProfileEditPage />} />
+        <Route path="virtual-speakers" element={<RequireSuperAdmin><VirtualSpeakersPage /></RequireSuperAdmin>} />
+        <Route path="saleor" element={<RequireSuperAdmin><SaleorManager /></RequireSuperAdmin>} />
+        <Route path="email-templates" element={<RequireSuperAdmin><EmailTemplatesPage /></RequireSuperAdmin>} />
+        <Route path="marketing/activity" element={<RequireSuperAdmin><MarketingHubLayout /></RequireSuperAdmin>}>
+          <Route index element={<AdminMarketingAuditPage />} />
+        </Route>
+        <Route path="newsletter" element={<RequireMarketingAccess><MarketingHubLayout /></RequireMarketingAccess>}>
+          <Route index element={<AdminNewsletterDashboardPage />} />
+          <Route path="campaigns" element={<AdminNewsletterPage />} />
+          <Route path="broadcasts" element={<AdminNewsletterPage />} />
+          <Route path="templates" element={<AdminNewsletterPage />} />
+          <Route path="lists" element={<AdminNewsletterPage />} />
+          <Route path="segments" element={<AdminNewsletterPage />} />
+          <Route path="analytics" element={<AdminNewsletterAnalyticsPage />} />
+          <Route path="settings" element={<AdminNewsletterPage />} />
+          <Route path="new" element={<AdminNewsletterPage />} />
+          <Route path="audiences/*" element={<Navigate to="/admin/newsletter" replace />} />
+          <Route path="contacts" element={<AdminNewsletterContactsPage />} />
+          <Route path="contacts/:mauticContactId" element={<AdminNewsletterContactDetailPage />} />
+          <Route path="companies" element={<AdminNewsletterCompaniesPage />} />
+          <Route path="companies/:companyId" element={<AdminNewsletterCompanyDetailPage />} />
+          <Route path="builder" element={<AdminNewsletterPage />} />
+          <Route path="builder/:campaignId" element={<AdminNewsletterPage />} />
+          <Route path="stages" element={<AdminNewsletterStagesPage />} />
+          <Route path="points" element={<AdminNewsletterPointsPage />} />
+          <Route path="lists/:slug" element={<AdminNewsletterListManagePage />} />
+          <Route path=":campaignId" element={<AdminNewsletterPage />} />
+        </Route>
+        <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
+        {blogAdminRoutes}
+      </Route>
+      <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
+      <Route path="/groups/public/:slug" element={<PublicGroupLandingPage />} />
+      <Route path="/events" element={<EventsPage />} />
+      <Route path="/public/:slug" element={<EventLandingPage_Marketing />} />
+      {/* Design preview (IPDT-749) - same page, green theme */}
+      <Route path="/staging/:slug" element={<EventLandingPage_Marketing theme="green" />} />
+      <Route path="/landing/:slug" element={<SingleEventMarketingPage />} />
+      <Route path="/series/:slug" element={<PublicSeriesLanding />} />
+      <Route path="/events/:slug/companion" element={<EventCompanionAccessPage />} />
+      <Route path="/events/:slug" element={<EventDetailsPage />} />
+      <Route path="/events/:id" element={<EventIdRedirect />} />
+      <Route path="/account/cart" element={<MyCartPage />} />
+      <Route path="/community" element={<RequireAuth><CommunityHubPage /></RequireAuth>} />
+      <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
+      <Route path="/community/mygroups" element={<RequireAuth><MyGroupsPage /></RequireAuth>} />
+      <Route path="/community/mygroups/:groupId" element={<RequireAuth><GroupDetailsPage /></RequireAuth>} />
 
-          {/* My Events list and details */}
-          <Route path="/account/events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
-          <Route path="/account/events/:slug" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
+      {/* My Events list and details */}
+      <Route path="/account/events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
+      <Route path="/account/events/:slug" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
 
-          {/* Post-Acceptance Forms */}
-          <Route path="/forms/:assignmentId" element={<RequireAuth><AttendeeFormPage /></RequireAuth>} />
+      {/* Post-Acceptance Forms */}
+      <Route path="/forms/:assignmentId" element={<RequireAuth><AttendeeFormPage /></RequireAuth>} />
 
-          {/* LIVE meeting page — no header/footer */}
-          <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
+      {/* LIVE meeting page — no header/footer */}
+      <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
 
-          <Route path="/account/courses" element={<RequireAuth><CoursesPage /></RequireAuth>} />
-          <Route path="/account/courses/:courseId" element={<RequireAuth><CoursePlayerPage /></RequireAuth>} />
-          <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
-          <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
-          {/* Signed-in federated (e.g. Google) users setting a password for the
-              first time. Reuses the ForgotPassword screen/OTP flow; the public
-              /forgot-password route is left untouched. */}
-          <Route path="/account/set-password" element={<RequireAuth><ForgotPassword authedMode /></RequireAuth>} />
-          <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
-          <Route path="/account/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
-          <Route path="/newsletter" element={<RequireAuth><NewsletterPage /></RequireAuth>} />
+      <Route path="/account/courses" element={<RequireAuth><CoursesPage /></RequireAuth>} />
+      <Route path="/account/courses/:courseId" element={<RequireAuth><CoursePlayerPage /></RequireAuth>} />
+      <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
+      <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+      {/* Signed-in federated (e.g. Google) users setting a password for the
+          first time. Reuses the ForgotPassword screen/OTP flow; the public
+          /forgot-password route is left untouched. */}
+      <Route path="/account/set-password" element={<RequireAuth><ForgotPassword authedMode /></RequireAuth>} />
+      <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
+      <Route path="/account/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+      <Route path="/newsletter" element={<RequireAuth><NewsletterPage /></RequireAuth>} />
 
-          {/* Blogs: Explore Blogs + reader (signed-in members) */}
-          {blogReaderRoutes}
+      {/* Blogs: Explore Blogs + reader (signed-in members) */}
+      {blogReaderRoutes}
 
-          {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
-          <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />
-          {/* ADD THIS ROUTE FOR RICH PROFILE */}
-          {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
-          <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
-          <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
+      {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
+      <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />
+      {/* ADD THIS ROUTE FOR RICH PROFILE */}
+      {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
+      <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
+      <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
 
-          {/* IMAA Standalone Public Pages */}
-          <Route path="/m-and-a-trainings" element={<TrainingProgramsPage />} />
-          <Route path="/m-and-a-trainings/*" element={<TrainingProgramsPage />} />
-          <Route path="/recognition" element={<RecognitionDirectoryPage />} />
-          <Route path="/recognition/*" element={<RecognitionDirectoryPage />} />
+      {/* IMAA Standalone Public Pages */}
+      <Route path="/m-and-a-trainings" element={<TrainingProgramsPage />} />
+      <Route path="/m-and-a-trainings/*" element={<TrainingProgramsPage />} />
+      <Route path="/recognition" element={<RecognitionDirectoryPage />} />
+      <Route path="/recognition/*" element={<RecognitionDirectoryPage />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-          <Route path="/kyc/callback" element={<KYCCallbackPage />} />
-        </Routes>
-      </Box>
+      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/kyc/callback" element={<KYCCallbackPage />} />
+    </Routes>
+);
 
-      {!hideChrome && !authed && typeof Footer !== "undefined" && <Footer />}
-    </Box>
-  );
-};
+const AppShell = () => (
+  <AppChrome>
+    <LegacyRoutes />
+  </AppChrome>
+);
 
 export default AppShell;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Box, Button, Typography, Container, CircularProgress } from "@mui/material";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "#navigation";
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { apiClient, startKYC, getToken } from "../utils/api";

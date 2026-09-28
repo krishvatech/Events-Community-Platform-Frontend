@@ -7,7 +7,7 @@ import {
   Typography, InputAdornment, Stack, Pagination, Skeleton,
   IconButton, FormControl, Select, MenuItem, Button, useTheme, useMediaQuery, Menu,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 
 // Icons
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";

@@ -1,5 +1,5 @@
 // src/components/GuestOnly.jsx
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "#navigation";
 import { getRoleAndRedirectPath, getCognitoGroupsFromTokens } from "../utils/roleRedirect";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 

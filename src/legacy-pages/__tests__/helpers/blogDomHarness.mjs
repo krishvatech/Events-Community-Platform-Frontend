@@ -92,7 +92,8 @@ const stubPlugin = {
       const stub = STUBS.find((s) => s.match.test(args.path));
       return stub ? { path: stub.file } : undefined;
     });
-    pluginBuild.onResolve({ filter: /^[^./]/ }, (args) => {
+    // Package imports ("#navigation") are project files: let esbuild resolve them.
+    pluginBuild.onResolve({ filter: /^[^./#]/ }, (args) => {
       if (CJS_SHIMS[args.path] && args.kind !== "require-call") {
         return { path: args.path, namespace: "cjs-shim" };
       }

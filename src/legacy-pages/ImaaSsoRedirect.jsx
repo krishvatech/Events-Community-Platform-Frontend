@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
 import { getAccessToken, removeAccessToken, removeIdToken, removeRefreshToken } from "../utils/tokenStore";
 

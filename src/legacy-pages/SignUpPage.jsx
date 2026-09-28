@@ -1,7 +1,7 @@
 ﻿// src/pages/SignUpPage.jsx
 // Renders the landing-page background with the signup modal open.
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 import { Box } from "@mui/material";
 import AuthModal from "../components/AuthModal.jsx";
 

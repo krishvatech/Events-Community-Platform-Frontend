@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 import { Box, Button, Typography } from "@mui/material";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 

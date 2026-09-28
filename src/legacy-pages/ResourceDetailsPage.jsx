@@ -1,7 +1,7 @@
 // src/pages/ResourceDetailsPage.jsx
 
 import React, { useEffect, useState } from "react";
-import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "#navigation";
 import { isOwnerUser } from "../utils/adminRole";
 
 import Container from "@mui/material/Container";

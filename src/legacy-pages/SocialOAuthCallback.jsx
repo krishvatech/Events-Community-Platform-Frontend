@@ -1,6 +1,6 @@
 // src/pages/SocialOAuthCallback.jsx
 import React, { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "#navigation";
 import { toast } from "react-toastify";
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";

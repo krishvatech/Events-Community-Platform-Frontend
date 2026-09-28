@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 import { cognitoChangePassword } from "../../utils/cognitoAuth";
 
 // Providers whose password lives in Cognito and is owned by the user.

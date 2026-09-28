@@ -4,7 +4,7 @@
 // as a scrollable vertical page (same as Moodle's course/view.php).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "#navigation";
 import {
   Alert,
   Box,

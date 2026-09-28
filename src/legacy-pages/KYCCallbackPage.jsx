@@ -1,6 +1,6 @@
 // src/pages/KYCCallbackPage.jsx
 import React, { useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "#navigation";
 import { apiClient } from "../utils/api";
 
 export default function KYCCallbackPage() {

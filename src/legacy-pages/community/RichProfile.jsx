@@ -1,6 +1,6 @@
 // src/pages/RichProfile.jsx
 import React, { useEffect, useMemo, useState } from "react"; // Verified file access
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "#navigation";
 import {
   Avatar,
   AvatarGroup,

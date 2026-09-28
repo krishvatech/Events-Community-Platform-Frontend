@@ -4,7 +4,7 @@ import HeroSection from '../components/HeroSection.jsx';
 import FeaturesSection from '../components/FeaturesSection.jsx';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from '#navigation';
 import { API_BASE } from "../utils/api";
 import { InputAdornment, IconButton } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';

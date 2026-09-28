@@ -16,7 +16,7 @@ import {
   Alert,
 } from "@mui/material";
 import { Visibility, VisibilityOff, Close as CloseIcon } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 import { toast } from "react-toastify";
 import { cognitoSignIn, cognitoSignUp, cognitoConfirmSignUp, cognitoResendSignUp } from "../utils/cognitoAuth";
 import { saveLoginPayload } from "../utils/authStorage";

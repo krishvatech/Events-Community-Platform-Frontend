@@ -1,6 +1,6 @@
 // src/components/UnifiedSidebar.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "#navigation";
 import useMarketingAccess from "../hooks/useMarketingAccess";
 import {
     Box,
