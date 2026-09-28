@@ -57,7 +57,7 @@ test("lists drafts and published blogs with text status badges", async () => {
   assert.ok(queryByText("September 20, 2026", { scope: liveRow }));
   assert.ok(queryByText("Ada Lovelace", { scope: liveRow }));
   assert.ok(getByRole("button", "Create Blog"));
-  assert.equal(queryByText(/Import from WordPress/i), null, "no WordPress import yet");
+  assert.ok(queryByRole("button", "Import from WordPress"), "Batch 4 adds the WordPress import action");
 });
 
 test("status filter and search are sent to the admin API", async () => {

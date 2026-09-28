@@ -30,7 +30,13 @@ export const BLOG_API = Object.freeze({
   category: (id) => `/blogs/admin/categories/${encodeURIComponent(id)}/`,
   tags: "/blogs/admin/tags/",
   tag: (id) => `/blogs/admin/tags/${encodeURIComponent(id)}/`,
+  wordpressImports: "/blogs/admin/wordpress-import/",
+  wordpressImport: (id) => `/blogs/admin/wordpress-import/${encodeURIComponent(id)}/`,
+  wordpressImportLatest: "/blogs/admin/wordpress-import/latest/",
 });
+
+export const IMPORT_TERMINAL_STATUSES = Object.freeze(["succeeded", "partial", "failed"]);
+export const isImportActive = (run) => Boolean(run) && !IMPORT_TERMINAL_STATUSES.includes(run.status);
 
 // Matches the backend's DRF PAGE_SIZE for these endpoints.
 export const BLOG_PAGE_SIZE = 20;
@@ -160,6 +166,30 @@ export function createBlogService(client) {
     listBlogTags: (params) => listPage(BLOG_API.tags, params),
     createBlogTag: (payload) => call(() => client.post(BLOG_API.tags, payload)),
     updateBlogTag: (id, payload) => call(() => client.patch(BLOG_API.tag(id), payload)),
+
+    // WordPress import (superuser only). Starting never waits for the import:
+    // the backend answers 202 with a queued run. A 409 means an import is
+    // already running; that run is returned (flagged) instead of an error.
+    startWordPressBlogImport: async () => {
+      try {
+        const response = await client.post(BLOG_API.wordpressImports, {});
+        return { ...response.data, alreadyRunning: false };
+      } catch (error) {
+        const active = error?.response?.status === 409 ? error.response.data?.active_run : null;
+        if (active) return { ...active, alreadyRunning: true };
+        throw new BlogApiError(normalizeBlogError(error));
+      }
+    },
+    getWordPressBlogImport: (id) => call(() => client.get(BLOG_API.wordpressImport(id))),
+    getLatestWordPressBlogImport: async () => {
+      try {
+        const response = await client.get(BLOG_API.wordpressImportLatest);
+        return response.data;
+      } catch (error) {
+        if (error?.response?.status === 404) return null; // no imports yet
+        throw new BlogApiError(normalizeBlogError(error));
+      }
+    },
   };
 }
 

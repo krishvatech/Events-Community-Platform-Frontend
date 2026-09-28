@@ -60,6 +60,13 @@ URL.createObjectURL = () => "blob:mock-preview";
 URL.revokeObjectURL = () => {};
 define("IS_REACT_ACT_ENVIRONMENT", true);
 
+// Safety: when an assertion involving a DOM node fails, Node's assert tries to
+// pretty-print the node, walking the whole circular jsdom graph until memory
+// runs out. Print nodes as a short tag instead.
+window.Node.prototype[Symbol.for("nodejs.util.inspect.custom")] = function inspectNode() {
+  return `<${String(this.nodeName || "node").toLowerCase()}>`;
+};
+
 // Keep test output readable: drop known third-party dev warnings only.
 const QUIET = [/React Router Future Flag Warning/, /not wrapped in act/, /Not implemented: /];
 for (const level of ["warn", "error"]) {
@@ -360,6 +367,30 @@ export const makePost = (overrides = {}) => ({
   ...overrides,
 });
 
+export const makeImportRun = (overrides = {}) => ({
+  id: "run-1",
+  status: "queued",
+  current_step: "queued",
+  total_discovered: 0,
+  total_importable: 0,
+  processed_count: 0,
+  created_count: 0,
+  updated_count: 0,
+  skipped_count: 0,
+  restricted_count: 0,
+  failed_count: 0,
+  media_found_count: 0,
+  media_processed_count: 0,
+  media_migrated_count: 0,
+  links_rewritten_count: 0,
+  progress: { processed: 0, total: 0, media_processed: 0, media_total: 0 },
+  summary: { errors: [], media_failures: [], restricted_post_ids: [] },
+  error_message: "",
+  created_at: "2026-09-26T08:00:00Z",
+  finished_at: null,
+  ...overrides,
+});
+
 /** Recording fake of the blog service; override any method per test. */
 export function fakeBlogService(overrides = {}) {
   const calls = [];
@@ -385,6 +416,9 @@ export function fakeBlogService(overrides = {}) {
     createBlogTag: async (payload) => ({ id: 91, slug: "new", ...payload }),
     updateBlogTag: async (id, payload) => ({ id, ...payload }),
     searchBlogAuthors: async () => [],
+    startWordPressBlogImport: async () => ({ ...makeImportRun(), alreadyRunning: false }),
+    getWordPressBlogImport: async (id) => makeImportRun({ id, status: "succeeded", current_step: "completed" }),
+    getLatestWordPressBlogImport: async () => null,
   };
   const api = { calls };
   for (const [name, impl] of Object.entries({ ...defaults, ...overrides })) api[name] = wrap(name, impl);

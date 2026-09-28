@@ -56,6 +56,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path,
       },
+      // Dev only: locally stored media (FileSystemStorage) is referenced by
+      // relative /media/... URLs, e.g. images migrated by the Blog importer.
+      '/media': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   preview: {

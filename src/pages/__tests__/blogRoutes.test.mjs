@@ -76,7 +76,7 @@ const ADMIN_API_METHODS = [
   "listAdminBlogs", "getAdminBlog", "createBlog", "updateBlog", "uploadBlogFeaturedImage",
   "clearBlogFeaturedImage", "publishBlog", "unpublishBlog", "listBlogCategories",
   "createBlogCategory", "updateBlogCategory", "listBlogTags", "createBlogTag", "updateBlogTag",
-  "searchBlogAuthors",
+  "searchBlogAuthors", "startWordPressBlogImport", "getWordPressBlogImport", "getLatestWordPressBlogImport",
 ];
 
 const BLOCKED_ROLES = [

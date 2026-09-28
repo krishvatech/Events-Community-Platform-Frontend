@@ -40,6 +40,7 @@ import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
 import BlogTaxonomyManager from "../../components/blogs/BlogTaxonomyManager.jsx";
+import WordPressImportPanel from "../../components/blogs/WordPressImportPanel.jsx";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
 import blogApi from "../../services/blogApi";
 import { totalPagesFor } from "../../services/blogService";
@@ -146,6 +147,7 @@ function BlogsTab({ onNotify }) {
 
   return (
     <Box>
+      <WordPressImportPanel onFinished={() => setReloadKey((k) => k + 1)} />
       <Paper sx={{ p: 2, mb: 2, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
         <TextField
           size="small"

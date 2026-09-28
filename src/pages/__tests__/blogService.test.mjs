@@ -184,3 +184,56 @@ test("endpoint table matches the backend contract", () => {
   assert.equal(BLOG_API.category(1), "/blogs/admin/categories/1/");
   assert.equal(BLOG_API.tag(1), "/blogs/admin/tags/1/");
 });
+
+test("starting a WordPress import posts once and returns the queued run", async () => {
+  const { calls, client } = recordingClient(() => ({ data: { id: "r1", status: "queued" } }));
+  const run = await createBlogService(client).startWordPressBlogImport();
+  assert.deepEqual(calls.map((c) => [c.method, c.url]), [["post", "/blogs/admin/wordpress-import/"]]);
+  assert.deepEqual(run, { id: "r1", status: "queued", alreadyRunning: false });
+});
+
+test("a 409 returns the already-running import instead of failing", async () => {
+  const { client } = recordingClient(() => {
+    const error = new Error("conflict");
+    error.response = { status: 409, data: { detail: "An import is already running.", active_run: { id: "r0", status: "running" } } };
+    throw error;
+  });
+  const run = await createBlogService(client).startWordPressBlogImport();
+  assert.deepEqual(run, { id: "r0", status: "running", alreadyRunning: true });
+});
+
+test("other start failures are normalised", async () => {
+  const { client } = recordingClient(() => {
+    const error = new Error("down");
+    error.response = { status: 503, data: { detail: "WordPress Blog import is not configured (WP_IMAA_BLOG_BASE_URL)." } };
+    throw error;
+  });
+  await assert.rejects(createBlogService(client).startWordPressBlogImport(), (err) => {
+    assert.ok(err instanceof BlogApiError);
+    assert.equal(err.status, 503);
+    return true;
+  });
+});
+
+test("import status and latest endpoints; latest 404 means no imports yet", async () => {
+  const { calls, client } = recordingClient(({ url }) => {
+    if (url.endsWith("latest/")) {
+      const error = new Error("none");
+      error.response = { status: 404, data: { detail: "No WordPress imports yet." } };
+      throw error;
+    }
+    return { data: { id: "r1" } };
+  });
+  const service = createBlogService(client);
+  assert.deepEqual(await service.getWordPressBlogImport("r1"), { id: "r1" });
+  assert.equal(await service.getLatestWordPressBlogImport(), null);
+  assert.deepEqual(calls.map((c) => c.url), ["/blogs/admin/wordpress-import/r1/", "/blogs/admin/wordpress-import/latest/"]);
+});
+
+test("isImportActive distinguishes running from finished runs", async () => {
+  const { isImportActive } = await import("../../services/blogService.js");
+  assert.equal(isImportActive({ status: "queued" }), true);
+  assert.equal(isImportActive({ status: "running" }), true);
+  for (const status of ["succeeded", "partial", "failed"]) assert.equal(isImportActive({ status }), false);
+  assert.equal(isImportActive(null), false);
+});
