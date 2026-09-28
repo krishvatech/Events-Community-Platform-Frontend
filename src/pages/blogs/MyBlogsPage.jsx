@@ -11,6 +11,7 @@ import {
   DialogContentText,
   DialogTitle,
   FormControl,
+  Grid,
   IconButton,
   InputLabel,
   LinearProgress,
@@ -21,12 +22,6 @@ import {
   Snackbar,
   Stack,
   Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Tabs,
   TextField,
   Tooltip,
@@ -39,18 +34,19 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
+import BlogCard from "../../components/blogs/BlogCard.jsx";
 import BlogTaxonomyManager from "../../components/blogs/BlogTaxonomyManager.jsx";
 import WordPressImportPanel from "../../components/blogs/WordPressImportPanel.jsx";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
 import blogApi from "../../services/blogApi";
-import { totalPagesFor } from "../../services/blogService";
+import { BLOG_CARD_PAGE_SIZE, totalPagesFor } from "../../services/blogService";
 import {
   NEW_BLOG_PATH,
   blogDetailPath,
   editBlogPath,
   previewBlogPath,
 } from "../../config/blogNavigation";
-import { formatBlogDate, getBlogAuthorName, getBlogStatusMeta } from "../../utils/blogContent";
+import { getBlogStatusMeta } from "../../utils/blogContent";
 import { blogPrimaryButtonSx } from "../../components/blogs/blogTheme";
 
 const TABS = ["blogs", "categories", "tags"];
@@ -80,6 +76,65 @@ export function BlogStatusChip({ status }) {
   );
 }
 
+// WordPress source statuses shown as secondary metadata (publish needs no badge).
+const WP_SOURCE_LABELS = { draft: "WordPress draft", pending: "WordPress pending", future: "WordPress scheduled", private: "WordPress private" };
+
+function AdminBadges({ blog }) {
+  const source = WP_SOURCE_LABELS[blog.wp_status];
+  return (
+    <>
+      <BlogStatusChip status={blog.status} />
+      {blog.wp_membership_restricted && (
+        <Chip label="WP members-only" size="small" variant="outlined" color="warning" data-testid="blog-members-only" />
+      )}
+      {source && <Chip label={source} size="small" variant="outlined" data-testid="blog-wp-source" />}
+    </>
+  );
+}
+
+function AdminActions({ blog, busy, onConfirm }) {
+  const isPublished = blog.status === "published";
+  return (
+    <>
+      {isPublished ? (
+        <Tooltip title="View published blog">
+          <IconButton size="small" component={RouterLink} to={blogDetailPath(blog.slug)} aria-label={`View ${blog.title}`}>
+            <VisibilityRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      ) : (
+        <Tooltip title="Preview draft">
+          <IconButton size="small" component={RouterLink} to={previewBlogPath(blog.id)} aria-label={`Preview ${blog.title}`}>
+            <VisibilityRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+      <Tooltip title="Edit">
+        <IconButton size="small" component={RouterLink} to={editBlogPath(blog.id)} aria-label={`Edit ${blog.title}`}>
+          <EditRoundedIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      {isPublished ? (
+        <Tooltip title="Unpublish">
+          <span>
+            <IconButton size="small" disabled={busy} onClick={() => onConfirm({ action: "unpublish", blog })} aria-label={`Unpublish ${blog.title}`}>
+              <UnpublishedRoundedIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+      ) : (
+        <Tooltip title="Publish">
+          <span>
+            <IconButton size="small" color="success" disabled={busy} onClick={() => onConfirm({ action: "publish", blog })} aria-label={`Publish ${blog.title}`}>
+              <PublishRoundedIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+      )}
+    </>
+  );
+}
+
 function BlogsTab({ onNotify }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState("");
@@ -105,7 +160,13 @@ function BlogsTab({ onNotify }) {
         if (!cancelled) setData(result);
       })
       .catch((err) => {
-        if (!cancelled) setError({ status: err.status, message: err.message });
+        if (cancelled) return;
+        // The page no longer exists (e.g. the last item left a filtered view).
+        if (err.status === 404 && page > 1) {
+          setPage((p) => Math.max(1, p - 1));
+          return;
+        }
+        setError({ status: err.status, message: err.message });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -138,7 +199,7 @@ function BlogsTab({ onNotify }) {
   }, [confirm, onNotify, pendingId]);
 
   const blogs = data?.results || [];
-  const totalPages = totalPagesFor(data?.count);
+  const totalPages = totalPagesFor(data?.count, BLOG_CARD_PAGE_SIZE);
   const filtered = Boolean(status || debouncedSearch);
 
   if (error?.status === 403) {
@@ -210,110 +271,19 @@ function BlogsTab({ onNotify }) {
           )}
         </Paper>
       ) : (
-        <TableContainer component={Paper} sx={{ borderRadius: 2, overflowX: "auto" }}>
-          <Table size="small" aria-label="Blogs">
-            <TableHead>
-              <TableRow sx={{ bgcolor: "grey.50" }}>
-                <TableCell sx={{ fontWeight: 800 }}>Title</TableCell>
-                <TableCell sx={{ fontWeight: 800, display: { xs: "none", md: "table-cell" } }}>Author</TableCell>
-                <TableCell sx={{ fontWeight: 800 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 800, display: { xs: "none", sm: "table-cell" } }}>Published</TableCell>
-                <TableCell sx={{ fontWeight: 800, display: { xs: "none", lg: "table-cell" } }}>Updated</TableCell>
-                <TableCell sx={{ fontWeight: 800, display: { xs: "none", lg: "table-cell" } }}>Categories</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {blogs.map((blog) => {
-                const isPublished = blog.status === "published";
-                const busy = pendingId === blog.id;
-                return (
-                  <TableRow key={blog.id} hover data-testid="admin-blog-row">
-                    <TableCell sx={{ maxWidth: 360, overflowWrap: "anywhere", fontWeight: 600 }}>{blog.title}</TableCell>
-                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
-                      {getBlogAuthorName(blog) || "—"}
-                    </TableCell>
-                    <TableCell>
-                      <BlogStatusChip status={blog.status} />
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" }, whiteSpace: "nowrap" }}>
-                      {formatBlogDate(blog.published_at) || "—"}
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" }, whiteSpace: "nowrap" }}>
-                      {formatBlogDate(blog.updated_at) || "—"}
-                    </TableCell>
-                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                      {(blog.categories || []).map((c) => c.name).join(", ") || "—"}
-                    </TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                      {isPublished ? (
-                        <Tooltip title="View published blog">
-                          <IconButton
-                            size="small"
-                            component={RouterLink}
-                            to={blogDetailPath(blog.slug)}
-                            aria-label={`View ${blog.title}`}
-                          >
-                            <VisibilityRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip title="Preview draft">
-                          <IconButton
-                            size="small"
-                            component={RouterLink}
-                            to={previewBlogPath(blog.id)}
-                            aria-label={`Preview ${blog.title}`}
-                          >
-                            <VisibilityRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          component={RouterLink}
-                          to={editBlogPath(blog.id)}
-                          aria-label={`Edit ${blog.title}`}
-                        >
-                          <EditRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {isPublished ? (
-                        <Tooltip title="Unpublish">
-                          <span>
-                            <IconButton
-                              size="small"
-                              disabled={busy}
-                              onClick={() => setConfirm({ action: "unpublish", blog })}
-                              aria-label={`Unpublish ${blog.title}`}
-                            >
-                              <UnpublishedRoundedIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip title="Publish">
-                          <span>
-                            <IconButton
-                              size="small"
-                              color="success"
-                              disabled={busy}
-                              onClick={() => setConfirm({ action: "publish", blog })}
-                              aria-label={`Publish ${blog.title}`}
-                            >
-                              <PublishRoundedIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Grid container spacing={2.5} data-testid="admin-blog-grid" aria-label="Blogs">
+          {blogs.map((blog) => (
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={blog.id}>
+              <BlogCard
+                post={blog}
+                variant="admin"
+                href={blog.status === "published" ? blogDetailPath(blog.slug) : previewBlogPath(blog.id)}
+                badges={<AdminBadges blog={blog} />}
+                actions={<AdminActions blog={blog} busy={pendingId === blog.id} onConfirm={setConfirm} />}
+              />
+            </Grid>
+          ))}
+        </Grid>
       )}
 
       {!error && totalPages > 1 && (

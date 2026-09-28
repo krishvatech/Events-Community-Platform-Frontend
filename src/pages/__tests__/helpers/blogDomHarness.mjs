@@ -53,6 +53,24 @@ window.matchMedia =
   window.matchMedia ||
   ((query) => ({ matches: false, media: query, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() { return false; } }));
 class NoopResizeObserver { observe() {} unobserve() {} disconnect() {} }
+
+// Controllable IntersectionObserver (jsdom has none): tests call intersect()
+// to simulate the reader scrolling a target into the observed area.
+export const intersectionObservers = new Set();
+class FakeIntersectionObserver {
+  constructor(callback, options = {}) {
+    this.callback = callback;
+    this.options = options;
+    this.targets = new Set();
+    intersectionObservers.add(this);
+  }
+  observe(target) { this.targets.add(target); }
+  unobserve(target) { this.targets.delete(target); }
+  disconnect() { this.targets.clear(); intersectionObservers.delete(this); }
+  takeRecords() { return []; }
+}
+window.IntersectionObserver = FakeIntersectionObserver;
+define("IntersectionObserver", FakeIntersectionObserver);
 window.ResizeObserver = window.ResizeObserver || NoopResizeObserver;
 define("ResizeObserver", window.ResizeObserver);
 // Node's own createObjectURL only accepts Node Blobs, not jsdom Files.
@@ -152,6 +170,19 @@ const router = await import("react-router-dom");
 const { HelmetProvider } = createRequire(import.meta.url)("react-helmet-async");
 
 export { React, act, router };
+
+/** Fires an intersection for every observed target matching `selector`; returns how many fired. */
+export async function intersect(selector) {
+  let fired = 0;
+  for (const observer of [...intersectionObservers]) {
+    for (const target of [...observer.targets]) {
+      if (selector && !target.matches(selector)) continue;
+      fired += 1;
+      await act(async () => observer.callback([{ isIntersecting: true, target }], observer));
+    }
+  }
+  return fired;
+}
 
 let mounted = [];
 
@@ -401,6 +432,7 @@ export function fakeBlogService(overrides = {}) {
   const defaults = {
     listPublishedBlogs: async () => page([]),
     getPublishedBlog: async () => makePost(),
+    getPublishedBlogChunk: async (slug, chunk) => ({ chunk, content_html: "", has_more: false, chunks: chunk }),
     listAdminBlogs: async () => page([]),
     getAdminBlog: async () => ({ ...makePost(), status: "draft", content_html: "<p>Body</p>" }),
     createBlog: async (payload) => ({ id: 50, status: "draft", published_at: null, ...payload }),

@@ -174,6 +174,58 @@ test("an API error shows a friendly message with a working retry", async () => {
   await waitFor(() => assert.equal(cards().length, 1));
 });
 
+test("a page of 9 cards is laid out 3 / 2 / 1 per row (desktop / tablet / mobile)", async () => {
+  const nine = Array.from({ length: 9 }, (_, i) => makePost({ id: i + 1, slug: `post-${i + 1}`, title: `Post ${i + 1}` }));
+  setBlogApi(fakeBlogService({ listPublishedBlogs: async () => page(nine, 85, "next") }));
+  await open("/blogs");
+  await waitFor(() => assert.equal(cards().length, 9));
+  const items = all("[data-testid='blog-grid'] > .MuiGrid-root");
+  assert.equal(items.length, 9);
+  for (const item of items) {
+    for (const cls of ["MuiGrid-grid-xs-12", "MuiGrid-grid-sm-6", "MuiGrid-grid-md-4"]) {
+      assert.ok(item.className.includes(cls), cls);
+    }
+  }
+  assert.ok(getByRole("button", "Go to page 10"), "85 posts -> 10 pages of 9");
+  assert.equal(queryByRole("button", "Go to page 11"), null, "no blank extra page");
+});
+
+test("Previous is disabled on the first page and Next on the last; paging shows loading", async () => {
+  let resolveSecond;
+  const api = fakeBlogService({
+    listPublishedBlogs: (params) => (params.page === 2
+      ? new Promise((r) => { resolveSecond = r; })
+      : Promise.resolve(page([makePost()], 18, "next"))),
+  });
+  setBlogApi(api);
+  const view = await open("/blogs");
+  await waitFor(() => assert.ok(getByRole("button", "Go to page 2")));
+  assert.equal(getByRole("button", "Go to previous page").disabled, true);
+  assert.equal(getByRole("button", "Go to next page").disabled, false);
+
+  await click(getByRole("button", "Go to next page"));
+  await waitFor(() => assert.ok(document.querySelector("[aria-label='Loading blogs']")));
+  assert.equal(view.path(), "/blogs?page=2");
+  resolveSecond(page([makePost({ id: 9, slug: "last-one", title: "Last one" })], 18));
+  await waitFor(() => assert.ok(queryByText("Last one", { selector: "a" })));
+  assert.equal(getByRole("button", "Go to next page").disabled, true);
+  assert.equal(getByRole("button", "Go to previous page").disabled, false);
+  await click(getByRole("button", "Go to previous page"));
+  await waitFor(() => assert.equal(view.path(), "/blogs"));
+});
+
+test("a category or tag filter returns to page 1", async () => {
+  const api = fakeBlogService({ listPublishedBlogs: async () => page([makePost()], 30, "next") });
+  setBlogApi(api);
+  const view = await open("/blogs?page=3");
+  await waitFor(() => assert.equal(cards().length, 1));
+  await click(getByText("Research", { selector: "[data-testid='blog-card'] .MuiChip-label" }));
+  await waitFor(() => assert.equal(view.path(), "/blogs?category=research"));
+  const last = api.callsTo("listPublishedBlogs").at(-1)[1];
+  assert.equal(last.page, 1);
+  assert.equal(last.category, "research");
+});
+
 // ------------------------------------------------------------- Detail --
 
 const DETAIL = makePost({

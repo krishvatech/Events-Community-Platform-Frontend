@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, Chip, Skeleton, Stack, Typography } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { Helmet } from "react-helmet-async";
-import { Link as RouterLink, useParams } from "react-router-dom";
+import { Link as RouterLink, useLocation, useParams } from "react-router-dom";
 import BlogArticleContent from "../../components/blogs/BlogArticleContent.jsx";
 import BlogFeaturedImage from "../../components/blogs/BlogFeaturedImage.jsx";
 import blogApi from "../../services/blogApi";
@@ -10,15 +10,31 @@ import { BLOGS_PATH } from "../../config/blogNavigation";
 import { formatBlogDate, getBlogAuthorName, getBlogSeoMeta } from "../../utils/blogContent";
 import { BLOG_BORDER, BLOG_MUTED, BLOG_NAVY, BLOG_PAGE_BG, BLOG_TEAL } from "../../components/blogs/blogTheme";
 
+// Fetch the next chunk of the article this far before the reader reaches it.
+export const CONTENT_CHUNK_ROOT_MARGIN = "0px 0px 800px 0px";
+
 /**
  * Presentational article view. Also used by the superuser draft preview, which
- * feeds it admin API data instead of the public reader API.
+ * feeds it admin API data (complete `content_html`) instead of the reader API.
+ *
+ * The reader passes `contentChunks` (the parts of the same article loaded so
+ * far) and a `contentFooter` (lazy-loading sentinel/status); tags are shown
+ * once the article is `complete`.
  */
-export function BlogArticleView({ post, backTo = BLOGS_PATH, backLabel = "All blogs", banner = null }) {
+export function BlogArticleView({
+  post,
+  backTo = BLOGS_PATH,
+  backLabel = "All blogs",
+  banner = null,
+  contentChunks = null,
+  contentFooter = null,
+  complete = true,
+}) {
   const author = getBlogAuthorName(post);
   const date = formatBlogDate(post.published_at);
   const categories = post.categories || [];
   const tags = post.tags || [];
+  const chunks = contentChunks || [post.content_html];
 
   return (
     <Box component="article" sx={{ maxWidth: 820, mx: "auto" }}>
@@ -76,15 +92,19 @@ export function BlogArticleView({ post, backTo = BLOGS_PATH, backLabel = "All bl
         <BlogFeaturedImage
           src={post.featured_image}
           alt={post.title}
+          loading="eager"
           sx={{ mt: 3, borderRadius: "14px" }}
         />
       )}
 
       <Box sx={{ mt: 3 }}>
-        <BlogArticleContent html={post.content_html} />
+        {chunks.map((html, index) => (
+          <BlogArticleContent key={index} html={html} continuation={index > 0} />
+        ))}
       </Box>
+      {contentFooter}
 
-      {tags.length > 0 && (
+      {complete && tags.length > 0 && (
         <Stack
           direction="row"
           useFlexGap
@@ -110,18 +130,141 @@ export function BlogArticleView({ post, backTo = BLOGS_PATH, backLabel = "All bl
   );
 }
 
+/**
+ * Lazy loading of ONE article's content. The detail request returns only the
+ * first chunk; later chunks of the same Blog are fetched one at a time and
+ * appended. Everything resets (and in-flight requests are cancelled) when the
+ * article changes.
+ */
+function useArticleChunks(post) {
+  const [chunks, setChunks] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [state, setState] = useState("idle"); // idle | loading | error
+  const nextChunk = useRef(2);
+  const inFlight = useRef(null);
+
+  useEffect(() => {
+    setChunks(post ? [post.content_html || ""] : []);
+    setHasMore(Boolean(post?.content_has_more));
+    setState("idle");
+    nextChunk.current = (post?.content_chunk || 1) + 1;
+    return () => {
+      inFlight.current?.abort();
+      inFlight.current = null;
+    };
+  }, [post]);
+
+  const loadMore = useCallback(() => {
+    if (!post || !hasMore || inFlight.current) return;
+    const controller = new AbortController();
+    const wanted = nextChunk.current;
+    inFlight.current = controller;
+    setState("loading");
+    blogApi
+      .getPublishedBlogChunk(post.slug, wanted, { signal: controller.signal })
+      .then((part) => {
+        if (controller.signal.aborted || part?.chunk !== wanted) return; // stale or out of order
+        nextChunk.current = wanted + 1;
+        setChunks((current) => [...current, part.content_html || ""]);
+        setHasMore(Boolean(part.has_more));
+        setState("idle");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState("error");
+      })
+      .finally(() => {
+        if (inFlight.current === controller) inFlight.current = null;
+      });
+  }, [post, hasMore]);
+
+  return { chunks, hasMore, state, loadMore };
+}
+
+function ContentChunkSentinel({ active, state, onVisible, onRetry }) {
+  const ref = useRef(null);
+  const supported = typeof window !== "undefined" && "IntersectionObserver" in window;
+
+  useEffect(() => {
+    if (!supported || !active || state !== "idle" || !ref.current) return undefined;
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect(); // one request per sentinel position
+          onVisible();
+        }
+      },
+      { rootMargin: CONTENT_CHUNK_ROOT_MARGIN }
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [supported, active, state, onVisible]);
+
+  if (!active) return null;
+  return (
+    <Box sx={{ mt: 2 }}>
+      <div ref={ref} data-testid="content-chunk-sentinel" />
+      {state === "loading" && (
+        <Box role="status" aria-live="polite" data-testid="content-chunk-loading">
+          <Typography sx={{ color: BLOG_MUTED, fontSize: 14, mb: 1 }}>Loading more…</Typography>
+          <Skeleton variant="text" />
+          <Skeleton variant="text" width="85%" />
+        </Box>
+      )}
+      {state === "error" && (
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" onClick={onRetry}>
+              Retry
+            </Button>
+          }
+        >
+          Couldn’t load more of this article.
+        </Alert>
+      )}
+      {state === "idle" && !supported && (
+        <Button onClick={onVisible} sx={{ textTransform: "none", color: BLOG_TEAL, fontWeight: 700 }}>
+          Continue reading
+        </Button>
+      )}
+    </Box>
+  );
+}
+
+/**
+ * A link to #section in a chunk that is not loaded yet keeps loading chunks
+ * until the target exists, then scrolls to it (heading IDs are preserved).
+ */
+function useFragmentTarget(hash, content) {
+  const done = useRef("");
+  useEffect(() => {
+    const id = decodeURIComponent((hash || "").replace(/^#/, ""));
+    if (!id || done.current === `${id}:${content.chunks.length}` || content.state !== "idle") return;
+    const target = document.getElementById(id);
+    if (target) {
+      done.current = `${id}:${content.chunks.length}`;
+      target.scrollIntoView?.({ block: "start" });
+    } else if (content.hasMore) {
+      content.loadMore();
+    }
+  }, [hash, content]);
+}
+
 export default function BlogDetailPage() {
   const { slug } = useParams();
+  const { hash } = useLocation();
   const [post, setPost] = useState(null);
   const [status, setStatus] = useState("loading"); // loading | ready | notfound | error
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const content = useArticleChunks(status === "ready" ? post : null);
+  useFragmentTarget(hash, content);
 
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
     blogApi
-      .getPublishedBlog(slug)
+      .getPublishedBlog(slug, { chunked: true })
       .then((data) => {
         if (cancelled) return;
         setPost(data);
@@ -201,7 +344,19 @@ export default function BlogDetailPage() {
               {post.featured_image && <meta property="og:image" content={post.featured_image} />}
               <meta property="og:type" content="article" />
             </Helmet>
-            <BlogArticleView post={post} />
+            <BlogArticleView
+              post={post}
+              contentChunks={content.chunks.length ? content.chunks : null}
+              complete={!content.hasMore}
+              contentFooter={
+                <ContentChunkSentinel
+                  active={content.hasMore}
+                  state={content.state}
+                  onVisible={content.loadMore}
+                  onRetry={content.loadMore}
+                />
+              }
+            />
           </>
         )}
       </Box>

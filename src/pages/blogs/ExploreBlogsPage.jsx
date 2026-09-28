@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -18,7 +18,7 @@ import { useSearchParams } from "react-router-dom";
 import BlogCard from "../../components/blogs/BlogCard.jsx";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
 import blogApi from "../../services/blogApi";
-import { totalPagesFor } from "../../services/blogService";
+import { BLOG_CARD_PAGE_SIZE, totalPagesFor } from "../../services/blogService";
 import { BLOG_BORDER, BLOG_NAVY, BLOG_PAGE_BG, BLOG_TEAL } from "../../components/blogs/blogTheme";
 
 function BlogCardSkeleton() {
@@ -52,6 +52,7 @@ export default function ExploreBlogsPage() {
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [termNames, setTermNames] = useState({}); // "category:slug" -> name
+  const resultsRef = useRef(null);
 
   // Any param change resets to page 1 unless the page itself is being set.
   const updateParams = useCallback(
@@ -111,7 +112,7 @@ export default function ExploreBlogsPage() {
   }, [page, search, category, tag, reloadKey, updateParams]);
 
   const posts = data?.results || [];
-  const totalPages = totalPagesFor(data?.count);
+  const totalPages = totalPagesFor(data?.count, BLOG_CARD_PAGE_SIZE);
   const hasFilters = Boolean(search || category || tag);
 
   const activeFilters = useMemo(
@@ -174,7 +175,7 @@ export default function ExploreBlogsPage() {
           ))}
         </Stack>
 
-        <Box sx={{ minHeight: 4, mb: 1 }}>
+        <Box ref={resultsRef} sx={{ minHeight: 4, mb: 1, scrollMarginTop: 80 }}>
           {loading && data && <LinearProgress aria-label="Loading blogs" />}
         </Box>
 
@@ -191,7 +192,7 @@ export default function ExploreBlogsPage() {
           </Alert>
         ) : loading && !data ? (
           <Grid container spacing={2.5} aria-busy="true" aria-label="Loading blogs">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: BLOG_CARD_PAGE_SIZE }).map((_, i) => (
               <Grid size={{ xs: 12, sm: 6, md: 4 }} key={i}>
                 <BlogCardSkeleton />
               </Grid>
@@ -209,7 +210,7 @@ export default function ExploreBlogsPage() {
             )}
           </Box>
         ) : (
-          <Grid container spacing={2.5}>
+          <Grid container spacing={2.5} data-testid="blog-grid">
             {posts.map((post) => (
               <Grid size={{ xs: 12, sm: 6, md: 4 }} key={post.id}>
                 <BlogCard
@@ -229,7 +230,7 @@ export default function ExploreBlogsPage() {
               page={Math.min(page, totalPages)}
               onChange={(_e, value) => {
                 updateParams({ page: value > 1 ? value : "" });
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
               color="primary"
               disabled={loading}
