@@ -11,10 +11,10 @@ import React from "react";
 import { Route } from "react-router-dom";
 import RequireAuth from "../components/RequireAuth.jsx";
 import RequireBlogManager from "../components/blogs/RequireBlogManager.jsx";
-import ExploreBlogsPage from "../pages/blogs/ExploreBlogsPage.jsx";
-import BlogDetailPage from "../pages/blogs/BlogDetailPage.jsx";
-import MyBlogsPage from "../pages/blogs/MyBlogsPage.jsx";
-import BlogEditorPage from "../pages/blogs/BlogEditorPage.jsx";
+import ExploreBlogsPage from "../legacy-pages/blogs/ExploreBlogsPage.jsx";
+import BlogDetailPage from "../legacy-pages/blogs/BlogDetailPage.jsx";
+import MyBlogsPage from "../legacy-pages/blogs/MyBlogsPage.jsx";
+import BlogEditorPage from "../legacy-pages/blogs/BlogEditorPage.jsx";
 
 /** Top-level reader routes: /blogs and /blogs/:slug */
 export const blogReaderRoutes = (
