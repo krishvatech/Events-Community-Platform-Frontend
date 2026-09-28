@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import ContactMailRoundedIcon from "@mui/icons-material/ContactMailRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
@@ -381,7 +382,8 @@ function RecentContacts({ section, loading }) {
 function QuickActions() {
   const navigate = useNavigate();
   const actions = [
-    { label: "Create Campaign", icon: <CampaignRoundedIcon />, path: "/admin/newsletter/campaigns" },
+    { label: "Create Broadcast", icon: <EmailRoundedIcon />, path: "/admin/newsletter/new" },
+    { label: "Automation Campaigns", icon: <CampaignRoundedIcon />, path: "/admin/newsletter/campaigns" },
     { label: "Create Template", icon: <ViewModuleRoundedIcon />, path: "/admin/newsletter/templates" },
     { label: "Add Contact", icon: <ContactMailRoundedIcon />, path: "/admin/newsletter/contacts" },
     { label: "Create Segment", icon: <SegmentRoundedIcon />, path: "/admin/newsletter/segments" },

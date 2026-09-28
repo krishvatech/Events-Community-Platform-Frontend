@@ -36,21 +36,9 @@ import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import EmailRoundedIcon from '@mui/icons-material/EmailRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import {
-  BG,
-  BORDER,
-  DIALOG_ACTIONS_SX,
-  DIALOG_TITLE_SX,
-  OUTLINE_BTN_SX,
-  PRIMARY_BTN_SX,
-  SUBTLE_BTN_SX,
-  TABLE_SX,
-  TEAL,
-} from "../../theme/imaaTokens";
 
 export default function ParticipantInformationManager({ eventId }) {
   const [assignments, setAssignments] = useState([]);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
@@ -327,7 +315,7 @@ export default function ParticipantInformationManager({ eventId }) {
           sx={{
             width: '100%',
             height: 8,
-            backgroundColor: BORDER,
+            backgroundColor: '#e0e0e0',
             borderRadius: 4,
             overflow: 'hidden',
             mb: 3,
@@ -336,7 +324,7 @@ export default function ParticipantInformationManager({ eventId }) {
           <Box
             sx={{
               height: '100%',
-              backgroundColor: TEAL,
+              backgroundColor: '#4caf50',
               width: `${progressPercent}%`,
               transition: 'width 0.3s ease',
             }}
@@ -458,7 +446,7 @@ export default function ParticipantInformationManager({ eventId }) {
 
         {/* Action buttons */}
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-          <Button sx={OUTLINE_BTN_SX}
+          <Button
             size="small"
             variant="outlined"
             startIcon={<EmailRoundedIcon />}
@@ -467,7 +455,7 @@ export default function ParticipantInformationManager({ eventId }) {
           >
             Send Reminders ({selectedAssignments.size})
           </Button>
-          <Button sx={OUTLINE_BTN_SX}
+          <Button
             size="small"
             variant="outlined"
             startIcon={<GetAppRoundedIcon />}
@@ -476,7 +464,7 @@ export default function ParticipantInformationManager({ eventId }) {
           >
             Export CSV
           </Button>
-          <Button sx={OUTLINE_BTN_SX}
+          <Button
             size="small"
             variant="outlined"
             startIcon={<GetAppRoundedIcon />}
@@ -490,10 +478,10 @@ export default function ParticipantInformationManager({ eventId }) {
       </Paper>
 
       {/* Table */}
-      <TableContainer sx={TABLE_SX} component={Paper}>
+      <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ backgroundColor: BG }}>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
               <TableCell padding="checkbox">
                 <Checkbox
                   indeterminate={selectedAssignments.size > 0 && selectedAssignments.size < assignments.length}
@@ -556,7 +544,7 @@ export default function ParticipantInformationManager({ eventId }) {
                   {assignment.visa_support_requested ? '✓' : '-'}
                 </TableCell>
                 <TableCell>
-                  <Button sx={SUBTLE_BTN_SX}
+                  <Button
                     size="small"
                     onClick={() => handleViewDetails(assignment)}
                   >
@@ -581,7 +569,7 @@ export default function ParticipantInformationManager({ eventId }) {
 
       {/* Details Modal */}
       <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={DIALOG_TITLE_SX}>Participant Information Details</DialogTitle>
+        <DialogTitle>Participant Information Details</DialogTitle>
         <DialogContent dividers>
           {selectedAssignment && (
             <Box>
@@ -655,9 +643,9 @@ export default function ParticipantInformationManager({ eventId }) {
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
+        <DialogActions>
           {selectedAssignment?.status !== 'completed' && (
-            <Button sx={PRIMARY_BTN_SX}
+            <Button
               onClick={() => handleMarkComplete(selectedAssignment.id)}
               variant="contained"
               disabled={submitting}
@@ -665,7 +653,7 @@ export default function ParticipantInformationManager({ eventId }) {
               Mark Complete
             </Button>
           )}
-          <Button sx={SUBTLE_BTN_SX} onClick={() => setDetailsOpen(false)}>Close</Button>
+          <Button onClick={() => setDetailsOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

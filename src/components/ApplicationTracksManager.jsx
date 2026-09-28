@@ -37,14 +37,6 @@ import AddIcon from "@mui/icons-material/Add";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CheckIcon from "@mui/icons-material/Check";
 import { apiClient } from "../utils/api";
-import {
-  BG,
-  FIELD_SX,
-  PRIMARY_BTN_SX,
-  SUBTLE_BTN_SX,
-  TABLE_SX,
-} from "../theme/imaaTokens";
-
 
 /**
  * ApplicationTracksManager
@@ -757,7 +749,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
 
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h6">Application Tracks</Typography>
-        <Button sx={PRIMARY_BTN_SX}
+        <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
@@ -769,10 +761,10 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
       {tracks.length === 0 ? (
         <Alert severity="info">No application tracks configured yet.</Alert>
       ) : (
-        <TableContainer sx={TABLE_SX} component={Card}>
+        <TableContainer component={Card}>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: BG }}>
+              <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
                 <TableCell>Label</TableCell>
                 <TableCell>Key</TableCell>
                 <TableCell>Status</TableCell>
@@ -871,7 +863,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
               {error}
             </Alert>
           )}
-          <TextField sx={FIELD_SX}
+          <TextField
             label="Track Key"
             name="key"
             value={formData.key}
@@ -882,7 +874,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
             fullWidth
           />
 
-          <TextField sx={FIELD_SX}
+          <TextField
             label="Track Label"
             name="label"
             value={formData.label}
@@ -891,7 +883,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
             fullWidth
           />
 
-          <TextField sx={FIELD_SX}
+          <TextField
             label="Description"
             name="short_description"
             value={formData.short_description}
@@ -916,7 +908,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
             </Select>
           </FormControl>
 
-          <TextField sx={FIELD_SX}
+          <TextField
             label="Sort Order"
             name="sort_order"
             type="number"
@@ -1069,7 +1061,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                   )}
 
                   <Box sx={{ display: "flex", gap: 1 }}>
-                    <TextField sx={FIELD_SX}
+                    <TextField
                       label="Tier Name"
                       size="small"
                       value={newTierName}
@@ -1172,14 +1164,14 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                   </Alert>
                   {/* Submission Mode Tabs */}
                   <Box sx={{ display: "flex", gap: 1, borderBottom: "1px solid #ddd", mb: 2 }}>
-                    <Button sx={SUBTLE_BTN_SX}
+                    <Button
                       variant={preapprovalTab === "codes" ? "contained" : "text"}
                       size="small"
                       onClick={() => setPreapprovalTab("codes")}
                     >
                       Pre-Approval Codes
                     </Button>
-                    <Button sx={SUBTLE_BTN_SX}
+                    <Button
                       variant={preapprovalTab === "allowlist" ? "contained" : "text"}
                       size="small"
                       onClick={() => setPreapprovalTab("allowlist")}
@@ -1237,7 +1229,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                       ) : preapprovalCodes.length > 0 ? (
                         <TableContainer sx={{ border: "1px solid #ddd", borderRadius: 1 }}>
                           <Table size="small">
-                            <TableHead sx={{ backgroundColor: BG }}>
+                            <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
                               <TableRow>
                                 <TableCell sx={{ fontWeight: 600 }}>Code</TableCell>
                                 <TableCell sx={{ fontWeight: 600 }}>Track</TableCell>
@@ -1315,7 +1307,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
 
                       {/* Create Single Code */}
                       <Box sx={{ display: "flex", gap: 1 }}>
-                        <TextField sx={FIELD_SX}
+                        <TextField
                           label="Code (auto-generated if empty)"
                           size="small"
                           value={newCodeValue}
@@ -1341,7 +1333,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                         </AccordionSummary>
                         <AccordionDetails>
                           <Stack spacing={1} sx={{ width: "100%" }}>
-                            <TextField sx={FIELD_SX}
+                            <TextField
                               label="Prefix (optional)"
                               size="small"
                               value={batchCodePrefix}
@@ -1349,7 +1341,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                               placeholder="e.g., SPEAKER"
                               fullWidth
                             />
-                            <TextField sx={FIELD_SX}
+                            <TextField
                               label="Count"
                               type="number"
                               size="small"
@@ -1358,7 +1350,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                               inputProps={{ min: 1, max: 1000 }}
                               fullWidth
                             />
-                            <Button sx={PRIMARY_BTN_SX}
+                            <Button
                               variant="contained"
                               size="small"
                               onClick={handleBatchCreateCodes}
@@ -1454,21 +1446,21 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
 
                       {/* Add to Allowlist */}
                       <Stack spacing={1}>
-                        <TextField sx={FIELD_SX}
+                        <TextField
                           label="First Name"
                           size="small"
                           value={newAllowlistFirstName}
                           onChange={(e) => setNewAllowlistFirstName(e.target.value)}
                           fullWidth
                         />
-                        <TextField sx={FIELD_SX}
+                        <TextField
                           label="Last Name"
                           size="small"
                           value={newAllowlistLastName}
                           onChange={(e) => setNewAllowlistLastName(e.target.value)}
                           fullWidth
                         />
-                        <TextField sx={FIELD_SX}
+                        <TextField
                           label="Email"
                           size="small"
                           type="email"
@@ -1476,7 +1468,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                           onChange={(e) => setNewAllowlistEmail(e.target.value)}
                           fullWidth
                         />
-                        <Button sx={PRIMARY_BTN_SX}
+                        <Button
                           variant="contained"
                           size="small"
                           onClick={handleAddToAllowlist}
@@ -1555,7 +1547,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
             </Alert>
           )}
 
-          <TextField sx={FIELD_SX}
+          <TextField
             label="Tier Key"
             value={tierFormData.key}
             onChange={(e) =>
@@ -1570,7 +1562,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
             fullWidth
           />
 
-          <TextField sx={FIELD_SX}
+          <TextField
             label="Tier Label"
             value={tierFormData.label}
             onChange={(e) =>
@@ -1580,7 +1572,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
             fullWidth
           />
 
-          <TextField sx={FIELD_SX}
+          <TextField
             label="Price"
             type="number"
             inputProps={{ step: "0.01", min: "0" }}

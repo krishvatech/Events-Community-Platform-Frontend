@@ -617,6 +617,40 @@ export async function createWagtailSession() {
   return `${backendRoot}/cms/`;
 }
 
+/**
+ * Create the Django browser session used by private OpenAPI documentation.
+ *
+ * The backend re-checks the authenticated ECP user against the canonical
+ * platform_admin rule before issuing the session cookie. Staff-only and
+ * normal users are rejected server-side.
+ */
+export async function createOpenApiDocsSession() {
+  const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api")
+    .trim()
+    .replace(/\/+$/, "");
+  const token =
+    readAccessToken() ||
+    localStorage.getItem("access") ||
+    "";
+
+  const r = await fetch(`${apiBase}/auth/openapi/session/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+  });
+
+  if (!r.ok) {
+    const msg = await r.text().catch(() => "");
+    throw new Error(msg || "Failed to create API docs session");
+  }
+
+  const backendRoot = apiBase.replace(/\/api$/, "");
+  return `${backendRoot}/api/docs/`;
+}
+
 export async function getSaleorDashboardUrl() {
   const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
   const token = readAccessToken() || localStorage.getItem("access") || "";

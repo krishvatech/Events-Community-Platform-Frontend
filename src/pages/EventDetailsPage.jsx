@@ -481,8 +481,8 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 
 function EventDetailsSkeleton() {
   return (
-    <div className="imaa-ecp-ui ecp-event-detail min-h-screen bg-slate-50">
-      <Container maxWidth="xl" className="ecp-event-detail__container py-6 sm:py-8">
+    <div className="min-h-screen bg-slate-50">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
             <div className="flex flex-col gap-6">
@@ -493,7 +493,7 @@ function EventDetailsSkeleton() {
                 <Skeleton variant="text" width={220} />
               </Breadcrumbs>
               {/* EVENT CARD skeleton */}
-              <Paper elevation={0} className="ecp-detail-card rounded-2xl border border-slate-200 overflow-hidden">
+              <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
                 <Skeleton
                   variant="rectangular"
                   sx={{ width: "100%", height: { xs: 160, sm: 200, md: 240 } }}
@@ -517,7 +517,7 @@ function EventDetailsSkeleton() {
               </Paper>
 
               {/* ATTEND CARD skeleton */}
-              <Paper elevation={0} className="ecp-detail-card rounded-2xl border border-slate-200">
+              <Paper elevation={0} className="rounded-2xl border border-slate-200">
                 <Box className="p-5">
                   <Skeleton height={28} width={120} />
                   <div className="mt-3 flex flex-col gap-2">
@@ -653,7 +653,7 @@ export default function EventDetailsPage() {
     return (
       <Link
         to={`/community/rich-profile/${userId}`}
-        style={{ color: '#0A9396', fontWeight: 600, textDecoration: 'none' }}
+        style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}
         className="hover:underline"
         onClick={(e) => e.stopPropagation()}
       >
@@ -1572,9 +1572,9 @@ export default function EventDetailsPage() {
   }
   if (notFound) {
     return (
-      <div className="imaa-ecp-ui ecp-event-detail min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-50">
         <Container maxWidth="xl" className="py-6 sm:py-8">
-          <Paper elevation={0} className="ecp-detail-card rounded-2xl border border-slate-200 p-8">
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-8">
             <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>
               404
             </Typography>
@@ -1600,12 +1600,12 @@ export default function EventDetailsPage() {
   if (!event) return null;
   const status = computeStatus(event);
   const chip = status === "live"
-    ? { label: "Live", className: "ecp-status-chip ecp-status-chip--live" }
+    ? { label: "Live", className: "bg-rose-50 text-rose-700" }
     : status === "upcoming"
-      ? { label: "Upcoming", className: "ecp-status-chip ecp-status-chip--upcoming" }
+      ? { label: "Upcoming", className: "bg-teal-50 text-teal-700" }
       : status === "cancelled"
-        ? { label: "Cancelled", className: "ecp-status-chip ecp-status-chip--cancelled" }
-        : { label: "Past", className: "ecp-status-chip ecp-status-chip--past" };
+        ? { label: "Cancelled", className: "bg-red-100 text-red-700" }
+        : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
   const currentUser = getBackendUserFromStorage();
   const isEventOwner = isOwnerUser() || Number(event.created_by_id) === Number(currentUserId);
@@ -1722,7 +1722,7 @@ export default function EventDetailsPage() {
   }
 
   return (
-    <div className="imaa-ecp-ui ecp-event-detail min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50">
       {event && (
         <Helmet>
           <title>{event.title}</title>
@@ -1737,25 +1737,25 @@ export default function EventDetailsPage() {
         </Helmet>
       )}
       {/* BODY with LEFT NAV + MAIN */}
-      <Container maxWidth="xl" className="ecp-event-detail__container py-6 sm:py-8">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
             <div className="flex flex-col gap-6">
 
               {/* Only show breadcrumbs to logged-in users */}
               {token && (
-                <Stack className="ecp-detail-breadcrumb" direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
                   <Button
                     startIcon={<ArrowBackRoundedIcon />}
                     component={Link}
                     to={backPath}
                     sx={{
                       textTransform: "none",
-                      color: "#1B2A4A",
+                      color: "text.primary",
                       fontWeight: 600,
                       minWidth: "auto",
                       px: 1,
-                      "&:hover": { bgcolor: "rgba(232,83,47,0.08)", color: "#E8532F" }
+                      "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
                     }}
                   >
                     Back
@@ -1773,7 +1773,7 @@ export default function EventDetailsPage() {
 
               {/* TABS HEADER - MOVED TO TOP */}
               {(showSpeedNetworkingTab || showSessionsTab || showQaTab) && (
-                <Box className="ecp-detail-tabs" sx={{ borderBottom: 1, borderColor: '#E3E8EF', mb: 3 }}>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                   <Tabs value={activeTab} onChange={handleTabChange} aria-label="event details tabs">
                     <Tab label="Overview" {...a11yProps(0)} />
                     {showSessionsTab && <Tab label="Sessions" {...a11yProps(1)} />}
@@ -1790,12 +1790,11 @@ export default function EventDetailsPage() {
               {((!showSpeedNetworkingTab && !showSessionsTab && !showQaTab) || activeTab === 0) && (
                 <Box>
                   {/* EVENT HEADER CARD - NEW LAYOUT */}
-                  <Paper elevation={0} className="ecp-detail-hero-card rounded-2xl border border-slate-200 overflow-hidden mb-6">
+                  <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
                     {/* Top section: Image + Details in a grid */}
-                    <Box className="ecp-detail-hero-card__grid" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 }, alignItems: 'start' }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 }, alignItems: 'start' }}>
                       {/* LEFT: Event Image */}
                       <Box
-                        className="ecp-detail-hero-card__media"
                         sx={{
                           backgroundColor: "#e5e7eb",
                           padding: 2,
@@ -1834,7 +1833,7 @@ export default function EventDetailsPage() {
                       </Box>
 
                       {/* RIGHT: Event Details */}
-                      <Stack className="ecp-detail-hero-card__content" spacing={2}>
+                      <Stack spacing={2}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
                           <Chip
                             size="small"
@@ -1853,7 +1852,7 @@ export default function EventDetailsPage() {
                           <Box>
                             {event.is_multi_day ? (
                               <Stack direction="row" spacing={1} alignItems="center" sx={{ fontSize: '0.875rem' }}>
-                                <CalendarMonthIcon fontSize="small" sx={{ color: '#0A9396' }} />
+                                <CalendarMonthIcon fontSize="small" sx={{ color: 'teal' }} />
                                 <Typography variant="body2" fontWeight={500}>
                                   {(() => {
                                     const organizerTimezone = normalizeTimezoneName(event.timezone);
@@ -1871,7 +1870,7 @@ export default function EventDetailsPage() {
                             ) : (
                               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 2, sm: 6 }} sx={{ fontSize: '0.875rem' }}>
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                  <CalendarMonthIcon fontSize="small" sx={{ color: '#0A9396' }} />
+                                  <CalendarMonthIcon fontSize="small" sx={{ color: 'teal' }} />
                                   <Typography variant="body2">
                                     {(() => {
                                       const organizerTimezone = normalizeTimezoneName(event.timezone);
@@ -1881,7 +1880,7 @@ export default function EventDetailsPage() {
                                 </Stack>
                                 {event.end_time && (
                                   <Stack direction="row" spacing={1} alignItems="flex-start">
-                                    <AccessTimeIcon fontSize="small" sx={{ color: '#0A9396', mt: 0.25 }} />
+                                    <AccessTimeIcon fontSize="small" sx={{ color: 'teal', mt: 0.25 }} />
                                     <Box>
                                       {(() => {
                                         const organizerTimezone = normalizeTimezoneName(event.timezone);
@@ -1895,11 +1894,11 @@ export default function EventDetailsPage() {
                                         return (
                                           <>
                                             <Typography variant="body2" fontWeight={500} sx={{ color: 'text.primary' }}>
-                                              {orgStartTime} – {orgEndTime} <span style={{ color: '#7A8291' }}>({event.timezone || 'UTC'})</span>
+                                              {orgStartTime} – {orgEndTime} <span style={{ color: '#9ca3af' }}>({event.timezone || 'UTC'})</span>
                                             </Typography>
                                             {isVirtualOrHybrid && timesDiffer && (
                                               <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
-                                                <span style={{ fontWeight: 600, color: '#0A9396' }}>Your Time:</span> {localStartTime} – {localEndTime} <span style={{ color: '#7A8291' }}>({dayjs.tz.guess()})</span>
+                                                <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span> {localStartTime} – {localEndTime} <span style={{ color: '#9ca3af' }}>({dayjs.tz.guess()})</span>
                                               </Typography>
                                             )}
                                           </>
@@ -1962,9 +1961,9 @@ export default function EventDetailsPage() {
                               alignItems="flex-start"
                               sx={{
                                 p: 1.5,
-                                bgcolor: 'rgba(10,147,150,0.08)',
+                                bgcolor: 'success.50',
                                 border: '1px solid',
-                                borderColor: 'rgba(10,147,150,0.24)',
+                                borderColor: 'success.200',
                                 borderRadius: 1.5,
                               }}
                             >
@@ -1972,7 +1971,7 @@ export default function EventDetailsPage() {
                                 🎥
                               </span>
                               <Box sx={{ flex: 1 }}>
-                                <Typography variant="body2" fontWeight={600} sx={{ color: '#1B2A4A', mb: 0.5 }}>
+                                <Typography variant="body2" fontWeight={600} sx={{ color: 'success.700', mb: 0.5 }}>
                                   {event.external_streaming_platform?.charAt(0).toUpperCase() +
                                     event.external_streaming_platform?.slice(1).replace('_', ' ')}
                                   {' '}Streaming
@@ -1980,12 +1979,12 @@ export default function EventDetailsPage() {
                                     <Chip
                                       label="LIVE NOW"
                                       size="small"
-                                      sx={{ ml: 1, height: 20, bgcolor: '#0A9396', color: 'white', fontWeight: 700, fontSize: '0.7rem' }}
+                                      sx={{ ml: 1, height: 20, bgcolor: '#10b8a6', color: 'white', fontWeight: 700, fontSize: '0.7rem' }}
                                     />
                                   )}
                                 </Typography>
                                 {isLive && (
-                                  <Typography variant="caption" sx={{ display: 'block', color: '#0A9396', mb: 1, fontWeight: 600 }}>
+                                  <Typography variant="caption" sx={{ display: 'block', color: 'success.700', mb: 1, fontWeight: 600 }}>
                                     🔴 Event is being streamed on {event.external_streaming_platform?.charAt(0).toUpperCase() + event.external_streaming_platform?.slice(1).replace('_', ' ')} now!
                                   </Typography>
                                 )}
@@ -2000,7 +1999,7 @@ export default function EventDetailsPage() {
                                   href={event.external_streaming_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  sx={{ mt: 0.5, bgcolor: '#0A9396', '&:hover': { bgcolor: '#077B7E' } }}
+                                  sx={{ mt: 0.5, bgcolor: '#10b8a6', '&:hover': { bgcolor: '#0ea5a4' } }}
                                 >
                                   {isLive ? '🔴 Join Stream (LIVE)' : 'Join Stream'}
                                 </Button>
@@ -2027,18 +2026,17 @@ export default function EventDetailsPage() {
                           if (canView) {
                             return (
                               <Box
-                                className="ecp-detail-registered-card"
                                 onClick={totalRegisteredCount > 0 ? handleShowParticipants : undefined}
                                 sx={{
                                   p: 1.5,
                                   border: '1px solid',
-                                  borderColor: '#E3E8EF',
+                                  borderColor: 'grey.200',
                                   borderRadius: 2,
                                   cursor: totalRegisteredCount > 0 ? 'pointer' : 'default',
                                   transition: 'all 0.2s',
                                   '&:hover': totalRegisteredCount > 0 ? {
-                                    bgcolor: '#F6F8FB',
-                                    borderColor: '#0A9396',
+                                    bgcolor: 'grey.50',
+                                    borderColor: 'primary.main',
                                   } : {}
                                 }}
                               >
@@ -2082,7 +2080,7 @@ export default function EventDetailsPage() {
                                       )}
                                     </Box>
                                   </Stack>
-                                  <GroupsIcon sx={{ color: '#0A9396', opacity: 0.8 }} />
+                                  <GroupsIcon sx={{ color: 'text.secondary', opacity: 0.5 }} />
                                 </Stack>
                               </Box>
                             );
@@ -2106,12 +2104,12 @@ export default function EventDetailsPage() {
 
                         {/* Session Counts and Hours Breakdown (Multi-day events only) */}
                         {event?.is_multi_day && (event?.main_sessions_count > 0 || event?.breakout_sessions_count > 0 || event?.workshops_count > 0 || event?.networking_count > 0 || event?.calculated_hours_display) && (
-                          <Stack className="ecp-detail-session-summary" spacing={1.5} sx={{
+                          <Stack spacing={1.5} sx={{
                             p: 1.5,
                             border: '1px solid',
-                            borderColor: '#E3E8EF',
+                            borderColor: 'grey.200',
                             borderRadius: 2,
-                            bgcolor: '#F6F8FB'
+                            bgcolor: 'grey.50'
                           }}>
                             <Typography variant="body2" fontWeight={600} color="text.primary">
                               Session Breakdown
@@ -2159,7 +2157,7 @@ export default function EventDetailsPage() {
                     </Box>
 
                     {/* Bottom section: Title + Description */}
-                    <Box className="ecp-detail-about-section" sx={{ borderTop: '1px solid', borderColor: '#E3E8EF', p: { xs: 2.5, sm: 3, md: 4 }, pt: { xs: 2.5, sm: 3, md: 3 } }}>
+                    <Box sx={{ borderTop: '1px solid', borderColor: 'divider', p: { xs: 2.5, sm: 3, md: 4 }, pt: { xs: 2.5, sm: 3, md: 3 } }}>
                       <Stack spacing={2}>
                         {event?.title ? (
                           <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
@@ -2185,12 +2183,12 @@ export default function EventDetailsPage() {
                   </Paper>
 
                   {/* ATTEND CARD */}
-                  <Paper elevation={0} className="ecp-detail-attend-card rounded-2xl border border-slate-200">
+                  <Paper elevation={0} className="rounded-2xl border border-slate-200">
                     <Box className="p-5">
-                      <Typography className="ecp-detail-attend-title" variant="h6">Attend</Typography>
+                      <Typography variant="h6" className="font-extrabold">Attend</Typography>
                       <Typography
                         variant="h5"
-                        className={`ecp-detail-attend-state font-bold mt-1 mb-2 ${paymentPending ? "text-amber-600" : "text-teal-600"}`}
+                        className={`font-bold mt-1 mb-2 ${paymentPending ? "text-amber-600" : "text-teal-600"}`}
                       >
                         {isEventOwner
                           ? "You are the event host."
@@ -2203,12 +2201,12 @@ export default function EventDetailsPage() {
                       <div className="mt-3 flex flex-col gap-2">
                         {/* Replay Info Badge */}
                         {(replayReady || (replayEnabled && event.replay_available)) && (
-                          <Box className="ecp-detail-replay-notice mt-2 mb-3 rounded-lg p-3">
-                            <Typography variant="subtitle2" className="font-semibold">
+                          <Box className="mt-2 mb-3 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+                            <Typography variant="subtitle2" className="text-indigo-800 font-semibold">
                               {replayReady ? "Replay is available now" : "Replay will be available"}
                             </Typography>
                             {event.replay_availability_duration && (
-                              <Typography variant="caption" className="block mt-0.5">
+                              <Typography variant="caption" className="text-indigo-600 block mt-0.5">
                                 Accessible for: {event.replay_availability_duration}
                               </Typography>
                             )}
@@ -2256,8 +2254,8 @@ export default function EventDetailsPage() {
                             }}
                             sx={{
                               textTransform: "none",
-                              backgroundColor: "#0A9396",
-                              "&:hover": { backgroundColor: "#077B7E" },
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
                             }}
                             className="rounded-xl"
                             variant="contained"
@@ -2288,8 +2286,8 @@ export default function EventDetailsPage() {
                                     variant="contained"
                                     sx={{
                                       textTransform: "none",
-                                      backgroundColor: "#0A9396",
-                                      "&:hover": { backgroundColor: "#077B7E" },
+                                      backgroundColor: "#10b8a6",
+                                      "&:hover": { backgroundColor: "#0ea5a4" },
                                     }}
                                     className="rounded-xl"
                                   >
@@ -2337,8 +2335,8 @@ export default function EventDetailsPage() {
                                           variant="contained"
                                           sx={{
                                             textTransform: "none",
-                                            backgroundColor: "#0A9396",
-                                            "&:hover": { backgroundColor: "#077B7E" },
+                                            backgroundColor: "#10b8a6",
+                                            "&:hover": { backgroundColor: "#0ea5a4" },
                                           }}
                                           className="rounded-xl"
                                         >
@@ -2353,8 +2351,8 @@ export default function EventDetailsPage() {
                                           variant="outlined"
                                           sx={{
                                             py: 2.5,
-                                            borderColor: "#0A9396",
-                                            color: "#0A9396",
+                                            borderColor: "#10b8a6",
+                                            color: "#10b8a6",
                                             fontWeight: 500
                                           }}
                                         />
@@ -2367,8 +2365,8 @@ export default function EventDetailsPage() {
                                           variant="outlined"
                                           sx={{
                                             py: 2.5,
-                                            borderColor: "#0A9396",
-                                            color: "#0A9396",
+                                            borderColor: "#10b8a6",
+                                            color: "#10b8a6",
                                             fontWeight: 500
                                           }}
                                         />
@@ -2422,8 +2420,8 @@ export default function EventDetailsPage() {
                                             variant="contained"
                                             sx={{
                                               textTransform: "none",
-                                              backgroundColor: "#0A9396",
-                                              "&:hover": { backgroundColor: "#077B7E" },
+                                              backgroundColor: "#10b8a6",
+                                              "&:hover": { backgroundColor: "#0ea5a4" },
                                             }}
                                             className="rounded-xl"
                                           >
@@ -2476,8 +2474,8 @@ export default function EventDetailsPage() {
                               disabled={addingPaidEventToCart}
                               sx={{
                                 textTransform: "none",
-                                backgroundColor: "#0A9396",
-                                "&:hover": { backgroundColor: "#077B7E" },
+                                backgroundColor: "#10b8a6",
+                                "&:hover": { backgroundColor: "#0ea5a4" },
                                 "&.Mui-disabled": { backgroundColor: "#9adbd3", color: "#ffffff" },
                               }}
                               className="rounded-xl"
@@ -2496,9 +2494,9 @@ export default function EventDetailsPage() {
                                   mt: 2,
                                   width: "100%",
                                   alignItems: "center",
-                                  borderColor: "#0A9396",
+                                  borderColor: "#10b8a6",
                                   backgroundColor: "rgba(16,184,166,0.06)",
-                                  "& .MuiAlert-icon": { color: "#0A9396" },
+                                  "& .MuiAlert-icon": { color: "#10b8a6" },
                                 }}
                                 action={
                                   <Stack direction="row" spacing={1}>
@@ -2508,9 +2506,9 @@ export default function EventDetailsPage() {
                                       onClick={() => navigate("/account/cart")}
                                       sx={{
                                         textTransform: "none",
-                                        backgroundColor: "#0A9396",
+                                        backgroundColor: "#10b8a6",
                                         whiteSpace: "nowrap",
-                                        "&:hover": { backgroundColor: "#077B7E" },
+                                        "&:hover": { backgroundColor: "#0ea5a4" },
                                       }}
                                     >
                                       Go to cart
@@ -2532,9 +2530,9 @@ export default function EventDetailsPage() {
                                 variant="outlined"
                                 sx={{
                                   textTransform: "none",
-                                  borderColor: "#0A9396",
-                                  color: "#0A9396",
-                                  "&:hover": { borderColor: "#077B7E", backgroundColor: "rgba(10,147,150,0.06)" },
+                                  borderColor: "#10b8a6",
+                                  color: "#10b8a6",
+                                  "&:hover": { borderColor: "#0ea5a4", backgroundColor: "rgba(16,184,166,0.04)" },
                                 }}
                                 className="rounded-xl"
                               >
@@ -2556,8 +2554,8 @@ export default function EventDetailsPage() {
                             variant="contained"
                             sx={{
                               textTransform: "none",
-                              backgroundColor: "#0A9396",
-                              "&:hover": { backgroundColor: "#077B7E" },
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
                             }}
                             className="rounded-xl"
                           >
@@ -2578,8 +2576,8 @@ export default function EventDetailsPage() {
                             variant="contained"
                             sx={{
                               textTransform: "none",
-                              backgroundColor: "#0A9396",
-                              "&:hover": { backgroundColor: "#077B7E" },
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
                             }}
                             className="rounded-xl"
                           >
@@ -2692,8 +2690,8 @@ export default function EventDetailsPage() {
                                         size="small"
                                         sx={{
                                           textTransform: 'none',
-                                          backgroundColor: '#0A9396',
-                                          '&:hover': { backgroundColor: '#077B7E' }
+                                          backgroundColor: '#10b8a6',
+                                          '&:hover': { backgroundColor: '#0ea5a4' }
                                         }}
                                       >
                                         {form.status === 'not_started' ? 'Complete' : 'Continue'}
@@ -2718,13 +2716,13 @@ export default function EventDetailsPage() {
                                 fullWidth
                                 sx={{
                                   textTransform: 'none',
-                                  borderColor: '#0A9396',
-                                  color: '#0A9396',
+                                  borderColor: '#10b8a6',
+                                  color: '#10b8a6',
                                   fontWeight: 600,
                                   py: 1.5,
                                   '&:hover': {
-                                    borderColor: '#077B7E',
-                                    bgcolor: 'rgba(10,147,150,0.06)',
+                                    borderColor: '#0ea5a4',
+                                    bgcolor: 'rgba(16,184,166,0.04)',
                                   },
                                 }}
                                 className="rounded-xl"
@@ -2742,8 +2740,8 @@ export default function EventDetailsPage() {
                               mt: 2,
                               p: 2,
                               borderRadius: 2,
-                              bgcolor: "rgba(10,147,150,0.08)",
-                              border: "1px solid rgba(10,147,150,0.24)",
+                              bgcolor: "rgba(16,184,166,0.06)",
+                              border: "1px solid rgba(16,184,166,0.2)",
                             }}
                           >
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -2755,9 +2753,9 @@ export default function EventDetailsPage() {
                               onClick={() => setPreEventQnaModalOpen(true)}
                               sx={{
                                 textTransform: "none",
-                                borderColor: "#0A9396",
-                                color: "#0A9396",
-                                "&:hover": { borderColor: "#077B7E", bgcolor: "rgba(10,147,150,0.06)" },
+                                borderColor: "#10b8a6",
+                                color: "#10b8a6",
+                                "&:hover": { borderColor: "#0ea5a4", bgcolor: "rgba(16,184,166,0.04)" },
                               }}
                               className="rounded-xl"
                             >
@@ -2795,7 +2793,7 @@ export default function EventDetailsPage() {
 
               {/* TAB CONTENT: SESSIONS */}
               {showSessionsTab && activeTab === 1 && (
-                <Paper elevation={0} className="ecp-detail-card rounded-2xl border border-slate-200">
+                <Paper elevation={0} className="rounded-2xl border border-slate-200">
                   <Box sx={{ p: 3 }}>
                     <Typography variant="h6" fontWeight={800} sx={{ mb: 3 }}>
                       Event Sessions ({normalizedSessions.length})
@@ -2838,7 +2836,7 @@ export default function EventDetailsPage() {
                         const isExpanded = Boolean(expandedSessionDescriptions[sessionKey]);
                         const isLongDescription = sessionDescription.length > 180;
                         return (
-                          <Paper key={session.id || sessionIdx} elevation={0} sx={{ p: 2, bgcolor: '#F6F8FB', border: '1px solid', borderColor: '#E3E8EF', borderRadius: 2 }}>
+                          <Paper key={session.id || sessionIdx} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
                             <Stack spacing={1.5}>
                               <Stack direction="row" justifyContent="space-between" alignItems="start">
                                 <Box>
@@ -2874,14 +2872,14 @@ export default function EventDetailsPage() {
 
                               <Stack direction="row" spacing={2} sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
                                 <Stack direction="row" spacing={0.5} alignItems="center">
-                                  <CalendarMonthIcon fontSize="small" sx={{ color: '#0A9396' }} />
+                                  <CalendarMonthIcon fontSize="small" sx={{ color: 'teal.700' }} />
                                   <Typography variant="body2">
                                     {event.timezone ? dayjs(session.start_time).tz(normalizeTimezoneName(event.timezone)).format("MMM D, YYYY") : dayjs(session.start_time).format("MMM D, YYYY")}
                                   </Typography>
                                 </Stack>
                                 <Stack direction="column" spacing={0.5}>
                                   <Stack direction="row" spacing={0.5} alignItems="center">
-                                    <AccessTimeIcon fontSize="small" sx={{ color: '#0A9396' }} />
+                                    <AccessTimeIcon fontSize="small" sx={{ color: 'teal.700' }} />
                                     <Typography variant="body2">
                                       {event.timezone ? dayjs(session.start_time).tz(normalizeTimezoneName(event.timezone)).format("h:mm A") : dayjs(session.start_time).format("h:mm A")} – {event.timezone ? dayjs(session.end_time).tz(normalizeTimezoneName(event.timezone)).format("h:mm A") : dayjs(session.end_time).format("h:mm A")}
                                       {event.timezone && (
@@ -2950,7 +2948,7 @@ export default function EventDetailsPage() {
 
               {/* TAB CONTENT: Q&A */}
               {showQaTab && activeTab === (showSessionsTab ? 2 : 1) && (
-                <Paper elevation={0} className="ecp-detail-card rounded-2xl border border-slate-200">
+                <Paper elevation={0} className="rounded-2xl border border-slate-200">
                   <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
                     {/* Header with Sort Option */}
                     <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
@@ -2981,7 +2979,7 @@ export default function EventDetailsPage() {
                             fontWeight: 500,
                             cursor: 'pointer',
                             '&:hover': { borderColor: '#d1d5db' },
-                            '&:focus': { outline: 'none', borderColor: '#0A9396', boxShadow: '0 0 0 3px rgba(10, 147, 150, 0.14)' }
+                            '&:focus': { outline: 'none', borderColor: '#3b82f6', boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)' }
                           }}
                         >
                           <option value="all">All Questions</option>
@@ -3041,7 +3039,7 @@ export default function EventDetailsPage() {
                             ? { label: 'Pending', bgcolor: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }
                             : q.answered_phase === 'live'
                               ? { label: 'Answered Live', bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
-                              : { label: 'Answered Post-Event', bgcolor: '#E8F7F7', color: '#0A9396', border: '1px solid rgba(10,147,150,0.24)' };
+                              : { label: 'Answered Post-Event', bgcolor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
 
                           return (
                             <Box
@@ -3138,13 +3136,13 @@ export default function EventDetailsPage() {
                                   }}>
                                     <Box sx={{
                                       p: 2,
-                                      bgcolor: q.answered_phase === 'live' ? '#E8F7F7' : '#F6F8FB',
-                                      border: q.answered_phase === 'live' ? '1px solid rgba(10,147,150,0.24)' : '1px solid #E3E8EF',
+                                      bgcolor: q.answered_phase === 'live' ? '#ecfdf5' : '#eff6ff',
+                                      border: q.answered_phase === 'live' ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
                                       borderRadius: 1.5
                                     }}>
                                       <Typography variant="caption" sx={{
                                         fontWeight: 700,
-                                        color: q.answered_phase === 'live' ? '#0A9396' : '#1B2A4A',
+                                        color: q.answered_phase === 'live' ? '#059669' : '#1d4ed8',
                                         display: 'block',
                                         mb: 0.75,
                                         textTransform: 'uppercase',
@@ -3191,19 +3189,19 @@ export default function EventDetailsPage() {
                             ? { label: 'Pending', bgcolor: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }
                             : answeredPhase === 'live'
                               ? { label: 'Answered Live', bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
-                              : { label: 'Answered Post-Event', bgcolor: '#E8F7F7', color: '#0A9396', border: '1px solid rgba(10,147,150,0.24)' };
+                              : { label: 'Answered Post-Event', bgcolor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
 
                           return (
                             <Box
                               key={`group_${g.id}`}
                               sx={{
-                                bgcolor: '#F6F8FB',
-                                border: '1.5px solid #E3E8EF',
+                                bgcolor: '#f0f4ff',
+                                border: '1.5px solid #dbeafe',
                                 borderRadius: 3,
                                 overflow: 'hidden',
                                 transition: 'all 0.2s ease',
                                 '&:hover': {
-                                  borderColor: '#0A9396',
+                                  borderColor: '#bfdbfe',
                                   boxShadow: '0 4px 12px rgba(59, 130, 246, 0.08)'
                                 }
                               }}
@@ -3216,7 +3214,7 @@ export default function EventDetailsPage() {
                                     label={`${members.length} combined`}
                                     sx={{
                                       bgcolor: 'rgba(59, 130, 246, 0.1)',
-                                      color: '#0A9396',
+                                      color: '#1d4ed8',
                                       fontWeight: 600,
                                       fontSize: '0.65rem',
                                       height: 20
@@ -3250,7 +3248,7 @@ export default function EventDetailsPage() {
                                   />
                                 </Stack>
 
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1, color: '#1B2A4A', lineHeight: 1.4 }}>
+                                <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1, color: '#1e3a8a', lineHeight: 1.4 }}>
                                   {summaryText}
                                 </Typography>
 
@@ -3278,9 +3276,9 @@ export default function EventDetailsPage() {
                                     textTransform: 'none',
                                     fontSize: '0.75rem',
                                     fontWeight: 700,
-                                    color: '#0A9396',
+                                    color: '#3b82f6',
                                     p: 0,
-                                    '&:hover': { bgcolor: 'transparent', color: '#077B7E' }
+                                    '&:hover': { bgcolor: 'transparent', color: '#2563eb' }
                                   }}
                                 >
                                   {isExpanded ? "Hide original questions" : `View ${members.length} original questions`}
@@ -3289,7 +3287,7 @@ export default function EventDetailsPage() {
 
                               {/* Collapsible Sub-questions */}
                               <Collapse in={isExpanded}>
-                                <Box sx={{ bgcolor: 'rgba(255,255,255,0.65)', borderTop: '1px solid #E3E8EF' }}>
+                                <Box sx={{ bgcolor: 'rgba(255,255,255,0.5)', borderTop: '1px solid #dbeafe' }}>
                                   {members.map(member => renderQuestion(member, true))}
                                 </Box>
                               </Collapse>
@@ -3315,7 +3313,7 @@ export default function EventDetailsPage() {
 
               {/* TAB CONTENT: SPEED NETWORKING */}
               {showSpeedNetworkingTab && activeTab === (showSessionsTab && showQaTab ? 3 : (showSessionsTab || showQaTab ? 2 : 1)) && (
-                <Paper elevation={0} className="ecp-detail-card rounded-2xl border border-slate-200">
+                <Paper elevation={0} className="rounded-2xl border border-slate-200">
                   <Box className="p-5">
                     <SpeedNetworkingMatchHistory eventId={event.id} sessionId={speedNetworkingSessionId} />
                   </Box>

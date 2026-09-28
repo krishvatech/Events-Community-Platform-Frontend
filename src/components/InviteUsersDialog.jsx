@@ -27,15 +27,6 @@ import PersonIcon from "@mui/icons-material/Person";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import { toast } from "react-toastify";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
-import {
-  BORDER,
-  DIALOG_ACTIONS_SX,
-  DIALOG_TITLE_SX,
-  FIELD_SX,
-  PRIMARY_BTN_SX,
-  SUBTLE_BTN_SX,
-} from "../theme/imaaTokens";
-
 
 // Define API constants (reusing existing patterns)
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -218,7 +209,7 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-            <DialogTitle sx={DIALOG_TITLE_SX}>Invite Users</DialogTitle>
+            <DialogTitle>Invite Users</DialogTitle>
             <DialogContent>
                 <Tabs
                     value={tab}
@@ -235,7 +226,7 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
                 </Tabs>
 
                 <Box sx={{ mb: 2, display: "flex", gap: 1 }}>
-                    <TextField sx={FIELD_SX}
+                    <TextField
                         fullWidth
                         placeholder={tab === 0 ? "Search users by name..." : "Search groups by name..."}
                         value={searchQuery}
@@ -251,7 +242,7 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
                     />
                 </Box>
 
-                <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, border: "1px solid", borderColor: BORDER, bgcolor: "grey.50" }}>
+                <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "grey.50" }}>
                     <FormControlLabel
                         control={
                             <MuiCheckbox
@@ -265,7 +256,7 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
                         Invite notifications will still be sent. This adds a direct message linked to the event.
                     </Typography>
                     {alsoSendMessage && (
-                        <TextField sx={FIELD_SX}
+                        <TextField
                             fullWidth
                             multiline
                             minRows={3}
@@ -280,7 +271,7 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
 
                 {results.length > 0 && (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-                        <Button sx={SUBTLE_BTN_SX} size="small" onClick={handleSelectAll}>
+                        <Button size="small" onClick={handleSelectAll}>
                             {isAllSelected ? "Deselect All Visible" : "Select All Visible"}
                         </Button>
                     </Box>
@@ -369,9 +360,9 @@ export default function InviteUsersDialog({ open, onClose, eventId, eventTitle =
                 </Box>
 
             </DialogContent>
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
-                <Button sx={SUBTLE_BTN_SX} onClick={onClose} disabled={loading}>Cancel</Button>
-                <Button sx={PRIMARY_BTN_SX}
+            <DialogActions>
+                <Button onClick={onClose} disabled={loading}>Cancel</Button>
+                <Button
                     onClick={handleSendInvites}
                     variant="contained"
                     disabled={loading || (selectedUsers.size === 0 && selectedGroups.size === 0)}

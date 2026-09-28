@@ -209,7 +209,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
   return (
     <Paper
       elevation={0}
-      className="ecp-event-card ecp-my-event-card flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+      className="flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
       sx={{
         borderRadius: 2,
         // Let the card grow to fill grid item height
@@ -218,7 +218,6 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
     >
       {/* SAME IMAGE SIZE for all cards: 16:9 area that always covers */}
       <Box
-        className="ecp-event-card__media"
         sx={{
           position: "relative",
           width: "100%",
@@ -255,7 +254,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
 
       {/* Content area with fixed rhythm so cards line up */}
-      <Box className="ecp-event-card__content" sx={{ p: 1.75, display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
+      <Box sx={{ p: 1.75, display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
         <div className="flex items-center justify-between gap-2">
           <Chip size="small" label={chip.label} className={`${chip.className} font-medium`} />
           {ev.category && <span className="text-[11px] text-slate-500">{ev.category}</span>}
@@ -410,7 +409,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
         </div>
 
         {/* Actions stick to bottom to keep equal heights */}
-        <Box className="ecp-event-card__actions" sx={{ mt: "auto", display: "flex", gap: 1 }}>
+        <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
           {(() => {
             // derive simple flags from status
             if (status === "cancelled") {
@@ -600,7 +599,7 @@ function EventCardSkeleton() {
   return (
     <Paper
       elevation={0}
-      className="ecp-event-card ecp-event-card--skeleton flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+      className="flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
       sx={{ borderRadius: 2, height: "auto" }}
     >
       {/* 16:9 image skeleton */}
@@ -881,22 +880,21 @@ export default function MyEventsPage() {
   };
 
   return (
-    <div className="imaa-ecp-ui ecp-my-events-page min-h-screen bg-slate-50">
-      <Container maxWidth="xl" className="ecp-my-events-page__container py-6 sm:py-8">
+    <div className="min-h-screen bg-slate-50">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
-            <div className="ecp-my-events-header flex items-center justify-between mb-3 sm:mb-4">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div>
-                <p className="imaa-ecp-eyebrow">Events</p>
-                <Typography className="ecp-my-events-title" variant="h4">
+                <Typography variant="h4">
                   My Events
                 </Typography>
-                <Typography className="ecp-my-events-subtitle" variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary">
                   View, join, and manage events you’ve registered for.
                 </Typography>
               </div>
             </div>
-            <Paper elevation={0} className="ecp-events-tabs rounded-2xl border border-slate-200 mb-4">
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
               <Tabs
                 value={tab}
                 onChange={(_, v) => setTab(v)}
@@ -921,7 +919,7 @@ export default function MyEventsPage() {
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
               alignItems={{ xs: "stretch", sm: "center" }}
-              className="ecp-my-events-toolbar mb-5"
+              className="mb-5"
             >
               <TextField
                 size="small"
@@ -966,7 +964,7 @@ export default function MyEventsPage() {
                 </Box>
               </>
             ) : events.length === 0 ? (
-              <Paper elevation={0} className="ecp-empty-events-state rounded-2xl border border-slate-200">
+              <Paper elevation={0} className="rounded-2xl border border-slate-200">
                 <Box className="p-8 text-center">
                   <Typography variant="h6" className="font-semibold text-slate-700">
                     No events yet
@@ -1024,7 +1022,7 @@ export default function MyEventsPage() {
 
 
                 {totalCount > PAGE_SIZE && (
-                  <Box className="ecp-events-pagination flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 gap-3">
+                  <Box className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 gap-3">
                     <Typography variant="body2" color="text.secondary">
                       Showing {startIndex + 1}–{Math.min(startIndex + PAGE_SIZE, totalCount)} of {totalCount}
                     </Typography>

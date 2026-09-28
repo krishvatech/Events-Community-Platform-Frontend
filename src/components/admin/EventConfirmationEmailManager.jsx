@@ -22,18 +22,6 @@ import {
 } from "@mui/material";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
-import {
-  BG,
-  BTN_SHAPE_SX,
-  DANGER_BTN_SX,
-  DIALOG_ACTIONS_SX,
-  DIALOG_TITLE_SX,
-  FIELD_SX,
-  OUTLINE_BTN_SX,
-  PRIMARY_BTN_SX,
-  SUBTLE_BTN_SX,
-} from "../../theme/imaaTokens";
-
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = API_BASE.replace(/\/+$/, "");
@@ -167,7 +155,7 @@ const parseHtmlToSimpleText = (htmlBody) => {
     const style = div.getAttribute("style");
     const text = div.textContent.trim();
 
-    if (style && style.includes(BG)) {
+    if (style && style.includes("#f5f5f5")) {
       meetingInfo = text;
     } else if (style && style.includes("#f9f9f9")) {
       eventDetails = text;
@@ -485,7 +473,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
                   Edit the subject and add optional content (Zoom link, closing message). The original template design is preserved.
                 </Typography>
 
-                <TextField sx={FIELD_SX}
+                <TextField
                   label="Email Subject"
                   value={template.subject || DEFAULT_SUBJECTS[selectedTemplate] || ""}
                   onChange={(e) => setTemplate({ ...template, subject: e.target.value })}
@@ -496,7 +484,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
                   helperText="This appears in the recipient's inbox. Use {{ event_title }} to include the event name."
                 />
 
-                <Box sx={{ my: 2, p: 2, bgcolor: BG, borderRadius: 1 }}>
+                <Box sx={{ my: 2, p: 2, bgcolor: "#f0f0f0", borderRadius: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
                     Original Template (Preserved)
                   </Typography>
@@ -506,7 +494,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
                 </Box>
 
                 <Box>
-                  <TextField sx={FIELD_SX}
+                  <TextField
                     label="Zoom Link or Meeting Details (Optional)"
                     value={template._meeting_info || ""}
                     onChange={(e) => setTemplate({ ...template, _meeting_info: e.target.value })}
@@ -530,7 +518,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
                 </Box>
 
                 <Box>
-                  <TextField sx={FIELD_SX}
+                  <TextField
                     label="Closing Message (Optional)"
                     value={template._closing || ""}
                     onChange={(e) => setTemplate({ ...template, _closing: e.target.value })}
@@ -600,7 +588,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
         {/* Actions */}
         {template && (
           <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end" }}>
-            <Button sx={OUTLINE_BTN_SX}
+            <Button
               variant="outlined"
               onClick={() => loadTemplate()}
               disabled={loading}
@@ -608,7 +596,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
             >
               Reload
             </Button>
-            <Button sx={DANGER_BTN_SX}
+            <Button
               variant="outlined"
               color="error"
               onClick={() => setResetConfirmOpen(true)}
@@ -616,14 +604,14 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
             >
               Reset to Default
             </Button>
-            <Button sx={OUTLINE_BTN_SX}
+            <Button
               variant="outlined"
               onClick={handlePreview}
               disabled={previewLoading || saving}
             >
               {previewLoading ? "Previewing..." : "Preview"}
             </Button>
-            <Button sx={PRIMARY_BTN_SX}
+            <Button
               variant="contained"
               onClick={handleSave}
               disabled={saving}
@@ -644,7 +632,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
           sx: { borderRadius: 2 },
         }}
       >
-        <DialogTitle sx={DIALOG_TITLE_SX}>Email Preview</DialogTitle>
+        <DialogTitle>Email Preview</DialogTitle>
         <DialogContent>
           {previewData && (
             <Stack spacing={2} sx={{ mt: 2 }}>
@@ -693,8 +681,8 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
             </Stack>
           )}
         </DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
-          <Button sx={SUBTLE_BTN_SX} onClick={() => setPreviewOpen(false)}>Close</Button>
+        <DialogActions>
+          <Button onClick={() => setPreviewOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
@@ -703,16 +691,16 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
         open={resetConfirmOpen}
         onClose={() => setResetConfirmOpen(false)}
       >
-        <DialogTitle sx={DIALOG_TITLE_SX}>Reset to Default Template?</DialogTitle>
+        <DialogTitle>Reset to Default Template?</DialogTitle>
         <DialogContent>
           <Typography>
             This will remove the custom template for this event and revert to the default template.
             This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
-          <Button sx={SUBTLE_BTN_SX} onClick={() => setResetConfirmOpen(false)}>Cancel</Button>
-          <Button sx={BTN_SHAPE_SX}
+        <DialogActions>
+          <Button onClick={() => setResetConfirmOpen(false)}>Cancel</Button>
+          <Button
             onClick={handleReset}
             color="error"
             variant="contained"

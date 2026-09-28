@@ -59,8 +59,6 @@ import {
 import VerifiedIcon from "@mui/icons-material/Verified";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
-import ImaaCommunityScope from "../../components/community/ImaaCommunityScope";
-import { IMAA } from "../../components/community/imaaCommunityTheme";
 
 // -----------------------------------------------------------------------------
 // 1. API Helpers & Constants
@@ -277,7 +275,7 @@ function PostComposer({ communityId, onCreate }) {
         <Stack spacing={1}>
           <TextField fullWidth multiline minRows={3} value={content} onChange={(e) => setContent(e.target.value)} placeholder="What's on your mind?" />
           {content && (
-            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25, bgcolor: IMAA.bg }}>
+            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
               <Typography variant="caption" color="text.secondary">Preview</Typography>
               <ClampedText text={content} maxLines={5} />
             </Box>
@@ -288,7 +286,7 @@ function PostComposer({ communityId, onCreate }) {
         <Stack spacing={2}>
           <TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Caption (optional)" />
           {content && (
-            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25, bgcolor: IMAA.bg }}>
+            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
               <Typography variant="caption" color="text.secondary">Preview</Typography>
               <ClampedText text={content} maxLines={5} />
             </Box>
@@ -298,8 +296,8 @@ function PostComposer({ communityId, onCreate }) {
           {images.length > 0 && (
             <Grid container spacing={1}>
               {images.map((src, i) => (
-                <Grid key={i} size={4}>
-                  <img src={src} alt="p" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 8, border: `1px solid ${IMAA.border}` }} />
+                <Grid key={i} item xs={4}>
+                  <img src={src} alt="p" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 4 }} />
                 </Grid>
               ))}
             </Grid>
@@ -317,7 +315,7 @@ function PostComposer({ communityId, onCreate }) {
           />
           <TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Caption (optional)" />
           {content && (
-            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25, bgcolor: IMAA.bg }}>
+            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
               <Typography variant="caption" color="text.secondary">Preview</Typography>
               <ClampedText text={content} maxLines={5} />
             </Box>
@@ -527,26 +525,23 @@ function PostCard({
   const userHasVoted = post.user_votes && post.user_votes.length > 0;
 
   return (
-    <Card variant="outlined" className="ecp-post-card" sx={{ borderRadius: 3, mb: 2, borderColor: IMAA.border, boxShadow: IMAA.shadowSm }}>
+    <Card variant="outlined" sx={{ borderRadius: 3, mb: 2 }}>
       <CardHeader
-        sx={{ px: { xs: 1.75, sm: 2.25 }, pt: { xs: 1.75, sm: 2 }, pb: 0.5, "& .MuiCardHeader-action": { alignSelf: "center", m: 0 } }}
-        avatar={<Avatar src={photo} sx={{ width: 44, height: 44, bgcolor: IMAA.navy, fontWeight: 700 }}>{initial}</Avatar>}
+        avatar={<Avatar src={photo}>{initial}</Avatar>}
         title={
           <Stack direction="row" spacing={0.5} alignItems="center">
-            <Typography fontWeight={700} sx={{ color: IMAA.navy, fontSize: 15 }}>{name}</Typography>
+            <Typography fontWeight={600}>{name}</Typography>
             {post.actor_kyc_status === "approved" && (
-              <VerifiedIcon sx={{ fontSize: 16, color: IMAA.teal }} />
+              <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
             )}
           </Stack>
         }
         subheader={timeAgo(post.created_at)}
-        subheaderTypographyProps={{ sx: { color: IMAA.hint, fontSize: 12.5, fontWeight: 500 } }}
         action={
-          <Stack direction="row" spacing={0.75}>
+          <Stack direction="row" spacing={0.5}>
             <Tooltip title="Edit">
               <IconButton
                 size="small"
-                className="ecp-icon-btn"
                 onClick={() => onEdit(post)}
               >
                 <EditRoundedIcon fontSize="small" />
@@ -556,7 +551,6 @@ function PostCard({
               <IconButton
                 size="small"
                 color="error"
-                className="ecp-icon-btn ecp-icon-btn--danger"
                 onClick={() => onDelete(post)}
               >
                 <DeleteOutlineRoundedIcon fontSize="small" />
@@ -566,7 +560,7 @@ function PostCard({
         }
       />
       {/* Body */}
-      <Box sx={{ mb: 1.5, px: { xs: 1.75, sm: 2.25 }, color: IMAA.body }}>
+      <Box sx={{ mb: 2, px: 2 }}>
         {post.is_removed || post.moderation_status === "removed" ? (
           <Typography color="text.secondary" sx={{ fontStyle: "italic", py: 2 }}>
             This content was removed by moderators.
@@ -588,7 +582,7 @@ function PostCard({
                     href={post.link}
                     target="_blank"
                     rel="noreferrer"
-                    sx={{ mt: 1, textTransform: "none", maxWidth: "100%", justifyContent: "flex-start", wordBreak: "break-all", textAlign: "left", bgcolor: IMAA.bg, border: `1px solid ${IMAA.border}`, borderLeft: `3px solid ${IMAA.navy}` }}
+                    sx={{ mt: 1, textTransform: "none" }}
                   >
                     {post.link}
                   </Button>
@@ -599,7 +593,7 @@ function PostCard({
             {post.type === "image" && post.images?.length > 0 && (
               <Grid container spacing={1} sx={{ mt: 1 }}>
                 {post.images.map((src, i) => (
-                  <Grid key={i} size={{ xs: 12, sm: 6 }}>
+                  <Grid key={i} item xs={12} sm={6}>
                     <img
                       src={src}
                       alt="post"
@@ -608,8 +602,6 @@ function PostCard({
                         maxHeight: 300,
                         objectFit: "cover",
                         borderRadius: 8,
-                        border: `1px solid ${IMAA.border}`,
-                        display: "block",
                       }}
                     />
                   </Grid>
@@ -646,7 +638,7 @@ function PostCard({
                           onClick={() => !userHasVoted && oid && onVote(post.id, oid)}
                           sx={{ cursor: (!userHasVoted && oid) ? "pointer" : "default", flex: 1 }}
                         >
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: IMAA.navy }}>
+                          <Typography variant="body2">
                             {label}
                           </Typography>
                         </Box>
@@ -673,7 +665,7 @@ function PostCard({
                       <LinearProgress
                         variant="determinate"
                         value={pct}
-                        sx={{ height: 8, borderRadius: 999, cursor: (!userHasVoted && oid) ? "pointer" : "default", "& .MuiLinearProgress-bar": { borderRadius: 999 } }}
+                        sx={{ height: 10, borderRadius: 5, cursor: (!userHasVoted && oid) ? "pointer" : "default" }}
                         onClick={() => !userHasVoted && oid && onVote(post.id, oid)}
                       />
                       <Typography
@@ -694,7 +686,7 @@ function PostCard({
         )}
       </Box>
 
-      <CardActions sx={{ px: { xs: 1.75, sm: 2.25 }, pt: 0, pb: 1, display: "block" }}>
+      <CardActions sx={{ px: 2, pb: 1, display: "block" }}>
         {(likeCount > 0 || shareCount > 0) && (
           <Box sx={{ pb: 1 }}>
             <Stack
@@ -716,8 +708,6 @@ function PostCard({
                       width: 24,
                       height: 24,
                       fontSize: 14,
-                      bgcolor: IMAA.bg,
-                      borderColor: "#fff",
                     },
                   }}
                 >
@@ -735,7 +725,7 @@ function PostCard({
                     })}
                 </AvatarGroup>
 
-                <Typography variant="caption" sx={{ ml: 1, color: IMAA.muted, fontSize: 13, "&:hover": { color: IMAA.navy, textDecoration: "underline" } }}>
+                <Typography variant="caption" sx={{ ml: 1 }}>
                   {likeLabel}
                 </Typography>
               </Stack>
@@ -743,7 +733,6 @@ function PostCard({
 
               <Button
                 size="small"
-                className="ecp-post-meta-link"
                 onClick={() => onViewShares(post.id)}
                 sx={{
                   textTransform: "none",
@@ -757,17 +746,16 @@ function PostCard({
           </Box>
         )}
 
-        <Divider sx={{ mb: 0.5, borderColor: IMAA.border }} />
+        <Divider sx={{ mb: 1 }} />
 
-        <Stack direction="row" justifyContent="space-between" className="ecp-post-actions">
+        <Stack direction="row" justifyContent="space-between">
           {/* Reaction button with popup */}
           <Button
             size="small"
-            className={`ecp-post-action${hasReaction ? " is-active" : ""}`}
             onClick={handleOpenPicker}
             sx={{
               textTransform: "none",
-              color: hasReaction ? IMAA.teal : "text.secondary",
+              color: hasReaction ? "primary.main" : "text.secondary",
               fontWeight: hasReaction ? 600 : 400,
             }}
             startIcon={
@@ -781,7 +769,6 @@ function PostCard({
 
           <Button
             size="small"
-            className="ecp-post-action"
             startIcon={<ChatBubbleOutlineRoundedIcon />}
             onClick={() => onComment(post.id)}
           >
@@ -790,7 +777,6 @@ function PostCard({
 
           <Button
             size="small"
-            className="ecp-post-action"
             startIcon={<IosShareRoundedIcon />}
             onClick={() => onShareAction(post.id)}
           >
@@ -885,7 +871,7 @@ function PostCard({
                         <Typography variant="body2" fontWeight={500}>{u.name}</Typography>
                         {u.kycStatus === "approved" && (
                           <Tooltip title="KYC Verified">
-                            <VerifiedIcon sx={{ fontSize: "1rem", color: IMAA.teal }} />
+                            <VerifiedIcon sx={{ fontSize: "1rem", color: "#1976d2" }} />
                           </Tooltip>
                         )}
                       </Stack>
@@ -996,12 +982,12 @@ function CommentsDialog({ open, postId, onClose, isPostOwner }) {
   const CommentItem = ({ c, depth = 0 }) => (
     <Box sx={{ pl: depth * 4, py: 1 }}>
       <Stack direction="row" spacing={1}>
-        <Avatar src={c.author.avatar} sx={{ width: 32, height: 32, bgcolor: IMAA.navy }} />
+        <Avatar src={c.author.avatar} sx={{ width: 32, height: 32 }} />
         <Box sx={{ flex: 1 }}>
-          <Box sx={{ bgcolor: IMAA.bg, border: `1px solid ${IMAA.border}`, p: 1.5, borderRadius: 2 }}>
+          <Box sx={{ bgcolor: "action.hover", p: 1.5, borderRadius: 2 }}>
             <Stack direction="row" spacing={0.5} alignItems="center">
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: IMAA.navy }}>{c.author.name}</Typography>
-              {c.author.kycStatus === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: IMAA.teal }} />}
+              <Typography variant="subtitle2" fontWeight={700}>{c.author.name}</Typography>
+              {c.author.kycStatus === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
             </Stack>
             <Typography variant="body2">{c.body}</Typography>
           </Box>
@@ -1010,7 +996,7 @@ function CommentsDialog({ open, postId, onClose, isPostOwner }) {
             <Button size="small"
               startIcon={c.likedByMe ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
               onClick={() => toggleCommentLike(c.id)}
-              sx={{ color: c.likedByMe ? IMAA.coral : IMAA.muted }}
+              sx={{ color: c.likedByMe ? "teal" : "inherit" }}
             >
               {c.likeCount}
             </Button>
@@ -1247,7 +1233,7 @@ function LikesDialog({ open, postId, onClose }) {
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <Typography variant="body2">{u.name}</Typography>
                       {u.kycStatus === "approved" && (
-                        <VerifiedIcon sx={{ fontSize: 14, color: IMAA.teal }} />
+                        <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />
                       )}
                     </Stack>
                   }
@@ -1329,7 +1315,7 @@ function SharesDialog({ open, postId, onClose }) {
         setUsers(uniqueById);
       }).catch(() => setUsers([])).finally(() => setLoading(false));
   }, [open, postId]);
-  return (<Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"> <DialogTitle>Shared by</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : users.map(u => (<ListItem key={u.id}> <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar> <ListItemText primary={<Stack direction="row" spacing={0.5} alignItems="center"><Typography variant="body2">{u.name}</Typography>{(u.kycStatus === "approved" || u.kycStatus === "verified") && <VerifiedIcon sx={{ fontSize: 14, color: IMAA.teal }} />}</Stack>} secondary={u.headline} /> </ListItem>))} {!loading && !users.length && <Typography p={2} color="text.secondary">No shares yet.</Typography>} </DialogContent> <DialogActions><Button onClick={onClose}>Close</Button></DialogActions> </Dialog>);
+  return (<Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"> <DialogTitle>Shared by</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : users.map(u => (<ListItem key={u.id}> <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar> <ListItemText primary={<Stack direction="row" spacing={0.5} alignItems="center"><Typography variant="body2">{u.name}</Typography>{(u.kycStatus === "approved" || u.kycStatus === "verified") && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}</Stack>} secondary={u.headline} /> </ListItem>))} {!loading && !users.length && <Typography p={2} color="text.secondary">No shares yet.</Typography>} </DialogContent> <DialogActions><Button onClick={onClose}>Close</Button></DialogActions> </Dialog>);
 }
 
 // --- NEW COMPONENT: Share To Friend Dialog ---
@@ -1504,7 +1490,7 @@ function ShareToFriendDialog({ open, onClose, postId, onSharedSuccessfully }) {
                   primary={
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <Typography variant="body1">{f.name}</Typography>
-                      {f.kycStatus === "approved" && !f.isGroup && <VerifiedIcon sx={{ fontSize: 14, color: IMAA.teal }} />}
+                      {f.kycStatus === "approved" && !f.isGroup && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
                     </Stack>
                   }
                   secondary={f.headline}
@@ -1595,7 +1581,7 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
           {textContent.length} / {MAX_CHAR_LIMIT} characters
         </Typography>
         {textContent && (
-          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25, bgcolor: IMAA.bg }}>
+          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
             <Typography variant="caption" color="text.secondary">Preview</Typography>
             <ClampedText text={textContent} maxLines={5} />
           </Box>
@@ -1620,7 +1606,7 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
           </Typography>
         </div>
         {imageCaption && (
-          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25, bgcolor: IMAA.bg }}>
+          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
             <Typography variant="caption" color="text.secondary">Preview</Typography>
             <ClampedText text={imageCaption} maxLines={5} />
           </Box>
@@ -1647,7 +1633,7 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
           {textContent.length} / {MAX_CHAR_LIMIT} characters
         </Typography>
         {textContent && (
-          <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25, bgcolor: IMAA.bg }}>
+          <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
             <Typography variant="caption" color="text.secondary">Preview</Typography>
             <ClampedText text={textContent} maxLines={5} />
           </Box>
@@ -1759,7 +1745,7 @@ function PostSkeleton() {
   return (
     <Card
       variant="outlined"
-      sx={{ borderRadius: 3, mb: 2, borderColor: IMAA.border, boxShadow: IMAA.shadowSm }}
+      sx={{ borderRadius: 3, mb: 2 }}
     >
       {/* Header skeleton */}
       <CardHeader
@@ -2077,18 +2063,17 @@ export default function MyPostsPage() {
 
 
   return (
-    <ImaaCommunityScope page="myposts">
-    <Box sx={{ width: "100%", maxWidth: 820, mx: "auto", pl: 0, pt: 0, pr: { xs: 0, sm: 1 }, pb: 3 }}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 pb-4" style={{ borderBottom: `1px solid ${IMAA.border}` }}>
+    <Box sx={{ width: "100%", pl: 0, pt: 0, pr: 1, pb: 3 }}>
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
         <div>
-          <Typography variant="h4" className="ecp-page-title">
+          <Typography variant="h4">
             My Posts
           </Typography>
-          <Typography variant="body2" className="ecp-page-subtitle">
+          <Typography variant="body2" color="text.secondary">
             Share your thoughts, connect with the community, and manage your posts.
           </Typography>
         </div>
-        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)} sx={{ flexShrink: 0, alignSelf: { xs: "flex-start", sm: "auto" } }}>Create Post</Button>
+        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)}>Create Post</Button>
       </div>
       {loading ? (
         // 🔹 Initial loading → show 4 skeleton cards instead of spinner
@@ -2101,11 +2086,8 @@ export default function MyPostsPage() {
       ) : (
         <>
           {posts.length === 0 && (
-            <Box className="ecp-empty-state">
-              <TextFieldsRoundedIcon />
-              <Typography variant="body2" sx={{ fontWeight: 600, color: IMAA.muted }}>
-                You haven&apos;t posted anything yet.
-              </Typography>
+            <Box sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
+              You haven&apos;t posted anything yet.
             </Box>
           )}
 
@@ -2167,14 +2149,13 @@ export default function MyPostsPage() {
           <IconButton
             onClick={handleScrollTop}
             size="large"
-            className="ecp-scroll-top"
             sx={{
-              bgcolor: IMAA.navy,
+              bgcolor: "primary.main",
               color: "#fff",
-              boxShadow: IMAA.shadowMd,
+              boxShadow: 4,
               borderRadius: "999px",
               "&:hover": {
-                bgcolor: IMAA.teal,
+                bgcolor: "primary.dark",
               },
             }}
           >
@@ -2183,6 +2164,5 @@ export default function MyPostsPage() {
         </Box>
       )}
     </Box>
-    </ImaaCommunityScope>
   );
 }

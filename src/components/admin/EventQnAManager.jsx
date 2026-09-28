@@ -28,22 +28,8 @@ import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
-import {
-  BG,
-  BTN_SHAPE_SX,
-  DANGER_BTN_SX,
-  DIALOG_ACTIONS_SX,
-  DIALOG_TITLE_SX,
-  FIELD_SX,
-  MUTED,
-  OUTLINE_BTN_SX,
-  PRIMARY_BTN_SX,
-  SUBTLE_BTN_SX,
-  SWITCH_SX,
-} from "../../theme/imaaTokens";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
-
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 
@@ -285,7 +271,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
     borderRadius: 4,
     border: "1px solid",
     borderColor: "rgba(15,23,42,0.14)",
-    backgroundColor: BG,
+    backgroundColor: "#f8fafc",
     boxShadow: "0 2px 6px rgba(15,23,42,0.06)",
   };
 
@@ -298,10 +284,10 @@ export default function EventQnAManager({ event, onEventUpdated }) {
       <Paper sx={sectionSx}>
         <Typography variant="h5" sx={{ fontWeight: 500 }}>Q&A Setup</Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mt={1.5} flexWrap="wrap">
-          <FormControlLabel control={<Switch sx={SWITCH_SX} checked={!!event?.pre_event_qna_enabled} onChange={(e) => handleSetupSave("pre_event_qna_enabled", e.target.checked)} disabled={setupSaving} />} label="Enable pre-event Q&A" />
-          <FormControlLabel control={<Switch sx={SWITCH_SX} checked={!!event?.qna_moderation_enabled} onChange={(e) => handleSetupSave("qna_moderation_enabled", e.target.checked)} disabled={setupSaving} />} label="Enable Q&A moderation" />
-          <FormControlLabel control={<Switch sx={SWITCH_SX} checked={!!event?.qna_anonymous_mode} onChange={(e) => handleSetupSave("qna_anonymous_mode", e.target.checked)} disabled={setupSaving} />} label="Enable anonymous Q&A mode" />
-          <FormControlLabel control={<Switch sx={SWITCH_SX} checked={!!event?.qna_ai_public_suggestions_enabled} onChange={(e) => handleSetupSave("qna_ai_public_suggestions_enabled", e.target.checked)} disabled={setupSaving} />} label="Enable AI public suggestions" />
+          <FormControlLabel control={<Switch checked={!!event?.pre_event_qna_enabled} onChange={(e) => handleSetupSave("pre_event_qna_enabled", e.target.checked)} disabled={setupSaving} />} label="Enable pre-event Q&A" />
+          <FormControlLabel control={<Switch checked={!!event?.qna_moderation_enabled} onChange={(e) => handleSetupSave("qna_moderation_enabled", e.target.checked)} disabled={setupSaving} />} label="Enable Q&A moderation" />
+          <FormControlLabel control={<Switch checked={!!event?.qna_anonymous_mode} onChange={(e) => handleSetupSave("qna_anonymous_mode", e.target.checked)} disabled={setupSaving} />} label="Enable anonymous Q&A mode" />
+          <FormControlLabel control={<Switch checked={!!event?.qna_ai_public_suggestions_enabled} onChange={(e) => handleSetupSave("qna_ai_public_suggestions_enabled", e.target.checked)} disabled={setupSaving} />} label="Enable AI public suggestions" />
         </Stack>
       </Paper>
 
@@ -360,9 +346,9 @@ export default function EventQnAManager({ event, onEventUpdated }) {
                     </Alert>
                   ) : null}
                   <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
-                    <Button sx={OUTLINE_BTN_SX} size="small" variant="outlined" onClick={() => { setEditing(q); setEditText(q.content || ""); }}>Edit</Button>
+                    <Button size="small" variant="outlined" onClick={() => { setEditing(q); setEditText(q.content || ""); }}>Edit</Button>
                     <Tooltip title={q.is_hidden ? "Make question visible to attendees" : "Hide question from attendee view"}>
-                      <Button sx={OUTLINE_BTN_SX} size="small" variant="outlined" onClick={async () => {
+                      <Button size="small" variant="outlined" onClick={async () => {
                         setActionLoadingId(q.id);
                         try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/set-visibility/`, "POST", { is_hidden: !q.is_hidden }); await load(); }
                         finally { setActionLoadingId(null); }
@@ -370,22 +356,22 @@ export default function EventQnAManager({ event, onEventUpdated }) {
                         {q.is_hidden ? "Unhide" : "Hide"}
                       </Button>
                     </Tooltip>
-                    <Button sx={DANGER_BTN_SX} size="small" color="error" variant="outlined" onClick={async () => {
+                    <Button size="small" color="error" variant="outlined" onClick={async () => {
                       setActionLoadingId(q.id);
                       try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/admin-soft-delete/`, "POST"); await load(); }
                       finally { setActionLoadingId(null); }
                     }}>Delete</Button>
-                    <Button sx={BTN_SHAPE_SX} size="small" color="success" variant="outlined" onClick={async () => {
+                    <Button size="small" color="success" variant="outlined" onClick={async () => {
                       setActionLoadingId(q.id);
                       try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/approve/`, "POST"); await load(); }
                       finally { setActionLoadingId(null); }
                     }}>Approve</Button>
-                    <Button sx={BTN_SHAPE_SX} size="small" color="warning" variant="outlined" onClick={async () => {
+                    <Button size="small" color="warning" variant="outlined" onClick={async () => {
                       setActionLoadingId(q.id);
                       try { await doAction(`${API_ROOT}/interactions/questions/${q.id}/reject/`, "POST", { reason: "Rejected by moderator" }); await load(); }
                       finally { setActionLoadingId(null); }
                     }}>Reject</Button>
-                    <Button sx={PRIMARY_BTN_SX} size="small" variant="contained" onClick={() => { setFeedbackFor(q); setFeedbackText(q.feedback_message || ""); }}>Feedback</Button>
+                    <Button size="small" variant="contained" onClick={() => { setFeedbackFor(q); setFeedbackText(q.feedback_message || ""); }}>Feedback</Button>
                     {actionLoadingId === q.id ? <CircularProgress size={16} /> : null}
                   </Stack>
                 </Paper>
@@ -537,7 +523,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
                       {g.question_ids.map((qId) => {
                         const q = allQuestions.find((aq) => aq.id === qId);
                         return (
-                          <Typography key={qId} variant="body2" sx={{ fontSize: "0.8rem", color: MUTED }}>
+                          <Typography key={qId} variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
                             {q?.content || `Question #${qId} (not found)`}
                           </Typography>
                         );
@@ -594,7 +580,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
                     )}
                   </Stack>
                   <Stack direction="row" spacing={1}>
-                    <Button sx={PRIMARY_BTN_SX}
+                    <Button
                       size="small"
                       variant="contained"
                       color="primary"
@@ -647,25 +633,25 @@ export default function EventQnAManager({ event, onEventUpdated }) {
       </Paper>
 
       <Dialog open={!!editing} onClose={() => setEditing(null)} fullWidth maxWidth="sm">
-        <DialogTitle sx={DIALOG_TITLE_SX}>Edit Question</DialogTitle>
-        <DialogContent><TextField sx={FIELD_SX} fullWidth multiline minRows={3} value={editText} onChange={(e) => setEditText(e.target.value)} /></DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
-          <Button sx={SUBTLE_BTN_SX} onClick={() => setEditing(null)}>Cancel</Button>
-          <Button sx={PRIMARY_BTN_SX} onClick={async () => { await doAction(`${API_ROOT}/interactions/questions/${editing.id}/admin-pre-event/`, "PATCH", { content: editText }); setEditing(null); load(); }} variant="contained">Save</Button>
+        <DialogTitle>Edit Question</DialogTitle>
+        <DialogContent><TextField fullWidth multiline minRows={3} value={editText} onChange={(e) => setEditText(e.target.value)} /></DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditing(null)}>Cancel</Button>
+          <Button onClick={async () => { await doAction(`${API_ROOT}/interactions/questions/${editing.id}/admin-pre-event/`, "PATCH", { content: editText }); setEditing(null); load(); }} variant="contained">Save</Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={!!feedbackFor} onClose={() => setFeedbackFor(null)} fullWidth maxWidth="sm">
-        <DialogTitle sx={DIALOG_TITLE_SX}>Question Feedback</DialogTitle>
-        <DialogContent><TextField sx={FIELD_SX} fullWidth multiline minRows={3} value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Feedback message" /></DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
-          <Button sx={SUBTLE_BTN_SX} onClick={() => setFeedbackFor(null)}>Cancel</Button>
-          <Button sx={PRIMARY_BTN_SX} onClick={async () => { await doAction(`${API_ROOT}/interactions/questions/${feedbackFor.id}/feedback/`, "POST", { feedback_message: feedbackText }); setFeedbackFor(null); load(); }} variant="contained">Save Feedback</Button>
+        <DialogTitle>Question Feedback</DialogTitle>
+        <DialogContent><TextField fullWidth multiline minRows={3} value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Feedback message" /></DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFeedbackFor(null)}>Cancel</Button>
+          <Button onClick={async () => { await doAction(`${API_ROOT}/interactions/questions/${feedbackFor.id}/feedback/`, "POST", { feedback_message: feedbackText }); setFeedbackFor(null); load(); }} variant="contained">Save Feedback</Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={!!postEventAnswerDialog} onClose={() => !postEventAnswerLoading && setPostEventAnswerDialog(null)} fullWidth maxWidth="sm">
-        <DialogTitle sx={DIALOG_TITLE_SX}>Answer Post-Event Question</DialogTitle>
+        <DialogTitle>Answer Post-Event Question</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Typography variant="body2" sx={{ mb: 2, fontWeight: 500 }}>Question: {postEventAnswerDialog?.content}</Typography>
           <TextField
@@ -680,22 +666,22 @@ export default function EventQnAManager({ event, onEventUpdated }) {
           />
           <Stack spacing={1}>
             <FormControlLabel
-              control={<Switch sx={SWITCH_SX} checked={postEventNotifyAuthor} onChange={(e) => setPostEventNotifyAuthor(e.target.checked)} disabled={postEventAnswerLoading} />}
+              control={<Switch checked={postEventNotifyAuthor} onChange={(e) => setPostEventNotifyAuthor(e.target.checked)} disabled={postEventAnswerLoading} />}
               label="Notify question author"
             />
             <FormControlLabel
-              control={<Switch sx={SWITCH_SX} checked={postEventNotifyInterested} onChange={(e) => setPostEventNotifyInterested(e.target.checked)} disabled={postEventAnswerLoading} />}
+              control={<Switch checked={postEventNotifyInterested} onChange={(e) => setPostEventNotifyInterested(e.target.checked)} disabled={postEventAnswerLoading} />}
               label="Notify upvoters"
             />
             <FormControlLabel
-              control={<Switch sx={SWITCH_SX} checked={postEventNotifyAll} onChange={(e) => setPostEventNotifyAll(e.target.checked)} disabled={postEventAnswerLoading} />}
+              control={<Switch checked={postEventNotifyAll} onChange={(e) => setPostEventNotifyAll(e.target.checked)} disabled={postEventAnswerLoading} />}
               label="Notify all participants"
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
-          <Button sx={SUBTLE_BTN_SX} onClick={() => setPostEventAnswerDialog(null)} disabled={postEventAnswerLoading}>Cancel</Button>
-          <Button sx={PRIMARY_BTN_SX}
+        <DialogActions>
+          <Button onClick={() => setPostEventAnswerDialog(null)} disabled={postEventAnswerLoading}>Cancel</Button>
+          <Button
             onClick={handlePostEventAnswer}
             variant="contained"
             disabled={postEventAnswerLoading || !postEventAnswerText.trim()}

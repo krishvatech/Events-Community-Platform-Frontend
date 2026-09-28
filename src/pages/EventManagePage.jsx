@@ -117,206 +117,6 @@ const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 const API_ORIGIN = API_ROOT.replace(/\/api$/, "");
 
-// ---- IMAA Institute design tokens (presentation only) ----
-const NAVY = "#1B2A4A";
-const CORAL = "#E8532F";
-const CORAL_DARK = "#CF4525";
-const TEAL = "#0A9396";
-const TEAL_DARK = "#087F82";
-const BG = "#F6F8FB";
-const BORDER = "#E3E8EF";
-const BORDER_STRONG = "#D9E0E8";
-const MUTED = "#64748B";
-const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
-const CARD_SHADOW_HOVER = "0 10px 24px rgba(27,42,74,0.10)";
-
-const CARD_SX = {
-  border: `1px solid ${BORDER}`,
-  borderRadius: 3,
-  bgcolor: "#fff",
-  boxShadow: CARD_SHADOW,
-};
-
-// Primary CTA = coral, per the IMAA button hierarchy.
-const PRIMARY_BTN_SX = {
-  textTransform: "none",
-  fontWeight: 600,
-  borderRadius: 2,
-  px: 2.5,
-  bgcolor: CORAL,
-  color: "#fff",
-  boxShadow: "none",
-  "&:hover": { bgcolor: CORAL_DARK, boxShadow: "none" },
-  "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#fff" },
-};
-
-// Supporting accent = teal (host / live actions).
-const ACCENT_BTN_SX = {
-  ...PRIMARY_BTN_SX,
-  bgcolor: TEAL,
-  "&:hover": { bgcolor: TEAL_DARK, boxShadow: "none" },
-};
-
-const OUTLINE_BTN_SX = {
-  textTransform: "none",
-  fontWeight: 600,
-  borderRadius: 2,
-  px: 2.5,
-  color: NAVY,
-  borderColor: BORDER_STRONG,
-  bgcolor: "#fff",
-  "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.06)" },
-};
-
-const SUBTLE_BTN_SX = {
-  textTransform: "none",
-  fontWeight: 600,
-  borderRadius: 2,
-  color: MUTED,
-  "&:hover": { bgcolor: "rgba(27,42,74,0.05)", color: NAVY },
-};
-
-// Destructive, but on the IMAA scale rather than raw MUI red.
-const DANGER_BTN_SX = {
-  textTransform: "none",
-  fontWeight: 600,
-  borderRadius: 2,
-  px: 2.5,
-  color: "#B91C1C",
-  borderColor: "#FECACA",
-  bgcolor: "#fff",
-  "&:hover": { borderColor: "#B91C1C", bgcolor: "rgba(185,28,28,0.06)" },
-};
-
-const BTN_SHAPE_SX = { textTransform: "none", fontWeight: 600, borderRadius: 2 };
-
-const FIELD_SX = {
-  "& .MuiOutlinedInput-root": {
-    borderRadius: 2,
-    bgcolor: "#fff",
-    "& fieldset": { borderColor: BORDER },
-    "&:hover fieldset": { borderColor: "#CBD5E1" },
-    "&.Mui-focused fieldset": { borderColor: TEAL, borderWidth: 2 },
-  },
-  "& .MuiInputLabel-root.Mui-focused": { color: TEAL },
-};
-
-const chipSx = (fg, bg, bd) => ({
-  height: 24,
-  fontSize: 12,
-  fontWeight: 600,
-  borderRadius: 1.5,
-  color: fg,
-  bgcolor: bg,
-  border: `1px solid ${bd}`,
-  "& .MuiChip-icon": { color: `${fg} !important`, fontSize: 15, ml: 0.75 },
-  "& .MuiChip-label": { px: 1 },
-});
-
-const BADGE_LIVE = chipSx(CORAL, "rgba(232,83,47,0.10)", "rgba(232,83,47,0.26)");
-const BADGE_UPCOMING = chipSx(TEAL_DARK, "rgba(10,147,150,0.10)", "rgba(10,147,150,0.22)");
-const BADGE_NEUTRAL = chipSx(MUTED, "#F1F5F9", BORDER);
-const BADGE_NAVY = chipSx(NAVY, "rgba(27,42,74,0.07)", "rgba(27,42,74,0.16)");
-const BADGE_OUTLINE = chipSx(MUTED, "#fff", BORDER);
-
-const DIALOG_TITLE_SX = {
-  fontWeight: 800,
-  fontSize: 19,
-  color: NAVY,
-  borderBottom: `1px solid ${BORDER}`,
-  py: 2,
-};
-
-const DIALOG_PAPER_SX = { borderRadius: 3, border: `1px solid ${BORDER}` };
-
-const DIALOG_ACTIONS_SX = {
-  px: 3,
-  py: 2.25,
-  borderTop: `1px solid ${BORDER}`,
-  bgcolor: BG,
-  gap: 1,
-};
-
-const UPLOAD_BOX_SX = {
-  position: "relative",
-  borderRadius: 2,
-  border: `1px dashed #CBD5E1`,
-  bgcolor: BG,
-  color: "#AEBACB",
-  transition: "border-color .2s ease, background-color .2s ease",
-  "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.04)" },
-};
-
-const TABLE_SX = {
-  border: `1px solid ${BORDER}`,
-  borderRadius: 2,
-  "& .MuiTableHead-root .MuiTableCell-root": {
-    bgcolor: BG,
-    color: NAVY,
-    fontWeight: 700,
-    fontSize: 12.5,
-    borderBottom: `1px solid ${BORDER}`,
-    whiteSpace: "nowrap",
-  },
-  "& .MuiTableCell-root": { borderBottom: `1px solid ${BORDER}`, fontSize: 13.5, color: "#334155" },
-  "& .MuiTableBody-root .MuiTableRow-root:hover": { bgcolor: "rgba(10,147,150,0.04)" },
-};
-
-const TABS_SX = {
-  minHeight: 48,
-  "& .MuiTab-root": {
-    textTransform: "none",
-    fontWeight: 700,
-    minHeight: 48,
-    fontSize: 13.5,
-    letterSpacing: 0.2,
-    color: MUTED,
-    "&:hover": { color: NAVY },
-  },
-  "& .Mui-selected": { color: `${NAVY} !important` },
-  "& .MuiTabs-indicator": { backgroundColor: CORAL, height: 3, borderRadius: 3 },
-};
-
-const PAGINATION_SX = {
-  "& .MuiPaginationItem-root": {
-    borderRadius: 2,
-    fontWeight: 600,
-    color: NAVY,
-    border: `1px solid ${BORDER}`,
-    bgcolor: "#fff",
-    minWidth: 34,
-    height: 34,
-    "&:hover": { bgcolor: "rgba(10,147,150,0.08)", borderColor: TEAL },
-  },
-  "& .MuiPaginationItem-root.Mui-selected": {
-    bgcolor: NAVY,
-    color: "#fff",
-    borderColor: NAVY,
-    "&:hover": { bgcolor: "#16233D" },
-  },
-  "& .MuiPaginationItem-ellipsis": { border: "none", bgcolor: "transparent" },
-};
-
-// Teal when on, neutral grey when off.
-const SWITCH_SX = {
-  "& .MuiSwitch-switchBase.Mui-checked": { color: TEAL },
-  "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: TEAL, opacity: 0.5 },
-  "& .MuiSwitch-switchBase": { color: "#fff" },
-  "& .MuiSwitch-track": { backgroundColor: "#CBD5E1", opacity: 1 },
-  "& .MuiSwitch-switchBase.Mui-disabled + .MuiSwitch-track": { backgroundColor: "#E2E8F0", opacity: 1 },
-};
-
-// Neutral placeholder used when an event has no cover image.
-const IMAGE_PLACEHOLDER_SX = {
-  position: "absolute",
-  inset: 0,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: `linear-gradient(135deg, ${BG} 0%, #ECF1F7 100%)`,
-  color: "#AEBACB",
-};
-
 const getToken = () =>
   getStoredAccessToken() ||
   localStorage.getItem("access") ||
@@ -371,19 +171,19 @@ const hasActiveArchiveMarker = (ev) => {
 const statusChip = (status) => {
   switch (status) {
     case "live":
-      return { label: "Live", color: "error", bg: "rgba(232,83,47,0.10)", sx: BADGE_LIVE };
+      return { label: "Live", color: "error", bg: "rgba(248,113,113,0.12)" };
     case "upcoming":
-      return { label: "Upcoming", color: "success", bg: "rgba(10,147,150,0.10)", sx: BADGE_UPCOMING };
+      return { label: "Upcoming", color: "success", bg: "rgba(34,197,94,0.08)" };
     case "past":
-      return { label: "Past", color: "default", bg: "#F1F5F9", sx: BADGE_NEUTRAL };
+      return { label: "Past", color: "default", bg: "rgba(148,163,184,0.16)" };
     case "deregistered":
-      return { label: "Deregistered", color: "default", bg: "#F1F5F9", sx: BADGE_NEUTRAL };
+      return { label: "Deregistered", color: "default", bg: "rgba(100,116,139,0.16)" };
     case "cancelled":
-      return { label: "Cancelled", color: "default", bg: "#F1F5F9", sx: BADGE_NEUTRAL };
+      return { label: "Cancelled", color: "default", bg: "rgba(100,116,139,0.16)" };
     case "archived":
-      return { label: "Deleted", color: "default", bg: "rgba(27,42,74,0.07)", sx: BADGE_NAVY };
+      return { label: "Deleted", color: "default", bg: "rgba(71,85,105,0.16)" };
     default:
-      return { label: "—", color: "default", bg: "#F1F5F9", sx: BADGE_NEUTRAL };
+      return { label: "—", color: "default", bg: "rgba(148,163,184,0.16)" };
   }
 };
 
@@ -2752,9 +2552,9 @@ export default function EventManagePage() {
             sx={{
               borderRadius: 3,
               border: "1px solid",
-              borderColor: BORDER,
+              borderColor: "divider",
               overflow: "hidden",
-              bgcolor: "#fff",
+              bgcolor: "background.paper",
             }}
           >
             {/* Cover image */}
@@ -2764,8 +2564,7 @@ export default function EventManagePage() {
                 width: "100%",
                 aspectRatio: "16 / 9",
                 "@supports not (aspect-ratio: 1 / 1)": { height: 240 },
-                background: `linear-gradient(135deg, ${BG} 0%, #ECF1F7 100%)`,
-                borderBottom: `1px solid ${BORDER}`,
+                bgcolor: "grey.200",
                 overflow: "hidden",
               }}
             >
@@ -2799,7 +2598,16 @@ export default function EventManagePage() {
                   <Chip
                     size="small"
                     label={statusMeta.label}
-                    sx={statusMeta.sx}
+                    sx={{
+                      fontWeight: 600,
+                      bgcolor: statusMeta.bg,
+                      color:
+                        statusMeta.color === "error"
+                          ? "error.main"
+                          : statusMeta.color === "success"
+                            ? "success.main"
+                            : "text.secondary",
+                    }}
                   />
                   {event.category && (
                     <Chip
@@ -2863,8 +2671,9 @@ export default function EventManagePage() {
                 <Paper
                   elevation={0}
                   sx={{
-                    bgcolor: BG,
-                    border: `1px solid ${BORDER}`,
+                    bgcolor: "rgba(59, 130, 246, 0.05)",
+                    border: "1px solid",
+                    borderColor: "primary.light",
                     borderRadius: 2,
                     p: 2,
                     mb: 2.5,
@@ -2874,8 +2683,8 @@ export default function EventManagePage() {
                     variant="caption"
                     sx={{
                       display: "block",
-                      fontWeight: 700,
-                      color: MUTED,
+                      fontWeight: 600,
+                      color: "text.secondary",
                       mb: 0.75,
                       textTransform: "uppercase",
                       letterSpacing: "0.5px",
@@ -2902,7 +2711,11 @@ export default function EventManagePage() {
                           </InputAdornment>
                         ),
                       }}
-                      sx={FIELD_SX}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          bgcolor: "background.paper",
+                        },
+                      }}
                     />
                     <Button
                       variant="outlined"
@@ -2917,7 +2730,7 @@ export default function EventManagePage() {
                         navigator.clipboard.writeText(landingUrl);
                         toast.success("Link copied to clipboard!");
                       }}
-                      sx={{ ...OUTLINE_BTN_SX, whiteSpace: "nowrap" }}
+                      sx={{ whiteSpace: "nowrap" }}
                     >
                       Copy
                     </Button>
@@ -2930,20 +2743,20 @@ export default function EventManagePage() {
                 <Paper
                   elevation={0}
                   sx={{
-                    bgcolor: BG,
-                    border: `1px solid ${BORDER}`,
+                    bgcolor: '#e3f2fd',
+                    border: '2px solid #1976d2',
                     borderRadius: 2,
                     p: 2,
                     mb: 2.5,
                   }}
                 >
                   <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                    <InfoRoundedIcon sx={{ color: TEAL, mt: 0.5, flexShrink: 0 }} />
+                    <InfoRoundedIcon sx={{ color: '#1565c0', mt: 0.5, flexShrink: 0 }} />
                     <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: NAVY, mb: 0.5 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1565c0', mb: 0.5 }}>
                         Application Tracks Required
                       </Typography>
-                      <Typography variant="body2" sx={{ color: MUTED, mb: 1 }}>
+                      <Typography variant="body2" sx={{ color: '#1565c0', mb: 1 }}>
                         This event requires at least one valid application track before publishing. Go to the "Application Tracks" tab to create one.
                       </Typography>
                       <Typography variant="caption" sx={{ color: '#0d47a1', fontStyle: 'italic' }}>
@@ -3005,11 +2818,11 @@ export default function EventManagePage() {
                         sx={{
                           borderRadius: 2,
                           textTransform: "none",
-                          bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "#CBD5E1" : TEAL,
+                          bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "#CBD5E1" : "#10b8a6",
                           py: 1,
                           fontSize: 15,
                           fontWeight: 600,
-                          "&:hover": { bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "#CBD5E1" : TEAL_DARK },
+                          "&:hover": { bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "#CBD5E1" : "#0ea5a4" },
                           ...(status === "cancelled" && {
                             "&.Mui-disabled": {
                               bgcolor: "#fef2f2",
@@ -3073,10 +2886,10 @@ export default function EventManagePage() {
                         sx={{
                           borderRadius: 2,
                           textTransform: "none",
-                          bgcolor: TEAL,
+                          bgcolor: "#10b8a6",
                           fontSize: 15,
                           fontWeight: 600,
-                          "&:hover": { bgcolor: TEAL_DARK },
+                          "&:hover": { bgcolor: "#0ea5a4" },
                         }}
                       >
                         Mark as LIVE 🔴
@@ -3090,7 +2903,12 @@ export default function EventManagePage() {
                         color="error"
                         fullWidth
                         startIcon={<DeleteOutlineRoundedIcon />}
-                        sx={{ ...DANGER_BTN_SX, fontSize: 15 }}
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: "none",
+                          fontSize: 15,
+                          fontWeight: 600,
+                        }}
                       >
                         Delete Event
                       </Button>
@@ -3102,7 +2920,12 @@ export default function EventManagePage() {
                         variant="outlined"
                         color="error"
                         fullWidth
-                        sx={{ ...DANGER_BTN_SX, fontSize: 15 }}
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: "none",
+                          fontSize: 15,
+                          fontWeight: 600,
+                        }}
                       >
                         Cancel Event & Notify Participants
                       </Button>
@@ -3122,15 +2945,13 @@ export default function EventManagePage() {
                         fullWidth
                         startIcon={event.is_hidden ? <VisibilityRoundedIcon /> : <VisibilityOffRoundedIcon />}
                         sx={{
-                          ...OUTLINE_BTN_SX,
+                          borderRadius: 2,
+                          textTransform: "none",
                           fontSize: 15,
-                          borderColor: event.is_hidden ? TEAL : BORDER_STRONG,
-                          color: event.is_hidden ? TEAL_DARK : MUTED,
-                          "&:hover": {
-                            borderColor: TEAL,
-                            color: TEAL_DARK,
-                            bgcolor: "rgba(10,147,150,0.06)",
-                          },
+                          fontWeight: 600,
+                          borderColor: event.is_hidden ? "success.main" : "text.disabled",
+                          color: event.is_hidden ? "success.main" : "text.secondary",
+                          "&:hover": { borderColor: event.is_hidden ? "success.dark" : "text.secondary", bgcolor: "action.hover" },
                         }}
                       >
                         {event.is_hidden ? "Unhide from Platform" : "Hide from Platform"}
@@ -3147,11 +2968,11 @@ export default function EventManagePage() {
                       sx={{
                         borderRadius: 2,
                         textTransform: "none",
-                        bgcolor: TEAL,
+                        bgcolor: "#10b8a6",
                         py: 1,
                         fontSize: 15,
                         fontWeight: 600,
-                        "&:hover": { bgcolor: TEAL_DARK },
+                        "&:hover": { bgcolor: "#0ea5a4" },
                       }}
                       disabled={!!joiningId}
                     >
@@ -3291,20 +3112,26 @@ export default function EventManagePage() {
           <Grid item xs={12}>
             <Paper
               elevation={0}
-              sx={{ ...CARD_SX, p: { xs: 2, sm: 3 } }}
+              sx={{
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "divider",
+                p: { xs: 2, sm: 3 },
+                bgcolor: "background.paper",
+              }}
             >
-              <Box sx={{ mb: 2.5, pb: 2, borderBottom: `1px solid ${BORDER}` }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: NAVY, fontSize: 17 }}>
+              <Box mb={2}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                   Participant List Visibility
                 </Typography>
-                <Typography variant="body2" sx={{ color: MUTED, mt: 0.25 }}>
+                <Typography variant="body2" color="text.secondary">
                   Control when regular participants can see the list of registered members.
                 </Typography>
               </Box>
               <Stack spacing={2}>
                 <FormControlLabel
                   control={
-                    <Switch sx={SWITCH_SX}
+                    <Switch
                       checked={participantVisibility.show_participants_before_event}
                       onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_participants_before_event: e.target.checked }))}
                     />
@@ -3318,7 +3145,7 @@ export default function EventManagePage() {
                 />
                 <FormControlLabel
                   control={
-                    <Switch sx={SWITCH_SX}
+                    <Switch
                       checked={participantVisibility.show_participants_after_event}
                       onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_participants_after_event: e.target.checked }))}
                     />
@@ -3332,7 +3159,7 @@ export default function EventManagePage() {
                 />
                 <FormControlLabel
                   control={
-                    <Switch sx={SWITCH_SX}
+                    <Switch
                       checked={participantVisibility.show_public_hosts}
                       onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_public_hosts: e.target.checked }))}
                     />
@@ -3346,7 +3173,7 @@ export default function EventManagePage() {
                 />
                 <FormControlLabel
                   control={
-                    <Switch sx={SWITCH_SX}
+                    <Switch
                       checked={participantVisibility.show_public_speakers}
                       onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_public_speakers: e.target.checked }))}
                     />
@@ -3360,7 +3187,7 @@ export default function EventManagePage() {
                 />
                 <FormControlLabel
                   control={
-                    <Switch sx={SWITCH_SX}
+                    <Switch
                       checked={participantVisibility.show_public_moderators}
                       onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_public_moderators: e.target.checked }))}
                     />
@@ -3374,7 +3201,7 @@ export default function EventManagePage() {
                 />
                 <FormControlLabel
                   control={
-                    <Switch sx={SWITCH_SX}
+                    <Switch
                       checked={participantVisibility.show_speed_networking_match_history}
                       onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_speed_networking_match_history: e.target.checked }))}
                     />
@@ -3392,7 +3219,16 @@ export default function EventManagePage() {
                     onClick={() => handleSaveVisibilitySettings(participantVisibility)}
                     disabled={visibilitySettingsSaving}
                     size="small"
-                    sx={{ ...PRIMARY_BTN_SX, px: 3, py: 0.9 }}
+                    sx={{
+                      textTransform: "uppercase",
+                      fontWeight: 700,
+                      letterSpacing: 0.5,
+                      borderRadius: 2,
+                      px: 3,
+                      bgcolor: "#10b8a6",
+                      "&:hover": { bgcolor: "#0ea5a4" },
+                      "&.Mui-disabled": { bgcolor: "grey.300", color: "grey.500" },
+                    }}
                   >
                     {visibilitySettingsSaving ? "Saving..." : "Save Settings"}
                   </Button>
@@ -3410,9 +3246,9 @@ export default function EventManagePage() {
               sx={{
                 borderRadius: 3,
                 border: "1px solid",
-                borderColor: BORDER,
+                borderColor: "divider",
                 p: { xs: 2, sm: 3 },
-                bgcolor: "#fff",
+                bgcolor: "background.paper",
               }}
             >
               <Box mb={1.5}>
@@ -3530,9 +3366,9 @@ export default function EventManagePage() {
         sx={{
           borderRadius: 3,
           border: "1px solid",
-          borderColor: BORDER,
+          borderColor: "divider",
           p: { xs: 2, sm: 3 },
-          bgcolor: "#fff",
+          bgcolor: "background.paper",
         }}
       >
         <Stack
@@ -3577,7 +3413,7 @@ export default function EventManagePage() {
           sx={{
             borderRadius: 2,
             border: "1px solid",
-            borderColor: BORDER,
+            borderColor: "divider",
             overflow: "hidden",
           }}
         >
@@ -3716,9 +3552,9 @@ export default function EventManagePage() {
         sx={{
           borderRadius: 3,
           border: "1px solid",
-          borderColor: BORDER,
+          borderColor: "divider",
           p: { xs: 2, sm: 3 },
-          bgcolor: "#fff",
+          bgcolor: "background.paper",
         }}
       >
         <Stack spacing={3}>
@@ -3737,7 +3573,7 @@ export default function EventManagePage() {
           <Box>
             <FormControlLabel
               control={
-                <Switch sx={SWITCH_SX}
+                <Switch
                   checked={loungeSettings.lounge_enabled_before}
                   onChange={(e) =>
                     setLoungeSettings((prev) => ({
@@ -3780,7 +3616,7 @@ export default function EventManagePage() {
           <Box>
             <FormControlLabel
               control={
-                <Switch sx={SWITCH_SX}
+                <Switch
                   checked={loungeSettings.lounge_enabled_during}
                   onChange={(e) =>
                     setLoungeSettings((prev) => ({
@@ -3807,7 +3643,7 @@ export default function EventManagePage() {
           <Box>
             <FormControlLabel
               control={
-                <Switch sx={SWITCH_SX}
+                <Switch
                   checked={loungeSettings.lounge_enabled_breaks}
                   onChange={(e) =>
                     setLoungeSettings((prev) => ({
@@ -3834,7 +3670,7 @@ export default function EventManagePage() {
           <Box>
             <FormControlLabel
               control={
-                <Switch sx={SWITCH_SX}
+                <Switch
                   checked={loungeSettings.lounge_enabled_after}
                   onChange={(e) =>
                     setLoungeSettings((prev) => ({
@@ -3877,7 +3713,7 @@ export default function EventManagePage() {
           <Box>
             <FormControlLabel
               control={
-                <Switch sx={SWITCH_SX}
+                <Switch
                   checked={loungeSettings.lounge_enabled_speed_networking}
                   onChange={(e) =>
                     setLoungeSettings((prev) => ({
@@ -4133,7 +3969,7 @@ export default function EventManagePage() {
           </Stack>
 
           {selectedAppIds.size > 0 && (
-            <Box sx={{ p: 2, bgcolor: BG, border: `1px solid ${BORDER}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ p: 2, backgroundColor: '#f0f0f0', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="body2" sx={{ fontWeight: 500 }}>
                 {selectedAppIds.size} application(s) selected
               </Typography>
@@ -4141,13 +3977,13 @@ export default function EventManagePage() {
                 <Button
                   size="small"
                   variant="contained"
-                  sx={ACCENT_BTN_SX}
+                  sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}
                   onClick={handleBulkApproveSelected}
                   disabled={bulkApprovalLoading}
                 >
                   Approve Selected
                 </Button>
-                <Button sx={OUTLINE_BTN_SX}
+                <Button
                   size="small"
                   variant="outlined"
                   onClick={() => setSelectedAppIds(new Set())}
@@ -4163,7 +3999,7 @@ export default function EventManagePage() {
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 variant="contained"
-                sx={OUTLINE_BTN_SX}
+                sx={{ bgcolor: '#2196F3', '&:hover': { bgcolor: '#1976D2' } }}
                 onClick={handleBulkApproveAllPending}
                 disabled={bulkApprovalLoading || !applications.some(app => app.status === 'pending')}
                 size="small"
@@ -4179,7 +4015,7 @@ export default function EventManagePage() {
             <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>No applications found.</Typography>
           ) : (
             <Box sx={{ overflowX: 'auto' }}>
-              <Table sx={{ minWidth: 650, '& thead th': { fontWeight: 700, color: NAVY, backgroundColor: BG } }}>
+              <Table sx={{ minWidth: 650, '& thead th': { fontWeight: 600, backgroundColor: '#f5f5f5' } }}>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600, width: 50 }}>
@@ -4205,7 +4041,7 @@ export default function EventManagePage() {
                 </TableHead>
                 <TableBody>
                   {filteredApps.map(app => (
-                    <TableRow key={app.id} sx={{ '&:hover': { backgroundColor: 'rgba(10,147,150,0.04)' } }}>
+                    <TableRow key={app.id} sx={{ '&:hover': { backgroundColor: '#fafafa' } }}>
                       <TableCell sx={{ width: 50 }}>
                         {app.status === 'pending' && (
                           <Checkbox
@@ -4244,7 +4080,7 @@ export default function EventManagePage() {
                             <Button
                               size="small"
                               variant="contained"
-                              sx={ACCENT_BTN_SX}
+                              sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}
                               onClick={() => handleApproveApp(app.id)}
                             >
                               Approve
@@ -4252,7 +4088,7 @@ export default function EventManagePage() {
                             <Button
                               size="small"
                               variant="contained"
-                              sx={PRIMARY_BTN_SX}
+                              sx={{ bgcolor: '#f44336', '&:hover': { bgcolor: '#da190b' } }}
                               onClick={() => { setSelectedApp(app); setDeclineDialogOpen(true); }}
                             >
                               Decline
@@ -4295,7 +4131,7 @@ export default function EventManagePage() {
             </Typography>
           </DialogContent>
           <DialogActions sx={{ p: 2, gap: 1 }}>
-            <Button sx={OUTLINE_BTN_SX}
+            <Button
               onClick={() => {
                 setDeclineDialogOpen(false);
                 setDeclineMessage('');
@@ -4307,7 +4143,7 @@ export default function EventManagePage() {
             </Button>
             <Button
               variant="contained"
-              sx={PRIMARY_BTN_SX}
+              sx={{ bgcolor: '#f44336', '&:hover': { bgcolor: '#da190b' } }}
               onClick={() => {
                 handleDeclineApp();
                 setDeclineMessage('');
@@ -4335,7 +4171,7 @@ export default function EventManagePage() {
             )}
           </DialogContent>
           <DialogActions sx={{ p: 2, gap: 1 }}>
-            <Button sx={OUTLINE_BTN_SX}
+            <Button
               onClick={() => setBulkApprovalDialogOpen(false)}
               variant="outlined"
               disabled={bulkApprovalLoading}
@@ -4344,7 +4180,7 @@ export default function EventManagePage() {
             </Button>
             <Button
               variant="contained"
-              sx={ACCENT_BTN_SX}
+              sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}
               onClick={() => confirmBulkApproval(selectedAppIds.size === 0)}
               disabled={bulkApprovalLoading}
             >
@@ -4364,9 +4200,9 @@ export default function EventManagePage() {
           sx={{
             borderRadius: 3,
             border: "1px solid",
-            borderColor: BORDER,
+            borderColor: "divider",
             p: { xs: 2, sm: 3 },
-            bgcolor: "#fff",
+            bgcolor: "background.paper",
           }}
         >
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -4386,9 +4222,9 @@ export default function EventManagePage() {
         sx={{
           borderRadius: 3,
           border: "1px solid",
-          borderColor: BORDER,
+          borderColor: "divider",
           p: { xs: 2, sm: 3 },
-          bgcolor: "#fff",
+          bgcolor: "background.paper",
         }}
       >
         <Stack
@@ -4427,7 +4263,7 @@ export default function EventManagePage() {
               size="small"
               startIcon={<AddIcon />}
               onClick={() => setAddParticipantOpen(true)}
-              sx={{ textTransform: "none", borderColor: BORDER, color: "text.primary" }}
+              sx={{ textTransform: "none", borderColor: "divider", color: "text.primary" }}
             >
               Add Member
             </Button>
@@ -4479,7 +4315,7 @@ export default function EventManagePage() {
           spacing={1.5}
           sx={{ mb: 2 }}
         >
-          <TextField sx={FIELD_SX}
+          <TextField
             fullWidth
             size="small"
             placeholder="Search members..."
@@ -4521,7 +4357,7 @@ export default function EventManagePage() {
               sx={{
                 borderRadius: 2,
                 border: "1px solid",
-                borderColor: BORDER,
+                borderColor: "divider",
                 overflowX: "auto",
                 overflowY: "hidden",
                 width: "100%",
@@ -4687,7 +4523,7 @@ export default function EventManagePage() {
                               )}
 
                               {['registered', 'cancellation_requested'].includes(r.status) ? (
-                                <Button sx={DANGER_BTN_SX}
+                                <Button
                                   size="small"
                                   color="error"
                                   onClick={() => openDialog("deregister", r)}
@@ -4695,8 +4531,9 @@ export default function EventManagePage() {
                                   Deregister
                                 </Button>
                               ) : (
-                                <Button sx={SUBTLE_BTN_SX}
+                                <Button
                                   size="small"
+                                  color="primary"
                                   onClick={() => openDialog("reinstate", r)}
                                 >
                                   Reinstate
@@ -4707,7 +4544,7 @@ export default function EventManagePage() {
                                 <>
                                   {r.status === "cancellation_requested" && (
                                     <>
-                                      <Button sx={BTN_SHAPE_SX}
+                                      <Button
                                         size="small"
                                         color="success"
                                         variant="contained"
@@ -4715,7 +4552,7 @@ export default function EventManagePage() {
                                       >
                                         Accept
                                       </Button>
-                                      <Button sx={DANGER_BTN_SX}
+                                      <Button
                                         size="small"
                                         color="error"
                                         onClick={() => openDialog("reject", r)}
@@ -4747,7 +4584,7 @@ export default function EventManagePage() {
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Showing {memberStart}-{memberEnd} of {totalMembers} members
               </Typography>
-              <Pagination sx={PAGINATION_SX}
+              <Pagination
                 size="small"
                 page={memberPage}
                 count={memberPageCount}
@@ -4771,9 +4608,9 @@ export default function EventManagePage() {
         sx={{
           borderRadius: 3,
           border: "1px solid",
-          borderColor: BORDER,
+          borderColor: "divider",
           p: { xs: 2, sm: 3 },
-          bgcolor: "#fff",
+          bgcolor: "background.paper",
         }}
       >
         <Stack
@@ -4799,7 +4636,7 @@ export default function EventManagePage() {
         </Stack>
 
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mb: 2 }}>
-          <TextField sx={FIELD_SX}
+          <TextField
             fullWidth
             size="small"
             placeholder="Search guest, guest email, registered email, company..."
@@ -4841,7 +4678,7 @@ export default function EventManagePage() {
             sx={{
               borderRadius: 2,
               border: "1px solid",
-              borderColor: BORDER,
+              borderColor: "divider",
               overflowX: "auto",
               overflowY: "hidden",
               width: "100%",
@@ -4875,8 +4712,8 @@ export default function EventManagePage() {
                     <TableCell sx={{ minWidth: 180 }}>
                       <Typography variant="body2">{row.guest_email || "—"}</Typography>
                       <Stack direction="row" spacing={0.75} sx={{ mt: 0.75, flexWrap: "wrap" }}>
-                        {row.email_verified && <Chip size="small" label="OTP Verified" sx={BADGE_UPCOMING} />}
-                        {row.joined_live && <Chip size="small" label="Joined Live" sx={BADGE_UPCOMING} />}
+                        {row.email_verified && <Chip size="small" label="OTP Verified" color="success" variant="outlined" />}
+                        {row.joined_live && <Chip size="small" label="Joined Live" color="primary" variant="outlined" />}
                       </Stack>
                     </TableCell>
                     <TableCell sx={{ minWidth: 190 }}>
@@ -5155,9 +4992,9 @@ export default function EventManagePage() {
           sx={{
             borderRadius: 3,
             border: "1px solid",
-            borderColor: BORDER,
+            borderColor: "divider",
             p: { xs: 2, sm: 3 },
-            bgcolor: "#fff",
+            bgcolor: "background.paper",
           }}
         >
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -5176,9 +5013,9 @@ export default function EventManagePage() {
         sx={{
           borderRadius: 3,
           border: "1px solid",
-          borderColor: BORDER,
+          borderColor: "divider",
           p: { xs: 2, sm: 3 },
-          bgcolor: "#fff",
+          bgcolor: "background.paper",
         }}
       >
         <Stack
@@ -5226,7 +5063,7 @@ export default function EventManagePage() {
             sx={{
               borderRadius: 2,
               border: "1px solid",
-              borderColor: BORDER,
+              borderColor: "divider",
               overflow: "hidden",
             }}
           >
@@ -5324,7 +5161,7 @@ export default function EventManagePage() {
                             <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
                               <IconButton
                                 size="small"
-                                sx={{ color: TEAL_DARK }}
+                                color="primary"
                                 onClick={() => openSessionEdit(session)}
                                 disabled={sessionActionLoading}
                                 title="Edit session"
@@ -5378,9 +5215,9 @@ export default function EventManagePage() {
       sx={{
         borderRadius: 3,
         border: "1px solid",
-        borderColor: BORDER,
+        borderColor: "divider",
         p: { xs: 2, sm: 3 },
-        bgcolor: "#fff",
+        bgcolor: "background.paper",
       }}
     >
       <Stack
@@ -5411,7 +5248,7 @@ export default function EventManagePage() {
         spacing={1.5}
         sx={{ mb: 2 }}
       >
-        <TextField sx={FIELD_SX}
+        <TextField
           fullWidth
           size="small"
           placeholder="Search resources…"
@@ -5471,7 +5308,7 @@ export default function EventManagePage() {
         sx={{
           borderRadius: 2,
           border: "1px solid",
-          borderColor: BORDER,
+          borderColor: "divider",
           overflow: "hidden",
         }}
       >
@@ -5590,7 +5427,7 @@ export default function EventManagePage() {
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           Showing {resourceStart}-{resourceEnd} of {totalResources} resources
         </Typography>
-        <Pagination sx={PAGINATION_SX}
+        <Pagination
           size="small"
           page={resourcePage}
           count={resourcePageCount}
@@ -5606,9 +5443,9 @@ export default function EventManagePage() {
       sx={{
         borderRadius: 3,
         border: "1px solid",
-        borderColor: BORDER,
+        borderColor: "divider",
         p: { xs: 2, sm: 3 },
-        bgcolor: "#fff",
+        bgcolor: "background.paper",
       }}
     >
       <Box mb={2}>
@@ -5652,7 +5489,7 @@ export default function EventManagePage() {
           ) : (
             <Stack spacing={1.5} sx={{ mb: 2 }}>
               {postEventQnaQuestions.map((q) => (
-                <Box key={q.id} sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 2, bgcolor: "#fff" }}>
+                <Box key={q.id} sx={{ p: 2, border: "1px solid #e5e7eb", borderRadius: 2, bgcolor: "#fff" }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
                     <Chip
                       label="Pending"
@@ -5672,7 +5509,7 @@ export default function EventManagePage() {
                       size="small"
                       variant="contained"
                       sx={{
-                        bgcolor: TEAL,
+                        bgcolor: "#22c55e",
                         color: "white",
                         textTransform: "none",
                         "&:hover": { bgcolor: "#16a34a" }
@@ -5707,9 +5544,9 @@ export default function EventManagePage() {
                           size="small"
                           label={q.answered_phase === "live" ? "Live Answer" : "Post-Event Answer"}
                           sx={{
-                            bgcolor: q.answered_phase === "live" ? "rgba(232,83,47,0.06)" : BG,
+                            bgcolor: q.answered_phase === "live" ? "#ecfeff" : "#eff6ff",
                             color: q.answered_phase === "live" ? "#0e7490" : "#1d4ed8",
-                            border: q.answered_phase === "live" ? "1px solid rgba(232,83,47,0.26)" : `1px solid ${BORDER}`,
+                            border: q.answered_phase === "live" ? "1px solid #67e8f9" : "1px solid #bfdbfe",
                             fontWeight: 600
                           }}
                         />
@@ -5756,9 +5593,9 @@ export default function EventManagePage() {
       sx={{
         borderRadius: 3,
         border: "1px solid",
-        borderColor: BORDER,
+        borderColor: "divider",
         p: { xs: 2, sm: 3 },
-        bgcolor: "#fff",
+        bgcolor: "background.paper",
       }}
     >
       <Stack
@@ -5782,8 +5619,8 @@ export default function EventManagePage() {
           onClick={() => setSpeedNetworkingCreateOpen(true)}
           sx={{
             textTransform: "none",
-            backgroundColor: TEAL,
-            "&:hover": { backgroundColor: TEAL_DARK },
+            backgroundColor: "#10b8a6",
+            "&:hover": { backgroundColor: "#0ea5a4" },
           }}
         >
           Create Session
@@ -5803,7 +5640,7 @@ export default function EventManagePage() {
           elevation={0}
           sx={{
             border: "1px dashed",
-            borderColor: BORDER,
+            borderColor: "divider",
             borderRadius: 2,
             p: 3,
             textAlign: "center",
@@ -5821,7 +5658,7 @@ export default function EventManagePage() {
           sx={{
             borderRadius: 2,
             border: "1px solid",
-            borderColor: BORDER,
+            borderColor: "divider",
             overflow: "hidden",
           }}
         >
@@ -5914,7 +5751,7 @@ export default function EventManagePage() {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={DIALOG_TITLE_SX}>
+        <DialogTitle>
           {speedNetworkingEditTarget ? "Edit Session" : "Create Speed Networking Session"}
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
@@ -5968,7 +5805,7 @@ export default function EventManagePage() {
             </Typography>
 
             {/* Skill */}
-            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: BORDER, borderRadius: 1 }}>
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -6005,7 +5842,7 @@ export default function EventManagePage() {
             </Box>
 
             {/* Location */}
-            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: BORDER, borderRadius: 1 }}>
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -6042,7 +5879,7 @@ export default function EventManagePage() {
             </Box>
 
             {/* Experience */}
-            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: BORDER, borderRadius: 1 }}>
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -6079,7 +5916,7 @@ export default function EventManagePage() {
             </Box>
 
             {/* Education */}
-            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: BORDER, borderRadius: 1 }}>
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -6116,7 +5953,7 @@ export default function EventManagePage() {
             </Box>
 
             {/* Interest-Based Matching */}
-            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: BORDER, borderRadius: 1 }}>
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -6149,7 +5986,7 @@ export default function EventManagePage() {
                         border: "2px solid",
                         borderColor:
                           criteriaConfig.interests.match_mode === "complementary"
-                            ? TEAL
+                            ? "#10b8a6"
                             : "divider",
                         borderRadius: 1,
                         cursor: "pointer",
@@ -6159,7 +5996,7 @@ export default function EventManagePage() {
                             : "transparent",
                         transition: "all 0.2s",
                         "&:hover": {
-                          borderColor: TEAL,
+                          borderColor: "#10b8a6",
                           backgroundColor: "rgba(16, 184, 166, 0.05)",
                         },
                       }}
@@ -6193,7 +6030,7 @@ export default function EventManagePage() {
                         border: "2px solid",
                         borderColor:
                           criteriaConfig.interests.match_mode === "similar"
-                            ? TEAL
+                            ? "#10b8a6"
                             : "divider",
                         borderRadius: 1,
                         cursor: "pointer",
@@ -6203,7 +6040,7 @@ export default function EventManagePage() {
                             : "transparent",
                         transition: "all 0.2s",
                         "&:hover": {
-                          borderColor: TEAL,
+                          borderColor: "#10b8a6",
                           backgroundColor: "rgba(16, 184, 166, 0.05)",
                         },
                       }}
@@ -6237,7 +6074,7 @@ export default function EventManagePage() {
                         border: "2px solid",
                         borderColor:
                           criteriaConfig.interests.match_mode === "both"
-                            ? TEAL
+                            ? "#10b8a6"
                             : "divider",
                         borderRadius: 1,
                         cursor: "pointer",
@@ -6247,7 +6084,7 @@ export default function EventManagePage() {
                             : "transparent",
                         transition: "all 0.2s",
                         "&:hover": {
-                          borderColor: TEAL,
+                          borderColor: "#10b8a6",
                           backgroundColor: "rgba(16, 184, 166, 0.05)",
                         },
                       }}
@@ -6304,8 +6141,8 @@ export default function EventManagePage() {
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
-          <Button sx={SUBTLE_BTN_SX}
+        <DialogActions>
+          <Button
             onClick={() => {
               setSpeedNetworkingCreateOpen(false);
               setSpeedNetworkingEditOpen(false);
@@ -6350,8 +6187,8 @@ export default function EventManagePage() {
               });
             }}
             sx={{
-              backgroundColor: TEAL,
-              "&:hover": { backgroundColor: TEAL_DARK },
+              backgroundColor: "#10b8a6",
+              "&:hover": { backgroundColor: "#0ea5a4" },
             }}
           >
             {speedNetworkingActionLoading ? (
@@ -6373,15 +6210,15 @@ export default function EventManagePage() {
           setSpeedNetworkingDeleteTarget(null);
         }}
       >
-        <DialogTitle sx={DIALOG_TITLE_SX}>Delete Session?</DialogTitle>
+        <DialogTitle>Delete Session?</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete "{speedNetworkingDeleteTarget?.name || 'this session'}"?
             This action cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
-          <Button sx={SUBTLE_BTN_SX}
+        <DialogActions>
+          <Button
             onClick={() => {
               setSpeedNetworkingDeleteOpen(false);
               setSpeedNetworkingDeleteTarget(null);
@@ -6389,7 +6226,7 @@ export default function EventManagePage() {
           >
             Cancel
           </Button>
-          <Button sx={BTN_SHAPE_SX}
+          <Button
             color="error"
             variant="contained"
             disabled={speedNetworkingActionLoading}
@@ -6415,7 +6252,7 @@ export default function EventManagePage() {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={DIALOG_TITLE_SX}>Add Interest Tag</DialogTitle>
+        <DialogTitle>Add Interest Tag</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <TextField
             fullWidth
@@ -6449,8 +6286,8 @@ export default function EventManagePage() {
             </Select>
           </FormControl>
         </DialogContent>
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
-          <Button sx={SUBTLE_BTN_SX}
+        <DialogActions>
+          <Button
             onClick={() => {
               setShowAddTagDialog(false);
               setTagLabel("");
@@ -6481,8 +6318,8 @@ export default function EventManagePage() {
               }
             }}
             sx={{
-              backgroundColor: TEAL,
-              "&:hover": { backgroundColor: TEAL_DARK },
+              backgroundColor: "#10b8a6",
+              "&:hover": { backgroundColor: "#0ea5a4" },
             }}
           >
             Add
@@ -6726,7 +6563,7 @@ export default function EventManagePage() {
           <Alert severity="info">No paid orders found for this event yet.</Alert>
         ) : (
           <>
-            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: BORDER, overflow: "hidden" }}>
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ bgcolor: "rgba(7, 29, 73, 0.04)" }}>
@@ -6812,7 +6649,7 @@ export default function EventManagePage() {
                               <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
                                 <Chip size="small" label={invStatus.label} color={invStatus.color} variant={invStatus.variant} />
                                 {inv.pdf_ready ? (
-                                  <Chip size="small" label="PDF ready" sx={BADGE_UPCOMING} />
+                                  <Chip size="small" label="PDF ready" color="success" variant="outlined" />
                                 ) : (
                                   <Chip size="small" label="PDF pending" variant="outlined" />
                                 )}
@@ -6868,11 +6705,11 @@ export default function EventManagePage() {
                                 lineHeight: 1.2,
                                 whiteSpace: "nowrap",
                                 borderColor: "#18b8b0",
-                                color: TEAL_DARK,
+                                color: "#0f766e",
                                 bgcolor: "rgba(24, 184, 176, 0.06)",
                                 boxShadow: "none",
                                 "&:hover": {
-                                  borderColor: TEAL_DARK,
+                                  borderColor: "#0f766e",
                                   bgcolor: "rgba(24, 184, 176, 0.12)",
                                   boxShadow: "none",
                                 },
@@ -6881,7 +6718,7 @@ export default function EventManagePage() {
                               {markPaidLoadingId === order.id ? "Saving..." : "Confirm payment"}
                             </Button>
                           ) : (
-                            <Chip size="small" label="Paid" sx={BADGE_UPCOMING} />
+                            <Chip size="small" color="success" label="Paid" />
                           )}
                         </Stack>
                       </TableCell>
@@ -6893,10 +6730,11 @@ export default function EventManagePage() {
           </TableContainer>
           {eventOrdersTotal > eventOrdersLimit && (
             <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
-              <Pagination sx={PAGINATION_SX}
+              <Pagination
                 count={Math.ceil(eventOrdersTotal / eventOrdersLimit)}
                 page={eventOrdersPage}
                 onChange={(_, page) => fetchEventOrders(page)}
+                color="primary"
               />
             </Box>
           )}
@@ -7013,7 +6851,7 @@ export default function EventManagePage() {
                     </Stack>
                   </Box>
 
-                  <TextField sx={FIELD_SX}
+                  <TextField
                     label="Payment reference / bank transaction ID"
                     value={markPaidReference}
                     onChange={(e) => setMarkPaidReference(e.target.value)}
@@ -7057,7 +6895,7 @@ export default function EventManagePage() {
           <WarningRoundedIcon sx={{ fontSize: 48, color: 'warning.main', mb: 2 }} />
           <Typography variant="h6" gutterBottom>Unable to Load Product Data</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{saleorError}</Typography>
-          <Button sx={PRIMARY_BTN_SX} variant="contained" onClick={fetchSaleorProduct} startIcon={<RefreshRoundedIcon />}>Retry</Button>
+          <Button variant="contained" onClick={fetchSaleorProduct} startIcon={<RefreshRoundedIcon />}>Retry</Button>
         </Paper>
       );
     }
@@ -7072,7 +6910,7 @@ export default function EventManagePage() {
           </Typography>
           {/* Public price display override shown even without a product */}
           <Box sx={{ mb: 3, maxWidth: 400, mx: 'auto', textAlign: 'left' }}>
-            <TextField sx={FIELD_SX}
+            <TextField
               label="Public price display text"
               fullWidth
               value={saleorPriceLabel}
@@ -7084,7 +6922,7 @@ export default function EventManagePage() {
               Save label
             </Button>
           </Box>
-          <Button sx={PRIMARY_BTN_SX} variant="contained" onClick={handleSyncSaleorProduct} startIcon={<RefreshRoundedIcon />} disabled={saleorLoading}>
+          <Button variant="contained" onClick={handleSyncSaleorProduct} startIcon={<RefreshRoundedIcon />} disabled={saleorLoading}>
             Create / Re-sync Saleor Product
           </Button>
         </Paper>
@@ -7107,7 +6945,7 @@ export default function EventManagePage() {
             <Typography variant="body2" color="text.secondary">Sync pricing and inventory with Saleor</Typography>
           </Box>
           <Stack direction="row" spacing={2}>
-            <Button sx={OUTLINE_BTN_SX}
+            <Button
               variant="outlined"
               startIcon={<RefreshRoundedIcon />}
               onClick={fetchSaleorProduct}
@@ -7174,7 +7012,7 @@ export default function EventManagePage() {
                   bgcolor: 'grey.50',
                   borderRadius: 3,
                   border: '1px solid',
-                  borderColor: BORDER,
+                  borderColor: 'divider',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 3
@@ -7207,8 +7045,8 @@ export default function EventManagePage() {
               <StorefrontRoundedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Channel Settings & Pricing</Typography>
             </Box>
-            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: BORDER, overflow: 'hidden' }}>
-              <TableContainer sx={TABLE_SX}>
+            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+              <TableContainer>
                 <Table>
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'grey.50' }}>
@@ -7273,8 +7111,8 @@ export default function EventManagePage() {
               <Inventory2RoundedIcon sx={{ mr: 1, color: 'primary.main', fontSize: '1.25rem' }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Inventory (Warehouses)</Typography>
             </Box>
-            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: BORDER, overflow: 'hidden' }}>
-              <TableContainer sx={TABLE_SX}>
+            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+              <TableContainer>
                 <Table>
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'grey.50' }}>
@@ -7339,9 +7177,9 @@ export default function EventManagePage() {
               </Alert>
             )}
 
-            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: BORDER, overflow: 'hidden' }}>
+            <Paper sx={{ p: 0, borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
               {/* Add Discount Button */}
-              <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: BORDER, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>Active Discounts</Typography>
                 <Button
                   size="small"
@@ -7349,14 +7187,14 @@ export default function EventManagePage() {
                   startIcon={<AddIcon />}
                   onClick={openCreateDiscount}
                   disabled={isDiscountDisabled}
-                  sx={{ backgroundColor: TEAL }}
+                  sx={{ backgroundColor: '#10b8a6' }}
                 >
                   Add Discount
                 </Button>
               </Box>
 
               {/* Discounts Table */}
-              <TableContainer sx={TABLE_SX}>
+              <TableContainer>
                 <Table>
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'grey.50' }}>
@@ -7535,7 +7373,7 @@ export default function EventManagePage() {
             </Paper>
           </Box>
         </Stack>
-        <Box sx={{ mt: 5, display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid', borderColor: BORDER, pt: 3 }}>
+        <Box sx={{ mt: 5, display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid', borderColor: 'divider', pt: 3 }}>
           <Button
             variant="contained"
             size="large"
@@ -7550,7 +7388,7 @@ export default function EventManagePage() {
 
         {/* Discount Dialog */}
         <Dialog open={discountDialogOpen} onClose={closeDiscountDialog} maxWidth="sm" fullWidth>
-          <DialogTitle sx={DIALOG_TITLE_SX}>
+          <DialogTitle>
             {editingDiscount ? 'Edit Discount' : 'Create Discount'}
           </DialogTitle>
           <DialogContent sx={{ pt: 3 }}>
@@ -7676,13 +7514,13 @@ export default function EventManagePage() {
               </Select>
             </FormControl>
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
-            <Button sx={SUBTLE_BTN_SX} onClick={closeDiscountDialog} disabled={discountSaving}>Cancel</Button>
+          <DialogActions>
+            <Button onClick={closeDiscountDialog} disabled={discountSaving}>Cancel</Button>
             <Button
               onClick={saveDiscount}
               variant="contained"
               disabled={discountSaving || !discountForm.name || !discountForm.channel_id || !discountForm.reward_value}
-              sx={{ backgroundColor: TEAL }}
+              sx={{ backgroundColor: '#10b8a6' }}
             >
               {discountSaving ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
               {editingDiscount ? 'Update Discount' : 'Save Discount'}
@@ -7700,8 +7538,8 @@ export default function EventManagePage() {
         sx={{
           borderRadius: 3,
           border: "1px solid",
-          borderColor: BORDER,
-          bgcolor: "#fff",
+          borderColor: "divider",
+          bgcolor: "background.paper",
           overflow: "hidden", // containment
         }}
       >
@@ -7722,7 +7560,7 @@ export default function EventManagePage() {
   const renderCompanion = () => {
     if (!isOwner) {
       return (
-        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: BORDER, p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Companion</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>Only the event owner can access Companion features.</Typography>
         </Paper>
@@ -8191,7 +8029,7 @@ export default function EventManagePage() {
     return (
       <Stack spacing={3}>
         {/* ---- 1:1 Meeting Scheduling Section ---- */}
-        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: BORDER, p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>1:1 Meeting Scheduling</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>Configure 1:1 networking meeting options for attendees.</Typography>
 
@@ -8204,7 +8042,7 @@ export default function EventManagePage() {
             <Stack spacing={3}>
               {/* Enable/Disable Toggle */}
               <FormControlLabel
-                control={<Switch sx={SWITCH_SX} checked={networkingEnabled} onChange={e => setNetworkingEnabled(e.target.checked)} />}
+                control={<Switch checked={networkingEnabled} onChange={e => setNetworkingEnabled(e.target.checked)} />}
                 label={
                   <Box>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>Enable 1:1 Meeting Scheduling</Typography>
@@ -8237,10 +8075,10 @@ export default function EventManagePage() {
                             key={`custom-${duration}`}
                             label={`${duration} min`}
                             variant="filled"
-                            
+                            color="primary"
                             onDelete={() => removeDuration(duration)}
                             icon={<CheckCircleRoundedIcon />}
-                            sx={BADGE_NAVY}
+                            sx={{ fontWeight: 600 }}
                           />
                         ))}
                       </Stack>
@@ -8361,7 +8199,7 @@ export default function EventManagePage() {
         </Paper>
 
         {/* ---- Event Companion Access Section ---- */}
-        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: BORDER, p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Event Companion Access</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>Generate QR code and share direct link for attendees to access the Event Companion.</Typography>
 
@@ -8384,7 +8222,7 @@ export default function EventManagePage() {
 
         {/* ---- Networking Tables Section ---- */}
         {networkingEnabled && (
-          <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: BORDER, p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+          <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Networking Tables</Typography>
             <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>Create and manage networking tables for assigning meeting attendees.</Typography>
 
@@ -8501,7 +8339,7 @@ export default function EventManagePage() {
           </Paper>
         )}
 
-        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: BORDER, p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Badge Labels</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>Create and manage custom badge labels for this event's participants.</Typography>
 
@@ -8559,7 +8397,7 @@ export default function EventManagePage() {
           )}
         </Paper>
 
-        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: BORDER, p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
+        <Paper elevation={0} sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", p: { xs: 2, sm: 3 }, bgcolor: "background.paper" }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" gap={1}>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.25 }}>Assign Labels to Participants</Typography>
@@ -8578,7 +8416,7 @@ export default function EventManagePage() {
           ) : companionRegsError ? (
             <Alert severity="error">{companionRegsError}</Alert>
           ) : (
-            <TableContainer sx={{ borderRadius: 2, border: "1px solid", borderColor: BORDER, overflow: "hidden" }}>
+            <TableContainer sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: "grey.50", "& th": { fontSize: 13, color: "text.secondary" } }}>
@@ -8627,7 +8465,7 @@ export default function EventManagePage() {
                           </Stack>
                         </TableCell>
                         <TableCell align="right">
-                          <Button size="small" variant="outlined" sx={{ textTransform: "none", borderRadius: 999, borderColor: BORDER, color: "text.primary" }} onClick={() => {
+                          <Button size="small" variant="outlined" sx={{ textTransform: "none", borderRadius: 999, borderColor: "divider", color: "text.primary" }} onClick={() => {
                             setCompanionAssignTarget(reg);
                             setCompanionAssignSelected((reg.badge_labels || []).map(bl => bl.id));
                             setCompanionAssignOpen(true);
@@ -8645,10 +8483,10 @@ export default function EventManagePage() {
         </Paper>
 
         <Dialog open={companionEditOpen} onClose={() => setCompanionEditOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={DIALOG_TITLE_SX}>Edit Badge Label</DialogTitle>
+          <DialogTitle>Edit Badge Label</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField sx={FIELD_SX} size="small" label="Label name" value={companionEditName} onChange={e => setCompanionEditName(e.target.value)} inputProps={{ maxLength: 100 }} />
+              <TextField size="small" label="Label name" value={companionEditName} onChange={e => setCompanionEditName(e.target.value)} inputProps={{ maxLength: 100 }} />
               <Stack direction="row" alignItems="center" spacing={1}>
                 <Typography variant="body2">Color:</Typography>
                 <Box component="input" type="color" value={companionEditColor} onChange={e => setCompanionEditColor(e.target.value)} style={{ width: 40, height: 36, border: "1px solid #e0e0e0", borderRadius: 6, cursor: "pointer", padding: 2 }} />
@@ -8656,7 +8494,7 @@ export default function EventManagePage() {
               </Stack>
             </Stack>
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <DialogActions>
             <Button onClick={() => setCompanionEditOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
             <Button variant="contained" disabled={!companionEditName.trim() || companionEditSaving} onClick={saveEditLabel} sx={{ textTransform: "none" }}>
               {companionEditSaving ? "Saving..." : "Save"}
@@ -8665,7 +8503,7 @@ export default function EventManagePage() {
         </Dialog>
 
         <Dialog open={companionDeleteOpen} onClose={() => setCompanionDeleteOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={DIALOG_TITLE_SX}>Delete Badge Label?</DialogTitle>
+          <DialogTitle>Delete Badge Label?</DialogTitle>
           <DialogContent>
             <DialogContentText>
               The label <strong>{companionDeleteTarget?.name}</strong> will disappear from active
@@ -8674,7 +8512,7 @@ export default function EventManagePage() {
               database for badge and attendance history.
             </DialogContentText>
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <DialogActions>
             <Button onClick={() => setCompanionDeleteOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
             <Button variant="contained" color="error" disabled={companionDeleteLoading} onClick={() => companionDeleteTarget && deleteLabel(companionDeleteTarget.id)} sx={{ textTransform: "none" }}>
               {companionDeleteLoading ? "Deleting..." : "Delete Badge Label"}
@@ -8683,7 +8521,7 @@ export default function EventManagePage() {
         </Dialog>
 
         <Dialog open={companionAssignOpen} onClose={() => setCompanionAssignOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle sx={DIALOG_TITLE_SX}>Assign Labels — {companionAssignTarget?.user_name || companionAssignTarget?.user_email || "Participant"}</DialogTitle>
+          <DialogTitle>Assign Labels — {companionAssignTarget?.user_name || companionAssignTarget?.user_email || "Participant"}</DialogTitle>
           <DialogContent>
             <Typography variant="body2" sx={{ color: "text.secondary", mb: 2, mt: 1 }}>Select labels to assign. This will replace any currently assigned labels.</Typography>
             {companionLabels.length === 0 ? (
@@ -8758,7 +8596,7 @@ export default function EventManagePage() {
               </Stack>
             )}
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <DialogActions>
             <Button onClick={() => setCompanionAssignOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
             <Button variant="contained" disabled={companionAssignSaving} onClick={() => companionAssignTarget && assignLabels(companionAssignTarget.id, companionAssignSelected)} sx={{ textTransform: "none" }}>
               {companionAssignSaving ? "Saving..." : "Save Labels"}
@@ -8767,7 +8605,7 @@ export default function EventManagePage() {
         </Dialog>
 
         <Dialog open={companionBulkAssignOpen} onClose={() => setCompanionBulkAssignOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle sx={DIALOG_TITLE_SX}>Bulk Assign Labels ({companionBulkSelected.length} participants)</DialogTitle>
+          <DialogTitle>Bulk Assign Labels ({companionBulkSelected.length} participants)</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1 }}>
               <FormControl size="small" fullWidth>
@@ -8848,7 +8686,7 @@ export default function EventManagePage() {
               </Stack>
             </Stack>
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <DialogActions>
             <Button onClick={() => setCompanionBulkAssignOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
             <Button variant="contained" disabled={companionBulkLabels.length === 0 || companionBulkSaving} onClick={bulkAssignLabels} sx={{ textTransform: "none" }}>
               {companionBulkSaving ? "Applying..." : "Apply to All Selected"}
@@ -8858,10 +8696,10 @@ export default function EventManagePage() {
 
         {/* ---- Networking Table Edit Dialog ---- */}
         <Dialog open={networkingTableEditOpen} onClose={() => setNetworkingTableEditOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={DIALOG_TITLE_SX}>Edit Networking Table</DialogTitle>
+          <DialogTitle>Edit Networking Table</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField sx={FIELD_SX}
+              <TextField
                 size="small"
                 label="Table name"
                 value={networkingTableEditName}
@@ -8869,7 +8707,7 @@ export default function EventManagePage() {
                 fullWidth
                 inputProps={{ maxLength: 100 }}
               />
-              <TextField sx={FIELD_SX}
+              <TextField
                 size="small"
                 label="Location/Note"
                 value={networkingTableEditLocation}
@@ -8879,7 +8717,7 @@ export default function EventManagePage() {
               />
             </Stack>
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <DialogActions>
             <Button onClick={() => setNetworkingTableEditOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
             <Button
               variant="contained"
@@ -8904,7 +8742,7 @@ export default function EventManagePage() {
           maxWidth="xs"
           fullWidth
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>
+          <DialogTitle>
             {networkingTableDeleteTarget?.is_in_use
               ? "Networking Table Already in Use"
               : "Delete Networking Table?"}
@@ -8932,7 +8770,7 @@ export default function EventManagePage() {
                   <strong>{networkingTableDeleteTarget?.name}</strong> is currently free and can be removed from active networking-table management.
                   This is a soft delete: the table remains stored in the database, and completed or cancelled meeting history keeps its table reference.
                 </DialogContentText>
-                <TextField sx={FIELD_SX}
+                <TextField
                   fullWidth
                   size="small"
                   label="Reason (optional)"
@@ -8945,7 +8783,7 @@ export default function EventManagePage() {
               </>
             )}
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
+          <DialogActions>
             <Button
               onClick={() => {
                 setNetworkingTableDeleteOpen(false);
@@ -9191,9 +9029,9 @@ export default function EventManagePage() {
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar
               sx={{
-                width: 46,
-                height: 46,
-                bgcolor: NAVY,
+                width: 40,
+                height: 40,
+                bgcolor: "primary.main",
                 fontWeight: 700,
               }}
             >
@@ -9202,13 +9040,13 @@ export default function EventManagePage() {
             <Box>
               <Typography
                 variant="h5"
-                sx={{ fontWeight: 800, lineHeight: 1.2, color: NAVY, fontSize: { xs: 21, sm: 25 } }}
+                sx={{ fontWeight: 800, lineHeight: 1.2 }}
               >
                 {event?.title || "Event Details"}
               </Typography>
               <Typography
                 variant="body2"
-                sx={{ color: MUTED, mt: 0.25 }}
+                sx={{ color: "text.secondary", mt: 0.5 }}
               >
                 Review purchases and resources for this event.
               </Typography>
@@ -9225,7 +9063,11 @@ export default function EventManagePage() {
                 variant="outlined"
                 startIcon={<EditNoteRoundedIcon fontSize="small" />}
                 onClick={() => setTab(tabLabels.indexOf("Edit") !== -1 ? tabLabels.indexOf("Edit") : 0)}
-                sx={OUTLINE_BTN_SX}
+                sx={{
+                  borderRadius: 999,
+                  textTransform: "none",
+                  px: 2.5,
+                }}
               >
                 Edit
               </Button>
@@ -9237,10 +9079,12 @@ export default function EventManagePage() {
                 disabled
                 variant="outlined"
                 sx={{
-                  ...DANGER_BTN_SX,
-                  backgroundColor: "#FEF2F2 !important",
-                  color: "#B91C1C !important",
-                  borderColor: "#FECACA !important",
+                  borderRadius: 999,
+                  textTransform: "none",
+                  px: 2.5,
+                  backgroundColor: "#fef2f2 !important",
+                  color: "#b91c1c !important",
+                  borderColor: "#fecaca !important",
                 }}
               >Cancelled
               </Button>) : (<Tooltip title={event?.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
@@ -9249,9 +9093,11 @@ export default function EventManagePage() {
                   startIcon={<LiveTvRoundedIcon />}
                   variant="contained"
                   sx={{
-                    ...ACCENT_BTN_SX,
-                    bgcolor: isPast ? "#CBD5E1" : TEAL,
-                    "&:hover": { bgcolor: isPast ? "#CBD5E1" : TEAL_DARK, boxShadow: "none" },
+                    borderRadius: 999,
+                    textTransform: "none",
+                    px: 2.5,
+                    bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
+                    "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
                   }}
                   disabled={!!hostingId || isPast || (event?.is_hidden && !isOwner)}
                 >
@@ -9263,7 +9109,13 @@ export default function EventManagePage() {
               (canShowActiveJoin && (<Button
                 onClick={handleJoinLive}
                 variant="contained"
-                sx={ACCENT_BTN_SX}
+                sx={{
+                  borderRadius: 999,
+                  textTransform: "none",
+                  px: 2.5,
+                  bgcolor: "#10b8a6",
+                  "&:hover": { bgcolor: "#0ea5a4" },
+                }}
                 disabled={!!joiningId}
               >
                 {joiningId ? (
@@ -9281,7 +9133,12 @@ export default function EventManagePage() {
               variant="contained"
               startIcon={<ArrowBackIosNewRoundedIcon fontSize="small" />}
               onClick={() => navigate(-1)}
-              sx={{ ...OUTLINE_BTN_SX, flexGrow: { xs: 1, sm: 0 } }}
+              sx={{
+                borderRadius: 999,
+                textTransform: "none",
+                px: 2.5,
+                flexGrow: { xs: 1, sm: 0 },
+              }}
             >
               Back to events
             </Button>
@@ -9306,7 +9163,12 @@ export default function EventManagePage() {
         {!eventLoading && !event && (
           <Paper
             elevation={0}
-            sx={CARD_SX}
+            sx={{
+              borderRadius: 3,
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
           >
             <Box sx={{ p: 4, textAlign: "center" }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
@@ -9325,10 +9187,9 @@ export default function EventManagePage() {
             {/* desktop / tablet tabs */}
             <Box
               sx={{
-                ...CARD_SX,
-                px: 1,
+                borderBottom: 1,
+                borderColor: "divider",
                 mb: 2,
-                overflow: "hidden",
                 display: { xs: "none", sm: "block" },
               }}
             >
@@ -9337,13 +9198,17 @@ export default function EventManagePage() {
                 onChange={(_, value) => setTab(value)}
                 variant="scrollable"
                 scrollButtons="auto"
-                sx={TABS_SX}
               >
                 {tabLabels.map((label, idx) => (
                   <Tab
                     key={label}
                     label={label.toUpperCase()}
-                    sx={{ mr: 1.5 }}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      fontSize: 14,
+                      mr: 2,
+                    }}
                   />
                 ))}
               </Tabs>
@@ -9361,7 +9226,11 @@ export default function EventManagePage() {
                 variant="outlined"
                 onClick={() => setMobileTabsOpen(true)}
                 endIcon={<ArrowDropDownRoundedIcon />}
-                sx={{ ...OUTLINE_BTN_SX, justifyContent: "space-between", py: 1.25 }}
+                sx={{
+                  justifyContent: "space-between",
+                  textTransform: "none",
+                  borderRadius: 999,
+                }}
               >
                 {tabLabels[tab]}
               </Button>
@@ -9535,19 +9404,19 @@ export default function EventManagePage() {
             },
           }}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>
+          <DialogTitle sx={{ fontWeight: 700 }}>
             {loungeCreateCategory === 'BREAKOUT' ? 'Create Breakout Room' : 'Create Lounge Table'}
           </DialogTitle>
           <br />
           <DialogContent sx={{ pt: 1 }}>
             <Stack spacing={2}>
-              <TextField sx={FIELD_SX}
+              <TextField
                 label={loungeCreateCategory === 'BREAKOUT' ? 'Room name' : 'Table name'}
                 value={loungeCreateName}
                 onChange={(e) => setLoungeCreateName(e.target.value)}
                 fullWidth
               />
-              <TextField sx={FIELD_SX}
+              <TextField
                 label="Seats"
                 type="number"
                 inputProps={{ min: 2, max: 30 }}
@@ -9630,19 +9499,19 @@ export default function EventManagePage() {
             },
           }}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>
+          <DialogTitle sx={{ fontWeight: 700 }}>
             {(loungeEditTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'Edit Breakout Room' : 'Edit Lounge Table'}
           </DialogTitle>
           <br />
           <DialogContent sx={{ pt: 1 }}>
             <Stack spacing={2}>
-              <TextField sx={FIELD_SX}
+              <TextField
                 label={(loungeEditTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'Room name' : 'Table name'}
                 value={loungeEditName}
                 onChange={(e) => setLoungeEditName(e.target.value)}
                 fullWidth
               />
-              <TextField sx={FIELD_SX}
+              <TextField
                 label="Seats"
                 type="number"
                 inputProps={{ min: 2, max: 30 }}
@@ -9726,14 +9595,14 @@ export default function EventManagePage() {
             },
           }}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>
+          <DialogTitle sx={{ fontWeight: 700 }}>
             {(loungeDeleteTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'Delete Breakout Room?' : 'Delete Lounge Table?'}
           </DialogTitle>
           <DialogContent>
             <DialogContentText sx={{ mb: 2 }}>
               This is a soft delete. The {(loungeDeleteTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'room' : 'table'} "{loungeDeleteTarget?.name || "Table"}" will disappear from the event, but its configuration, icon, event link, and meeting identifier will remain stored in the database. Current seats will be cleared.
             </DialogContentText>
-            <TextField sx={FIELD_SX}
+            <TextField
               fullWidth
               label="Reason (optional)"
               value={loungeDeleteReason}
@@ -9771,7 +9640,7 @@ export default function EventManagePage() {
           onClose={() => setDialogOpen(false)}
           PaperProps={{ style: { borderRadius: 16, padding: 8 } }}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>
+          <DialogTitle sx={{ fontWeight: 700 }}>
             {dialogAction === "deregister" && "Deregister User?"}
             {dialogAction === "approve" && "Approve Cancellation?"}
             {dialogAction === "reject" && "Reject Request?"}
@@ -9786,7 +9655,7 @@ export default function EventManagePage() {
             </DialogContentText>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button sx={BTN_SHAPE_SX}
+            <Button
               onClick={() => setDialogOpen(false)}
               disabled={actionLoading}
               color="inherit"
@@ -9794,7 +9663,7 @@ export default function EventManagePage() {
             >
               Cancel
             </Button>
-            <Button sx={PRIMARY_BTN_SX}
+            <Button
               onClick={handleConfirmAction}
               disabled={actionLoading}
               variant="contained"
@@ -9818,7 +9687,7 @@ export default function EventManagePage() {
             },
           }}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Add Participant</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>Add Participant</DialogTitle>
           <DialogContent>
             <DialogContentText sx={{ mb: 2 }}>
               Search for an existing user or enter an email address.
@@ -9858,7 +9727,7 @@ export default function EventManagePage() {
                 }
               }}
               renderInput={(params) => (
-                <TextField sx={FIELD_SX}
+                <TextField
                   {...params}
                   label="User Search or Email"
                   variant="outlined"
@@ -9936,10 +9805,10 @@ export default function EventManagePage() {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Create New Session</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>Create New Session</DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
             <Stack spacing={2}>
-              <TextField sx={FIELD_SX}
+              <TextField
                 fullWidth
                 label="Session Title *"
                 value={newSessionData.title}
@@ -9949,7 +9818,7 @@ export default function EventManagePage() {
                 size="small"
                 placeholder="e.g., Opening Keynote, Workshop, Networking"
               />
-              <TextField sx={FIELD_SX}
+              <TextField
                 fullWidth
                 label="Description"
                 value={newSessionData.description}
@@ -9974,7 +9843,7 @@ export default function EventManagePage() {
                   <MenuItem value="networking">Networking</MenuItem>
                 </Select>
               </FormControl>
-              <TextField sx={FIELD_SX}
+              <TextField
                 fullWidth
                 label="Session Date *"
                 type="date"
@@ -9990,7 +9859,7 @@ export default function EventManagePage() {
                   max: event?.end_time ? dayjs(event.end_time).format("YYYY-MM-DD") : "",
                 }}
               />
-              <TextField sx={FIELD_SX}
+              <TextField
                 fullWidth
                 label="Start Time *"
                 type="datetime-local"
@@ -10011,7 +9880,7 @@ export default function EventManagePage() {
                 InputLabelProps={{ shrink: true }}
                 helperText="Must be within event date range"
               />
-              <TextField sx={FIELD_SX}
+              <TextField
                 fullWidth
                 label="End Time *"
                 type="datetime-local"
@@ -10071,11 +9940,11 @@ export default function EventManagePage() {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Edit Session</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>Edit Session</DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
             {selectedSession && (
               <Stack spacing={2}>
-                <TextField sx={FIELD_SX}
+                <TextField
                   fullWidth
                   label="Title"
                   value={selectedSession.title}
@@ -10084,7 +9953,7 @@ export default function EventManagePage() {
                   }
                   size="small"
                 />
-                <TextField sx={FIELD_SX}
+                <TextField
                   fullWidth
                   label="Description"
                   value={selectedSession.description}
@@ -10109,7 +9978,7 @@ export default function EventManagePage() {
                     <MenuItem value="networking">Networking</MenuItem>
                   </Select>
                 </FormControl>
-                <TextField sx={FIELD_SX}
+                <TextField
                   fullWidth
                   label="Session Date"
                   type="date"
@@ -10120,7 +9989,7 @@ export default function EventManagePage() {
                   size="small"
                   InputLabelProps={{ shrink: true }}
                 />
-                <TextField sx={FIELD_SX}
+                <TextField
                   fullWidth
                   label="Start Time"
                   type="datetime-local"
@@ -10141,7 +10010,7 @@ export default function EventManagePage() {
                   InputLabelProps={{ shrink: true }}
                   helperText="Must be within event date range"
                 />
-                <TextField sx={FIELD_SX}
+                <TextField
                   fullWidth
                   label="End Time"
                   type="datetime-local"
@@ -10180,7 +10049,7 @@ export default function EventManagePage() {
           open={sessionDeleteDialogOpen}
           onClose={closeDeleteSessionDialog}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Delete Session?</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>Delete Session?</DialogTitle>
           <DialogContent>
             <DialogContentText component="div">
               <Typography component="p">
@@ -10226,7 +10095,7 @@ export default function EventManagePage() {
               onClose={() => !resendMailLoading && setResendMailOpen(false)}
               PaperProps={{ style: { borderRadius: 16, padding: 8 } }}
             >
-              <DialogTitle sx={DIALOG_TITLE_SX}>Resend Registration Email?</DialogTitle>
+              <DialogTitle sx={{ fontWeight: 700 }}>Resend Registration Email?</DialogTitle>
               <DialogContent>
                 <DialogContentText>
                   This will resend the registration confirmation email to all{" "}
@@ -10235,10 +10104,10 @@ export default function EventManagePage() {
                 </DialogContentText>
               </DialogContent>
               <DialogActions sx={{ px: 3, pb: 2 }}>
-                <Button sx={BTN_SHAPE_SX} onClick={() => setResendMailOpen(false)} disabled={resendMailLoading} color="inherit">
+                <Button onClick={() => setResendMailOpen(false)} disabled={resendMailLoading} color="inherit">
                   Cancel
                 </Button>
-                <Button sx={BTN_SHAPE_SX}
+                <Button
                   onClick={handleResendMailToAll}
                   disabled={resendMailLoading}
                   variant="contained"
@@ -10256,7 +10125,7 @@ export default function EventManagePage() {
               onClose={() => setResendMailResultOpen(false)}
               PaperProps={{ style: { borderRadius: 16, padding: 8 } }}
             >
-              <DialogTitle sx={DIALOG_TITLE_SX}>Email Resend Complete</DialogTitle>
+              <DialogTitle sx={{ fontWeight: 700 }}>Email Resend Complete</DialogTitle>
               <DialogContent>
                 <DialogContentText component="div">
                   <Stack spacing={1} sx={{ mt: 1 }}>
@@ -10275,7 +10144,7 @@ export default function EventManagePage() {
                 </DialogContentText>
               </DialogContent>
               <DialogActions sx={{ px: 3, pb: 2 }}>
-                <Button sx={PRIMARY_BTN_SX} onClick={() => setResendMailResultOpen(false)} variant="contained">
+                <Button onClick={() => setResendMailResultOpen(false)} variant="contained">
                   Done
                 </Button>
               </DialogActions>
@@ -10291,7 +10160,7 @@ export default function EventManagePage() {
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Cancel Event</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 800 }}>Cancel Event</DialogTitle>
           <DialogContent dividers>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Are you sure you want to cancel this event? This action will set the event status to "cancelled" and notify all registered participants.
@@ -10330,9 +10199,10 @@ export default function EventManagePage() {
 
             <FormControlLabel
               control={
-                <Switch sx={SWITCH_SX}
+                <Switch
                   checked={notifyParticipants}
                   onChange={(e) => setNotifyParticipants(e.target.checked)}
+                  color="primary"
                 />
               }
               label={
@@ -10377,7 +10247,7 @@ export default function EventManagePage() {
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>
+          <DialogTitle sx={{ fontWeight: 800 }}>
             {event?.is_hidden ? "Unhide Event" : "Hide Event from Platform"}
           </DialogTitle>
           <DialogContent dividers>
@@ -10422,7 +10292,7 @@ export default function EventManagePage() {
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Delete Event</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 800 }}>Delete Event</DialogTitle>
           <DialogContent dividers>
             <Alert severity="warning" sx={{ mb: 2 }}>
               <strong>{event?.title || "This event"}</strong> will be removed from the platform and will no longer
@@ -10433,7 +10303,7 @@ export default function EventManagePage() {
               applications, participants, attendance, orders, invoices, recordings, WordPress/MANDA mappings,
               canonical IDs, and Saleor IDs will remain stored. No cancellation email will be sent.
             </Alert>
-            <TextField sx={FIELD_SX}
+            <TextField
               fullWidth
               multiline
               minRows={3}
@@ -10466,11 +10336,11 @@ export default function EventManagePage() {
 
         {/* Post-Event Q&A Answer Modal */}
         <Dialog open={answerModalOpen} onClose={handleCloseAnswerModal} maxWidth="sm" fullWidth>
-          <DialogTitle sx={DIALOG_TITLE_SX}>{isEditingAnswer ? "Edit Answer" : "Answer Question"}</DialogTitle>
+          <DialogTitle>{isEditingAnswer ? "Edit Answer" : "Answer Question"}</DialogTitle>
           <DialogContent>
             {answeringQuestion && (
               <Box>
-                <Typography variant="body2" sx={{ mb: 2, p: 1.5, bgcolor: BG, border: `1px solid ${BORDER}`, borderRadius: 2 }}>
+                <Typography variant="body2" sx={{ mb: 2, p: 1.5, bgcolor: "#f9fafb", borderRadius: 1 }}>
                   <strong>Q:</strong> {answeringQuestion.content}
                 </Typography>
 
@@ -10490,7 +10360,7 @@ export default function EventManagePage() {
                 <FormGroup>
                   <FormControlLabel
                     control={
-                      <Switch sx={SWITCH_SX}
+                      <Switch
                         checked={notifyAuthor}
                         onChange={(e) => setNotifyAuthor(e.target.checked)}
                       />
@@ -10504,7 +10374,7 @@ export default function EventManagePage() {
                   />
                   <FormControlLabel
                     control={
-                      <Switch sx={SWITCH_SX}
+                      <Switch
                         checked={notifyInterested}
                         onChange={(e) => setNotifyInterested(e.target.checked)}
                       />
@@ -10518,7 +10388,7 @@ export default function EventManagePage() {
                   />
                   <FormControlLabel
                     control={
-                      <Switch sx={SWITCH_SX}
+                      <Switch
                         checked={notifyAll}
                         onChange={(e) => setNotifyAll(e.target.checked)}
                       />
@@ -10534,15 +10404,15 @@ export default function EventManagePage() {
               </Box>
             )}
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
-            <Button sx={BTN_SHAPE_SX} onClick={handleCloseAnswerModal} color="inherit">
+          <DialogActions>
+            <Button onClick={handleCloseAnswerModal} color="inherit">
               Cancel
             </Button>
             <Button
               onClick={handlePublishAnswer}
               variant="contained"
               disabled={answerSubmitting || !answerText.trim()}
-              sx={{ ...BADGE_UPCOMING }}
+              sx={{ bgcolor: "#22c55e", color: "white" }}
             >
               {answerSubmitting ? (isEditingAnswer ? "Updating..." : "Publishing...") : (isEditingAnswer ? "Update Answer" : "Publish Answer")}
             </Button>

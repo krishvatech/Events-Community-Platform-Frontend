@@ -62,11 +62,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { fetchEventSummaryCached } from "../../utils/entityCache.js";
 import { connectToConversation } from "../../utils/websocketMessaging.js";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
-import ImaaCommunityScope from "../../components/community/ImaaCommunityScope";
-import { IMAA } from "../../components/community/imaaCommunityTheme";
 
 
-const BORDER = IMAA.border;
+const BORDER = "#e2e8f0";
 const PANEL_H = "calc(100vh - 130px)";
 const TIME_W = 56;   // px reserved on the right for time
 const TIME_H = 16;   // px reserved at the bottom for time
@@ -78,13 +76,11 @@ const bubbleSx = (mine) => (theme) => ({
   padding: theme.spacing(0.75, 1.25),
   paddingRight: `calc(${theme.spacing(1.25)} + ${TIME_W}px)`,
   paddingBottom: `calc(${theme.spacing(0.75)} + ${TIME_H}px)`,
-  borderRadius: mine ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-  bgcolor: mine ? IMAA.tealLight : theme.palette.background.paper,
-  color: IMAA.navy,
-  border: `1px solid ${mine ? "rgba(10, 147, 150, 0.22)" : BORDER}`,
-  boxShadow: IMAA.shadowSm,
-  fontSize: 14,
-  lineHeight: 1.5,
+  borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+  bgcolor: mine ? "rgb(189, 189, 189, 0.25)" : theme.palette.background.paper,
+  color: mine ? theme.palette.common.black : "inherit",
+  border: `1px solid ${mine ? "rgba(87, 87, 87, 0.15)" : BORDER}`,
+  boxShadow: mine ? "0 2px 6px rgba(114, 113, 113, 0.15)" : "none",
   overflowWrap: "anywhere",
   wordBreak: "break-word",
   "&:after": {
@@ -96,7 +92,7 @@ const bubbleSx = (mine) => (theme) => ({
     borderTop: "8px solid transparent",
     borderBottom: "8px solid transparent",
     ...(mine
-      ? { right: -8, borderLeft: `8px solid ${IMAA.tealLight}` }
+      ? { right: -8, borderLeft: "8px solid rgba(87, 87, 87, 0.15)" }
       : { left: -8, borderRight: `8px solid ${theme.palette.background.paper}` }),
   },
 });
@@ -385,14 +381,13 @@ function SharePreview({ attachment, mine }) {
           mt: 0.75,
           borderRadius: 2,
           border: `1px solid ${BORDER}`,
-          bgcolor: mine ? "#ffffff" : IMAA.bg,
-          color: IMAA.navy,
+          bgcolor: mine ? "#ffffff" : "#f8fafc",
           overflow: "hidden",
           cursor: "pointer",
           transition: "transform 0.15s ease, box-shadow 0.15s ease",
           "&:hover": {
             transform: "translateY(-1px)",
-            boxShadow: IMAA.shadowMd,
+            boxShadow: "0 4px 12px rgba(15,23,42,0.12)",
           },
         }}
       >
@@ -462,7 +457,7 @@ function SharePreview({ attachment, mine }) {
                       width: `${opt.pct}%`,
                       maxWidth: "100%",
                       borderRadius: 9999,
-                      bgcolor: IMAA.teal,
+                      bgcolor: "primary.main",
                     }}
                   />
                 </Box>
@@ -493,14 +488,13 @@ function SharePreview({ attachment, mine }) {
         mt: 0.75,
         borderRadius: 2,
         border: `1px solid ${BORDER}`,
-        bgcolor: mine ? "#ffffff" : IMAA.bg,
-        color: IMAA.navy,
+        bgcolor: mine ? "#ffffff" : "#f8fafc",
         overflow: "hidden",
         cursor: "pointer",
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
         "&:hover": {
           transform: "translateY(-1px)",
-          boxShadow: IMAA.shadowMd,
+          boxShadow: "0 4px 12px rgba(15,23,42,0.12)",
         },
       }}
     >
@@ -510,7 +504,7 @@ function SharePreview({ attachment, mine }) {
           sx={{
             position: "relative",
             pt: "100%", // square like Instagram
-            bgcolor: IMAA.navy,
+            bgcolor: "#0f172a",
             overflow: "hidden",
           }}
         >
@@ -565,8 +559,8 @@ function SharePreview({ attachment, mine }) {
           variant="body2"
           sx={{
             fontSize: 13,
-            fontWeight: 700,
-            color: IMAA.teal,
+            fontWeight: 600,
+            color: "primary.main",
           }}
         >
           {loading ? "Loading post…" : "View post in live feed"}
@@ -1020,17 +1014,14 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
       onClick={onClick}
       onContextMenu={onContextMenu} // <--- Handle Right Click
       sx={{
-        px: 1.25,
+        px: 1,
         py: 1,
-        mb: 0.5,
         borderRadius: 2,
         cursor: "pointer",
-        border: "1px solid transparent",
-        transition: "background-color .15s, border-color .15s",
-        bgcolor: thread.is_pinned ? IMAA.bg : "transparent", // Slight background for pinned
+        bgcolor: thread.is_pinned ? "#f8fafc" : "transparent", // Slight background for pinned
         ...(active
-          ? { bgcolor: IMAA.tealLight, borderColor: "rgba(10,147,150,0.25)", boxShadow: `inset 3px 0 0 ${IMAA.teal}` }
-          : { "&:hover": { bgcolor: IMAA.bg, borderColor: BORDER } }),
+          ? { bgcolor: "#f6fffe", border: `1px solid ${BORDER}` }
+          : { "&:hover": { bgcolor: "#fafafa" } }),
       }}
     >
       <ListItemAvatar sx={{ minWidth: 48 }}>
@@ -1043,7 +1034,6 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
               thread?.event_cover ||
               ""
             }
-            sx={{ width: 40, height: 40, bgcolor: IMAA.navy, fontWeight: 700, fontSize: 16 }}
           >
             {(title || "C").slice(0, 1)}
           </Avatar>
@@ -1062,27 +1052,27 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
         disableTypography
         primary={
           <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Typography variant="body2" sx={{ fontWeight: unread > 0 ? 800 : 700, color: IMAA.navy, minWidth: 0 }} noWrap>
+            <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
               {title}
             </Typography>
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0, pl: 1 }}>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
               {/* Show Pin Icon if pinned */}
               {thread.is_pinned && <PushPinIcon sx={{ fontSize: 14, color: "text.secondary", transform: "rotate(45deg)" }} />}
-              <Typography variant="caption" sx={{ ...CAPTION_SX, color: unread > 0 ? IMAA.coral : IMAA.hint, fontWeight: unread > 0 ? 700 : 500 }}>
+              <Typography variant="caption" color="text.secondary" sx={CAPTION_SX}>
                 {time}
               </Typography>
             </Stack>
           </Stack>
         }
         secondary={
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ mt: 0.25 }}>
-            <Typography variant="caption" noWrap sx={{ color: unread > 0 ? IMAA.body : IMAA.muted, fontWeight: unread > 0 ? 600 : 400 }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Typography variant="caption" color="text.secondary" noWrap>
               {last}
             </Typography>
             {unread > 0 && (
               <Chip
                 size="small" label={String(unread)} color="primary"
-                sx={{ height: 18, minHeight: 18, minWidth: 18, bgcolor: IMAA.coral, color: "#fff", fontSize: 11, fontWeight: 800, "& .MuiChip-label": { px: 0.75 } }}
+                sx={{ height: 18, minHeight: 18 }}
               />
             )}
           </Stack>
@@ -1091,6 +1081,60 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
     </ListItem>
   );
 }
+// Matches http(s):// and bare www. links. Trailing punctuation is trimmed below so
+// a link at the end of a sentence doesn't swallow the full stop.
+const URL_RE = /((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
+const TRAILING_PUNCT_RE = /[.,;:!?)\]}'"]+$/;
+
+// Renders plain message text with any URLs turned into real links.
+function LinkifiedText({ text }) {
+  const raw = String(text ?? "");
+  if (!raw) return null;
+
+  const parts = raw.split(URL_RE);
+
+  return parts.map((part, i) => {
+    // Odd indexes are the captured URLs
+    if (i % 2 === 0 || !part) return part;
+
+    const trailing = (part.match(TRAILING_PUNCT_RE) || [""])[0];
+    const url = trailing ? part.slice(0, -trailing.length) : part;
+    if (!url) return part;
+
+    const href = url.startsWith("www.") ? `https://${url}` : url;
+
+    let sameOrigin = false;
+    try {
+      sameOrigin = new URL(href).origin === window.location.origin;
+    } catch {
+      sameOrigin = false;
+    }
+
+    return (
+      <React.Fragment key={`lnk-${i}`}>
+        <Box
+          component="a"
+          href={href}
+          target={sameOrigin ? "_self" : "_blank"}
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          sx={{
+            color: "inherit",
+            textDecoration: "underline",
+            textUnderlineOffset: "2px",
+            fontWeight: 600,
+            wordBreak: "break-all",
+            "&:hover": { opacity: 0.8 },
+          }}
+        >
+          {url}
+        </Box>
+        {trailing}
+      </React.Fragment>
+    );
+  });
+}
+
 function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, conversationId }) {
   const mine = Boolean(m.mine);
 
@@ -1145,7 +1189,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
       data-readbyme={m.read_by_me ? "1" : "0"}
     >
       {!mine && (
-        <Avatar src={m.sender_avatar} sx={{ width: 30, height: 30, mr: 1, bgcolor: IMAA.navy, fontSize: 13, fontWeight: 700 }}>
+        <Avatar src={m.sender_avatar} sx={{ width: 30, height: 30, mr: 1 }}>
           {(m.sender_display || m.sender_name || "U").slice(0, 1)}
         </Avatar>
       )}
@@ -1187,7 +1231,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
               display: "block",
               mb: 0.5,
               opacity: 0.9,
-              color: mine ? "inherit" : IMAA.teal
+              color: mine ? "inherit" : "primary.main"
             }}
           >
             {mine ? "You" : (m.sender_display || m.sender_name)}
@@ -1301,17 +1345,17 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                       maxWidth: "100%",
                       borderRadius: 2,
                       overflow: "hidden",
-                      bgcolor: mine ? "rgba(255,255,255,0.7)" : IMAA.bg,
+                      bgcolor: mine ? "rgba(0,0,0,0.05)" : "#f0f2f5",
                       cursor: "pointer",
                       mb: 0.5,
-                      border: `1px solid ${BORDER}`
+                      border: "1px solid rgba(0,0,0,0.08)"
                     }}
                   >
-                    <Box sx={{ height: 120, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: `1px solid ${BORDER}` }}>
-                      <PictureAsPdfRoundedIcon sx={{ fontSize: 50, color: IMAA.border }} />
+                    <Box sx={{ height: 120, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+                      <PictureAsPdfRoundedIcon sx={{ fontSize: 50, color: "#e0e0e0" }} />
                     </Box>
                     <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5 }}>
-                      <PictureAsPdfRoundedIcon sx={{ color: IMAA.danger, fontSize: 28 }} />
+                      <PictureAsPdfRoundedIcon sx={{ color: "#d32f2f", fontSize: 28 }} />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
                         <Typography variant="caption" color="text.secondary">{formatSize(att.size)} • PDF</Typography>
@@ -1338,10 +1382,10 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                   spacing={1.5}
                   onClick={() => window.open(url, "_blank")}
                   sx={{
-                    p: 1.5, borderRadius: 2, bgcolor: mine ? "rgba(255,255,255,0.7)" : IMAA.bg, border: `1px solid ${BORDER}`, cursor: "pointer", mb: 0.5
+                    p: 1.5, borderRadius: 2, bgcolor: "rgba(0,0,0,0.06)", cursor: "pointer", mb: 0.5
                   }}
                 >
-                  <InsertDriveFileRoundedIcon sx={{ color: IMAA.teal, fontSize: 28 }} />
+                  <InsertDriveFileRoundedIcon sx={{ color: "#54656f", fontSize: 28 }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
                     <Typography variant="caption" sx={{ opacity: 0.7 }}>{formatSize(att.size)} • {type.split('/').pop().toUpperCase()}</Typography>
@@ -1364,7 +1408,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
               mt: standardAttachments.length > 0 ? 0.5 : 0
             }}
           >
-            {m.body}
+            <LinkifiedText text={m.body} />
           </Typography>
         )}
 
@@ -1382,8 +1426,8 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
               float: "right",
               ml: 1,
               mt: 0.5,
-              fontSize: 10.5,
-              color: IMAA.muted,
+              fontSize: 10,
+              opacity: 0.75,
               display: "inline-block",
               verticalAlign: "bottom"
             }}
@@ -1703,7 +1747,7 @@ function NewChatDialog({ open, onClose, onOpened }) {
               <ListItem
                 key={`tab${tab}-${x.id}`}
                 disableGutters
-                sx={{ px: 1.25, py: 1, borderRadius: 2, cursor: "pointer", "&:hover": { bgcolor: IMAA.bg } }}
+                sx={{ px: 1, py: 1, borderRadius: 2, cursor: "pointer", "&:hover": { bgcolor: "#fafafa" } }}
                 onClick={async () => {
                   try {
                     if (tab === 0) {
@@ -1741,10 +1785,10 @@ function NewChatDialog({ open, onClose, onOpened }) {
                 }}
               >
                 <ListItemAvatar sx={{ minWidth: 44 }}>
-                  <Avatar src={absUrl(x.avatar)} sx={{ bgcolor: IMAA.navy, fontWeight: 700 }}>{(x.name || "X").slice(0, 1)}</Avatar>
+                  <Avatar src={absUrl(x.avatar)}>{(x.name || "X").slice(0, 1)}</Avatar>
                 </ListItemAvatar>
                 <ListItemText
-                  primary={<Typography variant="body2" sx={{ fontWeight: 700, color: IMAA.navy }} noWrap>{x.name}</Typography>}
+                  primary={<Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{x.name}</Typography>}
                   secondary={secondary}
                 />
               </ListItem>
@@ -3404,8 +3448,7 @@ export default function MessagesPage() {
         <Typography
           variant="subtitle1"
           sx={{
-            fontWeight: 700,
-            color: IMAA.navy,
+            fontWeight: 800,
             cursor: hasActiveGroup ? "pointer" : "default",
             "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
           }}
@@ -3457,7 +3500,7 @@ export default function MessagesPage() {
                   >
                     <Avatar
                       src={p.avatar}
-                      sx={{ width: 30, height: 30, cursor: "pointer", bgcolor: IMAA.navy }}
+                      sx={{ width: 28, height: 28, cursor: "pointer" }}
                       onClick={() => openUserProfile(p.id)}
                     />
                     <Typography
@@ -3640,7 +3683,7 @@ export default function MessagesPage() {
 
 
   return (
-    <ImaaCommunityScope page="messages">
+    <>
       <NewChatDialog
         open={newOpen}
         onOpened={() => { }}
@@ -3662,7 +3705,9 @@ export default function MessagesPage() {
       >
         {/* LEFT: Conversation list */}
         <Grid
-          size={{ xs: 12, md: 4, lg: 3 }}
+          item
+          xs={12}
+          md={3}
           sx={{
             // Mobile / tablet: only show when in "list" mode
             display: {
@@ -3672,26 +3717,29 @@ export default function MessagesPage() {
           }}
         >
           <Paper
-            elevation={0}
             sx={{
               p: 1.5,
               border: `1px solid ${BORDER}`,
               borderRadius: 3,
-              boxShadow: IMAA.shadowSm,
               height: PANEL_H,
               display: "flex",
               flexDirection: "column",
-              width: "100%",
+
+              // 🔹 137% width on mobile (xs), normal 100% on tablet & up
+              width: { xs: "137%", sm: "250%", md: "100%" },
+              maxWidth: "none",
+
+              // optional: recentre the block so it doesn’t look shifted
+              ml: { xs: "-1.0%", sm: 0 }, // half of extra 37% = 18.5%
             }}
           >
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25, px: 0.25 }}>
-              <Typography variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: IMAA.navy, fontSize: 22, lineHeight: 1.2 }}>Messages</Typography>
-              <IconButton size="small" className="ecp-icon-btn"><AttachFileOutlinedIcon fontSize="small" /></IconButton>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>Messages</Typography>
+              <IconButton size="small"><AttachFileOutlinedIcon fontSize="small" /></IconButton>
             </Stack>
 
             <TextField
               size="small"
-              className="ecp-search-field"
               placeholder="Search…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -3705,10 +3753,10 @@ export default function MessagesPage() {
               }}
             />
 
-            <Typography variant="caption" className="ecp-section-label" sx={{ mt: 1.5, mb: 0.75, px: 0.5 }}>
+            <Typography variant="caption" sx={{ mt: 1, mb: 0.5, display: "block", color: "text.secondary" }}>
               All Message
             </Typography>
-            <List dense disablePadding sx={{ flex: 1, overflowY: "auto", mx: -0.5, px: 0.5 }}>
+            <List dense sx={{ flex: 1, overflowY: "auto" }}>
               {filtered.map((t) => {
                 const isActive = t.id === activeId;
                 let showOnline = false;
@@ -3757,7 +3805,7 @@ export default function MessagesPage() {
 
             </List>
 
-            <Button fullWidth variant="contained" sx={{ mt: 1.25 }} onClick={() => setNewOpen(true)}>
+            <Button fullWidth variant="outlined" sx={{ mt: 1 }} onClick={() => setNewOpen(true)}>
               New Chat
             </Button>
           </Paper>
@@ -3765,7 +3813,9 @@ export default function MessagesPage() {
 
         {/* CENTER: Chat */}
         <Grid
-          size={{ xs: 12, md: 8, lg: 9 }}
+          item
+          xs={12}
+          md={9}
           sx={{
             display: {
               xs: mobileView === "chat" ? "block" : "none",
@@ -3779,29 +3829,29 @@ export default function MessagesPage() {
               display: "flex",
               flexDirection: "column",
               minHeight: 0,
-              width: "100%",
+              // 🔹 full width on mobile / tablet
+              width: { xs: "105%", sm: "185%", md: "149%" },
+              maxWidth: "none",  // no cap on tablet/mobile
             }}
           >
             {!activeId ? (
               <Paper
-                elevation={0}
                 sx={{
                   flex: 1,
                   border: `1px solid ${BORDER}`,
                   borderRadius: 3,
-                  boxShadow: IMAA.shadowSm,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   textAlign: "center",
                   px: 3,
-                  bgcolor: "#fff",
-                  backgroundImage: `linear-gradient(180deg, ${IMAA.bg} 0%, #ffffff 60%)`,
+                  background:
+                    "radial-gradient(1200px circle at 30% 0%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(1000px circle at 80% 30%, rgba(20,184,166,0.10), transparent 55%)",
                 }}
               >
-                <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 360, lineHeight: 1.7 }}>
+                <Typography variant="body1" color="text.secondary">
                   Select a conversation on the left or use{" "}
-                  <Box component="span" sx={{ fontWeight: 800, color: IMAA.navy }}>
+                  <Box component="span" sx={{ fontWeight: 800 }}>
                     New chat
                   </Box>{" "}
                   to start one.
@@ -3810,7 +3860,7 @@ export default function MessagesPage() {
             ) : (
               <>
                 {/* Top bar */}
-                <Paper elevation={0} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, border: `1px solid ${BORDER}`, borderRadius: 3, boxShadow: IMAA.shadowSm, mb: 1.25 }}>
+                <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 1 }}>
                   <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                     {/* CLICKABLE: group avatar + name */}
                     <Stack
@@ -3828,7 +3878,6 @@ export default function MessagesPage() {
                       {isMobileOrTablet && (
                         <IconButton
                           size="small"
-                          className="ecp-icon-btn"
                           onClick={(e) => {
                             e.stopPropagation();
                             setMobileView("list");
@@ -3840,7 +3889,7 @@ export default function MessagesPage() {
 
                       <Avatar
                         src={topLogo}
-                        sx={{ width: 42, height: 42, bgcolor: IMAA.navy, fontWeight: 700, cursor: hasActiveGroup ? "pointer" : "default" }}
+                        sx={{ width: 40, height: 40, cursor: hasActiveGroup ? "pointer" : "default" }}
                         onClick={hasActiveGroup ? openActiveGroup : undefined}
                       >
                         {(topTitle || "C").slice(0, 1)}
@@ -3851,9 +3900,7 @@ export default function MessagesPage() {
                         <Typography
                           variant="subtitle1"
                           sx={{
-                            fontWeight: 700,
-                            color: IMAA.navy,
-                            lineHeight: 1.3,
+                            fontWeight: 800,
                             cursor: hasActiveGroup ? "pointer" : "default",
                             "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
                           }}
@@ -3891,7 +3938,6 @@ export default function MessagesPage() {
                       {/* ℹ️ Details icon – opens members/attachments popup */}
                       <IconButton
                         size="small"
-                        className="ecp-icon-btn"
                         onClick={() => setDetailsOpen(true)}
                       >
                         <InfoOutlinedIcon fontSize="small" />
@@ -3903,12 +3949,10 @@ export default function MessagesPage() {
 
                 {/* Chat thread */}
                 <Paper
-                  elevation={0}
                   sx={{
-                    p: { xs: 1.5, sm: 2 },
+                    p: 2,
                     border: `1px solid ${BORDER}`,
                     borderRadius: 3,
-                    boxShadow: IMAA.shadowSm,
                     flex: 1,
                     minHeight: 0,
                     display: "flex",
@@ -3926,7 +3970,7 @@ export default function MessagesPage() {
                         right: 0,
                         bottom: 0,
                         zIndex: 20,
-                        bgcolor: IMAA.bg,
+                        bgcolor: "#e9edef",
                         display: "flex",
                         flexDirection: "column",
                         borderRadius: 3,
@@ -3938,7 +3982,7 @@ export default function MessagesPage() {
                         <IconButton onClick={handleClearAttachments}>
                           <CloseRoundedIcon sx={{ fontSize: 30 }} />
                         </IconButton>
-                        <Typography variant="h6" sx={{ ml: 2, fontWeight: 700, color: IMAA.navy }}>
+                        <Typography variant="h6" sx={{ ml: 2 }}>
                           Preview {draftAttachments.length > 1 && `(${activePreviewIndex + 1} of ${draftAttachments.length})`}
                         </Typography>
                       </Stack>
@@ -3951,7 +3995,7 @@ export default function MessagesPage() {
                           display: "flex",
                           justifyContent: "center",
                           alignItems: "center",
-                          bgcolor: "#EEF2F6",
+                          bgcolor: "#d1d7db",
                           overflow: "hidden"
                         }}
                       >
@@ -3988,8 +4032,8 @@ export default function MessagesPage() {
                               }}
                             />
                           ) : (
-                            <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "white", borderRadius: 3, border: `1px solid ${BORDER}` }}>
-                              <DescriptionOutlinedIcon sx={{ fontSize: 60, color: IMAA.teal }} />
+                            <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "white", borderRadius: 4 }}>
+                              <DescriptionOutlinedIcon sx={{ fontSize: 60, color: "#54656f" }} />
                               <Typography variant="h6">{draftAttachments[activePreviewIndex].name}</Typography>
                               <Typography variant="body2" color="text.secondary">
                                 {(draftAttachments[activePreviewIndex].size / 1024).toFixed(1)} KB
@@ -4039,7 +4083,7 @@ export default function MessagesPage() {
                                 height: 50,
                                 borderRadius: 1,
                                 overflow: "hidden",
-                                border: activePreviewIndex === idx ? `2px solid ${IMAA.teal}` : "2px solid transparent",
+                                border: activePreviewIndex === idx ? "2px solid #00a884" : "2px solid transparent",
                                 cursor: "pointer",
                                 flexShrink: 0
                               }}
@@ -4064,7 +4108,7 @@ export default function MessagesPage() {
                         direction="row"
                         spacing={1}
                         alignItems="center"
-                        sx={{ p: 2, bgcolor: "#fff", borderTop: `1px solid ${BORDER}` }}
+                        sx={{ p: 2, bgcolor: "#f0f2f5" }}
                       >
                         <TextField
                           size="small"
@@ -4073,7 +4117,7 @@ export default function MessagesPage() {
                           onChange={(e) => setDraft(e.target.value)}
                           fullWidth
                           autoFocus
-                          sx={{ bgcolor: "white", borderRadius: 2 }}
+                          sx={{ bgcolor: "white", borderRadius: 1 }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                               e.preventDefault();
@@ -4084,10 +4128,10 @@ export default function MessagesPage() {
                         <IconButton
                           onClick={handleSend}
                           sx={{
-                            bgcolor: IMAA.coral,
+                            bgcolor: "#00a884",
                             color: "white",
                             width: 45, height: 45,
-                            "&:hover": { bgcolor: IMAA.coralHover }
+                            "&:hover": { bgcolor: "#008f6f" }
                           }}
                         >
                           <SendIcon sx={{ fontSize: 20, ml: 0.5 }} />
@@ -4097,13 +4141,7 @@ export default function MessagesPage() {
                   )}
                   <Box
                     id="chat-scroll"
-                    className="ecp-chat-thread"
                     sx={{
-                      mx: { xs: -1.5, sm: -2 },
-                      mt: { xs: -1.5, sm: -2 },
-                      px: { xs: 1.5, sm: 2 },
-                      pt: 1,
-                      borderRadius: "12px 12px 0 0",
                       flex: 1,
                       overflowY: "auto",
                       overflowX: "hidden",
@@ -4141,10 +4179,9 @@ export default function MessagesPage() {
                           px: 1,
                           py: 0.75,
                           borderRadius: 2,
-                          bgcolor: "#fff",
+                          bgcolor: "#f8fafc",
                           border: `1px solid ${BORDER}`,
-                          borderLeft: `3px solid ${IMAA.coral}`,
-                          boxShadow: IMAA.shadowSm,
+                          boxShadow: pinnedMessages.length > 1 ? "0 2px 4px rgba(0,0,0,0.03)" : "none",
                         }}
                       >
                         {/* Header Row: Always visible */}
@@ -4189,7 +4226,7 @@ export default function MessagesPage() {
                                     height: 20,
                                     fontSize: 10,
                                     fontWeight: 700,
-                                    bgcolor: IMAA.navy,
+                                    bgcolor: "primary.main",
                                     color: "#fff"
                                   }}
                                 />
@@ -4218,7 +4255,7 @@ export default function MessagesPage() {
                                   cursor: "pointer",
                                   borderRadius: 1,
                                   p: 0.5,
-                                  "&:hover": { bgcolor: IMAA.bg },
+                                  "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -4253,7 +4290,7 @@ export default function MessagesPage() {
                     {sections.map((sec) => (
                       <React.Fragment key={sec.label}>
                         <Stack alignItems="center" sx={{ my: 0.8 }}>
-                          <Chip size="small" variant="outlined" label={sec.label} sx={{ bgcolor: "#fff", borderColor: BORDER, color: IMAA.muted, fontSize: 11, fontWeight: 700, height: 22 }} />
+                          <Chip size="small" variant="outlined" label={sec.label} />
                         </Stack>
                         {sec.items.map((m, i) => {
                           if (m._system) {
@@ -4266,8 +4303,8 @@ export default function MessagesPage() {
                                     px: 1.25,
                                     py: 0.5,
                                     borderRadius: 999,
-                                    border: `1px solid ${BORDER}`,
-                                    bgcolor: "#fff",
+                                    border: "1px solid rgba(148,163,184,0.45)",
+                                    bgcolor: "#f8fafc",
                                     color: "text.secondary",
                                   }}
                                 >
@@ -4303,7 +4340,7 @@ export default function MessagesPage() {
                     ))}
                   </Box>
 
-                  <Divider sx={{ mx: { xs: -1.5, sm: -2 }, mb: 1.25 }} />
+                  <Divider sx={{ my: 1.25 }} />
 
                   {groupReadOnly ? (
                     // 🔒 WhatsApp-style read-only group banner
@@ -4311,9 +4348,9 @@ export default function MessagesPage() {
                       sx={{
                         px: 2,
                         py: 1,
-                        borderRadius: 2,
-                        border: `1px dashed ${IMAA.borderStrong}`,
-                        bgcolor: IMAA.bg,
+                        borderRadius: 1.5,
+                        border: `1px dashed ${BORDER}`,
+                        bgcolor: "#f9fafb",
                         color: "text.secondary",
                         fontSize: 13,
                         textAlign: "center",
@@ -4321,7 +4358,7 @@ export default function MessagesPage() {
                     >Only admins can send messages in this group.
                                           </Box>)
                   ) : (
-                    <Stack direction="row" spacing={1} alignItems="center" className="ecp-chat-composer">
+                    <Stack direction="row" spacing={1} alignItems="center">
                       {/* 🔹 1. Hidden Inputs for File and Camera */}
                       <input
                         type="file"
@@ -4344,12 +4381,8 @@ export default function MessagesPage() {
                         <IconButton
                           onClick={handleAttachClick}
                           size="small"
-                          className="ecp-icon-btn"
                           sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: "50%",
-                            bgcolor: isAttachMenuOpen ? IMAA.tealLight : "#fff",
+                            bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.08)" : "transparent",
                             transition: "transform 0.2s",
                             transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)"
                           }}
@@ -4369,20 +4402,20 @@ export default function MessagesPage() {
                           "& .MuiPaper-root": {
                             borderRadius: 3,
                             mb: 1,
-                            boxShadow: IMAA.shadowMd
+                            boxShadow: "0px 4px 20px rgba(0,0,0,0.15)"
                           }
                         }}
                       >
                         <MenuItem onClick={handleTriggerFileUpload} sx={{ py: 1.5, pr: 3 }}>
                           <ListItemIcon>
-                            <UploadFileRoundedIcon fontSize="small" sx={{ color: IMAA.teal }} />
+                            <UploadFileRoundedIcon fontSize="small" sx={{ color: "#7F66FF" }} />
                           </ListItemIcon>
                           <Typography variant="body2" fontWeight={600}>File Upload</Typography>
                         </MenuItem>
 
                         <MenuItem onClick={handleTriggerCamera} sx={{ py: 1.5, pr: 3 }}>
                           <ListItemIcon>
-                            <CameraAltRoundedIcon fontSize="small" sx={{ color: IMAA.coral }} />
+                            <CameraAltRoundedIcon fontSize="small" sx={{ color: "#D93025" }} />
                           </ListItemIcon>
                           <Typography variant="body2" fontWeight={600}>Camera</Typography>
                         </MenuItem>
@@ -4405,7 +4438,6 @@ export default function MessagesPage() {
                       <Button
                         variant="contained"
                         size="small"
-                        className="ecp-chat-send"
                         endIcon={<SendIcon />}
                         onClick={handleSend}
                       >
@@ -4466,7 +4498,7 @@ export default function MessagesPage() {
             pr: 1,
           }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 700, color: IMAA.navy }}>Chat details</Typography>
+          <Typography variant="h6">Chat details</Typography>
           <IconButton size="small" onClick={() => setDetailsOpen(false)}>
             <CloseRoundedIcon fontSize="small" />
           </IconButton>
@@ -4537,6 +4569,6 @@ export default function MessagesPage() {
           </IconButton>
         </Stack>
       </Dialog>
-    </ImaaCommunityScope>
+    </>
   );
 }

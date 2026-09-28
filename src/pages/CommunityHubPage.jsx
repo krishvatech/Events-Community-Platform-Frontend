@@ -55,7 +55,6 @@ export default function CommunityHubPage() {
 
   return (
     <Box
-      className="imaa-ecp-ui"
       sx={{
         width: "100%",
         maxWidth: view === "home" ? "100%" : 1200,

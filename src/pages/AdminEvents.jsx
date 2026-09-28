@@ -98,171 +98,6 @@ const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 // Origin without the /api suffix
 const API_ORIGIN = API_BASE.replace(/\/api$/, "");
 
-// ---- IMAA Institute design tokens (presentation only) ----
-const NAVY = "#1B2A4A";
-const CORAL = "#E8532F";
-const TEAL = "#0A9396";
-const TEAL_DARK = "#087F82";
-const BG = "#F6F8FB";
-const BORDER = "#E3E8EF";
-const MUTED = "#64748B";
-const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
-const CARD_SHADOW_HOVER = "0 10px 24px rgba(27,42,74,0.10)";
-
-const CARD_SX = {
-  border: `1px solid ${BORDER}`,
-  borderRadius: 3,
-  bgcolor: "#fff",
-  boxShadow: CARD_SHADOW,
-};
-
-const PRIMARY_BTN_SX = {
-  textTransform: "none",
-  fontWeight: 600,
-  borderRadius: 2,
-  px: 2.25,
-  bgcolor: TEAL,
-  color: "#fff",
-  boxShadow: "none",
-  "&:hover": { bgcolor: TEAL_DARK, boxShadow: "none" },
-  "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#fff" },
-};
-
-const ACCENT_BTN_SX = {
-  ...PRIMARY_BTN_SX,
-  bgcolor: CORAL,
-  "&:hover": { bgcolor: "#CF4525", boxShadow: "none" },
-};
-
-const OUTLINE_BTN_SX = {
-  textTransform: "none",
-  fontWeight: 600,
-  borderRadius: 2,
-  px: 2.25,
-  color: NAVY,
-  borderColor: BORDER,
-  bgcolor: "#fff",
-  "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.06)" },
-};
-
-const SUBTLE_BTN_SX = {
-  textTransform: "none",
-  fontWeight: 600,
-  borderRadius: 2,
-  color: MUTED,
-  "&:hover": { bgcolor: "rgba(27,42,74,0.05)", color: NAVY },
-};
-
-const BTN_SHAPE_SX = { textTransform: "none", fontWeight: 600, borderRadius: 2 };
-
-const FIELD_SX = {
-  "& .MuiOutlinedInput-root": {
-    borderRadius: 2,
-    bgcolor: "#fff",
-    "& fieldset": { borderColor: BORDER },
-    "&:hover fieldset": { borderColor: "#CBD5E1" },
-    "&.Mui-focused fieldset": { borderColor: TEAL, borderWidth: 2 },
-  },
-  "& .MuiInputLabel-root.Mui-focused": { color: TEAL },
-};
-
-const chipSx = (fg, bg, bd) => ({
-  height: 24,
-  fontSize: 12,
-  fontWeight: 600,
-  borderRadius: 1.5,
-  color: fg,
-  bgcolor: bg,
-  border: `1px solid ${bd}`,
-  "& .MuiChip-icon": { color: `${fg} !important`, fontSize: 15, ml: 0.75 },
-  "& .MuiChip-label": { px: 1 },
-});
-
-const BADGE_LIVE = chipSx(CORAL, "rgba(232,83,47,0.10)", "rgba(232,83,47,0.26)");
-const BADGE_UPCOMING = chipSx(TEAL_DARK, "rgba(10,147,150,0.10)", "rgba(10,147,150,0.22)");
-const BADGE_NEUTRAL = chipSx(MUTED, "#F1F5F9", BORDER);
-const BADGE_NAVY = chipSx(NAVY, "rgba(27,42,74,0.07)", "rgba(27,42,74,0.16)");
-const BADGE_OUTLINE = chipSx(MUTED, "#fff", BORDER);
-
-const DIALOG_TITLE_SX = {
-  fontWeight: 800,
-  fontSize: 19,
-  color: NAVY,
-  borderBottom: `1px solid ${BORDER}`,
-  py: 2,
-};
-
-const DIALOG_PAPER_SX = { borderRadius: 3, border: `1px solid ${BORDER}` };
-
-const DIALOG_ACTIONS_SX = {
-  px: 3,
-  py: 2.25,
-  borderTop: `1px solid ${BORDER}`,
-  bgcolor: BG,
-  gap: 1,
-};
-
-const UPLOAD_BOX_SX = {
-  position: "relative",
-  borderRadius: 2,
-  border: `1px dashed #CBD5E1`,
-  bgcolor: BG,
-  color: "#AEBACB",
-  transition: "border-color .2s ease, background-color .2s ease",
-  "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.04)" },
-};
-
-const TABS_SX = {
-  px: 2,
-  minHeight: 48,
-  "& .MuiTab-root": {
-    textTransform: "none",
-    fontWeight: 700,
-    minHeight: 48,
-    fontSize: 14.5,
-    color: MUTED,
-    "&:hover": { color: NAVY },
-  },
-  "& .Mui-selected": { color: `${NAVY} !important` },
-  "& .MuiTabs-indicator": { backgroundColor: CORAL, height: 3, borderRadius: 3 },
-};
-
-const PAGINATION_SX = {
-  "& .MuiPaginationItem-root": {
-    borderRadius: 2,
-    fontWeight: 600,
-    color: NAVY,
-    border: `1px solid ${BORDER}`,
-    bgcolor: "#fff",
-    minWidth: 36,
-    height: 36,
-    "&:hover": { bgcolor: "rgba(10,147,150,0.08)", borderColor: TEAL },
-  },
-  "& .MuiPaginationItem-root.Mui-selected": {
-    bgcolor: NAVY,
-    color: "#fff",
-    borderColor: NAVY,
-    "&:hover": { bgcolor: "#16233D" },
-  },
-  "& .MuiPaginationItem-ellipsis": { border: "none", bgcolor: "transparent" },
-};
-
-const SWITCH_SX = {
-  "& .MuiSwitch-switchBase.Mui-checked": { color: TEAL },
-  "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: TEAL },
-};
-
-// Neutral placeholder used when an event has no cover image.
-const IMAGE_PLACEHOLDER_SX = {
-  position: "absolute",
-  inset: 0,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: `linear-gradient(135deg, ${BG} 0%, #ECF1F7 100%)`,
-  color: "#AEBACB",
-};
-
 // Small helpers reused from MyEventsPage
 const urlJoin = (base, path) => {
   const p = path.startsWith("/") ? path : `/${path}`;
@@ -456,7 +291,7 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect, error, hel
         onSelect?.(newValue || null);
       }}
       renderInput={(params) => (
-        <TextField sx={FIELD_SX}
+        <TextField
           {...params}
           label={label}
           fullWidth
@@ -523,17 +358,17 @@ const computeStatus = (ev) => {
 const statusChip = (status) => {
   switch (status) {
     case "live":
-      return { label: "Live", sx: BADGE_LIVE };
+      return { label: "Live", className: "bg-rose-50 text-rose-700" };
     case "upcoming":
-      return { label: "Upcoming", sx: BADGE_UPCOMING };
+      return { label: "Upcoming", className: "bg-teal-50 text-teal-700" };
     case "past":
-      return { label: "Past", sx: BADGE_NEUTRAL };
+      return { label: "Past", className: "bg-slate-100 text-slate-700" };
     case "cancelled":
-      return { label: "Cancelled", sx: BADGE_LIVE };
+      return { label: "Cancelled", className: "bg-red-100 text-red-700" };
     case "archived":
-      return { label: "Deleted", sx: BADGE_NAVY };
+      return { label: "Deleted", className: "bg-slate-200 text-slate-800" };
     default:
-      return { label: "—", sx: BADGE_NEUTRAL };
+      return { label: "—", className: "bg-slate-100 text-slate-700" };
   }
 };
 
@@ -1568,21 +1403,21 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         onClose={onClose}
         fullWidth
         maxWidth="md"
-        PaperProps={{ sx: { ...DIALOG_PAPER_SX, width: { xs: "100%", sm: 880 }, maxWidth: "100%" } }}
+        PaperProps={{ sx: { width: { xs: "100%", sm: 880 }, maxWidth: "100%", borderRadius: 3 } }}
       >
-        <DialogTitle sx={DIALOG_TITLE_SX}>Create an Event</DialogTitle>
+        <DialogTitle className="font-extrabold">Create an Event</DialogTitle>
 
         <DialogContent dividers>
-          <Typography variant="body2" className="text-[#64748B] mb-4">
+          <Typography variant="body2" className="text-slate-500 mb-4">
             *Required fields are marked with an asterisk
           </Typography>
 
           {/* ===== Basic Info ===== */}
-          <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4 mb-3">
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
             <Typography variant="h6" className="font-semibold mb-3">Basic Info</Typography>
 
             <Box className="flex items-start mb-3">
-              <TextField sx={FIELD_SX}
+              <TextField
                 label="Name of the Event *"
                 placeholder="Enter event name"
                 InputLabelProps={{ shrink: true }}
@@ -1732,7 +1567,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                 Registration Type
               </Typography>
-              <TextField sx={FIELD_SX}
+              <TextField
                 select
                 fullWidth
                 value={registrationType}
@@ -1782,7 +1617,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
           {/* Replay Options - Only for Virtual/Hybrid */}
           {(format === "virtual" || format === "hybrid") && (
-            <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4 mb-3">
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
               <Typography variant="h6" className="font-semibold mb-3">Replay Options</Typography>
               <Stack direction="column" spacing={2}>
                 <FormControlLabel
@@ -1867,7 +1702,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
           {/* External Streaming Options - Only for Virtual/Hybrid */}
           {(format === "virtual" || format === "hybrid") && (
-            <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4 mb-3">
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
               <Typography variant="h6" className="font-semibold mb-3">Streaming Platform</Typography>
               <Stack direction="column" spacing={2}>
                 <FormControlLabel
@@ -1888,7 +1723,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
                 {useExternalStreaming && (
                   <Box sx={{ pl: 2, pt: 1 }}>
-                    <TextField sx={FIELD_SX}
+                    <TextField
                       select
                       label="Platform *"
                       value={externalStreamingPlatform}
@@ -1901,7 +1736,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       <MenuItem value="microsoft_teams">Microsoft Teams</MenuItem>
                     </TextField>
 
-                    <TextField sx={FIELD_SX}
+                    <TextField
                       label="Join URL *"
                       value={externalStreamingUrl}
                       onChange={(e) => setExternalStreamingUrl(e.target.value)}
@@ -1911,7 +1746,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       helperText="Direct link for attendees to join"
                     />
 
-                    <TextField sx={FIELD_SX}
+                    <TextField
                       label="Meeting ID"
                       value={externalStreamingMeetingId}
                       onChange={(e) => setExternalStreamingMeetingId(e.target.value)}
@@ -1921,7 +1756,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       helperText="Optional: meeting ID for reference"
                     />
 
-                    <TextField sx={FIELD_SX}
+                    <TextField
                       label="Additional Login Instructions"
                       value={externalStreamingOtherDetails}
                       onChange={(e) => setExternalStreamingOtherDetails(e.target.value)}
@@ -1933,7 +1768,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       helperText="Optional: shown to attendees on event details page"
                     />
 
-                    <TextField sx={FIELD_SX}
+                    <TextField
                       label="Host/Moderator Join Link"
                       value={externalStreamingHostLink}
                       onChange={(e) => setExternalStreamingHostLink(e.target.value)}
@@ -1978,7 +1813,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   </li>
                 )}
                 renderInput={(params) => (
-                  <TextField sx={FIELD_SX}
+                  <TextField
                     {...params}
                     label="Country"
                     placeholder="Select country"
@@ -2036,7 +1871,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       </li>
                     )}
                     renderInput={(params) => (
-                      <TextField sx={FIELD_SX}
+                      <TextField
                         {...params}
                         label="Country"
                         placeholder="Select country"
@@ -2051,7 +1886,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 </Box>
                 {/* Venue Name - Optional */}
                 <Box sx={{ mt: 2 }}>
-                  <TextField sx={FIELD_SX}
+                  <TextField
                     fullWidth
                     label="Venue Name (Optional)"
                     placeholder="e.g., Marriott Hotel, Tech Hub Office"
@@ -2062,7 +1897,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 </Box>
                 {/* Venue Address - Optional and private */}
                 <Box sx={{ mt: 2 }}>
-                  <TextField sx={FIELD_SX}
+                  <TextField
                     fullWidth
                     label="Exact Address (Optional)"
                     placeholder="e.g., 123 Main St, Suite 100"
@@ -2081,7 +1916,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
           {/* Category Field */}
           <Box sx={{ mb: 3 }}>
-            <TextField sx={FIELD_SX}
+            <TextField
               label="Category"
               select
               value={category}
@@ -2108,9 +1943,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             {!isFree ? (
               <Box sx={{
                 p: 2.5,
-                border: `1px solid ${BORDER}`,
+                border: "1px solid #e3f2fd",
                 borderRadius: 2,
-                bgcolor: BG,
+                bgcolor: "#f0f7ff",
                 mb: 3,
                 display: "flex",
                 alignItems: "flex-start",
@@ -2118,10 +1953,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               }}>
                 <Box sx={{ fontSize: 20, mt: 0.1 }}>💳</Box>
                 <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: NAVY, mb: 0.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1565c0", mb: 0.5 }}>
                     💳 Paid Event — Will be saved as Draft
                   </Typography>
-                  <Typography variant="body2" sx={{ color: MUTED }}>
+                  <Typography variant="body2" sx={{ color: "#1565c0" }}>
                     This event will be created as a <strong>Draft</strong> (not publicly visible).
                     Once you set the price in the <strong>Product Management tab</strong>, you can publish it.
                   </Typography>
@@ -2150,7 +1985,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
-                <TextField sx={FIELD_SX}
+                <TextField
                   label="Total eligible minutes"
                   type="number"
                   value={cpdCpeMinutes}
@@ -2166,7 +2001,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField sx={FIELD_SX}
+                <TextField
                   label="Minutes per credit"
                   type="number"
                   value={cpdCpeMinutesPerCredit}
@@ -2212,13 +2047,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             {/* Update Logo / Picture */}
             <Box>
               <Typography variant="subtitle1" className="font-semibold">Logo / Picture</Typography>
-              <Typography variant="caption" className="text-[#64748B] block mb-2">
+              <Typography variant="caption" className="text-slate-500 block mb-2">
                 Recommended 200x200px - Max 5 MB
               </Typography>
 
               <Box
-                className="flex items-center justify-center"
-                sx={{ ...UPLOAD_BOX_SX, height: 150, overflow: "hidden" }}
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
               >
                 {localLogoImagePreview ? (
                   <img
@@ -2229,7 +2064,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 ) : (
                   <Stack alignItems="center" spacing={1}>
                     <ImageRoundedIcon />
-                    <Typography variant="body2" className="text-[#64748B]">Logo / Picture</Typography>
+                    <Typography variant="body2" className="text-slate-600">Logo / Picture</Typography>
                   </Stack>
                 )}
 
@@ -2270,13 +2105,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             {/* Cover Image */}
             <Box>
               <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
-              <Typography variant="caption" className="text-[#64748B] block mb-2">
+              <Typography variant="caption" className="text-slate-500 block mb-2">
                 Recommended 1280x720px - Max 5 MB
               </Typography>
 
               <Box
-                className="flex items-center justify-center"
-                sx={{ ...UPLOAD_BOX_SX, height: 150, overflow: "hidden" }}
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
               >
                 {localCoverImagePreview ? (
                   <img
@@ -2287,7 +2122,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 ) : (
                   <Stack alignItems="center" spacing={1}>
                     <ImageRoundedIcon />
-                    <Typography variant="body2" className="text-[#64748B]">Cover Image</Typography>
+                    <Typography variant="body2" className="text-slate-600">Cover Image</Typography>
                   </Stack>
                 )}
 
@@ -2328,13 +2163,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             {/* Waiting Room Image */}
             <Box>
               <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
-              <Typography variant="caption" className="text-[#64748B] block mb-2">
+              <Typography variant="caption" className="text-slate-500 block mb-2">
                 Recommended 1280x720px - Max 5 MB
               </Typography>
 
               <Box
-                className="flex items-center justify-center"
-                sx={{ ...UPLOAD_BOX_SX, height: 150, overflow: "hidden" }}
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
               >
                 {localWaitingRoomImagePreview ? (
                   <img
@@ -2345,7 +2180,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 ) : (
                   <Stack alignItems="center" spacing={1}>
                     <ImageRoundedIcon />
-                    <Typography variant="body2" className="text-[#64748B]">Waiting Room</Typography>
+                    <Typography variant="body2" className="text-slate-600">Waiting Room</Typography>
                   </Stack>
                 )}
 
@@ -2445,7 +2280,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 "& .MuiFormControlLabel-label": { marginLeft: 0 },
               }}
             />
-            <TextField sx={FIELD_SX}
+            <TextField
               label="Auto-admit after (seconds)"
               size="small"
               type="number"
@@ -2472,7 +2307,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           />
 
           {/* ===== Schedule ===== */}
-          <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4 mb-3">
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
             <Box className="flex items-center justify-between mb-3">
               <Typography variant="h6" className="font-semibold">Schedule</Typography>
               <FormControlLabel
@@ -2620,7 +2455,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     value={timezone}
                     onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
                     renderInput={(params) => (
-                      <TextField sx={FIELD_SX}
+                      <TextField
                         {...params}
                         label="Event Timezone"
                         helperText="Times are saved in this timezone."
@@ -2631,12 +2466,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     <Box
                       sx={{
                         p: 1.5,
-                        backgroundColor: BG,
+                        backgroundColor: "#f3f4f6",
                         borderRadius: 1,
-                        border: `1px solid ${BORDER}`
+                        border: "1px solid #e5e7eb"
                       }}
                     >
-                      <Typography variant="caption" sx={{ fontWeight: 600, color: MUTED }}>
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: "#6b7280" }}>
                         User Time: {getBrowserTimezone()}
                       </Typography>
                       <Typography variant="caption" sx={{ display: "block", color: "#9ca3af", mt: 0.5 }}>
@@ -2651,7 +2486,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
           {/* ===== Sessions (Multi-Day Events) ===== */}
           {isMultiDay && (
-            <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4 mb-3">
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
               <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <CalendarMonthRoundedIcon color="action" />
@@ -2666,7 +2501,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     setEditingSessionIndex(null);
                     setSessionDialogOpen(true);
                   }}
-                  sx={PRIMARY_BTN_SX}
+                  sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 >
                   Add Session
                 </Button>
@@ -2699,7 +2534,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           )}
 
           {/* ===== Speakers & Hosts ===== */}
-          <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4 mb-3">
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
             <Stack direction="row" alignItems="center" spacing={1} mb={2}>
               <RecordVoiceOverRoundedIcon color="action" />
               <Typography variant="h6" className="font-semibold">
@@ -2730,7 +2565,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               </Box>
             )}
 
-            <Button sx={OUTLINE_BTN_SX}
+            <Button
               variant="outlined"
               startIcon={<AddRoundedIcon />}
               onClick={() => {
@@ -2744,9 +2579,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           </Paper>
 
           {/* ===== Attach Resources ===== */}
-          <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
             <Typography variant="h6" className="font-semibold mb-1">Attach Resources (optional)</Typography>
-            <Typography variant="caption" className="text-[#64748B]">
+            <Typography variant="caption" className="text-slate-500">
               You can add files, links, or videos now. They’ll be saved to this event.
             </Typography>
 
@@ -2814,7 +2649,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             {/* NEW: Resource metadata (applies to any type) */}
             <Grid container spacing={2} sx={{ mt: 2 }}>
               <Grid item xs={12} md={6}>
-                <TextField sx={FIELD_SX}
+                <TextField
                   label="Title"
                   placeholder="Enter resource title"
                   InputLabelProps={{ shrink: true }}
@@ -2824,7 +2659,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField sx={FIELD_SX}
+                <TextField
                   label="Description"
                   placeholder="Enter resource description"
                   InputLabelProps={{ shrink: true }}
@@ -2839,7 +2674,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>Tags</Typography>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                   <TextField size="small" placeholder="Add a tag" value={tagInput} onChange={(e) => setTagInput(e.target.value)} sx={{ flex: 1, maxWidth: 420 }} />
-                  <Button sx={OUTLINE_BTN_SX} variant="outlined" onClick={addTag}>Add</Button>
+                  <Button variant="outlined" onClick={addTag}>Add</Button>
                 </Stack>
                 {resTags.length > 0 && (
                   <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
@@ -2856,7 +2691,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               <Box sx={{ mt: 2 }}>
                 <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>Files</Typography>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Button sx={OUTLINE_BTN_SX} component="label" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
+                  <Button component="label" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
                     Choose files
                     <input hidden type="file" multiple onChange={(e) => e.target.files && setResFiles((p) => [...p, ...Array.from(e.target.files)])} />
                   </Button>
@@ -2867,7 +2702,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     {resFiles.map((f, idx) => (
                       <Stack key={`${f.name}-${idx}`} direction="row" spacing={1} alignItems="center">
                         <Chip size="small" label={f.name} />
-                        <Button sx={BTN_SHAPE_SX} size="small" color="error" onClick={() => setResFiles((p) => p.filter((_, i) => i !== idx))}>
+                        <Button size="small" color="error" onClick={() => setResFiles((p) => p.filter((_, i) => i !== idx))}>
                           Remove
                         </Button>
                       </Stack>
@@ -2883,14 +2718,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <Stack spacing={1} sx={{ width: "100%" }}>
                   {resLinks.map((val, idx) => (
                     <Stack key={`link-${idx}`} direction="row" spacing={1} sx={{ width: "100%" }}>
-                      <TextField sx={FIELD_SX} fullWidth placeholder="https://example.com/resource" value={val}
+                      <TextField fullWidth placeholder="https://example.com/resource" value={val}
                         onChange={(e) => setResLinks((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
-                      <Button sx={BTN_SHAPE_SX} variant="outlined" color="error" onClick={() => setResLinks((p) => p.filter((_, i) => i !== idx))}>
+                      <Button variant="outlined" color="error" onClick={() => setResLinks((p) => p.filter((_, i) => i !== idx))}>
                         Remove
                       </Button>
                     </Stack>
                   ))}
-                  <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => setResLinks((p) => [...p, ""])} startIcon={<AddRoundedIcon />}>
+                  <Button size="small" onClick={() => setResLinks((p) => [...p, ""])} startIcon={<AddRoundedIcon />}>
                     Add link
                   </Button>
                 </Stack>
@@ -2903,14 +2738,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <Stack spacing={1} sx={{ width: "100%" }}>
                   {resVideos.map((val, idx) => (
                     <Stack key={`video-${idx}`} direction="row" spacing={1} sx={{ width: "100%" }}>
-                      <TextField sx={FIELD_SX} fullWidth placeholder="https://youtu.be/abcd…" value={val}
+                      <TextField fullWidth placeholder="https://youtu.be/abcd…" value={val}
                         onChange={(e) => setResVideos((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
-                      <Button sx={BTN_SHAPE_SX} variant="outlined" color="error" onClick={() => setResVideos((p) => p.filter((_, i) => i !== idx))}>
+                      <Button variant="outlined" color="error" onClick={() => setResVideos((p) => p.filter((_, i) => i !== idx))}>
                         Remove
                       </Button>
                     </Stack>
                   ))}
-                  <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => setResVideos((p) => [...p, ""])} startIcon={<AddRoundedIcon />}>
+                  <Button size="small" onClick={() => setResVideos((p) => [...p, ""])} startIcon={<AddRoundedIcon />}>
                     Add video
                   </Button>
                 </Stack>
@@ -2918,7 +2753,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             )}
           </Paper>
           {/* ── Seed Questions Section ─────────────────────────────── */}
-          <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4 mb-3" sx={{ mt: 2 }}>
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3" sx={{ mt: 2 }}>
             <Stack direction="row" alignItems="center" spacing={1} mb={1}>
               <QuizOutlinedIcon color="action" />
               <Typography variant="h6" className="font-semibold">Seed Questions (Q&amp;A)</Typography>
@@ -2937,14 +2772,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     checked={qnaAiPublicSuggestionsEnabled}
                     onChange={(e) => setQnaAiPublicSuggestionsEnabled(e.target.checked)}
                     sx={{
-                      "& .MuiSwitch-switchBase.Mui-checked": { color: TEAL },
-                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: TEAL }
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: "#9c7bff" },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#9c7bff" }
                     }}
                   />
                 }
                 label={
                   <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: NAVY }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: "#9c7bff" }}>
                       Enable AI Question Adoption
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -2963,14 +2798,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     checked={preEventQnaEnabled}
                     onChange={(e) => setPreEventQnaEnabled(e.target.checked)}
                     sx={{
-                      "& .MuiSwitch-switchBase.Mui-checked": { color: TEAL },
-                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: TEAL }
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: "#10b8a6" },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#10b8a6" }
                     }}
                   />
                 }
                 label={
                   <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: NAVY }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: "#10b8a6" }}>
                       Enable Pre-Event Q&A
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -2992,9 +2827,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   <Paper key={idx} variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, bgcolor: "rgba(16,184,166,0.04)", borderColor: "rgba(16,184,166,0.25)" }}>
                     {editingSeedIdx === idx ? (
                       <Stack spacing={1}>
-                        <TextField sx={FIELD_SX} label="Question" fullWidth size="small" multiline minRows={2}
+                        <TextField label="Question" fullWidth size="small" multiline minRows={2}
                           value={editSeedContent} onChange={(e) => setEditSeedContent(e.target.value)} />
-                        <TextField sx={FIELD_SX} label="Attribution label" fullWidth size="small"
+                        <TextField label="Attribution label" fullWidth size="small"
                           placeholder="e.g. Event Team, Dr. Smith, Host"
                           value={editSeedAttribution} onChange={(e) => setEditSeedAttribution(e.target.value)} />
                         <TextField label="Speaker note (private)" fullWidth size="small"
@@ -3011,7 +2846,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                           }}
                         />
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => setEditingSeedIdx(null)}>Cancel</Button>
+                          <Button size="small" onClick={() => setEditingSeedIdx(null)}>Cancel</Button>
                           <Button size="small" variant="contained"
                             startIcon={<SaveRoundedIcon />}
                             onClick={() => {
@@ -3021,7 +2856,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                               ));
                               setEditingSeedIdx(null);
                             }}
-                            sx={PRIMARY_BTN_SX}>
+                            sx={{ bgcolor: "#10b8a6", "&:hover": { bgcolor: "#0ea5a4" } }}>
                             Save
                           </Button>
                         </Stack>
@@ -3031,9 +2866,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" mb={0.5}>
                             <Chip label={seed.attribution_label || "Event Team"} size="small"
-                              sx={{ ...BADGE_UPCOMING, fontSize: 11, height: 20 }} />
+                              sx={{ fontSize: 11, height: 20, bgcolor: "rgba(16,184,166,0.12)", color: "#10b8a6", border: "1px solid rgba(16,184,166,0.3)" }} />
                             <Chip label="SEED" size="small"
-                              sx={{ ...BADGE_NAVY, fontSize: 10, height: 18 }} />
+                              sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.3)" }} />
                           </Stack>
                           <Typography variant="body2" sx={{ wordBreak: "break-word" }}>{seed.content}</Typography>
                           {seed.speaker_note && (
@@ -3069,11 +2904,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
             {/* Add new draft seed question */}
             <Stack spacing={1.5}>
-              <TextField sx={FIELD_SX} label="Question text" fullWidth size="small" multiline minRows={2}
+              <TextField label="Question text" fullWidth size="small" multiline minRows={2}
                 placeholder="e.g. What is the biggest challenge AI faces in diagnostics today?"
                 value={newSeedContent} onChange={(e) => setNewSeedContent(e.target.value)} />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                <TextField sx={FIELD_SX} label="Attribution label" size="small" fullWidth
+                <TextField label="Attribution label" size="small" fullWidth
                   placeholder="e.g. Event Team, Host, Dr. Smith"
                   value={newSeedAttribution} onChange={(e) => setNewSeedAttribution(e.target.value)}
                   helperText="Shown instead of your name" />
@@ -3106,7 +2941,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     setNewSeedAttribution("");
                     setNewSeedNote("");
                   }}
-                  sx={OUTLINE_BTN_SX}>
+                  sx={{ borderColor: "#10b8a6", color: "#10b8a6", "&:hover": { borderColor: "#0ea5a4", bgcolor: "rgba(16,184,166,0.06)" } }}>
                   Add Seed Question
                 </Button>
               </Box>
@@ -3115,13 +2950,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
         </DialogContent>
 
-        <DialogActions sx={DIALOG_ACTIONS_SX}>
+        <DialogActions className="px-6 py-4">
           <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
           <Button
             onClick={submit}
             disabled={submitting}
             variant="contained"
-            sx={PRIMARY_BTN_SX}
+            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
           >
             Create
           </Button>
@@ -3182,15 +3017,15 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Remove Participant?</DialogTitle>
+          <DialogTitle>Remove Participant?</DialogTitle>
           <DialogContent>
             <Typography>
               Are you sure you want to remove <strong>{participantToRemove?.participant?.name || participantToRemove?.participant?.guest_name || "this participant"}</strong>?
               This action will use soft delete, preserving the record for audit purposes.
             </Typography>
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
-            <Button sx={OUTLINE_BTN_SX}
+          <DialogActions>
+            <Button
               onClick={() => {
                 setConfirmRemoveDialogOpen(false);
                 setParticipantToRemove(null);
@@ -3199,7 +3034,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             >
               Cancel
             </Button>
-            <Button sx={BTN_SHAPE_SX}
+            <Button
               onClick={() => {
                 if (participantToRemove) {
                   const removedName = participantToRemove.participant?.name || participantToRemove.participant?.guest_name || "Participant";
@@ -3227,7 +3062,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Delete Session?</DialogTitle>
+          <DialogTitle>Delete Session?</DialogTitle>
           <DialogContent>
             <Stack spacing={2}>
               <Typography>
@@ -3243,8 +3078,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               </Typography>
             </Stack>
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
-            <Button sx={OUTLINE_BTN_SX}
+          <DialogActions>
+            <Button
               onClick={() => {
                 setConfirmDeleteSessionDialogOpen(false);
                 setSessionToDelete(null);
@@ -3253,7 +3088,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             >
               Cancel
             </Button>
-            <Button sx={BTN_SHAPE_SX}
+            <Button
               onClick={() => {
                 if (sessionToDelete) {
                   const deletedSessionTitle = sessionToDelete.session?.title || "Session";
@@ -3325,7 +3160,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           fullWidth
           maxWidth="xs"
         >
-          <DialogTitle sx={DIALOG_TITLE_SX}>Sessions Outside Date Range</DialogTitle>
+          <DialogTitle className="font-bold">Sessions Outside Date Range</DialogTitle>
           <DialogContent dividers>
             <Typography variant="body2" sx={{ mb: 1 }}>
               Some sessions fall outside the new event date range. Please delete or reschedule them before changing
@@ -3343,8 +3178,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               </Box>
             )}
           </DialogContent>
-          <DialogActions sx={DIALOG_ACTIONS_SX}>
-            <Button sx={PRIMARY_BTN_SX} variant="contained" onClick={() => setDateRangeDialogOpen(false)}>
+          <DialogActions>
+            <Button variant="contained" onClick={() => setDateRangeDialogOpen(false)}>
               OK
             </Button>
           </DialogActions>
@@ -3362,7 +3197,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 export function EditEventDialog({ open, onClose, event, onUpdated }) {
   // Simple wrapper around the new reusable form
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ sx: DIALOG_PAPER_SX }}>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
       <DialogContent sx={{ p: 0 }}>
         <EditEventForm
           event={event}
@@ -3457,14 +3292,9 @@ function AdminEventCard({
   return (
     <Paper
       elevation={0}
-      className="h-full flex flex-col overflow-hidden"
+      className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
       onClick={handleOpenDetails}
-      sx={{
-        ...CARD_SX,
-        cursor: "pointer",
-        transition: "box-shadow .2s ease, border-color .2s ease, transform .2s ease",
-        "&:hover": { boxShadow: CARD_SHADOW_HOVER, borderColor: "#CBD5E1", transform: "translateY(-2px)" },
-      }}
+      sx={{ cursor: "pointer" }}
     >
       {/* Top image area */}
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
@@ -3482,9 +3312,13 @@ function AdminEventCard({
             }}
           />
         ) : (
-          <Box sx={IMAGE_PLACEHOLDER_SX}>
-            <CalendarMonthRoundedIcon sx={{ fontSize: 34, opacity: 0.85 }} />
-          </Box>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "#E5E7EB",
+            }}
+          />
         )}
 
         {isOwner && (
@@ -3499,11 +3333,10 @@ function AdminEventCard({
               position: "absolute",
               top: 8,
               right: 8,
-              bgcolor: "rgba(27,42,74,0.78)",
+              bgcolor: "rgba(15,23,42,0.75)",
               color: "common.white",
-              backdropFilter: "blur(2px)",
               "&:hover": {
-                bgcolor: NAVY,
+                bgcolor: "rgba(15,23,42,0.95)",
               },
             }}
           >
@@ -3512,31 +3345,26 @@ function AdminEventCard({
         )}
       </Box>
       {/* Content */}
-      <Box className="flex flex-col flex-1" sx={{ p: 2.25, gap: 1 }}>
+      <Box className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-center justify-between gap-2">
           <div className="flex gap-2 items-center">
             <Chip
               size="small"
               label={chip.label}
-              sx={chip.sx}
+              className={`${chip.className} font-medium`}
             />
             {ev.is_pinned && (
-              <PushPinIcon sx={{ color: CORAL, fontSize: 20 }} />
+              <PushPinIcon sx={{ color: "error.main", fontSize: 20 }} />
             )}
           </div>
           {ev.category && (
-            <Typography
-              component="span"
-              sx={{ fontSize: 12, fontWeight: 600, color: MUTED, whiteSpace: "nowrap" }}
-            >
-              {ev.category}
-            </Typography>
+            <span className="text-xs text-slate-500">{ev.category}</span>
           )}
         </div>
 
         <Typography
           variant="h6"
-          sx={{ fontWeight: 800, fontSize: 18, lineHeight: 1.3, color: NAVY, mt: 0.25 }}
+          className="font-extrabold !leading-snug text-slate-900"
         >
           {ev.title}
         </Typography>
@@ -3551,13 +3379,13 @@ function AdminEventCard({
                   size="small"
                   variant="outlined"
                   label={platform.name || platformDisplayName(platform.slug)}
-                  sx={{ ...BADGE_OUTLINE, height: 22, fontSize: "0.72rem" }}
+                  sx={{ height: 22, fontSize: "0.72rem" }}
                 />
               ))}
           </Stack>
         )}
 
-        <div className="text-sm text-[#64748B]">
+        <div className="text-sm text-slate-500">
           {(() => {
             // DEBUG: Log event data
             // console.log(`[AdminEventCard Debug] Event "${ev.title}":`, {
@@ -3572,7 +3400,7 @@ function AdminEventCard({
               return (
                 <div>
                   {/* Show location */}
-                  <span className="block font-medium text-[#1B2A4A] mb-1">
+                  <span className="block font-medium text-slate-900 mb-1">
                     {ev.location || "Virtual"}
                   </span>
 
@@ -3599,7 +3427,7 @@ function AdminEventCard({
                     return (
                       <>
                         {/* Primary: Organizer Time */}
-                        <span className="block text-xs font-medium text-[#1B2A4A]" style={{ lineHeight: 1.4 }}>
+                        <span className="block text-xs font-medium text-slate-900" style={{ lineHeight: 1.4 }}>
                           {sessionTimeRange.primary}
                           {organizerTimezone && (
                             <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
@@ -3609,7 +3437,7 @@ function AdminEventCard({
                         {/* Secondary: Your Time */}
                         {sessionTimeRange.secondary && (
                           <span className="block mt-1 text-xs text-neutral-600">
-                            <span className="font-semibold text-[#087F82]">Your Time:</span>{" "}
+                            <span className="font-semibold text-teal-700">Your Time:</span>{" "}
                             {sessionTimeRange.secondary.label.replace('Your Time: ', '')}
                             <span className="text-neutral-400 ml-1">({sessionTimeRange.secondary.timezone})</span>
                           </span>
@@ -3625,7 +3453,7 @@ function AdminEventCard({
             return (
               <>
                 {/* Primary: Organizer Time + Location (for single-day events) */}
-                <span className="block font-medium text-[#1B2A4A]">
+                <span className="block font-medium text-slate-900">
                   {orgDateStr} {orgTimeRangeKey}
                   {organizerTimezone && (
                     <span className="text-neutral-400 ml-1">({organizerTimezone})</span>
@@ -3635,7 +3463,7 @@ function AdminEventCard({
                 {/* Secondary: Your Time */}
                 {showYourTime && (
                   <span className="block mt-1.5 text-xs text-neutral-600">
-                    <span className="font-semibold text-[#087F82]">Your Time:</span>{" "}
+                    <span className="font-semibold text-teal-700">Your Time:</span>{" "}
                     {localDateStr} {localTimeRangeKey}
                     <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
                   </span>
@@ -3647,7 +3475,7 @@ function AdminEventCard({
 
         {/* Session counts for multi-day events */}
         {ev.is_multi_day && (
-          <div className="text-xs text-[#64748B] space-y-1 my-2">
+          <div className="text-xs text-slate-600 space-y-1 my-2">
             {(ev.main_sessions_count > 0 || ev.breakout_sessions_count > 0 || ev.workshops_count > 0 || ev.networking_count > 0) && (
               <>
                 {ev.main_sessions_count > 0 && (
@@ -3665,15 +3493,14 @@ function AdminEventCard({
               </>
             )}
             {ev.calculated_hours_display && (
-              <div className="font-medium text-[#334155]">⏱️ {ev.calculated_hours_display}</div>
+              <div className="font-medium text-slate-700">⏱️ {ev.calculated_hours_display}</div>
             )}
           </div>
         )}
 
         {/* Actions – stop click bubbling so buttons don't trigger card navigation */}
         <Box
-          className="mt-auto flex"
-          sx={{ gap: 1, pt: 1.75, mt: 1.5, borderTop: `1px solid ${BORDER}` }}
+          className="mt-auto pt-1 flex gap-2"
           onClick={(e) => e.stopPropagation()}
         >
           {isOwner ? (
@@ -3687,7 +3514,8 @@ function AdminEventCard({
                     className="rounded-xl flex-1"
                     sx={{
                       textTransform: "none",
-                      ...PRIMARY_BTN_SX,
+                      backgroundColor: "#10b8a6",
+                      "&:hover": { backgroundColor: "#0ea5a4" },
                       minWidth: 0,
                       px: 1,
                     }}
@@ -3714,7 +3542,9 @@ function AdminEventCard({
                       textTransform: "none",
                       minWidth: 0,
                       px: 1,
-                      ...OUTLINE_BTN_SX,
+                      borderColor: "#cbd5e1",
+                      color: "#475569",
+                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
                     }}
                   >
                     Details
@@ -3733,7 +3563,8 @@ function AdminEventCard({
                       className="rounded-xl flex-1"
                       sx={{
                         textTransform: "none",
-                        ...PRIMARY_BTN_SX,
+                        backgroundColor: "#10b8a6",
+                        "&:hover": { backgroundColor: "#0ea5a4" },
                         minWidth: 0,
                         px: 1,
                       }}
@@ -3778,7 +3609,9 @@ function AdminEventCard({
                       textTransform: "none",
                       minWidth: 0,
                       px: 1,
-                      ...OUTLINE_BTN_SX,
+                      borderColor: "#cbd5e1",
+                      color: "#475569",
+                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
                     }}
                   >
                     Details
@@ -3814,7 +3647,8 @@ function AdminEventCard({
                         className="rounded-xl flex-1"
                         sx={{
                           textTransform: "none",
-                          ...PRIMARY_BTN_SX,
+                          backgroundColor: "#10b8a6",
+                          "&:hover": { backgroundColor: "#0ea5a4" },
                           minWidth: 0,
                           px: 1,
                         }}
@@ -3875,7 +3709,8 @@ function AdminEventCard({
                       className="rounded-xl flex-1"
                       sx={{
                         textTransform: "none",
-                        ...PRIMARY_BTN_SX,
+                        backgroundColor: "#10b8a6",
+                        "&:hover": { backgroundColor: "#0ea5a4" },
                         minWidth: 0,
                         px: 1.5,
                         fontSize: "0.85rem",
@@ -3953,7 +3788,9 @@ function AdminEventCard({
                       textTransform: "none",
                       minWidth: 0,
                       px: 1,
-                      ...OUTLINE_BTN_SX,
+                      borderColor: "#cbd5e1",
+                      color: "#475569",
+                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
                     }}
                   >
                     Details
@@ -3993,7 +3830,8 @@ function AdminEventCard({
                   fullWidth
                   sx={{
                     textTransform: "none",
-                    ...PRIMARY_BTN_SX,
+                    backgroundColor: "#10b8a6",
+                    "&:hover": { backgroundColor: "#0ea5a4" },
                   }}
                   disabled={isJoining}
                 >
@@ -4036,7 +3874,8 @@ function AdminEventCard({
                   fullWidth
                   sx={{
                     textTransform: "none",
-                    ...PRIMARY_BTN_SX,
+                    backgroundColor: "#10b8a6",
+                    "&:hover": { backgroundColor: "#0ea5a4" },
                   }}
                 >
                   <Box
@@ -4513,31 +4352,11 @@ function EventsPage() {
   return (
     <Container maxWidth="lg" disableGutters className="pt-6 pb-6 sm:pt-1 sm:pb-8">
       {/* Header */}
-      <Box
-        sx={{
-          ...CARD_SX,
-          p: { xs: 2, sm: 2.5 },
-          mb: 2.5,
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: { xs: "flex-start", sm: "center" },
-          gap: { xs: 1.75, sm: 2 },
-          borderLeft: `4px solid ${CORAL}`,
-        }}
-      >
-        <Avatar sx={{ bgcolor: NAVY, fontWeight: 700, width: 46, height: 46 }}>
-          {(user?.first_name || "A")[0].toUpperCase()}
-        </Avatar>
+      <Box className="mb-4" sx={{ display: "flex", flexWrap: "wrap", alignItems: { xs: "flex-start", sm: "center" }, gap: 2 }}>
+        <Avatar sx={{ bgcolor: "#0ea5a4" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="h5"
-            sx={{ fontWeight: 800, color: NAVY, lineHeight: 1.2, fontSize: { xs: 21, sm: 25 } }}
-          >
-            Events
-          </Typography>
-          <Typography sx={{ color: MUTED, fontSize: 14, mt: 0.25 }}>
-            Manage sessions you’ve created. Start hosting with one click.
-          </Typography>
+          <Typography variant="h5" className="font-extrabold">Events</Typography>
+          <Typography className="text-slate-500">Manage sessions you’ve created. Start hosting with one click.</Typography>
         </Box>
         {isOwnerUser() && (
           <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
@@ -4546,7 +4365,8 @@ function EventsPage() {
               onClick={() => setCreateOpen(true)}
               startIcon={<AddRoundedIcon />}
               variant="contained"
-              sx={{ ...ACCENT_BTN_SX, py: 1 }}
+              className="rounded-xl"
+              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
             >
               Create Event
             </Button>
@@ -4555,13 +4375,18 @@ function EventsPage() {
       </Box>
 
       {/* Tabs */}
-      <Paper elevation={0} className="mb-4 overflow-hidden" sx={CARD_SX}>
+      <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
           variant="scrollable"
           scrollButtons="auto"
-          sx={TABS_SX}
+          sx={{
+            px: 1,
+            "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
+            "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
+            "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+          }}
         >
           <Tab label="All" />
           <Tab label="Upcoming" />
@@ -4579,35 +4404,12 @@ function EventsPage() {
           placeholder="Search your events…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          InputProps={{
-            startAdornment: <SearchRoundedIcon sx={{ mr: 1, fontSize: 20, color: "#94A3B8" }} />,
-          }}
-          sx={{
-            ...FIELD_SX,
-            width: { xs: "100%", sm: 380 },
-            "& .MuiOutlinedInput-root": {
-              ...FIELD_SX["& .MuiOutlinedInput-root"],
-              height: 44,
-              boxShadow: CARD_SHADOW,
-            },
-          }}
+          InputProps={{ startAdornment: <SearchRoundedIcon className="mr-2 text-slate-400" /> }}
+          sx={{ width: { xs: "100%", sm: 360 } }}
         />
         <Box sx={{ flex: 1 }} />
         <Tooltip title="Refresh events">
-          <IconButton
-            size="small"
-            onClick={() => setRefreshKey((k) => k + 1)}
-            disabled={loading}
-            sx={{
-              border: `1px solid ${BORDER}`,
-              borderRadius: 2,
-              bgcolor: "#fff",
-              color: NAVY,
-              width: 40,
-              height: 40,
-              "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.06)" },
-            }}
-          >
+          <IconButton size="small" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
             <RefreshRoundedIcon />
           </IconButton>
         </Tooltip>
@@ -4619,7 +4421,7 @@ function EventsPage() {
           <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
             {Array.from({ length: PAGE_SIZE }).map((_, idx) => (
               <Grid key={idx} size={{ xs: 4, sm: 4, md: 4 }}>
-                <Paper elevation={0} className="h-full flex flex-col overflow-hidden" sx={CARD_SX}>
+                <Paper elevation={0} className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden">
                   <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
                     <Skeleton variant="rectangular" sx={{ position: "absolute", inset: 0 }} />
                   </Box>
@@ -4638,26 +4440,15 @@ function EventsPage() {
           </Grid>
         </Box>
       ) : events.length === 0 ? (
-        <Paper elevation={0} sx={CARD_SX}>
-          <Box sx={{ p: { xs: 4, sm: 6 }, textAlign: "center" }}>
-            <Box
-              sx={{
-                width: 56, height: 56, mx: "auto", mb: 1.75, borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                bgcolor: BG, color: "#AEBACB", border: `1px solid ${BORDER}`,
-              }}
-            >
-              <SearchRoundedIcon />
-            </Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: NAVY, fontSize: 17 }}>No events found</Typography>
-            <Typography sx={{ color: MUTED, mt: 0.5, fontSize: 14 }}>
-              Try a different search{isPlatformAdmin ? " or create a new event." : "."}
-            </Typography>
+        <Paper elevation={0} className="rounded-2xl border border-slate-200">
+          <Box className="p-8 text-center">
+            <Typography variant="h6" className="font-semibold text-slate-700">No events found</Typography>
+            <p className="text-slate-500 mt-1">Try a different search{isPlatformAdmin ? " or create a new event." : "."}</p>
             {isPlatformAdmin && (
               <Button
                 onClick={() => setCreateOpen(true)}
-                startIcon={<AddRoundedIcon />}
-                sx={{ ...ACCENT_BTN_SX, mt: 2.5 }}
+                className="mt-4 rounded-xl"
+                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 variant="contained"
               >
                 Create Event
@@ -4751,7 +4542,7 @@ function EventsPage() {
               count={pageCount}
               page={page}
               onChange={(_, p) => setPage(p)}
-              sx={PAGINATION_SX}
+              color="primary"
               shape="rounded"
             />
           </Box>
@@ -4816,7 +4607,7 @@ export default function DashbAdminEventsoard() {
   }, [location.search, location.pathname]);
 
   return (
-    <Box className="min-h-screen bg-[#F6F8FB]">
+    <Box className="min-h-screen bg-slate-50">
       <Container
         maxWidth="xl"
         sx={{

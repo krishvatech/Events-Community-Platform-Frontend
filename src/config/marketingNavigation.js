@@ -1,3 +1,4 @@
+import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
@@ -13,6 +14,10 @@ import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 
 export const MARKETING_HOME_PATH = "/admin/newsletter";
 export const MARKETING_AUDIT_PATH = "/admin/marketing/activity";
+// Segment/list newsletter emails (ECP NewsletterCampaign). Distinct from
+// automation campaigns, which live under `${MARKETING_HOME_PATH}/campaigns`.
+export const MARKETING_BROADCASTS_PATH = `${MARKETING_HOME_PATH}/broadcasts`;
+export const MARKETING_BROADCAST_NEW_PATH = `${MARKETING_HOME_PATH}/new`;
 export const CONNECT_HOME_PATH = "/community?view=home";
 
 export const marketingNavigationGroups = [
@@ -34,10 +39,17 @@ export const marketingNavigationGroups = [
     items: [
       {
         id: "campaigns",
-        label: "Campaigns",
+        label: "Automation Campaigns",
         path: `${MARKETING_HOME_PATH}/campaigns`,
+        icon: AccountTreeRoundedIcon,
+        match: [`${MARKETING_HOME_PATH}/campaigns`, `${MARKETING_HOME_PATH}/builder`],
+      },
+      {
+        id: "broadcasts",
+        label: "Email Broadcasts",
+        path: MARKETING_BROADCASTS_PATH,
         icon: EmailRoundedIcon,
-        match: [`${MARKETING_HOME_PATH}/campaigns`, `${MARKETING_HOME_PATH}/builder`, `${MARKETING_HOME_PATH}/new`],
+        match: [MARKETING_BROADCASTS_PATH, MARKETING_BROADCAST_NEW_PATH],
       },
       {
         id: "templates",
@@ -146,13 +158,18 @@ export function getMarketingSectionFromPath(pathname = "") {
   const normalized = pathname.replace(/\/+$/, "") || MARKETING_HOME_PATH;
   if (normalized === MARKETING_AUDIT_PATH) return "activity";
   if (normalized === MARKETING_HOME_PATH) return "dashboard";
-  if (normalized.startsWith(`${MARKETING_HOME_PATH}/builder`) || normalized.startsWith(`${MARKETING_HOME_PATH}/new`)) return "campaigns";
+  // The campaign builder belongs to automation campaigns; the broadcast
+  // composer at /new belongs to email broadcasts.
+  if (normalized.startsWith(`${MARKETING_HOME_PATH}/builder`)) return "campaigns";
+  if (normalized.startsWith(MARKETING_BROADCAST_NEW_PATH)) return "broadcasts";
 
   const directMatch = marketingNavigationItems
     .filter((item) => item.id !== "dashboard")
     .find((item) => item.match?.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`)));
 
-  return directMatch?.id || "campaigns";
+  // The only unmatched path left under the hub is /admin/newsletter/:uuid,
+  // which is a single broadcast.
+  return directMatch?.id || "broadcasts";
 }
 
 export function isMarketingNavItemActive(item, pathname = "") {

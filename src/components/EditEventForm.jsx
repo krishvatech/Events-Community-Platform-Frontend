@@ -70,25 +70,8 @@ import {
     validateMultidayEvent,
 } from "../utils/dateTimeValidator";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
-import {
-  BG,
-  BORDER,
-  BTN_SHAPE_SX,
-  DIALOG_ACTIONS_SX,
-  DIALOG_TITLE_SX,
-  FIELD_SX,
-  MUTED,
-  NAVY,
-  OUTLINE_BTN_SX,
-  PRIMARY_BTN_SX,
-  SUBTLE_BTN_SX,
-  SWITCH_SX,
-  TEAL,
-  TEAL_DARK,
-} from "../theme/imaaTokens";
 
 dayjs.extend(utc);
-
 dayjs.extend(timezone);
 
 const categories = ["Workshop", "Strategy", "Legal", "Leadership", "Networking", "Q&A", "Live"];
@@ -207,7 +190,7 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect, error, hel
                 onSelect?.(newValue || null);
             }}
             renderInput={(params) => (
-                <TextField sx={FIELD_SX}
+                <TextField
                     {...params}
                     label={label}
                     fullWidth
@@ -1615,7 +1598,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                 </Typography>
 
                 <Box className="flex items-start mb-4">
-                    <TextField sx={FIELD_SX}
+                    <TextField
                         label="Name of the Event *"
                         value={title}
                         onChange={(e) => {
@@ -1630,7 +1613,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                     />
                 </Box>
 
-                <TextField sx={FIELD_SX}
+                <TextField
                     label="Description *"
                     multiline minRows={3}
                     value={description}
@@ -1639,7 +1622,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                     error={!!errors.description} helperText={errors.description}
                 />
 
-                <TextField sx={FIELD_SX}
+                <TextField
                     label="Slug *"
                     placeholder="enter-event-slug"
                     value={slug}
@@ -1660,7 +1643,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                         mb: 2,
                         borderRadius: 2,
                         border: errors.platforms ? "1px solid #ef4444" : "1px solid #e2e8f0",
-                        bgcolor: BG,
+                        bgcolor: "#f8fafc",
                     }}
                 >
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
@@ -1727,7 +1710,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                     )}
                 </Paper>
 
-                <TextField sx={FIELD_SX}
+                <TextField
                     label="Format"
                     select
                     value={format}
@@ -1763,7 +1746,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                         <Stack direction="column" spacing={2}>
                             <FormControlLabel
                                 control={
-                                    <Switch sx={SWITCH_SX}
+                                    <Switch
                                         checked={replayAvailable}
                                         onChange={(e) => {
                                             const newReplayAvailable = e.target.checked;
@@ -1785,7 +1768,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 2 }}>
                                 <FormControlLabel
                                     control={
-                                        <Switch sx={SWITCH_SX}
+                                        <Switch
                                             checked={autoPublish}
                                             disabled={!replayAvailable}
                                             onChange={(e) => setAutoPublish(e.target.checked)}
@@ -1852,7 +1835,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             </Typography>
                             <Stack spacing={2}>
                                 <FormControlLabel
-                                    control={<Switch sx={SWITCH_SX} checked={replayEnabled} onChange={(e) => setReplayEnabled(e.target.checked)} />}
+                                    control={<Switch checked={replayEnabled} onChange={(e) => setReplayEnabled(e.target.checked)} />}
                                     label="Enable replay sign-up for new users"
                                     sx={{ m: 0 }}
                                 />
@@ -1860,10 +1843,10 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                     <>
                                         {event?.id && event?.slug && (
                                             <Box sx={{ p: 2, bgcolor: "rgba(16,184,166,0.08)", borderRadius: 1, border: "1px solid rgba(16,184,166,0.2)" }}>
-                                                <Typography variant="caption" sx={{ display: "block", color: MUTED, mb: 1 }}>
+                                                <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 1 }}>
                                                     📋 Public Replay Link (for sharing on LinkedIn/YouTube posts)
                                                 </Typography>
-                                                <TextField sx={FIELD_SX}
+                                                <TextField
                                                     size="small"
                                                     fullWidth
                                                     value={`${window.location.origin}/events/${event.slug}`}
@@ -1904,7 +1887,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                                 />
                                             </Box>
                                         )}
-                                        <TextField sx={FIELD_SX}
+                                        <TextField
                                             label="Sign-up CTA Text (optional)"
                                             value={replayCTAText}
                                             onChange={(e) => setReplayCTAText(e.target.value)}
@@ -1927,7 +1910,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                         <Stack direction="column" spacing={2}>
                             <FormControlLabel
                                 control={
-                                    <Switch sx={SWITCH_SX}
+                                    <Switch
                                         checked={useExternalStreaming}
                                         onChange={(e) => {
                                             setUseExternalStreaming(e.target.checked);
@@ -1943,7 +1926,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
 
                             {useExternalStreaming && (
                                 <Box sx={{ pl: 2, pt: 1 }}>
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         select
                                         label="Platform *"
                                         value={externalStreamingPlatform}
@@ -1956,7 +1939,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         <MenuItem value="microsoft_teams">Microsoft Teams</MenuItem>
                                     </TextField>
 
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         label="Join URL *"
                                         value={externalStreamingUrl}
                                         onChange={(e) => setExternalStreamingUrl(e.target.value)}
@@ -1966,7 +1949,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         helperText="Direct link for attendees to join"
                                     />
 
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         label="Meeting ID"
                                         value={externalStreamingMeetingId}
                                         onChange={(e) => setExternalStreamingMeetingId(e.target.value)}
@@ -1976,7 +1959,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         helperText="Optional: meeting ID for reference"
                                     />
 
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         label="Additional Login Instructions"
                                         value={externalStreamingOtherDetails}
                                         onChange={(e) => setExternalStreamingOtherDetails(e.target.value)}
@@ -1988,7 +1971,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         helperText="Optional: shown to attendees on event details page"
                                     />
 
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         label="Host/Moderator Join Link"
                                         value={externalStreamingHostLink}
                                         onChange={(e) => setExternalStreamingHostLink(e.target.value)}
@@ -2035,7 +2018,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                     </li>
                                 )}
                                 renderInput={(params) => (
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         {...params}
                                         label="Country"
                                         placeholder="Select country"
@@ -2093,7 +2076,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                             </li>
                                         )}
                                         renderInput={(params) => (
-                                            <TextField sx={FIELD_SX}
+                                            <TextField
                                                 {...params}
                                                 label="Country"
                                                 placeholder="Select country"
@@ -2109,7 +2092,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
 
                                 {/* Venue Name - Optional */}
                                 <Box sx={{ mt: 2 }}>
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         fullWidth
                                         size="small"
                                         label="Venue Name (Optional)"
@@ -2122,7 +2105,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
 
                                 {/* Venue Address - Optional and private */}
                                 <Box sx={{ mt: 2 }}>
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         fullWidth
                                         size="small"
                                         label="Exact Address (Optional)"
@@ -2147,7 +2130,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
 
                         <Box sx={{ mt: 3, mb: 3 }}>
                             <FormControlLabel
-                                control={<Switch sx={SWITCH_SX} checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+                                control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
                                 label="Free Event (all users can register)"
                                 sx={{ mb: 2 }}
                             />
@@ -2156,9 +2139,9 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             {!isFree ? (
                                 <Box sx={{
                                     p: 2.5,
-                                    border: `1px solid ${BORDER}`,
+                                    border: "1px solid #e3f2fd",
                                     borderRadius: 2,
-                                    bgcolor: BG,
+                                    bgcolor: "#f0f7ff",
                                     mt: 2,
                                     display: "flex",
                                     alignItems: "flex-start",
@@ -2166,10 +2149,10 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 }}>
                                     <Box sx={{ fontSize: 20, mt: 0.1 }}>💳</Box>
                                     <Box>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: NAVY, mb: 0.5 }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1565c0", mb: 0.5 }}>
                                             💳 Paid Event — Saved as Draft
                                         </Typography>
-                                        <Typography variant="body2" sx={{ color: NAVY }}>
+                                        <Typography variant="body2" sx={{ color: "#1565c0" }}>
                                             This event will remain Draft until the actual Saleor checkout price, channel, and stock are configured in
                                             <strong> Product Management</strong>.
                                             The field below is for public display text only and does not set the checkout price.
@@ -2211,7 +2194,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                                 Registration Type
                             </Typography>
-                            <TextField sx={FIELD_SX}
+                            <TextField
                                 select
                                 fullWidth
                                 value={registrationType}
@@ -2222,8 +2205,8 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
                             </TextField>
                             {registrationType === 'apply' && (
-                                <Box sx={{ mt: 1, p: 1.5, bgcolor: BG, border: '1px solid #90caf9', borderRadius: 1 }}>
-                                    <Typography variant="caption" sx={{ color: NAVY, fontWeight: 500 }}>
+                                <Box sx={{ mt: 1, p: 1.5, bgcolor: '#e3f2fd', border: '1px solid #90caf9', borderRadius: 1 }}>
+                                    <Typography variant="caption" sx={{ color: '#1565c0', fontWeight: 500 }}>
                                         💡 This event will remain in Draft until at least one application track is created.
                                     </Typography>
                                 </Box>
@@ -2232,7 +2215,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 <Box sx={{ mt: 2 }}>
                                     <FormControlLabel
                                         control={
-                                            <Switch sx={SWITCH_SX}
+                                            <Switch
                                                 checked={allowGuestApplications}
                                                 onChange={(e) => setAllowGuestApplications(e.target.checked)}
                                             />
@@ -2244,7 +2227,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                     </Typography>
                                     <FormControlLabel
                                         control={
-                                            <Switch sx={SWITCH_SX}
+                                            <Switch
                                                 checked={attendeeMarkerEnabled}
                                                 onChange={(e) => setAttendeeMarkerEnabled(e.target.checked)}
                                             />
@@ -2265,7 +2248,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             )}
                         </Box>
 
-                        <Box sx={{ mt: 3, mb: 2, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: BG }}>
+                        <Box sx={{ mt: 3, mb: 2, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fafafa" }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                                 CPD/CPE Credits
                             </Typography>
@@ -2274,7 +2257,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             </Typography>
                             <Grid container spacing={2}>
                                 <Grid item xs={12} sm={6}>
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         label="Total eligible minutes"
                                         type="number"
                                         fullWidth
@@ -2290,7 +2273,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         label="Minutes per credit"
                                         type="number"
                                         fullWidth
@@ -2440,7 +2423,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                     >
                         <FormControlLabel
                             control={
-                                <Switch sx={SWITCH_SX}
+                                <Switch
                                     checked={waitingRoomEnabled}
                                     onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
                                 />
@@ -2456,7 +2439,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                         />
                         <FormControlLabel
                             control={
-                                <Switch sx={SWITCH_SX}
+                                <Switch
                                     checked={waitingRoomLoungeAllowed}
                                     onChange={(e) => setWaitingRoomLoungeAllowed(e.target.checked)}
                                     disabled={!waitingRoomEnabled}
@@ -2473,7 +2456,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                         />
                         <FormControlLabel
                             control={
-                                <Switch sx={SWITCH_SX}
+                                <Switch
                                     checked={waitingRoomNetworkingAllowed}
                                     onChange={(e) => setWaitingRoomNetworkingAllowed(e.target.checked)}
                                     disabled={!waitingRoomEnabled}
@@ -2488,7 +2471,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 "& .MuiFormControlLabel-label": { marginLeft: 0 },
                             }}
                         />
-                        <TextField sx={FIELD_SX}
+                        <TextField
                             label="Auto-admit after (seconds)"
                             size="small"
                             type="number"
@@ -2517,7 +2500,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                     {/* Dates */}
                     <Grid item xs={12}>
                         <FormControlLabel
-                            control={<Switch sx={SWITCH_SX} checked={isMultiDay} disabled={sessionsLoading} onChange={(e) => {
+                            control={<Switch checked={isMultiDay} disabled={sessionsLoading} onChange={(e) => {
                                 const v = e.target.checked;
                                 if (!v && sessions.length > 0) {
                                     // Cannot convert to single-day when sessions exist — show dialog
@@ -2680,7 +2663,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         value={timezone}
                                         onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
                                         renderInput={(params) => (
-                                            <TextField sx={FIELD_SX}
+                                            <TextField
                                                 {...params}
                                                 label="Event Timezone"
                                                 helperText="Times are saved in this timezone."
@@ -2691,7 +2674,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         <Box
                                             sx={{
                                                 p: 1.5,
-                                                backgroundColor: BG,
+                                                backgroundColor: "#f3f4f6",
                                                 borderRadius: 1,
                                                 border: "1px solid #e5e7eb"
                                             }}
@@ -2728,7 +2711,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                             setSessionDialogOpen(true);
                                         }}
                                         disabled={sessionSubmitting}
-                                        sx={{ backgroundColor: TEAL, color: "white", "&:hover": { backgroundColor: TEAL_DARK } }}
+                                        sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                     >
                                         Add Session
                                     </Button>
@@ -2789,7 +2772,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         <FormControlLabel
                                             key={sessionType}
                                             control={
-                                                <Switch sx={SWITCH_SX}
+                                                <Switch
                                                     checked={hoursCalculationSessionTypes.includes(sessionType)}
                                                     onChange={(e) => {
                                                         if (e.target.checked) {
@@ -2822,7 +2805,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 <Box sx={{ mt: 3, pt: 3, borderTop: "1px solid #e5e7eb" }}>
                                     <FormControlLabel
                                         control={
-                                            <Switch sx={SWITCH_SX}
+                                            <Switch
                                                 checked={hasTotalHoursOverride}
                                                 onChange={(e) => setHasTotalHoursOverride(e.target.checked)}
                                             />
@@ -2897,7 +2880,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 </Box>
                             )}
 
-                            <Button sx={OUTLINE_BTN_SX}
+                            <Button
                                 variant="outlined"
                                 startIcon={<AddRoundedIcon />}
                                 onClick={() => {
@@ -2937,14 +2920,14 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                             checked={qnaAiPublicSuggestionsEnabled}
                                             onChange={(e) => setQnaAiPublicSuggestionsEnabled(e.target.checked)}
                                             sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked": { color: NAVY },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: NAVY }
+                                                "& .MuiSwitch-switchBase.Mui-checked": { color: "#9c7bff" },
+                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#9c7bff" }
                                             }}
                                         />
                                     }
                                     label={
                                         <Box>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: NAVY }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#9c7bff" }}>
                                                 Enable AI Question Adoption
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary">
@@ -2963,14 +2946,14 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                             checked={preEventQnaEnabled}
                                             onChange={(e) => setPreEventQnaEnabled(e.target.checked)}
                                             sx={{
-                                                "& .MuiSwitch-switchBase.Mui-checked": { color: TEAL },
-                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: TEAL }
+                                                "& .MuiSwitch-switchBase.Mui-checked": { color: "#10b8a6" },
+                                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#10b8a6" }
                                             }}
                                         />
                                     }
                                     label={
                                         <Box>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: TEAL }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#10b8a6" }}>
                                                 Enable Pre-Event Q&A
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary">
@@ -2997,13 +2980,13 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         <Paper key={q.id} variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, bgcolor: "rgba(16,184,166,0.04)", borderColor: "rgba(16,184,166,0.25)" }}>
                                             {editingSeedId === q.id ? (
                                                 <Stack spacing={1}>
-                                                    <TextField sx={FIELD_SX}
+                                                    <TextField
                                                         label="Question"
                                                         fullWidth size="small" multiline minRows={2}
                                                         value={editSeedContent}
                                                         onChange={(e) => setEditSeedContent(e.target.value)}
                                                     />
-                                                    <TextField sx={FIELD_SX}
+                                                    <TextField
                                                         label="Attribution label"
                                                         fullWidth size="small"
                                                         placeholder="e.g. Event Team, Dr. Smith, Host"
@@ -3027,12 +3010,12 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                                         }}
                                                     />
                                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                        <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => setEditingSeedId(null)}>Cancel</Button>
+                                                        <Button size="small" onClick={() => setEditingSeedId(null)}>Cancel</Button>
                                                         <Button
                                                             size="small" variant="contained"
                                                             startIcon={<SaveRoundedIcon />}
                                                             onClick={() => saveSeedEdit(q.id)}
-                                                            sx={{ bgcolor: TEAL, "&:hover": { bgcolor: TEAL_DARK } }}
+                                                            sx={{ bgcolor: "#10b8a6", "&:hover": { bgcolor: "#0ea5a4" } }}
                                                         >
                                                             Save
                                                         </Button>
@@ -3045,7 +3028,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                                             <Chip
                                                                 label={q.attribution_label || "Event Team"}
                                                                 size="small"
-                                                                sx={{ fontSize: 11, height: 20, bgcolor: "rgba(16,184,166,0.12)", color: TEAL, border: "1px solid rgba(16,184,166,0.3)" }}
+                                                                sx={{ fontSize: 11, height: 20, bgcolor: "rgba(16,184,166,0.12)", color: "#10b8a6", border: "1px solid rgba(16,184,166,0.3)" }}
                                                             />
                                                             <Chip label="SEED" size="small" sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }} />
                                                         </Stack>
@@ -3087,7 +3070,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
 
                             {/* Add new seed question form */}
                             <Stack spacing={1.5}>
-                                <TextField sx={FIELD_SX}
+                                <TextField
                                     label="Question text"
                                     fullWidth size="small" multiline minRows={2}
                                     placeholder="e.g. What's the biggest challenge AI faces in diagnostics today?"
@@ -3095,7 +3078,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                     onChange={(e) => setNewSeedContent(e.target.value)}
                                 />
                                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                                    <TextField sx={FIELD_SX}
+                                    <TextField
                                         label="Attribution label"
                                         size="small" fullWidth
                                         placeholder="e.g. Event Team, Host, Dr. Smith"
@@ -3128,7 +3111,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         startIcon={addingSeed ? <CircularProgress size={14} /> : <AddRoundedIcon />}
                                         disabled={addingSeed || !newSeedContent.trim()}
                                         onClick={addSeedQuestion}
-                                        sx={{ borderColor: TEAL, color: TEAL, "&:hover": { borderColor: TEAL_DARK, bgcolor: "rgba(16,184,166,0.06)" } }}
+                                        sx={{ borderColor: "#10b8a6", color: "#10b8a6", "&:hover": { borderColor: "#0ea5a4", bgcolor: "rgba(16,184,166,0.06)" } }}
                                     >
                                         Add Seed Question
                                     </Button>
@@ -3145,7 +3128,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                         disabled={submitting}
                         variant="contained"
                         className="rounded-xl"
-                        sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: TEAL_DARK } }}
+                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                     >
                         Save Changes
                     </Button>
@@ -3213,7 +3196,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                     maxWidth="sm"
                     fullWidth
                 >
-                    <DialogTitle sx={DIALOG_TITLE_SX}>Delete Session?</DialogTitle>
+                    <DialogTitle>Delete Session?</DialogTitle>
                     <DialogContent>
                         <DialogContentText component="div">
                             <Typography component="p">
@@ -3221,14 +3204,14 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             </Typography>
                         </DialogContentText>
                     </DialogContent>
-                    <DialogActions sx={DIALOG_ACTIONS_SX}>
-                        <Button sx={SUBTLE_BTN_SX}
+                    <DialogActions>
+                        <Button
                             onClick={() => setSessionDeleteTarget(null)}
                             disabled={sessionSubmitting}
                         >
                             Cancel
                         </Button>
-                        <Button sx={BTN_SHAPE_SX}
+                        <Button
                             color="error"
                             variant="contained"
                             disabled={sessionSubmitting}
@@ -3244,14 +3227,14 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
 
                 {/* Multi-day to Single-day Conversion Confirmation Dialog */}
                 <Dialog open={showSingleDayConversionDialog} onClose={() => setShowSingleDayConversionDialog(false)}>
-                    <DialogTitle sx={DIALOG_TITLE_SX}>Cannot Convert to Single-Day</DialogTitle>
+                    <DialogTitle>Cannot Convert to Single-Day</DialogTitle>
                     <DialogContent>
                         <DialogContentText>
                             To convert this event into a single-day event, you must first delete all existing sessions.
                         </DialogContentText>
                     </DialogContent>
-                    <DialogActions sx={DIALOG_ACTIONS_SX}>
-                        <Button sx={PRIMARY_BTN_SX} onClick={() => setShowSingleDayConversionDialog(false)} variant="contained">
+                    <DialogActions>
+                        <Button onClick={() => setShowSingleDayConversionDialog(false)} variant="contained">
                             OK
                         </Button>
                     </DialogActions>

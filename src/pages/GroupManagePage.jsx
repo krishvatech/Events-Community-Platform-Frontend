@@ -40,181 +40,14 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import InviteGroupUsersDialog from "../components/InviteGroupUsersDialog";
 
 
 // Number of members shown per page in the Members tab list.
 const MEMBERS_PER_PAGE = 20;
-const NAVY = "#1B2A4A";
-const CORAL = "#E8532F";
-const TEAL = "#0A9396";
-const BG = "#F6F8FB";
-const BORDER = "#E3E8EF";
-const MUTED = "#64748B";
-const CARD_SHADOW = "0 2px 8px rgba(16,24,40,0.05)";
-const TEAL_DARK = "#087F82";
-const CARD_SHADOW_HOVER = "0 10px 24px rgba(27,42,74,0.10)";
-
-// Shared surface / control styles so every admin group tab matches AdminGroups.
-const CARD_SX = {
-    border: `1px solid ${BORDER}`,
-    borderRadius: 3,
-    bgcolor: "#fff",
-    boxShadow: CARD_SHADOW,
-};
-
-const PRIMARY_BTN_SX = {
-    textTransform: "none",
-    fontWeight: 600,
-    borderRadius: 2,
-    px: 2.25,
-    bgcolor: TEAL,
-    color: "#fff",
-    boxShadow: "none",
-    "&:hover": { bgcolor: TEAL_DARK, boxShadow: "none" },
-    "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#fff" },
-};
-
-const ACCENT_BTN_SX = {
-    ...PRIMARY_BTN_SX,
-    bgcolor: CORAL,
-    "&:hover": { bgcolor: "#CF4525", boxShadow: "none" },
-};
-
-const OUTLINE_BTN_SX = {
-    textTransform: "none",
-    fontWeight: 600,
-    borderRadius: 2,
-    px: 2.25,
-    color: NAVY,
-    borderColor: BORDER,
-    bgcolor: "#fff",
-    "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.06)" },
-};
-
-const SUBTLE_BTN_SX = {
-    textTransform: "none",
-    fontWeight: 600,
-    borderRadius: 2,
-    color: MUTED,
-    "&:hover": { bgcolor: "rgba(27,42,74,0.05)", color: NAVY },
-};
-
-const FIELD_SX = {
-    "& .MuiOutlinedInput-root": {
-        borderRadius: 2,
-        bgcolor: "#fff",
-        "& fieldset": { borderColor: BORDER },
-        "&:hover fieldset": { borderColor: "#CBD5E1" },
-        "&.Mui-focused fieldset": { borderColor: TEAL, borderWidth: 2 },
-    },
-    "& .MuiInputLabel-root.Mui-focused": { color: TEAL },
-};
-
-const chipSx = (fg, bg, bd) => ({
-    height: 24,
-    fontSize: 12,
-    fontWeight: 600,
-    borderRadius: 1.5,
-    color: fg,
-    bgcolor: bg,
-    border: `1px solid ${bd}`,
-    "& .MuiChip-icon": { color: `${fg} !important`, fontSize: 15, ml: 0.75 },
-    "& .MuiChip-label": { px: 1 },
-});
-
-const BADGE_PUBLIC = chipSx(TEAL_DARK, "rgba(10,147,150,0.10)", "rgba(10,147,150,0.22)");
-const BADGE_PRIVATE = chipSx(NAVY, "rgba(27,42,74,0.07)", "rgba(27,42,74,0.16)");
-const BADGE_NEUTRAL = chipSx(MUTED, "#F1F5F9", BORDER);
-const BADGE_ROLE = chipSx(CORAL, "rgba(232,83,47,0.10)", "rgba(232,83,47,0.22)");
-const BADGE_PENDING = chipSx("#B45309", "rgba(245,158,11,0.12)", "rgba(245,158,11,0.26)");
-const BADGE_MEMBER = chipSx(TEAL_DARK, "rgba(10,147,150,0.10)", "rgba(10,147,150,0.22)");
-
-const DIALOG_TITLE_SX = {
-    fontWeight: 800,
-    fontSize: 19,
-    color: NAVY,
-    borderBottom: `1px solid ${BORDER}`,
-    py: 2,
-};
-
-const DIALOG_PAPER_SX = { borderRadius: 3, border: `1px solid ${BORDER}` };
-
-const DIALOG_ACTIONS_SX = {
-    px: 3,
-    py: 2.25,
-    borderTop: `1px solid ${BORDER}`,
-    bgcolor: BG,
-    gap: 1,
-};
-
-const UPLOAD_BOX_SX = {
-    position: "relative",
-    borderRadius: 2,
-    border: `1px dashed #CBD5E1`,
-    bgcolor: BG,
-    color: "#AEBACB",
-    transition: "border-color .2s ease, background-color .2s ease",
-    "&:hover": { borderColor: TEAL, bgcolor: "rgba(10,147,150,0.04)" },
-};
-
-const TABLE_SX = {
-    border: `1px solid ${BORDER}`,
-    borderRadius: 2,
-    "& .MuiTableHead-root .MuiTableCell-root": {
-        bgcolor: BG,
-        color: NAVY,
-        fontWeight: 700,
-        fontSize: 12.5,
-        borderBottom: `1px solid ${BORDER}`,
-        whiteSpace: "nowrap",
-    },
-    "& .MuiTableCell-root": { borderBottom: `1px solid ${BORDER}`, fontSize: 13.5, color: "#334155" },
-    "& .MuiTableBody-root .MuiTableRow-root:hover": { bgcolor: "rgba(10,147,150,0.04)" },
-};
-
-const TABS_SX = {
-    px: 2,
-    minHeight: 48,
-    "& .MuiTab-root": {
-        textTransform: "none",
-        fontWeight: 700,
-        minHeight: 48,
-        fontSize: 14.5,
-        color: MUTED,
-        "&:hover": { color: NAVY },
-    },
-    "& .Mui-selected": { color: `${NAVY} !important` },
-    "& .MuiTabs-indicator": { backgroundColor: CORAL, height: 3, borderRadius: 3 },
-};
-
-const PAGINATION_SX = {
-    "& .MuiPaginationItem-root": {
-        borderRadius: 2,
-        fontWeight: 600,
-        color: NAVY,
-        border: `1px solid ${BORDER}`,
-        bgcolor: "#fff",
-        minWidth: 34,
-        height: 34,
-        "&:hover": { bgcolor: "rgba(10,147,150,0.08)", borderColor: TEAL },
-    },
-    "& .MuiPaginationItem-root.Mui-selected": {
-        bgcolor: NAVY,
-        color: "#fff",
-        borderColor: NAVY,
-        "&:hover": { bgcolor: "#16233D" },
-    },
-    "& .MuiPaginationItem-ellipsis": { border: "none", bgcolor: "transparent" },
-};
-
-const BTN_SHAPE_SX = { textTransform: "none", fontWeight: 600, borderRadius: 2 };
-
-const SWITCH_SX = {
-    "& .MuiSwitch-switchBase.Mui-checked": { color: TEAL },
-    "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: TEAL },
-};
 
 // ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -268,28 +101,14 @@ const getToken = () =>
     "";
 
 const ROLE_BADGE_CONFIG = {
-    owner: { label: "Owner", tone: "navy" },
-    admin: { label: "Admin", tone: "teal" },
-    moderator: { label: "Moderator", tone: "coral" },
-    member: { label: "Member", tone: "neutral" },
+    owner: { label: "Owner", className: "bg-slate-200 text-slate-700" },
+    admin: { label: "Admin", className: "bg-teal-50 text-teal-700" },
+    moderator: { label: "Moderator", className: "bg-sky-50 text-sky-700" },
+    member: { label: "Member", className: "bg-slate-100 text-slate-700" },
 };
 const RoleBadge = ({ role }) => {
     const cfg = ROLE_BADGE_CONFIG[role] || ROLE_BADGE_CONFIG.member;
-    return (
-        <Chip
-            size="small"
-            label={cfg.label}
-            sx={{
-                bgcolor: cfg.tone === "teal" ? "rgba(10,147,150,0.10)" :
-                    cfg.tone === "coral" ? "rgba(232,83,47,0.10)" :
-                        cfg.tone === "navy" ? "rgba(27,42,74,0.10)" : BG,
-                color: cfg.tone === "teal" ? TEAL :
-                    cfg.tone === "coral" ? CORAL :
-                        cfg.tone === "navy" ? NAVY : MUTED,
-                fontWeight: 800,
-            }}
-        />
-    );
+    return <Chip size="small" label={cfg.label} className={cfg.className} />;
 };
 
 // Keep labels safe for Chips / text
@@ -381,7 +200,7 @@ function ClampedText({ text = "", lines = 5, sx = {} }) {
                 <Button
                     size="small"
                     onClick={() => setExpanded((v) => !v)}
-                    sx={{ textTransform: "none", px: 0, mt: 0.5, color: "#087f82" }}
+                    sx={{ textTransform: "none", px: 0, mt: 0.5, color: "#0ea5a4" }}
                 >
                     {expanded ? "See less" : "See more"}
                 </Button>
@@ -496,7 +315,7 @@ function PollVotersDialog({ open, onClose, option, postId }) {
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-            <DialogTitle sx={DIALOG_TITLE_SX}>
+            <DialogTitle sx={{ pb: 1 }}>
                 Voters
             </DialogTitle>
             <Box sx={{ px: 3, pb: 1 }}>
@@ -522,7 +341,7 @@ function PollVotersDialog({ open, onClose, option, postId }) {
                                     primary={
                                         <Stack direction="row" alignItems="center" spacing={0.5}>
                                             <span>{u.name}</span>
-                                            {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: TEAL }} />}
+                                            {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
                                         </Stack>
                                     }
                                     secondary={u.votedAt ? new Date(u.votedAt).toLocaleDateString() : null}
@@ -532,8 +351,8 @@ function PollVotersDialog({ open, onClose, option, postId }) {
                     </List>
                 )}
             </DialogContent>
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
-                <Button sx={SUBTLE_BTN_SX} onClick={onClose}>Close</Button>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
             </DialogActions>
         </Dialog>
     );
@@ -594,10 +413,10 @@ function PollResultsBlock({ post, onVote }) {
                                 sx={{
                                     p: 1,
                                     borderRadius: 2,
-                                    borderColor: BORDER,
+                                    borderColor: "#e2e8f0",
                                     bgcolor: chosen ? "action.selected" : "background.paper",
                                     cursor: canVote && !chosen ? "pointer" : "default",
-                                    "&:hover": canVote && !chosen ? { borderColor: TEAL } : undefined,
+                                    "&:hover": canVote && !chosen ? { borderColor: "primary.main" } : undefined,
                                 }}
                             >
                                 <Stack spacing={0.5}>
@@ -668,7 +487,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
             <Box
                 ref={anchorRef}
                 onClick={() => !disabled && setOpen(!open)}
-                className="border border-[#CBD5E1] rounded-md p-3 bg-white cursor-pointer hover:bg-[#F6F8FB] transition"
+                className="border border-slate-300 rounded-md p-3 bg-white cursor-pointer hover:bg-slate-50 transition"
                 sx={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -676,16 +495,16 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
                     minHeight: 56,
                     opacity: disabled ? 0.6 : 1,
                     pointerEvents: disabled ? "none" : "auto",
-                    '&:hover': { borderColor: disabled ? "inherit" : TEAL }
+                    '&:hover': { borderColor: disabled ? "inherit" : "#10b8a6" }
                 }}
             >
                 <Box>
-                    <Typography variant="caption" sx={{ color: MUTED }}>{label}</Typography>
+                    <Typography variant="caption" className="text-slate-500">{label}</Typography>
                     <Typography variant="body2" className="font-medium">
                         {options.find(opt => opt.value === value)?.label || "Select..."}
                     </Typography>
                 </Box>
-                <Box sx={{ color: "#94A3B8" }}>▼</Box>
+                <Box className="text-slate-400">▼</Box>
             </Box>
 
             <Popper
@@ -696,7 +515,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
             >
                 <Paper
                     elevation={3}
-                    className="rounded-md border border-[#E3E8EF] overflow-hidden"
+                    className="rounded-md border border-slate-200 overflow-hidden"
                     style={{ width: anchorRef.current?.offsetWidth || 300 }}
                 >
                     <Box className="max-h-60 overflow-y-auto">
@@ -707,11 +526,11 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
                                     onChange(opt.value);
                                     setOpen(false);
                                 }}
-                                className="cursor-pointer transition"
+                                className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
                                 sx={{
-                                    backgroundColor: value === opt.value ? "rgba(10,147,150,0.10)" : "transparent",
+                                    backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
                                     fontWeight: value === opt.value ? 600 : 400,
-                                    color: value === opt.value ? TEAL : "inherit"
+                                    color: value === opt.value ? "#10b8a6" : "inherit"
                                 }}
                             >
                                 {opt.label}
@@ -722,7 +541,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
             </Popper>
 
             {helperText && (
-                <Typography variant="caption" className="text-[#64748B] block mt-1">
+                <Typography variant="caption" className="text-slate-500 block mt-1">
                     {helperText}
                 </Typography>
             )}
@@ -934,9 +753,9 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
             onClose={onClose}
             fullWidth
             maxWidth="md"
-            PaperProps={{ sx: DIALOG_PAPER_SX }}
+            PaperProps={{ className: "rounded-2xl" }}
         >
-            <DialogTitle sx={DIALOG_TITLE_SX}>Edit Group</DialogTitle>
+            <DialogTitle className="font-extrabold">Edit Group</DialogTitle>
 
             <DialogContent dividers>
                 {errors.__all__ && (
@@ -1035,13 +854,14 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                 <Typography variant="subtitle1" className="font-semibold">
                                     Logo / Icon
                                 </Typography>
-                                <Typography variant="caption" className="text-[#64748B] block mb-2">
+                                <Typography variant="caption" className="text-slate-500 block mb-2">
                                     Recommended 200×200px (Square)
                                 </Typography>
 
                                 <Box className="flex items-center gap-4">
                                     <Box
-                                        className="flex items-center justify-center overflow-hidden" sx={{ ...UPLOAD_BOX_SX, width: 100, height: 100, position: "relative" }}
+                                        className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center overflow-hidden"
+                                        sx={{ width: 100, height: 100, position: "relative" }}
                                     >
                                         {logoPreview ? (
                                             <img
@@ -1056,7 +876,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                         ) : (
                                             <Stack alignItems="center" spacing={0.5}>
                                                 <ImageRoundedIcon fontSize="small" />
-                                                <Typography variant="caption" className="text-[#64748B] text-[10px]">
+                                                <Typography variant="caption" className="text-slate-600 text-[10px]">
                                                     Icon
                                                 </Typography>
                                             </Stack>
@@ -1072,7 +892,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
                                     <div className="flex flex-col gap-1">
                                         <label htmlFor="group-edit-logo-file-manage">
-                                            <Button sx={OUTLINE_BTN_SX}
+                                            <Button
                                                 component="span"
                                                 size="small"
                                                 variant="outlined"
@@ -1081,7 +901,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                                 Upload Icon
                                             </Button>
                                         </label>
-                                        <Button sx={BTN_SHAPE_SX}
+                                        <Button
                                             size="small"
                                             variant="text"
                                             color="error"
@@ -1102,12 +922,13 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                 <Typography variant="subtitle1" className="font-semibold">
                                     Cover Image
                                 </Typography>
-                                <Typography variant="caption" className="text-[#64748B] block mb-2">
+                                <Typography variant="caption" className="text-slate-500 block mb-2">
                                     Recommended 650×365px • Max 50 MB
                                 </Typography>
 
                                 <Box
-                                    className="flex items-center justify-center" sx={{ ...UPLOAD_BOX_SX, height: 200, position: "relative", overflow: "hidden" }}
+                                    className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                                    sx={{ height: 200, position: "relative", overflow: "hidden" }}
                                 >
                                     {localPreview ? (
                                         <img
@@ -1124,7 +945,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                     ) : (
                                         <Stack alignItems="center" spacing={1}>
                                             <ImageRoundedIcon />
-                                            <Typography variant="body2" sx={{ color: MUTED }}>
+                                            <Typography variant="body2" className="text-slate-600">
                                                 Image Preview
                                             </Typography>
                                         </Stack>
@@ -1140,7 +961,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
                                 <Stack direction="row" spacing={1} className="mt-2">
                                     <label htmlFor="group-edit-image-file">
-                                        <Button sx={OUTLINE_BTN_SX}
+                                        <Button
                                             component="span"
                                             size="small"
                                             variant="outlined"
@@ -1149,7 +970,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                             Upload
                                         </Button>
                                     </label>
-                                    <Button sx={BTN_SHAPE_SX}
+                                    <Button
                                         size="small"
                                         variant="text"
                                         color="error"
@@ -1168,7 +989,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                 </Grid>
             </DialogContent>
 
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
+            <DialogActions className="px-6 py-4">
                 <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>
                     Cancel
                 </Button>
@@ -1179,8 +1000,8 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     className="rounded-xl"
                     sx={{
                         textTransform: "none",
-                        backgroundColor: TEAL,
-                        "&:hover": { backgroundColor: "#087f82" },
+                        backgroundColor: "#10b8a6",
+                        "&:hover": { backgroundColor: "#0ea5a4" },
                     }}
                 >
                     Save
@@ -1258,8 +1079,8 @@ function GroupImageDialog({ open, group, onClose, type = "cover", onUpdated }) {
     if (!group) return null;
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ sx: DIALOG_PAPER_SX }}>
-            <DialogTitle sx={DIALOG_TITLE_SX}>{title}</DialogTitle>
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ className: "rounded-2xl" }}>
+            <DialogTitle className="font-extrabold pb-1">{title}</DialogTitle>
             <DialogContent dividers>
                 {error && (
                     <Alert severity="error" className="mb-3">
@@ -1274,7 +1095,7 @@ function GroupImageDialog({ open, group, onClose, type = "cover", onUpdated }) {
                             height: isLogo ? 120 : 200,
                             borderRadius: isLogo ? "50%" : 2,
                             overflow: "hidden",
-                            border: "1px solid #E3E8EF",
+                            border: "1px solid #e2e8f0",
                             position: "relative",
                             bgcolor: "#f1f5f9",
                             display: "flex",
@@ -1294,7 +1115,7 @@ function GroupImageDialog({ open, group, onClose, type = "cover", onUpdated }) {
                     </Box>
 
                     <Box textAlign="center">
-                        <Typography variant="body2" className="text-[#64748B] mb-2">
+                        <Typography variant="body2" className="text-slate-500 mb-2">
                             {isLogo ? "Recommended 200×200px (Square)" : "Recommended 650×365px"}
                         </Typography>
 
@@ -1306,14 +1127,14 @@ function GroupImageDialog({ open, group, onClose, type = "cover", onUpdated }) {
                             onChange={(e) => onPickFile(e.target.files?.[0] || null)}
                         />
                         <label htmlFor="group-image-file-input">
-                            <Button sx={OUTLINE_BTN_SX} component="span" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                            <Button component="span" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
                                 Choose Image
                             </Button>
                         </label>
                     </Box>
                 </Stack>
             </DialogContent>
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
+            <DialogActions className="px-6 py-4">
                 <Button onClick={onClose} disabled={submitting} className="rounded-xl" sx={{ textTransform: "none" }}>
                     Cancel
                 </Button>
@@ -1322,7 +1143,7 @@ function GroupImageDialog({ open, group, onClose, type = "cover", onUpdated }) {
                     variant="contained"
                     disabled={submitting || !imageFile}
                     className="rounded-xl"
-                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 >
                     {submitting ? "Saving..." : "Save Changes"}
                 </Button>
@@ -1391,8 +1212,8 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
     };
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ sx: DIALOG_PAPER_SX }}>
-            <DialogTitle sx={DIALOG_TITLE_SX}>Add members</DialogTitle>
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
+            <DialogTitle className="font-extrabold">Add members</DialogTitle>
             <DialogContent dividers>
                 <TextField
                     placeholder="Search users…"
@@ -1407,12 +1228,12 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
                 {loading ? (
                     <>
                         <LinearProgress />
-                        <Typography className="mt-2 text-[#64748B]">Searching…</Typography>
+                        <Typography className="mt-2 text-slate-500">Searching…</Typography>
                     </>
                 ) : error ? (
                     <Alert severity="error">{error}</Alert>
                 ) : rows.length === 0 ? (
-                    <Typography sx={{ color: MUTED }}>No users found.</Typography>
+                    <Typography className="text-slate-500">No users found.</Typography>
                 ) : (
                     <Stack spacing={1} divider={<Divider />}>
                         {rows.map((u) => {
@@ -1423,7 +1244,7 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
                                     direction="row"
                                     alignItems="center"
                                     spacing={2}
-                                    className="py-2 cursor-pointer hover:bg-[#F6F8FB] rounded-lg px-1"
+                                    className="py-2 cursor-pointer hover:bg-slate-50 rounded-lg px-1"
                                     onClick={() => toggle(u.id)}
                                 >
                                     <input type="checkbox" checked={checked} readOnly />
@@ -1433,9 +1254,9 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
                                     <Box sx={{ flex: 1 }}>
                                         <Stack direction="row" alignItems="center" spacing={0.5}>
                                             <Typography className="font-medium">{u.name || u.email || u.id}</Typography>
-                                            {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: TEAL }} />}
+                                            {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: "#10b8a6" }} />}
                                         </Stack>
-                                        {u.email && <Typography variant="caption" sx={{ color: MUTED }}>{u.email}</Typography>}
+                                        {u.email && <Typography variant="caption" className="text-slate-500">{u.email}</Typography>}
                                     </Box>
                                 </Stack>
                             );
@@ -1444,17 +1265,17 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ ...DIALOG_ACTIONS_SX, position: 'sticky', bottom: 0 }}>
-                <Typography sx={{ flex: 1, color: MUTED }}>
+            <DialogActions sx={{ position: 'sticky', bottom: 0, background: 'white' }} className="px-6 py-4">
+                <Typography sx={{ flex: 1 }} className="text-slate-600">
                     {selected.size} selected
                 </Typography>
-                <Button onClick={onClose} sx={SUBTLE_BTN_SX}>Cancel</Button>
+                <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
                 <Button
                     onClick={submit}
                     disabled={selected.size === 0 || submitting}
                     variant="contained"
                     className="rounded-xl"
-                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 >
                     {submitting ? "Adding..." : `Add ${selected.size > 0 ? `(${selected.size})` : ""}`}
                 </Button>
@@ -1585,8 +1406,8 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
     };
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ sx: DIALOG_PAPER_SX }}>
-            <DialogTitle sx={DIALOG_TITLE_SX}>Request to add members</DialogTitle>
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
+            <DialogTitle className="font-extrabold">Request to add members</DialogTitle>
             <DialogContent dividers>
                 <TextField
                     placeholder="Search users…"
@@ -1601,12 +1422,12 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
                 {loading ? (
                     <>
                         <LinearProgress />
-                        <Typography className="mt-2 text-[#64748B]">Searching…</Typography>
+                        <Typography className="mt-2 text-slate-500">Searching…</Typography>
                     </>
                 ) : error ? (
                     <Alert severity="error">{error}</Alert>
                 ) : rows.length === 0 ? (
-                    <Typography sx={{ color: MUTED }}>No users found.</Typography>
+                    <Typography className="text-slate-500">No users found.</Typography>
                 ) : (
                     <Stack spacing={1} divider={<Divider />}>
                         {rows.map((u) => {
@@ -1617,7 +1438,7 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
                                     direction="row"
                                     alignItems="center"
                                     spacing={2}
-                                    className="py-2 cursor-pointer hover:bg-[#F6F8FB] rounded-lg px-1"
+                                    className="py-2 cursor-pointer hover:bg-slate-50 rounded-lg px-1"
                                     onClick={() => toggle(u.id)}
                                 >
                                     <input type="checkbox" checked={checked} readOnly />
@@ -1627,9 +1448,9 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
                                     <Box sx={{ flex: 1 }}>
                                         <Stack direction="row" alignItems="center" spacing={0.5}>
                                             <Typography className="font-medium">{u.name || u.email || u.id}</Typography>
-                                            {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: TEAL }} />}
+                                            {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: "#10b8a6" }} />}
                                         </Stack>
-                                        {u.email && <Typography variant="caption" sx={{ color: MUTED }}>{u.email}</Typography>}
+                                        {u.email && <Typography variant="caption" className="text-slate-500">{u.email}</Typography>}
                                     </Box>
                                 </Stack>
                             );
@@ -1638,15 +1459,15 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ ...DIALOG_ACTIONS_SX, position: 'sticky', bottom: 0 }}>
-                <Typography sx={{ flex: 1, color: MUTED }}>
+            <DialogActions sx={{ position: 'sticky', bottom: 0, background: 'white' }} className="px-6 py-4">
+                <Typography sx={{ flex: 1 }} className="text-slate-600">
                     {selected.size} selected
                 </Typography>
-                <Button onClick={onClose} sx={SUBTLE_BTN_SX}>Cancel</Button>
+                <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
                 <Button
                     onClick={submit} disabled={selected.size === 0 || submitting}
                     variant="contained"
-                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 >
                     {submitting ? "Sending..." : "Send request"}
                 </Button>
@@ -1795,15 +1616,15 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
     };
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ sx: DIALOG_PAPER_SX }}>
-            <DialogTitle sx={DIALOG_TITLE_SX}>Create Sub-group</DialogTitle>
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
+            <DialogTitle className="font-extrabold">Create Sub-group</DialogTitle>
             <DialogContent dividers>
-                <Typography variant="body2" className="text-[#64748B] mb-4">
+                <Typography variant="body2" className="text-slate-500 mb-4">
                     *Required fields are marked with an asterisk
                 </Typography>
 
                 <Box className="flex items-start gap-3 mb-4">
-                    <Avatar sx={{ bgcolor: TEAL, width: 40, height: 40 }} />
+                    <Avatar sx={{ bgcolor: "#10b8a6", width: 40, height: 40 }} />
                     <TextField
                         label="Group Name *"
                         value={name}
@@ -1907,19 +1728,20 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
 
                     <div className="col-span-12 md:col-span-5">
                         <Typography variant="subtitle1" className="font-semibold">Group Photo</Typography>
-                        <Typography variant="caption" className="text-[#64748B] block mb-2">
+                        <Typography variant="caption" className="text-slate-500 block mb-2">
                             Recommended 650×365px • Max 50 MB
                         </Typography>
 
                         <Box
-                            className="flex items-center justify-center" sx={{ ...UPLOAD_BOX_SX, height: 200, position: "relative", overflow: "hidden" }}
+                            className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                            sx={{ height: 200, position: "relative", overflow: "hidden" }}
                         >
                             {localPreview ? (
                                 <img src={localPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
                                 <Stack alignItems="center" spacing={1}>
                                     <ImageRoundedIcon />
-                                    <Typography variant="body2" sx={{ color: MUTED }}>Image Preview</Typography>
+                                    <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
                                 </Stack>
                             )}
                             <input
@@ -1933,7 +1755,7 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
 
                         <Stack direction="row" spacing={1} className="mt-2">
                             <label htmlFor="subgroup-cover-input">
-                                <Button sx={OUTLINE_BTN_SX} component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
                                     Upload
                                 </Button>
                             </label>
@@ -1942,14 +1764,14 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
                 </div>
             </DialogContent>
 
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
+            <DialogActions className="px-6 py-4">
                 <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>
                 <Button
                     onClick={submit}
                     disabled={submitting}
                     variant="contained"
                     className="rounded-xl"
-                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 >
                     Create
                 </Button>
@@ -2046,7 +1868,7 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
 
     return (
         <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
-            <DialogTitle sx={DIALOG_TITLE_SX}>Reactions</DialogTitle>
+            <DialogTitle>Reactions</DialogTitle>
             <DialogContent dividers>
                 {/* Tabs for filtering */}
                 <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
@@ -2055,12 +1877,7 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
                         onChange={(_, v) => setActiveFilter(v)}
                         variant="scrollable"
                         allowScrollButtonsMobile
-                        sx={{
-                            minHeight: 40,
-                            "& .MuiTab-root": { textTransform: "none", fontWeight: 700, color: MUTED, minHeight: 40 },
-                            "& .Mui-selected": { color: `${NAVY} !important` },
-                            "& .MuiTabs-indicator": { backgroundColor: CORAL, height: 3, borderRadius: 3 },
-                        }}
+                        sx={{ minHeight: 40 }}
                     >
                         <Tab
                             value="all"
@@ -2095,7 +1912,7 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
                                 <ListItemText primary={
                                     <Stack direction="row" alignItems="center" spacing={0.5}>
                                         <span>{u.name}</span>
-                                        {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: TEAL }} />}
+                                        {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
                                     </Stack>
                                 } />
                                 {u.reactionEmoji && (
@@ -2108,8 +1925,8 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
                     </List>
                 )}
             </DialogContent>
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
-                <Button sx={SUBTLE_BTN_SX} onClick={onClose}>Close</Button>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
             </DialogActions>
         </Dialog>
     );
@@ -2173,7 +1990,7 @@ function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
 
     return (
         <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
-            <DialogTitle sx={DIALOG_TITLE_SX}>Shares</DialogTitle>
+            <DialogTitle>Shares</DialogTitle>
             <DialogContent dividers>
                 {loading ? (
                     <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
@@ -2189,7 +2006,7 @@ function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
                                     <ListItemText primary={
                                         <Stack direction="row" alignItems="center" spacing={0.5}>
                                             <span>{user.name || user.username || `User #${user.id}`}</span>
-                                            {user.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: TEAL }} />}
+                                            {user.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
                                         </Stack>
                                     } />
                                 </ListItem>
@@ -2198,8 +2015,8 @@ function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
                     </List>
                 )}
             </DialogContent>
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
-                <Button sx={SUBTLE_BTN_SX} onClick={onClose}>Close</Button>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
             </DialogActions>
         </Dialog>
     );
@@ -2435,17 +2252,17 @@ function GroupCommentsDialog({
             maxWidth="xs"
             fullWidth
         >
-            <DialogTitle sx={DIALOG_TITLE_SX}>Delete Comment?</DialogTitle>
+            <DialogTitle>Delete Comment?</DialogTitle>
             <DialogContent>
                 <DialogContentText>
                     This comment will be removed from the platform, but it and its replies, reactions, reports and history will remain stored in the database.
                 </DialogContentText>
             </DialogContent>
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
-                <Button sx={SUBTLE_BTN_SX} onClick={() => setConfirmDelId(null)} disabled={delBusy}>
+            <DialogActions>
+                <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>
                     Cancel
                 </Button>
-                <Button sx={BTN_SHAPE_SX}
+                <Button
                     onClick={performDelete}
                     color="error"
                     variant="contained"
@@ -2462,7 +2279,7 @@ function GroupCommentsDialog({
     const CommentItem = ({ c, depth = 0 }) => (
         <Box sx={{
             pl: depth ? 2 : 0,
-            borderLeft: depth ? "2px solid #E3E8EF" : "none",
+            borderLeft: depth ? "2px solid #e2e8f0" : "none",
             ml: depth ? 1.5 : 0,
             mt: depth ? 1 : 0
         }}>
@@ -2472,7 +2289,7 @@ function GroupCommentsDialog({
                     <Typography variant="subtitle2">
                         {c.author?.name || c.author?.username || `User #${c.author_id}`}
                     </Typography>
-                    {c.author?.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: TEAL }} />}
+                    {c.author?.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
                 </Stack>
                 <Typography variant="caption" color="text.secondary">
                     {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
@@ -2490,11 +2307,11 @@ function GroupCommentsDialog({
                 >
                     {c.like_count ?? 0}
                 </Button>
-                <Button sx={SUBTLE_BTN_SX} size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
+                <Button size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
                     Reply
                 </Button>
                 {((me?.id || me?.user?.id) === c.author_id || (me?.id || me?.user?.id) === groupOwnerId) && (
-                    <Button sx={BTN_SHAPE_SX} size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => deleteComment(c)}>Delete</Button>
+                    <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => deleteComment(c)}>Delete</Button>
                 )}
             </Stack>
 
@@ -2520,7 +2337,7 @@ function GroupCommentsDialog({
                         <Typography variant="caption" color="text.secondary">
                             Replying to {replyTo.author?.name || `#${replyTo.author_id}`}
                         </Typography>
-                        <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+                        <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
                     </Stack>
                 )}
 
@@ -2539,7 +2356,7 @@ function GroupCommentsDialog({
                             }
                         }}
                     />
-                    <Button sx={PRIMARY_BTN_SX}
+                    <Button
                         variant="contained"
                         onClick={() => createComment(text, replyTo?.id || null)}
                         disabled={!text.trim()}
@@ -2561,7 +2378,7 @@ function GroupCommentsDialog({
 
                     {hasMore && (
                         <Stack alignItems="flex-start" sx={{ mt: 1 }}>
-                            <Button sx={SUBTLE_BTN_SX} size="small" variant="text" onClick={() => setVisibleCount(v => v + initialCount)}>
+                            <Button size="small" variant="text" onClick={() => setVisibleCount(v => v + initialCount)}>
                                 Load more comments
                             </Button>
                         </Stack>
@@ -2576,7 +2393,7 @@ function GroupCommentsDialog({
     return (
         <>
             <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="md">
-                <DialogTitle sx={DIALOG_TITLE_SX}>Comments</DialogTitle>
+                <DialogTitle>Comments</DialogTitle>
                 <DialogContent dividers>
                     {loading ? (
                         <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
@@ -2591,7 +2408,7 @@ function GroupCommentsDialog({
                     {replyTo && (
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                             <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
-                            <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+                            <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
                         </Stack>
                     )}
                     <Stack direction="row" spacing={1}>
@@ -2602,7 +2419,7 @@ function GroupCommentsDialog({
                             value={text}
                             onChange={(e) => setText(e.target.value)}
                         />
-                        <Button sx={PRIMARY_BTN_SX} variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>
+                        <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>
                             Post
                         </Button>
                     </Stack>
@@ -2730,7 +2547,7 @@ function GroupSharePickerDialog({ open, onClose, groupIdOrSlug, postId, onShared
 
     return (
         <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle sx={DIALOG_TITLE_SX}>Share post</DialogTitle>
+            <DialogTitle>Share post</DialogTitle>
             <DialogContent dividers>
                 {loading ? (
                     <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
@@ -2760,7 +2577,7 @@ function GroupSharePickerDialog({ open, onClose, groupIdOrSlug, postId, onShared
                                         <ListItemText primary={
                                             <Stack direction="row" alignItems="center" spacing={0.5}>
                                                 <span>{m.name}</span>
-                                                {m.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: TEAL }} />}
+                                                {m.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
                                             </Stack>
                                         } />
                                     </ListItemButton>
@@ -2770,9 +2587,9 @@ function GroupSharePickerDialog({ open, onClose, groupIdOrSlug, postId, onShared
                     </>
                 )}
             </DialogContent>
-            <DialogActions sx={DIALOG_ACTIONS_SX}>
-                <Button sx={SUBTLE_BTN_SX} onClick={onClose} disabled={sending}>Cancel</Button>
-                <Button sx={PRIMARY_BTN_SX} variant="contained" onClick={shareNow} disabled={!selected.size || sending}>
+            <DialogActions>
+                <Button onClick={onClose} disabled={sending}>Cancel</Button>
+                <Button variant="contained" onClick={shareNow} disabled={!selected.size || sending}>
                     {sending ? "Sharing…" : "Share"}
                 </Button>
             </DialogActions>
@@ -2960,7 +2777,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post, onNotify = () =
                             "& .MuiAvatar-root": {
                                 width: 24,
                                 height: 24,
-                                bgcolor: BORDER,
+                                bgcolor: "#d1d5db",
                                 border: "2px solid #fff",
                             }
                         }}
@@ -2970,7 +2787,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post, onNotify = () =
                             .map(rid => {
                                 const def = POST_REACTIONS.find(r => r.id === rid) || POST_REACTIONS[0];
                                 return (
-                                    <Avatar key={rid} sx={{ bgcolor: BORDER }}>
+                                    <Avatar key={rid} sx={{ bgcolor: "#d1d5db" }}>
                                         <span style={{ fontSize: 22, lineHeight: 1 }}>{def.emoji}</span>
                                     </Avatar>
                                 );
@@ -3001,7 +2818,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post, onNotify = () =
                     onClick={handleOpenPicker}
                     sx={{
                         textTransform: "uppercase",
-                        color: hasReaction ? TEAL : "inherit", // Teal if active
+                        color: hasReaction ? "#10b8a6" : "inherit", // Teal if active
                         fontWeight: hasReaction ? 700 : 400,
                     }}
                     // Show Emoji if specific reaction, else Heart icon fallback
@@ -3412,13 +3229,15 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
             {/* Left: target list (group + members) */}
             <Paper
                 elevation={0}
-                sx={{ ...CARD_SX, width: { xs: "100%", md: 280 },
+                className="rounded-2xl border border-slate-200"
+                sx={{
+                    width: { xs: "100%", md: 280 },
                     maxHeight: 480,
                     overflowY: "auto",
-                    display: { xs: mobileView === "list" ? "block" : "none", md: "block" } }}
-
+                    display: { xs: mobileView === "list" ? "block" : "none", md: "block" },
+                }}
             >
-                <Box sx={{ p: 2, borderBottom: "1px solid #E3E8EF" }}>
+                <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0" }}>
                     <Typography variant="subtitle1" className="font-semibold">
                         Chats
                     </Typography>
@@ -3482,7 +3301,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
             {/* Right: conversation */}
             <Paper
                 elevation={0}
-                className="rounded-2xl border border-[#E3E8EF] flex-1"
+                className="rounded-2xl border border-slate-200 flex-1"
                 sx={{
                     display: {
                         xs: mobileView === "chat" ? "flex" : "none",
@@ -3493,7 +3312,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                     maxHeight: 520,
                 }}
             >
-                <Box sx={{ p: 2, borderBottom: "1px solid #E3E8EF" }}>
+                <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0" }}>
                     <Stack
                         direction="row"
                         alignItems="center"
@@ -3577,7 +3396,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                                             px: 1.5,
                                             py: 1,
                                             borderRadius: 2,
-                                            bgcolor: mine ? TEAL : BORDER,
+                                            bgcolor: mine ? "#10b8a6" : "#e2e8f0",
                                             color: mine ? "white" : "inherit",
                                         }}
                                     >
@@ -3608,7 +3427,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                 </Box>
 
                 {/* Composer */}
-                <Box sx={{ p: 1.5, borderTop: "1px solid #E3E8EF" }}>
+                <Box sx={{ p: 1.5, borderTop: "1px solid #e2e8f0" }}>
                     <Stack
                         direction="row"
                         spacing={1}
@@ -3648,8 +3467,8 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                             }
                             sx={{
                                 textTransform: "none",
-                                backgroundColor: TEAL,
-                                "&:hover": { backgroundColor: "#087f82" },
+                                backgroundColor: "#10b8a6",
+                                "&:hover": { backgroundColor: "#0ea5a4" },
                             }}
                         >
                             Send
@@ -3756,6 +3575,7 @@ export default function GroupManagePage() {
     const [memberPage, setMemberPage] = React.useState(1);
     const [addOpen, setAddOpen] = React.useState(false);
     const [inviteEmailsOpen, setInviteEmailsOpen] = React.useState(false);
+    const [inviteUsersOpen, setInviteUsersOpen] = React.useState(false);
     const [requestAddOpen, setRequestAddOpen] = React.useState(false);
     const [memMenuAnchor, setMemMenuAnchor] = React.useState(null);
     const [activeMember, setActiveMember] = React.useState(null);
@@ -5309,16 +5129,16 @@ export default function GroupManagePage() {
     const onUpdated = (updated) => setGroup(updated);
 
     return (
-        <div className="max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0" style={{ background: BG, minHeight: "100vh" }}>
+        <div className="max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0">
             <div className="grid grid-cols-12 gap-4">
 
                 {/* RIGHT: your original page content unchanged */}
-                <main className="col-span-12 lg:col-span-9" style={{ background: BG }}>
+                <main className="col-span-12 lg:col-span-9">
                     {/* ↓↓↓ PASTE everything that was inside your <Container> here ↓↓↓ */}
                     <Container maxWidth="lg" disableGutters className="py-0">
                         {/* Cover banner */}
                         {/* Header (no cover image) */}
-                        <Box sx={{ px: { xs: 2, sm: 3 }, py: 2, mb: 2, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: "10px", boxShadow: CARD_SHADOW }}>
+                        <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
                             <Stack
                                 direction={{ xs: "column", sm: "row" }}
                                 alignItems={{ xs: "flex-start", sm: "center" }}
@@ -5336,11 +5156,8 @@ export default function GroupManagePage() {
                                             sx={{
                                                 width: 64,
                                                 height: 64,
-                                                bgcolor: TEAL,
+                                                bgcolor: "#10b8a6",
                                                 border: "3px solid white",
-                                                color: "#fff",
-                                                fontWeight: 900,
-                                                boxShadow: "0 4px 14px rgba(16,24,40,0.14)",
                                             }}
                                             src={group?.logo ? bust(group.logo, group.updated_at || group._cache) : undefined}
                                             alt={group?.name || "Group"}
@@ -5357,9 +5174,9 @@ export default function GroupManagePage() {
                                                         right: -6,
                                                         bottom: -6,
                                                         bgcolor: "white",
-                                                        border: `1px solid ${BORDER}`,
+                                                        border: "1px solid #e2e8f0",
                                                         boxShadow: 1,
-                                                        "&:hover": { bgcolor: BG },
+                                                        "&:hover": { bgcolor: "#f8fafc" },
                                                     }}
                                                 >
                                                     <PhotoCameraRoundedIcon fontSize="inherit" />
@@ -5372,15 +5189,15 @@ export default function GroupManagePage() {
                                         <Typography
                                             variant="h5"
                                             className="font-extrabold"
-                                            sx={{ wordBreak: "break-word", color: NAVY, fontWeight: 900 }}
+                                            sx={{ wordBreak: "break-word" }}
                                         >
                                             {group?.name || "Group"}
                                         </Typography>
                                         {group?.short_description && (
                                             <Typography
                                                 variant="subtitle2"
-                                                className="text-[#64748B] font-semibold"
-                                                sx={{ wordBreak: "break-word", color: MUTED }}
+                                                className="text-slate-600 font-semibold"
+                                                sx={{ wordBreak: "break-word" }}
                                             >
                                                 {group.short_description}
                                             </Typography>
@@ -5389,10 +5206,10 @@ export default function GroupManagePage() {
                                             <Chip
                                                 size="small"
                                                 label={group?.visibility === "private" ? "Private" : "Public"}
-                                                sx={{ bgcolor: group?.visibility === "private" ? "rgba(27,42,74,0.08)" : "rgba(10,147,150,0.10)", color: group?.visibility === "private" ? NAVY : TEAL, fontWeight: 800 }}
+                                                className={group?.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
                                             />
                                             {typeof memberCount === "number" && (
-                                                <Typography variant="body2" sx={{ color: MUTED, fontWeight: 700 }}>{memberCount} members</Typography>
+                                                <Typography variant="body2">{memberCount} members</Typography>
                                             )}
                                         </Stack>
                                     </Box>
@@ -5411,7 +5228,7 @@ export default function GroupManagePage() {
                                         onClick={() => navigate(-1)}
                                         variant="outlined"
                                         className="rounded-xl"
-                                        sx={{ textTransform: "none", color: NAVY, borderColor: BORDER, bgcolor: "#fff", fontWeight: 800, borderRadius: "8px", "&:hover": { borderColor: TEAL, color: TEAL, bgcolor: "#fff" } }}
+                                        sx={{ textTransform: "none", color: "#0ea5a4", borderColor: "#0ea5a4" }}
                                     >
                                         Back
                                     </Button>
@@ -5422,7 +5239,7 @@ export default function GroupManagePage() {
                                             onClick={handleOpenEditDialog}
                                             variant="contained"
                                             className="rounded-xl"
-                                            sx={{ textTransform: "none", backgroundColor: CORAL, fontWeight: 800, borderRadius: "8px", "&:hover": { backgroundColor: "#cf4525" } }}
+                                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                         >
                                             Edit
                                         </Button>
@@ -5433,8 +5250,9 @@ export default function GroupManagePage() {
                                         startIcon={<LogoutRoundedIcon />}
                                         onClick={() => setLeaveGroupOpen(true)}
                                         variant="outlined"
+                                        color="error"
                                         className="rounded-xl"
-                                        sx={{ textTransform: "none", color: CORAL, borderColor: "rgba(232,83,47,0.35)", fontWeight: 800, borderRadius: "8px", "&:hover": { borderColor: CORAL, bgcolor: "rgba(232,83,47,0.08)" } }}
+                                        sx={{ textTransform: "none" }}
                                     >
                                         Leave
                                     </Button>
@@ -5447,20 +5265,13 @@ export default function GroupManagePage() {
                         <Paper
                             elevation={0}
                             className="rounded-none"
-                            sx={{ display: { xs: "none", sm: "block" }, border: `1px solid ${BORDER}`, borderRadius: "10px", mb: 2, overflow: "hidden", boxShadow: CARD_SHADOW }}
+                            sx={{ display: { xs: "none", sm: "block" } }}
                         >
                             <Tabs
                                 value={tab}
                                 onChange={(_, v) => setTab(v)}
                                 variant="scrollable"
                                 allowScrollButtonsMobile
-                                sx={{
-                                    px: 2,
-                                    bgcolor: "#fff",
-                                    "& .MuiTabs-indicator": { bgcolor: CORAL, height: 3, borderRadius: "3px 3px 0 0" },
-                                    "& .MuiTab-root": { color: MUTED, fontWeight: 800, textTransform: "none", minHeight: 54 },
-                                    "& .Mui-selected": { color: `${NAVY} !important` },
-                                }}
                             >
                                 <Tab label="Overview" value={0} />
                                 <Tab label="Members" value={1} />
@@ -5512,11 +5323,11 @@ export default function GroupManagePage() {
                                 justifyContent: "space-between",
                                 px: 2,
                                 py: 1,
-                                borderBottom: `1px solid ${BORDER}`,
-                                bgcolor: "#fff",
+                                borderBottom: "1px solid #e2e8f0",
+                                bgcolor: "background.paper",
                             }}
                         >
-                            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: NAVY }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                                 {GROUP_TAB_LABELS[tab] || "Overview"}
                             </Typography>
                             <IconButton
@@ -5530,20 +5341,20 @@ export default function GroupManagePage() {
 
                         {/* Content */}
                         {loading ? (
-                            <Box className="p-8"><LinearProgress /><Typography className="mt-3 text-[#64748B]">Loading…</Typography></Box>
+                            <Box className="p-8"><LinearProgress /><Typography className="mt-3 text-slate-500">Loading…</Typography></Box>
                         ) : error ? (
                             <Box className="p-8"><Alert severity="error">{error}</Alert></Box>
                         ) : !group ? (
                             <Box className="p-8"><Alert severity="warning">Group not found.</Alert></Box>
                         ) : (
-                            <Box className="p-6" sx={{ bgcolor: BG }}>
+                            <Box className="p-6">
                                 {tab === 0 && (
                                     <Grid container spacing={3}>
                                         <Grid item xs={12} md={8}>
-                                            <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                                 <Typography variant="h6" className="font-semibold mb-1">About</Typography>
                                                 {group.short_description && (
-                                                    <Typography className="text-[#334155] font-semibold mb-2">
+                                                    <Typography className="text-slate-700 font-semibold mb-2">
                                                         {group.short_description}
                                                     </Typography>
                                                 )}
@@ -5555,16 +5366,16 @@ export default function GroupManagePage() {
                                             </Paper>
                                         </Grid>
                                         <Grid item xs={12} md={4}>
-                                            <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                                 <Typography variant="h6" className="font-semibold mb-2">Details</Typography>
-                                                <Stack spacing={1} sx={{ color: MUTED }}>
+                                                <Stack spacing={1} className="text-slate-600">
                                                     <div><b>Visibility:</b> {group.visibility}</div>
                                                     {group.parent_group && (
                                                         <div>
                                                             <b>Parent Group: </b>
                                                             <Link
                                                                 to={`/admin/groups/${group.parent_group.slug || group.parent_group.id}`}
-                                                                style={{ color: '#0A9396', textDecoration: 'none', fontWeight: 500 }}
+                                                                style={{ color: '#10b8a6', textDecoration: 'none', fontWeight: 500 }}
                                                                 className="hover:underline"
                                                             >
                                                                 {group.parent_group.name}
@@ -5580,7 +5391,7 @@ export default function GroupManagePage() {
                                     </Grid>
                                 )}
                                 {tab === 1 && (
-                                    <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-4">
                                             <Typography variant="h6" className="font-semibold">Members</Typography>
 
@@ -5592,7 +5403,7 @@ export default function GroupManagePage() {
                                                         className="rounded-xl"
                                                         startIcon={<FileDownloadRoundedIcon />}
                                                         disabled={exportingCSV}
-                                                        sx={{ textTransform: "none", borderColor: TEAL, color: TEAL }}
+                                                        sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
                                                         onClick={handleExportCSV}
                                                     >
                                                         {exportingCSV ? "Exporting..." : "Export CSV"}
@@ -5605,7 +5416,7 @@ export default function GroupManagePage() {
                                                         <Button
                                                             variant="contained"
                                                             className="rounded-xl"
-                                                            sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                                             onClick={() => setAddOpen(true)}
                                                         >
                                                             Add members
@@ -5613,7 +5424,16 @@ export default function GroupManagePage() {
                                                         <Button
                                                             variant="contained"
                                                             className="rounded-xl ml-2 text-white"
-                                                            sx={{ ...OUTLINE_BTN_SX, ml: 1 }}
+                                                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" }, ml: 1 }}
+                                                            startIcon={<PersonAddAlt1RoundedIcon />}
+                                                            onClick={() => setInviteUsersOpen(true)}
+                                                        >
+                                                            Invite
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            className="rounded-xl ml-2 text-white"
+                                                            sx={{ textTransform: "none", backgroundColor: "#0ea5e9", "&:hover": { backgroundColor: "#0284c7" }, ml: 1 }}
                                                             startIcon={<EmailRoundedIcon />}
                                                             onClick={() => setInviteEmailsOpen(true)}
                                                         >
@@ -5627,7 +5447,7 @@ export default function GroupManagePage() {
                                                     (<Button
                                                         variant="outlined"
                                                         className="rounded-xl"
-                                                        sx={{ textTransform: "none", borderColor: TEAL, color: TEAL }}
+                                                        sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
                                                         onClick={() => {
                                                             fetchRequests();
                                                             setRequestAddOpen(true);
@@ -5640,11 +5460,11 @@ export default function GroupManagePage() {
                                         </Stack>
 
                                         {memLoading ? (
-                                            <><LinearProgress /><Typography className="mt-2 text-[#64748B]">Loading members…</Typography></>
+                                            <><LinearProgress /><Typography className="mt-2 text-slate-500">Loading members…</Typography></>
                                         ) : memError ? (
                                             <Alert severity="error">{memError}</Alert>
                                         ) : membersWithOwner.length === 0 ? (
-                                            <Typography sx={{ color: MUTED }}>No members yet.</Typography>
+                                            <Typography className="text-slate-500">No members yet.</Typography>
                                         ) : (
                                             <>
                                                 <Stack divider={<Divider />} spacing={1}>
@@ -5687,13 +5507,13 @@ export default function GroupManagePage() {
                                                                         boxSizing: "border-box",
                                                                         transition: "background-color .15s ease, border-color .15s ease, box-shadow .15s ease",
                                                                         "&:hover": {
-                                                                            bgcolor: BG,
-                                                                            borderColor: "rgba(10,147,150,0.35)",
+                                                                            bgcolor: "#f3f4f6",
+                                                                            borderColor: "#99f6e4",
                                                                         },
                                                                         "&:focus-visible": {
-                                                                            bgcolor: BG,
-                                                                            borderColor: "rgba(10,147,150,0.35)",
-                                                                            boxShadow: `0 0 0 1px ${TEAL}`,
+                                                                            bgcolor: "#f3f4f6",
+                                                                            borderColor: "#99f6e4",
+                                                                            boxShadow: "0 0 0 1px #99f6e4",
                                                                             outline: "none",
                                                                         },
                                                                     }}
@@ -5703,15 +5523,15 @@ export default function GroupManagePage() {
                                                                         <Stack direction="row" alignItems="center" spacing={0.5}>
                                                                             <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
                                                                             {m.user?.kyc_status === "approved" && (
-                                                                                (<VerifiedIcon sx={{ fontSize: 16, color: TEAL }} />) // Cyan verified icon
+                                                                                (<VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />) // Cyan verified icon
                                                                             )}
                                                                         </Stack>
                                                                         <Stack direction="row" spacing={2}>
                                                                             {m.user.email && (
-                                                                                <Typography variant="caption" sx={{ color: MUTED }}>{m.user.email}</Typography>
+                                                                                <Typography variant="caption" className="text-slate-500">{m.user.email}</Typography>
                                                                             )}
                                                                             {m.joined_at && (
-                                                                                <Typography variant="caption" sx={{ color: MUTED }}>
+                                                                                <Typography variant="caption" className="text-slate-500">
                                                                                     Joined: {new Date(m.joined_at).toLocaleDateString()}
                                                                                 </Typography>
                                                                             )}
@@ -5753,7 +5573,7 @@ export default function GroupManagePage() {
                                                         spacing={1}
                                                         className="mt-4"
                                                     >
-                                                        <Typography variant="caption" sx={{ color: MUTED }}>
+                                                        <Typography variant="caption" className="text-slate-500">
                                                             Showing {(memberPage - 1) * MEMBERS_PER_PAGE + 1}
                                                             –{Math.min(memberPage * MEMBERS_PER_PAGE, sortedMembersWithOwner.length)}
                                                             {" "}of {sortedMembersWithOwner.length}
@@ -5762,7 +5582,7 @@ export default function GroupManagePage() {
                                                             count={memberPageCount}
                                                             page={memberPage}
                                                             onChange={(_, value) => setMemberPage(value)}
-                                                            sx={PAGINATION_SX}
+                                                            color="primary"
                                                             shape="rounded"
                                                             siblingCount={1}
                                                             boundaryCount={1}
@@ -5846,7 +5666,7 @@ export default function GroupManagePage() {
                                     <Stack spacing={3}>
                                         {/* Parent Groups (Both Primary & Linked) */}
                                         {(isChildGroup || hasParents) && (
-                                            <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                                 <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                                     <Typography variant="h6" className="font-semibold">Parent Groups</Typography>
                                                     <Stack direction="row" spacing={1}>
@@ -5867,7 +5687,7 @@ export default function GroupManagePage() {
                                                                 variant="contained"
                                                                 size="small"
                                                                 className="rounded-xl"
-                                                                sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                                                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                                                 onClick={() => setRequestParentOpen(true)}
                                                                 startIcon={<LinkRoundedIcon />}
                                                             >
@@ -5876,16 +5696,16 @@ export default function GroupManagePage() {
                                                         )}
                                                     </Stack>
                                                 </Stack>
-                                                <Typography variant="body2" className="text-[#64748B] mb-3">
+                                                <Typography variant="body2" className="text-slate-500 mb-3">
                                                     Groups this group belongs to.
                                                 </Typography>
 
                                                 {relLoading && parentLinks.length === 0 && !isChildGroup ? <LinearProgress /> : (!isChildGroup && parentLinks.length === 0) ? (
-                                                    <Typography className="text-[#64748B] italic mb-2">No parent groups.</Typography>
+                                                    <Typography className="text-slate-500 italic mb-2">No parent groups.</Typography>
                                                 ) : (
                                                     <Stack spacing={1}>
                                                         {isChildGroup && (group.parent_group || group.parent) && (
-                                                            <Paper variant="outlined" className="p-2 rounded-xl border-[#E3E8EF] bg-[#F6F8FB]">
+                                                            <Paper variant="outlined" className="p-2 rounded-xl border-slate-200 bg-slate-50">
                                                                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                                                                     <Stack direction="row" alignItems="center" spacing={2}>
                                                                         <Avatar variant="rounded" sx={{ width: 40, height: 40 }} src={(group.parent_group || group.parent).cover_image}>
@@ -5900,7 +5720,9 @@ export default function GroupManagePage() {
                                                                                 <Chip
                                                                                     label="PRIMARY PARENT"
                                                                                     size="small"
-                                                                                    sx={{ ...BADGE_ROLE, height: 20, fontSize: '0.7rem' }}
+                                                                                    color="primary"
+                                                                                    variant="outlined"
+                                                                                    sx={{ height: 20, fontSize: '0.7rem' }}
                                                                                 />
                                                                             </Stack>
                                                                         </Box>
@@ -5918,7 +5740,7 @@ export default function GroupManagePage() {
                                                         )}
 
                                                         {parentLinks.map(link => (
-                                                            <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-[#E3E8EF]">
+                                                            <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200">
                                                                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                                                                     <Stack direction="row" alignItems="center" spacing={2}>
                                                                         <Avatar variant="rounded" sx={{ width: 40, height: 40 }}>{link.parent_group?.name?.[0]}</Avatar>
@@ -5935,7 +5757,7 @@ export default function GroupManagePage() {
                                                                                     variant="outlined"
                                                                                     sx={{ height: 20, fontSize: '0.7rem' }}
                                                                                 />
-                                                                                <Typography variant="caption" sx={{ color: MUTED }}>
+                                                                                <Typography variant="caption" className="text-slate-500">
                                                                                     {link.status === 'pending' ? `Requested by ${link.requested_by?.name}` :
                                                                                         link.status === 'approved' ? `Reviewed by ${link.reviewed_by?.name}` : ''}
                                                                                 </Typography>
@@ -5952,7 +5774,7 @@ export default function GroupManagePage() {
                                                                             View
                                                                         </Button>
                                                                         {canEditGroup && (
-                                                                            <Button sx={BTN_SHAPE_SX} size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
+                                                                            <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
                                                                         )}
                                                                     </Box>
                                                                 </Stack>
@@ -5966,14 +5788,14 @@ export default function GroupManagePage() {
                                         {/* 2. Subgroups */}
                                         {/* 2. Subgroups - ONLY for Independent/Parent Groups (No parents) */}
                                         {!hasParents && (
-                                            <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                                 <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                                     <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
                                                     {canCreateSubgroups && (
                                                         <Button
                                                             variant="contained"
                                                             className="rounded-xl"
-                                                            sx={{ textTransform: "none", backgroundColor: CORAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                                            sx={{ textTransform: "none", backgroundColor: "#10b981", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                                             onClick={() => setAddSubOpen(true)}
                                                             startIcon={<AddRoundedIcon />}
                                                         >
@@ -5994,14 +5816,14 @@ export default function GroupManagePage() {
                                                                             <Avatar>{link.child_group?.name?.[0]}</Avatar>
                                                                             <Box>
                                                                                 <Typography className="font-semibold">{link.child_group.name}</Typography>
-                                                                                <Typography variant="caption" sx={{ color: MUTED }}>
+                                                                                <Typography variant="caption" className="text-slate-600">
                                                                                     Request from <span className="font-medium">{link.requested_by?.name}</span>
                                                                                 </Typography>
                                                                             </Box>
                                                                         </Stack>
                                                                         <Stack direction="row" spacing={1}>
-                                                                            <Button sx={BTN_SHAPE_SX} size="small" variant="contained" color="success" onClick={() => handleParentLinkAction(link.id, 'approve')}>Approve</Button>
-                                                                            <Button sx={BTN_SHAPE_SX} size="small" variant="outlined" color="error" onClick={() => handleParentLinkAction(link.id, 'reject')}>Reject</Button>
+                                                                            <Button size="small" variant="contained" color="success" onClick={() => handleParentLinkAction(link.id, 'approve')}>Approve</Button>
+                                                                            <Button size="small" variant="outlined" color="error" onClick={() => handleParentLinkAction(link.id, 'reject')}>Reject</Button>
                                                                         </Stack>
                                                                     </Stack>
                                                                 </Paper>
@@ -6014,10 +5836,10 @@ export default function GroupManagePage() {
                                                 {/* Linked Subgroups Management */}
                                                 {childLinks.filter(l => l.status === 'approved').length > 0 && (
                                                     <Box className="mb-4">
-                                                        <Typography variant="subtitle2" className="text-[#64748B] mb-2">Linked Subgroups (via Association)</Typography>
+                                                        <Typography variant="subtitle2" className="text-slate-600 mb-2">Linked Subgroups (via Association)</Typography>
                                                         <Stack spacing={1}>
                                                             {childLinks.filter(l => l.status === 'approved').map(link => (
-                                                                <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-[#E3E8EF] bg-[#F6F8FB]">
+                                                                <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200 bg-slate-50">
                                                                     <Stack direction="row" alignItems="center" justifyContent="space-between">
                                                                         <Stack direction="row" alignItems="center" spacing={2}>
                                                                             <Avatar sx={{ width: 32, height: 32 }}>{link.child_group?.name?.[0]}</Avatar>
@@ -6025,7 +5847,7 @@ export default function GroupManagePage() {
                                                                                 <Typography className="font-semibold text-sm">{link.child_group.name}</Typography>
                                                                             </Box>
                                                                         </Stack>
-                                                                        <Button sx={BTN_SHAPE_SX} size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
+                                                                        <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
                                                                     </Stack>
                                                                 </Paper>
                                                             ))}
@@ -6035,14 +5857,14 @@ export default function GroupManagePage() {
 
                                                 )}
 
-                                                <Typography variant="subtitle2" className="text-[#64748B] mb-2">All Subgroups (Primary & Linked)</Typography>
+                                                <Typography variant="subtitle2" className="text-slate-600 mb-2">All Subgroups (Primary & Linked)</Typography>
 
                                                 {subLoading ? (
                                                     <LinearProgress />
                                                 ) : subError ? (
                                                     <Alert severity="error">{subError}</Alert>
                                                 ) : visibleSubgroups.length === 0 ? (
-                                                    <Typography sx={{ color: MUTED }}>
+                                                    <Typography className="text-slate-500">
                                                         {isOwnerRole || isAdminRole
                                                             ? "No sub-groups yet."
                                                             : "You haven't joined any sub-groups yet."}
@@ -6062,13 +5884,13 @@ export default function GroupManagePage() {
                                                                         </Avatar>
                                                                         <Box>
                                                                             <Typography className="font-semibold">{sg.name}</Typography>
-                                                                            <Typography variant="caption" sx={{ color: MUTED }}>
+                                                                            <Typography variant="caption" className="text-slate-500">
                                                                                 {(sg.visibility === "private" ? "Private" : "Public")} •{" "}
                                                                                 {(sg.member_count ?? sg.members_count ?? 0)} members
                                                                             </Typography>
                                                                         </Box>
                                                                     </Stack>
-                                                                    <Button sx={SUBTLE_BTN_SX}
+                                                                    <Button
                                                                         size="small"
                                                                         variant="text"
                                                                         endIcon={<OpenInNewRoundedIcon />}
@@ -6099,9 +5921,9 @@ export default function GroupManagePage() {
                                 )}
 
                                 {tab === 3 && (
-                                    <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                         <Typography variant="h6" className="font-semibold mb-1">Settings</Typography>
-                                        <Typography className="text-[#64748B] mb-4">
+                                        <Typography className="text-slate-500 mb-4">
                                             Manage group visibility and permissions.
                                         </Typography>
 
@@ -6153,10 +5975,10 @@ export default function GroupManagePage() {
                                             <Grid item xs={12}>
                                                 <Box
                                                     sx={{
-                                                        border: "1px solid #E3E8EF",
+                                                        border: "1px solid #e2e8f0",
                                                         borderRadius: 2,
                                                         p: 2,
-                                                        bgcolor: BG,
+                                                        bgcolor: "#f8fafc",
                                                     }}
                                                 >
                                                     <Stack
@@ -6169,7 +5991,7 @@ export default function GroupManagePage() {
                                                             <Typography variant="subtitle1" className="font-semibold">
                                                                 Public Landing Page
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ color: MUTED }}>
+                                                            <Typography variant="body2" className="text-slate-600">
                                                                 Allow logged-out visitors to preview this public group before signing in or registering.
                                                             </Typography>
                                                         </Box>
@@ -6236,7 +6058,7 @@ export default function GroupManagePage() {
                                                     disabled={saveSettingsLoading}
                                                     onClick={saveGroupSettings}
                                                     className="rounded-xl"
-                                                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                                 >
                                                     {saveSettingsLoading ? "Saving..." : "Save Changes"}
                                                 </Button>
@@ -6248,7 +6070,7 @@ export default function GroupManagePage() {
                                         <Stack spacing={1.5} className="mb-4">
                                             <Typography variant="subtitle1" className="font-semibold">Communication / Forum</Typography>
                                             <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                                <Typography variant="body2" sx={{ color: MUTED }}>
+                                                <Typography variant="body2" className="text-slate-600">
                                                     Enable forum posts for members.
                                                 </Typography>
                                                 <FormControlLabel
@@ -6263,7 +6085,7 @@ export default function GroupManagePage() {
                                                 />
                                             </Stack>
                                             <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                                <Typography variant="body2" sx={{ color: MUTED }}>
+                                                <Typography variant="body2" className="text-slate-600">
                                                     Restrict posting to admins only.
                                                 </Typography>
                                                 <FormControlLabel
@@ -6278,7 +6100,7 @@ export default function GroupManagePage() {
                                                 />
                                             </Stack>
                                             <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                                <Typography variant="body2" sx={{ color: MUTED }}>
+                                                <Typography variant="body2" className="text-slate-600">
                                                     Enable comments on posts.
                                                 </Typography>
                                                 <FormControlLabel
@@ -6298,7 +6120,7 @@ export default function GroupManagePage() {
                                                     onClick={saveCommunicationSettings}
                                                     disabled={commLoading || commSaving}
                                                     className="rounded-xl"
-                                                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                                 >
                                                     {commSaving ? "Saving..." : "Save Forum Settings"}
                                                 </Button>
@@ -6310,7 +6132,7 @@ export default function GroupManagePage() {
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                             <div>
                                                 <Typography variant="subtitle1" className="font-semibold">Group Chat</Typography>
-                                                <Typography variant="body2" sx={{ color: MUTED }}>
+                                                <Typography variant="body2" className="text-slate-600">
                                                     {chatOn ? "Members can chat in this group." : "Chat is disabled — only owners/admins can post updates."}
                                                 </Typography>
                                             </div>
@@ -6345,7 +6167,7 @@ export default function GroupManagePage() {
                                                     variant="contained"
                                                     className="rounded-xl"
                                                     startIcon={<EditNoteRoundedIcon fontSize="small" />}
-                                                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                                     onClick={handleOpenEditDialog}
                                                 >
                                                     Edit Details
@@ -6389,7 +6211,7 @@ export default function GroupManagePage() {
                                 )}
 
                                 {tab === 4 && (
-                                    <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                         <Stack spacing={2}>
                                             <Typography variant="h6" className="font-semibold">Posts</Typography>
 
@@ -6398,7 +6220,7 @@ export default function GroupManagePage() {
                                                     Only the <b>Owner</b>, <b>Admins</b>, and <b>Moderators</b> can create posts in this group.
                                                 </Alert>
                                             ) : (
-                                                <Paper elevation={0} className="rounded-xl border border-[#E3E8EF] p-3">
+                                                <Paper elevation={0} className="rounded-xl border border-slate-200 p-3">
                                                     <Stack spacing={2}>
                                                         <Stack direction="row" spacing={2} alignItems="center">
                                                             <TextField
@@ -6420,7 +6242,7 @@ export default function GroupManagePage() {
                                                                 disabled={creating || (postType === "text" && !postText.trim()) || (postType === "image" && !postImageFile)}
                                                                 startIcon={<SendRoundedIcon />}
                                                                 className="rounded-xl"
-                                                                sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                                                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                                             >
                                                                 Post
                                                             </Button>
@@ -6448,7 +6270,7 @@ export default function GroupManagePage() {
                                                                 />
                                                                 <Stack direction="row" spacing={1} alignItems="center">
                                                                     <label htmlFor="post-image-file">
-                                                                        <Button sx={OUTLINE_BTN_SX} component="span" size="small" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
+                                                                        <Button component="span" size="small" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
                                                                             Choose image
                                                                         </Button>
                                                                     </label>
@@ -6459,7 +6281,7 @@ export default function GroupManagePage() {
                                                                         style={{ display: "none" }}
                                                                         onChange={(e) => setPostImageFile(e.target.files?.[0] || null)}
                                                                     />
-                                                                    <Typography variant="body2" sx={{ color: MUTED }}>
+                                                                    <Typography variant="body2" className="text-slate-600">
                                                                         {postImageFile ? postImageFile.name : "No file selected"}
                                                                     </Typography>
                                                                 </Stack>
@@ -6504,11 +6326,11 @@ export default function GroupManagePage() {
                                                                                 onChange={(e) => updatePollOption(idx, e.target.value)}
                                                                             />
                                                                             {pollOptions.length > 2 && (
-                                                                                <Button sx={SUBTLE_BTN_SX} size="small" onClick={() => removePollOption(idx)}>Remove</Button>
+                                                                                <Button size="small" onClick={() => removePollOption(idx)}>Remove</Button>
                                                                             )}
                                                                         </Stack>
                                                                     ))}
-                                                                    <Button sx={SUBTLE_BTN_SX} size="small" onClick={addPollOption} startIcon={<PollRoundedIcon />}>
+                                                                    <Button size="small" onClick={addPollOption} startIcon={<PollRoundedIcon />}>
                                                                         Add option
                                                                     </Button>
                                                                 </Stack>
@@ -6524,12 +6346,12 @@ export default function GroupManagePage() {
                                             {postsLoading ? (
                                                 <>
                                                     <LinearProgress />
-                                                    <Typography className="mt-2 text-[#64748B]">Loading posts…</Typography>
+                                                    <Typography className="mt-2 text-slate-500">Loading posts…</Typography>
                                                 </>
                                             ) : postsError ? (
                                                 <Alert severity="error">{postsError}</Alert>
                                             ) : posts.length === 0 ? (
-                                                <Typography sx={{ color: MUTED, fontStyle: (postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0)) ? 'italic' : 'normal' }}>
+                                                <Typography className="text-slate-500" sx={{ fontStyle: (postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0)) ? 'italic' : 'normal' }}>
                                                     {(postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0))
                                                         ? "This content was removed by moderators."
                                                         : "No posts yet."}
@@ -6542,7 +6364,7 @@ export default function GroupManagePage() {
                                                         justifyContent="space-between"
                                                         spacing={1.5}
                                                     >
-                                                        <Typography variant="caption" sx={{ color: MUTED }}>
+                                                        <Typography variant="caption" className="text-slate-500">
                                                             Showing {postsShowingFrom}-{postsShowingTo} of {posts.length} posts
                                                         </Typography>
                                                         <TextField
@@ -6567,7 +6389,7 @@ export default function GroupManagePage() {
                                                         const isRemoved = p.is_removed || (p.moderation_status === "removed") || (p.status === "removed") || (m.status === "removed") || (m.moderationStatus === "removed") || (p.moderationStatus === "removed");
 
                                                         return (
-                                                            <Paper key={postKey(p)} elevation={0} className="rounded-xl border border-[#E3E8EF] p-3">
+                                                            <Paper key={postKey(p)} elevation={0} className="rounded-xl border border-slate-200 p-3">
                                                                 <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                                                     <Stack direction="row" spacing={1.5} alignItems="center">
                                                                         <Avatar src={toAbs(p.created_by?.avatar || p.created_by?.avatar_url || p.created_by?.user_image || "")}>
@@ -6579,10 +6401,10 @@ export default function GroupManagePage() {
                                                                                     {p.created_by?.name || p.created_by?.email || "User"}
                                                                                 </Typography>
                                                                                 {p.created_by?.kyc_status === "approved" && (
-                                                                                    <VerifiedIcon sx={{ fontSize: 16, color: TEAL }} />
+                                                                                    <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
                                                                                 )}
                                                                             </Stack>
-                                                                            <Typography variant="caption" sx={{ color: MUTED }}>
+                                                                            <Typography variant="caption" className="text-slate-500">
                                                                                 {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
                                                                             </Typography>
                                                                         </Box>
@@ -6625,7 +6447,7 @@ export default function GroupManagePage() {
                                                                                         href={toAbs(p.url)}
                                                                                         target="_blank"
                                                                                         rel="noreferrer"
-                                                                                        style={{ color: "#087f82", wordBreak: "break-word" }}
+                                                                                        style={{ color: "#0ea5a4", wordBreak: "break-word" }}
                                                                                     >
                                                                                         <LinkRoundedIcon fontSize="small" /> {p.url}
                                                                                     </a>
@@ -6655,7 +6477,7 @@ export default function GroupManagePage() {
                                                                 page={postsPage}
                                                                 count={postsTotalPages}
                                                                 onChange={(_, value) => setPostsPage(value)}
-                                                                sx={PAGINATION_SX}
+                                                                color="primary"
                                                                 shape="rounded"
                                                                 showFirstButton
                                                                 showLastButton
@@ -6670,7 +6492,7 @@ export default function GroupManagePage() {
                                 {tab === CHAT_TAB_INDEX && (
                                     <Paper
                                         elevation={0}
-                                        className="rounded-2xl border border-[#E3E8EF] p-4"
+                                        className="rounded-2xl border border-slate-200 p-4"
                                     >
                                         <GroupChatTab
                                             group={group}
@@ -6684,24 +6506,24 @@ export default function GroupManagePage() {
                                 )}
 
                                 {canSeeNotificationsTab && tab === NOTIF_TAB_INDEX && (
-                                    <Paper elevation={0} className="rounded-2xl border border-[#E3E8EF] p-4">
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                         <Stack spacing={2}>
                                             <Typography variant="h6" className="font-semibold">Notifications</Typography>
 
                                             {canReviewRequests ? (
                                                 <>
                                                     {/* Filter Tabs */}
-                                                    <Box sx={{ display: "flex", gap: 1, mb: 2, pb: 1, borderBottom: "2px solid #E3E8EF" }}>
+                                                    <Box sx={{ display: "flex", gap: 1, mb: 2, pb: 1, borderBottom: "2px solid #e2e8f0" }}>
                                                         <Button
                                                             onClick={() => setNotifTab(0)}
                                                             sx={{
                                                                 textTransform: "none",
                                                                 fontWeight: notifTab === 0 ? 600 : 400,
-                                                                color: notifTab === 0 ? TEAL : "#64748b",
-                                                                borderBottom: notifTab === 0 ? "3px solid #0A9396" : "none",
+                                                                color: notifTab === 0 ? "#10b8a6" : "#64748b",
+                                                                borderBottom: notifTab === 0 ? "3px solid #10b8a6" : "none",
                                                                 paddingBottom: "8px",
                                                                 marginBottom: "-2px",
-                                                                "&:hover": { backgroundColor: "transparent", color: TEAL },
+                                                                "&:hover": { backgroundColor: "transparent", color: "#10b8a6" },
                                                             }}
                                                         >
                                                             All Notifications
@@ -6709,7 +6531,7 @@ export default function GroupManagePage() {
                                                                 <Chip
                                                                     label={reqs.length + promotionReqs.length}
                                                                     size="small"
-                                                                    sx={{ ml: 1, height: 20, backgroundColor: TEAL, color: "white" }}
+                                                                    sx={{ ml: 1, height: 20, backgroundColor: "#10b8a6", color: "white" }}
                                                                 />
                                                             )}
                                                         </Button>
@@ -6719,11 +6541,11 @@ export default function GroupManagePage() {
                                                             sx={{
                                                                 textTransform: "none",
                                                                 fontWeight: notifTab === 1 ? 600 : 400,
-                                                                color: notifTab === 1 ? TEAL : "#64748b",
-                                                                borderBottom: notifTab === 1 ? "3px solid #0A9396" : "none",
+                                                                color: notifTab === 1 ? "#10b8a6" : "#64748b",
+                                                                borderBottom: notifTab === 1 ? "3px solid #10b8a6" : "none",
                                                                 paddingBottom: "8px",
                                                                 marginBottom: "-2px",
-                                                                "&:hover": { backgroundColor: "transparent", color: TEAL },
+                                                                "&:hover": { backgroundColor: "transparent", color: "#10b8a6" },
                                                             }}
                                                         >
                                                             Join Requests
@@ -6731,7 +6553,7 @@ export default function GroupManagePage() {
                                                                 <Chip
                                                                     label={reqs.length}
                                                                     size="small"
-                                                                    sx={{ ml: 1, height: 20, backgroundColor: TEAL, color: "white" }}
+                                                                    sx={{ ml: 1, height: 20, backgroundColor: "#10b8a6", color: "white" }}
                                                                 />
                                                             )}
                                                         </Button>
@@ -6741,11 +6563,11 @@ export default function GroupManagePage() {
                                                             sx={{
                                                                 textTransform: "none",
                                                                 fontWeight: notifTab === 2 ? 600 : 400,
-                                                                color: notifTab === 2 ? TEAL : "#64748b",
-                                                                borderBottom: notifTab === 2 ? "3px solid #0A9396" : "none",
+                                                                color: notifTab === 2 ? "#10b8a6" : "#64748b",
+                                                                borderBottom: notifTab === 2 ? "3px solid #10b8a6" : "none",
                                                                 paddingBottom: "8px",
                                                                 marginBottom: "-2px",
-                                                                "&:hover": { backgroundColor: "transparent", color: TEAL },
+                                                                "&:hover": { backgroundColor: "transparent", color: "#10b8a6" },
                                                             }}
                                                         >
                                                             Promotion Requests
@@ -6753,7 +6575,7 @@ export default function GroupManagePage() {
                                                                 <Chip
                                                                     label={promotionReqs.length}
                                                                     size="small"
-                                                                    sx={{ ml: 1, height: 20, backgroundColor: TEAL, color: "white" }}
+                                                                    sx={{ ml: 1, height: 20, backgroundColor: "#10b8a6", color: "white" }}
                                                                 />
                                                             )}
                                                         </Button>
@@ -6793,14 +6615,14 @@ export default function GroupManagePage() {
                                                                                 divider
                                                                                 secondaryAction={
                                                                                     <ButtonGroup variant="outlined" size="small">
-                                                                                        <Button sx={BTN_SHAPE_SX}
+                                                                                        <Button
                                                                                             color="success"
                                                                                             onClick={() => takeAction(userId, "approve")}
                                                                                             disabled={reqsLoading}
                                                                                         >
                                                                                             Approve
                                                                                         </Button>
-                                                                                        <Button sx={BTN_SHAPE_SX}
+                                                                                        <Button
                                                                                             color="error"
                                                                                             onClick={() => takeAction(userId, "reject")}
                                                                                             disabled={reqsLoading}
@@ -6855,14 +6677,14 @@ export default function GroupManagePage() {
                                                                                 divider
                                                                                 secondaryAction={
                                                                                     <ButtonGroup variant="outlined" size="small">
-                                                                                        <Button sx={BTN_SHAPE_SX}
+                                                                                        <Button
                                                                                             color="success"
                                                                                             onClick={() => takePromotionAction(r, "approve")}
                                                                                             disabled={promotionLoading}
                                                                                         >
                                                                                             Approve
                                                                                         </Button>
-                                                                                        <Button sx={BTN_SHAPE_SX}
+                                                                                        <Button
                                                                                             color="error"
                                                                                             onClick={() => takePromotionAction(r, "reject")}
                                                                                             disabled={promotionLoading}
@@ -6902,7 +6724,7 @@ export default function GroupManagePage() {
 
                                                     {/* Refresh buttons */}
                                                     <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                                                        <Button sx={OUTLINE_BTN_SX}
+                                                        <Button
                                                             variant="outlined"
                                                             onClick={fetchRequests}
                                                             disabled={reqsLoading}
@@ -6982,10 +6804,10 @@ export default function GroupManagePage() {
                                                     fontSize: 14,
                                                     fontWeight: index === tab ? 700 : 500,
                                                     backgroundColor:
-                                                        index === tab ? "rgba(10,147,150,0.10)" : "transparent",
+                                                        index === tab ? "#E6F7F6" : "transparent",
                                                     "&:hover": {
                                                         backgroundColor:
-                                                            index === tab ? "rgba(10,147,150,0.14)" : BG,
+                                                            index === tab ? "#E6F7F6" : "#F3F4F6",
                                                     },
                                                 }}
                                                 onClick={() => {
@@ -7012,6 +6834,14 @@ export default function GroupManagePage() {
                                 await fetchMembers();
                                 setGroup((prev) => prev ? { ...prev, member_count: (prev.member_count || 0) + n } : prev);
                             }}
+                        />
+
+                        <InviteGroupUsersDialog
+                            open={inviteUsersOpen}
+                            onClose={() => setInviteUsersOpen(false)}
+                            groupIdOrSlug={idOrSlug}
+                            groupId={group?.id}
+                            groupName={group?.name || ""}
                         />
 
                         <InviteEmailsDialog
@@ -7045,15 +6875,15 @@ export default function GroupManagePage() {
                             onClose={() => setRoleErrorOpen(false)}
                             fullWidth
                             maxWidth="xs"
-                            PaperProps={{ sx: DIALOG_PAPER_SX }}
+                            PaperProps={{ sx: { borderRadius: 3 } }}
                         >
-                            <DialogTitle sx={DIALOG_TITLE_SX}>Couldn’t update role</DialogTitle>
+                            <DialogTitle sx={{ fontWeight: 800 }}>Couldn’t update role</DialogTitle>
                             <DialogContent>
                                 <Alert severity="error" sx={{ my: 1 }}>
                                     {roleErrorMsg || "Something went wrong while assigning the role."}
                                 </Alert>
                             </DialogContent>
-                            <DialogActions sx={DIALOG_ACTIONS_SX}>
+                            <DialogActions>
                                 <Button
                                     onClick={() => setRoleErrorOpen(false)}
                                     variant="contained"
@@ -7069,15 +6899,15 @@ export default function GroupManagePage() {
                             onClose={() => setRequestInfoOpen(false)}
                             fullWidth
                             maxWidth="xs"
-                            PaperProps={{ sx: DIALOG_PAPER_SX }}
+                            PaperProps={{ sx: { borderRadius: 3 } }}
                         >
-                            <DialogTitle sx={DIALOG_TITLE_SX}>Request sent</DialogTitle>
+                            <DialogTitle sx={{ fontWeight: 800 }}>Request sent</DialogTitle>
                             <DialogContent>
                                 <Alert severity="success" sx={{ my: 1 }}>
                                     {requestInfoMessage || "Your request has been sent to the group admins."}
                                 </Alert>
                             </DialogContent>
-                            <DialogActions sx={DIALOG_ACTIONS_SX}>
+                            <DialogActions>
                                 <Button
                                     onClick={() => setRequestInfoOpen(false)}
                                     variant="contained"
@@ -7093,9 +6923,9 @@ export default function GroupManagePage() {
                             onClose={() => setChatConfirmOpen(false)}
                             fullWidth
                             maxWidth="xs"
-                            PaperProps={{ sx: DIALOG_PAPER_SX }}
+                            PaperProps={{ sx: { borderRadius: 3 } }}
                         >
-                            <DialogTitle sx={DIALOG_TITLE_SX}>
+                            <DialogTitle sx={{ fontWeight: 800 }}>
                                 {chatNext ? "Allow everyone to chat?" : "Restrict chat to admins only?"}
                             </DialogTitle>
                             <DialogContent>
@@ -7108,7 +6938,7 @@ export default function GroupManagePage() {
                                     You can change this anytime in Settings.
                                 </Typography>
                             </DialogContent>
-                            <DialogActions sx={DIALOG_ACTIONS_SX}>
+                            <DialogActions>
                                 <Button onClick={() => setChatConfirmOpen(false)} sx={{ textTransform: "none" }}>
                                     Cancel
                                 </Button>
@@ -7120,7 +6950,7 @@ export default function GroupManagePage() {
                                         setChatOn(chatNext);            // optimistic
                                         await saveChatToggle(chatNext); // persist to DB as all/admins_only
                                     }}
-                                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                 >
                                     {chatNext ? "Allow all" : "Set to admins_only"}
                                 </Button>
@@ -7133,9 +6963,9 @@ export default function GroupManagePage() {
                             onClose={() => (deletingGroup ? null : setDeleteGroupOpen(false))}
                             fullWidth
                             maxWidth="xs"
-                            PaperProps={{ sx: DIALOG_PAPER_SX }}
+                            PaperProps={{ sx: { borderRadius: 3 } }}
                         >
-                            <DialogTitle sx={DIALOG_TITLE_SX}>Delete this group?</DialogTitle>
+                            <DialogTitle sx={{ fontWeight: 800 }}>Delete this group?</DialogTitle>
                             <DialogContent>
                                 <Alert severity="warning" sx={{ mb: 2 }}>
                                     This is a soft delete. The group will disappear from My Groups, public group pages, feeds, chat and forum access, but it will remain stored in the database.
@@ -7163,7 +6993,7 @@ export default function GroupManagePage() {
                                     placeholder={group?.name || "Group name"}
                                 />
                             </DialogContent>
-                            <DialogActions sx={DIALOG_ACTIONS_SX}>
+                            <DialogActions>
                                 <Button onClick={() => setDeleteGroupOpen(false)} disabled={deletingGroup} sx={{ textTransform: "none" }}>
                                     Cancel
                                 </Button>
@@ -7216,16 +7046,16 @@ export default function GroupManagePage() {
                             onClose={() => setRemoveMemberOpen(false)}
                             fullWidth
                             maxWidth="xs"
-                            PaperProps={{ sx: DIALOG_PAPER_SX }}
+                            PaperProps={{ sx: { borderRadius: 3 } }}
                         >
-                            <DialogTitle sx={DIALOG_TITLE_SX}>Remove member?</DialogTitle>
+                            <DialogTitle sx={{ fontWeight: 800 }}>Remove member?</DialogTitle>
                             <DialogContent>
                                 <Typography sx={{ mb: 1.5 }}>
                                     {removeMemberTarget?.user?.name || removeMemberTarget?.user?.email || "This member"} will be
                                     removed from the group and will lose access to posts and updates.
                                 </Typography>
                             </DialogContent>
-                            <DialogActions sx={DIALOG_ACTIONS_SX}>
+                            <DialogActions>
                                 <Button onClick={() => setRemoveMemberOpen(false)} sx={{ textTransform: "none" }}>
                                     Cancel
                                 </Button>
@@ -7272,11 +7102,11 @@ export default function GroupManagePage() {
 
                         {/* Delete confirmation dialog */}
                         <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-                            <DialogTitle sx={DIALOG_TITLE_SX}>Delete this post?</DialogTitle>
+                            <DialogTitle>Delete this post?</DialogTitle>
                             <DialogContent>
                                 <Typography>This content will be removed from the platform, but it and all related comments, reactions, poll votes, reports and history will remain stored in the database.</Typography>
                             </DialogContent>
-                            <DialogActions sx={DIALOG_ACTIONS_SX}>
+                            <DialogActions>
                                 <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
                                 <Button onClick={deletePost} color="error" variant="contained" sx={{ textTransform: "none" }}>
                                     Delete
@@ -7290,7 +7120,7 @@ export default function GroupManagePage() {
                             fullWidth
                             maxWidth="sm"
                         >
-                            <DialogTitle sx={DIALOG_TITLE_SX}>Edit Post</DialogTitle>
+                            <DialogTitle>Edit Post</DialogTitle>
                             <DialogContent>
                                 {activePost?.type === "text" && (
                                     <TextField
@@ -7373,7 +7203,7 @@ export default function GroupManagePage() {
                                         />
                                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
                                             <label htmlFor="edit-image-file">
-                                                <Button sx={OUTLINE_BTN_SX} component="span" size="small" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
+                                                <Button component="span" size="small" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
                                                     Replace image
                                                 </Button>
                                             </label>
@@ -7384,7 +7214,7 @@ export default function GroupManagePage() {
                                                 style={{ display: "none" }}
                                                 onChange={(e) => setEditImageFile(e.target.files?.[0] || null)}
                                             />
-                                            <Typography variant="body2" sx={{ color: MUTED }}>
+                                            <Typography variant="body2" className="text-slate-600">
                                                 {editImageFile ? editImageFile.name : "Keeping current image"}
                                             </Typography>
                                         </Stack>
@@ -7415,7 +7245,7 @@ export default function GroupManagePage() {
                                                             setActivePost({ ...activePost, options: next });
                                                         }}
                                                     />
-                                                    <Button sx={SUBTLE_BTN_SX}
+                                                    <Button
                                                         size="small"
                                                         onClick={() => {
                                                             const next = [...(activePost?.options || [])];
@@ -7429,7 +7259,7 @@ export default function GroupManagePage() {
                                                 </Stack>
                                             ))}
 
-                                            <Button sx={SUBTLE_BTN_SX}
+                                            <Button
                                                 size="small"
                                                 startIcon={<AddRoundedIcon />}
                                                 onClick={() => {
@@ -7444,7 +7274,7 @@ export default function GroupManagePage() {
                                     </>
                                 )}
                             </DialogContent>
-                            <DialogActions sx={DIALOG_ACTIONS_SX}>
+                            <DialogActions>
                                 <Button onClick={() => setEditPostOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
                                 <Button
                                     onClick={async () => {
@@ -7555,7 +7385,7 @@ export default function GroupManagePage() {
                                     }}
                                     variant="contained"
                                     disabled={saving}
-                                    sx={{ textTransform: "none", backgroundColor: TEAL, "&:hover": { backgroundColor: "#087f82" } }}
+                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                 >
                                     {saving ? "Saving…" : "Save"}
                                 </Button>
@@ -7568,7 +7398,7 @@ export default function GroupManagePage() {
                 {/* 👇 ADD THIS ANYWHERE INSIDE RETURN (typically here) */}
                 {/* Request Parent Link Dialog */}
                 <Dialog open={requestParentOpen} onClose={() => setRequestParentOpen(false)}>
-                    <DialogTitle sx={DIALOG_TITLE_SX}>Link to Parent Group</DialogTitle>
+                    <DialogTitle>Link to Parent Group</DialogTitle>
                     <DialogContent>
                         <DialogContentText className="mb-4">
                             Search for the parent group you want to link to.
@@ -7633,9 +7463,9 @@ export default function GroupManagePage() {
                             sx={{ mt: 2, display: 'none' }} // Hidden but keeping state binding conceptually
                         />
                     </DialogContent>
-                    <DialogActions sx={DIALOG_ACTIONS_SX}>
-                        <Button sx={SUBTLE_BTN_SX} onClick={() => setRequestParentOpen(false)}>Cancel</Button>
-                        <Button sx={PRIMARY_BTN_SX}
+                    <DialogActions>
+                        <Button onClick={() => setRequestParentOpen(false)}>Cancel</Button>
+                        <Button
                             onClick={handleRequestLink}
                             disabled={!reqParentId || String(reqParentId).trim() === ""}
                             variant="contained"
@@ -7660,7 +7490,7 @@ export default function GroupManagePage() {
                 />
 
                 <Dialog open={leaveGroupOpen} onClose={() => setLeaveGroupOpen(false)}>
-                    <DialogTitle sx={DIALOG_TITLE_SX}>Leave Group?</DialogTitle>
+                    <DialogTitle>Leave Group?</DialogTitle>
                     <DialogContent>
                         <DialogContentText>
                             Are you sure you want to leave <b>{group?.name}</b>?<br /><br />
@@ -7669,16 +7499,16 @@ export default function GroupManagePage() {
                             {myRole !== "owner" && myRole !== "admin" && "You can rejoin later if the group is public or by request."}
                         </DialogContentText>
                     </DialogContent>
-                    <DialogActions sx={DIALOG_ACTIONS_SX}>
-                        <Button sx={SUBTLE_BTN_SX} onClick={() => setLeaveGroupOpen(false)}>Cancel</Button>
-                        <Button sx={BTN_SHAPE_SX} onClick={handleLeaveGroup} color="error" variant="contained">
+                    <DialogActions>
+                        <Button onClick={() => setLeaveGroupOpen(false)}>Cancel</Button>
+                        <Button onClick={handleLeaveGroup} color="error" variant="contained">
                             Confirm Leave
                         </Button>
                     </DialogActions>
                 </Dialog>
 
                 <Dialog open={promoteDialogOpen} onClose={() => setPromoteDialogOpen(false)}>
-                    <DialogTitle sx={{ ...DIALOG_TITLE_SX, color: CORAL }}>Promote to Main Group?</DialogTitle>
+                    <DialogTitle className="text-red-700">Promote to Main Group?</DialogTitle>
                     <DialogContent>
                         <DialogContentText sx={{ mb: 2 }}>
                             Are you sure you want to promote <b>{group?.name}</b> to be an independent main group?
@@ -7707,7 +7537,7 @@ export default function GroupManagePage() {
                             </RadioGroup>
                         </FormControl>
                     </DialogContent>
-                    <DialogActions sx={DIALOG_ACTIONS_SX}>
+                    <DialogActions>
                         <Button onClick={() => setPromoteDialogOpen(false)} disabled={isPromoting} sx={{ textTransform: "none" }}>
                             Cancel
                         </Button>
@@ -7729,20 +7559,20 @@ export default function GroupManagePage() {
                     onClose={closeConfirmDialog}
                     maxWidth="xs"
                     fullWidth
-                    PaperProps={{ sx: { ...DIALOG_PAPER_SX, p: 1 } }}
+                    PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
                 >
-                    <DialogTitle sx={DIALOG_TITLE_SX}>{confirmDialog.title}</DialogTitle>
+                    <DialogTitle sx={{ fontWeight: 700, pb: 0 }}>{confirmDialog.title}</DialogTitle>
                     <DialogContent sx={{ pt: 1 }}>
                         <DialogContentText>{confirmDialog.content}</DialogContentText>
                     </DialogContent>
-                    <DialogActions sx={DIALOG_ACTIONS_SX}>
+                    <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
                         <Button onClick={closeConfirmDialog} variant="outlined" sx={{ textTransform: "none", borderRadius: 2 }}>
                             Cancel
                         </Button>
                         <Button
                             onClick={executeConfirmAction}
                             variant="contained"
-                            sx={{ textTransform: "none", borderRadius: 2, backgroundColor: CORAL, "&:hover": { backgroundColor: "#cf4525" } }}
+                            sx={{ textTransform: "none", borderRadius: 2, backgroundColor: "#10b981", "&:hover": { backgroundColor: "#059669" } }}
                         >
                             Confirm
                         </Button>
@@ -7770,5 +7600,3 @@ export default function GroupManagePage() {
     );
 
 }
-
-
