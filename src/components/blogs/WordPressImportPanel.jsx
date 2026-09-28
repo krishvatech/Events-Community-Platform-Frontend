@@ -37,9 +37,32 @@ const COUNTS = [
   ["created_count", "Created"],
   ["updated_count", "Updated"],
   ["skipped_count", "Skipped"],
-  ["restricted_count", "Restricted"],
   ["failed_count", "Failed"],
 ];
+
+const WP_STATUS_LABELS = {
+  publish: "Published",
+  draft: "Draft",
+  pending: "Pending",
+  future: "Scheduled",
+  private: "Private",
+};
+
+/**
+ * Members-only chips. The breakdown arrives with the final report; while a run
+ * is active only the neutral count is known. Finished runs from before draft
+ * sync skipped restricted posts.
+ */
+function restrictedChips(run) {
+  const restricted = run.summary?.restricted;
+  if (!restricted || restricted.imported_as_draft === undefined) {
+    if (!run.restricted_count) return [];
+    return [isImportActive(run) ? `Restricted: ${run.restricted_count}` : `Restricted (skipped): ${run.restricted_count}`];
+  }
+  const chips = [`Restricted → Draft: ${restricted.imported_as_draft}`];
+  if (restricted.teaser_only_not_imported) chips.push(`Restricted (not imported): ${restricted.teaser_only_not_imported}`);
+  return chips;
+}
 
 function Counts({ run }) {
   return (
@@ -47,9 +70,37 @@ function Counts({ run }) {
       {COUNTS.map(([field, label]) => (
         <Chip key={field} size="small" variant="outlined" label={`${label}: ${run[field] ?? 0}`} />
       ))}
+      {restrictedChips(run).map((label) => (
+        <Chip key={label} size="small" variant="outlined" label={label} />
+      ))}
       <Chip size="small" variant="outlined" label={`Media migrated: ${run.media_migrated_count ?? 0}`} />
       <Chip size="small" variant="outlined" label={`Links rewritten: ${run.links_rewritten_count ?? 0}`} />
     </Stack>
+  );
+}
+
+/** One line per side: what WordPress has, and what ECP shows after the sync. */
+function StatusBreakdown({ run }) {
+  const source = run.summary?.source_status_counts || {};
+  const ecp = run.summary?.ecp_status_counts || {};
+  // Published and Draft always; the rarer statuses only when present.
+  const sourceParts = Object.entries(WP_STATUS_LABELS)
+    .filter(([status]) => source[status] !== undefined && (source[status] > 0 || status === "publish" || status === "draft"))
+    .map(([status, label]) => `${label} ${source[status]}`);
+  const hasEcp = ecp.published !== undefined;
+  if (!sourceParts.length && !hasEcp) return null;
+  return (
+    <Box sx={{ mt: 1 }} data-testid="import-status-breakdown">
+      {sourceParts.length > 0 && (
+        <Typography variant="body2">WordPress: {sourceParts.join(" · ")}</Typography>
+      )}
+      {hasEcp && (
+        <Typography variant="body2">
+          In ECP: {ecp.published} Published · {ecp.draft} Draft
+          {ecp.restricted_draft ? ` (${ecp.restricted_draft} members-only)` : ""}
+        </Typography>
+      )}
+    </Box>
   );
 }
 
@@ -206,12 +257,14 @@ export default function WordPressImportPanel({ onFinished, pollInterval = IMPORT
         <Alert severity="success" sx={{ mt: 2 }} data-testid="import-result" onClose={() => setRun(null)}>
           <AlertTitle>WordPress import completed.</AlertTitle>
           <Counts run={run} />
+          <StatusBreakdown run={run} />
         </Alert>
       )}
       {run && run.status === "partial" && (
         <Alert severity="warning" sx={{ mt: 2 }} data-testid="import-result" onClose={() => setRun(null)}>
           <AlertTitle>Import completed with warnings.</AlertTitle>
           <Counts run={run} />
+          <StatusBreakdown run={run} />
           <Problems run={run} />
         </Alert>
       )}
@@ -227,11 +280,13 @@ export default function WordPressImportPanel({ onFinished, pollInterval = IMPORT
         <DialogTitle>Import Blogs from WordPress?</DialogTitle>
         <DialogContent>
           <Box component="ul" sx={{ pl: 2.5, m: 0, color: "text.secondary", fontSize: 14, lineHeight: 1.7 }}>
-            <li>Published, public WordPress Blogs are synchronized into ECP.</li>
-            <li>New Blogs are created; changed imported Blogs are updated; unchanged ones are skipped.</li>
-            <li>Members-only (restricted) Blogs are skipped.</li>
-            <li>No existing ECP Blog is deleted, and Blogs you unpublished stay unpublished.</li>
-            <li>Images are copied into ECP; this can take several minutes.</li>
+            <li>WordPress Blogs will be synchronized into ECP.</li>
+            <li>Published public Blogs are imported as Published.</li>
+            <li>WordPress drafts, pending, scheduled or private Blogs are imported as Drafts.</li>
+            <li>Membership-restricted Blogs are imported as Drafts so restricted content is not accidentally exposed.</li>
+            <li>New Blogs are created, changed imported Blogs are updated and unchanged Blogs are skipped.</li>
+            <li>No ECP Blog is automatically deleted, and Blogs you published or unpublished in ECP keep that status.</li>
+            <li>Images are copied into ECP and may take several minutes.</li>
           </Box>
           {startError && <Alert severity="error" sx={{ mt: 2 }}>{startError}</Alert>}
         </DialogContent>

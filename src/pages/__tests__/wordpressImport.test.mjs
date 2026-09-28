@@ -33,8 +33,14 @@ const renderPanel = () =>
 
 const running = (overrides = {}) =>
   makeImportRun({ status: "running", current_step: "syncing_blogs", total_importable: 3, progress: { processed: 1, total: 3, media_processed: 2, media_total: 10 }, ...overrides });
+const allStatusSummary = {
+  errors: [], media_failures: [], restricted_post_ids: [84],
+  restricted: { detected: 1, imported_as_draft: 1, teaser_only_not_imported: 0, teaser_only_post_ids: [] },
+  source_status_counts: { publish: 93, draft: 11, pending: 0, future: 2, private: 0 },
+  ecp_status_counts: { published: 85, draft: 21, restricted_draft: 8 },
+};
 const done = (overrides = {}) =>
-  makeImportRun({ status: "succeeded", current_step: "completed", created_count: 3, restricted_count: 1, media_migrated_count: 7, links_rewritten_count: 2, finished_at: "2026-09-26T08:10:00Z", ...overrides });
+  makeImportRun({ status: "succeeded", current_step: "completed", created_count: 3, restricted_count: 1, media_migrated_count: 7, links_rewritten_count: 2, finished_at: "2026-09-26T08:10:00Z", summary: allStatusSummary, ...overrides });
 
 /** Service whose status endpoint walks through the given runs, then repeats the last. */
 function sequence(runs, extra = {}) {
@@ -67,9 +73,18 @@ test("button opens a confirmation modal; Cancel starts nothing", async () => {
   await renderPanel();
   await click(getByRole("button", "Import from WordPress"));
   const dialog = await waitFor(() => getByRole("dialog"));
-  for (const text of [/restricted/i, /No existing ECP Blog is deleted/, /several minutes/, /unchanged ones are skipped/]) {
+  for (const text of [
+    /WordPress Blogs will be synchronized into ECP/,
+    /Published public Blogs are imported as Published/,
+    /drafts, pending, scheduled or private Blogs are imported as Drafts/,
+    /Membership-restricted Blogs are imported as Drafts so restricted content is not accidentally exposed/,
+    /unchanged Blogs are skipped/,
+    /No ECP Blog is automatically deleted/,
+    /several minutes/,
+  ]) {
     assert.match(dialog.textContent, text);
   }
+  assert.doesNotMatch(dialog.textContent, /Restricted\) Blogs are skipped|Published, public WordPress Blogs are synchronized/);
   await click(getByRole("button", "Cancel", { scope: dialog }));
   await waitFor(() => assert.ok(!queryByRole("dialog"), "dialog closed"));
   assert.equal(api.callsTo("startWordPressBlogImport").length, 0);
@@ -92,14 +107,21 @@ test("start -> progress polling -> completion, then polling stops and the list i
   state.run = running({ current_step: "migrating_media", progress: { processed: 3, total: 3, media_processed: 6, media_total: 10 } });
   await waitFor(() => assert.ok(queryByText(/Processed 3 \/ 3/)));
   assert.ok(queryByText("Migrating images…"));
+  state.run = running({ current_step: "migrating_media", restricted_count: 8, progress: { processed: 3, total: 3, media_processed: 7, media_total: 10 } });
+  await waitFor(() => assert.ok(queryByText("Restricted: 8")));
+  assert.ok(!document.querySelector("[data-testid='import-progress']").textContent.includes("skipped"),
+    "an active run never claims restricted posts were skipped");
   assert.equal(finished.length, 0);
 
   state.run = done();
   await waitFor(() => assert.ok(queryByText("WordPress import completed.")));
   const result = document.querySelector("[data-testid='import-result']").textContent;
-  for (const text of ["Created: 3", "Restricted: 1", "Failed: 0", "Media migrated: 7", "Links rewritten: 2"]) {
+  for (const text of ["Created: 3", "Restricted → Draft: 1", "Failed: 0", "Media migrated: 7", "Links rewritten: 2",
+                      "WordPress: Published 93 · Draft 11 · Scheduled 2", "In ECP: 85 Published · 21 Draft (8 members-only)"]) {
     assert.ok(result.includes(text), text);
   }
+  assert.ok(!result.includes("Pending") && !result.includes("Private"), "empty rare statuses are not listed");
+  assert.ok(!result.includes("skipped): "), "restricted posts are not reported as skipped");
   assert.equal(finished.length, 1);
   const polls = api.callsTo("getWordPressBlogImport").length;
   await settle(120);
@@ -144,14 +166,38 @@ test("409 attaches to the running import instead of failing", async () => {
 
 test("start errors stay in the modal", async () => {
   setBlogApi(fakeBlogService({
-    startWordPressBlogImport: async () => { throw apiError(503, "WordPress Blog import is not configured (WP_IMAA_BLOG_BASE_URL)."); },
+    startWordPressBlogImport: async () => { throw apiError(503, "Authenticated WordPress Blog import is not configured."); },
   }));
   await renderPanel();
   await click(getByRole("button", "Import from WordPress"));
   const dialog = await waitFor(() => getByRole("dialog"));
   await click(getByRole("button", "Start Import", { scope: dialog }));
-  await waitFor(() => assert.ok(queryByText(/not configured/)));
+  await waitFor(() => assert.ok(queryByText("Authenticated WordPress Blog import is not configured.")));
   assert.ok(queryByRole("dialog"));
+});
+
+test("teaser-only members posts are reported as not imported, never as drafts", async () => {
+  setBlogApi(fakeBlogService({ getLatestWordPressBlogImport: async () => done({
+    restricted_count: 3,
+    summary: { ...allStatusSummary, restricted: { detected: 3, imported_as_draft: 1, teaser_only_not_imported: 2, teaser_only_post_ids: [5, 6] } },
+  }) }));
+  await renderPanel();
+  await waitFor(() => assert.ok(queryByText("WordPress import completed.")));
+  const result = document.querySelector("[data-testid='import-result']").textContent;
+  assert.ok(result.includes("Restricted → Draft: 1"));
+  assert.ok(result.includes("Restricted (not imported): 2"));
+});
+
+test("runs from before draft sync keep their original restricted meaning", async () => {
+  setBlogApi(fakeBlogService({ getLatestWordPressBlogImport: async () => done({
+    restricted_count: 8, summary: { errors: [], media_failures: [], restricted_post_ids: [1, 2] },
+  }) }));
+  await renderPanel();
+  await waitFor(() => assert.ok(queryByText("WordPress import completed.")));
+  const result = document.querySelector("[data-testid='import-result']").textContent;
+  assert.ok(result.includes("Restricted (skipped): 8"));
+  assert.ok(!result.includes("→ Draft"));
+  assert.ok(!document.querySelector("[data-testid='import-status-breakdown']"), "no breakdown for old runs");
 });
 
 test("an active import is restored after a page refresh and keeps polling", async () => {
