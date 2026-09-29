@@ -83,7 +83,7 @@ import {
   SAVE_STATUS_SYNCED,
   saveBroadcastDraft,
 } from "./newsletterBroadcastSave.js";
-import { isBroadcastDetailLoaded } from "./newsletterBroadcastState.js";
+import { broadcastScheduleActions, isBroadcastDetailLoaded } from "./newsletterBroadcastState.js";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
@@ -510,6 +510,7 @@ function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, 
 
 function AnalyticsOverview({ campaigns, loading, selectedCampaignId, onSelectCampaign, analyticsState, onRefreshAnalytics }) {
   const engagement = analyticsState.data?.engagement || {};
+  const sendSummary = analyticsState.data?.send_summary || {};
   const rates = analyticsState.data?.rates || {};
   const selectedCampaign = campaigns.find((campaign) => campaign.uuid === selectedCampaignId);
 
@@ -535,6 +536,11 @@ function AnalyticsOverview({ campaigns, loading, selectedCampaignId, onSelectCam
         </TextField>
       </Stack>
       {analyticsState.error && <Alert severity="warning">{analyticsState.error}</Alert>}
+      <Grid container spacing={2}>
+        {/* Sent/Failed are provider send attempts, not mailbox deliveries. */}
+        <Grid item xs={12} sm={6} md={6}><MetricCard label="Sent" value={formatNumber(sendSummary.sent_count)} loading={loading || analyticsState.loading} /></Grid>
+        <Grid item xs={12} sm={6} md={6}><MetricCard label="Failed Sends" value={formatNumber(sendSummary.failed_count)} loading={loading || analyticsState.loading} /></Grid>
+      </Grid>
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6} md={2.4}><MetricCard label="Delivered" value={formatNumber(engagement.delivered_count)} loading={loading || analyticsState.loading} /></Grid>
         <Grid item xs={12} sm={6} md={2.4}><MetricCard label="Opened" value={formatNumber(engagement.opened_count)} loading={loading || analyticsState.loading} /></Grid>
@@ -752,6 +758,7 @@ function SettingsPage() {
                     <Field label="Configuration" value={diagnostics.background_processing?.configuration} />
                     <Field label="Worker heartbeat" value={diagnostics.background_processing?.live_worker_status} />
                     <Field label="Sync recovery scheduled" value={diagnostics.background_processing?.newsletter_sync_scheduled ? "Yes" : "No"} />
+                    <Field label="Native Broadcast reconciliation scheduled" value={diagnostics.background_processing?.native_broadcast_reconciliation_scheduled ? "Yes" : "No"} />
                   </InfoCard>
                 </Grid>
               </Grid>
@@ -1147,9 +1154,14 @@ export default function AdminNewsletterPage() {
   const editable = detailLoaded && (isNew || status === "draft");
   const isDirty = editable && !isNew && JSON.stringify(form) !== JSON.stringify(savedForm);
   const canDelete = detailLoaded && !isNew && status === "draft";
-  const canSchedule = detailLoaded && !isNew && (status === "draft" || status === "scheduled");
+  const { canSchedule, canCancel } = broadcastScheduleActions({
+    detailLoaded,
+    isNew,
+    status,
+    scheduleOwner: campaign?.schedule_owner,
+    scheduledAt: campaign?.scheduled_at,
+  });
   const canSendNow = detailLoaded && !isNew && status === "draft";
-  const canCancel = detailLoaded && !isNew && status === "scheduled";
 
   if (!isDetail) {
     return (
