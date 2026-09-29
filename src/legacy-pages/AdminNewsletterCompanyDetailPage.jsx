@@ -35,7 +35,7 @@ import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import LinkOffRoundedIcon from "@mui/icons-material/LinkOffRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "#navigation";
 
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 import {

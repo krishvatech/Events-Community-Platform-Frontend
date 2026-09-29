@@ -37,7 +37,7 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "#navigation";
 
 import WorkflowCanvas from "./WorkflowCanvas";
 import {

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, Chip, Skeleton, Stack, Typography } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { Helmet } from "react-helmet-async";
-import { Link as RouterLink, useLocation, useParams } from "react-router-dom";
+import { Link as RouterLink, useLocation, useParams } from "#navigation";
 import BlogArticleContent from "../../components/blogs/BlogArticleContent.jsx";
 import BlogFeaturedImage from "../../components/blogs/BlogFeaturedImage.jsx";
 import blogApi from "../../services/blogApi";

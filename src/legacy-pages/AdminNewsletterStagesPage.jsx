@@ -42,7 +42,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 
 import {
   createNewsletterStage,

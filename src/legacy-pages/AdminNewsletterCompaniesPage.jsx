@@ -41,7 +41,7 @@ import SegmentRoundedIcon from "@mui/icons-material/SegmentRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 import {

@@ -7,7 +7,9 @@ import MarketingHubSidebar from "./MarketingHubSidebar";
 
 const SIDEBAR_WIDTH = 280;
 
-export default function MarketingHubLayout() {
+// `children` is provided by the Next.js App Router Marketing Hub layouts; the
+// Vite / legacy React Router route table renders nested routes through <Outlet />.
+export default function MarketingHubLayout({ children }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -55,7 +57,7 @@ export default function MarketingHubLayout() {
         }}
       >
         <Box sx={{ maxWidth: "1600px", mx: "auto" }}>
-          <Outlet />
+          {children ?? <Outlet />}
         </Box>
       </Box>
     </Box>

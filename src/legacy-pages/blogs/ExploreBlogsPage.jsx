@@ -14,7 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "#navigation";
 import BlogCard from "../../components/blogs/BlogCard.jsx";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
 import blogApi from "../../services/blogApi";

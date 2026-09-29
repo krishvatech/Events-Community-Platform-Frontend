@@ -59,7 +59,7 @@ import StopCircleRoundedIcon from "@mui/icons-material/StopCircleRounded";
 import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import SegmentRoundedIcon from "@mui/icons-material/SegmentRounded";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "#navigation";
 
 import {
   cancelNewsletterCampaign,

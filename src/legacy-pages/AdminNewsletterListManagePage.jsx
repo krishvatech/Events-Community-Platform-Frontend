@@ -46,7 +46,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "#navigation";
 
 import {
   deleteNewsletterCategory,

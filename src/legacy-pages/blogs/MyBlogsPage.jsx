@@ -33,7 +33,7 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useSearchParams } from "#navigation";
 import BlogCard from "../../components/blogs/BlogCard.jsx";
 import BlogTaxonomyManager from "../../components/blogs/BlogTaxonomyManager.jsx";
 import WordPressImportPanel from "../../components/blogs/WordPressImportPanel.jsx";

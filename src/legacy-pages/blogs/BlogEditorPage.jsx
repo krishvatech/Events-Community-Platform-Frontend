@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import { Link as RouterLink, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate, useParams, useSearchParams } from "#navigation";
 import BlogContentEditor from "../../components/blogs/BlogContentEditor.jsx";
 import { BlogArticleView } from "./BlogDetailPage.jsx";
 import { BlogStatusChip } from "./MyBlogsPage.jsx";

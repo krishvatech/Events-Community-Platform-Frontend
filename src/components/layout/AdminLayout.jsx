@@ -1,7 +1,8 @@
 // src/components/layout/AdminLayout.jsx
 import * as React from "react";
 import { Box, Container } from "@mui/material";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet } from "react-router-dom";
+import { useLocation, useNavigate } from "#navigation";
 import { isMarketingHubPath } from "../../config/marketingNavigation";
 import { logoutBrowserSession } from "../../utils/logoutSession";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
@@ -10,7 +11,9 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/ap
   .trim()
   .replace(/\/+$/, "");
 
-export default function AdminLayout() {
+// `children` is provided by the Next.js App Router admin layout; the Vite /
+// legacy React Router route table renders nested routes through <Outlet />.
+export default function AdminLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -77,7 +80,7 @@ export default function AdminLayout() {
   }, [navigate]);
 
   if (isMarketingHubPath(location.pathname)) {
-    return <Outlet />;
+    return children ?? <Outlet />;
   }
 
   return (
@@ -85,7 +88,7 @@ export default function AdminLayout() {
       <Container maxWidth="xl">
         <Box>
           {/* IMPORTANT: Without Outlet, /admin renders blank */}
-          <Outlet />
+          {children ?? <Outlet />}
         </Box>
       </Container>
     </Box>

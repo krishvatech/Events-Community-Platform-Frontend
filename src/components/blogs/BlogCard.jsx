@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink } from "#navigation";
 import BlogFeaturedImage from "./BlogFeaturedImage.jsx";
 import { blogDetailPath } from "../../config/blogNavigation";
 import { formatBlogDate, getBlogAuthorName } from "../../utils/blogContent";

@@ -25,7 +25,7 @@ import SegmentRoundedIcon from "@mui/icons-material/SegmentRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 
 import { getNewsletterDashboard } from "../services/newsletterService";
 
