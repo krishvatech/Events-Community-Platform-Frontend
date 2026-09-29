@@ -10,7 +10,7 @@ import {
   Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon,
   DragIndicator as DragIcon, Publish as PublishIcon, Archive as ArchiveIcon
 } from '@mui/icons-material';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from '#navigation';
 import { API_BASE, authConfig } from '../utils/api';
 import { toast } from 'react-toastify';
 

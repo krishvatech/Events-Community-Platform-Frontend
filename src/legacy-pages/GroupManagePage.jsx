@@ -8,7 +8,7 @@ import {
     IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar, Autocomplete,
     FormControl, RadioGroup, Radio, Checkbox, ListItemButton
 } from "@mui/material";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "#navigation";
 import { isOwnerUser } from "../utils/adminRole";
 import {
   GROUP_SHORT_DESCRIPTION_MAX_LENGTH,

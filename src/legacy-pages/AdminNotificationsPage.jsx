@@ -21,7 +21,7 @@ import {
   Container,
   Skeleton
 } from "@mui/material";
-import { Link } from "react-router-dom";
+import { Link } from "#navigation";
 import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
 import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
 import MarkEmailUnreadOutlinedIcon from "@mui/icons-material/MarkEmailUnreadOutlined";

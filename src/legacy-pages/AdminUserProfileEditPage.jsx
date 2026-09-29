@@ -1,6 +1,6 @@
 // src/pages/ProfilePage.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "#navigation";
 import {
   Avatar, Box, Button, Container, Divider, Grid, LinearProgress, Paper,
   Snackbar, Alert, TextField, Typography, Card, CardHeader, CardContent,

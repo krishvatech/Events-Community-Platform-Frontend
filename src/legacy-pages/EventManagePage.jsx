@@ -1,6 +1,6 @@
 // src/pages/EventManagePage.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "#navigation";
 import { toast } from "react-toastify";
 import RegisteredActions from "../components/RegisteredActions";
 import InviteUsersDialog from "../components/InviteUsersDialog";

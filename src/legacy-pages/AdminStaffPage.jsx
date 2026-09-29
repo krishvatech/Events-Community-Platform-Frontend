@@ -24,7 +24,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
 import { apiClient, listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deactivateAdminUser, restoreAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff, getMarketingAccessUsers, addUserToMarketing, removeUserFromMarketing } from "../utils/api";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "#navigation";
 import { resetMarketingStatusCache } from "../hooks/useMarketingAccess";
 
 

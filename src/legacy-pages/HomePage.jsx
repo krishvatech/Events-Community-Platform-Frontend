@@ -1,6 +1,6 @@
 ﻿// src/pages/HomePage.jsx
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "#navigation";
 import { apiClient } from "../utils/api";
 import AuthModal from "../components/AuthModal.jsx";
 import {

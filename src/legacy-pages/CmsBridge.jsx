@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 import { createWagtailSession } from "../utils/api";
 
 export default function CmsBridge() {

@@ -1,6 +1,6 @@
 // src/pages/AdminRecordingsPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "#navigation";
 import {
   Box,
   Button,

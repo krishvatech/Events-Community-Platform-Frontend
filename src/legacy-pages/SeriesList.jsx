@@ -13,7 +13,7 @@ import {
   GridView as GridIcon,
   ViewList as ListIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '#navigation';
 import { API_BASE, getToken, authConfig } from '../utils/api';
 import { toast } from 'react-toastify';
 import SeriesDialog from '../components/dialogs/SeriesDialog';

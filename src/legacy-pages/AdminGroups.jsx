@@ -6,7 +6,7 @@ import {
   describeWordCount,
   validateDescriptionWords,
 } from "../utils/groupValidation";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "#navigation";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
