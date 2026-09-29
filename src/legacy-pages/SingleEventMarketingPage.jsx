@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "#navigation";
 import speakerImage from "../assets/prof-dr-aswath-damodaran-12b35a4e.png";
 import citiesImage from "../assets/cities.png";
 import virtualImage from "../assets/virtual.png";

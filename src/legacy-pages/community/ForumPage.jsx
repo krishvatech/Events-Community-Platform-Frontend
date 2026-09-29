@@ -1,6 +1,6 @@
 // src/pages/community/ForumPage.jsx
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 import {
   Alert,
   Avatar,

@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "#navigation";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";

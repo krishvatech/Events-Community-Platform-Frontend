@@ -18,7 +18,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import LaunchIcon from '@mui/icons-material/Launch';
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink } from "#navigation";
 
 const ROLE_CHIP_PROPS = {
     host: { label: "Host", color: "primary" },

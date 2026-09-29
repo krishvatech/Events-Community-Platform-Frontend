@@ -1,6 +1,6 @@
 // src/pages/EventDetailsPage.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate } from "#navigation";
 import {
   Box,
   Button,

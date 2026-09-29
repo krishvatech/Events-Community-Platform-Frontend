@@ -64,7 +64,7 @@ import PublicSeriesLanding from "./legacy-pages/PublicSeriesLanding.jsx";
 import AdminCarts from "./legacy-pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./legacy-pages/AdminNameRequestsPage.jsx";
 import KYCCallbackPage from "./legacy-pages/KYCCallbackPage.jsx";
-import { useParams, useNavigate } from "react-router-dom";
+import { RedirectGroupToAdmin, RedirectGroupDetailsToAdmin, EventIdRedirect } from "./routes/routeRedirects.jsx";
 import { RequireSuperAdmin, RequireStaffOrAdmin, RequireStaffOrAdminForResources, RequireMarketingAccess } from "./components/RoleBasedRoute.jsx";
 import ForgotPassword from "./legacy-pages/ForgotPassword.jsx";
 import SocialOAuthCallback from "./legacy-pages/SocialOAuthCallback.jsx";
@@ -85,57 +85,7 @@ import SingleEventMarketingPage from "./legacy-pages/SingleEventMarketingPage.js
 import AttendeeFormPage from "./legacy-pages/AttendeeFormPage.jsx";
 import TrainingProgramsPage from "./legacy-pages/TrainingProgramsPage.jsx";
 import RecognitionDirectoryPage from "./legacy-pages/RecognitionDirectoryPage.jsx";
-import { CircularProgress } from "@mui/material";
 
-
-function RedirectGroupToAdmin() {
-  const { idOrSlug } = useParams();
-  return <Navigate to={`/admin/groups/${idOrSlug}`} replace />;
-}
-
-function RedirectGroupDetailsToAdmin() {
-  const { groupId } = useParams();
-  return <Navigate to={`/admin/community/groups/${groupId}`} replace />;
-}
-
-// Redirect numeric event IDs to slug-based URLs
-function EventIdRedirect() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    // Only redirect if id is numeric
-    if (!/^\d+$/.test(id)) {
-      navigate('/events', { replace: true });
-      return;
-    }
-
-    const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
-
-    fetch(`${API_BASE}/events/${id}/`)
-      .then(r => {
-        if (!r.ok) throw new Error('Not found');
-        return r.json();
-      })
-      .then(event => {
-        if (event.slug) {
-          navigate(`/events/${encodeURIComponent(event.slug)}`, { replace: true });
-        } else {
-          navigate('/events', { replace: true });
-        }
-      })
-      .catch(() => {
-        navigate('/events', { replace: true });
-      })
-      .finally(() => setLoading(false));
-  }, [id, navigate]);
-
-  if (loading) {
-    return <CircularProgress sx={{ display: 'block', margin: '50px auto' }} />;
-  }
-  return null;
-}
 
 // Route table of the Vite app. Also rendered by the Next.js legacy fallback
 // (src/app/(app)/[[...legacy]]/page.jsx) for routes not yet migrated.

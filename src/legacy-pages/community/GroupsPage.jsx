@@ -1,6 +1,6 @@
 // src/pages/community/GroupsPage.jsx
 import * as React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "#navigation";
 import {
   GROUP_SHORT_DESCRIPTION_MAX_LENGTH,
   describeWordCount,

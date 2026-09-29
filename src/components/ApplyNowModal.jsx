@@ -16,7 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 import MultiTrackApplicationForm from "./MultiTrackApplicationForm.jsx";
 import {
   getAcceptanceMessage,

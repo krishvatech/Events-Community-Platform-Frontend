@@ -1,6 +1,6 @@
 // src/pages/community/LiveFeedPage.jsx
 import * as React from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "#navigation";
 import {
   Avatar, AvatarGroup, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
   Paper, Stack, TextField, Typography, InputAdornment, Popover, Tooltip, Skeleton,

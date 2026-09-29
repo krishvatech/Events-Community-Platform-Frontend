@@ -23,7 +23,7 @@ import {
 } from "@mui/material";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "#navigation";
 import { logoutBrowserSession } from "../utils/logoutSession";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { getAccessToken as readAccessToken } from "../utils/tokenStore";

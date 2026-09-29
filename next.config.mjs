@@ -47,6 +47,10 @@ for (const [nextName, viteName] of PUBLIC_ENV) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Optional override so a verification build/start can run next to a
+  // developer's `next dev` without sharing (and clobbering) the same .next folder.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
+
   env: publicEnv,
 
   // Vite returns a URL string for `import logo from "./x.png"`; Next's default

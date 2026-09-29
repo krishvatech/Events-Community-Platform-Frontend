@@ -12,7 +12,7 @@ import {
   Alert,
   Box,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "#navigation";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.replace(/\/+$/, "");

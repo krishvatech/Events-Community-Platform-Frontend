@@ -1,6 +1,6 @@
 // src/pages/CommunityHubPage.jsx
 import * as React from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation } from "#navigation";
 import { Box } from "@mui/material";
 
 import DashboardPage from "./DashboardPage.jsx";

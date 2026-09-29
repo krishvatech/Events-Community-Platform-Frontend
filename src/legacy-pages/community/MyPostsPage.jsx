@@ -1,6 +1,6 @@
 // src/pages/community/MyPostsPage.jsx
 import * as React from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink } from "#navigation";
 import {
   Alert,
   Avatar,

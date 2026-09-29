@@ -20,26 +20,47 @@ import {
   useSearchParams as useNextSearchParams,
 } from "next/navigation";
 import * as RR from "react-router-dom";
-import { readNavigationState, resolveHref, writeNavigationState } from "./navigationState";
+import {
+  clearPendingNavigation,
+  getPendingNavigation,
+  isPendingNavigationActive,
+  readNavigationState,
+  resolveHref,
+  setPendingNavigation,
+  writeNavigationState,
+} from "./navigationState";
 
 const useInReactRouter = RR.useInRouterContext;
 
 const currentHash = () => (typeof window !== "undefined" ? window.location.hash : "");
 
 function useNextLocation() {
-  const pathname = usePathname() || "/";
+  const committedPathname = usePathname() || "/";
   const params = useNextSearchParams();
   const query = params ? params.toString() : "";
-  const search = query ? `?${query}` : "";
+  const committedSearch = query ? `?${query}` : "";
+  const committedKey = `${committedPathname}${committedSearch}`;
+
+  // Report an in-flight navigation's target immediately, like React Router
+  // (see "Pending navigation" in navigationState.js).
+  const pending = getPendingNavigation();
+  const active = isPendingNavigationActive(pending, committedKey);
+  useEffect(() => {
+    if (pending && !active) clearPendingNavigation(pending);
+  }, [pending, active]);
+
+  const pathname = active ? pending.pathname : committedPathname;
+  const search = active ? pending.search : committedSearch;
+  const hash = active ? pending.hash : currentHash();
   return useMemo(
     () => ({
       pathname,
       search,
-      hash: currentHash(),
+      hash,
       state: readNavigationState(pathname, search),
       key: `${pathname}${search}`,
     }),
-    [pathname, search]
+    [pathname, search, hash]
   );
 }
 
@@ -53,6 +74,7 @@ function useNextNavigate() {
       }
       const href = resolveHref(to);
       writeNavigationState(href, options.state);
+      setPendingNavigation(href);
       // React Router keeps the scroll position on navigation; match it.
       if (options.replace) router.replace(href, { scroll: false });
       else router.push(href, { scroll: false });
@@ -90,10 +112,9 @@ export function useParams() {
 
 export function useSearchParams() {
   if (useInReactRouter()) return RR.useSearchParams();
-  const params = useNextSearchParams();
-  const pathname = usePathname() || "/";
+  const { pathname, search } = useNextLocation();
   const navigate = useNextNavigate();
-  const current = useMemo(() => new URLSearchParams(params ? params.toString() : ""), [params]);
+  const current = useMemo(() => new URLSearchParams(search), [search]);
   const setSearchParams = useCallback(
     (next, options) => {
       const value = typeof next === "function" ? next(new URLSearchParams(current)) : next;
@@ -105,25 +126,35 @@ export function useSearchParams() {
   return [current, setSearchParams];
 }
 
-export const Link = forwardRef(function Link({ to, replace, state, reloadDocument, onClick, ...rest }, ref) {
+// Like React Router's <Link>, the computed href always wins: callers such as
+// `<Button component={isExternal ? "a" : Link} href={isExternal ? url : undefined} to={url}>`
+// pass `href={undefined}` alongside `to`, which must not override it.
+export const Link = forwardRef(function Link(
+  { to, replace, state, reloadDocument, onClick, href: _ignoredHref, as: _ignoredAs, ...rest },
+  ref
+) {
   if (useInReactRouter()) {
-    return <RR.Link ref={ref} to={to} replace={replace} state={state} reloadDocument={reloadDocument} onClick={onClick} {...rest} />;
+    return <RR.Link ref={ref} {...rest} to={to} replace={replace} state={state} reloadDocument={reloadDocument} onClick={onClick} />;
   }
   const href = resolveHref(to);
   if (reloadDocument) {
-    return <a ref={ref} href={href} onClick={onClick} {...rest} />;
+    return <a ref={ref} {...rest} href={href} onClick={onClick} />;
   }
   return (
     <NextLink
       ref={ref}
+      {...rest}
       href={href}
       replace={replace}
       scroll={false}
       onClick={(event) => {
         onClick?.(event);
-        if (!event.defaultPrevented) writeNavigationState(href, state);
+        if (!event.defaultPrevented) {
+          writeNavigationState(href, state);
+          const modified = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0 || rest.target;
+          if (!modified) setPendingNavigation(href);
+        }
       }}
-      {...rest}
     />
   );
 });

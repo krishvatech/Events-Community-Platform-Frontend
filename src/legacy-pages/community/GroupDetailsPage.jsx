@@ -1,6 +1,6 @@
 // src/pages/community/GroupDetailsPage.jsx
 import * as React from "react";
-import { useParams, Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
+import { useParams, Link as RouterLink, useNavigate, useLocation } from "#navigation";
 import {
   GROUP_SHORT_DESCRIPTION_MAX_LENGTH,
   describeWordCount,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "#navigation";
 import { Button, Alert, Snackbar } from "@mui/material";
 import { Helmet } from "react-helmet-async";
 import ApplyNowModal from "../components/ApplyNowModal";

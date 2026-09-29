@@ -58,7 +58,7 @@ import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "#navigation";
 import { fetchEventSummaryCached } from "../../utils/entityCache.js";
 import { connectToConversation } from "../../utils/websocketMessaging.js";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";

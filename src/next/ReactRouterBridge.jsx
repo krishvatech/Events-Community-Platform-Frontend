@@ -6,11 +6,16 @@
 // calls the Next.js router. Legacy (not yet migrated) React Router pages render
 // inside it, so every navigation goes through Next.js: migrated routes are served
 // by their App Router pages, everything else by the legacy route table.
+//
+// The legacy route table deliberately follows the COMMITTED Next.js URL (never
+// the pending one), so it cannot briefly render a legacy copy of a migrated
+// page; the navigator still records the pending target so the shared chrome
+// sees it immediately (see "Pending navigation" in navigationState.js).
 
 import { useMemo } from "react";
 import { Router } from "react-router-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { readNavigationState, resolveHref, writeNavigationState } from "../navigation/navigationState";
+import { readNavigationState, resolveHref, setPendingNavigation, writeNavigationState } from "../navigation/navigationState";
 
 export default function ReactRouterBridge({ children }) {
   const router = useRouter();
@@ -37,11 +42,13 @@ export default function ReactRouterBridge({ children }) {
       push: (to, state) => {
         const href = resolveHref(to);
         writeNavigationState(href, state);
+        setPendingNavigation(href);
         router.push(href, { scroll: false });
       },
       replace: (to, state) => {
         const href = resolveHref(to);
         writeNavigationState(href, state);
+        setPendingNavigation(href);
         router.replace(href, { scroll: false });
       },
     }),

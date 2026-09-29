@@ -1,7 +1,7 @@
 // src/pages/DashboardPage.jsx
 // Redesigned to match imaa-connect-v3 reference
 import React, { useEffect, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "#navigation";
 import { apiClient } from "../utils/api";
 import { Badge } from "@mui/material";
 import {

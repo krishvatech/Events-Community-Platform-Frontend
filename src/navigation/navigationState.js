@@ -48,6 +48,52 @@ export const writeNavigationState = (href, state) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Pending navigation.
+// React Router updates `location` synchronously on navigate(); Next.js router
+// navigations are transitions, so for a moment the old pathname is still
+// committed. Components that react to auth changes in the same tick as a
+// navigation (e.g. logout: AppChrome swaps UnifiedSidebar for Header, whose
+// protected-prefix guard reads the pathname) must see the navigation target,
+// as they did under React Router. The Next adapter's useLocation() reports the
+// pending target until Next commits it (or moves elsewhere / 10s elapse).
+
+// The target is recorded silently (no subscriber notification): broadcasting it
+// would force an urgent re-render of every useLocation() consumer - including a
+// RequireAuth guard on the page being left - before Next.js swaps routes, which
+// React Router never does. Components that render in the meantime (e.g. Header
+// mounting when AppChrome reacts to "auth:changed") read it directly.
+
+const PENDING_TTL_MS = 10000;
+let pendingNavigation = null;
+
+const currentCommittedKey = () =>
+  typeof window === "undefined" ? "" : `${window.location.pathname}${window.location.search}`;
+
+export const setPendingNavigation = (href) => {
+  if (typeof window === "undefined") return;
+  const url = new URL(href, window.location.href);
+  pendingNavigation = {
+    pathname: url.pathname,
+    search: url.search,
+    hash: url.hash,
+    fromKey: currentCommittedKey(),
+    at: Date.now(),
+  };
+};
+
+export const clearPendingNavigation = (expected) => {
+  if (!pendingNavigation || (expected && expected !== pendingNavigation)) return;
+  pendingNavigation = null;
+};
+
+export const getPendingNavigation = () => pendingNavigation;
+
+// The pending target applies only while the committed URL is still the one the
+// navigation started from.
+export const isPendingNavigationActive = (pending, committedKey) =>
+  !!pending && pending.fromKey === committedKey && Date.now() - pending.at < PENDING_TTL_MS;
+
 export const readNavigationState = (pathname, search = "") => {
   const store = storage();
   if (!store) return null;
