@@ -2592,6 +2592,62 @@ export default function ProfilePage() {
     } catch (e) { showNotification("error", e?.message || "Save failed"); } finally { setSaving(false); }
   }
 
+  async function refreshProfileAfterLinkedInImport() {
+    const r = await fetch(`${API_BASE}/users/me/`, {
+      method: "GET",
+      headers: tokenHeader(),
+      cache: "no-store",
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(getApiErrorMessage(data, "Failed to refresh imported profile"));
+
+    const prof = data?.profile || {};
+    setForm({
+      id: data?.id,
+      first_name: data?.first_name || "",
+      last_name: data?.last_name || "",
+      email: data?.email || "",
+      provider: data?.provider || "",
+      full_name: prof.full_name || "",
+      timezone: prof.timezone || "",
+      bio: prof.bio || "",
+      headline: prof.headline || "",
+      job_title: prof.job_title || "",
+      company: prof.company || "",
+      location: prof.location || "",
+      avatar: prof.user_image_url || prof.avatar || data.avatar || "",
+      skillsText: Array.isArray(prof.skills) ? prof.skills.join(", ") : typeof prof.skills === "string" ? prof.skills : "",
+      linksText: prof.links ? JSON.stringify(prof.links) : "",
+      kyc_status: prof.kyc_status || "not_started",
+      legal_name_locked: prof.legal_name_locked || false,
+      kyc_decline_reason: prof.kyc_decline_reason || "",
+      directory_hidden: prof.directory_hidden || false,
+      connections_hidden: prof.connections_hidden || false,
+      hide_from_others_connections: prof.hide_from_others_connections || false,
+      anonymous_profile_views: prof.anonymous_profile_views || false,
+      default_qna_anonymous: prof.default_qna_anonymous || false,
+      pending_verification_request: prof.pending_verification_request || false,
+    });
+
+    if (prof.location_city || prof.location_country || prof.location_lat != null) {
+      setLocationForm({
+        city: prof.location_city || "",
+        country: prof.location_country || "",
+        country_code: prof.location_country_code || "",
+        lat: prof.location_lat ?? null,
+        lng: prof.location_lng ?? null,
+        timezone: prof.timezone || "",
+      });
+    } else if (prof.location) {
+      setLocationForm((prev) => ({ ...prev, timezone: prof.timezone || "" }));
+    }
+
+    setPostsCount(Number(data?.posts_count) || 0);
+    setFriendCount(Number(data?.contacts_count) || 0);
+    await Promise.allSettled([loadMeExtras(), loadUserSkills(), loadLanguages()]);
+    showNotification("success", "LinkedIn profile imported");
+  }
+
   // --- Email Verification Handlers ---
   async function refreshCurrentUserProfile(verifiedEmail = "") {
     const r = await fetch(`${API_BASE}/users/me/`, {
@@ -6630,7 +6686,7 @@ export default function ProfilePage() {
       <LinkedInProfileImportDialog
         open={linkedinImportOpen}
         onClose={() => setLinkedinImportOpen(false)}
-        onImported={() => window.location.reload()}
+        onImported={refreshProfileAfterLinkedInImport}
       />
     </div >
   );
