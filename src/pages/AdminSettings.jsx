@@ -79,6 +79,7 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import ExperienceList from "../components/profile/ExperienceList";
 
 // --- API helpers ---
 const API_ROOT = (
@@ -3163,24 +3164,17 @@ export default function AdminSettings() {
                     </Tooltip>
                   }>
                     {expList.length ? (
-                      <List dense disablePadding>
-                        {expList.map((x) => (
-                          <ListItem key={x.id} disableGutters sx={{ py: 0.5, pr: { xs: 0, md: 9 } }} secondaryAction={
-                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                              <Tooltip title="Edit"><IconButton size="small" onClick={() => onEditExperience(x)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                              <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteExperience(x.id, `${x.community_name || x.org || ""} — ${x.position || ""}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                            </Box>
-                          }>
-                            <ListItemText disableTypography primary={
-                              <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{x.position || "Role not specified"}{x.community_name || x.org ? ` · ${x.community_name || x.org}` : ""}</Typography>
-                                <Typography variant="caption" color="text.secondary">{rangeLinkedIn(x.start_date || x.start, x.end_date || x.end, x.currently_work_here ?? x.current)}{x.location ? ` · ${x.location}` : ""}</Typography>
-                                {x.description && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }}>{x.description}</Typography>}
-                              </Box>
-                            } />
-                          </ListItem>
-                        ))}
-                      </List>
+                      <ExperienceList
+                        experiences={expList}
+                        formatRange={rangeLinkedIn}
+                        actionPr={9}
+                        renderActions={(x) => (
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                            <Tooltip title="Edit"><IconButton size="small" onClick={() => onEditExperience(x)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteExperience(x.id, `${x.community_name || x.org || ""} — ${x.position || ""}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                          </Box>
+                        )}
+                      />
                     ) : (
                       <Box sx={{ textAlign: "center", py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", mx: "auto" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an experience to your profile</Typography><Box><Button variant="contained" size="small" sx={{ mt: 1.5 }} onClick={openAddExperience}>Create</Button></Box></Box>
                     )}

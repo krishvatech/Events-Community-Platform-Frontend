@@ -55,6 +55,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import ExperienceList from "../components/profile/ExperienceList";
+import ProfileEditButton, { topActionSx } from "../components/profile/ProfileEditButton";
 
 // -------------------- Constants for Dropdowns --------------------
 const CEFR_OPTIONS = [
@@ -2283,6 +2285,7 @@ export default function ProfilePage() {
       if (type === "language") {
         showNotification("success", "Language deleted");
         loadLanguages(); // Refresh list
+        setLangOpen(false);
       }
       else if (type === "certificate") {
         showNotification("success", "Certificate deleted");
@@ -3855,24 +3858,11 @@ export default function ProfilePage() {
                         }
                       >
                         {expList.length ? (
-                          <List dense disablePadding>
-                            {expList.map((x) => (
-                              <ListItem key={x.id} disableGutters sx={{ py: 0.5, pr: { xs: 0, md: 9 } }} secondaryAction={
-                                <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                                  <Tooltip title="Edit"><IconButton size="small" onClick={() => onEditExperience(x)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                                  <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteExperience(x.id, `${x.community_name || x.org || ""} — ${x.position || ""}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                                </Box>
-                              }>
-                                <ListItemText disableTypography primary={
-                                  <Box>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{x.position || "Role not specified"}{x.community_name || x.org ? ` · ${x.community_name || x.org}` : ""}</Typography>
-                                    <Typography variant="caption" color="text.secondary">{rangeLinkedIn(x.start_date || x.start, x.end_date || x.end, x.currently_work_here ?? x.current)}{x.location ? ` · ${x.location}` : ""}</Typography>
-                                    {x.description && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }}>{x.description}</Typography>}
-                                  </Box>
-                                } />
-                              </ListItem>
-                            ))}
-                          </List>
+                          <ExperienceList
+                            experiences={expList}
+                            formatRange={rangeLinkedIn}
+                            renderActions={(x) => <ProfileEditButton onClick={() => onEditExperience(x)} />}
+                          />
                         ) : (
                           <Box sx={{ textAlign: "center", py: 4 }}>
                             <Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", color: "grey.600", mx: "auto" }}>
@@ -3913,12 +3903,7 @@ export default function ProfilePage() {
                         {eduList.length ? (
                           <List dense disablePadding>
                             {eduList.map((e) => (
-                              <ListItem key={e.id} disableGutters sx={{ py: 0.5, pr: { xs: 0, md: 9 } }} secondaryAction={
-                                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
-                                  <Tooltip title="Edit"><IconButton size="small" onClick={() => onEditEducation(e)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                                  <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteEducation(e.id, `${e.school} — ${e.degree}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                                </Box>
-                              }>
+                              <ListItem key={e.id} disableGutters sx={{ py: 0.5, pr: { xs: 0, md: 6 }, ...topActionSx }} secondaryAction={<ProfileEditButton onClick={() => onEditEducation(e)} />}>
                                 <ListItemText
                                   primary={<Typography variant="body2" fontWeight={500}>{e.degree || "Degree"} — {e.school || "School"}</Typography>}
                                   secondary={
@@ -3982,19 +3967,10 @@ export default function ProfilePage() {
                                         </IconButton>
                                       </Tooltip>
                                     ) : null}
-                                    <Tooltip title="Delete">
-                                      <IconButton size="small" onClick={() => setCertDeleteId(cert.id)}>
-                                        <DeleteOutlineIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Edit">
-                                      <IconButton size="small" onClick={() => openEditCert(cert)}>
-                                        <EditOutlinedIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
+                                    <ProfileEditButton onClick={() => openEditCert(cert)} />
                                   </Box>
                                 }
-                                sx={{ display: 'block' }}
+                                sx={{ display: 'block', ...topActionSx }}
                               >
                                 <ListItemText
                                   primary={
@@ -4083,6 +4059,7 @@ export default function ProfilePage() {
                               <ListItem
                                 key={m.id}
                                 disableGutters
+                                sx={topActionSx}
                                 secondaryAction={
                                   <Box sx={{ display: "flex" }}>
                                     {m.membership_url ? (
@@ -4095,16 +4072,7 @@ export default function ProfilePage() {
                                         </IconButton>
                                       </Tooltip>
                                     ) : null}
-                                    <Tooltip title="Delete">
-                                      <IconButton size="small" onClick={() => setMemberDeleteId(m.id)}>
-                                        <DeleteOutlineIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Edit">
-                                      <IconButton size="small" onClick={() => openEditMember(m)}>
-                                        <EditOutlinedIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
+                                    <ProfileEditButton onClick={() => openEditMember(m)} />
                                   </Box>
                                 }
                               >
@@ -4618,6 +4586,7 @@ export default function ProfilePage() {
                               <ListItem
                                 key={t.id}
                                 disableGutters
+                                sx={topActionSx}
                                 secondaryAction={
                                   <Box sx={{ display: "flex" }}>
                                     {t.credential_url ? (
@@ -4630,16 +4599,7 @@ export default function ProfilePage() {
                                         </IconButton>
                                       </Tooltip>
                                     ) : null}
-                                    <Tooltip title="Delete">
-                                      <IconButton size="small" onClick={() => setTrainingDeleteId(t.id)}>
-                                        <DeleteOutlineIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Edit">
-                                      <IconButton size="small" onClick={() => openEditTraining(t)}>
-                                        <EditOutlinedIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
+                                    <ProfileEditButton onClick={() => openEditTraining(t)} />
                                   </Box>
                                 }
                               >
@@ -4746,20 +4706,9 @@ export default function ProfilePage() {
                               <ListItem
                                 key={l.id}
                                 disableGutters
+                                sx={topActionSx}
                                 secondaryAction={
-                                  <Box sx={{ display: "flex", gap: 1 }}>
-                                    <IconButton size="small" onClick={() => onEditLanguage(l)}>
-                                      <EditOutlinedIcon fontSize="small" />
-                                    </IconButton>
-                                    <Tooltip title="Delete">
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => askDeleteLanguage(l.id, l.language.english_name)}
-                                      >
-                                        <DeleteOutlineIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </Box>
+                                  <ProfileEditButton onClick={() => onEditLanguage(l)} />
                                 }
                               >
                                 <ListItemText
@@ -5647,6 +5596,11 @@ export default function ProfilePage() {
           </Stack>
         </DialogContent>
         <DialogActions>
+          {!!editLangId && (
+            <Button color="error" sx={{ mr: "auto" }} onClick={() => askDeleteLanguage(editLangId, langForm.iso_obj?.label || "this language")} disabled={langSaving}>
+              Delete
+            </Button>
+          )}
           <Button onClick={() => setLangOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={saveLanguage} disabled={langSaving}>
             {langSaving ? "Saving..." : "Save"}
@@ -5725,6 +5679,7 @@ export default function ProfilePage() {
           {editEduId && (
             <Button
               color="error"
+              sx={{ mr: "auto" }}
               onClick={() =>
                 askDeleteEducation(
                   editEduId,
@@ -5849,6 +5804,7 @@ export default function ProfilePage() {
           {!!editExpId && (
             <Button
               color="error"
+              sx={{ mr: "auto" }}
               onClick={() =>
                 askDeleteExperience(editExpId, `${expForm.org} — ${expForm.position}`)
               }
@@ -6034,6 +5990,11 @@ export default function ProfilePage() {
           </LocalizationProvider>
         </DialogContent>
         <DialogActions>
+          {!!editTrainingId && (
+            <Button color="error" sx={{ mr: "auto" }} onClick={() => setTrainingDeleteId(editTrainingId)} disabled={savingTraining}>
+              Delete
+            </Button>
+          )}
           <Button onClick={() => setTrainingOpen(false)} disabled={savingTraining}>Cancel</Button>
           <Button variant="contained" onClick={saveTraining} disabled={savingTraining}>
             {savingTraining ? "Saving..." : "Save"}
@@ -6172,6 +6133,11 @@ export default function ProfilePage() {
           </LocalizationProvider>
         </DialogContent>
         <DialogActions>
+          {!!editCertId && (
+            <Button color="error" sx={{ mr: "auto" }} onClick={() => setCertDeleteId(editCertId)} disabled={savingCert}>
+              Delete
+            </Button>
+          )}
           <Button onClick={() => setCertOpen(false)} disabled={savingCert}>Cancel</Button>
           <Button variant="contained" onClick={saveCert} disabled={savingCert}>
             {savingCert ? "Saving..." : "Save"}
@@ -6345,6 +6311,11 @@ export default function ProfilePage() {
           </LocalizationProvider>
         </DialogContent>
         <DialogActions>
+          {!!editMemberId && (
+            <Button color="error" sx={{ mr: "auto" }} onClick={() => setMemberDeleteId(editMemberId)} disabled={savingMember}>
+              Delete
+            </Button>
+          )}
           <Button onClick={() => setMemberOpen(false)} disabled={savingMember}>Cancel</Button>
           <Button variant="contained" onClick={saveMember} disabled={savingMember}>
             {savingMember ? "Saving..." : "Save"}
@@ -6380,6 +6351,7 @@ export default function ProfilePage() {
                 await loadMeExtras();
                 showNotification("success", "Training deleted.");
                 setTrainingDeleteId(null);
+                setTrainingOpen(false);
               } catch (e) {
                 console.error(e);
                 showNotification("error", "Failed to delete training.");
@@ -6422,6 +6394,7 @@ export default function ProfilePage() {
                 await loadMeExtras();
                 showNotification("success", "Certification deleted.");
                 setCertDeleteId(null);
+                setCertOpen(false);
               } catch (e) {
                 console.error(e);
                 showNotification("error", "Failed to delete certification.");
@@ -6464,6 +6437,7 @@ export default function ProfilePage() {
                 await loadMeExtras();
                 showNotification("success", "Membership deleted.");
                 setMemberDeleteId(null);
+                setMemberOpen(false);
               } catch (e) {
                 console.error(e);
                 showNotification("error", "Failed to delete membership.");
