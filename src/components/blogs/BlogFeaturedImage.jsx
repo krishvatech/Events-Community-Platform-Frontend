@@ -5,8 +5,10 @@ import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 /**
  * Featured image with a fixed aspect ratio (no layout shift) and a neutral
  * placeholder when the post has no image or the image fails to load.
+ * `loading="eager"` is for the one image visible on first paint (the article
+ * being opened); everything else stays lazy.
  */
-export default function BlogFeaturedImage({ src, alt, ratio = "16 / 9", sx }) {
+export default function BlogFeaturedImage({ src, alt, ratio = "16 / 9", sx, loading = "lazy" }) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => setFailed(false), [src]);
@@ -29,7 +31,7 @@ export default function BlogFeaturedImage({ src, alt, ratio = "16 / 9", sx }) {
           component="img"
           src={src}
           alt={alt || ""}
-          loading="lazy"
+          loading={loading}
           decoding="async"
           onError={() => setFailed(true)}
           sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}

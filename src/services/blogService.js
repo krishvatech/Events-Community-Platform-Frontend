@@ -6,10 +6,11 @@
 //
 // Backend contract (ecp-backend `blogs` app):
 //   Reader (any authenticated user, published only):
-//     GET  /blogs/                      ?page ?search ?category ?tag
-//     GET  /blogs/<slug>/
+//     GET  /blogs/                      ?page ?page_size ?search ?category ?tag
+//     GET  /blogs/<slug>/               ?content_mode=chunked -> first content chunk only
+//     GET  /blogs/<slug>/content/       ?chunk=N  -> {chunk, content_html, has_more, chunks}
 //   Management (superuser only):
-//     GET  /blogs/admin/                ?page ?status ?search ?category ?tag
+//     GET  /blogs/admin/                ?page ?page_size ?status ?search ?category ?tag
 //     POST /blogs/admin/
 //     GET  /blogs/admin/<id>/
 //     PATCH /blogs/admin/<id>/
@@ -22,6 +23,7 @@
 export const BLOG_API = Object.freeze({
   list: "/blogs/",
   detail: (slug) => `/blogs/${encodeURIComponent(slug)}/`,
+  content: (slug) => `/blogs/${encodeURIComponent(slug)}/content/`,
   adminList: "/blogs/admin/",
   adminDetail: (id) => `/blogs/admin/${encodeURIComponent(id)}/`,
   publish: (id) => `/blogs/admin/${encodeURIComponent(id)}/publish/`,
@@ -30,10 +32,19 @@ export const BLOG_API = Object.freeze({
   category: (id) => `/blogs/admin/categories/${encodeURIComponent(id)}/`,
   tags: "/blogs/admin/tags/",
   tag: (id) => `/blogs/admin/tags/${encodeURIComponent(id)}/`,
+  wordpressImports: "/blogs/admin/wordpress-import/",
+  wordpressImport: (id) => `/blogs/admin/wordpress-import/${encodeURIComponent(id)}/`,
+  wordpressImportLatest: "/blogs/admin/wordpress-import/latest/",
 });
+
+export const IMPORT_TERMINAL_STATUSES = Object.freeze(["succeeded", "partial", "failed"]);
+export const isImportActive = (run) => Boolean(run) && !IMPORT_TERMINAL_STATUSES.includes(run.status);
 
 // Matches the backend's DRF PAGE_SIZE for these endpoints.
 export const BLOG_PAGE_SIZE = 20;
+
+// Blog card grids (Explore Blogs, My Blogs): 3 x 3 on desktop.
+export const BLOG_CARD_PAGE_SIZE = 9;
 
 // Mirrors the backend FEATURED_IMAGE_MAX_BYTES so the UI can fail fast.
 export const BLOG_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -131,11 +142,16 @@ export function createBlogService(client) {
 
   return {
     // Reader
-    listPublishedBlogs: (params) => listPage(BLOG_API.list, params),
-    getPublishedBlog: (slug) => call(() => client.get(BLOG_API.detail(slug))),
+    listPublishedBlogs: (params) => listPage(BLOG_API.list, { page_size: BLOG_CARD_PAGE_SIZE, ...params }),
+    /** `chunked: true` returns metadata plus only the first content chunk. */
+    getPublishedBlog: (slug, { chunked = false } = {}) =>
+      call(() => client.get(BLOG_API.detail(slug), chunked ? { params: { content_mode: "chunked" } } : undefined)),
+    /** One later chunk of a published article: {chunk, content_html, has_more}. */
+    getPublishedBlogChunk: (slug, chunk, { signal } = {}) =>
+      call(() => client.get(BLOG_API.content(slug), { params: { chunk }, ...(signal ? { signal } : {}) })),
 
     // Management
-    listAdminBlogs: (params) => listPage(BLOG_API.adminList, params),
+    listAdminBlogs: (params) => listPage(BLOG_API.adminList, { page_size: BLOG_CARD_PAGE_SIZE, ...params }),
     getAdminBlog: (id) => call(() => client.get(BLOG_API.adminDetail(id))),
     createBlog: (payload) => call(() => client.post(BLOG_API.adminList, payload)),
     updateBlog: (id, payload) => call(() => client.patch(BLOG_API.adminDetail(id), payload)),
@@ -160,6 +176,30 @@ export function createBlogService(client) {
     listBlogTags: (params) => listPage(BLOG_API.tags, params),
     createBlogTag: (payload) => call(() => client.post(BLOG_API.tags, payload)),
     updateBlogTag: (id, payload) => call(() => client.patch(BLOG_API.tag(id), payload)),
+
+    // WordPress import (superuser only). Starting never waits for the import:
+    // the backend answers 202 with a queued run. A 409 means an import is
+    // already running; that run is returned (flagged) instead of an error.
+    startWordPressBlogImport: async () => {
+      try {
+        const response = await client.post(BLOG_API.wordpressImports, {});
+        return { ...response.data, alreadyRunning: false };
+      } catch (error) {
+        const active = error?.response?.status === 409 ? error.response.data?.active_run : null;
+        if (active) return { ...active, alreadyRunning: true };
+        throw new BlogApiError(normalizeBlogError(error));
+      }
+    },
+    getWordPressBlogImport: (id) => call(() => client.get(BLOG_API.wordpressImport(id))),
+    getLatestWordPressBlogImport: async () => {
+      try {
+        const response = await client.get(BLOG_API.wordpressImportLatest);
+        return response.data;
+      } catch (error) {
+        if (error?.response?.status === 404) return null; // no imports yet
+        throw new BlogApiError(normalizeBlogError(error));
+      }
+    },
   };
 }
 

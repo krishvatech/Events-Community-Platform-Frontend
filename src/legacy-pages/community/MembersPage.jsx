@@ -14,8 +14,6 @@ import {
   Typography,
   Button,
   IconButton,
-  Switch,
-  FormControlLabel,
   Chip,
   Card,
   useMediaQuery,
@@ -47,6 +45,7 @@ import { feature as topoFeature } from "topojson-client";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import { isAdminUser } from "../../utils/adminRole";
+import { MapToggle, MembersMapPreview } from "./MapPreview.jsx";
 isoCountries.registerLocale(enLocale);
 import {
   MapContainer,
@@ -2412,21 +2411,11 @@ export default function MembersPage() {
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   Where {tabValue === 1 ? "My Contacts" : "members"} are from
                 </Typography>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={showMap}
-                        onChange={(_, v) => setShowMap(v)}
-                        size="small"
-                      />
-                    }
-                    label="Show map"
-                  />
-                </Stack>
+                <MapToggle checked={showMap} onChange={setShowMap} />
               </Stack>
 
               {/* Legend */}
+              {showMap && (
               <Stack
                 direction="row"
                 spacing={2}
@@ -2460,14 +2449,19 @@ export default function MembersPage() {
                   </Stack>
                 </Stack>
               </Stack>
+              )}
 
-              <MembersLeafletMap
-                markers={markers}
-                countryAgg={countryAgg}
-                showMap={showMap}
-                loading={mapLoading}
-                onOpenProfile={handleOpenProfile}
-              />
+              {showMap ? (
+                <MembersLeafletMap
+                  markers={markers}
+                  countryAgg={countryAgg}
+                  showMap={showMap}
+                  loading={mapLoading}
+                  onOpenProfile={handleOpenProfile}
+                />
+              ) : (
+                <MembersMapPreview tileUrl={MEMBER_MAP_TILE_URL} onShowMap={() => setShowMap(true)} />
+              )}
             </Paper>
           </Box>
         )}
@@ -2523,20 +2517,10 @@ export default function MembersPage() {
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Where {tabValue === 1 ? "My Contacts" : "members"} are from
               </Typography>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={showMap}
-                      onChange={(_, v) => setShowMap(v)}
-                      size="small"
-                    />
-                  }
-                  label="Show map"
-                />
-              </Stack>
+              <MapToggle checked={showMap} onChange={setShowMap} />
             </Stack>
 
+            {showMap && (
             <Stack
               direction="row"
               spacing={2}
@@ -2570,15 +2554,20 @@ export default function MembersPage() {
                 </Stack>
               </Stack>
             </Stack>
+            )}
 
-            <MembersLeafletMap
-              markers={markers}
-              countryAgg={countryAgg}
-              showMap={showMap}
-              loading={mapLoading}
-              minHeight={360}
-              onOpenProfile={handleOpenProfile}
-            />
+            {showMap ? (
+              <MembersLeafletMap
+                markers={markers}
+                countryAgg={countryAgg}
+                showMap={showMap}
+                loading={mapLoading}
+                minHeight={360}
+                onOpenProfile={handleOpenProfile}
+              />
+            ) : (
+              <MembersMapPreview tileUrl={MEMBER_MAP_TILE_URL} onShowMap={() => setShowMap(true)} minHeight={360} />
+            )}
           </Paper>
         </Box>
       )}

@@ -10,7 +10,6 @@ const articleSx = {
   fontSize: { xs: 16, md: 17 },
   lineHeight: 1.75,
   overflowWrap: "anywhere",
-  "& > :first-of-type": { mt: 0 },
   "& p": { my: 2 },
   "& h1, & h2, & h3, & h4, & h5, & h6": {
     color: BLOG_NAVY,
@@ -58,14 +57,18 @@ const articleSx = {
   "& .aligncenter": { mx: "auto", textAlign: "center" },
 };
 
+// The article's first block sits flush under the header; a continuation chunk
+// (lazy-loaded part of the same article) keeps its normal top margin.
+const firstChunkSx = { ...articleSx, "& > :first-of-type": { mt: 0 } };
+
 /** Renders Blog `content_html` after sanitisation. Never renders raw HTML. */
-export default function BlogArticleContent({ html }) {
+export default function BlogArticleContent({ html, continuation = false }) {
   const safeHtml = useMemo(() => sanitizeBlogHtml(html), [html]);
   return (
     <Box
       className="ecp-blog-article"
       data-testid="blog-article-content"
-      sx={articleSx}
+      sx={continuation ? articleSx : firstChunkSx}
       dangerouslySetInnerHTML={{ __html: safeHtml }}
     />
   );

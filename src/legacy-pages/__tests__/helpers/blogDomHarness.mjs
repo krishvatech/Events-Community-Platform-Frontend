@@ -53,12 +53,37 @@ window.matchMedia =
   window.matchMedia ||
   ((query) => ({ matches: false, media: query, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() { return false; } }));
 class NoopResizeObserver { observe() {} unobserve() {} disconnect() {} }
+
+// Controllable IntersectionObserver (jsdom has none): tests call intersect()
+// to simulate the reader scrolling a target into the observed area.
+export const intersectionObservers = new Set();
+class FakeIntersectionObserver {
+  constructor(callback, options = {}) {
+    this.callback = callback;
+    this.options = options;
+    this.targets = new Set();
+    intersectionObservers.add(this);
+  }
+  observe(target) { this.targets.add(target); }
+  unobserve(target) { this.targets.delete(target); }
+  disconnect() { this.targets.clear(); intersectionObservers.delete(this); }
+  takeRecords() { return []; }
+}
+window.IntersectionObserver = FakeIntersectionObserver;
+define("IntersectionObserver", FakeIntersectionObserver);
 window.ResizeObserver = window.ResizeObserver || NoopResizeObserver;
 define("ResizeObserver", window.ResizeObserver);
 // Node's own createObjectURL only accepts Node Blobs, not jsdom Files.
 URL.createObjectURL = () => "blob:mock-preview";
 URL.revokeObjectURL = () => {};
 define("IS_REACT_ACT_ENVIRONMENT", true);
+
+// Safety: when an assertion involving a DOM node fails, Node's assert tries to
+// pretty-print the node, walking the whole circular jsdom graph until memory
+// runs out. Print nodes as a short tag instead.
+window.Node.prototype[Symbol.for("nodejs.util.inspect.custom")] = function inspectNode() {
+  return `<${String(this.nodeName || "node").toLowerCase()}>`;
+};
 
 // Keep test output readable: drop known third-party dev warnings only.
 const QUIET = [/React Router Future Flag Warning/, /not wrapped in act/, /Not implemented: /];
@@ -146,6 +171,19 @@ const router = await import("react-router-dom");
 const { HelmetProvider } = createRequire(import.meta.url)("react-helmet-async");
 
 export { React, act, router };
+
+/** Fires an intersection for every observed target matching `selector`; returns how many fired. */
+export async function intersect(selector) {
+  let fired = 0;
+  for (const observer of [...intersectionObservers]) {
+    for (const target of [...observer.targets]) {
+      if (selector && !target.matches(selector)) continue;
+      fired += 1;
+      await act(async () => observer.callback([{ isIntersecting: true, target }], observer));
+    }
+  }
+  return fired;
+}
 
 let mounted = [];
 
@@ -361,6 +399,30 @@ export const makePost = (overrides = {}) => ({
   ...overrides,
 });
 
+export const makeImportRun = (overrides = {}) => ({
+  id: "run-1",
+  status: "queued",
+  current_step: "queued",
+  total_discovered: 0,
+  total_importable: 0,
+  processed_count: 0,
+  created_count: 0,
+  updated_count: 0,
+  skipped_count: 0,
+  restricted_count: 0,
+  failed_count: 0,
+  media_found_count: 0,
+  media_processed_count: 0,
+  media_migrated_count: 0,
+  links_rewritten_count: 0,
+  progress: { processed: 0, total: 0, media_processed: 0, media_total: 0 },
+  summary: { errors: [], media_failures: [], restricted_post_ids: [] },
+  error_message: "",
+  created_at: "2026-09-26T08:00:00Z",
+  finished_at: null,
+  ...overrides,
+});
+
 /** Recording fake of the blog service; override any method per test. */
 export function fakeBlogService(overrides = {}) {
   const calls = [];
@@ -371,6 +433,7 @@ export function fakeBlogService(overrides = {}) {
   const defaults = {
     listPublishedBlogs: async () => page([]),
     getPublishedBlog: async () => makePost(),
+    getPublishedBlogChunk: async (slug, chunk) => ({ chunk, content_html: "", has_more: false, chunks: chunk }),
     listAdminBlogs: async () => page([]),
     getAdminBlog: async () => ({ ...makePost(), status: "draft", content_html: "<p>Body</p>" }),
     createBlog: async (payload) => ({ id: 50, status: "draft", published_at: null, ...payload }),
@@ -386,6 +449,9 @@ export function fakeBlogService(overrides = {}) {
     createBlogTag: async (payload) => ({ id: 91, slug: "new", ...payload }),
     updateBlogTag: async (id, payload) => ({ id, ...payload }),
     searchBlogAuthors: async () => [],
+    startWordPressBlogImport: async () => ({ ...makeImportRun(), alreadyRunning: false }),
+    getWordPressBlogImport: async (id) => makeImportRun({ id, status: "succeeded", current_step: "completed" }),
+    getLatestWordPressBlogImport: async () => null,
   };
   const api = { calls };
   for (const [name, impl] of Object.entries({ ...defaults, ...overrides })) api[name] = wrap(name, impl);

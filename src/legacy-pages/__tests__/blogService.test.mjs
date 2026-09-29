@@ -35,7 +35,7 @@ test("published list uses the reader endpoint and returns a normalised page", as
   const page = await createBlogService(client).listPublishedBlogs({ search: "deals" });
   assert.equal(calls[0].method, "get");
   assert.equal(calls[0].url, "/blogs/");
-  assert.deepEqual(calls[0].config.params, { search: "deals" });
+  assert.deepEqual(calls[0].config.params, { page_size: 9, search: "deals" }, "card grids use 9 per page");
   assert.deepEqual(page, PAGE);
 });
 
@@ -49,10 +49,10 @@ test("query params are trimmed, empty ones dropped and page 1 omitted", async ()
   const { calls, client } = recordingClient(() => ({ data: PAGE }));
   const service = createBlogService(client);
   await service.listPublishedBlogs({ page: 1, search: "  ", category: "research", tag: "" });
-  assert.deepEqual(calls[0].config.params, { category: "research" });
+  assert.deepEqual(calls[0].config.params, { page_size: 9, category: "research" });
   await service.listAdminBlogs({ page: 3, status: "draft", search: " q ", tag: "europe" });
   assert.equal(calls[1].url, "/blogs/admin/");
-  assert.deepEqual(calls[1].config.params, { page: 3, status: "draft", search: "q", tag: "europe" });
+  assert.deepEqual(calls[1].config.params, { page_size: 9, page: 3, status: "draft", search: "q", tag: "europe" });
 });
 
 test("admin detail, create and PATCH edit hit the management endpoints", async () => {
@@ -183,4 +183,90 @@ test("endpoint table matches the backend contract", () => {
   assert.equal(BLOG_API.adminList, "/blogs/admin/");
   assert.equal(BLOG_API.category(1), "/blogs/admin/categories/1/");
   assert.equal(BLOG_API.tag(1), "/blogs/admin/tags/1/");
+});
+
+test("starting a WordPress import posts once and returns the queued run", async () => {
+  const { calls, client } = recordingClient(() => ({ data: { id: "r1", status: "queued" } }));
+  const run = await createBlogService(client).startWordPressBlogImport();
+  assert.deepEqual(calls.map((c) => [c.method, c.url]), [["post", "/blogs/admin/wordpress-import/"]]);
+  assert.deepEqual(run, { id: "r1", status: "queued", alreadyRunning: false });
+});
+
+test("a 409 returns the already-running import instead of failing", async () => {
+  const { client } = recordingClient(() => {
+    const error = new Error("conflict");
+    error.response = { status: 409, data: { detail: "An import is already running.", active_run: { id: "r0", status: "running" } } };
+    throw error;
+  });
+  const run = await createBlogService(client).startWordPressBlogImport();
+  assert.deepEqual(run, { id: "r0", status: "running", alreadyRunning: true });
+});
+
+test("other start failures are normalised", async () => {
+  const { client } = recordingClient(() => {
+    const error = new Error("down");
+    error.response = { status: 503, data: { detail: "WordPress Blog import is not configured (WP_IMAA_BLOG_BASE_URL)." } };
+    throw error;
+  });
+  await assert.rejects(createBlogService(client).startWordPressBlogImport(), (err) => {
+    assert.ok(err instanceof BlogApiError);
+    assert.equal(err.status, 503);
+    return true;
+  });
+});
+
+test("import status and latest endpoints; latest 404 means no imports yet", async () => {
+  const { calls, client } = recordingClient(({ url }) => {
+    if (url.endsWith("latest/")) {
+      const error = new Error("none");
+      error.response = { status: 404, data: { detail: "No WordPress imports yet." } };
+      throw error;
+    }
+    return { data: { id: "r1" } };
+  });
+  const service = createBlogService(client);
+  assert.deepEqual(await service.getWordPressBlogImport("r1"), { id: "r1" });
+  assert.equal(await service.getLatestWordPressBlogImport(), null);
+  assert.deepEqual(calls.map((c) => c.url), ["/blogs/admin/wordpress-import/r1/", "/blogs/admin/wordpress-import/latest/"]);
+});
+
+test("isImportActive distinguishes running from finished runs", async () => {
+  const { isImportActive } = await import("../../services/blogService.js");
+  assert.equal(isImportActive({ status: "queued" }), true);
+  assert.equal(isImportActive({ status: "running" }), true);
+  for (const status of ["succeeded", "partial", "failed"]) assert.equal(isImportActive({ status }), false);
+  assert.equal(isImportActive(null), false);
+});
+
+test("reader detail can ask for the first content chunk only", async () => {
+  const { calls, client } = recordingClient(() => ({ data: { slug: "a", content_html: "<p>1</p>", content_has_more: true } }));
+  const service = createBlogService(client);
+  await service.getPublishedBlog("a");
+  await service.getPublishedBlog("a", { chunked: true });
+  assert.equal(calls[0].config, undefined, "full content by default (backward compatible)");
+  assert.deepEqual(calls[1].config.params, { content_mode: "chunked" });
+});
+
+test("later chunks come from the same article's content endpoint, cancellable", async () => {
+  const controller = new AbortController();
+  const { calls, client } = recordingClient(() => ({ data: { chunk: 2, content_html: "<p>2</p>", has_more: false } }));
+  const part = await createBlogService(client).getPublishedBlogChunk("m&a update", 2, { signal: controller.signal });
+  assert.deepEqual(part, { chunk: 2, content_html: "<p>2</p>", has_more: false });
+  assert.equal(calls[0].url, "/blogs/m%26a%20update/content/");
+  assert.deepEqual(calls[0].config.params, { chunk: 2 });
+  assert.equal(calls[0].config.signal, controller.signal);
+  assert.equal(BLOG_API.content("x"), "/blogs/x/content/");
+  assert.equal(BLOG_API.next, undefined, "no next-article API");
+});
+
+test("chunk errors are normalised", async () => {
+  const service = createBlogService({ get: async () => { throw { response: { status: 404, data: { detail: "Not found." } } }; } });
+  await assert.rejects(service.getPublishedBlogChunk("draft", 1), (err) => err instanceof BlogApiError && err.status === 404);
+});
+
+test("card page size is 9 while taxonomy pages keep the default", () => {
+  assert.equal(totalPagesFor(9, 9), 1);
+  assert.equal(totalPagesFor(10, 9), 2);
+  assert.equal(totalPagesFor(85, 9), 10);
+  assert.equal(totalPagesFor(21), 2, "default (taxonomy) page size unchanged");
 });

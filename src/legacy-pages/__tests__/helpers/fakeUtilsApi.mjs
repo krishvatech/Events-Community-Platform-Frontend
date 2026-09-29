@@ -8,4 +8,5 @@ export const apiClient = { get: offline, post: offline, patch: offline, put: off
 export const listAdminUsers = offline;
 export const getCurrentMarketingStatus = async () => ({ has_marketing_access: false });
 export const createWagtailSession = offline;
+export const createOpenApiDocsSession = offline;
 export const getSaleorDashboardUrl = offline;

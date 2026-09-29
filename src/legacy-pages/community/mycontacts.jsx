@@ -19,8 +19,6 @@ import {
     Grid,
     Chip,
     useMediaQuery,
-    FormControlLabel,
-    Switch,
     Snackbar,
     Alert,
     Tabs,
@@ -45,6 +43,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRounded";
 import { isAdminUser } from "../../utils/adminRole";
+import { MapToggle, MembersMapPreview } from "./MapPreview.jsx";
 import { geoCentroid } from "d3-geo";
 import { feature as topoFeature } from "topojson-client";
 import * as isoCountries from "i18n-iso-countries";
@@ -63,6 +62,10 @@ import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 /* --------------------- constants & helpers --------------------- */
 const BORDER = "#e2e8f0";
+const CONTACTS_MAP_TILE_URL =
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
+const CONTACTS_MAP_ATTRIBUTION =
+    "Tiles &copy; Esri &mdash; Esri, TomTom, Garmin, FAO, NOAA, USGS, OpenStreetMap contributors";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 
@@ -335,7 +338,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
             {showMap && hasMarkers ? (
                 <MapContainer center={center} zoom={3} minZoom={2} maxZoom={18} style={{ width: "100%", height: "100%" }} scrollWheelZoom worldCopyJump attributionControl={false}>
                     <AutoZoom markers={markers} />
-                    <TileLayer attribution='&copy; OpenStreetMap contributors &copy; CARTO' url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                    <TileLayer attribution={CONTACTS_MAP_ATTRIBUTION} maxNativeZoom={16} url={CONTACTS_MAP_TILE_URL} />
                     <MembersHeatLayer markers={markers} />
                     {countryAgg.map((c) => {
                         const [lng, lat] = c.center;
@@ -830,7 +833,7 @@ export default function MyContacts() {
     const getCenterForISO2 = useCountryCentroids("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json");
     const cityCentersRef = useRef({});
     const [cityCenters, setCityCenters] = useState({});
-    const [showMap, setShowMap] = useState(true);
+    const [showMap, setShowMap] = useState(false);
 
     const [tabIndex, setTabIndex] = useState(0); // 0 = Contacts, 1 = Sent, 2 = Received, 3 = Visitors
     const [sentRequests, setSentRequests] = useState([]);
@@ -1242,6 +1245,8 @@ export default function MyContacts() {
     }, [allDisplayedUsers]);
 
     useEffect(() => {
+        // City lookups only feed the map, so skip them while it is off.
+        if (!showMap) return () => { };
         let alive = true;
         const missing = cityKeyEntries.filter(
             (e) => !Object.prototype.hasOwnProperty.call(cityCentersRef.current, e.key)
@@ -1279,7 +1284,7 @@ export default function MyContacts() {
         })();
 
         return () => { alive = false; };
-    }, [cityKeyEntries]);
+    }, [showMap, cityKeyEntries]);
 
     // Fetch visitors when visitors tab is opened (tab === 3)
     useEffect(() => {
@@ -1842,21 +1847,11 @@ export default function MyContacts() {
                                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
                                     Where My Contacts are from
                                 </Typography>
-                                <Stack direction="row" alignItems="center" spacing={2}>
-                                    <FormControlLabel
-                                        control={
-                                            <Switch
-                                                checked={showMap}
-                                                onChange={(_, v) => setShowMap(v)}
-                                                size="small"
-                                            />
-                                        }
-                                        label="Show map"
-                                    />
-                                </Stack>
+                                <MapToggle checked={showMap} onChange={setShowMap} />
                             </Stack>
 
                             {/* Legend */}
+                            {showMap && (
                             <Stack
                                 direction="row"
                                 spacing={2}
@@ -1878,13 +1873,18 @@ export default function MyContacts() {
                                     </Stack>
                                 </Stack>
                             </Stack>
+                            )}
 
-                            <MembersLeafletMap
-                                markers={markers}
-                                countryAgg={countryAgg}
-                                showMap={showMap}
-                                onOpenProfile={handleOpenProfile}
-                            />
+                            {showMap ? (
+                                <MembersLeafletMap
+                                    markers={markers}
+                                    countryAgg={countryAgg}
+                                    showMap={showMap}
+                                    onOpenProfile={handleOpenProfile}
+                                />
+                            ) : (
+                                <MembersMapPreview tileUrl={CONTACTS_MAP_TILE_URL} onShowMap={() => setShowMap(true)} />
+                            )}
                         </Paper>
                     </Box>
                 )}
@@ -1940,20 +1940,10 @@ export default function MyContacts() {
                             <Typography variant="h6" sx={{ fontWeight: 700 }}>
                                 Where My Contacts are from
                             </Typography>
-                            <Stack direction="row" alignItems="center" spacing={2}>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={showMap}
-                                            onChange={(_, v) => setShowMap(v)}
-                                            size="small"
-                                        />
-                                    }
-                                    label="Show map"
-                                />
-                            </Stack>
+                            <MapToggle checked={showMap} onChange={setShowMap} />
                         </Stack>
 
+                        {showMap && (
                         <Stack
                             direction="row"
                             spacing={2}
@@ -1975,14 +1965,19 @@ export default function MyContacts() {
                                 </Stack>
                             </Stack>
                         </Stack>
+                        )}
 
-                        <MembersLeafletMap
-                            markers={markers}
-                            countryAgg={countryAgg}
-                            showMap={showMap}
-                            minHeight={360}
-                            onOpenProfile={handleOpenProfile}
-                        />
+                        {showMap ? (
+                            <MembersLeafletMap
+                                markers={markers}
+                                countryAgg={countryAgg}
+                                showMap={showMap}
+                                minHeight={360}
+                                onOpenProfile={handleOpenProfile}
+                            />
+                        ) : (
+                            <MembersMapPreview tileUrl={CONTACTS_MAP_TILE_URL} onShowMap={() => setShowMap(true)} minHeight={360} />
+                        )}
                     </Paper>
                 </Box>
             )}

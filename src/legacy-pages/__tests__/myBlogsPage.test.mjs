@@ -35,7 +35,8 @@ const routes = () => [
   h(React.Fragment, { key: "reader" }, blogReaderRoutes),
 ];
 const open = (url = "/admin/blogs") => renderRoutes(routes(), { url });
-const rows = () => all("[data-testid='admin-blog-row']");
+// Admin Blog cards (the Blog listing is a card grid, not a table).
+const rows = () => all("[data-testid='admin-blog-grid'] [data-testid='blog-card']");
 
 const DRAFT = { ...makePost({ id: 2, title: "Draft thoughts", slug: "draft-thoughts", published_at: null }), status: "draft", updated_at: "2026-09-24T00:00:00Z" };
 const LIVE = { ...makePost({ id: 1 }), status: "published", updated_at: "2026-09-21T00:00:00Z" };
@@ -57,7 +58,62 @@ test("lists drafts and published blogs with text status badges", async () => {
   assert.ok(queryByText("September 20, 2026", { scope: liveRow }));
   assert.ok(queryByText("Ada Lovelace", { scope: liveRow }));
   assert.ok(getByRole("button", "Create Blog"));
-  assert.equal(queryByText(/Import from WordPress/i), null, "no WordPress import yet");
+  assert.ok(queryByRole("button", "Import from WordPress"), "Batch 4 adds the WordPress import action");
+});
+
+test("the Blog list is a card grid (no table) with admin badges, dates and actions", async () => {
+  const MEMBERS = { ...makePost({ id: 3, title: "Members report", slug: "members-report" }), status: "draft",
+                    wp_status: "publish", wp_membership_restricted: true, updated_at: "2026-09-27T00:00:00Z" };
+  const WP_DRAFT = { ...DRAFT, id: 4, title: "WP idea", slug: "wp-idea", wp_status: "draft" };
+  setBlogApi(fakeBlogService({ listAdminBlogs: async () => page([LIVE, MEMBERS, WP_DRAFT]) }));
+  await open();
+  await waitFor(() => assert.equal(rows().length, 3));
+  assert.equal(all("table").length, 0, "the Blog listing no longer uses a table");
+  const grid = document.querySelector("[data-testid='admin-blog-grid']");
+  for (const item of all(":scope > .MuiGrid-root", grid)) {
+    assert.ok(item.className.includes("MuiGrid-grid-md-4") && item.className.includes("MuiGrid-grid-sm-6"));
+  }
+  const [live, members, wpDraft] = rows();
+  assert.equal(live.dataset.variant, "admin", "same BlogCard, admin variant");
+  assert.ok(queryByText("Quarterly deal activity.", { scope: live }), "excerpt shown");
+  assert.match(live.querySelector("[data-testid='blog-card-updated']").textContent, /Updated September 21, 2026/);
+  assert.ok(!live.querySelector("[data-testid='blog-members-only']"));
+  assert.equal(members.querySelector("[data-testid='blog-members-only']").textContent, "WP members-only");
+  assert.equal(members.querySelector("[data-testid='blog-status']").textContent, "Draft");
+  assert.equal(wpDraft.querySelector("[data-testid='blog-wp-source']").textContent, "WordPress draft");
+  assert.equal(queryByText(/Read more/, { scope: live }), null, "admin cards show actions instead of Read more");
+  assert.ok(getByRole("link", "Edit M&A Market Update", { scope: live }));
+  assert.ok(getByRole("button", "Unpublish M&A Market Update", { scope: live }));
+  assert.ok(getByRole("button", "Publish Members report", { scope: members }));
+  // Title links follow the existing view behaviour: public page vs draft preview.
+  assert.equal(queryByText("M&A Market Update", { scope: live, selector: "a" }).getAttribute("href"), "/blogs/m-a-market-update");
+  assert.equal(queryByText("Members report", { scope: members, selector: "a" }).getAttribute("href"), "/admin/blogs/3/edit?preview=1");
+});
+
+test("My Blogs shows 9 cards per page from backend pagination", async () => {
+  const nine = Array.from({ length: 9 }, (_, i) => ({ ...makePost({ id: i + 10, slug: `p-${i}`, title: `Post ${i}` }), status: "published" }));
+  const api = fakeBlogService({ listAdminBlogs: async () => page(nine, 104, "next") });
+  setBlogApi(api);
+  await open();
+  await waitFor(() => assert.equal(rows().length, 9));
+  assert.ok(getByRole("button", "Go to page 12"), "104 blogs -> 12 pages of 9");
+  assert.equal(queryByRole("button", "Go to page 13"), null);
+});
+
+test("a page that no longer exists falls back to the previous page", async () => {
+  const api = fakeBlogService({
+    listAdminBlogs: async (params) => {
+      if ((params.page || 1) === 2) throw apiError(404, "Invalid page.");
+      return page([DRAFT], 10, "next");
+    },
+  });
+  setBlogApi(api);
+  await open();
+  await waitFor(() => assert.ok(getByRole("button", "Go to page 2")));
+  await click(getByRole("button", "Go to page 2"));
+  await waitFor(() => assert.equal(api.callsTo("listAdminBlogs").at(-1)[1].page, 1));
+  await waitFor(() => assert.equal(rows().length, 1));
+  assert.equal(queryByText("Invalid page."), null, "no error shown");
 });
 
 test("status filter and search are sent to the admin API", async () => {
@@ -184,7 +240,7 @@ test("no delete UI exists anywhere on My Blogs", async () => {
   }));
   for (const url of ["/admin/blogs", "/admin/blogs?tab=categories", "/admin/blogs?tab=tags"]) {
     await open(url);
-    await waitFor(() => assert.ok(all("tbody tr").length > 0, url));
+    await waitFor(() => assert.ok((url === "/admin/blogs" ? rows() : all("tbody tr")).length > 0, url));
     assert.equal(all("button, a").filter((el) => /delete/i.test(`${el.getAttribute("aria-label") || ""} ${el.textContent}`)).length, 0, url);
     await cleanup();
   }

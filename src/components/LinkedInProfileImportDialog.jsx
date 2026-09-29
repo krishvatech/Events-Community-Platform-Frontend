@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Alert,
+  Backdrop,
   Box,
   Button,
   Checkbox,
@@ -32,6 +33,7 @@ export default function LinkedInProfileImportDialog({
   const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
   const [addLinkedinEmail, setAddLinkedinEmail] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState("");
 
   const previewImport = async () => {
@@ -40,6 +42,7 @@ export default function LinkedInProfileImportDialog({
     setLoading(true);
     setError("");
     setOwnershipConfirmed(false);
+    setLoadingMessage("Reading LinkedIn PDF...");
     setAddLinkedinEmail(false);
 
     try {
@@ -67,6 +70,7 @@ export default function LinkedInProfileImportDialog({
       setError(e.message);
     } finally {
       setLoading(false);
+      setLoadingMessage("");
     }
   };
 
@@ -75,6 +79,7 @@ export default function LinkedInProfileImportDialog({
 
     setLoading(true);
     setError("");
+    setLoadingMessage("Importing LinkedIn profile...");
 
     try {
       const response = await fetch(
@@ -99,12 +104,13 @@ export default function LinkedInProfileImportDialog({
         throw new Error(data.message || data.detail || "Import failed");
       }
 
-      onImported?.();
+      await onImported?.();
       handleClose();
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
+      setLoadingMessage("");
     }
   };
 
@@ -124,6 +130,7 @@ export default function LinkedInProfileImportDialog({
     setOwnershipConfirmed(false);
     setAddLinkedinEmail(false);
     setError("");
+    setLoadingMessage("");
     onClose();
   };
 
@@ -137,7 +144,7 @@ export default function LinkedInProfileImportDialog({
     (!needsOwnershipConfirmation || ownershipConfirmed);
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md">
+    <Dialog open={open} onClose={loading ? undefined : handleClose} fullWidth maxWidth="md">
       <DialogTitle>Import LinkedIn Profile</DialogTitle>
 
       <DialogContent dividers>
@@ -192,6 +199,12 @@ export default function LinkedInProfileImportDialog({
             <Typography>
               {preview.headline}
             </Typography>
+
+            {preview.linkedin_url && (
+              <Typography sx={{ mt: 1 }}>
+                LinkedIn: {preview.linkedin_url}
+              </Typography>
+            )}
 
             {preview.phone && (
               <Typography sx={{ mt: 1 }}>
@@ -289,7 +302,7 @@ export default function LinkedInProfileImportDialog({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleClose}>
+        <Button onClick={handleClose} disabled={loading}>
           Cancel
         </Button>
 
@@ -323,6 +336,23 @@ export default function LinkedInProfileImportDialog({
           </Button>
         )}
       </DialogActions>
+
+      <Backdrop
+        open={loading}
+        sx={{
+          position: "absolute",
+          zIndex: (theme) => theme.zIndex.modal + 1,
+          color: "#fff",
+          backgroundColor: "rgba(15, 23, 42, 0.58)",
+        }}
+      >
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <CircularProgress color="inherit" />
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {loadingMessage || "Working..."}
+          </Typography>
+        </Box>
+      </Backdrop>
     </Dialog>
   );
 }

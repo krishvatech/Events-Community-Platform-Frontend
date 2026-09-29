@@ -67,6 +67,7 @@ import { Menu, MenuItem } from "@mui/material";
 import { isAdminUser } from "../../utils/adminRole";
 import { startKYC } from "../../utils/api";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import ExperienceList from "../../components/profile/ExperienceList";
 
 
 
@@ -4111,29 +4112,12 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           {loadingExtras ? (
                             <LinearProgress />
                           ) : experiences.length ? (
-                            <List dense disablePadding>
-                              {experiences.map((x) => (
-                                <ListItem key={x.id} disableGutters sx={{ py: 0.5 }}>
-                                  <ListItemText
-                                    primary={
-                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                        {[x.position, x.community_name].filter(Boolean).join(" — ")}
-                                      </Typography>
-                                    }
-                                    secondary={
-                                      <Typography variant="caption" color="text.secondary">
-                                        {rangeText(
-                                          x.start_date,
-                                          x.end_date,
-                                          x.currently_work_here
-                                        )}
-                                        {x.location ? ` · ${x.location}` : ""}
-                                      </Typography>
-                                    }
-                                  />
-                                </ListItem>
-                              ))}
-                            </List>
+                            <ExperienceList
+                              experiences={experiences}
+                              formatRange={rangeText}
+                              showDescription={false}
+                              titleSeparator=" — "
+                            />
                           ) : (
                             <Typography variant="body2" color="text.secondary">
                               {isMe
