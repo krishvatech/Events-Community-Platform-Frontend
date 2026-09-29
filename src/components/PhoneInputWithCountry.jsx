@@ -42,7 +42,7 @@ export default function PhoneInputWithCountry({
                             boxShadow: "none",
                             fontSize: "0.875rem", // Match body2 variant often used in display
                             opacity: 1, // Ensure it doesn't look disabled
-                            "-webkit-text-fill-color": "inherit" // Override browser disabled text color
+                            WebkitTextFillColor: "inherit" // Override browser disabled text color
                         }}
                         buttonStyle={{
                             background: "transparent",

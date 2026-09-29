@@ -3864,6 +3864,8 @@ export default function ProfilePage() {
                                 </Box>
                               }>
                                 <ListItemText
+                                  // secondary contains block content (<p>/<div>); render its wrapper as a div, not <p>
+                                  slotProps={{ secondary: { component: "div" } }}
                                   primary={<Typography variant="body2" fontWeight={500}>{e.degree || "Degree"} — {e.school || "School"}</Typography>}
                                   secondary={
                                     <Stack component="span" spacing={0.5}>
@@ -4053,6 +4055,8 @@ export default function ProfilePage() {
                                 }
                               >
                                 <ListItemText
+                                  // secondary contains block content (<p>/<div>); render its wrapper as a div, not <p>
+                                  slotProps={{ secondary: { component: "div" } }}
                                   primary={
                                     <Typography variant="body2" fontWeight={600}>
                                       {m.organization_name || "Organization"}
@@ -4588,6 +4592,8 @@ export default function ProfilePage() {
                                 }
                               >
                                 <ListItemText
+                                  // secondary contains block content (<p>/<div>); render its wrapper as a div, not <p>
+                                  slotProps={{ secondary: { component: "div" } }}
                                   primary={
                                     <Typography variant="body2" fontWeight={600}>
                                       {t.program_title || "Training"}
@@ -4707,6 +4713,8 @@ export default function ProfilePage() {
                                 }
                               >
                                 <ListItemText
+                                  // secondary contains block content (<p>/<div>); render its wrapper as a div, not <p>
+                                  slotProps={{ secondary: { component: "div" } }}
                                   primary={
                                     <Box component="span" sx={{ fontWeight: 600 }}>
                                       {l.language.english_name}
