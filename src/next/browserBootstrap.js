@@ -4,10 +4,13 @@
 // next/dynamic { ssr: false }), so none of this ever runs on the server.
 //
 // Intentionally NOT migrated yet:
-//  - Sentry (src/sentry.js)            -> dedicated Sentry step
 //  - RealtimeKit unhandledrejection filter -> Live Meeting phase
 
 import "../setupPolyfills"; // Buffer/process/global for amazon-cognito-identity-js
+// Same browser Sentry setup as the Vite entry (src/main.jsx): @sentry/react,
+// initialised only in production builds when a DSN is configured
+// (NEXT_PUBLIC_SENTRY_DSN, falling back to VITE_SENTRY_DSN via next.config.mjs).
+import "../sentry";
 import { applyEnUsLocaleOverrides } from "../bootstrap/enUsLocale";
 import "../utils/fetchInterceptor"; // global fetch auth refresh / 403 cache / timeouts
 

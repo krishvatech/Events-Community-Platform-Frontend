@@ -10,8 +10,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 // Vite name, so the same .env / Amplify variables work during the migration.
 // Explicit allow-list only: never add build credentials (SENTRY_AUTH_TOKEN,
 // SENTRY_ORG, SENTRY_PROJECT) or other secrets here.
-// Live Meeting tuning variables (VITE_RTK_*, VITE_SPEED_NETWORKING_*, ...) are
-// deliberately not mapped yet; that code falls back to its built-in defaults.
+// Live Meeting tuning variables are passed through unchanged (see LIVE_MEETING_ENV).
 const PUBLIC_ENV = [
   ["NEXT_PUBLIC_API_BASE_URL", "VITE_API_BASE_URL"],
   ["NEXT_PUBLIC_MEDIA_BASE_URL", "VITE_MEDIA_BASE_URL"],
@@ -45,11 +44,52 @@ for (const [nextName, viteName] of PUBLIC_ENV) {
   legacyViteEnv[viteName] = value;
 }
 
+// Live Meeting / realtime tuning values read by the unchanged legacy Live Meeting
+// code (LiveMeetingPage, speed networking, rtkBackground). Non-secret numbers and
+// flags that the Vite build already inlines into its public bundle. Passed through
+// under the SAME names so /live/* (still served by the legacy fallback) keeps the
+// configuration it had under Vite. No NEXT_PUBLIC_* equivalents; unset values keep
+// the code's own defaults, exactly as with Vite.
+const LIVE_MEETING_ENV = [
+  "VITE_BREAKOUT_JOIN_POLLING_PAUSE_MS",
+  "VITE_BREAKOUT_STATUS_POLL_MS",
+  "VITE_ENABLE_VIRTUAL_BG",
+  "VITE_LIVE_DEBUG",
+  "VITE_LIVE_LARGE_MAIN_ROOM_LIMIT",
+  "VITE_LOUNGE_PARTICIPANTS_POLL_MS",
+  "VITE_MEETING_END_REDIRECT_BASE_MS",
+  "VITE_MEETING_END_REDIRECT_JITTER_MS",
+  "VITE_RTK_BREAKOUT_PARTICIPANTS_POLL_MS",
+  "VITE_RTK_BREAKOUT_PRESENCE_BROADCAST_MS",
+  "VITE_RTK_MAIN_PARTICIPANTS_POLL_MS",
+  "VITE_RTK_MAIN_PRESENCE_BROADCAST_MS",
+  "VITE_SPEED_NETWORKING_DM_ACTIVE_POLL_MS",
+  "VITE_SPEED_NETWORKING_DM_PAGE_SIZE",
+  "VITE_SPEED_NETWORKING_DM_WS_FALLBACK_MS",
+  "VITE_SPEED_NETWORKING_MATCH_STATUS_POLL_MS",
+  "VITE_SPEED_NETWORKING_MY_MATCH_POLL_MS",
+  "VITE_SPEED_NETWORKING_POLL_JITTER_MS",
+  "VITE_SPEED_NETWORKING_RESTORE_JITTER_MS",
+  "VITE_SPEED_NETWORKING_RESTORE_MAX_AGE_MS",
+  "VITE_SPEED_NETWORKING_RETURN_JITTER_MS",
+  "VITE_SPEED_NETWORKING_SESSION_POLL_MS",
+  "VITE_WAITING_ROOM_HOST_QUEUE_POLL_MS",
+  "VITE_WAITING_ROOM_STATUS_JITTER_MS",
+  "VITE_WAITING_ROOM_STATUS_POLL_MS",
+];
+for (const viteName of LIVE_MEETING_ENV) {
+  if (process.env[viteName] !== undefined) legacyViteEnv[viteName] = process.env[viteName];
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Optional override so a verification build/start can run next to a
   // developer's `next dev` without sharing (and clobbering) the same .next folder.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+
+  // Pin the workspace root to this repository: a lockfile in a parent directory
+  // otherwise makes Next infer the wrong root for server output file tracing.
+  outputFileTracingRoot: ROOT,
 
   env: publicEnv,
 
