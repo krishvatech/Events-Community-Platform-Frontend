@@ -422,11 +422,12 @@ export default function AdminNewsletterDashboardPage() {
   const [error, setError] = useState("");
   const [range, setRange] = useState(() => rangeForDays(30));
 
-  const loadDashboard = async (nextRange = range) => {
+  // `refresh` asks the backend to bypass its dashboard cache (Refresh button).
+  const loadDashboard = async (nextRange = range, { refresh = false } = {}) => {
     setLoading(true);
     setError("");
     try {
-      setDashboard(await getNewsletterDashboard(nextRange));
+      setDashboard(await getNewsletterDashboard(refresh ? { ...nextRange, refresh: 1 } : nextRange));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -451,7 +452,7 @@ export default function AdminNewsletterDashboardPage() {
           <Typography variant="h5" sx={{ fontWeight: 850, color: TEXT }}>Marketing Dashboard</Typography>
           <Typography color="text.secondary">Operational overview of your Mautic-powered marketing workspace.</Typography>
         </Box>
-        <Button startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <RefreshRoundedIcon />} onClick={() => loadDashboard(range)} disabled={loading} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
+        <Button startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <RefreshRoundedIcon />} onClick={() => loadDashboard(range, { refresh: true })} disabled={loading} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
           Refresh
         </Button>
       </Stack>

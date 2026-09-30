@@ -195,11 +195,12 @@ export default function AdminNewsletterCompaniesPage() {
 
   const pageSize = 25;
 
-  const loadCompanies = useCallback(async () => {
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
+  const loadCompanies = useCallback(async ({ refresh = false } = {}) => {
     setLoading(true);
     setError("");
     try {
-      const response = await listNewsletterCompanies({ page, page_size: pageSize, search });
+      const response = await listNewsletterCompanies({ page, page_size: pageSize, search, ...(refresh ? { refresh: 1 } : {}) });
       setData(response);
     } catch (err) {
       setError(getErrorMessage(err, "Could not load companies from Mautic."));
@@ -254,7 +255,7 @@ export default function AdminNewsletterCompaniesPage() {
         <Stack direction="row" spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
-            onClick={loadCompanies}
+            onClick={() => loadCompanies({ refresh: true })}
             disabled={loading}
             sx={{ textTransform: "none" }}
           >

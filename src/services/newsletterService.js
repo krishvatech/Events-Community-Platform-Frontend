@@ -265,8 +265,8 @@ export const updateNewsletterStage = (stageId, payload) =>
 export const deleteNewsletterStage = (stageId) =>
   unwrap(apiClient.delete(`${adminStagesEndpoint}${stageId}/`));
 
-export const getNewsletterStageAnalytics = () =>
-  unwrap(apiClient.get(`${adminStagesEndpoint}analytics/`));
+export const getNewsletterStageAnalytics = (params = {}) =>
+  unwrap(apiClient.get(`${adminStagesEndpoint}analytics/`, { params }));
 
 export const listNewsletterPointActionTypes = () =>
   unwrap(apiClient.get(`${adminPointsEndpoint}types/`));

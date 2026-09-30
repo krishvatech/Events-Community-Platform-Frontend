@@ -577,8 +577,9 @@ export default function AdminNewsletterTemplatesPanel() {
     message: "",
   });
 
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
   const loadTemplates = useCallback(
-    async ({ nextPage = page, nextSearch = search } = {}) => {
+    async ({ nextPage = page, nextSearch = search, refresh = false } = {}) => {
       setLoading(true);
       setError("");
       try {
@@ -586,6 +587,7 @@ export default function AdminNewsletterTemplatesPanel() {
           page: nextPage,
           page_size: PAGE_SIZE,
           ...(nextSearch ? { search: nextSearch } : {}),
+          ...(refresh ? { refresh: 1 } : {}),
         });
         const normalized = {
           count: Number(response?.count || 0),
@@ -853,7 +855,7 @@ export default function AdminNewsletterTemplatesPanel() {
           <Tooltip title="Refresh from Mautic">
             <span>
               <IconButton
-                onClick={() => loadTemplates({ nextPage: page, nextSearch: search })}
+                onClick={() => loadTemplates({ nextPage: page, nextSearch: search, refresh: true })}
                 disabled={loading}
               >
                 <RefreshRoundedIcon />

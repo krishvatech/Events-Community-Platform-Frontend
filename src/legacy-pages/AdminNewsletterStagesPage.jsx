@@ -221,8 +221,9 @@ export default function AdminNewsletterStagesPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, stage: null, deleting: false, error: "" });
   const pageSize = 25;
 
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
   const loadStages = useCallback(
-    async ({ nextPage = page, nextSearch = search } = {}) => {
+    async ({ nextPage = page, nextSearch = search, refresh = false } = {}) => {
       setLoading(true);
       setError("");
       try {
@@ -230,6 +231,7 @@ export default function AdminNewsletterStagesPage() {
           page: nextPage,
           page_size: pageSize,
           ...(nextSearch ? { search: nextSearch } : {}),
+          ...(refresh ? { refresh: 1 } : {}),
         });
         setData(response);
         setPage(response?.page || nextPage);
@@ -243,11 +245,12 @@ export default function AdminNewsletterStagesPage() {
     [page, search]
   );
 
-  const loadAnalytics = useCallback(async () => {
+  // `refresh` asks the backend to bypass its analytics cache (Refresh button).
+  const loadAnalytics = useCallback(async ({ refresh = false } = {}) => {
     setAnalyticsLoading(true);
     setAnalyticsError("");
     try {
-      const response = await getNewsletterStageAnalytics();
+      const response = await getNewsletterStageAnalytics(refresh ? { refresh: 1 } : {});
       setAnalytics(response);
     } catch (err) {
       setAnalytics(null);
@@ -339,8 +342,8 @@ export default function AdminNewsletterStagesPage() {
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => {
-              loadStages({ nextPage: page, nextSearch: search });
-              loadAnalytics();
+              loadStages({ nextPage: page, nextSearch: search, refresh: true });
+              loadAnalytics({ refresh: true });
             }}
             disabled={loading || analyticsLoading}
             sx={{ textTransform: "none" }}
@@ -366,7 +369,7 @@ export default function AdminNewsletterStagesPage() {
         <Alert
           severity="warning"
           action={
-            <Button color="inherit" size="small" onClick={loadAnalytics}>
+            <Button color="inherit" size="small" onClick={() => loadAnalytics()}>
               Retry
             </Button>
           }

@@ -783,8 +783,9 @@ export default function AdminNewsletterPointTriggersPanel() {
     }
   }, []);
 
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
   const loadTriggers = useCallback(
-    async ({ nextPage = page, nextSearch = search } = {}) => {
+    async ({ nextPage = page, nextSearch = search, refresh = false } = {}) => {
       setLoading(true);
       setError("");
       try {
@@ -792,6 +793,7 @@ export default function AdminNewsletterPointTriggersPanel() {
           page: nextPage,
           page_size: pageSize,
           ...(nextSearch ? { search: nextSearch } : {}),
+          ...(refresh ? { refresh: 1 } : {}),
         });
         setData(response);
         setPage(response?.page || nextPage);
@@ -891,7 +893,7 @@ export default function AdminNewsletterPointTriggersPanel() {
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => {
-              loadTriggers({ nextPage: page, nextSearch: search });
+              loadTriggers({ nextPage: page, nextSearch: search, refresh: true });
               loadEventTypes();
               loadPointGroups();
             }}

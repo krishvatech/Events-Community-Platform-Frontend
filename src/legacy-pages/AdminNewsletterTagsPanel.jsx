@@ -138,11 +138,12 @@ export default function AdminNewsletterTagsPanel() {
   const [deleting, setDeleting] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  const loadTags = useCallback(async () => {
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
+  const loadTags = useCallback(async ({ refresh = false } = {}) => {
     setLoading(true);
     setError("");
     try {
-      setData(await listNewsletterTagDirectory({ page, page_size: 25, search }));
+      setData(await listNewsletterTagDirectory({ page, page_size: 25, search, ...(refresh ? { refresh: 1 } : {}) }));
     } catch (err) {
       setError(getErrorMessage(err, "Could not load tags from Mautic."));
       setData(null);
@@ -200,7 +201,7 @@ export default function AdminNewsletterTagsPanel() {
         <Stack direction="row" spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
-            onClick={loadTags}
+            onClick={() => loadTags({ refresh: true })}
             disabled={loading}
             sx={{ textTransform: "none" }}
           >
