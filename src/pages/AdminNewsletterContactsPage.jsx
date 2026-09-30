@@ -126,11 +126,13 @@ export default function AdminNewsletterContactsPage() {
     }
   }, []);
 
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
   const loadContacts = useCallback(
     async ({
       nextPage = page,
       nextSearch = search,
       nextStageFilter = stageFilter,
+      refresh = false,
     } = {}) => {
       setLoading(true);
       setError("");
@@ -141,6 +143,7 @@ export default function AdminNewsletterContactsPage() {
           page_size: pageSize,
           ...(nextSearch ? { search: nextSearch } : {}),
           ...(nextStageFilter ? { stage_id: nextStageFilter } : {}),
+          ...(refresh ? { refresh: 1 } : {}),
         });
         setData(response);
         setPage(response?.page || nextPage);
@@ -323,6 +326,7 @@ export default function AdminNewsletterContactsPage() {
                 nextPage: page,
                 nextSearch: search,
                 nextStageFilter: stageFilter,
+                refresh: true,
               })
             }
             disabled={loading}

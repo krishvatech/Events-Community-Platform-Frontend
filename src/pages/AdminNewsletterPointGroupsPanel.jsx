@@ -105,7 +105,8 @@ export default function AdminNewsletterPointGroupsPanel() {
   });
   const pageSize = 25;
 
-  const loadGroups = async (nextPage = page, nextSearch = search) => {
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
+  const loadGroups = async (nextPage = page, nextSearch = search, { refresh = false } = {}) => {
     setLoading(true);
     setError("");
     try {
@@ -113,6 +114,7 @@ export default function AdminNewsletterPointGroupsPanel() {
         page: nextPage,
         page_size: pageSize,
         ...(nextSearch ? { search: nextSearch } : {}),
+        ...(refresh ? { refresh: 1 } : {}),
       });
       const nextRows = Array.isArray(data)
         ? data
@@ -366,7 +368,7 @@ export default function AdminNewsletterPointGroupsPanel() {
         <Stack direction="row" spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
-            onClick={() => loadGroups(page, search)}
+            onClick={() => loadGroups(page, search, { refresh: true })}
             disabled={loading}
             sx={{ textTransform: "none" }}
           >

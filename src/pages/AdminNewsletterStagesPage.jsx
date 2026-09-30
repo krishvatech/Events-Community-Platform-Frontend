@@ -221,8 +221,9 @@ export default function AdminNewsletterStagesPage() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, stage: null, deleting: false, error: "" });
   const pageSize = 25;
 
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
   const loadStages = useCallback(
-    async ({ nextPage = page, nextSearch = search } = {}) => {
+    async ({ nextPage = page, nextSearch = search, refresh = false } = {}) => {
       setLoading(true);
       setError("");
       try {
@@ -230,6 +231,7 @@ export default function AdminNewsletterStagesPage() {
           page: nextPage,
           page_size: pageSize,
           ...(nextSearch ? { search: nextSearch } : {}),
+          ...(refresh ? { refresh: 1 } : {}),
         });
         setData(response);
         setPage(response?.page || nextPage);
@@ -340,7 +342,7 @@ export default function AdminNewsletterStagesPage() {
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => {
-              loadStages({ nextPage: page, nextSearch: search });
+              loadStages({ nextPage: page, nextSearch: search, refresh: true });
               loadAnalytics({ refresh: true });
             }}
             disabled={loading || analyticsLoading}

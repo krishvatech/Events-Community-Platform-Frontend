@@ -263,7 +263,8 @@ export default function AdminNewsletterMauticCampaignsPanel() {
     message: "",
   });
 
-  const loadCampaigns = useCallback(async () => {
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
+  const loadCampaigns = useCallback(async ({ refresh = false } = {}) => {
     setLoading(true);
     setError("");
     try {
@@ -271,6 +272,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
         page,
         page_size: PAGE_SIZE,
         ...(search ? { search } : {}),
+        ...(refresh ? { refresh: 1 } : {}),
       });
       setCampaigns(Array.isArray(data?.results) ? data.results : []);
       setCount(Number(data?.count || 0));
@@ -405,7 +407,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
         <Stack direction="row" spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
-            onClick={loadCampaigns}
+            onClick={() => loadCampaigns({ refresh: true })}
             disabled={loading}
             sx={{ textTransform: "none" }}
           >

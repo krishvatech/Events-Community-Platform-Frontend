@@ -542,8 +542,9 @@ export default function AdminNewsletterPointsPage() {
     }
   }, []);
 
+  // `refresh` asks the backend to bypass its list cache (Refresh button).
   const loadActions = useCallback(
-    async ({ nextPage = page, nextSearch = search } = {}) => {
+    async ({ nextPage = page, nextSearch = search, refresh = false } = {}) => {
       setLoading(true);
       setError("");
       try {
@@ -551,6 +552,7 @@ export default function AdminNewsletterPointsPage() {
           page: nextPage,
           page_size: pageSize,
           ...(nextSearch ? { search: nextSearch } : {}),
+          ...(refresh ? { refresh: 1 } : {}),
         });
         setData(response);
         setPage(response?.page || nextPage);
@@ -680,7 +682,7 @@ export default function AdminNewsletterPointsPage() {
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => {
-              loadActions({ nextPage: page, nextSearch: search });
+              loadActions({ nextPage: page, nextSearch: search, refresh: true });
               loadTypes();
               loadPointGroups();
             }}
