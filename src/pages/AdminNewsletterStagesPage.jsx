@@ -243,11 +243,12 @@ export default function AdminNewsletterStagesPage() {
     [page, search]
   );
 
-  const loadAnalytics = useCallback(async () => {
+  // `refresh` asks the backend to bypass its analytics cache (Refresh button).
+  const loadAnalytics = useCallback(async ({ refresh = false } = {}) => {
     setAnalyticsLoading(true);
     setAnalyticsError("");
     try {
-      const response = await getNewsletterStageAnalytics();
+      const response = await getNewsletterStageAnalytics(refresh ? { refresh: 1 } : {});
       setAnalytics(response);
     } catch (err) {
       setAnalytics(null);
@@ -340,7 +341,7 @@ export default function AdminNewsletterStagesPage() {
             startIcon={<RefreshRoundedIcon />}
             onClick={() => {
               loadStages({ nextPage: page, nextSearch: search });
-              loadAnalytics();
+              loadAnalytics({ refresh: true });
             }}
             disabled={loading || analyticsLoading}
             sx={{ textTransform: "none" }}
@@ -366,7 +367,7 @@ export default function AdminNewsletterStagesPage() {
         <Alert
           severity="warning"
           action={
-            <Button color="inherit" size="small" onClick={loadAnalytics}>
+            <Button color="inherit" size="small" onClick={() => loadAnalytics()}>
               Retry
             </Button>
           }

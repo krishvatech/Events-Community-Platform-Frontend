@@ -166,7 +166,8 @@ export default function AdminNewsletterAnalyticsPage() {
 
   const params = useMemo(() => ({ from: range.from, to: range.to, page, page_size: pageSize }), [range, page]);
 
-  const load = useCallback(async () => {
+  // `refresh` asks the backend to bypass its analytics cache (Refresh button).
+  const load = useCallback(async ({ refresh = false } = {}) => {
     setState((current) => ({ ...current, loading: true, error: "" }));
     try {
       const loader = {
@@ -176,7 +177,7 @@ export default function AdminNewsletterAnalyticsPage() {
         contacts: getNewsletterAnalyticsContacts,
         segments: listNewsletterAnalyticsSegments,
       }[tab];
-      const data = await loader(params);
+      const data = await loader(refresh ? { ...params, refresh: 1 } : params);
       setState({ loading: false, error: "", data });
     } catch (err) {
       setState({ loading: false, error: getErrorMessage(err), data: null });
@@ -239,7 +240,7 @@ export default function AdminNewsletterAnalyticsPage() {
           setRange(draftRange);
           setPage(1);
         }}
-        refresh={load}
+        refresh={() => load({ refresh: true })}
         loading={state.loading}
       />
 
@@ -253,7 +254,7 @@ export default function AdminNewsletterAnalyticsPage() {
         </Tabs>
       </Paper>
 
-      {state.error ? <Alert severity="error" action={<Button color="inherit" size="small" onClick={load}>Retry</Button>}>{state.error}</Alert> : null}
+      {state.error ? <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => load()}>Retry</Button>}>{state.error}</Alert> : null}
 
       {tab === "overview" ? (
         <Stack spacing={2}>
