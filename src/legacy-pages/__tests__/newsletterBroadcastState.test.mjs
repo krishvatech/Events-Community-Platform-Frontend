@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { isBroadcastDetailLoaded } from "../newsletterBroadcastState.js";
+import { broadcastScheduleActions, isBroadcastDetailLoaded } from "../newsletterBroadcastState.js";
 
 const CAMPAIGN = { uuid: "u-1", name: "Broadcast", status: "draft" };
 
@@ -95,4 +95,60 @@ test("the page uses the predicate rather than coupling error to load state", () 
     source.includes("saveBroadcastDraft("),
     "Save Draft must still delegate to the save orchestrator"
   );
+});
+
+// Batch 4 — schedule actions after native delivery
+const NOW = Date.parse("2026-10-01T10:00:00Z");
+const actions = (overrides) =>
+  broadcastScheduleActions({ detailLoaded: true, isNew: false, now: NOW, ...overrides });
+
+test("a sent broadcast offers neither Reschedule nor Cancel", () => {
+  assert.deepEqual(actions({ status: "sent", scheduleOwner: "" }), { canSchedule: false, canCancel: false });
+});
+
+test("a draft can be scheduled but not cancelled", () => {
+  assert.deepEqual(actions({ status: "draft" }), { canSchedule: true, canCancel: false });
+});
+
+test("a future native schedule can still be rescheduled and cancelled", () => {
+  assert.deepEqual(
+    actions({ status: "scheduled", scheduleOwner: "mautic", scheduledAt: "2026-10-01T10:05:00Z" }),
+    { canSchedule: true, canCancel: true }
+  );
+});
+
+test("a native schedule inside its final minute or past due offers no changes", () => {
+  for (const scheduledAt of ["2026-10-01T10:01:00Z", "2026-10-01T10:00:00Z", "2026-10-01T09:40:00Z"]) {
+    assert.deepEqual(
+      actions({ status: "scheduled", scheduleOwner: "mautic", scheduledAt }),
+      { canSchedule: false, canCancel: false },
+      scheduledAt
+    );
+  }
+});
+
+test("an ECP-owned past-due schedule keeps its existing actions", () => {
+  // ECP's own dispatcher and send-event guards own that case.
+  assert.deepEqual(
+    actions({ status: "scheduled", scheduleOwner: "ecp", scheduledAt: "2026-10-01T09:40:00Z" }),
+    { canSchedule: true, canCancel: true }
+  );
+});
+
+test("nothing is offered before the broadcast has loaded", () => {
+  assert.deepEqual(
+    broadcastScheduleActions({ detailLoaded: false, isNew: false, status: "scheduled" }),
+    { canSchedule: false, canCancel: false }
+  );
+});
+
+test("the editor derives its schedule buttons from the shared helper", () => {
+  const source = fs.readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "AdminNewsletterPage.jsx"),
+    "utf8"
+  );
+  assert.match(source, /broadcastScheduleActions\(\{/);
+  assert.doesNotMatch(source, /const canCancel = detailLoaded/);
+  assert.match(source, /label="Sent"/);
+  assert.match(source, /native_broadcast_reconciliation_scheduled/);
 });
