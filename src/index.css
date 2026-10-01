@@ -5,9 +5,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom global styles */
+/* Custom global styles
+   Body/UI font is Inter (loaded in index.html and src/app/layout.jsx). It replaces the previous
+   'DM Sans' declarations: DM Sans was never loaded, so text fell back to whatever font the OS had. */
 body {
-  font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--imaa-font-sans);
   background-color: var(--surface-muted);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -15,14 +17,40 @@ body {
 }
 
 @layer base {
-  html { font-family: 'DM Sans', 'Helvetica Neue', sans-serif; }
-  h1, h2, h3, h4, h5, h6 { color: var(--text-primary); font-family: 'DM Sans', 'Helvetica Neue', sans-serif; }
+  html { font-family: var(--imaa-font-sans); }
+  h1, h2, h3, h4, h5, h6 { color: var(--text-primary); font-family: var(--imaa-font-sans); }
   a { color: inherit; }
 }
 
-/* MUI override for DM Sans */
+/* MUI text components use the same body/UI font (keeps the previous precedence) */
 .MuiTypography-root, .MuiButton-root, .MuiInputBase-root, .MuiMenuItem-root {
-  font-family: 'DM Sans', 'Helvetica Neue', sans-serif !important;
+  font-family: var(--imaa-font-sans) !important;
+}
+
+/* Keyboard focus. The design mockup defines no focus treatment, and MUI removes the browser
+   outline from its buttons. `:focus-visible` only matches keyboard-style focus, so mouse
+   clicks don't show the ring. Outlines don't affect layout. */
+:focus-visible,
+.Mui-focusVisible {
+  outline: var(--imaa-focus-width) solid var(--imaa-focus-color);
+  outline-offset: var(--imaa-focus-offset);
+}
+/* Programmatic focus targets (dialog containers, menu lists) are not tab stops */
+[tabindex="-1"]:focus-visible:not(.Mui-focusVisible) {
+  outline: none;
+}
+/* MUI text fields already show focus through their border and ring (see muiTheme.js) */
+.MuiInputBase-input:focus-visible {
+  outline: none;
+}
+/* Items inside scrolling lists and tab bars: draw the ring inside so it isn't clipped */
+.MuiMenuItem-root.Mui-focusVisible,
+.MuiListItemButton-root.Mui-focusVisible,
+.MuiTab-root.Mui-focusVisible,
+.MuiAutocomplete-option.Mui-focusVisible,
+.MuiAccordionSummary-root.Mui-focusVisible {
+  outline: var(--imaa-focus-width) solid var(--imaa-focus-color);
+  outline-offset: calc(var(--imaa-focus-width) * -1);
 }
 
 html, body, #root {

@@ -25,7 +25,7 @@ const T = "#0A9396";
 // const G = "#D4920B"; // COMMENTED OUT - used only in commented Community section
 const BG = "#FAF9F7";
 const BORDER = "#EEECEA";
-const FONT = "'DM Sans', 'Helvetica Neue', sans-serif";
+const FONT = "var(--imaa-font-sans)"; // Inter (design token in src/styles/brand.css)
 
 const FALLBACK_IMGS = [
   "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80",

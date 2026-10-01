@@ -32,6 +32,51 @@
 
   /* Top bar */
   --topbar-height: 50px;
+
+  /* ── IMAA design foundations ─────────────────────────────────────────────
+     Source: IMAA design-system mockup `_foundations.css` v1.65 (2026-06-07).
+     JS mirror for the MUI theme and Tailwind: src/styles/designTokens.js — keep in sync.
+     Additive only: the variables above are unchanged. */
+  --imaa-coral: #E84C38;
+  --imaa-link: #4A7DB5;
+  --imaa-bg-cool: #F0F4F5;    /* public alternating sections */
+  --imaa-bg-member: #F7F8FA;  /* member (Connect) area */
+  --imaa-ink: #1B2A4A;
+  --imaa-ink-body: #5A6070;
+  --imaa-ink-meta: #747A88;   /* below AA for small text on white */
+  --imaa-ink-hint: #B0B4BC;   /* placeholders / disabled only */
+  --imaa-border: #E2E4E8;
+  --imaa-border-hover: #D1CFC9;
+  --imaa-hairline: rgba(27, 42, 74, 0.13);
+
+  --imaa-shadow-sm: 0 1px 2px rgba(27, 42, 74, 0.08);
+  --imaa-shadow-md: 0 4px 12px rgba(27, 42, 74, 0.12);
+  --imaa-shadow-lg: 0 12px 32px rgba(27, 42, 74, 0.20);
+
+  --imaa-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --imaa-font-serif: 'Source Serif 4', Georgia, serif;
+
+  --imaa-radius-tag: 4px;
+  --imaa-radius-field: 6px;
+  --imaa-radius-card: 8px;
+  --imaa-radius-popup: 12px;
+  --imaa-radius-pill: 999px;
+
+  --imaa-space-1: 4px;
+  --imaa-space-2: 8px;
+  --imaa-space-3: 12px;
+  --imaa-space-4: 16px;
+  --imaa-space-5: 24px;
+  --imaa-space-6: 32px;
+  --imaa-space-7: 48px;
+  --imaa-space-section: 60px;
+  --imaa-content-max: 1200px;
+  --imaa-prose-max: 700px;
+
+  /* Keyboard focus ring (the mockup defines none) */
+  --imaa-focus-color: var(--imaa-teal);
+  --imaa-focus-width: 2px;
+  --imaa-focus-offset: 2px;
 }
 
 /* Card interactions */

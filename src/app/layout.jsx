@@ -18,11 +18,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
-        {/* Same font loading as index.html */}
+        {/* Same font loading as index.html. One request: Inter (body/UI, variable weight 400–900)
+            and Source Serif 4 (design headings, 400–700 plus italic). */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400..900&family=Source+Serif+4:ital,wght@0,400..700;1,400..700&display=swap"
           rel="stylesheet"
         />
       </head>
