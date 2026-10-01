@@ -34,6 +34,14 @@ export const getNewsletterCampaign = (uuid) =>
 export const getNewsletterCampaignAnalytics = (uuid) =>
   unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/analytics/`));
 
+// One request for the Broadcast list; `refresh` bypasses the analytics cache.
+export const getNewsletterCampaignAnalyticsSummary = (uuids, { refresh = false } = {}) =>
+  unwrap(
+    apiClient.get(`${adminCampaignsEndpoint}analytics-summary/`, {
+      params: { uuids: uuids.join(","), ...(refresh ? { refresh: 1 } : {}) },
+    })
+  );
+
 export const updateNewsletterCampaign = (uuid, payload) =>
   unwrap(apiClient.patch(`${adminCampaignsEndpoint}${uuid}/`, payload));
 

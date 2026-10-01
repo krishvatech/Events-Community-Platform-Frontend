@@ -16,6 +16,60 @@ export function isBroadcastDetailLoaded({ isNew, loading, campaign }) {
   return !loading && Boolean(campaign);
 }
 
+/**
+ * Statuses in which a broadcast has been handed over for delivery. A draft,
+ * scheduled or cancelled broadcast has no sends, so the list shows "—" for it
+ * without asking for analytics.
+ */
+const STATUSES_WITH_SEND_DATA = new Set(["sending", "sent", "failed"]);
+
+export function broadcastHasSendData(status) {
+  return STATUSES_WITH_SEND_DATA.has(String(status || "").toLowerCase());
+}
+
+/**
+ * How to show one rate (`open_rate` or `click_rate`) from a backend analytics
+ * payload — the per-broadcast response or one entry of the list summary,
+ * which share the same shape and semantics.
+ *
+ * The backend returns rate 0 both for "never sent" and for a real 0%, so the
+ * difference is read from its own denominator (delivered, else provider
+ * sends): no denominator means no send data, not 0%.
+ *
+ * @returns {{ kind: "loading" | "unavailable" | "none" | "value", value?: number }}
+ */
+export function broadcastRate(analytics, rateKey) {
+  if (!analytics || analytics.loading) return { kind: "loading" };
+  if (analytics.error) return { kind: "unavailable" };
+  const metadata = analytics.metadata || {};
+  // Opens and provider sends come from Mautic; without it they would read as 0.
+  if (metadata.mautic_email_id && metadata.mautic_available === false) {
+    return { kind: "unavailable" };
+  }
+  const denominator =
+    Number(analytics.engagement?.delivered_count) || Number(analytics.send_summary?.sent_count) || 0;
+  if (!denominator) return { kind: "none" };
+  const value = Number(analytics.rates?.[rateKey]);
+  if (analytics.rates?.[rateKey] == null || !Number.isFinite(value)) return { kind: "unavailable" };
+  return { kind: "value", value };
+}
+
+/** A rate (0–1) as a percentage with at most one decimal: 0.5 → "50%", 0.4234 → "42.3%". */
+export function formatRate(value) {
+  const number = Number(value);
+  if (value == null || !Number.isFinite(number)) return "";
+  return `${Number((number * 100).toFixed(1))}%`;
+}
+
+/** Text for a rate cell: "—" for no send data, never "0%" unless it is a real 0%. */
+export function broadcastRateText(analytics, rateKey) {
+  const rate = broadcastRate(analytics, rateKey);
+  if (rate.kind === "value") return formatRate(rate.value);
+  if (rate.kind === "none") return "—";
+  if (rate.kind === "unavailable") return "Unavailable";
+  return "";
+}
+
 /** Mirrors the backend cutoff: native changes stop one minute before the send minute. */
 const NATIVE_CHANGE_CUTOFF_MS = 60 * 1000;
 
