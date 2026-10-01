@@ -42,6 +42,8 @@ import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import ShoppingCartCheckoutRoundedIcon from "@mui/icons-material/ShoppingCartCheckoutRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import { CalendarX, Video } from "lucide-react";
+import { EmptyState } from "../components/page";
 import { FormControl, Select, MenuItem, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -247,7 +249,7 @@ function priceStr(p) {
 
 function displayPrice(ev) {
   const price = getDisplayPrice(ev);
-  if (price === "Free") return <span className="text-teal-600">Free to Join</span>;
+  if (price === "Free") return <span className="text-imaa-teal-dark">Free to Join</span>;
   return price;
 }
 
@@ -987,9 +989,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     <MUICard
       elevation={0}
       onClick={handleCardClick}
-      className="group h-full w-full flex flex-col rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
-                transition-all duration-300 hover:shadow-xl hover:-translate-y-2.5
-                hover:ring-1 hover:ring-teal-200 overflow-hidden cursor-pointer"
+      className="group h-full w-full flex flex-col rounded-lg border border-imaa-border bg-white shadow-imaa-sm
+                transition-all duration-300 hover:shadow-imaa-md hover:-translate-y-1 motion-reduce:hover:translate-y-0
+                hover:border-imaa-border-hover overflow-hidden cursor-pointer"
     >
       {/* MEDIA */}
       <Box className="relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px] overflow-hidden">
@@ -1005,19 +1007,19 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         )}
 
         {ev.topics?.[0] && (
-          <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold shadow-sm">
+          <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-imaa-teal-dark text-white px-3 py-1 text-xs font-semibold shadow-sm">
             {ev.topics[0]}
           </span>
         )}
         {ev.topics?.[1] && (
-          <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-slate-200 text-slate-900 px-3 py-1 text-xs font-semibold shadow-sm">
+          <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-white text-imaa-ink px-3 py-1 text-xs font-semibold shadow-sm">
             {ev.topics[1]}
           </span>
         )}
       </Box>
       <CardContent className="p-4 sm:p-5 md:p-6 flex-1 flex flex-col min-h-[260px] sm:min-h-[280px] md:min-h-[300px]">
         <div className="flex items-start gap-2 mb-1">
-          <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 leading-snug two-line flex-1">
+          <h3 className="font-serif text-xl sm:text-2xl font-semibold text-imaa-ink leading-snug two-line flex-1">
             {ev.title}
           </h3>
           {ev.isPinnedTopCopy && (
@@ -1026,7 +1028,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         </div>
 
         {ev.description && (
-          <p className="mt-2 text-neutral-600 text-sm three-line">{ev.description}</p>
+          <p className="mt-2 text-imaa-body text-sm three-line">{ev.description}</p>
         )}
 
         <FeaturedParticipantsStrip
@@ -1287,7 +1289,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           {isPaymentPending ? (
             <PaymentPendingSummary reg={reg} />
           ) : (isEventOwner || isConfirmedRegistered) ? (
-            <span className="text-teal-600">You are registered for this event.</span>
+            <span className="text-imaa-teal-dark">You are registered for this event.</span>
           ) : ev.registration_type === 'apply' && (applicationStatus === 'pending' || applicationStatus === 'waitlisted') ? (
             <span className="text-gray-600">Application {applicationStatus === 'pending' ? 'Pending' : 'Waitlisted'}</span>
           ) : (
@@ -1788,9 +1790,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   return (
     <MUICard
       elevation={0}
-      className="group rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
-                 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5
-                 hover:ring-1 hover:ring-teal-200 overflow-hidden overflow-hidden"
+      className="group rounded-lg border border-imaa-border bg-white shadow-imaa-sm
+                 transition-all duration-300 hover:shadow-imaa-md hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
+                 hover:border-imaa-border-hover overflow-hidden"
     >
       <div className="md:flex">
         {/* Image / badges */}
@@ -1806,12 +1808,12 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
           )}
 
           {ev.topics?.[0] && (
-            <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold shadow-sm">
+            <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-imaa-teal-dark text-white px-3 py-1 text-xs font-semibold shadow-sm">
               {ev.topics[0]}
             </span>
           )}
           {ev.topics?.[1] && (
-            <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-slate-200 text-slate-900 px-3 py-1 text-xs font-semibold shadow-sm">
+            <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-white text-imaa-ink px-3 py-1 text-xs font-semibold shadow-sm">
               {ev.topics[1]}
             </span>
           )}
@@ -1822,7 +1824,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-start gap-2 mb-1">
-                <h3 className="text-xl md:text-2xl font-semibold text-neutral-900 leading-snug flex-1">
+                <h3 className="font-serif text-xl md:text-2xl font-semibold text-imaa-ink leading-snug flex-1">
                   {ev.title}
                 </h3>
                 {ev.isPinnedTopCopy && (
@@ -1830,7 +1832,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                 )}
               </div>
               {ev.description && (
-                <p className="mt-2 text-neutral-600 text-sm md:text-base leading-relaxed">
+                <p className="mt-2 text-imaa-body text-sm md:text-base leading-relaxed">
                   {truncate(ev.description, 220)}
                 </p>
               )}
@@ -1933,7 +1935,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                 {isPaymentPending ? (
                   <PaymentPendingSummary reg={reg} />
                 ) : (isEventOwner || isConfirmedRegistered) ? (
-                  <span className="text-teal-600">You are registered for this event.</span>
+                  <span className="text-imaa-teal-dark">You are registered for this event.</span>
                 ) : (
                   displayPrice(ev)
                 )}
@@ -2177,7 +2179,7 @@ function CardFooterSkeleton() {
 
 function EventCardSkeleton() {
   return (
-    <MUICard className="rounded-3xl border border-slate-200 overflow-hidden">
+    <MUICard elevation={0} className="rounded-lg border border-imaa-border overflow-hidden">
       <Skeleton variant="rectangular" height={200} />
       <CardContent sx={{ p: 3 }}>
         <Skeleton variant="text" height={30} width="85%" />
@@ -2197,7 +2199,7 @@ function EventCardSkeleton() {
 
 function EventRowSkeleton() {
   return (
-    <MUICard className="rounded-3xl border border-slate-200 overflow-hidden">
+    <MUICard elevation={0} className="rounded-lg border border-imaa-border overflow-hidden">
       <div className="flex flex-col md:flex-row">
         <Box sx={{ width: { xs: "100%", md: 260 }, flexShrink: 0 }}>
           <Skeleton variant="rectangular" height={170} />
@@ -3454,10 +3456,12 @@ export default function EventsPage() {
             backgroundPosition: "center",
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0d2046]/80 to-[#0d2046]/95" />
+          {/* Flat navy photo overlay (design tokens) */}
+          <div className="absolute inset-0 bg-imaa-navy/85" />
           <Container maxWidth={false} disableGutters>
             <div className="relative mx-auto max-w-7xl px-6 py-16 md:py-20">
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
+              {/* text-white is set on the heading itself: the base h1 rule in index.css would otherwise make it navy */}
+              <h1 className="font-serif text-4xl md:text-5xl font-bold tracking-tight text-white mb-4">
                 {heroTitle}
               </h1>
               <p className="mx-auto max-w-3xl text-lg md:text-xl text-white/80">
@@ -3505,7 +3509,7 @@ export default function EventsPage() {
                           target={isExternal ? "_blank" : undefined}
                           rel={isExternal ? "noreferrer" : undefined}
                           variant="outlined"
-                          className="normal-case rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10"
+                          className="normal-case rounded-xl border-white/30 text-imaa-ink bg-white hover:border-white hover:bg-white/90"
                         >
                           {label}
                         </Button>
@@ -3536,7 +3540,7 @@ export default function EventsPage() {
 
       {/* Top filters / controls bar */}
       <Container maxWidth={false} disableGutters className="mt-6 px-4 sm:px-6">
-        <div className="w-full rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 overflow-visible">
+        <div className="w-full rounded-2xl border border-imaa-border bg-white p-3 sm:p-4 overflow-visible">
           {/* Responsive grid: 1 col on xs, 2 cols on sm, 12-col layout on lg+ */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
 
@@ -3544,7 +3548,7 @@ export default function EventsPage() {
             <div className="col-span-1 lg:col-span-3">
               <div className="relative">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
                       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -3552,7 +3556,8 @@ export default function EventsPage() {
                 <input
                   type="text"
                   placeholder="Search events by keyword..."
-                  className="w-full h-11 pl-12 pr-4 rounded-xl border border-slate-200 bg-white outline-none"
+                  aria-label="Search events"
+                  className="w-full h-11 pl-12 pr-4 rounded-xl border border-imaa-border bg-white text-imaa-ink outline-none transition-colors hover:border-imaa-border-hover focus:border-imaa-teal focus:ring-2 focus:ring-imaa-teal/25"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                 />
@@ -3633,9 +3638,10 @@ export default function EventsPage() {
               <button
                 onClick={() => setShowAdvanced((v) => !v)}
                 type="button"
-                className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm"
+                aria-expanded={showAdvanced}
+                className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-imaa-border bg-white text-sm font-medium text-imaa-ink transition-colors hover:border-imaa-border-hover hover:bg-imaa-member"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-slate-600">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-slate-600" aria-hidden="true">
                   <path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
                 Advanced
@@ -3648,14 +3654,16 @@ export default function EventsPage() {
               className="hidden sm:block sm:col-span-2 lg:col-span-1 min-w-0"
               aria-hidden={false} // hidden only on xs due to Tailwind
             >
-              <div className="flex w-full h-11 rounded-xl overflow-hidden border border-slate-200 bg-white">
+              <div className="flex w-full h-11 rounded-xl overflow-hidden border border-imaa-border bg-white">
                 <button
+                  type="button"
                   aria-label="Grid view"
+                  aria-pressed={view === 'grid'}
                   onClick={() => setView('grid')}
-                  className={`flex-1 h-full grid place-items-center
-                    ${view === 'grid' ? 'bg-[#0b0b23] text-white' : 'bg-white text-slate-800'}`}
+                  className={`flex-1 h-full grid place-items-center focus-visible:[outline-offset:-2px]
+                    ${view === 'grid' ? 'bg-imaa-navy text-white' : 'bg-white text-slate-800 hover:bg-imaa-member'}`}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <rect x="3" y="3" width="8" height="8" rx="1" />
                     <rect x="13" y="3" width="8" height="8" rx="1" />
                     <rect x="3" y="13" width="8" height="8" rx="1" />
@@ -3664,12 +3672,14 @@ export default function EventsPage() {
                 </button>
 
                 <button
+                  type="button"
                   aria-label="List view"
+                  aria-pressed={view === 'list'}
                   onClick={() => setView('list')}
-                  className={`flex-1 h-full grid place-items-center border-l border-slate-200
-                    ${view === 'list' ? 'bg-[#0b0b23] text-white' : 'bg-white text-slate-800'}`}
+                  className={`flex-1 h-full grid place-items-center border-l border-imaa-border focus-visible:[outline-offset:-2px]
+                    ${view === 'list' ? 'bg-imaa-navy text-white' : 'bg-white text-slate-800 hover:bg-imaa-member'}`}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
@@ -3699,7 +3709,7 @@ export default function EventsPage() {
               }}
             >
               <div className="sticky top-24 h-fit">
-                <div className="rounded-2xl bg-[#0d2046] text-white p-6">
+                <div className="rounded-2xl bg-imaa-navy text-white p-6">
                   <div className="flex items-center gap-2 mb-6">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                       <path
@@ -3978,7 +3988,7 @@ export default function EventsPage() {
             sx={{ flex: 1, minWidth: 0 }}
           >
             {/* Tab Navigation */}
-            <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
+            <Paper elevation={0} className="rounded-2xl border border-imaa-border mb-4">
               <Tabs
                 value={selectedTab === "upcoming" ? 0 : 1}
                 onChange={(_, value) => {
@@ -3990,8 +4000,9 @@ export default function EventsPage() {
                 sx={{
                   px: 1,
                   "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
-                  "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
-                  "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+                  // Selected label in ink (teal text was below AA contrast); teal indicator bar
+                  "& .Mui-selected": { color: "var(--imaa-ink) !important", fontWeight: 700 },
+                  "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal)" },
                 }}
               >
                 <Tab label="Upcoming Events" />
@@ -4001,7 +4012,7 @@ export default function EventsPage() {
 
             <div className="w-full">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-3xl font-bold">
+                <h2 className="font-serif text-2xl sm:text-3xl font-bold text-imaa-ink">
                   {selectedTab === "replays" ? "Available Replays" : "Upcoming Events"}
                 </h2>
                 {selectedTab === "upcoming" && (
@@ -4016,7 +4027,7 @@ export default function EventsPage() {
                   </Tooltip>
                 )}
               </div>
-              <p className="text-neutral-600 mt-1">
+              <p className="text-imaa-body text-sm mt-1">
                 {selectedTab === "replays" ? (
                   replayLoading ? (
                     <Skeleton variant="text" width={140} sx={{ display: "inline-block" }} />
@@ -4034,7 +4045,7 @@ export default function EventsPage() {
                 )}
               </p>
               {selectedTab === "upcoming" && error && (
-                <p className="mt-2 text-red-600 text-sm">
+                <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   Failed to load events: {error}
                 </p>
               )}
@@ -4100,9 +4111,9 @@ export default function EventsPage() {
                       return (
                         <div
                           key={`series-${series.id}`}
-                          className="group h-full w-full flex flex-col rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
-                                     transition-all duration-300 hover:shadow-xl hover:-translate-y-2.5
-                                     hover:ring-1 hover:ring-teal-200 overflow-hidden"
+                          className="group h-full w-full flex flex-col rounded-lg border border-imaa-border bg-white shadow-imaa-sm
+                                     transition-all duration-300 hover:shadow-imaa-md hover:-translate-y-1 motion-reduce:hover:translate-y-0
+                                     hover:border-imaa-border-hover overflow-hidden"
                         >
                           {/*
                             Series card image: first available image from the
@@ -4125,10 +4136,10 @@ export default function EventsPage() {
                             )}
 
                             {/* SERIES + status badges overlaid like event topic chips */}
-                            <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold shadow-sm">
+                            <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-imaa-teal-dark text-white px-3 py-1 text-xs font-semibold shadow-sm">
                               SERIES
                             </span>
-                            <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-slate-200 text-slate-900 px-3 py-1 text-xs font-semibold shadow-sm">
+                            <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-white text-imaa-ink px-3 py-1 text-xs font-semibold shadow-sm">
                               {series.status?.toUpperCase() || 'DRAFT'}
                             </span>
                           </div>
@@ -4136,7 +4147,7 @@ export default function EventsPage() {
                           {/* Content */}
                           <div className="p-4 sm:p-5 md:p-6 flex flex-col flex-grow">
                             {/* Title */}
-                            <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 mb-2 leading-snug">
+                            <h3 className="font-serif text-xl sm:text-2xl font-semibold text-imaa-ink mb-2 leading-snug">
                               {series.title}
                             </h3>
 
@@ -4258,9 +4269,9 @@ export default function EventsPage() {
 
                       return (
                         <Grid item key={`series-${series.id}`} xs={12}>
-                          <div className="group rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
-                                          transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5
-                                          hover:ring-1 hover:ring-teal-200 overflow-hidden">
+                          <div className="group rounded-lg border border-imaa-border bg-white shadow-imaa-sm
+                                          transition-all duration-300 hover:shadow-imaa-md hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
+                                          hover:border-imaa-border-hover overflow-hidden">
                             <div className="md:flex">
                               {/*
                                 Image / badges — matches the event row layout.
@@ -4282,10 +4293,10 @@ export default function EventsPage() {
                                   <div className="w-full h-44 md:h-full bg-slate-100" />
                                 )}
 
-                                <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold shadow-sm">
+                                <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-imaa-teal-dark text-white px-3 py-1 text-xs font-semibold shadow-sm">
                                   SERIES
                                 </span>
-                                <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-slate-200 text-slate-900 px-3 py-1 text-xs font-semibold shadow-sm">
+                                <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-white text-imaa-ink px-3 py-1 text-xs font-semibold shadow-sm">
                                   {series.status?.toUpperCase() || 'DRAFT'}
                                 </span>
                               </div>
@@ -4293,7 +4304,7 @@ export default function EventsPage() {
                               {/* Details */}
                               <div className="p-6 md:w-3/5 flex flex-col">
                                 <div className="min-w-0">
-                                  <h3 className="text-xl md:text-2xl font-semibold text-neutral-900 leading-snug">
+                                  <h3 className="font-serif text-xl md:text-2xl font-semibold text-imaa-ink leading-snug">
                                     {series.title}
                                   </h3>
                                   {series.description && (
@@ -4366,6 +4377,18 @@ export default function EventsPage() {
               </Grid>
             )}
 
+            {/* No-results message: shown only once loading has finished with nothing to display */}
+            {!initialLoading && !refreshing && !pinnedLoading && !error &&
+              rawEvents.length === 0 && displayedPinnedEvents.length === 0 && seriesToDisplay.size === 0 && (
+              <EmptyState
+                icon={<CalendarX size={40} strokeWidth={1.5} />}
+                title="No upcoming events found"
+                description="Try a different search, date range, topic or format."
+                titleComponent="h3"
+                sx={{ mt: 3 }}
+              />
+            )}
+
             {/* Pagination */}
             <Box
               className="mt-8 flex items-center justify-center"
@@ -4399,7 +4422,7 @@ export default function EventsPage() {
                 width: '100%',          // not 100vw (avoids overshoot)
                 maxWidth: '100%',
                 height: '100dvh',       // better on mobile than 100vh
-                bgcolor: '#0d2046',
+                bgcolor: 'var(--imaa-navy)',
                 color: 'white',
                 borderRadius: 0,
                 boxSizing: 'border-box', // include border in width
@@ -4408,7 +4431,7 @@ export default function EventsPage() {
             }}
           >
             {/* Top bar */}
-            <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-[#0d2046] border-b border-white/10 w-full">
+            <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-imaa-navy border-b border-white/10 w-full">
               <span className="text-lg font-semibold">Advanced Filters</span>
               <Button size="small" variant="outlined" onClick={() => setShowAdvanced(false)}>
                 Close
@@ -4585,7 +4608,7 @@ export default function EventsPage() {
             </div>
 
             {/* Bottom action bar (no left/right offsets) */}
-            <div className="sticky bottom-0 w-full bg-[#0d2046] border-t border-white/10 p-3 flex gap-2">
+            <div className="sticky bottom-0 w-full bg-imaa-navy border-t border-white/10 p-3 flex gap-2">
               <Button
                 fullWidth
                 variant="outlined"
@@ -4714,6 +4737,16 @@ export default function EventsPage() {
                     );
                   })}
               </Grid>
+            )}
+
+            {!replayLoading && replayEvents.length === 0 && (
+              <EmptyState
+                icon={<Video size={40} strokeWidth={1.5} />}
+                title="No replays available"
+                description="Recordings of past events will appear here once they are published."
+                titleComponent="h3"
+                sx={{ mt: 3 }}
+              />
             )}
 
             {/* Pagination for Replays */}

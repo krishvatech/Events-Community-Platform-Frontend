@@ -173,7 +173,7 @@ function statusChip(status) {
     case "live":
       return { label: "Live", className: "bg-rose-50 text-rose-700" };
     case "upcoming":
-      return { label: "Upcoming", className: "bg-teal-50 text-teal-700" };
+      return { label: "Upcoming", className: "bg-[var(--imaa-teal-light)] text-imaa-teal-dark" };
     case "past":
       return { label: "Past", className: "bg-slate-100 text-slate-700" };
     case "cancelled":
@@ -209,9 +209,9 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
   return (
     <Paper
       elevation={0}
-      className="flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+      className="flex flex-col rounded-lg border border-imaa-border overflow-hidden"
       sx={{
-        borderRadius: 2,
+        borderRadius: "var(--imaa-radius-card)",
         // Let the card grow to fill grid item height
         height: "100%",
       }}
@@ -599,8 +599,8 @@ function EventCardSkeleton() {
   return (
     <Paper
       elevation={0}
-      className="flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
-      sx={{ borderRadius: 2, height: "auto" }}
+      className="flex flex-col rounded-lg border border-imaa-border overflow-hidden"
+      sx={{ borderRadius: "var(--imaa-radius-card)", height: "auto" }}
     >
       {/* 16:9 image skeleton */}
       <Box
@@ -880,7 +880,7 @@ export default function MyEventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-imaa-member">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
@@ -888,7 +888,7 @@ export default function MyEventsPage() {
               title="My Events"
               subtitle="View, join, and manage events you’ve registered for."
             />
-            <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
+            <Paper elevation={0} className="rounded-lg border border-imaa-border mb-4">
               <Tabs
                 value={tab}
                 onChange={(_, v) => setTab(v)}
@@ -897,8 +897,9 @@ export default function MyEventsPage() {
                 sx={{
                   px: 1,
                   "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
-                  "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
-                  "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+                  // Selected label in ink (teal text was below AA contrast); teal indicator bar
+                  "& .Mui-selected": { color: "var(--imaa-ink) !important", fontWeight: 700 },
+                  "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal)" },
                 }}
               >
                 <Tab label="All" />

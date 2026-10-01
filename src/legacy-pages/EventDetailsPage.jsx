@@ -21,6 +21,7 @@ import {
   Collapse,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import { SectionHeader } from "../components/page";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
@@ -64,6 +65,17 @@ const toAbs = (u) => {
   return `${API_ORIGIN}${p}`;
 };
 const EARLY_JOIN_MINUTES = 15;
+
+// Event title (page <h1>): serif heading, matching the A3 PageHeader title scale (design tokens)
+const eventTitleSx = {
+  m: 0,
+  fontFamily: "var(--imaa-font-serif)",
+  fontWeight: 700,
+  fontSize: { xs: "1.5rem", sm: "1.75rem", md: "2rem" },
+  lineHeight: 1.2,
+  color: "var(--imaa-ink)",
+  overflowWrap: "anywhere",
+};
 
 // Get location display text, handling virtual/hybrid events
 function getEventLocation(event) {
@@ -481,7 +493,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 
 function EventDetailsSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-imaa-member">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
@@ -493,7 +505,7 @@ function EventDetailsSkeleton() {
                 <Skeleton variant="text" width={220} />
               </Breadcrumbs>
               {/* EVENT CARD skeleton */}
-              <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
+              <Paper elevation={0} className="rounded-lg border border-imaa-border overflow-hidden">
                 <Skeleton
                   variant="rectangular"
                   sx={{ width: "100%", height: { xs: 160, sm: 200, md: 240 } }}
@@ -517,7 +529,7 @@ function EventDetailsSkeleton() {
               </Paper>
 
               {/* ATTEND CARD skeleton */}
-              <Paper elevation={0} className="rounded-2xl border border-slate-200">
+              <Paper elevation={0} className="rounded-lg border border-imaa-border">
                 <Box className="p-5">
                   <Skeleton height={28} width={120} />
                   <div className="mt-3 flex flex-col gap-2">
@@ -1572,9 +1584,9 @@ export default function EventDetailsPage() {
   }
   if (notFound) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-imaa-member">
         <Container maxWidth="xl" className="py-6 sm:py-8">
-          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-8">
+          <Paper elevation={0} className="rounded-lg border border-imaa-border p-8">
             <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>
               404
             </Typography>
@@ -1722,7 +1734,7 @@ export default function EventDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-imaa-member">
       {event && (
         <Helmet>
           <title>{event.title}</title>
@@ -1790,7 +1802,7 @@ export default function EventDetailsPage() {
               {((!showSpeedNetworkingTab && !showSessionsTab && !showQaTab) || activeTab === 0) && (
                 <Box>
                   {/* EVENT HEADER CARD - NEW LAYOUT */}
-                  <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
+                  <Paper elevation={0} className="rounded-lg border border-imaa-border overflow-hidden mb-6">
                     {/* Top section: Image + Details in a grid */}
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 }, alignItems: 'start' }}>
                       {/* LEFT: Event Image */}
@@ -2160,14 +2172,13 @@ export default function EventDetailsPage() {
                     <Box sx={{ borderTop: '1px solid', borderColor: 'divider', p: { xs: 2.5, sm: 3, md: 4 }, pt: { xs: 2.5, sm: 3, md: 3 } }}>
                       <Stack spacing={2}>
                         {event?.title ? (
-                          <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
+                          // Page title: a plain heading element, since index.css forces the sans font on MUI Typography
+                          <Box component="h1" sx={eventTitleSx}>
                             {event.title}
-                          </Typography>
+                          </Box>
                         ) : null}
                         <Box>
-                          <Typography variant="h6" fontWeight={800} sx={{ mb: 1 }}>
-                            About this event
-                          </Typography>
+                          <SectionHeader title="About this event" sx={{ mb: 1 }} />
                           {desc?.trim() ? (
                             <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
                               {desc}
@@ -2183,9 +2194,9 @@ export default function EventDetailsPage() {
                   </Paper>
 
                   {/* ATTEND CARD */}
-                  <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                  <Paper elevation={0} className="rounded-lg border border-imaa-border">
                     <Box className="p-5">
-                      <Typography variant="h6" className="font-extrabold">Attend</Typography>
+                      <SectionHeader title="Attend" sx={{ mb: 0 }} />
                       <Typography
                         variant="h5"
                         className={`font-bold mt-1 mb-2 ${paymentPending ? "text-amber-600" : "text-teal-600"}`}
@@ -2793,11 +2804,9 @@ export default function EventDetailsPage() {
 
               {/* TAB CONTENT: SESSIONS */}
               {showSessionsTab && activeTab === 1 && (
-                <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                <Paper elevation={0} className="rounded-lg border border-imaa-border">
                   <Box sx={{ p: 3 }}>
-                    <Typography variant="h6" fontWeight={800} sx={{ mb: 3 }}>
-                      Event Sessions ({normalizedSessions.length})
-                    </Typography>
+                    <SectionHeader title={`Event Sessions (${normalizedSessions.length})`} sx={{ mb: 3 }} />
                     <Stack spacing={2}>
                       {(() => {
                         // Group sessions by date
@@ -2948,17 +2957,16 @@ export default function EventDetailsPage() {
 
               {/* TAB CONTENT: Q&A */}
               {showQaTab && activeTab === (showSessionsTab ? 2 : 1) && (
-                <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                <Paper elevation={0} className="rounded-lg border border-imaa-border">
                   <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
                     {/* Header with Sort Option */}
                     <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="h6" fontWeight={800} sx={{ mb: 0.5 }}>
-                          Questions & Answers
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Answers to questions asked during this event.
-                        </Typography>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <SectionHeader
+                          title="Questions & Answers"
+                          description="Answers to questions asked during this event."
+                          sx={{ mb: 0 }}
+                        />
                       </Box>
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
                         <Typography variant="caption" sx={{ color: '#6b7280', whiteSpace: 'nowrap' }}>
@@ -3313,7 +3321,7 @@ export default function EventDetailsPage() {
 
               {/* TAB CONTENT: SPEED NETWORKING */}
               {showSpeedNetworkingTab && activeTab === (showSessionsTab && showQaTab ? 3 : (showSessionsTab || showQaTab ? 2 : 1)) && (
-                <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                <Paper elevation={0} className="rounded-lg border border-imaa-border">
                   <Box className="p-5">
                     <SpeedNetworkingMatchHistory eventId={event.id} sessionId={speedNetworkingSessionId} />
                   </Box>
