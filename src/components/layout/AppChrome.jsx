@@ -167,6 +167,7 @@ const AppChrome = ({ children }) => {
           {isMobile && (
             <Box sx={{ position: "fixed", top: 12, left: 12, zIndex: 1200 }}>
               <IconButton
+                aria-label="Open navigation menu"
                 onClick={() => setMobileOpen(true)}
                 sx={{ bgcolor: "white", boxShadow: 1, "&:hover": { bgcolor: "#f9fafb" } }}
               >
@@ -177,7 +178,17 @@ const AppChrome = ({ children }) => {
         </>
       )}
 
-      {!isCompanionPage && !isImaaStandalonePublicPage && !isSsoRedirectPage && <KYCNotification />}
+      {/* On desktop the KYC notice sits in the content column, beside the fixed sidebar instead of under it */}
+      {!isCompanionPage && !isImaaStandalonePublicPage && !isSsoRedirectPage && (
+        <Box
+          sx={{
+            width: showSidebar && !isMobile ? "calc(100% - 280px)" : "100%",
+            ml: showSidebar && !isMobile ? "280px" : 0,
+          }}
+        >
+          <KYCNotification />
+        </Box>
+      )}
 
       {/* Main Content Wrapper */}
       <Box
@@ -187,6 +198,8 @@ const AppChrome = ({ children }) => {
           width: showSidebar && !isMobile ? "calc(100% - 280px)" : "100%",
           ml: showSidebar && !isMobile ? "280px" : 0,
           pt: isMobile && showSidebar ? 6 : 0, // spacing for mobile hamburger?
+          // Member-area background (design token). Pages that paint their own background keep it.
+          bgcolor: showSidebar ? "var(--imaa-bg-member)" : undefined,
         }}
       >
         {children}

@@ -64,11 +64,16 @@ import { apiClient, createWagtailSession, createOpenApiDocsSession, getSaleorDas
 import { logoutBrowserSession } from "../utils/logoutSession";
 import { getAccessToken } from "../utils/tokenStore";
 
-const ORANGE = "#E8532F";
-const TEXT = "#2C3E5A";
-const HOVER_BG = "rgba(232,83,47,0.07)";
-const CARD_BG = "#ffffff";
-const CARD_BORDER = "#F0EEEB";
+// Member-shell sidebar styling, from the IMAA design tokens (src/styles/brand.css).
+// Mockup reference: connect-sidebar-full-nav.html (light sidebar, white selected row, teal indicator).
+const SIDEBAR_BG = "var(--imaa-bg-member)"; // #F7F8FA member-area grey
+const SURFACE = "#ffffff"; // selected row, search field, user strip
+const CARD_BORDER = "var(--imaa-border)"; // #E2E4E8
+const TEXT = "#2C3E5A"; // default item text (unchanged)
+const TEXT_ACTIVE = "var(--imaa-ink)"; // #1B2A4A navy, selected/hover text
+const TEXT_MUTED = "var(--imaa-ink-body)"; // #5A6070: section labels, icons, back link (AA on the grey)
+const ACCENT = "var(--imaa-teal)"; // selected-row indicator bar
+const HOVER_BG = "rgba(27, 42, 74, 0.05)"; // navy-tinted hover (was a coral tint)
 
 // --- Helpers for badges ---
 const BADGE_CACHE_TTL_MS = 60_000;
@@ -490,7 +495,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         return (
         <Box sx={{ mb: 2 }}>
             {title && (
-                <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: "block", color: "#C0BAB4", fontWeight: 800, fontSize: 10, letterSpacing: "0.1em" }}>
+                <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: "block", color: TEXT_MUTED, fontWeight: 700, fontSize: 10, letterSpacing: "0.12em" }}>
                     {title}
                 </Typography>
             )}
@@ -549,6 +554,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                             key={idx}
                             ref={selected ? activeItemRef : null}
                             selected={selected}
+                            aria-current={selected ? "page" : undefined}
                             onClick={() => {
                                 if (item.action) handleAction(item.action);
                                 else {
@@ -557,18 +563,29 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                 }
                             }}
                             sx={{
-                                borderRadius: 2,
+                                position: "relative",
+                                borderRadius: "var(--imaa-radius-card)",
                                 px: 1.5,
                                 mx: 1,
                                 mb: 0.5,
-                                color: selected ? ORANGE : TEXT,
-                                bgcolor: selected ? HOVER_BG : "transparent",
-                                "&:hover": { bgcolor: HOVER_BG },
-                                "&.Mui-selected": { bgcolor: HOVER_BG },
-                                "&.Mui-selected:hover": { bgcolor: HOVER_BG },
+                                color: selected ? TEXT_ACTIVE : TEXT,
+                                bgcolor: "transparent",
+                                "&:hover": { bgcolor: HOVER_BG, color: TEXT_ACTIVE },
+                                // Selected: white row + teal bar + bold label, so it isn't shown by colour alone
+                                "&.Mui-selected, &.Mui-selected:hover": { bgcolor: SURFACE, boxShadow: "var(--imaa-shadow-sm)" },
+                                "&.Mui-selected::before": {
+                                    content: '""',
+                                    position: "absolute",
+                                    left: 0,
+                                    top: 8,
+                                    bottom: 8,
+                                    width: 3,
+                                    borderRadius: 3,
+                                    backgroundColor: ACCENT,
+                                },
                             }}
                         >
-                            <ListItemIcon sx={{ minWidth: 36, color: selected ? ORANGE : "#6b7280" }}>
+                            <ListItemIcon sx={{ minWidth: 36, color: selected ? TEXT_ACTIVE : TEXT_MUTED }}>
                                 {item.badge ? (
                                     <Badge color="error" badgeContent={item.badge === "notifications" ? notifCount : messageCount} invisible={!(item.badge === "notifications" ? notifCount : messageCount)}>
                                         <item.icon fontSize="small" />
@@ -705,7 +722,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const showCart = cartCount > 0 && !isSuperUser; // Owners typically don't shop
 
     const SidebarContent = (
-        <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "#ffffff", borderRight: `1px solid ${CARD_BORDER}` }}>
+        <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: SIDEBAR_BG, borderRight: `1px solid ${CARD_BORDER}` }}>
             {/* Brand area */}
             <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", gap: 1.5, borderBottom: `1px solid ${CARD_BORDER}` }}>
                 <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#1B2A4A", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -747,7 +764,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     position: "sticky",
                     top: 0,
                     zIndex: 10,
-                    bgcolor: "#ffffff",
+                    bgcolor: SIDEBAR_BG,
                     p: 1.5,
                     mb: 1,
                     borderBottom: `1px solid ${CARD_BORDER}`
@@ -756,11 +773,18 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                         display: "flex",
                         alignItems: "center",
                         gap: 0.5,
-                        bgcolor: "rgba(0, 0, 0, 0.04)",
-                        borderRadius: 1.5,
+                        bgcolor: SURFACE,
+                        border: `1px solid ${CARD_BORDER}`,
+                        borderRadius: "var(--imaa-radius-field)",
                         px: 1.5,
-                        py: 0.75,
-                        justifyContent: "space-between"
+                        py: "5px", // 6px minus the 1px border, so the field height is unchanged
+                        justifyContent: "space-between",
+                        // The input hides its own outline (inline style below), so keyboard focus
+                        // is shown on the whole field instead. Outlines don't affect layout.
+                        "&:focus-within": {
+                            outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)",
+                            outlineOffset: "1px",
+                        },
                     }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flex: 1, minWidth: 0 }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -788,7 +812,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                 }}
                             />
                         </Box>
-                        <Box sx={{ fontSize: "12px", color: "#666", fontWeight: 600, whiteSpace: "nowrap", ml: 1 }}>
+                        <Box sx={{ fontSize: "12px", color: TEXT_MUTED, fontWeight: 600, whiteSpace: "nowrap", ml: 1 }}>
                             {searchQuery && filteredCount > 0
                                 ? `${currentSearchIndex + 1} / ${filteredCount}`
                                 : `${allItems.length}`
@@ -811,7 +835,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     justifyContent: "center",
                     py: 1.5,
                     px: 1.5,
-                    bgcolor: "#ffffff",
+                    bgcolor: SIDEBAR_BG,
                     borderTop: `1px solid ${CARD_BORDER}`,
                     opacity: showMoreIndicator ? 1 : 0,
                     pointerEvents: showMoreIndicator ? "auto" : "none",
@@ -833,13 +857,13 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                             textTransform: "none",
                             fontSize: "13px",
                             fontWeight: 500,
-                            color: ORANGE,
-                            bgcolor: HOVER_BG,
+                            color: TEXT_ACTIVE,
+                            bgcolor: SURFACE,
                             padding: "8px 16px",
-                            border: `1px solid ${ORANGE}20`,
+                            border: `1px solid ${CARD_BORDER}`,
                             "&:hover": {
-                                bgcolor: "rgba(232,83,47,0.12)",
-                                borderColor: `${ORANGE}40`
+                                bgcolor: SURFACE,
+                                borderColor: TEXT_ACTIVE
                             },
                             transition: "all 0.2s"
                         }}
@@ -865,8 +889,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     href="https://imaa-institute.org"
                     target="_blank"
                     rel="noopener noreferrer"
-                    sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.5, py: 0.75, color: "#C0BAB4", fontSize: 11.5, textDecoration: "none", fontWeight: 500,
-                        "&:hover": { color: ORANGE } }}
+                    sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.5, py: 0.75, color: TEXT_MUTED, fontSize: 11.5, textDecoration: "none", fontWeight: 500,
+                        "&:hover": { color: TEXT_ACTIVE, textDecoration: "underline" } }}
                 >
                     <OpenInNewIcon sx={{ fontSize: 13 }} />
                     Back to imaa-institute.org
@@ -875,7 +899,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
 
             <Divider />
 
-            <Box sx={{ p: 2, pb: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+            <Box sx={{ p: 2, pb: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, bgcolor: SURFACE }}>
                 {/* Profile Section */}
                 <Box
                     onClick={() => navigate('/account/profile')}
@@ -889,7 +913,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                         p: 0.5,
                         borderRadius: 2,
                         transition: "background-color 0.2s",
-                        "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" }
+                        "&:hover": { bgcolor: HOVER_BG }
                     }}
                 >
                     {user && (
