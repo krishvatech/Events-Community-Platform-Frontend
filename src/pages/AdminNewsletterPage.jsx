@@ -384,41 +384,6 @@ function ScheduleDialog({ open, loading, error, initialValue, onClose, onSchedul
   );
 }
 
-function Dashboard({ campaigns, loading, error, onRefresh }) {
-  const sentCampaigns = campaigns.filter((campaign) => campaign.status === "sent");
-  const lastSent = sentCampaigns
-    .slice()
-    .sort((a, b) => new Date(b.sent_at || 0) - new Date(a.sent_at || 0))[0];
-
-  return (
-    <Stack spacing={3}>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Marketing Dashboard</Typography>
-          <Typography color="text.secondary">Live summary will expand as newsletter reporting APIs are added.</Typography>
-        </Box>
-        <Button startIcon={<RefreshRoundedIcon />} onClick={onRefresh} disabled={loading} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
-          Refresh
-        </Button>
-      </Stack>
-      {error && <Alert severity="error">{error}</Alert>}
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Total Contacts" value="No data available" loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Active Subscribers" value="No data available" loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Total Campaigns" value={formatNumber(campaigns.length)} loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Last Sent Campaign" value={lastSent?.name || "No data available"} loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Open Rate" value="No data available" loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Click Rate" value="No data available" loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Unsubscribe Count" value="No data available" loading={loading} /></Grid>
-      </Grid>
-      <EmptyState
-        title="Coming Soon"
-        description="Contact totals and account-wide engagement metrics need a dashboard summary API before they can be displayed here."
-      />
-    </Stack>
-  );
-}
-
 // A Draft, Scheduled or Cancelled broadcast has no sends: "—", with no request.
 function BroadcastRateCell({ status, analytics, rateKey }) {
   if (!broadcastHasSendData(status)) return "—";
@@ -1226,7 +1191,6 @@ export default function AdminNewsletterPage() {
           <AdminNewsletterMauticCampaignBuilderPage />
         ) : (
           <>
-            {activeTab === "dashboard" && <Dashboard campaigns={campaigns} loading={loading} error={error} onRefresh={loadCampaigns} />}
             {activeTab === "campaigns" && <AdminNewsletterMauticCampaignsPanel />}
             {activeTab === "broadcasts" && (
               <CampaignList
