@@ -427,9 +427,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
 
       <Alert severity="info" variant="outlined">
         Mautic is the source of truth for this Campaign screen. The old ECP newsletter
-        broadcast Campaign model is not used here. Native Campaign creation, Segment/Form
-        source editing, and workflow building will be enabled in the next Campaign Builder
-        phases.
+        broadcast Campaign model is not used here.
       </Alert>
 
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF" }}>

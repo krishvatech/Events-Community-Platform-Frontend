@@ -51,12 +51,22 @@ import {
   isProviderMetadataHydrated,
   isProviderMetadataUnavailable,
 } from "./mauticCampaignEventHydration";
+import { buildEventsPayload } from "./mauticCampaignSavePayload";
 import {
-  buildEventsPayload,
-  buildFlatExecutionEvents,
-  executionEventId,
-  isEcpCanvasNode,
-} from "./mauticCampaignSavePayload";
+  DELAY_UNIT_OPTIONS,
+  EVENT_NODE_TYPES,
+  buildCanvasGraph,
+  canvasEdgeId,
+  canvasNodeDescription,
+  canvasNodeTypeLabel,
+  hydrateCanvasFromEvents,
+  isBranchingNodeType,
+  mapCanvasToExecution,
+  mergeReportedNodes,
+  timingLabel,
+  toCanvasEdge,
+  toMauticCanvas,
+} from "./mauticCampaignGraph";
 import { isRemoteChoiceField } from "./mauticCampaignChoices";
 import {
   getEventPropertyFields,
@@ -154,243 +164,6 @@ const statusChipColor = (status) =>
 
 const statusChipVariant = (status) =>
   status?.complete && !status?.color ? "filled" : "outlined";
-
-const hasValidPosition = (node) =>
-  Boolean(node?.position) &&
-  Number.isFinite(node.position.x) &&
-  Number.isFinite(node.position.y);
-
-// Trigger nodes first, then whatever each one flows into, then any orphans.
-const orderCanvasNodes = (nodes, edges) => {
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const outgoing = new Map();
-  for (const edge of edges || []) {
-    if (!outgoing.has(edge.source)) outgoing.set(edge.source, []);
-    outgoing.get(edge.source).push(edge.target);
-  }
-
-  const ordered = [];
-  const seen = new Set();
-  const visit = (nodeId) => {
-    if (seen.has(nodeId) || !byId.has(nodeId)) return;
-    seen.add(nodeId);
-    ordered.push(byId.get(nodeId));
-    (outgoing.get(nodeId) || []).forEach(visit);
-  };
-
-  nodes.filter((node) => node.nodeType === "trigger").forEach((node) => visit(node.id));
-  nodes.forEach((node) => visit(node.id));
-  return ordered;
-};
-
-const applyWorkflowLayout = (nodes, edges) =>
-  orderCanvasNodes(nodes, edges).map((node, index) => ({
-    ...node,
-    position: hasValidPosition(node)
-      ? node.position
-      : { x: 60 + index * 260, y: 120 },
-  }));
-
-const canvasNodeTypeLabel = (nodeType) =>
-  ({ trigger: "Trigger", action: "Action", condition: "Condition", delay: "Delay" }[
-    nodeType
-  ] || "Node");
-
-const canvasEdgeId = (source, target) => `edge-${source}-${target}`;
-
-const canvasNodeDescription = (node) => {
-  const typeLabel = canvasNodeTypeLabel(node?.nodeType);
-  return node?.eventId && node?.label ? `${typeLabel} "${node.label}"` : `${typeLabel} node`;
-};
-
-// Chain nodes in workflow order so a saved canvas without edges still runs.
-const buildSequentialEdges = (orderedNodes) =>
-  orderedNodes.slice(1).map((node, index) => {
-    const source = orderedNodes[index].id;
-    return { id: canvasEdgeId(source, node.id), source, target: node.id };
-  });
-
-// Mautic models a campaign as events linked by `parent`. Trigger and delay
-// nodes are canvas-only concepts: the trigger is the workflow start and a delay
-// becomes the trigger timing of the event that follows it.
-const EVENT_NODE_TYPES = new Set(["action", "condition", "decision"]);
-
-const DELAY_UNIT_OPTIONS = [
-  { value: "i", label: "Minutes" },
-  { value: "h", label: "Hours" },
-  { value: "d", label: "Days" },
-  { value: "m", label: "Months" },
-];
-
-const readDelay = (node) => {
-  const interval = Number(node?.delay?.interval);
-  if (!Number.isFinite(interval) || interval <= 0) return null;
-  const unit = node?.delay?.unit;
-  return {
-    interval,
-    unit: DELAY_UNIT_OPTIONS.some((option) => option.value === unit) ? unit : "d",
-  };
-};
-
-const buildCanvasGraph = (canvasNodes, canvasEdges) => {
-  const byId = new Map((canvasNodes || []).map((node) => [node.id, node]));
-  const outgoing = new Map();
-  const incoming = new Map();
-
-  for (const edge of canvasEdges || []) {
-    if (!byId.has(edge?.source) || !byId.has(edge?.target)) continue;
-    if (!outgoing.has(edge.source)) outgoing.set(edge.source, []);
-    outgoing.get(edge.source).push(edge.target);
-    if (!incoming.has(edge.target)) incoming.set(edge.target, []);
-    incoming.get(edge.target).push(edge.source);
-  }
-
-  return { byId, outgoing, incoming };
-};
-
-const mapCanvasToExecution = (canvasNodes, canvasEdges, form) => {
-  const nodes = canvasNodes || [];
-  if (!nodes.length) {
-    return {
-      events: buildFlatExecutionEvents(form.events || []),
-      errors: [],
-      nodeMap: new Map(),
-      reachable: new Set(),
-    };
-  }
-
-  const errors = [];
-  const { byId, outgoing } = buildCanvasGraph(nodes, canvasEdges);
-  const triggerNodes = nodes.filter((node) => node.nodeType === "trigger");
-  if (!triggerNodes.length) {
-    errors.push("Workflow must start with a Trigger node.");
-  }
-
-  const executionEvents = [];
-  const nodeMap = new Map();
-  const reachable = new Set();
-  let sequence = 0;
-
-  // Walk forward from the trigger so each event learns its parent event, and a
-  // delay in between is folded into the next event instead of becoming one.
-  const queue = triggerNodes.map((node) => ({
-    nodeId: node.id,
-    parentEventId: null,
-    delay: null,
-  }));
-
-  while (queue.length) {
-    const { nodeId, parentEventId, delay } = queue.shift();
-    if (reachable.has(nodeId)) continue;
-    reachable.add(nodeId);
-
-    const node = byId.get(nodeId);
-    if (!node) continue;
-
-    let nextParentEventId = parentEventId;
-    let nextDelay = delay;
-
-    if (node.nodeType === "delay") {
-      nextDelay = readDelay(node);
-      if (!nextDelay) {
-        errors.push(
-          `${canvasNodeDescription(node)} needs a delay interval before it can be saved.`
-        );
-      }
-      if (!(outgoing.get(nodeId) || []).length) {
-        errors.push(
-          `${canvasNodeDescription(node)} has nothing after it — a delay must lead to an action.`
-        );
-      }
-    } else if (EVENT_NODE_TYPES.has(node.nodeType)) {
-      const event = form.events?.find((candidate) => candidate.id === node.eventId);
-      if (!event) {
-        errors.push(
-          `${canvasNodeDescription(node)} has no linked event. Link one or remove the node.`
-        );
-      } else {
-        sequence += 1;
-        // Persisted events keep their provider ID so Mautic updates them in
-        // place instead of creating a duplicate alongside the original.
-        const executionId = executionEventId(event, sequence);
-        const executionEvent = {
-          id: executionId,
-          name: getEventLabel(event.metadata),
-          key: event.key,
-          eventType: event.eventType,
-          properties: isPlainObject(event.properties) ? event.properties : {},
-          order: sequence,
-          parent: parentEventId,
-        };
-
-        if (delay) {
-          executionEvent.triggerMode = "interval";
-          executionEvent.triggerInterval = delay.interval;
-          executionEvent.triggerIntervalUnit = delay.unit;
-        } else {
-          executionEvent.triggerMode = "immediate";
-        }
-
-        executionEvents.push(executionEvent);
-        nodeMap.set(node.id, { executionId, event, nodeType: node.nodeType });
-        nextParentEventId = executionId;
-        nextDelay = null;
-      }
-    }
-
-    for (const targetId of outgoing.get(nodeId) || []) {
-      queue.push({
-        nodeId: targetId,
-        parentEventId: nextParentEventId,
-        delay: nextDelay,
-      });
-    }
-  }
-
-  for (const node of nodes) {
-    if (node.nodeType !== "trigger" && !reachable.has(node.id)) {
-      errors.push(`${canvasNodeDescription(node)} is not connected to the trigger.`);
-    }
-  }
-
-  // Every workflow event must be represented by a node, or Mautic receives an
-  // event with no place in the graph and rejects the campaign as orphaned.
-  const linkedEventIds = new Set(
-    nodes
-      .filter((node) => node.eventId && EVENT_NODE_TYPES.has(node.nodeType))
-      .map((node) => node.eventId)
-  );
-  for (const event of form.events || []) {
-    if (!linkedEventIds.has(event.id)) {
-      errors.push(
-        `Event "${getEventLabel(event.metadata)}" is not on the canvas. Link it to a node or remove it.`
-      );
-    }
-  }
-
-  if (!executionEvents.length && !errors.length) {
-    errors.push(
-      "Workflow has no runnable step. Add an action after the trigger and link it to an event."
-    );
-  }
-
-  return { events: executionEvents, errors, nodeMap, reachable };
-};
-
-// The provider reads `connections`, not `edges`; our own keys ride along so the
-// canvas round-trips exactly on reload.
-const toCanvasSettingsPayload = (canvasSettings) => ({
-  nodes: (canvasSettings?.nodes || []).map((node) => ({
-    ...node,
-    positionX: String(Math.round(node.position?.x ?? 0)),
-    positionY: String(Math.round(node.position?.y ?? 0)),
-  })),
-  connections: (canvasSettings?.edges || []).map((edge) => ({
-    ...edge,
-    sourceId: edge.source,
-    targetId: edge.target,
-  })),
-});
 
 const validateExecutionMapping = (canvasNodes, canvasEdges, form) => {
   const { errors } = mapCanvasToExecution(canvasNodes, canvasEdges, form);
@@ -877,6 +650,9 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   const [canvasNodes, setCanvasNodes] = useState([]);
   const [selectedCanvasNodeId, setSelectedCanvasNodeId] = useState("");
   const [builderTab, setBuilderTab] = useState("edit");
+  // Structures of the loaded Mautic workflow the builder cannot represent
+  // faithfully. While any exist, Save and Publish are refused.
+  const [graphBlockers, setGraphBlockers] = useState([]);
 
   const capabilityIndex = useMemo(
     () => buildCapabilityIndex(capabilities),
@@ -954,43 +730,22 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
 
     const campaign = await getNativeMauticCampaignBuilder(campaignId);
 
-    // The saved canvas holds two graphs: this builder's nodes and the
-    // provider-native event graph Mautic needs (keyed by event ID, no nodeType).
-    // Only the builder's own nodes belong on the canvas.
-    const rawCanvasNodes = (campaign?.canvasSettings?.nodes || [])
-      .filter((node) => node && node.id && isEcpCanvasNode(node))
-      .map((node) => ({
-        ...node,
-        nodeType: node.nodeType || node.type,
-        position: hasValidPosition(node)
-          ? node.position
-          : {
-              x: Number(node.positionX),
-              y: Number(node.positionY),
-            },
-      }));
-    const canvasNodeIds = new Set(rawCanvasNodes.map((node) => node.id));
-    const savedEdges = [
-      ...(campaign?.canvasSettings?.connections || []),
-      ...(campaign?.canvasSettings?.edges || []),
-    ]
-      .map((edge) => ({
-        ...edge,
-        source: edge?.source || edge?.sourceId,
-        target: edge?.target || edge?.targetId,
-      }))
-      .filter(
-        (edge, index, all) =>
-          edge.source &&
-          edge.target &&
-          canvasNodeIds.has(edge.source) &&
-          canvasNodeIds.has(edge.target) &&
-          all.findIndex((o) => o.source === edge.source && o.target === edge.target) === index
-      );
-    const validatedCanvasNodes = applyWorkflowLayout(rawCanvasNodes, savedEdges);
-    const validatedCanvasEdges = savedEdges.length
-      ? savedEdges
-      : buildSequentialEdges(validatedCanvasNodes);
+    // Only provider-owned state is persisted; labels and form schema come from
+    // the live capability definition, joined here by provider event key.
+    const events = hydrateWorkflowEvents(
+      (campaign?.events || []).map((event) => ({
+        id: String(event.id || workflowEventId()),
+        key: event.key,
+        eventType: event.eventType,
+        metadata: event.metadata,
+        properties: isPlainObject(event.properties) ? event.properties : {},
+      })),
+      capabilityIndexRef.current
+    );
+
+    // The workflow shown is the one Mautic runs: rebuilt from each event's
+    // parent and YES/NO path. The saved canvas only lends node positions.
+    const graph = hydrateCanvasFromEvents(events, campaign?.canvasSettings || {});
 
     setForm({
       name: campaign?.name || "",
@@ -998,24 +753,15 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       isPublished: Boolean(campaign?.isPublished),
       lists: (campaign?.sources?.segments || []).map((item) => item.id).filter(Boolean),
       forms: (campaign?.sources?.forms || []).map((item) => item.id).filter(Boolean),
-      // Only provider-owned state is persisted; labels and form schema come from
-      // the live capability definition, joined here by provider event key.
-      events: hydrateWorkflowEvents(
-        (campaign?.events || []).map((event) => ({
-          id: String(event.id || workflowEventId()),
-          key: event.key,
-          eventType: event.eventType,
-          metadata: event.metadata,
-          properties: isPlainObject(event.properties) ? event.properties : {},
-        })),
-        capabilityIndexRef.current
-      ),
+      events,
       canvasSettings: {
-        nodes: validatedCanvasNodes,
-        edges: validatedCanvasEdges,
+        nodes: graph.nodes,
+        edges: graph.edges,
       },
     });
-    setCanvasNodes(validatedCanvasNodes);
+    setCanvasNodes(graph.nodes);
+    setGraphBlockers(graph.blockers);
+    setSelectedCanvasNodeId("");
   }, [campaignId]);
 
   useEffect(() => {
@@ -1037,6 +783,27 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setFormError("");
   };
 
+  // Save and Publish send the workflow through this one serializer, so a
+  // Publish can never flatten what a Save preserves.
+  const buildWorkflowSavePayload = ({ name, isPublished }) => {
+    if (graphBlockers.length) return { errors: graphBlockers };
+    const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
+    if (mapping.errors.length) return { errors: mapping.errors };
+    return {
+      payload: {
+        name,
+        description: form.description,
+        isPublished,
+        sources: {
+          segments: form.lists,
+          forms: form.forms,
+        },
+        events: buildEventsPayload(mapping.events),
+        canvasSettings: toMauticCanvas(canvasNodes, mapping.nodeMap, { lists: form.lists, forms: form.forms }),
+      },
+    };
+  };
+
   const createCampaign = async (event) => {
     event.preventDefault();
     const name = form.name.trim();
@@ -1052,32 +819,16 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       return;
     }
 
+    const built = buildWorkflowSavePayload({ name, isPublished: Boolean(form.isPublished) });
+    if (built.errors) {
+      reportWorkflowErrors(built.errors);
+      return;
+    }
+
     setSaving(true);
     setFormError("");
     try {
-      let executionEvents = buildFlatExecutionEvents(form.events);
-      if (canvasNodes.length > 0) {
-        const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
-        if (mapping.errors.length > 0) {
-          reportWorkflowErrors(mapping.errors);
-          setSaving(false);
-          return;
-        }
-        executionEvents = mapping.events;
-      }
-
-      const payload = {
-        name,
-        description: form.description,
-        isPublished: Boolean(form.isPublished),
-        sources: {
-          segments: form.lists,
-          forms: form.forms,
-        },
-        events: buildEventsPayload(executionEvents),
-        canvasSettings: toCanvasSettingsPayload(form.canvasSettings),
-      };
-
+      const payload = built.payload;
       const createdCampaign = isEditMode
         ? await updateNativeMauticCampaign(campaignId, payload)
         : await createNativeMauticCampaign(payload);
@@ -1088,7 +839,11 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           ? `Native Mautic Campaign #${createdCampaign.id} ${isEditMode ? "updated" : "created"}.`
           : `Native Mautic Campaign ${isEditMode ? "updated" : "created"}.`,
       });
-      if (!isEditMode) {
+      if (isEditMode) {
+        // Reload what Mautic now holds: new events get their real IDs, so a
+        // second save updates them instead of creating them again.
+        await loadCampaign();
+      } else {
         setForm({
           name: "",
           description: "",
@@ -1096,7 +851,10 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           lists: [],
           forms: [],
           events: [],
+          canvasSettings: { nodes: [], edges: [] },
         });
+        setCanvasNodes([]);
+        setSelectedCanvasNodeId("");
         setSelectedWorkflowEventId("");
       }
     } catch (err) {
@@ -1225,21 +983,17 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     }));
   };
 
+  // The canvas reports moved and removed nodes. Only positions and removals are
+  // taken from it: everything else a node carries (its delay, linked event and
+  // type) stays as the builder holds it.
   const handleCanvasNodesChange = (nodes) => {
-    const updatedCanvasNodes = nodes.map((n) => ({
-      id: n.id,
-      type: n.data?.nodeType,
-      nodeType: n.data?.nodeType,
-      position: n.position,
-      eventId: n.data?.eventId,
-      label: n.data?.label,
-    }));
-    setCanvasNodes(updatedCanvasNodes);
+    const merge = (current) => mergeReportedNodes(current, nodes);
+    setCanvasNodes(merge);
     setForm((current) => ({
       ...current,
       canvasSettings: {
         ...current.canvasSettings,
-        nodes: updatedCanvasNodes,
+        nodes: merge(current.canvasSettings.nodes || []),
       },
     }));
   };
@@ -1249,19 +1003,20 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       ...current,
       canvasSettings: {
         ...current.canvasSettings,
-        edges: edges.map((e) => ({
-          id: e.id,
-          source: e.source,
-          target: e.target,
-        })),
+        // The YES/NO path is part of the connection and must survive.
+        edges: edges.map(toCanvasEdge),
       },
     }));
   };
 
   const handleCanvasConnect = (connection) => {
+    const edge = toCanvasEdge(connection);
     setForm((current) => {
-      const exists = current.canvasSettings.edges.some(
-        (edge) => edge.source === connection.source && edge.target === connection.target
+      const exists = (current.canvasSettings.edges || []).some(
+        (existing) =>
+          existing.source === edge.source &&
+          existing.target === edge.target &&
+          (existing.sourceHandle || null) === edge.sourceHandle
       );
       if (exists) return current;
 
@@ -1269,14 +1024,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         ...current,
         canvasSettings: {
           ...current.canvasSettings,
-          edges: [
-            ...current.canvasSettings.edges,
-            {
-              id: canvasEdgeId(connection.source, connection.target),
-              source: connection.source,
-              target: connection.target,
-            },
-          ],
+          edges: [...(current.canvasSettings.edges || []), edge],
         },
       };
     });
@@ -1325,7 +1073,10 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       eventId: null,
       label: canvasNodeTypeLabel(nodeType),
     };
-    const previousNode = canvasNodes[canvasNodes.length - 1];
+    // A YES/NO node needs the user to choose the path, so it is never
+    // connected automatically.
+    const lastNode = canvasNodes[canvasNodes.length - 1];
+    const previousNode = lastNode && !isBranchingNodeType(lastNode.nodeType) ? lastNode : null;
 
     setCanvasNodes((current) => [...current, newNode]);
     setForm((current) => ({
@@ -1368,8 +1119,16 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     }));
   };
 
+  // A node takes the type of the event it stands for, so a Decision or
+  // Condition event always gets YES/NO outputs.
   const handleCanvasLinkEvent = (nodeId, eventId) => {
-    applyToCanvasNode(nodeId, { eventId: eventId || null });
+    const event = eventId ? findWorkflowEvent(form.events, eventId) : null;
+    applyToCanvasNode(nodeId, {
+      eventId: eventId || null,
+      ...(event && EVENT_NODE_TYPES.has(event.eventType)
+        ? { nodeType: event.eventType, type: event.eventType }
+        : {}),
+    });
   };
 
   const handleCanvasSetDelay = (nodeId, delay) => {
@@ -1442,34 +1201,17 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       return;
     }
 
+    const built = buildWorkflowSavePayload({ name: form.name, isPublished: true });
+    if (built.errors) {
+      reportWorkflowErrors(built.errors, "Cannot publish");
+      return;
+    }
+
     setSaving(true);
     setFormError("");
     try {
-      let executionEvents = buildFlatExecutionEvents(form.events);
-      if (canvasNodes.length > 0) {
-        const mapping = mapCanvasToExecution(canvasNodes, form.canvasSettings?.edges || [], form);
-        if (mapping.errors.length > 0) {
-          reportWorkflowErrors(mapping.errors, "Cannot publish");
-          setSaving(false);
-          return;
-        }
-        executionEvents = mapping.events;
-      }
-
-      const payload = {
-        name: form.name,
-        description: form.description,
-        isPublished: true,
-        sources: {
-          segments: form.lists,
-          forms: form.forms,
-        },
-        events: buildEventsPayload(executionEvents),
-        canvasSettings: toCanvasSettingsPayload(form.canvasSettings),
-      };
-
-      await updateNativeMauticCampaign(campaignId, payload);
-      setForm((current) => ({ ...current, isPublished: true }));
+      await updateNativeMauticCampaign(campaignId, built.payload);
+      await loadCampaign();
       setSnack({
         open: true,
         severity: "success",
@@ -1604,7 +1346,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   <Button
                     startIcon={form.isPublished ? <UnpublishedRoundedIcon /> : <PublishRoundedIcon />}
                     onClick={form.isPublished ? unpublishCampaign : publishCampaign}
-                    disabled={saving || isDuplicating}
+                    disabled={saving || isDuplicating || (!form.isPublished && graphBlockers.length > 0)}
                     variant="outlined"
                     sx={{ textTransform: "none" }}
                   >
@@ -1669,6 +1411,13 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
 
         <Stack spacing={2.5} component="form" onSubmit={createCampaign} sx={{ p: 2.5 }}>
           {formError && <Alert severity="error">{formError}</Alert>}
+          {graphBlockers.length > 0 && (
+            <Alert severity="error">
+              This campaign contains workflow structure that the builder cannot safely edit, so
+              Update and Publish are disabled and nothing will be saved. Unpublishing is still
+              possible. {graphBlockers.join(" ")}
+            </Alert>
+          )}
 
           {builderTab === "edit" && (
             <Stack spacing={2.5}>
@@ -2069,7 +1818,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               type="submit"
               variant="contained"
               startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />}
-              disabled={saving}
+              disabled={saving || graphBlockers.length > 0}
             >
               {isEditMode ? "Update Campaign" : "Create Campaign"}
             </Button>

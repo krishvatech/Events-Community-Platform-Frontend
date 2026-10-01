@@ -30,12 +30,15 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import TriggerIcon from "@mui/icons-material/PlayArrowRounded";
 import ActionIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import ConditionIcon from "@mui/icons-material/HelpOutlineRounded";
+import DecisionIcon from "@mui/icons-material/CallSplitRounded";
 import DelayIcon from "@mui/icons-material/TimerOutlined";
+import { isBranchingNodeType, isBranchPath, timingLabel } from "./mauticCampaignGraph";
 
 const nodeTypeColors = {
   trigger: "#3B82F6",
   action: "#10B981",
   condition: "#F59E0B",
+  decision: "#EA580C",
   delay: "#8B5CF6",
   event: "#6B7280",
 };
@@ -44,6 +47,7 @@ const nodeTypeIcons = {
   trigger: TriggerIcon,
   action: ActionIcon,
   condition: ConditionIcon,
+  decision: DecisionIcon,
   delay: DelayIcon,
 };
 
@@ -51,7 +55,22 @@ const nodeTypeLabels = {
   trigger: "Trigger",
   action: "Action",
   condition: "Condition",
+  decision: "Decision",
   delay: "Delay",
+};
+
+// The two outputs of a Condition or Decision. The handle id is the Mautic
+// decisionPath the connection stands for.
+const BRANCH_HANDLES = [
+  { id: "yes", label: "YES", color: "#16A34A", top: "35%" },
+  { id: "no", label: "NO", color: "#DC2626", top: "70%" },
+];
+
+const edgeAppearance = (edge) => {
+  const branch = BRANCH_HANDLES.find((handle) => handle.id === edge.sourceHandle);
+  return branch
+    ? { ...edge, label: branch.label, style: { stroke: branch.color }, labelStyle: { fill: branch.color, fontWeight: 700 } }
+    : edge;
 };
 
 function CanvasNode({ data, isConnectable }) {
@@ -62,6 +81,7 @@ function CanvasNode({ data, isConnectable }) {
     <Paper
       elevation={data.isSelected ? 6 : 1}
       sx={{
+        position: "relative",
         borderRadius: 1.5,
         overflow: "hidden",
         width: 200,
@@ -134,7 +154,37 @@ function CanvasNode({ data, isConnectable }) {
         )}
       </Stack>
 
-      <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
+      {data.timingLabel && (
+        <Typography variant="caption" sx={{ display: "block", px: 1, pb: 0.75, color: "#7C3AED" }}>
+          {data.timingLabel}
+        </Typography>
+      )}
+
+      {isBranchingNodeType(data.nodeType) ? (
+        <>
+          {BRANCH_HANDLES.map((handle) => (
+            <React.Fragment key={handle.id}>
+              <Handle
+                type="source"
+                id={handle.id}
+                position={Position.Right}
+                isConnectable={isConnectable}
+                style={{ top: handle.top, background: handle.color, width: 10, height: 10 }}
+              />
+              <Typography
+                variant="caption"
+                sx={{ position: "absolute", right: 8, top: handle.top, transform: "translateY(-50%)", fontWeight: 800, color: handle.color, fontSize: "0.6rem" }}
+              >
+                {handle.label}
+              </Typography>
+            </React.Fragment>
+          ))}
+          {/* Shows a saved connection with no YES/NO path; it cannot be drawn. */}
+          <Handle type="source" position={Position.Bottom} isConnectable={false} style={{ background: "#9CA3AF" }} />
+        </>
+      ) : (
+        <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
+      )}
     </Paper>
   );
 }
@@ -187,6 +237,7 @@ export default function WorkflowCanvas({
               eventName,
               eventKey: event?.key || "",
               nodeType: node.nodeType,
+              timingLabel: event ? timingLabel(event) : "",
               nodeId: node.id,
               eventId: node.eventId,
               complete: status ? status.complete : true,
@@ -203,7 +254,10 @@ export default function WorkflowCanvas({
   );
 
   const initialEdges = useMemo(
-    () => (canvasSettings?.edges || []).filter((e) => e && e.source && e.target),
+    () =>
+      (canvasSettings?.edges || [])
+        .filter((e) => e && e.source && e.target)
+        .map((e) => edgeAppearance({ ...e, sourceHandle: isBranchPath(e.sourceHandle) ? e.sourceHandle : null })),
     [canvasSettings?.edges]
   );
 
@@ -225,6 +279,8 @@ export default function WorkflowCanvas({
             node.position.y === next.position.y &&
             node.data.eventName === next.data.eventName &&
             node.data.eventKey === next.data.eventKey &&
+            node.data.nodeType === next.data.nodeType &&
+            node.data.timingLabel === next.data.timingLabel &&
             node.data.isSelected === next.data.isSelected &&
             node.data.complete === next.data.complete &&
             node.data.statusMessage === next.data.statusMessage
@@ -270,7 +326,7 @@ export default function WorkflowCanvas({
   const handleConnect = useCallback(
     (connection) => {
       if (onConnect) {
-        setEdgesState((eds) => addEdge(connection, eds));
+        setEdgesState((eds) => addEdge(edgeAppearance(connection), eds));
         onConnect(connection);
       }
     },
@@ -418,6 +474,9 @@ export default function WorkflowCanvas({
         </MenuItem>
         <MenuItem onClick={() => handleAddNode("condition")}>
           <ConditionIcon sx={{ mr: 1 }} /> Condition
+        </MenuItem>
+        <MenuItem onClick={() => handleAddNode("decision")}>
+          <DecisionIcon sx={{ mr: 1 }} /> Decision
         </MenuItem>
         <MenuItem onClick={() => handleAddNode("delay")}>
           <DelayIcon sx={{ mr: 1 }} /> Delay

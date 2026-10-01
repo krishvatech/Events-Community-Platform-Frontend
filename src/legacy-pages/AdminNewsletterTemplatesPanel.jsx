@@ -42,6 +42,7 @@ import {
   listNewsletterTemplateTokens,
   listNewsletterTemplates,
   previewNewsletterTemplate,
+  testSendNewsletterTemplate,
   updateNewsletterTemplate,
 } from "../services/newsletterService";
 
@@ -532,6 +533,62 @@ function TemplatePreviewDialog({ open, loading, template, error, onClose }) {
   );
 }
 
+// Mirrors the backend's own refusal, so the button explains itself instead of
+// offering a send that can only be rejected.
+export const templateTestSendBlocker = (template) => {
+  if (!String(template?.subject || "").trim()) return "Add a subject before sending a test email";
+  if (!String(template?.customHtml || "").trim() && !String(template?.plainText || "").trim()) {
+    return "Add HTML or plain-text content before sending a test email";
+  }
+  return "";
+};
+
+const closedTestSend = { open: false, template: null, email: "", loading: false, error: "" };
+
+function TemplateTestSendDialog({ state, onEmailChange, onClose, onSend }) {
+  const email = state.email.trim();
+  const invalid = Boolean(email) && !emailPattern.test(email);
+
+  return (
+    <Dialog open={state.open} onClose={state.loading ? undefined : onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Send Test Email</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ pt: 1 }}>
+          {state.error ? <Alert severity="error">{state.error}</Alert> : null}
+          <Typography color="text.secondary">
+            Send <strong>{state.template?.name || "this Template"}</strong> once to one
+            address. A temporary copy is sent, so this Template&apos;s own sent and read
+            counts do not change.
+          </Typography>
+          <TextField
+            label="Recipient Email"
+            type="email"
+            value={state.email}
+            onChange={(event) => onEmailChange(event.target.value)}
+            error={invalid}
+            helperText={invalid ? "Enter a valid email address." : " "}
+            disabled={state.loading}
+            autoFocus
+            fullWidth
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={state.loading}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => onSend(email)}
+          disabled={state.loading || !email || invalid}
+        >
+          {state.loading ? <CircularProgress size={20} color="inherit" /> : "Send Test"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function AdminNewsletterTemplatesPanel() {
   const [data, setData] = useState({
     count: 0,
@@ -571,6 +628,10 @@ export default function AdminNewsletterTemplatesPanel() {
     categories: [],
     themes: [],
   });
+  const [testSend, setTestSend] = useState(closedTestSend);
+  // Guards the request itself: state updates are async, so a fast second
+  // click could otherwise start a second send before `loading` re-renders.
+  const testSendInFlight = useRef(false);
   const [snack, setSnack] = useState({
     open: false,
     severity: "success",
@@ -794,6 +855,37 @@ export default function AdminNewsletterTemplatesPanel() {
         template: null,
         error: getErrorMessage(err, "Template preview is unavailable."),
       });
+    }
+  };
+
+  const openTestSend = (template) => {
+    setTestSend({ ...closedTestSend, open: true, template });
+  };
+
+  const sendTestEmail = async (email) => {
+    const templateId = testSend.template?.id;
+    if (!templateId || testSendInFlight.current) return;
+
+    testSendInFlight.current = true;
+    setTestSend((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const result = await testSendNewsletterTemplate(templateId, email);
+      setTestSend(closedTestSend);
+      setSnack({
+        open: true,
+        severity: "success",
+        message: `Test email sent to ${result?.recipient_email || email}.`,
+      });
+    } catch (err) {
+      setTestSend((current) => ({
+        ...current,
+        loading: false,
+        error: err?.response
+          ? getErrorMessage(err, "We could not send this test email.")
+          : "We could not reach the server. Check your connection and try again.",
+      }));
+    } finally {
+      testSendInFlight.current = false;
     }
   };
 
@@ -1064,9 +1156,13 @@ export default function AdminNewsletterTemplatesPanel() {
                         <ContentCopyRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Test send requires a verified Mautic test-send bridge">
+                    <Tooltip title={templateTestSendBlocker(template) || "Send test email"}>
                       <span>
-                        <IconButton disabled>
+                        <IconButton
+                          aria-label="Send test email"
+                          disabled={Boolean(templateTestSendBlocker(template))}
+                          onClick={() => openTestSend(template)}
+                        >
                           <EmailRoundedIcon fontSize="small" />
                         </IconButton>
                       </span>
@@ -1215,6 +1311,13 @@ export default function AdminNewsletterTemplatesPanel() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <TemplateTestSendDialog
+        state={testSend}
+        onEmailChange={(email) => setTestSend((current) => ({ ...current, email, error: "" }))}
+        onClose={() => setTestSend(closedTestSend)}
+        onSend={sendTestEmail}
+      />
 
       <Snackbar
         open={snack.open}

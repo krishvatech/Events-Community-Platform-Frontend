@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -68,6 +68,7 @@ import {
   duplicateNewsletterCampaign,
   getNewsletterCampaign,
   getNewsletterCampaignAnalytics,
+  getNewsletterCampaignAnalyticsSummary,
   listNewsletterCampaigns,
   listNewsletterCategories,
   previewNewsletterCampaign,
@@ -83,7 +84,13 @@ import {
   SAVE_STATUS_SYNCED,
   saveBroadcastDraft,
 } from "./newsletterBroadcastSave.js";
-import { broadcastScheduleActions, isBroadcastDetailLoaded } from "./newsletterBroadcastState.js";
+import {
+  broadcastHasSendData,
+  broadcastRate,
+  broadcastRateText,
+  broadcastScheduleActions,
+  isBroadcastDetailLoaded,
+} from "./newsletterBroadcastState.js";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
@@ -173,12 +180,6 @@ const formatNumber = (value) => {
   return new Intl.NumberFormat().format(number);
 };
 
-const formatPercent = (rate) => {
-  if (rate === null || rate === undefined || rate === "") return "No data available";
-  const number = Number(rate);
-  if (!Number.isFinite(number)) return "No data available";
-  return `${Math.round(number * 100)}%`;
-};
 
 const getCampaignAudienceSlugs = (campaign) => {
   const raw = campaign?.audience_slugs || campaign?.audiences || [];
@@ -383,42 +384,14 @@ function ScheduleDialog({ open, loading, error, initialValue, onClose, onSchedul
   );
 }
 
-function Dashboard({ campaigns, loading, error, onRefresh }) {
-  const sentCampaigns = campaigns.filter((campaign) => campaign.status === "sent");
-  const lastSent = sentCampaigns
-    .slice()
-    .sort((a, b) => new Date(b.sent_at || 0) - new Date(a.sent_at || 0))[0];
-
-  return (
-    <Stack spacing={3}>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Marketing Dashboard</Typography>
-          <Typography color="text.secondary">Live summary will expand as newsletter reporting APIs are added.</Typography>
-        </Box>
-        <Button startIcon={<RefreshRoundedIcon />} onClick={onRefresh} disabled={loading} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
-          Refresh
-        </Button>
-      </Stack>
-      {error && <Alert severity="error">{error}</Alert>}
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Total Contacts" value="No data available" loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Active Subscribers" value="No data available" loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Total Campaigns" value={formatNumber(campaigns.length)} loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Last Sent Campaign" value={lastSent?.name || "No data available"} loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Open Rate" value="No data available" loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Click Rate" value="No data available" loading={loading} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><MetricCard label="Unsubscribe Count" value="No data available" loading={loading} /></Grid>
-      </Grid>
-      <EmptyState
-        title="Coming Soon"
-        description="Contact totals and account-wide engagement metrics need a dashboard summary API before they can be displayed here."
-      />
-    </Stack>
-  );
+// A Draft, Scheduled or Cancelled broadcast has no sends: "—", with no request.
+function BroadcastRateCell({ status, analytics, rateKey }) {
+  if (!broadcastHasSendData(status)) return "—";
+  if (broadcastRate(analytics, rateKey).kind === "loading") return <Skeleton width={40} />;
+  return broadcastRateText(analytics, rateKey);
 }
 
-function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, onOpen, onDuplicate, onCreate }) {
+function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFilter, onRefresh, onOpen, onDuplicate, duplicatingUuid, onCreate }) {
   const filteredCampaigns = filter === "all"
     ? campaigns
     : campaigns.filter((row) => String(row?.status || "").toLowerCase() === filter);
@@ -483,13 +456,19 @@ function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, 
                     <TableCell>{formatDateTime(row.created_at)}</TableCell>
                     <TableCell>{formatDateTime(row.scheduled_at)}</TableCell>
                     <TableCell>{formatDateTime(row.sent_at || row.send_started_at)}</TableCell>
-                    <TableCell>No data available</TableCell>
-                    <TableCell>No data available</TableCell>
+                    <TableCell><BroadcastRateCell status={row.status} analytics={analyticsByUuid[row.uuid]} rateKey="open_rate" /></TableCell>
+                    <TableCell><BroadcastRateCell status={row.status} analytics={analyticsByUuid[row.uuid]} rateKey="click_rate" /></TableCell>
                     <TableCell align="right">
                       <Tooltip title="Duplicate broadcast">
-                        <IconButton onClick={(event) => { event.stopPropagation(); onDuplicate(row.uuid); }}>
-                          <ContentCopyRoundedIcon fontSize="small" />
-                        </IconButton>
+                        <span>
+                          <IconButton
+                            aria-label="Duplicate broadcast"
+                            disabled={Boolean(duplicatingUuid)}
+                            onClick={(event) => { event.stopPropagation(); onDuplicate(row.uuid); }}
+                          >
+                            {duplicatingUuid === row.uuid ? <CircularProgress size={18} /> : <ContentCopyRoundedIcon fontSize="small" />}
+                          </IconButton>
+                        </span>
                       </Tooltip>
                       <Tooltip title="Open broadcast">
                         <IconButton onClick={(event) => { event.stopPropagation(); onOpen(row.uuid); }}>
@@ -508,68 +487,52 @@ function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, 
   );
 }
 
-function AnalyticsOverview({ campaigns, loading, selectedCampaignId, onSelectCampaign, analyticsState, onRefreshAnalytics }) {
-  const engagement = analyticsState.data?.engagement || {};
-  const sendSummary = analyticsState.data?.send_summary || {};
-  const rates = analyticsState.data?.rates || {};
-  const selectedCampaign = campaigns.find((campaign) => campaign.uuid === selectedCampaignId);
+function BroadcastAnalyticsPanel({ status, analyticsState, onRefresh }) {
+  const data = analyticsState.data;
+  const sendSummary = data?.send_summary || {};
+  const engagement = data?.engagement || {};
+  const loading = analyticsState.loading;
+  // Same rule as the list: a Draft, Scheduled or Cancelled broadcast has no
+  // sends, even when Mautic cannot be reached to confirm it.
+  const neverSent = !broadcastHasSendData(status);
+  const openRate = broadcastRate(data, "open_rate");
+  const noSends = !loading && !analyticsState.error && (neverSent || openRate.kind === "none");
+  const providerUnavailable = !loading && !neverSent && Boolean(data) && openRate.kind === "unavailable";
+  const count = (value) => (loading || !data ? "—" : formatNumber(value));
+  const rate = (rateKey) => (loading || !data || neverSent ? "—" : broadcastRateText(data, rateKey));
+  // Without Mautic, opens (and sends not recorded by ECP) would read as 0.
+  const opensUnknown = providerUnavailable;
+  const sentUnknown = providerUnavailable && data?.metadata?.send_summary_source !== "ecp";
 
   return (
-    <Stack spacing={3}>
-      <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Analytics</Typography>
-          <Typography color="text.secondary">Campaign performance appears after sending and tracking events are available.</Typography>
-        </Box>
-        <TextField
-          select
-          label="Campaign"
-          value={selectedCampaignId || ""}
-          onChange={(event) => onSelectCampaign(event.target.value)}
-          SelectProps={{ native: true }}
-          sx={{ minWidth: { xs: "100%", md: 320 } }}
-        >
-          <option value="">Select a campaign</option>
-          {campaigns.map((campaign) => (
-            <option key={campaign.uuid} value={campaign.uuid}>{campaign.name || "Untitled campaign"}</option>
-          ))}
-        </TextField>
+    <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>Broadcast Analytics</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Rates use delivered emails, or sends when delivery is not reported. Opens and clicks count each recipient once.
+            </Typography>
+          </Box>
+          <Button startIcon={<RefreshRoundedIcon />} onClick={onRefresh} disabled={loading} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
+            Refresh Analytics
+          </Button>
+        </Stack>
+        {analyticsState.error && <Alert severity="warning">{analyticsState.error} The broadcast itself is unaffected.</Alert>}
+        {providerUnavailable && <Alert severity="warning">Mautic statistics are temporarily unavailable, so opens and sends cannot be shown right now.</Alert>}
+        {noSends && <Alert severity="info" variant="outlined">No sends yet. Analytics appear after this broadcast is sent.</Alert>}
+        <Grid container spacing={2}>
+          {/* Sent counts provider send attempts, not mailbox deliveries. */}
+          <Grid item xs={6} sm={4} md={3}><MetricCard label="Sent" value={sentUnknown ? "Unavailable" : count(sendSummary.sent_count)} loading={loading} /></Grid>
+          <Grid item xs={6} sm={4} md={3}><MetricCard label="Unique Opens" value={opensUnknown ? "Unavailable" : count(engagement.unique_open_count)} loading={loading} /></Grid>
+          <Grid item xs={6} sm={4} md={3}><MetricCard label="Open Rate" value={rate("open_rate")} loading={loading} /></Grid>
+          <Grid item xs={6} sm={4} md={3}><MetricCard label="Unique Clicks" value={count(engagement.unique_click_count)} loading={loading} /></Grid>
+          <Grid item xs={6} sm={4} md={3}><MetricCard label="Click Rate" value={rate("click_rate")} loading={loading} /></Grid>
+          <Grid item xs={6} sm={4} md={3}><MetricCard label="Bounced" value={count(engagement.bounced_count)} loading={loading} /></Grid>
+          <Grid item xs={6} sm={4} md={3}><MetricCard label="Unsubscribed" value={count(engagement.unsubscribe_count)} loading={loading} /></Grid>
+        </Grid>
       </Stack>
-      {analyticsState.error && <Alert severity="warning">{analyticsState.error}</Alert>}
-      <Grid container spacing={2}>
-        {/* Sent/Failed are provider send attempts, not mailbox deliveries. */}
-        <Grid item xs={12} sm={6} md={6}><MetricCard label="Sent" value={formatNumber(sendSummary.sent_count)} loading={loading || analyticsState.loading} /></Grid>
-        <Grid item xs={12} sm={6} md={6}><MetricCard label="Failed Sends" value={formatNumber(sendSummary.failed_count)} loading={loading || analyticsState.loading} /></Grid>
-      </Grid>
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} md={2.4}><MetricCard label="Delivered" value={formatNumber(engagement.delivered_count)} loading={loading || analyticsState.loading} /></Grid>
-        <Grid item xs={12} sm={6} md={2.4}><MetricCard label="Opened" value={formatNumber(engagement.opened_count)} loading={loading || analyticsState.loading} /></Grid>
-        <Grid item xs={12} sm={6} md={2.4}><MetricCard label="Clicked" value={formatNumber(engagement.clicked_count)} loading={loading || analyticsState.loading} /></Grid>
-        <Grid item xs={12} sm={6} md={2.4}><MetricCard label="Bounced" value={formatNumber(engagement.bounced_count)} loading={loading || analyticsState.loading} /></Grid>
-        <Grid item xs={12} sm={6} md={2.4}><MetricCard label="Unsubscribed" value={formatNumber(engagement.unsubscribe_count)} loading={loading || analyticsState.loading} /></Grid>
-      </Grid>
-      {selectedCampaign && (
-        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between">
-            <Box>
-              <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{selectedCampaign.name}</Typography>
-              <Typography color="text.secondary">Open rate: {formatPercent(rates.open_rate)} · Click rate: {formatPercent(rates.click_rate)}</Typography>
-            </Box>
-            <Button startIcon={<RefreshRoundedIcon />} onClick={onRefreshAnalytics} disabled={analyticsState.loading} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
-              Refresh Analytics
-            </Button>
-          </Stack>
-        </Paper>
-      )}
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
-          <EmptyState title="Open Rate Trend" description="Tracking data will appear after campaign sending." />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <EmptyState title="Click Rate Trend" description="Tracking data will appear after campaign sending." />
-        </Grid>
-      </Grid>
-    </Stack>
+    </Paper>
   );
 }
 
@@ -910,7 +873,14 @@ export default function AdminNewsletterPage() {
   const [scheduleState, setScheduleState] = useState({ open: false, loading: false, error: "" });
   const [confirmState, setConfirmState] = useState({ type: "", loading: false });
   const [analyticsState, setAnalyticsState] = useState({ loading: false, data: null, error: "" });
-  const [selectedAnalyticsCampaignId, setSelectedAnalyticsCampaignId] = useState("");
+  const [listAnalytics, setListAnalytics] = useState({});
+  // Bumped on every successful list load so analytics follow each reload,
+  // even when the reloaded rows are unchanged.
+  const [listLoadCount, setListLoadCount] = useState(0);
+  // Set by the list's Refresh button so the next summary bypasses the cache.
+  const refreshListAnalytics = useRef(false);
+  const [duplicatingUuid, setDuplicatingUuid] = useState("");
+  const duplicateInFlight = useRef(false);
 
   const loadCampaigns = async () => {
     setLoading(true);
@@ -919,9 +889,7 @@ export default function AdminNewsletterPage() {
       const data = await listNewsletterCampaigns();
       const rows = Array.isArray(data) ? data : data?.results || [];
       setCampaigns(rows);
-      if (!selectedAnalyticsCampaignId && rows.length) {
-        setSelectedAnalyticsCampaignId(rows[0].uuid);
-      }
+      setListLoadCount((count) => count + 1);
     } catch (err) {
       setError(getErrorMessage(err, "We could not load email broadcasts."));
     } finally {
@@ -962,7 +930,7 @@ export default function AdminNewsletterPage() {
     }
   };
 
-  const loadAnalytics = async (uuid = selectedAnalyticsCampaignId) => {
+  const loadAnalytics = async (uuid) => {
     if (!uuid) return;
     setAnalyticsState((state) => ({ ...state, loading: true, error: "" }));
     try {
@@ -1000,11 +968,41 @@ export default function AdminNewsletterPage() {
     }
   }, [isDetail, requestedTab, navigate]);
 
+  // Open/Click Rate for the list: one summary request for the broadcasts that
+  // have sends, never one request per row.
   useEffect(() => {
-    if (!isDetail && activeTab === "analytics" && selectedAnalyticsCampaignId) {
-      loadAnalytics(selectedAnalyticsCampaignId);
-    }
-  }, [selectedAnalyticsCampaignId, activeTab, isDetail]);
+    if (isDetail || activeTab !== "broadcasts") return undefined;
+    const uuids = campaigns.filter((row) => broadcastHasSendData(row.status)).map((row) => row.uuid);
+    if (!uuids.length) return undefined;
+
+    const refresh = refreshListAnalytics.current;
+    refreshListAnalytics.current = false;
+    let active = true;
+    setListAnalytics((current) => {
+      const next = { ...current };
+      uuids.forEach((uuid) => { next[uuid] = { loading: true }; });
+      return next;
+    });
+    getNewsletterCampaignAnalyticsSummary(uuids, { refresh })
+      .then((data) => {
+        if (!active) return;
+        const results = data?.results || {};
+        setListAnalytics((current) => {
+          const next = { ...current };
+          uuids.forEach((uuid) => { next[uuid] = results[uuid] || { error: "unavailable" }; });
+          return next;
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        setListAnalytics((current) => {
+          const next = { ...current };
+          uuids.forEach((uuid) => { next[uuid] = { error: "unavailable" }; });
+          return next;
+        });
+      });
+    return () => { active = false; };
+  }, [campaigns, listLoadCount, activeTab, isDetail]);
 
   const validate = () => {
     const errors = {};
@@ -1084,13 +1082,28 @@ export default function AdminNewsletterPage() {
   };
 
   const duplicateCampaign = async (uuid) => {
-    setError("");
+    // The ref blocks a second click before `duplicatingUuid` has re-rendered,
+    // so one click can never create two copies.
+    if (!uuid || duplicateInFlight.current) return;
+    duplicateInFlight.current = true;
+    setDuplicatingUuid(uuid);
     try {
       const data = await duplicateNewsletterCampaign(uuid);
       setSnack({ open: true, severity: "success", message: "Broadcast duplicated as a new draft." });
       navigate(`/admin/newsletter/${data.uuid}`);
     } catch (err) {
-      setError(getErrorMessage(err, "We could not duplicate this broadcast."));
+      // A snackbar, not the page error slot: on the list that slot replaces
+      // the whole table, and the source broadcast is untouched either way.
+      setSnack({
+        open: true,
+        severity: "error",
+        message: err?.response
+          ? getErrorMessage(err, "We could not duplicate this broadcast.")
+          : "We could not reach the server. Check your connection and try again.",
+      });
+    } finally {
+      duplicateInFlight.current = false;
+      setDuplicatingUuid("");
     }
   };
 
@@ -1163,6 +1176,14 @@ export default function AdminNewsletterPage() {
   });
   const canSendNow = detailLoaded && !isNew && status === "draft";
 
+  // Shared by the list and the editor: Duplicate reports success or failure
+  // from either one.
+  const snackbar = (
+    <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack((state) => ({ ...state, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
+      <Alert severity={snack.severity} onClose={() => setSnack((state) => ({ ...state, open: false }))}>{snack.message}</Alert>
+    </Snackbar>
+  );
+
   if (!isDetail) {
     return (
       <NewsletterShell>
@@ -1170,37 +1191,29 @@ export default function AdminNewsletterPage() {
           <AdminNewsletterMauticCampaignBuilderPage />
         ) : (
           <>
-            {activeTab === "dashboard" && <Dashboard campaigns={campaigns} loading={loading} error={error} onRefresh={loadCampaigns} />}
             {activeTab === "campaigns" && <AdminNewsletterMauticCampaignsPanel />}
             {activeTab === "broadcasts" && (
               <CampaignList
                 campaigns={campaigns}
+                analyticsByUuid={listAnalytics}
                 loading={loading}
                 error={error}
                 filter={filter}
                 onFilter={setFilter}
-                onRefresh={loadCampaigns}
+                onRefresh={() => { refreshListAnalytics.current = true; loadCampaigns(); }}
                 onOpen={(uuid) => navigate(`/admin/newsletter/${uuid}`)}
                 onDuplicate={duplicateCampaign}
+                duplicatingUuid={duplicatingUuid}
                 onCreate={() => navigate("/admin/newsletter/new")}
               />
             )}
             {activeTab === "lists" && <AdminNewsletterCategoriesTab />}
             {activeTab === "segments" && <AdminNewsletterNativeSegmentsPanel />}
             {activeTab === "templates" && <AdminNewsletterTemplatesPanel />}
-            {activeTab === "analytics" && (
-              <AnalyticsOverview
-                campaigns={campaigns}
-                loading={loading}
-                selectedCampaignId={selectedAnalyticsCampaignId}
-                onSelectCampaign={setSelectedAnalyticsCampaignId}
-                analyticsState={analyticsState}
-                onRefreshAnalytics={() => loadAnalytics(selectedAnalyticsCampaignId)}
-              />
-            )}
             {activeTab === "settings" && <SettingsPage />}
           </>
         )}
+        {snackbar}
       </NewsletterShell>
     );
   }
@@ -1221,7 +1234,7 @@ export default function AdminNewsletterPage() {
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {!isNew && <Button startIcon={<PreviewRoundedIcon />} onClick={openPreview} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>Preview</Button>}
-          {!isNew && <Button startIcon={<ContentCopyRoundedIcon />} onClick={() => duplicateCampaign(campaignId)} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Duplicate</Button>}
+          {!isNew && <Button startIcon={duplicatingUuid ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />} onClick={() => duplicateCampaign(campaignId)} disabled={confirmState.loading || Boolean(duplicatingUuid)} sx={{ textTransform: "none" }}>{duplicatingUuid ? "Duplicating..." : "Duplicate"}</Button>}
           {!isNew && editable && <Button startIcon={<EmailRoundedIcon />} onClick={() => setTestState({ open: true, loading: false, error: "" })} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>Send Test Email</Button>}
           {canSchedule && <Button startIcon={<ScheduleRoundedIcon />} onClick={() => setScheduleState({ open: true, loading: false, error: "" })} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>{status === "scheduled" ? "Reschedule" : "Schedule"}</Button>}
           {canCancel && <Button color="warning" startIcon={<StopCircleRoundedIcon />} onClick={() => setConfirmState({ type: "cancel", loading: false })} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Cancel</Button>}
@@ -1249,6 +1262,10 @@ export default function AdminNewsletterPage() {
         />
       ) : (
         <EmptyState title="Broadcast could not be loaded." action={<Button variant="contained" onClick={loadDetail}>Retry</Button>} />
+      )}
+
+      {detailLoaded && !isNew && (
+        <BroadcastAnalyticsPanel status={status} analyticsState={analyticsState} onRefresh={() => loadAnalytics(campaignId)} />
       )}
 
       {detailLoaded && activeStep === 3 && (
@@ -1335,9 +1352,7 @@ export default function AdminNewsletterPage() {
         <Typography>This only removes draft broadcasts. Sent or scheduled broadcast history is left untouched.</Typography>
       </ConfirmDialog>
 
-      <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack((state) => ({ ...state, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
-        <Alert severity={snack.severity} onClose={() => setSnack((state) => ({ ...state, open: false }))}>{snack.message}</Alert>
-      </Snackbar>
+      {snackbar}
       </Stack>
     </NewsletterShell>
   );

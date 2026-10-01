@@ -26,6 +26,13 @@ export const isEcpCanvasNode = (node) =>
 export const executionEventId = (event, sequence) =>
   isPersistedEventId(event?.id) ? String(event.id) : `new_${sequence}`;
 
+// A persisted event keeps the name it has in Mautic (which may be a custom
+// one); the provider's generic label only names events created here.
+export const persistedEventName = (event) =>
+  isPersistedEventId(event?.id) && typeof event?.metadata?.name === "string" && event.metadata.name.trim()
+    ? event.metadata.name
+    : "";
+
 // Keep whatever timing the provider already stored; only fall back to immediate.
 export const persistedTriggerFields = (event) => {
   const metadata = isPlainObject(event?.metadata) ? event.metadata : {};
@@ -50,7 +57,7 @@ export const persistedTriggerFields = (event) => {
 export const buildFlatExecutionEvents = (events) =>
   (Array.isArray(events) ? events : []).map((event, index) => ({
     id: executionEventId(event, index + 1),
-    name: getEventLabel(event?.metadata),
+    name: persistedEventName(event) || getEventLabel(event?.metadata),
     key: event?.key,
     eventType: event?.eventType,
     properties: isPlainObject(event?.properties) ? event.properties : {},

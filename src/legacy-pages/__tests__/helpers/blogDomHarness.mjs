@@ -113,6 +113,10 @@ const CJS_SHIMS = {
 const stubPlugin = {
   name: "blog-test-stubs",
   setup(pluginBuild) {
+    // Stylesheets (e.g. a package's dist/style.css) have no meaning in jsdom
+    // and Node cannot import them, so they resolve to an empty module.
+    pluginBuild.onResolve({ filter: /\.css$/ }, (args) => ({ path: args.path, namespace: "empty-css" }));
+    pluginBuild.onLoad({ filter: /.*/, namespace: "empty-css" }, () => ({ contents: "", loader: "js" }));
     pluginBuild.onResolve({ filter: /^\.{1,2}\// }, (args) => {
       const stub = STUBS.find((s) => s.match.test(args.path));
       return stub ? { path: stub.file } : undefined;
