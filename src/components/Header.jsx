@@ -26,8 +26,12 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { authConfig } from "../utils/api";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
 import { getAccessToken } from "../utils/tokenStore";
+import imaaLogo from "../assets/IMAA-logo130.svg";
+import { colors, focus, layout, radii } from "../styles/designTokens";
 const apiBase =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+
+const imaaLogoSrc = typeof imaaLogo === "string" ? imaaLogo : imaaLogo.src;
 
 const getCookie = (name) =>
   document.cookie
@@ -245,57 +249,108 @@ const Header = () => {
     navigate("/", { replace: true });
   };
 
-  const NavLink = ({ to, children, requireAuth = false }) => (
-    <Link
-      to={to}
-      onClick={(e) => {
-        if (requireAuth && !authed) {
-          e.preventDefault();
-          navigate(`/signin?next=${encodeURIComponent(to)}`);
-        }
-      }}
-      style={{
-        fontSize: 15,
-        fontWeight: 500,
-        color: "#374151",
-        textDecoration: "none",
-        padding: "4px 0",
-        transition: "color .15s",
-      }}
-      onMouseEnter={e => (e.target.style.color = "#0F2040")}
-      onMouseLeave={e => (e.target.style.color = "#374151")}
-    >
-      {children}
-    </Link>
-  );
+  const isNavItemActive = (to) => {
+    const targetPath = to.split(/[?#]/)[0].replace(/\/$/, "") || "/";
+    const currentPath = pathname.replace(/\/$/, "") || "/";
+    return targetPath === "/"
+      ? currentPath === "/"
+      : currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
+  };
+
+  const mobileNavItemSx = (to) => ({
+    borderLeft: `3px solid ${isNavItemActive(to) ? colors.teal : "transparent"}`,
+    "&.Mui-selected": { bgcolor: "rgba(10,147,150,.08)" },
+    "&.Mui-selected:hover": { bgcolor: "rgba(10,147,150,.12)" },
+  });
+
+  const NavLink = ({ to, children, requireAuth = false }) => {
+    const active = isNavItemActive(to);
+
+    return (
+      <Box
+        component={Link}
+        to={to}
+        aria-current={active ? "page" : undefined}
+        onClick={(e) => {
+          if (requireAuth && !authed) {
+            e.preventDefault();
+            navigate(`/signin?next=${encodeURIComponent(to)}`);
+          }
+        }}
+        sx={{
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          minHeight: 44,
+          fontSize: 14,
+          fontWeight: 500,
+          color: active ? colors.navy : colors.inkBody,
+          textDecoration: "none",
+          px: 0.25,
+          transition: "color .15s ease",
+          "&::after": {
+            content: '""',
+            position: "absolute",
+            right: 2,
+            bottom: 2,
+            left: 2,
+            height: 2,
+            borderRadius: 1,
+            bgcolor: active ? colors.teal : "transparent",
+          },
+          "&:hover": { color: colors.navy },
+          "&:hover::after": { bgcolor: colors.teal },
+          "&:focus-visible": {
+            outline: `${focus.width}px solid ${focus.color}`,
+            outlineOffset: focus.offset,
+            borderRadius: `${radii.tag}px`,
+          },
+        }}
+      >
+        {children}
+      </Box>
+    );
+  };
 
   return (
     <AppBar
       position="fixed"
       elevation={0}
       sx={{
-        bgcolor: "#ffffff",
-        borderBottom: "1px solid #E2E8F0",
+        bgcolor: colors.white,
+        color: colors.navy,
+        borderBottom: `1px solid ${colors.border}`,
         zIndex: (t) => t.zIndex.drawer + 2,
       }}
     >
       <Toolbar
         disableGutters
-        sx={{ minHeight: { xs: 56, md: 64 }, px: { xs: 2, md: 0 } }}
+        sx={{ minHeight: { xs: 56, md: 64 } }}
       >
-        <Box sx={{ mx: "auto", maxWidth: 1200, width: "100%", px: { xs: 2, md: 4 }, display: "flex", alignItems: "center", gap: 4 }}>
+        <Box sx={{ mx: "auto", maxWidth: layout.contentMax, width: "100%", px: { xs: 2, sm: 3, md: 4 }, display: "flex", alignItems: "center", gap: { xs: 1.5, lg: 3.5 } }}>
 
           {/* Left: IMAA Brand logo */}
-          <Box component={Link} to="/" sx={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 1.5, flexShrink: 0 }}>
-            {/* IMAA logo SVG mark */}
-            <svg width="36" height="36" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <text x="0" y="30" fontFamily="Georgia, serif" fontWeight="700" fontSize="30" fill="#0F2040">imaa</text>
-            </svg>
-            <Box sx={{ display: { xs: "none", sm: "flex" }, flexDirection: "column", lineHeight: 1.1 }}>
-              <span style={{ fontSize: 11, color: "#64748B", letterSpacing: "0.01em", maxWidth: 180, lineHeight: 1.3 }}>
-                Institute for Mergers,<br />Acquisitions &amp; Alliances
-              </span>
-            </Box>
+          <Box
+            component={Link}
+            to="/"
+            aria-label="IMAA Connect home"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              flexShrink: 0,
+              borderRadius: `${radii.tag}px`,
+              "&:focus-visible": {
+                outline: `${focus.width}px solid ${focus.color}`,
+                outlineOffset: focus.offset,
+              },
+            }}
+          >
+            <Box
+              component="img"
+              src={imaaLogoSrc}
+              alt="IMAA"
+              sx={{ display: "block", width: { xs: 96, sm: 108 }, height: "auto", maxHeight: { xs: 42, sm: 46 } }}
+            />
           </Box>
 
           {/* Center spacer on mobile */}
@@ -304,7 +359,8 @@ const Header = () => {
           {/* Center: Nav links (desktop) */}
           <Box
             component="nav"
-            sx={{ display: { xs: "none", lg: "flex" }, alignItems: "center", gap: 4 }}
+            aria-label="Primary navigation"
+            sx={{ display: { xs: "none", lg: "flex" }, alignItems: "center", gap: 3.5 }}
           >
             <NavLink to="/events">Events</NavLink>
             <NavLink to="/community" requireAuth>Community</NavLink>
@@ -332,14 +388,14 @@ const Header = () => {
                   component={Link}
                   to={accountHref}
                   variant="text"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, color: "#0F2040", "&:hover": { color: "#E85C2A", bgcolor: "transparent" } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, color: colors.navy, "&:hover": { color: colors.coral, bgcolor: "transparent" } }}
                 >
                   My Account
                 </Button>
                 <Button
                   onClick={signOut}
                   variant="outlined"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: 6, borderColor: "#0F2040", color: "#0F2040", px: 2.5, "&:hover": { bgcolor: "#0F2040", color: "#fff" } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: radii.pill, borderColor: colors.navy, color: colors.navy, px: 2.5, "&:hover": { bgcolor: colors.navy, color: colors.white, borderColor: colors.navy } }}
                 >
                   Log out
                 </Button>
@@ -350,7 +406,7 @@ const Header = () => {
                   component={Link}
                   to="/signin"
                   variant="text"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 500, color: "#374151", borderRadius: 6, px: 2, "&:hover": { color: "#0F2040", bgcolor: "rgba(15,32,64,.04)" } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 500, color: colors.inkBody, borderRadius: radii.pill, px: 2, "&:hover": { color: colors.navy, bgcolor: "rgba(27,42,74,.05)" } }}
                 >
                   Log in
                 </Button>
@@ -358,7 +414,7 @@ const Header = () => {
                   component={Link}
                   to="/signup"
                   variant="contained"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: 6, px: 2.5, bgcolor: "#0F2040", color: "#ffffff", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, borderRadius: radii.pill, px: 2.75, bgcolor: colors.tealDark, color: colors.white, "&:hover": { bgcolor: colors.navy }, boxShadow: "none" }}
                 >
                   Sign up
                 </Button>
@@ -368,7 +424,7 @@ const Header = () => {
 
           {/* Mobile burger */}
           <Box sx={{ display: { xs: "flex", lg: "none" } }}>
-            <IconButton onClick={openDrawer} aria-label="Open menu">
+            <IconButton onClick={openDrawer} aria-label="Open navigation menu" sx={{ color: colors.navy, minWidth: 44, minHeight: 44 }}>
               <MenuRoundedIcon />
             </IconButton>
           </Box>
@@ -377,29 +433,29 @@ const Header = () => {
 
       {/* Mobile Drawer */}
       <Drawer anchor="right" open={mobileOpen} onClose={closeDrawer}>
-        <Box sx={{ width: 280 }} role="presentation">
+        <Box sx={{ width: { xs: "min(320px, 88vw)", sm: 320 }, color: colors.navy }} role="presentation">
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5 }}>
-            <span style={{ fontWeight: 700, fontSize: 16, color: "#0F2040" }}>Menu</span>
-            <IconButton onClick={closeDrawer} aria-label="Close">
+            <span style={{ fontWeight: 700, fontSize: 16, color: colors.navy }}>Menu</span>
+            <IconButton onClick={closeDrawer} aria-label="Close navigation menu" sx={{ minWidth: 44, minHeight: 44, color: colors.navy }}>
               <CloseRoundedIcon />
             </IconButton>
           </Box>
           <Divider />
           <List onClick={closeDrawer}>
-            <ListItemButton component={Link} to="/events">
+            <ListItemButton component={Link} to="/events" selected={isNavItemActive("/events")} aria-current={isNavItemActive("/events") ? "page" : undefined} sx={mobileNavItemSx("/events")}>
               <ListItemText primary="Events" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
-            <ListItemButton component={Link} to="/community" onClick={(e) => {
+            <ListItemButton component={Link} to="/community" selected={isNavItemActive("/community")} aria-current={isNavItemActive("/community") ? "page" : undefined} sx={mobileNavItemSx("/community")} onClick={(e) => {
               if (!authed) { e.preventDefault(); navigate(`/signin?next=${encodeURIComponent("/community")}`); }
             }}>
               <ListItemText primary="Community" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
-            <ListItemButton component={Link} to={resourcesHref} onClick={(e) => {
+            <ListItemButton component={Link} to={resourcesHref} selected={isNavItemActive(resourcesHref)} aria-current={isNavItemActive(resourcesHref) ? "page" : undefined} sx={mobileNavItemSx(resourcesHref)} onClick={(e) => {
               if (!authed) { e.preventDefault(); navigate(`/signin?next=${encodeURIComponent(resourcesHref)}`); }
             }}>
               <ListItemText primary="Resources" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
-            <ListItemButton component={Link} to="/about">
+            <ListItemButton component={Link} to="/about" selected={isNavItemActive("/about")} aria-current={isNavItemActive("/about") ? "page" : undefined} sx={mobileNavItemSx("/about")}>
               <ListItemText primary="About Us" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
           </List>
@@ -428,7 +484,7 @@ const Header = () => {
                 <ListItemText primary="Log in" />
               </ListItemButton>
               <ListItemButton component={Link} to="/signup">
-                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 600, color: "#0F2040" }} />
+                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 700, color: colors.tealDark }} />
               </ListItemButton>
             </List>
           )}
